@@ -40,6 +40,33 @@ log = get_logger(__name__)
 
 _EVENT_TEXT_CHARS: int = 4000
 _BROKEN_ARGUMENTS_CHARS: int = 600
+# Read-only tools: a failed one may be tried once more, as a second call changes nothing. A tool that acts on a page or
+# a window is never in this set: a second call could repeat the action.
+_READ_ONLY_TOOLS: frozenset[str] = frozenset(
+    {
+        "web_search",
+        "web_fetch",
+        "read_file",
+        "list_dir",
+        "search_files",
+        "find_files",
+        "desktop_snapshot",
+        "desktop_read",
+        "browser_snapshot",
+        "browser_read_text",
+    }
+)
+# The read-only tools that go on while the owner holds the run (a takeover of its browser or its screen) in `auto` and
+# `yolo` (item 809): they touch neither the browser nor the screen the owner has taken, so they read nothing of what the
+# owner types or sees there (a password being typed). A tool that reads the page or the screen waits as before, and so
+# do `web_fetch` and `web_search`, which may open a tab of their own in the run's browser (a page that refuses a plain
+# request, the browser at the foot of the ladder of search engines).
+_HOLD_FREE_TOOLS: frozenset[str] = frozenset({"read_file", "list_dir", "search_files", "find_files"})
+_HOLD_FREE_APPROVALS: frozenset[str] = frozenset({"auto", "yolo"})
+# When an acting tool's call answers with an error, the page or the window is read instead (item 809): the reader's
+# result says the action was not performed, never that it succeeded. The reader takes its own arguments
+# (:func:`_failover_arguments`).
+_TOOL_FAILOVERS: dict[str, str] = {"browser_act": "browser_snapshot", "desktop_act": "desktop_snapshot"}
 # The kinds of action whose target does not show what the call acts on: an MCP call's is the name of its server.
 _BY_ARGUMENTS: frozenset[str] = frozenset({"mcp", "mcp_read"})
 
@@ -168,6 +195,13 @@ def _with_approval_note(result: ToolResult, note: str) -> ToolResult:
     return result.model_copy(update={"text": f"{result.text}\n\n[The user approved this action and wrote: “{note}”]"})
 
 
+def _failover_arguments(call: ToolCall) -> JsonObject:
+    """The arguments of the reader a failed ``call`` falls over to: none, but the app a desktop step named, so that the
+    window read is the one it acted in."""
+    app: object = call.arguments.get("app")
+    return {"app": app} if call.name == "desktop_act" and isinstance(app, str) and app else {}
+
+
 @dataclass(frozen=True)
 class _Checked:
     """What a call that reached its tool came to. ``waited_s`` is the time it spent at the gate (:class:`_GateTime`),
@@ -183,9 +217,9 @@ class _Checked:
 async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate) -> _Checked:
     action: ActionInfo | None = None
     at_gate: _GateTime = _GateTime()
-    # What the user wrote when approving the call: the model reads it with the result, a failed one's too.
     note: str = ""
     decision: StepDecision | None = None
+    held_s: float = 0.0
     try:
         prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
         action = prepared.action
@@ -197,13 +231,18 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         try:
             # The call's arguments go with it: a run that read outside content sends no secret out in them (item 525).
             authorized: Authorization = await gate.authorize_recorded(action, call.arguments, prepared.weighed)
+            # What the user wrote when approving the call: the model reads it with the result, a failed one's too.
             note, decision = authorized.note, authorized.decision
-            # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock.
-            held_s: float = await gate.wait_free()
+            # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock. In auto
+            # and yolo a read that touches neither the browser nor the screen goes on (item 809); the approval above
+            # decided it all the same.
+            if not (tool.spec.name in _HOLD_FREE_TOOLS and ctx.approvals in _HOLD_FREE_APPROVALS):
+                held_s = await gate.wait_free()
         finally:
             at_gate.seconds += time.monotonic() - asked_at
         # The wait may have been long, and another run may have taken the app or changed the file since: checked again,
         # and from here the check and the footprint are one step, before the call runs (item 305).
+
         taken: str | None = ctx.runtime.peers.take(ctx.run_id, call.name, action)
         if taken is not None:
             return _Checked(
@@ -212,8 +251,58 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
                 waited_s=at_gate.seconds,
                 decision=decision,
             )
-        async with asyncio.timeout(tool.timeout_s) as scope:
-            result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
+
+        # A read-only call that times out or fails may be tried once more: it changes nothing, so a second try is a
+        # retry, not a repeated action. An acting tool is run once; if it fails, the chain has a diagnostic reader to
+        # show the page or the window instead, and its result says the action itself was not performed.
+        max_attempts: int = 2 if tool.spec.name in _READ_ONLY_TOOLS else 1
+        fallback: str = ""
+        for attempt in range(1, max_attempts + 1):
+            try:
+                async with asyncio.timeout(tool.timeout_s) as scope:
+                    result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
+            except (RunCancelled, FailSafeTriggered):
+                raise
+            except (TimeoutError, DotError) as exc:
+                if attempt >= max_attempts:
+                    raise
+                log.info("tool_retry", tool=tool.spec.name, attempt=attempt, error=str(exc))
+                continue
+            if not result.is_error:
+                break
+            if attempt < max_attempts:
+                log.info("tool_retry_result", tool=tool.spec.name, attempt=attempt, text=result.text)
+                continue
+            alt_name: str | None = _TOOL_FAILOVERS.get(tool.spec.name)
+            alt_tool: RegisteredTool | None = None if alt_name is None else ctx.runtime.registry.tools.get(alt_name)
+            if alt_name is not None and alt_tool is not None:
+                try:
+                    arguments: JsonObject = _failover_arguments(call)
+                    alt_prepared: PreparedCall = await alt_tool.prepare(arguments, ctx)
+                    alt_action: ActionInfo = alt_prepared.action
+                    # The reader is a step as any: it is checked against the other runs, decided by the gate, and waits
+                    # while the owner holds the run, before it reads the page or the window they have taken.
+                    alt_held: str | None = ctx.runtime.peers.conflict(ctx.run_id, alt_name, alt_action)
+                    if alt_held is None:
+                        alt_authorized: Authorization = await gate.authorize_recorded(
+                            alt_action, arguments, alt_prepared.weighed
+                        )
+                        held_s += await gate.wait_free()
+                        alt_taken: str | None = ctx.runtime.peers.take(ctx.run_id, alt_name, alt_action)
+                        if alt_taken is None:
+                            async with asyncio.timeout(alt_tool.timeout_s):
+                                result = await alt_prepared.run(replace(ctx, gate=gate))
+                            action = alt_action
+                            note, decision = alt_authorized.note, alt_authorized.decision
+                            fallback = (
+                                f"[fallback] {tool.spec.name} failed; {alt_name} answered instead. "
+                                "The original action was not performed."
+                            )
+                except (RunCancelled, FailSafeTriggered):
+                    raise
+                except Exception as exc:  # noqa: BLE001 - a broken reader must not eat the original failure
+                    log.info("tool_failover_failed", tool=alt_name, error=str(exc))
+            break
     except (RunCancelled, FailSafeTriggered):
         raise
     except Exception as exc:
@@ -234,6 +323,8 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         ctx.runtime.peers.saw(ctx.run_id, call.name, action)
     if result.untrusted:
         gate.taint()
+    if fallback:
+        result = result.model_copy(update={"text": f"{fallback}\n\n{result.text}"})
     noted: ToolResult = _with_approval_note(result, note)
     if held_s > 0.0:
         noted = noted.model_copy(update={"text": f"{noted.text}\n\n{hold_note(held_s)}"})

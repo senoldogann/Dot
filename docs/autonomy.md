@@ -115,7 +115,10 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
 
 - `achieved`: the run ends as done.
 - `continue`: the goal is not reached yet, so the run is sent back to work with the instruction of the checker. A run is
-  sent back at most `goal_patience` times; after that it ends as failed and keeps its answer.
+  sent back at most `goal_patience` times; after that it ends as failed and keeps its answer. The checker also says
+  continue when the goal is reached but a clearly better result is in reach (a better price, a valuable detail the
+  answer lacks, research that would improve it), saying how (item 809); the same `goal_patience` bounds it, and its
+  words are no instruction of yours: what the run does then is decided by the gate as every step.
 - `blocked`: the goal cannot be reached from here (it needs you, a credential or something that does not exist). The run
   ends as failed with its answer and the reason.
 - `scheduled` (item 675): all the run can do now is done, and what is left waits on something only time brings (a reply

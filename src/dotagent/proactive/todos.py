@@ -14,6 +14,9 @@ from dotagent.store.models import TodoRecord
 
 log = get_logger(__name__)
 
+# Who put a thing on the list from the card's box: the owner (item 715). Only such a thing may be urgent (item 809).
+OWNER_SOURCE: str = "owner"
+
 INITIATIVE_KEY: str = "proactive.initiative"
 TITLE_CHARS: int = 200
 WHY_CHARS: int = 600
@@ -156,7 +159,7 @@ async def set_initiative(store: Store, enabled: bool) -> InitiativeView:
 
 async def owners_todo(store: Store, request: TodoRequest) -> InitiativeView:
     """Put the owner's own thing on the list; 422 when it is on it already or was done or let go lately."""
-    added: TodoRecord | str = await add_todo(store, request.title, request.why, "owner", None, False)
+    added: TodoRecord | str = await add_todo(store, request.title, request.why, OWNER_SOURCE, None, False)
     if isinstance(added, str):
         raise InvalidValueError(added, {"title": request.title})
     return await initiative_view(store)

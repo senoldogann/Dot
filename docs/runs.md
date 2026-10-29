@@ -482,7 +482,12 @@ the file tools change goes into the undo journal, shows in Changes and can be un
 a file's size and a run's copies, under [Autonomy](autonomy.md)), and what a command writes does not. Nothing stops a
 command from writing a file. Any error of a tool fails that
 call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the log
-keeps its traceback) and goes on. `edit_file` changes the text it is given and nothing else: a file that breaks its
+keeps its traceback) and goes on. A read-only tool's call that fails is tried once more first, as a second read changes
+nothing; an acting one is never tried again. A browser or desktop step whose call answers with an error is followed by
+a read of the page or the window (`browser_snapshot`, `desktop_snapshot` of the app it named), whose result starts
+`[fallback] … The original action was not performed.`: a step of its own, checked against the other runs, decided by
+the gate and waiting while you hold the run (item 809).
+`edit_file` changes the text it is given and nothing else: a file that breaks its
 lines with CRLF keeps them, in the new text too, a file that is not UTF-8 text is refused, saying so, for the shell
 to change, and an empty text to replace is refused (item 556). A file the file tools make gets the permission bits
 any program's new file gets (`0666` less your umask), and a file that was there keeps its own. `read_file` reads a
