@@ -19,6 +19,7 @@ from dotagent import cli_daemon, launchd, restart_when_idle
 from dotagent.cli import build_parser, parse_command
 from dotagent.cli_commands import Command, ServiceInstallCommand, ServiceRestartCommand, ServiceUninstallCommand
 from dotagent.cli_daemon import _duration, _restart_line, dispatch
+from dotagent.config import load_user_config
 from dotagent.core.errors import ServiceError
 from dotagent.core.paths import db_path, dot_home, ensure_layout, screenshots_dir, token_path
 from dotagent.core.runenv import RUN_SHELL_MARKER, started_by_a_run
@@ -39,7 +40,14 @@ from dotagent.launchd import (
     restart_job,
     restart_job_path,
 )
-from dotagent.restart_when_idle import Busy, count_working_runs, night_work_of, wait_until_idle
+from dotagent.restart_when_idle import (
+    Busy,
+    NightLook,
+    count_working_runs,
+    night_look,
+    night_work_of,
+    wait_until_idle,
+)
 from dotagent.store.db import Store
 from dotagent.store.models import WORKING_STATUSES, RunRecord, RunStatus, ThreadRecord
 from dotagent.tools.shell import child_env
@@ -264,6 +272,38 @@ async def test_the_daemon_is_asked_with_the_token_and_an_answer_it_cannot_give_r
     with capture_logs() as logs:
         assert await night_work_of(f"{base}/new/api/status", "the token") == ()
     assert not logs
+
+
+async def test_the_token_is_read_at_each_question_and_one_that_cannot_be_read_reads_as_no_night(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The token the daemon is asked with is the one its file holds at that question: one made anew during the wait is
+    sent, and one the file no longer gives (other users could read it) is logged and reads as no night."""
+    heard: list[bytes] = []
+    answers: dict[str, tuple[int, bytes]] = {"/api/status": (200, b'{"night_work": ["reflection"]}')}
+    server: asyncio.Server = await asyncio.start_server(_daemon(answers, heard), "127.0.0.1", 0)
+    monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DOT_LOG_DIR", str(tmp_path / "logs"))
+    ensure_layout()
+    port: int = server.sockets[0].getsockname()[1]
+    (dot_home() / "config.toml").write_text(f"[server]\nport = {port}\n", encoding="utf-8")
+    try:
+        token_path().write_text("the first token\n", encoding="utf-8")
+        token_path().chmod(0o600)
+        look: NightLook = night_look(load_user_config())
+        assert await look() == ("reflection",)
+        token_path().write_text("the second token\n", encoding="utf-8")
+        assert await look() == ("reflection",)
+        assert [b"\r\nauthorization: bearer the first token\r\n" in head.lower() for head in heard] == [True, False]
+        assert b"\r\nauthorization: bearer the second token\r\n" in heard[1].lower()
+        token_path().chmod(0o644)
+        with capture_logs() as logs:
+            assert await look() == ()
+        assert _events(logs) == ["restart_when_idle_night_unknown"]
+        assert len(heard) == 2
+    finally:
+        server.close()
+        await server.wait_closed()
 
 
 @pytest.fixture
