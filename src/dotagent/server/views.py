@@ -39,6 +39,7 @@ from dotagent.mcp.catalogue import ServiceKind
 from dotagent.mcp.types import McpFailure
 from dotagent.notify.keys import keys_problem
 from dotagent.policy.types import ApprovalMode
+from dotagent.scheduler import NightWork
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
     AgentLook,
@@ -1834,6 +1835,8 @@ class StatusView(FrozenModel):
     models: ModelsConfig
     # Whether the daemon's next start resumes on its own the runs it cut off (item 231).
     resume: ResumeView
+    # The night's learning under way (item 815), which ``dotx service restart --when-idle`` waits for as for the runs.
+    night_work: list[NightWork]
 
 
 # The sections: what waits for the user, what works now, what ended today, what was learned today (item 72: the

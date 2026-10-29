@@ -333,6 +333,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             mcp_failures=list(ctx.runtime.mcp.failures),
             models=models_now(),
             resume=resume_now(),
+            night_work=[] if ctx.scheduler is None else list(ctx.scheduler.night_work()),
         )
 
     @router.get("/models")

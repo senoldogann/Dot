@@ -36,6 +36,9 @@ RESTART_MODULE: str = "dotagent.restart_when_idle"
 # How often that job looks at the runs, and how long it waits before it gives up without restarting.
 RESTART_POLL_S: float = 5.0
 RESTART_WAIT_LIMIT_S: float = 2 * 60 * 60
+# How long it waits besides for the night's learning under way (item 815): a step of the harness takes up to
+# [harness] step_minutes (90 by default), the reflection and the plugin scout's night less.
+RESTART_NIGHT_LIMIT_S: float = 3 * 60 * 60
 # What launchd gives a job is only /usr/bin:/bin:/usr/sbin:/sbin; shell commands of the agent get the login shell's own.
 SERVICE_PATH: str = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 # The folder of the tools the desktop app carries (ripgrep, uv; item 575), put before SERVICE_PATH in a job's PATH when
