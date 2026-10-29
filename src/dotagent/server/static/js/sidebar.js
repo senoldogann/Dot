@@ -8,7 +8,7 @@
 // read. Each chat stands once (item 202): a chat at work stands under Working, wearing the faces of the runs it delegated
 // (item 507), and goes back among the days once it rests; a pinned one stays under Pinned, with the same faces.
 // The chats a channel's messages made (item 619: the "iMessage" chat) leave the days for a section of their own at the foot
-// of the list, with the channel's mark and a count; it folds like the Chats group does and keeps its fold, and a search
+// of the list, with a count and no mark (item 828); it folds like the Chats group does and keeps its fold, and a search
 // finds its chats as it finds the others. Dot's own work does too (item 822): the chats of On its own and of the
 // schedules stand folded at the foot, so that the days hold the owner's own chats.
 
