@@ -20,7 +20,14 @@ from dotagent.plugins.catalog import load_plugins, read_plugin
 from dotagent.plugins.manifest import PluginVariables, parse_manifest, parse_servers_file, to_server_config
 from dotagent.plugins.types import McpServerJson, PluginCatalog
 from dotagent.server.app import STATIC_DIR as STATIC
-from dotagent.skills.catalog import BUILTIN_SKILLS, BUILTIN_SOURCE, SkillRoot, load_catalog, skill_roots
+from dotagent.skills.catalog import (
+    BUILTIN_SKILLS,
+    BUILTIN_SOURCE,
+    SkillRoot,
+    load_catalog,
+    plugin_skill_name,
+    skill_roots,
+)
 from dotagent.skills.discover import find_skill_files
 from dotagent.skills.icons import ICON_NAMES, skill_icon
 from dotagent.skills.office import CLOUD_STORAGE, OFFICE_APPS, ONEDRIVE_APP, app_version, onedrive_folders
@@ -187,6 +194,42 @@ def test_the_catalog_keeps_each_name_once_and_reports_what_it_left_out(tmp_path:
     )
     row = _skills_row(load_catalog(clashing))
     assert row.ok and "1 not offered, as another skill has the name" in row.detail, row.detail
+
+
+def test_a_plugin_skill_whose_name_another_skill_has_is_offered_by_its_plugins_name(tmp_path: Path) -> None:
+    # The owner's Dot (item 816): an engineering plugin's code-review beside the owner's, and two plugins' own
+    # design-system, of which the second was left out.
+    home: Path = tmp_path / "home"
+    _skill_dir(home, "code-review", _simple("code-review"))
+    engineering: Path = tmp_path / "engineering"
+    _skill_dir(engineering, "code-review", _simple("code-review").replace("Do code-review.", "Review the PR."))
+    _skill_dir(engineering, "design-system", _simple("design-system"))
+    ui: Path = tmp_path / "ui"
+    _skill_dir(ui, "design-system", _simple("design-system").replace("Do design-system.", "Lay out tokens."))
+    # A copy of a skill counts once, as before, and a name too long for a skill is left out with the reason.
+    _skill_dir(ui, "code-review", _simple("code-review"))
+    long: Path = tmp_path / "long"
+    _skill_dir(long, "design-system", _simple("design-system").replace("Do design-system.", "Another one."))
+    roots: tuple[SkillRoot, ...] = (
+        SkillRoot(path=home, source="home"),
+        SkillRoot(path=engineering, source="plugin engineering", plugin="engineering"),
+        SkillRoot(path=ui, source="plugin ui-ux-pro-max", plugin="ui-ux-pro-max"),
+        SkillRoot(path=long, source=f"plugin {'x' * 60}", plugin="x" * 60),
+    )
+    catalog = load_catalog(roots)
+    assert [(skill.name, skill.source, skill.body) for skill in catalog.skills] == [
+        ("code-review", "home", "Do code-review."),
+        ("engineering-code-review", "plugin engineering", "Review the PR."),
+        ("design-system", "plugin engineering", "Do design-system."),
+        ("ui-ux-pro-max-design-system", "plugin ui-ux-pro-max", "Lay out tokens."),
+    ]
+    assert [(problem.path.relative_to(tmp_path), problem.shadowed) for problem in catalog.problems] == [
+        (Path("long/design-system/SKILL.md"), True)
+    ]
+    assert catalog.find("engineering-code-review") is not None
+    # The plugin's name as a skill name takes: lower case, hyphens for spaces; one it cannot be is none.
+    assert plugin_skill_name("Dev Tools", "lint") == "dev-tools-lint"
+    assert plugin_skill_name("a.b", "lint") is None
 
 
 def test_the_names_of_the_skills_dot_learned_or_was_taught_are_kept_for_its_playbook_folder(tmp_path: Path) -> None:
