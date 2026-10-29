@@ -171,8 +171,9 @@ means to do for you, each with why it helps you, where it stands (to do, doing n
 tried it; a row opens the chat of the run that did it. A run puts a thing on the list with the tool `todo_add` (a
 follow-up its work calls for, something you asked to be done later, a chore it noticed), and takes back with `todo_drop`
 one it put on it itself by mistake, with why (item 821: the look of 2026-10-29 listed an empty "placeholder" it could
-not take off, and the run that was then given it changed Dot's database to close it). A title of one word, or the same
-as its reason, is refused: it says no work. A run given a thing ends as it is done; Dot marks it done, or to try again
+not take off, and the run that was then given it changed Dot's database to close it). A run's `todo_add` refuses a
+title of one word (words counted by their spaces, so a task in a script written without them is refused too), or the
+same as its reason: it says no work; your own box takes what you write. A run given a thing ends as it is done; Dot marks it done, or to try again
 when the run failed, and the run is told never to change the list or Dot's database itself. You put one on it with the
 box at the card's foot; **Remove** takes a thing to do off it, **Again** puts back one that was let go.
 

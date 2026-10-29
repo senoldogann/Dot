@@ -5,8 +5,9 @@ can author, and the run that does it starts so.
 
 A run may take back a thing it put on the list itself, with a reason (``todo_drop``, item 821): the run that looked for
 work on 2026-10-29 put an empty "placeholder" on it by mistake and could not take it off, so the next run did it, and
-then changed Dot's database with ``sqlite3`` to close it. A thing whose title is one word, or the same as its reason, is
-refused: it says no work."""
+then changed Dot's database with ``sqlite3`` to close it. A thing whose title is one word (by its spaces: a title in a
+script written without them is refused too), or the same as its reason, is refused: it says no work. The owner's box
+(:func:`dotagent.proactive.todos.owners_todo`) takes what they write."""
 
 import time
 
