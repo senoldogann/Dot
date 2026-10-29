@@ -5,6 +5,7 @@ back to its section; a search finds its chats folded or not; a pinned one stays 
 and the arrow keys reach it. Scripted runs, served by a real server, wide and on a phone."""
 
 import asyncio
+import itertools
 import json
 import re
 import time
@@ -402,6 +403,19 @@ async def test_choosing_chats_to_delete_includes_the_chat_of_a_channel_and_the_a
         await page.context.close()
 
 
+# Where the words of Chats' label and of another section's label begin, in pixels from the left.
+_WORDS_LEFT: str = """(selector) => {
+  const words = (button) => {
+    const text = [...button.childNodes].find((node) => node.nodeType === 3 && node.textContent.trim() !== "");
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    return range.getBoundingClientRect().left;
+  };
+  const chats = document.querySelector("#sidebar .side-list-head .side-fold");
+  return [words(chats), words(document.querySelector(`#sidebar .side-channels ${selector}`))];
+}"""
+
+
 async def test_dots_own_chats_stand_folded_at_the_foot_and_open_as_the_owner_leaves_them(
     runtime: Runtime, browser: Browser, address: str, manager: RunManager, replies: Replies, garden: RunRecord
 ) -> None:
@@ -426,6 +440,12 @@ async def test_dots_own_chats_stand_folded_at_the_foot_and_open_as_the_owner_lea
             section: Locator = sidebar.locator(f".side-channels section[data-channel={channel}]")
             fold: Locator = section.locator("> .side-label .side-fold")
             await expect(section.locator("> .side-label")).to_have_text(label)
+            # No mark: its words stand where Chats' do (item 827).
+            await expect(section.locator(".side-channel-mark")).to_have_count(0)
+            lefts: object = await page.evaluate(
+                _WORDS_LEFT, f"section[data-channel={channel}] > .side-label .side-fold"
+            )
+            assert isinstance(lefts, list) and abs(lefts[0] - lefts[1]) <= 0.5, lefts
             await expect(fold).to_have_attribute("aria-expanded", "false")
             await expect(section.locator(".side-chat")).to_have_count(0)
             await fold.click()
@@ -438,3 +458,24 @@ async def test_dots_own_chats_stand_folded_at_the_foot_and_open_as_the_owner_lea
         await expect(sidebar.locator(".side-channels section[data-channel=initiative] .side-chat")).to_have_count(1)
         await _fits(page, f"{width} with Dot's own sections")
         await page.context.close()
+
+
+async def test_under_a_folded_chats_the_first_section_follows_as_one_section_follows_another(
+    browser: Browser, address: str, garden: RunRecord, imessage: ThreadRecord
+) -> None:
+    """Item 827: with the days folded, the gap from Chats to the first section below is the gap from one section to the
+    next, not 11 px more."""
+    page: Page = await _open(browser, address, 1280)
+    sidebar: Locator = page.locator("#sidebar")
+    await sidebar.locator(".side-list-head .side-fold").click()
+    await expect(sidebar.locator(".side-runs")).to_be_hidden()
+    tops: object = await page.evaluate(
+        """() => [document.querySelector('#sidebar .side-list-head .side-fold'),
+                 ...document.querySelectorAll('#sidebar .side-channels section > .side-label .side-fold')]
+                 .map((fold) => fold.getBoundingClientRect().top)"""
+    )
+    assert isinstance(tops, list) and len(tops) >= 3, tops
+    steps: list[float] = [after - before for before, after in itertools.pairwise(tops)]
+    assert abs(steps[0] - steps[1]) <= 4, steps
+    await sidebar.locator(".side-list-head .side-fold").click()
+    await page.context.close()

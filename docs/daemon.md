@@ -52,6 +52,8 @@ the channel's mark (a speech bubble in the label's ink, item 823), its name and 
 it fold Chats. **Dot's own work** stands so too (item 822), above iMessage: **On its own** (a chat for each thing of
 Dot's own list and one for each look for work, [Proactive](proactive.md#on-its-own)) and **Scheduled** (the chats of the
 schedules), each folded until you open it, so that the days hold your own chats; opened, it stays open as you left it.
+Their labels have no mark, so that their words stand where Chats' do, and under a folded Chats the first of them
+follows as one section follows another (item 827).
 Folded over a chat you have not read, the label shows the accent's dot after its count. Its chat is a row like any
 chat's, with its menu; Select and the arrow keys reach it, and a search shows what it finds in it, folded or not. A
 chat of it at work stands under Working like every chat (item 202) and comes back once the run ends, and one you
