@@ -17,7 +17,7 @@ from dotagent.skills.types import SKILL_NAME_PATTERN, Skill, SkillCatalog, Skill
 
 class SkillRoot(FrozenModel):
     """A directory of skills and where it was named: Dot's own folder, the configuration, or a plugin (``plugin``, the
-    plugin's name, by which a skill of it whose name another skill has is offered, item 816)."""
+    plugin's name, by which a skill of it whose name another skill has is offered, item 817)."""
 
     path: Path
     source: str
@@ -76,11 +76,14 @@ _MAX_NAME_CHARS: int = 64
 
 
 def plugin_skill_name(plugin: str, skill: str) -> str | None:
-    """The name a plugin's skill is offered by when another skill has its own (item 816): ``<plugin>-<skill>``, as a
+    """The name a plugin's skill is offered by when another skill has its own (item 817): ``<plugin>-<skill>``, as a
     plugin's MCP server is named; ``None`` when that is no skill name (longer than 64 characters, or the plugin's name
-    holds what a skill name may not)."""
+    holds what a skill name may not) or is one kept for Dot's own (:data:`PLAYBOOK_PREFIXES`): a plugin called
+    ``taught`` would otherwise bring a skill the prompt calls the owner's own instruction."""
     derived: str = f"{plugin}-{skill}".lower().replace("_", "-").replace(" ", "-")
     if len(derived) > _MAX_NAME_CHARS or re.fullmatch(SKILL_NAME_PATTERN, derived) is None:
+        return None
+    if derived.startswith(PLAYBOOK_PREFIXES):
         return None
     return derived
 
@@ -102,7 +105,7 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
     copy of one (the same name, description and instructions in its SKILL.md in another folder, as a sync of the same
     skills leaves; the other files of the folders are not compared, and the first one's are used).
     A skill of a plugin whose name another skill has, and is no copy of it, is offered as ``<plugin>-<skill>``
-    (:func:`plugin_skill_name`, item 816): two plugins (or a plugin and the owner) may each bring a ``code-review`` of
+    (:func:`plugin_skill_name`, item 817): two plugins (or a plugin and the owner) may each bring a ``code-review`` of
     their own, and the second was left out. It is left out only when that name is taken too or is no skill name.
     A skill that comes with Dot gives way to one of the user's with its name, which is no problem: it is how the user
     replaces it."""
