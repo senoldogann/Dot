@@ -87,7 +87,10 @@ class TrendEngine:
             notes.append(f"paused by {paused.by}: {paused.reason}")
         else:
             try:
-                shares, placed, notes, chasing, result = await self._trade(config, now, chasing)
+                shares, placed, notes, chasing, found = await self._trade(config, now, chasing)
+                # A price that could not be read for the result keeps the last one, as a look that trades nothing
+                # does (the review: the daily supervisor could read none that day).
+                result = result if found is None else found
             except MarketError as error:
                 notes.append(f"the market could not be read: {error.message}")
         state: EngineState = EngineState(
