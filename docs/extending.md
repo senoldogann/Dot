@@ -56,7 +56,11 @@ the card's badge reads **Older version** in place of Installed (the state `outda
 plugin's page says which commit its files are from): Install is refused while the folder is there, so Remove it and
 Install it again to take the new pin (item 558).
 Two plugins may bring a skill of the same name (UI/UX Pro Max and Product Design a `design-system`, Product Management
-and Marketing a `competitive-brief`): the first read is offered, and `dotx skills list` names the other as left out. A
+and Marketing a `competitive-brief`): the first read keeps its name, and the other is offered as `<plugin>-<skill>`
+(`ui-ux-pro-max-design-system`), as a plugin's MCP server is named (item 816; it was left out before). So is a plugin's
+skill that one of your own skills has the name of. Only a skill whose name that is too, or one the plugin's name cannot
+make a skill name of (more than 64 characters, or a character a skill name may not hold), is left out, and `dotx skills
+list` names it. A
 skill is text the run's model reads as instructions: the gallery takes repositories of known publishers and pins them,
 so what is installed is what was looked at, and a skill acts only through the run's tools, under the same rules and the
 same asks as anything else the run does ([Safety](safety.md)).
