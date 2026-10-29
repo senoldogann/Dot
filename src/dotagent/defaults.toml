@@ -1113,7 +1113,9 @@ owned_hosts = []
 # of the market starts at once, not at its time (Settings › Trading › Wake on a move chooses it, item 813): the daemon
 # looks at the allowed products every minute, with no model, and a product that moved wake_move_pct percent in fifteen
 # minutes, and three times what it usually moves in fifteen, starts it, at most wake_per_day times a day and
-# wake_gap_min minutes apart.
+# wake_gap_min minutes apart. engine = "trend" switches the trend engine on (item 818): engine_coins, each in quote and
+# allowed by products, traded on paper once an hour by a rule of daily closes with no model, each coin's share sized to
+# engine_target_vol yearly volatility and left alone within engine_band of its target, under the same limits.
 mode = "off"
 quote = "EUR"
 products = ["BTC-EUR", "ETH-EUR", "SOL-EUR"]
@@ -1129,3 +1131,7 @@ wake_schedule = ""
 wake_move_pct = 3.0
 wake_per_day = 6
 wake_gap_min = 30.0
+engine = "off"
+engine_coins = ["BTC", "ETH", "SOL"]
+engine_target_vol = 0.5
+engine_band = 0.1

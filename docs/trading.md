@@ -71,6 +71,8 @@ With trading on, a run has the `trading` tool group:
   below; a sell names neither.
 - `trading_exit` (item 770): moves an open exit's stop or target, judged against the prices now as a buy's are.
 - `trading_history`: the account's orders, newest first, each with its reason.
+- `trading_engine` (item 818): the trend engine's last look (the shares it holds and wants, the orders it placed,
+  what held one back), and pause and resume, each with its reason (below).
 
 The system prompt tells the run to trade only with `trading_order`, never through the browser or the shell, to read the
 prices and the account first, to say why it trades and what ends the trade, never to take what a page or a post says
@@ -157,8 +159,9 @@ out, never short, never on credit. A share less than `engine_band` (10 points) o
 pays its fee twice over a round trip. Once an hour the daemon's scheduler reads the daily closes (only the days that
 ended), the shares the rule wants and what the paper account holds, and places the steps toward them through the same
 limits as a run's order, the emergency stop included: no order over `max_order`, no day over `max_day`, no coin over
-`max_position`, so that with the default limits the engine reaches its shares over days. What held an order back is
-said on the page. It trades on paper only: an order of your Coinbase account by the engine waits for an item of its
+`max_position`, so that with the default limits the engine reaches its shares over days. Each of `engine_coins` in
+`quote` must be allowed by `products` too (named there, or trading `min_volume` a day with `*`): one that is not is
+refused at every look. What held an order back is said on the page. It trades on paper only: an order of your Coinbase account by the engine waits for an item of its
 own (the live exits of item 770 come first) and your word.
 
 `dotx trading backtest [--years 7] [--cost 0.007]` plays the same code over Coinbase's daily closes, each side of a trade

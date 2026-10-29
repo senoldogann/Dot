@@ -632,7 +632,6 @@ export function mount(root, ctx) {
     });
   }
 
-  /** What the account holds, each currency at the bid now and its share of the account. */
   /** The trend engine (item 818): its switch, the shares its rule wants beside those held at its last look, and
    * what held an order back or why it is paused. It trades on paper only, with no model. */
   function engineSection() {
@@ -697,6 +696,7 @@ export function mount(root, ctx) {
     });
   }
 
+  /** What the account holds, each currency at the bid now and its share of the account. */
   function holdingsSection() {
     const { portfolio } = view;
     if (portfolio === null) {
