@@ -34,7 +34,7 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 TOKEN: str = "work-status-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _TURNS: tuple[ScriptedTurn, ...] = (
-    ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 6"}),)),
+    ScriptedTurn(text="Listing it now.", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 6"}),)),
     ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
 )
 # The words the line has for a command, whichever of them stands at the moment it is read.
@@ -135,6 +135,21 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                     " line.querySelector(part).getBoundingClientRect().x)"
                 )
                 assert dots_x - face_x == 36, (face_x, dots_x)
+                # Under the pointer, the reaction of the message before the line stands beside its bubble, in the
+                # place of a face, and covers none of the line: a press on the line's face shows the steps (the
+                # pre-push review of item 843).
+                said: Locator = page.locator(".bubble.say").first
+                await said.hover()
+                react = await said.locator(".react-button").bounding_box()
+                bubble = await said.locator(".prose").bounding_box()
+                face = await line.locator(".turn-face").bounding_box()
+                assert react is not None and bubble is not None and face is not None
+                assert react["x"] + react["width"] <= bubble["x"] + 1, (react, bubble)
+                assert react["y"] + react["height"] <= face["y"] + 1, (react, face)
+                await page.mouse.click(face["x"] + face["width"] / 2, face["y"] + face["height"] / 2)
+                await expect(line).to_have_attribute("aria-pressed", "true")
+                await line.click()
+                await expect(line).to_have_attribute("aria-pressed", "false")
                 await expect(page.locator("details.steps")).to_be_hidden()
                 await page.screenshot(path=str(tmp_path / "working.png"))
                 # Pressed while the run works, the line shows the steps; pressed again, it folds them back; pressed a
