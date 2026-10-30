@@ -498,6 +498,16 @@ async def _fits(page: Page, inner: Locator, outer: Locator) -> None:
     assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 
 
+# A message that opens with a list, given its picks as the page gives them: the tags of its text's first two blocks.
+_LIST_OPENING: str = """async () => {
+  const { userMessage, showMessagePicks } = await import("/js/messages.js");
+  const message = userMessage({ text: "- one\\n- two", sentAt: Date.now() / 1000, files: [], editFromHere: null });
+  showMessagePicks(message, { plugins: [], skills: ["weekly-report"], plan_first: false, accounts: [] });
+  const blocks = [...message.querySelector(".prose").children].slice(0, 2);
+  return blocks[0].querySelector(".pick-list.inline") === null ? [] : blocks.map((block) => block.tagName);
+}"""
+
+
 @pytest.mark.browser
 async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_with_the_message(
     login_env: dict[str, str], tmp_path: Path
@@ -572,6 +582,12 @@ async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_wit
                     await expect(sent).to_have_count(2 + len(skills))
                     await expect(sent.first).to_have_attribute("data-kind", "plan")
                     await _fits(page, sent, page.locator(".user-message").first)
+                    # Item 858: words at the head of the message's first paragraph, a space between them, before what
+                    # the owner wrote; a message that opens with a list has them on a line of their own over it.
+                    opening: Locator = page.locator(".bubble.user .prose > p:first-child").first
+                    await expect(opening.locator(".pick-list.inline .pick-chip")).to_have_count(2 + len(skills))
+                    assert (await opening.inner_text()).endswith(GOAL)
+                    assert await page.evaluate(_LIST_OPENING) == ["P", "UL"]
                     await page.screenshot(path=str(tmp_path / f"sent-{width}-{scheme}.png"), animations="disabled")
                     assert (await _ended(runtime, manager, model, run_id, 0)).record.status == "done"
                     events: list[EventRecord] = await runtime.store.list_events(run_id, 0, _MAX_EVENTS)

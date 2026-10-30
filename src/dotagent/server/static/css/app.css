@@ -8945,13 +8945,14 @@ dialog.modal.page-dialog .shown-page-frame {
   height: auto;
 }
 
-/* What the owner picked for a message (item 318): chips under the message box and under a sent message, each with the
-   mark of a server or a skill in the colour of its name (--pick-tint, a character colour picks.js sets), and Plan first
-   in the accent. They wrap; a long name ends in an ellipsis, so no chip is wider than its row. */
+/* What the owner picked for a message (item 318): under the message box and at the head of a sent message's text, each
+   the mark of a server or a skill and its name in the colour of its name (--pick-tint, a character colour picks.js
+   sets), with no border and no ground (item 858, as a skill stands in a line of text), and Plan first in the accent.
+   They wrap; a long name ends in an ellipsis, so none is wider than its row. */
 .pick-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px 12px;
   min-width: 0;
 }
 
@@ -8971,16 +8972,36 @@ dialog.modal.page-dialog .shown-page-frame {
   gap: 4px;
   min-width: 0;
   max-width: 100%;
-  padding: var(--space-half) var(--space-half) var(--space-half) 8px;
-  border: 1px solid color-mix(in oklab, var(--pick-tint) 35%, var(--border));
-  border-radius: var(--radius-pill);
-  background: color-mix(in oklab, var(--pick-tint) 10%, var(--surface));
-  color: var(--text);
-  font-size: var(--text-xs);
+  color: color-mix(in oklab, var(--pick-tint) 78%, var(--text));
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
 }
 
-.pick-list.sent .pick-chip {
-  padding: var(--space-half) 8px;
+/* In a sent message's text, words of its line: its size, on its baseline. The bubble is dark in both schemes (ink in
+   the light one), so the characters take their dark scheme's tones there and mix with its own ink; Plan first is in
+   that ink. */
+.pick-list.inline {
+  display: inline;
+  color-scheme: dark;
+}
+
+.pick-list.inline .pick-chip {
+  color: color-mix(in oklab, var(--pick-tint) 82%, currentcolor);
+  font-size: inherit;
+  vertical-align: bottom;
+}
+
+.pick-list.inline .pick-chip[data-kind="plan"] {
+  color: inherit;
+}
+
+/* A server's mark keeps its service's ink on its tile (item 530). */
+.pick-list.inline .pick-mark:not([data-mark="service"]) {
+  color: inherit;
+}
+
+.pick-list.inline .pick-chip:last-child {
+  margin-right: 0;
 }
 
 .pick-mark {
@@ -9014,9 +9035,6 @@ dialog.modal.page-dialog .shown-page-frame {
   height: 12px;
 }
 
-.pick-chip:has(> .pick-mark[data-mark="service"]) {
-  padding-left: 4px;
-}
 
 .pick-name {
   min-width: 0;
