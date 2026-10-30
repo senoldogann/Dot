@@ -64,8 +64,8 @@ row under the search said New chat), and on a phone the round **+** of the foot.
 as faces (item 835), as a messaging app's people: each its face over its name, on two lines at most, to its page,
 where a message to it starts, the one whose page is open marked; the row scrolls sideways past what the sidebar holds,
 and its last tile, **All**, is the page of every agent and team, which the Agents row is while you have no agent of
-your own; an agent made, changed or deleted on a page shows there at once, and one a run made with the next reload of
-the list. In the foot, the cog of **Settings**, **Connect apps** beside it
+your own; an agent made, changed or deleted on a page shows there at once, and one a run made once that run ends. In
+the foot, the cog of **Settings**, **Connect apps** beside it
 ([Connect apps](extending.md#connect-apps), items 492 and 545), which opens
 [Customize › Connectors](extending.md#customize--connectors), and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
