@@ -985,23 +985,38 @@
   text-transform: uppercase;
 }
 
-/* At the head of the side panel's Task tab (item 842), the lessons are a section of the panel as its others are: a
-   title in sentence case over their rows, no box of their own. */
+/* At the foot of the side panel's Task tab (items 842 and 856), the lessons are a fold of the panel as its others are:
+   the chevron, a title in sentence case and their count, on the panel's hairline, with no mark and no box of their
+   own (item 856: they stood at the tab's head, a card of their own). */
 .lessons-slot > .lessons-card {
-  margin-bottom: var(--space-4);
-  border-color: transparent;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
   background: none;
   box-shadow: none;
 }
 
 .lessons-slot .lessons-head {
-  padding: 0 0 var(--space-2);
-  color: var(--text);
+  padding: 12px 16px;
+  color: var(--text-2);
+}
+
+.lessons-slot .lessons-mark {
+  display: none;
+}
+
+.lessons-slot .lessons-chevron {
+  order: -1;
 }
 
 .lessons-slot .lessons-title {
-  font-size: var(--text-ui);
-  font-weight: var(--weight-title);
+  font-size: inherit;
+  font-weight: var(--weight-label);
+}
+
+.lessons-slot .lessons-count {
+  margin-left: 0;
 }
 
 .lessons-count {
