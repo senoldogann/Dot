@@ -144,7 +144,9 @@ has stopped without closing (a network that changed, a Mac that slept): the page
 Every stream opens with a comment line at once, as Safari, the iPhone and Dot.app hand the page a stream only once its
 body begins: a quiet one read as not connected until its first keepalive (item 709). What a run's stream replays of
 what is stored goes in one write, as WebKit took the first frames of a burst of writes and then nothing until the next
-keepalive: a chat at work opened without its steps (item 716).
+keepalive: a chat at work opened without its steps (item 716). For the same reason a stream writes a keepalive a
+quarter of a second after its own last write (item 859; another run's events, which it hears too, do not put it off): a run that asks writes its policy line and its card a moment
+apart and then waits, and WebKit handed the page the line and held the card until the keepalive 15 s on.
 Between tries the page waits half a second, then longer, up to 8 seconds, and from half a second again once a stream is
 made; a page that comes back into view, or a browser back on the network, tries at once. The rules page reads its rules
 again when one is added, switched or deleted on another page. A page loaded before Dot was updated says so in a banner,

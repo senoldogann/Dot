@@ -29,9 +29,12 @@ line is not there. Pressed, it shows every step of the chat again, and pressed a
 over and has its answer, the line goes and **Show the steps** stands in the answer's foot, beside the copy, the speaker
 and the time, where the pointer rests (item 842; a touch screen always shows it), and turns to *Hide the steps* once
 pressed. Approvals, questions, notes and the messages stay in sight either way; the changes of the memory stand with the
-steps, and an agent's message is open, with **What it is doing** (item 830). The choice is kept by the browser. A run
+steps, with **What it is doing** (item 830), and an agent's message is folded until you open it, in either choice
+(item 859). The choice is kept by the browser. A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
-now …"): those lines are its messages in the conversation, in either choice. The short marks at the left of the
+now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
+spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow
+line up with its words (item 859; the steps, thoughts and notes between them, and a card, a hand-off, a page it shows, are no one speaking). The short marks at the left of the
 conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
 work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out; the page
 reads the latest 200 runs of a chat, the most the daemon lists at once, so a chat of more says that its earlier runs are
