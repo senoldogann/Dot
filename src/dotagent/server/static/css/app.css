@@ -121,7 +121,9 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
-  --pad-card: var(--space-4);
+  /* A card's room (item 838: 16 px before), so that a soft box breathes as a messaging app's; the compact density keeps
+     its own (below). */
+  --pad-card: var(--space-5);
   --pad-row: var(--space-3) var(--space-4);
   --pad-side: var(--space-2) var(--space-2);
   --gap-stack: var(--space-3);
