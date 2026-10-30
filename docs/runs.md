@@ -399,10 +399,11 @@ there), and the page goes on at the run it starts, as it does for a message type
 works in the chat it waits in the chat's queue as a message does: edit it (files too), take it out, or Steer it,
 which sends it on to the run at work. The files you put on it go with it, whether it starts as the chat's next run or
 is sent on. Sent on, its words stand in the conversation as your message, on the run's page and in the turns before a
-later run, while the run reads a note that vouches for nothing. Started as the chat's next run, its goal is Dot's words
-for the reaction and no message of yours: the conversation draws none for it, on its page or in the turns before a
-later run, as a messaging app sends none for a reaction, and the chip on the message reacted to says it (item 844;
-the run keeps the reaction, `follows_reaction` of the run in the API). The model reads the goal as before.
+later run, while the run reads a note that vouches for nothing. Started as the chat's next run in Dot's words for the
+reaction, it is no message of yours: the conversation draws none for it, on its page or in the turns before a later
+run, as a messaging app sends none for a reaction, and the chip on the message reacted to says it (item 844; the run
+keeps the reaction, `follows_reaction` of the run in the API). Words you wrote over them in the queue, or a file you
+put on it there, make it your message, drawn as any. The model reads the goal as before.
 
 - The goal holds no quote of Dot's. A reviewer takes your words as your instruction, and what Dot said may repeat
   what a stranger wrote, so the message is quoted under your words, for the run alone (up to 600 characters), as

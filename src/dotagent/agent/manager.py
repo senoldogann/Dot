@@ -69,7 +69,8 @@ from dotagent.agent.playbooks import (
     playbook_case,
 )
 from dotagent.agent.progress import can_ask_user
-from dotagent.agent.reaction_words import RELEASE_NOTE, queued_reaction_note
+from dotagent.agent.reaction_words import ANSWER as ANSWER_MESSAGE
+from dotagent.agent.reaction_words import RELEASE_NOTE, follow_up_goal, queued_reaction_note
 from dotagent.agent.reflection import reflect
 from dotagent.agent.reflection_record import Reflection
 from dotagent.agent.resume import (
@@ -3191,7 +3192,13 @@ class RunManager:
             once=None,
             carried=await self._carried_by(thread_id, follow_up),
             picks=NO_PICKS,
-            follows=follow_up.reaction,
+            # Dot's words for the reaction, with nothing of the owner's: the conversation draws no message for the run
+            # (item 844). A follow-up edited in the queue, or given a file there, is the owner's message.
+            follows=(
+                follow_up.reaction
+                if not files and goal == follow_up_goal(follow_up.reaction, follow_up.message == ANSWER_MESSAGE)
+                else None
+            ),
         )
         run, _ = await self._launch(
             goal,
