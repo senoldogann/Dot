@@ -376,11 +376,13 @@ async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_
                 await expect(card).to_contain_text("It waits until")
                 await expect(card.get_by_role("button", name="Skip this step")).to_be_visible()
                 if index == 0:
-                    # The sidebar lists each step that waits, two of one run included.
-                    waiting = page.locator("[data-section='waiting'] .side-activity-title")
-                    await expect(waiting).to_have_count(2)
-                    await expect(waiting.first).to_contain_text("Write ")
-                    await expect(waiting.last).to_contain_text("Run: ./report.sh")
+                    # The sidebar's row of the chat says what has waited longest and how many more wait (item 836),
+                    # and its name for a screen reader names each step that waits, two of one run included.
+                    waiting = page.locator("[data-section='waiting'] .side-chat > a.side-run")
+                    await expect(waiting).to_have_count(1)
+                    await expect(waiting.locator(".side-chat-waits")).to_contain_text("Waiting for you: Write ")
+                    await expect(waiting.locator(".side-chat-waits")).to_contain_text("(+1)")
+                    await expect(waiting).to_have_attribute("aria-label", re.compile(r"Write .*; Run: \./report\.sh"))
                 question = page.locator(".approval:not(.handoff)", has_text="Kept for you")
                 await expect(question).to_contain_text("Choose Allow once to carry the work on in this conversation")
                 await expect(question.get_by_role("button", name="Allow once")).to_be_visible()

@@ -183,9 +183,12 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                         await expect(page.locator(".home .approval")).to_have_count(0)
                         if width < 860:
                             await page.get_by_role("button", name="Show sidebar").click()
-                        await expect(page.locator("#sidebar [data-section=waiting] a.side-activity")).to_contain_text(
-                            "waits for your answer"
-                        )
+                        # Its chat stands first, its last line saying what waits (item 836), and its name for a
+                        # screen reader how.
+                        waits: Locator = page.locator("#sidebar [data-section=waiting] .side-chat > a.side-run")
+                        await expect(waits).to_have_count(1)
+                        await expect(waits.locator(".side-chat-waits")).to_contain_text("Waiting for you: ")
+                        await expect(waits).to_have_attribute("aria-label", re.compile("waits for your answer"))
                         if width < 860:
                             await page.keyboard.press("Escape")
                         await page.goto(f"{address}/#/runs/{run.id}")

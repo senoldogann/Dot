@@ -254,7 +254,7 @@ async def test_the_side_menu_shows_every_agent_of_a_run_on_the_chats_row(
                 section: Locator = page.locator("#sidebar [data-section=working]")
                 # Working holds the run's chat (item 202), wearing the faces of every run it delegated (item 507):
                 # three, the one at work among them, and nothing under the row.
-                await expect(section.locator(".side-label")).to_have_text("Working 1")
+                await expect(section.locator(".side-chat")).to_have_count(1)
                 row: Locator = section.locator(".side-chat > .side-run")
                 faces = row.locator(".side-chat-helpers .side-helper")
                 await expect(faces).to_have_count(len(_SHELVES))
