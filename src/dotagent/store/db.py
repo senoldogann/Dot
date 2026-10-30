@@ -581,6 +581,7 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         agent_id=row["agent_id"],
         rewindable=row["history_version"] is not None and row["history_seq"] is not None,
         harness_version=row["harness_version"],
+        follows_reaction=row["follows_reaction"],
     )
 
 
@@ -1124,6 +1125,8 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("rewound_at", "REAL"),
     # The version of the harness the run took as it started (item 389), NULL with none adopted and for runs from before.
     ("harness_version", "TEXT"),
+    # The reaction a follow-up run follows up (item 844), NULL for every other run and for runs from before.
+    ("follows_reaction", "TEXT"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used, and are Dot's.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -2555,8 +2558,10 @@ class Store:
         campaign_id: str | None,
         agent_id: str | None,
         owner: str | None,
+        follows_reaction: ReactionName | None = None,
     ) -> RunRecord:
-        """A new queued run; ``owner`` is the process that drives it (:mod:`dotagent.agent.owners`)."""
+        """A new queued run; ``owner`` is the process that drives it (:mod:`dotagent.agent.owners`), and
+        ``follows_reaction`` the reaction it follows up (item 844)."""
         record: RunRecord = RunRecord(
             id=new_id("run"),
             thread_id=thread_id,
@@ -2580,6 +2585,7 @@ class Store:
             campaign_id=campaign_id,
             agent_id=agent_id,
             rewindable=parent_run_id is None,
+            follows_reaction=follows_reaction,
         )
         working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
         # Where the run's first message goes in the chat's history (item 282): the history's version and the place after
@@ -2604,8 +2610,8 @@ class Store:
         async with self._db.execute(
             "INSERT INTO runs(id, thread_id, goal, mode, model, status, created_at, finished_at, result, steps,"
             " input_tokens, output_tokens, parent_run_id, source, effort, speed, once, approvals, goal_mode,"
-            " campaign_id, agent_id, owner, history_version, history_seq) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
-            f" ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {place}{refusal} RETURNING id",
+            " campaign_id, agent_id, owner, follows_reaction, history_version, history_seq) SELECT ?, ?, ?, ?, ?, ?,"
+            f" ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {place}{refusal} RETURNING id",
             (
                 record.id,
                 record.thread_id,
@@ -2629,6 +2635,7 @@ class Store:
                 record.campaign_id,
                 record.agent_id,
                 owner,
+                record.follows_reaction,
                 *(() if parent_run_id is not None else (thread_id, thread_id)),
                 *(() if parent_run_id is not None else (thread_id, *working, owner, thread_id, owner)),
             ),

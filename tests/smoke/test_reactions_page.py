@@ -519,8 +519,13 @@ async def test_a_not_right_on_an_answer_starts_a_follow_up_run_the_page_goes_on_
     await expect(page.locator(".toast")).to_contain_text("Started a follow-up run.")
     # The chat goes on at the run the reaction started, as it does for a message typed in the box.
     await expect(page).to_have_url(re.compile(r"#/runs/(?!" + re.escape(run.id) + r")run_"))
-    await expect(page.locator(".user-message .bubble").last).to_contain_text(THUMB_DOWN)
     await expect(page.get_by_role("article", name="Answer").last).to_contain_text("Reconsidered: the beds face east.")
+    # The follow-up draws no message of yours, as a messaging app sends none for a reaction: the chip on the answer
+    # reacted to says it (item 844). The message you wrote first stays.
+    await expect(page.locator(".user-message .bubble", has_text=THUMB_DOWN)).to_have_count(0)
+    await expect(page.locator(".user-message .bubble", has_text=GOAL)).to_have_count(1)
+    reacted: Locator = page.get_by_role("article", name="Answer").first
+    await expect(reacted.get_by_role("button", name="Not right", pressed=True)).to_be_visible()
     runs: list[RunRecord] = await served.runtime.store.list_runs(10, run.thread_id)
     assert [one.goal for one in runs] == [THUMB_DOWN, GOAL]
     standing: list[ReactionRecord] = await served.runtime.store.message_reactions(run.id, "answer")

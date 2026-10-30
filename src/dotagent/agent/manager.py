@@ -2579,6 +2579,7 @@ class RunManager:
                 campaign_id,
                 agent_id,
                 self._owner_id(),
+                opening.follows,
             )
 
         run: RunRecord = await self._stored_run(stored)
@@ -3190,6 +3191,7 @@ class RunManager:
             once=None,
             carried=await self._carried_by(thread_id, follow_up),
             picks=NO_PICKS,
+            follows=follow_up.reaction,
         )
         run, _ = await self._launch(
             goal,

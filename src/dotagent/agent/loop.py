@@ -257,6 +257,7 @@ from dotagent.store.models import (
     CampaignRecord,
     EventRecord,
     MemoryRecord,
+    ReactionName,
     RunMode,
     RunPicks,
     RunRecord,
@@ -454,7 +455,8 @@ class RunOpening(FrozenModel):
     answer that came after its run ended) opens without picks: the first run's message, with the picks' lines and
     skills, stays in the chat's history, and with grouped tools ``use_tools`` turns a picked server's group on.
     ``tainted`` starts the run untrusted whatever it goes on from: the run a watcher starts (item 571) is set off by
-    what a third party wrote."""
+    what a third party wrote. ``follows`` is the reaction of the owner's the run follows up (item 844), which the run
+    keeps (``RunRecord.follows_reaction``)."""
 
     text: str
     files: tuple[StoredAttachment, ...]
@@ -463,6 +465,7 @@ class RunOpening(FrozenModel):
     carried: tuple[str, ...]
     picks: RunPicks
     tainted: bool = False
+    follows: ReactionName | None = None
 
 
 @dataclass(frozen=True)

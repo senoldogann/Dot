@@ -34,6 +34,13 @@ export const RESUME_SOURCE = "resume";
 // The source of a run that tells the chat that its command in the background ended (item 229).
 export const BACKGROUND_SOURCE = "background";
 
+/** Whether `run` follows up a reaction of yours (item 844): its goal is Dot's words for the reaction, which stands as a
+ * chip on the message reacted to, so the conversation draws no message of yours for it, as a messaging app sends none.
+ */
+export function followsReaction(run) {
+  return typeof run.follows_reaction === "string";
+}
+
 /** The runs of a thread that the user started, oldest first; delegated runs belong to the run that delegated them. */
 function conversation(runs) {
   return runs.filter((candidate) => candidate.parent_run_id === null).toSorted((a, b) => a.created_at - b.created_at);
@@ -185,7 +192,7 @@ function drawFlow(past, flow, asked, events, reactions) {
     batch.rows.push(row.node);
     return { row, batch };
   };
-  const message = asked.classList.contains("user-message") ? asked : null;
+  const message = asked?.classList.contains("user-message") ? asked : null;
   // The files and picks of the message go in with the flow, inside keepPlace's change: a browser without scroll
   // anchoring would otherwise see the reader's text pushed down by their height.
   let files = null;
@@ -356,8 +363,9 @@ function turn(past, editFromHereOf, known, signal, reactions) {
   const answer = ended
     ? answerMessage({ actorId: past.agent_id ?? "dot", status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href: null, reactions, runId: past.id })
     : el("div", { class: "note" }, icon("clock"), el("span", null, "This task is still going."), el("a", { class: "small", href }, "Open task"));
-  const asked =
-    past.source === RESUME_SOURCE
+  const asked = followsReaction(past)
+    ? null
+    : past.source === RESUME_SOURCE
       ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, "Continued where the task above was cut off"))
       : past.source === BACKGROUND_SOURCE
         ? backgroundNote(past.goal)

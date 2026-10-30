@@ -154,7 +154,9 @@ class RunRecord(FrozenModel):
     282): Dot kept where that message went in the chat's history, which it does not for a delegated run, nor did for
     runs from before. ``harness_version`` is the version of the harness the run took as it started (item 389), ``None``
     when Dot's own text alone was in use and for a run that has not started or is from before; it is how the runs that
-    had a version are told from the others (item 588)."""
+    had a version are told from the others (item 588). ``follows_reaction`` is the reaction of the owner's that the run
+    follows up (item 844), ``None`` for any other run: the conversation draws no message of the owner's for it, its
+    goal being Dot's words for the reaction, which stands as a chip on the message reacted to."""
 
     id: str
     thread_id: str
@@ -179,6 +181,7 @@ class RunRecord(FrozenModel):
     agent_id: str | None
     rewindable: bool
     harness_version: str | None = None
+    follows_reaction: ReactionName | None = None
 
 
 class RewindCut(FrozenModel):
