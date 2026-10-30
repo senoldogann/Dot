@@ -157,9 +157,19 @@
   cursor: pointer;
 }
 
-/* A run that is over and took no step has nothing to show. */
-:root[data-work="status"] .run-thread:not(:has(details.steps, details.thought)) .work-status[data-state="over"] {
+/* A run that is over and took no step has nothing to show; one that has an answer offers its steps in the answer's
+   foot, where the pointer rests (item 842), and the line goes. */
+:root[data-work="status"] .run-thread:not(:has(details.steps, details.thought)) .work-status[data-state="over"],
+:root[data-work="status"] .run-thread:has(.answer-steps) .work-status[data-state="over"] {
   display: none;
+}
+
+.answer-steps {
+  display: none;
+}
+
+:root[data-work="status"] .run-thread:has(details.steps, details.thought) .answer-steps {
+  display: inline-flex;
 }
 
 .work-status-dots {
@@ -955,8 +965,31 @@
 .lessons-title {
   font-size: var(--text-xs);
   font-weight: var(--weight-label);
+}
+
+/* In the conversation, where they stand only while they wait for you (item 842), the lessons keep their small caps. */
+.lessons-place .lessons-title {
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
+}
+
+/* At the head of the side panel's Task tab (item 842), the lessons are a section of the panel as its others are: a
+   title in sentence case over their rows, no box of their own. */
+.lessons-slot > .lessons-card {
+  margin-bottom: var(--space-4);
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+
+.lessons-slot .lessons-head {
+  padding: 0 0 var(--space-2);
+  color: var(--text);
+}
+
+.lessons-slot .lessons-title {
+  font-size: var(--text-ui);
+  font-weight: var(--weight-title);
 }
 
 .lessons-count {

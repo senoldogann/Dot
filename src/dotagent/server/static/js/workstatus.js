@@ -3,7 +3,8 @@
 // now, in a few words that change as it goes ("Searching the web", "Reading a page", "Thinking"). Each phrase is of
 // what the run's latest event is: nothing is said that the run is not doing. While the same work goes on, the line
 // turns through the other words for it, so that a long step still reads as alive. The line is a button: pressed, the
-// conversation shows every step again, and pressed again folds them back; once the run is over it says so.
+// conversation shows every step again, and pressed again folds them back; once the run is over and has an answer, the
+// way to the steps is the answer's foot (item 842), and the line goes.
 
 import { el, setText } from "./dom.js";
 import { callKind } from "./tools.js";
@@ -93,11 +94,13 @@ export function createWorkStatus({ rootRunId, active, onToggle }) {
     paint();
   }
 
-  element.addEventListener("click", () => {
+  function toggle() {
     shown = !shown;
     paint();
     onToggle(shown);
-  });
+  }
+
+  element.addEventListener("click", toggle);
 
   function push(record) {
     if (record.run_id !== rootRunId) {
@@ -141,6 +144,8 @@ export function createWorkStatus({ rootRunId, active, onToggle }) {
     element,
     push,
     setActive,
+    // The steps shown or folded back from elsewhere: the answer's foot (item 842).
+    toggle,
     dispose: () => window.clearInterval(timer),
   };
 }

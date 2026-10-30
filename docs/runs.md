@@ -24,7 +24,9 @@ latest event: "Thinking…" while the model thinks, "Running a command…", "Sea
 "Working on the Mac…", "Asking Scout…" for a message to an agent, and so on, the words for the same work turning every
 four seconds ("Working in the terminal…") so that a long step reads as alive. Nothing is said that the run is not
 doing: while it writes a message, or a card waits for you, the line is not there. Pressed, it shows every step of the
-chat again, and pressed again folds them back; once the run is over it says *Show the steps*. Approvals, questions,
+chat again, and pressed again folds them back; once the run is over and has its answer, the line goes and **Show the
+steps** stands in the answer's foot, beside the copy, the speaker and the time, where the pointer rests (item 842; a
+touch screen always shows it), and turns to *Hide the steps* once pressed. Approvals, questions,
 notes and the messages stay in sight either way; the changes of the memory stand with the steps, and an agent's message
 is open, with **What it is doing** (item 830). The choice is kept by the browser. A run says what it does as it works,
 in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it, now …"): those lines are its
