@@ -418,3 +418,80 @@ async def test_an_agent_of_a_ready_team_hands_its_teammate_a_part_from_its_own_c
     )
     for agent_id in members.values():
         assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204
+
+
+async def test_a_group_chat_hands_every_agent_its_part_at_once_with_the_chats_conversation(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """Item 831: in a chat with a team, the run that leads it says the plan and sends each agent its part in one reply;
+    the agents work at once, each reading who is in the chat, its part and the chat's conversation, fenced, and its
+    goal is the part alone; the lead ends with the owner's answer."""
+    ids: dict[str, str] = {}
+    for name, role in (("Planner", "Plans the launch"), ("Writer", "Writes the copy"), ("Auditor", "Checks budgets")):
+        made = await client.post(
+            "/api/agents",
+            json={"name": name, "role": role, "instructions": "", "model": "", "effort": None, "approvals": None,
+                  "tools": ["shell"]},
+        )  # fmt: skip
+        assert made.status_code == 201, made.text
+        ids[name] = made.json()["id"]
+    team = await client.post(
+        "/api/teams", json={"name": "Launch", "purpose": "Ship the launch", "agents": [ids["Planner"], ids["Writer"]]}
+    )
+    assert team.status_code == 201, team.text
+    plan: ScriptedTurn = ScriptedTurn(
+        text="Plan: @Planner sets the dates, @Writer drafts the post.",
+        calls=(
+            ScriptedCall(tool=MESSAGE_AGENT_TOOL, arguments={"agent": "Planner", "message": "Set the launch dates."}),
+            ScriptedCall(tool=MESSAGE_AGENT_TOOL, arguments={"agent": "Writer", "message": "Draft the launch post."}),
+            # An agent of the owner's outside the team (the pre-push review): not in the chat, it reads its part alone.
+            ScriptedCall(tool=MESSAGE_AGENT_TOOL, arguments={"agent": "Auditor", "message": "Check the budget."}),
+        ),
+    )
+    MODEL.requests.clear()
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            plan,
+            _turn(FINISH_TOOL, {"answer": "My part is done.", "success": True}),
+            _turn(FINISH_TOOL, {"answer": "My part is done.", "success": True}),
+            _turn(FINISH_TOOL, {"answer": "My part is done.", "success": True}),
+            _turn(FINISH_TOOL, {"answer": "Dates are set and the post is drafted.", "success": True}),
+        ],
+    )
+    started = await client.post(
+        "/api/runs", json={"goal": "Plan the launch of the app", "approvals": "yolo", "team_id": team.json()["id"]}
+    )
+    assert started.status_code == 201, started.text
+    run_id: str = started.json()["id"]
+    async with asyncio.timeout(_RUN_WAIT_S):
+        assert (await manager.wait(run_id)).status == "done"
+    # The lead is told the chat is a group chat and how to lead it.
+    lead_prompt: str = _system(MODEL.requests[0])
+    assert "This chat is a group chat" in lead_prompt and "naming each agent as @Name" in lead_prompt
+    children: list[RunRecord] = await runtime.store.list_child_runs(run_id)
+    assert sorted((child.agent_id, child.goal, child.status) for child in children) == sorted(
+        [
+            (ids["Planner"], "Set the launch dates.", "done"),
+            (ids["Writer"], "Draft the launch post.", "done"),
+            (ids["Auditor"], "Check the budget.", "done"),
+        ]
+    )
+    # Both started before either ended: they worked at once.
+    assert max(child.created_at for child in children) < min(child.finished_at or 0.0 for child in children)
+    # Each agent read the group, its part and the chat's conversation, fenced.
+    every: list[str] = [
+        next(message.content for message in request.messages if message.role == "user")
+        for request in MODEL.requests[1:4]
+    ]
+    assert "Check the budget." in every
+    openings: list[str] = [opening for opening in every if opening != "Check the budget."]
+    assert len(openings) == 2
+    for opening in openings:
+        assert opening.startswith('[Group chat "Launch": the owner, Dot, who leads it, and the agents ')
+        assert "<group_chat nonce=" in opening and "The owner: Plan the launch of the app" in opening
+        assert "Answer as your message to the group" in opening
+    assert {("Set the launch dates." in opening, "Draft the launch post." in opening) for opening in openings} == {
+        (True, False),
+        (False, True),
+    }
