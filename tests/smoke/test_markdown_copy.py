@@ -326,8 +326,12 @@ async def test_the_owners_messages_read_as_markdown_and_a_copy_of_the_conversati
                 press: Locator = snippet.get_by_role("button", name="Copy the code")
                 await expect(press).to_be_visible()
                 await snippet.evaluate("node => node.scrollIntoView({ block: 'center' })")
-                where = await press.bounding_box()
-                frame = await snippet.locator("pre").bounding_box()
+                # Both boxes read in one frame: a scroll still moving the page between two reads put them apart.
+                where, frame = await snippet.evaluate(
+                    "node => [node.querySelector('.code-head .btn:last-child'), node.querySelector('pre')]"
+                    ".map((part) => { const box = part.getBoundingClientRect();"
+                    " return { x: box.x, y: box.y, width: box.width, height: box.height }; })"
+                )
                 assert where is not None and frame is not None
                 assert where["x"] + where["width"] <= frame["x"] + frame["width"] + 1, (where, frame)
                 assert where["y"] <= frame["y"] + 1, (where, frame)

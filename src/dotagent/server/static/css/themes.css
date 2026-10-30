@@ -32,6 +32,11 @@
   --surface: light-dark(#fdfcfa, #22211f);
   --surface-2: light-dark(#f3f2ee, #2a2927);
   --surface-3: light-dark(#e9e8e3, #343230);
+  /* A chat's messages (item 832), as a messaging app draws them: yours in ink in light and one step raised in the dark,
+     Dot's and its agents' on a soft fill. Made of the look's own colours, so that every look and scheme has them. */
+  --msg-me: light-dark(var(--text), var(--surface-3));
+  --on-msg-me: light-dark(var(--surface), var(--text));
+  --msg-agent: var(--surface-2);
   --border: light-dark(rgb(28 27 25 / 8%), rgb(236 234 229 / 9%));
   --border-strong: light-dark(rgb(28 27 25 / 16%), rgb(236 234 229 / 18%));
   --control: light-dark(#85837d, #8a8882);
@@ -236,4 +241,12 @@
     color-mix(in srgb, var(--contrast-border-strong) var(--contrast-base), transparent),
     var(--contrast-text) var(--contrast-border-boost)
   );
+}
+
+/* The messages' colours are made of the text's and the surfaces' (item 832): with the contrast set they are made again
+   where the text is, so that they take its stronger ink (the pre-push review: made on the root alone, they kept the
+   plain one). */
+:root[data-contrast] body {
+  --msg-me: light-dark(var(--text), var(--surface-3));
+  --on-msg-me: light-dark(var(--surface), var(--text));
 }

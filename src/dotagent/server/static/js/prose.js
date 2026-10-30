@@ -13,14 +13,24 @@ import { parseBlocks } from "./markdown.js";
 const FILE_PATH = /^(~|\/Users\/[^/\s]+)\/[^\n*?[\]{}$<>|]*[^/\s*?[\]{}$<>|]\.[A-Za-z0-9]{1,8}$/;
 const FILE_PATH_CHARS = 400;
 
+/** A file's path as a chip of its name (item 832): the whole path in its title and for a screen reader, and in a copy
+ * of the message, which takes the text it was written in. */
 function codeNode(value) {
   if (value.length > FILE_PATH_CHARS || !FILE_PATH.test(value)) {
     return el("code", null, value);
   }
+  const name = value.slice(value.lastIndexOf("/") + 1);
   return el(
     "button",
-    { class: "code-path", type: "button", title: "Show the file", dataset: { path: value }, onclick: (event) => requestFile(event.currentTarget) },
-    el("code", null, value),
+    {
+      class: "code-path",
+      type: "button",
+      title: `Show the file: ${value}`,
+      "aria-label": `Show the file ${value}`,
+      dataset: { path: value },
+      onclick: (event) => requestFile(event.currentTarget),
+    },
+    el("code", null, name),
   );
 }
 

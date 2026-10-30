@@ -5129,29 +5129,52 @@ dialog.modal.versions-dialog {
   gap: var(--space-1);
 }
 
-/* Dot's answers are not boxed: they read as text on the page. Only what the user wrote sits in a rounded bubble. */
+/* A chat as a messaging app draws one (item 832, after the owner's screenshots of another agent app): what Dot and its
+   agents say sits in a soft bubble, and what you wrote in an ink one. Until then Dot's answers were text on the page
+   and only yours was boxed. */
 .bubble {
   min-width: 0;
 }
 
-/* Your message sits on the raised surface (item 79); the yellow is Dot's face alone. Its padding is a chat bubble's
-   (item 401): the words, and no room above and below them to scroll past. */
+/* Your message in ink (item 832; the raised surface since item 79, the yellow staying Dot's face alone). Its padding is
+   a chat bubble's (item 401): the words, and no room above and below them to scroll past. */
 .bubble.user {
   align-self: flex-end;
   width: fit-content;
   max-width: 85%;
   margin-left: auto;
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  color: var(--text);
+  background: var(--msg-me);
+  color: var(--on-msg-me);
 }
 
-/* What you wrote reads as markdown (item 206): its code and its tables' heads one surface up from the bubble's. */
+/* What you wrote reads as markdown (item 206): its code and its tables' heads a tint of the bubble's own ink. */
 .bubble.user .prose code,
 .bubble.user .prose .code-block,
 .bubble.user .prose th {
-  background: var(--surface-3);
+  background: color-mix(in oklab, var(--on-msg-me) 14%, transparent);
+  color: inherit;
+}
+
+.bubble.user .prose a {
+  color: inherit;
+}
+
+/* What Dot and its agents say, the answer and the lines along the way, in a soft bubble (item 832); a bubble that holds
+   a table, code or a picture takes the column's width, as those need it. */
+.answer > .prose,
+.bubble.say > .prose {
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--msg-agent);
+}
+
+.answer > .prose:has(:is(pre, table, .table-scroll, .prose-code, .prose-table, figure, img)),
+.bubble.say > .prose:has(:is(pre, table, .table-scroll, .prose-code, .prose-table, figure, img)) {
+  width: 100%;
 }
 
 /* Dot's reaction on your message (item 664): a round badge on the bubble's lower left corner, as a chat shows one, away
@@ -6768,12 +6791,14 @@ summary:has(> .chev)::-webkit-details-marker {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  width: fit-content;
+  max-width: 100%;
   gap: var(--space-2) var(--space-3);
   margin: var(--space-2) 0 var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  /* An attachment of the answer, in the answer's own soft fill (item 832), not a boxed card. */
+  background: var(--msg-agent);
   color: var(--text-2);
   font-size: var(--text-sm);
 }
@@ -6855,6 +6880,26 @@ summary:has(> .chev)::-webkit-details-marker {
 .answer > .prose:has(> :is(pre, table, .table-scroll, .prose-code, .prose-table, figure, img, hr):last-child) + .answer-foot,
 .answer-foot:not(:has(.btn)) {
   margin-top: var(--space-2);
+}
+
+/* Under a bubble the foot keeps a breath from it (item 832): the bubble's fill ends where its words do. */
+.answer > .prose + .answer-foot {
+  margin-top: var(--space-1);
+}
+
+/* Where a pointer can hover, the foot of an answer that ended well and of your message waits for it, as a messaging
+   app's actions do (item 832): a reaction that stands, a failure and a stop stay in sight. */
+@media (hover: hover) {
+  .answer.done > .answer-foot:not(:has(.reaction-chip)),
+  .user-message > .message-foot {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease);
+  }
+
+  .answer.done:is(:hover, :focus-within) > .answer-foot,
+  .user-message:is(:hover, :focus-within) > .message-foot {
+    opacity: 1;
+  }
 }
 
 .answer-foot .btn {

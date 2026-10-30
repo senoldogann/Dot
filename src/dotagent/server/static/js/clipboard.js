@@ -132,7 +132,8 @@ function inlineOf(node) {
     case "S":
       return wrapped("~~", inline(node.childNodes));
     case "CODE":
-      return codeSpan(node.textContent);
+      // A file's chip shows its name; the copy takes the path it was written as (item 832).
+      return codeSpan(node.parentElement?.matches("button.code-path") ? (node.parentElement.dataset.path ?? node.textContent) : node.textContent);
     case "A":
       return link(node);
     default:
@@ -337,7 +338,8 @@ function cleanHtml(nodes) {
     node.remove();
   }
   for (const button of holder.querySelectorAll("button.code-path")) {
-    button.replaceWith(...button.childNodes);
+    // The path as it was written, not the name its chip shows (item 832).
+    button.replaceWith(el("code", null, button.getAttribute("data-path") ?? button.textContent));
   }
   for (const node of holder.querySelectorAll("*")) {
     for (const name of node.getAttributeNames()) {
