@@ -331,7 +331,7 @@ def test_a_verdicts_text_past_its_bound_is_cut_there_when_it_holds_nothing_a_gat
         "Plan the shelves first, then " + "read each shelf with its own tool and say what was found " * 4
     )
     proposal: HarnessProposal = _verdict_from(
-        _called(PROPOSE_TOOL, _proposal(long_summary)), PROPOSE_TOOL, HarnessProposal, "ollama:deepseek", ()
+        _called(PROPOSE_TOOL, _proposal(long_summary)), PROPOSE_TOOL, HarnessProposal, "ollama:deepseek"
     )
     assert len(proposal.summary) == 120
     assert proposal.summary.endswith("…")
@@ -351,7 +351,6 @@ def test_a_verdicts_text_past_its_bound_is_cut_there_when_it_holds_nothing_a_gat
         PLAYBOOK_TOOL,
         PlaybookReply,
         "ollama:deepseek",
-        (),
     )
     assert len(draft.description) == 200 and draft.description.endswith("…")
     # Read plainly, the type still refuses a text past its bound, and a text within it is kept as written.
@@ -378,7 +377,7 @@ def test_a_text_past_its_bound_that_holds_what_a_gate_refuses_is_not_cut_but_ask
     summary: str = "Plan the shelves first and read each one with care, " * 2 + tail
     assert len(summary) > 120
     with pytest.raises(ProviderProtocolError) as raised:
-        _verdict_from(_called(PROPOSE_TOOL, _proposal(summary)), PROPOSE_TOOL, HarnessProposal, "m", ())
+        _verdict_from(_called(PROPOSE_TOOL, _proposal(summary)), PROPOSE_TOOL, HarnessProposal, "m")
     assert "summary: String should have at most 120 characters" in raised.value.message
     held: str = "correct-horse-battery-staple-9"
     with pytest.raises(ProviderProtocolError):
@@ -387,11 +386,11 @@ def test_a_text_past_its_bound_that_holds_what_a_gate_refuses_is_not_cut_but_ask
             PROPOSE_TOOL,
             HarnessProposal,
             "m",
-            (held,),
+            lambda: (held,),
         )
     wrong_too: JsonObject = {**_proposal("Plan the shelves first, " * 8), "keep": "maybe"}
     with pytest.raises(ProviderProtocolError):
-        _verdict_from(_called(PROPOSE_TOOL, wrong_too), PROPOSE_TOOL, HarnessProposal, "m", ())
+        _verdict_from(_called(PROPOSE_TOOL, wrong_too), PROPOSE_TOOL, HarnessProposal, "m")
 
 
 def test_a_skills_kind_past_its_bound_is_not_cut_and_the_skill_is_asked_again() -> None:
@@ -414,6 +413,5 @@ def test_a_skills_kind_past_its_bound_is_not_cut_and_the_skill_is_asked_again() 
             PLAYBOOK_TOOL,
             PlaybookReply,
             "m",
-            (),
         )
     assert "kind: String should have at most 60 characters" in raised.value.message

@@ -62,6 +62,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/reflection.py:_describe_owner": (False,),
     "harness/propose.py:propose_from_run": (False,),
     "harness/step.py:_carry_out": (False,),
+    # Whether a review model's line past its bound may be cut: refused when, whole, it holds a value (item 840).
+    "agent/review.py:_refused_values": (False,),
     "agent/review.py:harness_proposer_for.propose": (False,),
     "agent/review.py:harness_composer_for.compose": (False,),
     "agent/review.py:experience_writer_for.write": (False,),

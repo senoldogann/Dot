@@ -1434,7 +1434,7 @@ def text_arguments(text: str, tool: str) -> JsonObject | None:
     return parsed
 
 
-def _cuttable(arguments: JsonObject, exc: ValidationError, secrets: Sequence[str]) -> bool:
+def _cuttable(arguments: JsonObject, exc: ValidationError, secrets: Callable[[], Sequence[str]]) -> bool:
     """Whether a verdict that failed only for texts past their bound may be read with them cut there (item 840): each
     such text, whole, passes the strictest gate a learned text has (:func:`dotagent.core.learned_text.gate` with the
     links and the account names: no secret, of the values Dot holds or of a known form, no e-mail address, link, path in
@@ -1444,6 +1444,7 @@ def _cuttable(arguments: JsonObject, exc: ValidationError, secrets: Sequence[str
     errors = exc.errors(include_url=False, include_context=False, include_input=False)
     if not errors or any(error["type"] != "string_too_long" for error in errors):
         return False
+    held: Sequence[str] = secrets()
     for error in errors:
         value: object = arguments
         for part in error["loc"]:
@@ -1453,18 +1454,22 @@ def _cuttable(arguments: JsonObject, exc: ValidationError, secrets: Sequence[str
                 value = value[part]
             else:
                 return False
-        if not isinstance(value, str) or gate(value, secrets) is not None:
+        if not isinstance(value, str) or gate(value, held) is not None:
             return False
     return True
 
 
 def _verdict_from[V: FrozenModel](
-    reply: ModelReply, tool: str, verdict_type: type[V], model: str, secrets: Sequence[str] = ()
+    reply: ModelReply,
+    tool: str,
+    verdict_type: type[V],
+    model: str,
+    secrets: Callable[[], Sequence[str]] = tuple,
 ) -> V:
     """The verdict a reply carries; anything else is a protocol error that names what was wrong with it, but for a
     reply the provider ended as a refusal, a :class:`ProviderRefusedError` that names the model. A verdict whose only
-    fault is texts past their bound that may be cut (:func:`_cuttable`, against ``secrets``, the values Dot holds) is
-    read with them cut."""
+    fault is texts past their bound that may be cut (:func:`_cuttable`, against ``secrets``, which gives the values Dot
+    holds and is called only then) is read with them cut."""
     context: JsonObject = {
         "model": model,
         "finish": reply.raw_finish,
@@ -1523,6 +1528,11 @@ def _fields_wrong(exc: ValidationError) -> str:
     return truncate_middle("; ".join(problems), _FIELDS_WRONG_CHARS)
 
 
+def _refused_values() -> tuple[str, ...]:
+    """The values Dot holds as a refusing gate reads them (``filled`` false), for :func:`_cuttable` (item 840)."""
+    return known_secrets(filled=False)
+
+
 async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V:
     ref: ModelRef = parse_model_ref(question.review_model)
     # The review model may be another provider's than the run's: what it reads has the secrets Dot holds and the ones
@@ -1549,9 +1559,8 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
             "the review model did not answer in time", {"model": ref.label, "timeout_s": question.timeout_s}
         ) from exc
     # A text past its bound is cut only when, whole, it holds none of the values Dot holds (item 840): refused, as the
-    # gates of what is learned refuse, so `filled` is false.
-    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-    return _verdict_from(reply, question.tool.name, question.verdict_type, ref.label, held)
+    # gates of what is learned refuse, so `filled` is false; read only when a text would be cut, a small file.
+    return _verdict_from(reply, question.tool.name, question.verdict_type, ref.label, _refused_values)
 
 
 def _as_is[V: FrozenModel](verdict: V) -> V:
