@@ -277,7 +277,10 @@ textarea {
   flex: none;
   fill: none;
   stroke: currentcolor;
-  stroke-width: 2;
+  /* As thick on every icon, whatever the frame it is seen through (icons.js, item 849). */
+  stroke-width: calc(2 / var(--icon-scale, 1));
+  /* A frame drawn close around a shape leaves the stroke's own half-width past its edge: drawn, not cut. */
+  overflow: visible;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -5158,7 +5161,7 @@ dialog.modal.versions-dialog {
 .plan-step.done .mark .icon {
   width: 9px;
   height: 9px;
-  stroke-width: 3.5;
+  stroke-width: calc(3.5 / var(--icon-scale, 1));
 }
 
 .plan-step.done .text {
@@ -5213,7 +5216,7 @@ dialog.modal.versions-dialog {
 .plan-step.skipped .mark .icon {
   width: 9px;
   height: 9px;
-  stroke-width: 3.5;
+  stroke-width: calc(3.5 / var(--icon-scale, 1));
 }
 
 .plan-step.failed .text {
