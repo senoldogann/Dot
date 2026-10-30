@@ -442,8 +442,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     ),
     lessonsBody,
   );
-  // Where the lessons stand (item 842): in the conversation while one waits for your decision or notes wait for your
-  // look, else at the head of the side panel's Task tab, which counts them. A chat says only what needs you.
+  // Where the lessons stand (item 842): in the conversation while one waits for your decision, notes wait for your
+  // look or they could not be drawn, else at the head of the side panel's Task tab, which counts them. A chat says
+  // only what needs you.
   const lessonsPlace = el("div", { class: "lessons-place" });
   const lessonsSlot = el("div", { class: "lessons-slot" });
   function placeLessons(needsYou, count) {
@@ -604,7 +605,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       ].filter((node) => node !== null),
       ...doubted,
     );
-    placeLessons(proposed > 0 || doubted.length > 0, lessons.lessons.length);
+    // Lessons that could not be drawn say so where the owner reads, as before (the review: in the panel, missed).
+    placeLessons(proposed > 0 || doubted.length > 0 || lessons.error !== null, lessons.lessons.length);
   }
 
   // ------------------------------------------------------------------------------------------ questions
@@ -1231,8 +1233,14 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     // What the run changed on this Mac, with the way back (item 597), read as the answer comes, in the Changes tab.
     undoLine.load();
     // The way to the steps is in the answer's foot, where the pointer rests (item 842), not a line of its own under it.
+    // It starts from whether the steps are shown: the line may have shown them while the run worked (the review).
+    const stepsShown = workStatus.shown();
     node.querySelector(".answer-foot .answer-facts")?.before(
-      el("button", { class: "btn ghost sm answer-steps", type: "button", "aria-pressed": "false", onclick: () => workStatus.toggle() }, "Show the steps"),
+      el(
+        "button",
+        { class: "btn ghost sm answer-steps", type: "button", "aria-pressed": String(stepsShown), onclick: () => workStatus.toggle() },
+        stepsShown ? "Hide the steps" : "Show the steps",
+      ),
     );
     if (openedFinished) {
       // A chat that is over when it opens starts at its foot, on the newest message (item 440), and keeps there while

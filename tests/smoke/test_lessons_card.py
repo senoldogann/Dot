@@ -210,13 +210,12 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
                 (None, "could not be drawn"),
             ):
                 page, errors = await _page_with_lessons(browser, address, run.id, lessons)
-                # Lessons that wait for a decision stand in the conversation; lessons that could not be drawn ask
-                # nothing of the owner and head the Task tab (item 842).
-                if lessons is None:
-                    await page.get_by_role("button", name="Task details").first.click()
-                place: str = ".lessons-place" if lessons is not None else ".lessons-slot"
+                # Lessons that wait for a decision, and lessons that could not be drawn, stand in the conversation
+                # (item 842 and its review).
                 count: Locator = (
-                    page.locator(place).get_by_role("region", name="Lessons from this task").locator(".lessons-count")
+                    page.locator(".lessons-place")
+                    .get_by_role("region", name="Lessons from this task")
+                    .locator(".lessons-count")
                 )
                 await expect(count).to_have_text(said)
                 await expect(count).to_have_attribute("data-tone", "warn" if lessons is not None else "bad")
