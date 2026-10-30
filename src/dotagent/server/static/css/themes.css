@@ -242,3 +242,11 @@
     var(--contrast-text) var(--contrast-border-boost)
   );
 }
+
+/* The messages' colours are made of the text's and the surfaces' (item 832): with the contrast set they are made again
+   where the text is, so that they take its stronger ink (the pre-push review: made on the root alone, they kept the
+   plain one). */
+:root[data-contrast] body {
+  --msg-me: light-dark(var(--text), var(--surface-3));
+  --on-msg-me: light-dark(var(--surface), var(--text));
+}
