@@ -23,7 +23,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Annotated, Literal
 
-from pydantic import Field, StringConstraints, ValidationError, field_validator, model_validator
+from pydantic import BeforeValidator, Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from dotagent.core.errors import (
     ConfigError,
@@ -456,6 +456,33 @@ _RULE_SYSTEM: str = (
 )
 
 
+def _clipped(limit: int) -> Callable[[object], object]:
+    """A text of a verdict cut at ``limit`` characters with an ellipsis, rather than refused (item 840): its bound keeps
+    a line short where it is shown and stored, and a model that writes past it (DeepSeek V4.1 Flash wrote a summary of
+    over 120 characters, twice, and the night's step failed; a skill's description of over 200, and the skill was
+    lost) has said what it meant. A value that is no text is left to the type to refuse."""
+
+    def clip(value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        stripped: str = value.strip()
+        return stripped if len(stripped) <= limit else stripped[: limit - 1].rstrip() + "…"
+
+    return clip
+
+
+# The texts of the verdicts, a line or a sentence each, bound and clipped at their bound (item 840).
+Text120 = Annotated[
+    str, BeforeValidator(_clipped(120)), StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+]
+Text200 = Annotated[
+    str, BeforeValidator(_clipped(200)), StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+]
+Text300 = Annotated[
+    str, BeforeValidator(_clipped(300)), StringConstraints(strip_whitespace=True, min_length=1, max_length=300)
+]
+
+
 class ReviewRequest(FrozenModel):
     """What the reviewer is asked: ``instructions`` are the user's own words, oldest first."""
 
@@ -565,9 +592,7 @@ class LessonVetRequest(FrozenModel):
 class LessonVerdict(FrozenModel):
     lesson: int = Field(ge=1, description="The number of the lesson the verdict is about, as the list numbers it.")
     keep: bool = Field(description="Whether the lesson may be saved with nobody reading it first.")
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="Why, in a few words."
-    )
+    reason: Text120 = Field(description="Why, in a few words.")
 
 
 class LessonVetting(FrozenModel):
@@ -594,9 +619,7 @@ class OutdatedRequest(FrozenModel):
 class OutdatedVerdict(FrozenModel):
     pair: int = Field(ge=1, description="The number of the pair the verdict is about (PAIR n).")
     outdated: bool = Field(description="Whether the newer note makes the older one outdated or wrong.")
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="Why, in a few words."
-    )
+    reason: Text120 = Field(description="Why, in a few words.")
 
 
 class OutdatedJudgement(FrozenModel):
@@ -630,9 +653,7 @@ class MergeVerdict(FrozenModel):
         ge=0,
         description="The number, among those merged, of the note whose words say it best; 0 when none is merged.",
     )
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="Why, in a few words."
-    )
+    reason: Text120 = Field(description="Why, in a few words.")
 
 
 class MergeJudgement(FrozenModel):
@@ -665,9 +686,7 @@ class OverlapVerdict(FrozenModel):
         le=2,
         description="1 or 2: the skill whose name the merged skill keeps; 0 when the two are not one procedure.",
     )
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="Why, in a few words."
-    )
+    reason: Text120 = Field(description="Why, in a few words.")
 
 
 class OverlapJudgement(FrozenModel):
@@ -696,7 +715,7 @@ class OwnerRequest(FrozenModel):
 
 class OwnerDraft(FrozenModel):
     lines: Annotated[
-        list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]],
+        list[Text300],
         Field(max_length=12),
     ] = Field(description="The agent's lines of the section, rewritten: at most twelve, one fact each.")
 
@@ -764,7 +783,7 @@ class PlaybookDraft(FrozenModel):
             "the values of this run: 'audit an X profile', 'turn a PDF table into CSV'."
         )
     )
-    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = Field(
+    description: Text200 = Field(
         description=(
             "One sentence, at most 200 characters, that a later run reads to decide whether this skill fits its "
             "goal: what is done and where."
@@ -940,12 +959,10 @@ class HarnessProposal(FrozenModel):
         description="The whole new text of the tool guidance, or null to leave it as it is."
     )
     moments: Annotated[
-        list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]],
+        list[Text300],
         Field(max_length=3),
     ] = Field(description="The moments of the run each change answers to, a line each; empty when keep is true.")
-    summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="What the candidate changes, in a line; 'keep' when keep is true."
-    )
+    summary: Text120 = Field(description="What the candidate changes, in a line; 'keep' when keep is true.")
 
     # A model answers "no text" as the word null or none, or as nothing, and "no moment" as null: read at the boundary
     # as what it means (seen with Claude Haiku 5.5, 2026-10-19).
@@ -986,11 +1003,9 @@ class CompositionRequest(FrozenModel):
 
 class CompositionDecision(FrozenModel):
     candidate: int = Field(ge=1, description="The number of the candidate the decision is about.")
-    edit: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = Field(
-        description="The change decided on, in a few words."
-    )
+    edit: Text200 = Field(description="The change decided on, in a few words.")
     verdict: EditWord = Field(description="kept as it is, revised, or dropped.")
-    evidence: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
+    evidence: Text300 = Field(
         description="The observation the decision rests on: a moment of the run, a probe's contrast, a count."
     )
 
@@ -1002,9 +1017,7 @@ class HarnessComposition(FrozenModel):
     decisions: Annotated[list[CompositionDecision], Field(max_length=12)] = Field(
         description="One decision for each change a candidate proposed."
     )
-    summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="What the composed version changes, in a line; 'keep' when keep_base is true."
-    )
+    summary: Text120 = Field(description="What the composed version changes, in a line; 'keep' when keep_base is true.")
 
 
 class SelectionRequest(FrozenModel):
@@ -1017,9 +1030,7 @@ class SelectionRequest(FrozenModel):
 
 class HarnessSelection(FrozenModel):
     choice: int = Field(ge=1, description="The number of the answer chosen.")
-    why: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
-        description="The criterion that decided, and the closest runner-up, in a few lines."
-    )
+    why: Text300 = Field(description="The criterion that decided, and the closest runner-up, in a few lines.")
 
 
 class EditOutcome(FrozenModel):
@@ -1045,21 +1056,13 @@ class ExperienceRequest(FrozenModel):
 class EditEffect(FrozenModel):
     edit: int = Field(ge=1, description="The number of the edit the effect is about.")
     effect: EffectWord = Field(description="helped, hurt, no_effect, or confounded when it cannot be told apart.")
-    why: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = Field(
-        description="What was observed, in a few words."
-    )
+    why: Text200 = Field(description="What was observed, in a few words.")
 
 
 class ExperienceEntry(FrozenModel):
-    cue: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = Field(
-        description="The shape of situation the lesson applies to, not the facts of this task."
-    )
-    lesson: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
-        description="A transferable operation, naming its component."
-    )
-    evidence: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
-        description="The edits and observations the lesson rests on."
-    )
+    cue: Text200 = Field(description="The shape of situation the lesson applies to, not the facts of this task.")
+    lesson: Text300 = Field(description="A transferable operation, naming its component.")
+    evidence: Text300 = Field(description="The edits and observations the lesson rests on.")
     confidence: ConfidenceWord = Field(description="high, medium or low.")
 
 

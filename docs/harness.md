@@ -308,9 +308,12 @@ the **composer** (`compose_harness`: one version of the candidates, a decision w
 base kept), the **selector** (`select_answer`: the best of anonymous answers to one goal, judged on delivery,
 conformance, fidelity, consistency, fitness and finish, never on length) and the **experience writer**
 (`write_experience`: what each edit did, and an experience only when an edit helped or hurt with evidence). An answer
-that breaks its rules (a text past the bounds, a change with no moment, an
-experience with no effect behind it) is asked once more with what was wrong (the fields and their problems, never a
-key the model made up, as the step says them when it fails), then the step fails and says so.
+that breaks its rules (a habits or tool guidance text past the bounds, a change with no moment, an experience with no
+effect behind it) is asked once more with what was wrong (the fields and their problems, never a key the model made
+up, as the step says them when it fails), then the step fails and says so. A line of an answer past its bound (a
+summary's 120 characters, an edit's or a cue's 200, a moment's, a piece of evidence's or a lesson's 300, and so a
+skill's description's 200) is cut there with an ellipsis rather than refused (item 840: on 2026-10-30 DeepSeek V4.1
+Flash wrote a summary past 120 twice and the night's step failed, and a skill was lost on its description).
 `[harness] proposer`, `composer`, `selector` and `experience` name a model for each; "" is `[models] review`.
 `dotx harness propose RUN_ID [--scope invariant|domain]` asks the proposer about one run by hand and writes its
 candidate, whose notes keep the scope and the moments; `keep` writes nothing.

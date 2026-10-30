@@ -299,3 +299,50 @@ async def test_the_writer_keeps_a_skill_answered_in_text_at_the_first_answer() -
     written: PlaybookDraft = await (await _writer(provider))(REQUEST)
     assert written.kind == DRAFT["kind"]
     assert len(provider.asked) == 1
+
+
+def test_a_verdicts_text_past_its_bound_is_cut_there_rather_than_refused() -> None:
+    """Item 840: the night's step of 2026-10-30 failed as "the proposer failed in the domain scope: the arguments of
+    propose_harness are not a valid verdict (summary: String should have at most 120 characters)", DeepSeek V4.1 Flash
+    writing past the bound twice, and a skill was lost the same way on its description's 200. The text is cut at its
+    bound with an ellipsis; the tool's schema still tells the model the bound."""
+    from dotagent.agent.review import HarnessProposal
+
+    long_summary: str = (
+        "Plan the shelves first, then " + "read each shelf with its own tool and say what was found " * 4
+    )
+    proposal: HarnessProposal = HarnessProposal.model_validate(
+        {
+            "keep": False,
+            "habits": "Plan first.",
+            "tool_guidance": None,
+            "moments": ["step 3 read the wrong shelf"],
+            "summary": long_summary,
+        }
+    )
+    assert len(proposal.summary) == 120
+    assert proposal.summary.endswith("…")
+    assert proposal.summary.startswith("Plan the shelves first, then read each shelf")
+    draft: PlaybookDraft = PlaybookDraft.model_validate(
+        {
+            "kind": "audit a shelf",
+            "description": "Reads every shelf and lists what is on it. " * 8,
+            "when": "A shelf to audit.",
+            "steps": ["Open the shelf."],
+            "parameters": [],
+        }
+    )
+    assert len(draft.description) == 200 and draft.description.endswith("…")
+    # A text within its bound is kept as written, and an empty one is still refused.
+    assert (
+        HarnessProposal.model_validate(
+            {"keep": True, "habits": None, "tool_guidance": None, "moments": [], "summary": "keep"}
+        ).summary
+        == "keep"
+    )
+    with pytest.raises(ValidationError):
+        HarnessProposal.model_validate(
+            {"keep": True, "habits": None, "tool_guidance": None, "moments": [], "summary": " "}
+        )
+    schema = HarnessProposal.model_json_schema()
+    assert schema["properties"]["summary"]["maxLength"] == 120
