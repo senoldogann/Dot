@@ -54,25 +54,27 @@ were sections with a label, a count and a fold, item 513); a search keeps what w
 arrows reach what waits first, then what works and the list, as the search finds them.
 **The chats a channel's messages made** (item 619, [Channels](channels.md): today the **iMessage** chat, a thread whose
 `source` is the channel's id) leave the days for a section of their own at the foot of the list, under the days, with
-its name and how many chats it holds: **iMessage 1**, with no mark, its words where Chats' are (item 828). Its label
-folds it, as Chats' does, and the fold is kept between visits; folding Chats does not fold it, nor does it fold Chats.
-**Dot's own work** stands so too (item 822), above iMessage: **On its own** (a chat for each thing of Dot's own list and
-one for each look for work, [Proactive](proactive.md#on-its-own)) and **Scheduled** (the chats of the schedules), each
-folded until you open it, so that the days hold your own chats; opened, it stays open as you left it. Their labels have
-no mark, so that their words stand where Chats' do, and under a folded Chats the first of them follows as one section
-follows another (item 827).
+its name and how many chats it holds: **iMessage 1**, with no mark, its label where the days' labels stand (items 828
+and 855). Its label folds it, and the fold is kept between visits. **Dot's work** stands so too (items 822 and 855),
+above iMessage: one section for the chats of Dot's own initiative (a chat for each thing of its own list and one for
+each look for work, [Proactive](proactive.md#on-its-own)) and of the schedules, folded until you open it, so that the
+days hold your own chats; opened, it stays open as you left it (until item 855 they were two, **On its own** and
+**Scheduled**). The days themselves have no heading and no fold (item 855: a **Chats** label named the list and
+folded it); their labels (Pinned, Today, Yesterday…) are small and quiet, and **Select** stands at the right of the
+first of them.
 Folded over a chat you have not read, the label shows the accent's dot after its count. Its chat is a row like any
 chat's, with its menu; Select and the arrow keys reach it, and a search shows what it finds in it, folded or not. A
 chat of it at work stands with what works like every chat (item 202) and comes back once the run ends, and one you
 pinned stays under Pinned.
-Above the list: a search over the titles (⌘K or `/`) and the ways to **Agents**, **Campaigns** and **Schedules** (a
-page of its own since item 401); a new chat is the **+** at the right of the sidebar's head (⇧⌘O; item 834, where a
-row under the search said New chat), and on a phone the round **+** of the foot. Under the search your agents stand
-as faces (item 835), as a messaging app's people: each its face over its name, on two lines at most, to its page,
-where a message to it starts, the one whose page is open marked; the row scrolls sideways past what the sidebar holds,
-and its last tile, **All**, is the page of every agent and team, which the Agents row is while you have no agent of
-your own; an agent made, changed or deleted on a page shows there at once, and one a run made once that run ends. In
-the foot, the cog of **Settings**, **Connect apps** beside it
+Above the list: a search over the titles (⌘K or `/`) and, while you have no agent of your own, the way to **Agents**;
+**Campaigns** and **Schedules** (a page of its own since item 401) are icons at the right of the sidebar's head
+(item 855: they were rows of their own), before the **+** of a new chat (⇧⌘O; item 834, where a row under the search
+said New chat), which on a phone is the round **+** of the foot. Under the search your agents stand as faces (item
+835), as a messaging app's people: the three that worked last, each its face over its name on one line, to its page,
+where a message to it starts, the one whose page is open marked, and **All**, the page of every agent and team, in
+four columns the sidebar holds whole (item 855: the row scrolled sideways and cut a face at its edge); an agent made,
+changed or deleted on a page shows there at once, and one a run made once that run ends. In the foot, the cog of
+**Settings**, **Connect apps** beside it
 ([Connect apps](extending.md#connect-apps), items 492 and 545), which opens
 [Customize › Connectors](extending.md#customize--connectors), and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
@@ -85,8 +87,9 @@ Handoffs, Diagnostics and the licences open on what they hold), and so do the pa
 proposals; a row of the Memory, Vault and Schedules pages shows one action (a schedule's switch) and keeps the rest in
 its **…**. Every icon draws about the same area at its size, with the same stroke (item 849): a "+", a speaker or
 a microphone no smaller than a copy beside it, each shape seen through a frame of its own (`icons.js`). The sections
-(Chats, and a channel's) fold on a click of their label, and the folds are kept between visits. The sidebar's head holds
-the button that folds it away, at its left, and the **+** of a new chat. **Select** turns the list into checkboxes, each chat keeping its creature and the mark of
+at the foot (Dot's work, a channel's) fold on a click of their label, and the folds are kept between visits. The
+sidebar's head holds the button that folds it away, at its left, and the **+** of a new chat. **Select** turns the list
+into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
 and approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to
 end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a

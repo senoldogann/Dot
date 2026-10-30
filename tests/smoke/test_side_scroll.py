@@ -46,8 +46,9 @@ _NOTES: int = 45
 _WAIT_COMMAND: str = "sleep 300"
 _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
-# A list one row shorter may move by about a row; a jump back to the open chat moves it by the whole list.
-_ROW_SLACK_PX: int = 80
+# A list one row shorter may move by about a row, and the bar of Select, which takes the place of no row since the
+# chats lost their heading (item 855), by its own height; a jump back to the open chat moves it by the whole list.
+_ROW_SLACK_PX: int = 130
 # Enough learned skills for more than a section shows at first.
 _SKILLS: int = 20
 _SHOWN_SKILLS: int = 6
