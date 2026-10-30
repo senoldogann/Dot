@@ -5024,7 +5024,7 @@
 }
 
 .trading-watch-line.ok .trading-dot {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .trading-watch-line.warn .trading-dot {
