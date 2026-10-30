@@ -404,8 +404,9 @@ step, a delegated run, an eval's, one of OpenCode's agent, a chat-mode run and a
 skill**, under a **More** button, until item 406.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
-while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
-failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
+while it works, an amber ring while it waits for you, a tick in the text's ink for a moment when the run ends done
+(item 839: it was green), red when it failed (with reduced motion the tick simply shows). The panel button sits on the
+right; the run's facts (its state,
 agent, model, approval mode, goal mode, campaign, work, time, mode, start and id) are under More on the panel's Task tab,
 closed the first time (items 452 and 544). Your goal is the
 first message, in the ink bubble of your messages (item 832). What you write reads there as markdown, as an
@@ -429,8 +430,9 @@ chat's box when it was the first. **Also undo the file changes** also takes back
 the file tools, each file that is as they left it; a file changed since is left and named, and what a command changed
 stays. A message sent before Dot kept the place of each message in its chat has no Edit from here, nor has one that
 steered a turn at work, and a chat is not rewound while a run works on it or messages wait in its queue. A delegated run
-is a row: the face with its state at the corner (turning while it works, amber while it waits for you, green with a
-check when it is done, red when it failed), its name and its goal over the last thing it did and, once it ended, the
+is a row: the face with its state at the corner (turning while it works, amber while it waits for you, a check in
+the text's ink when it is done, item 839, red when it failed), its name and its goal over the last thing it did and,
+once it ended, the
 start of its answer (item 245): an agent's run is named by the agent ("Scout"), any other by its place among the
 helpers of the run that started it ("Helper 1", "Helper 2"), and the goal follows quieter, its paths cut to their last
 two parts ("…/housestory/brief.md"); the last thing it did names the tool in the words the steps use ("step 32 ·
@@ -787,7 +789,7 @@ In a Mac's window the sidebar is the settings' nav while they are open (item 562
 open; in the desktop app under the traffic lights, whose row holds the button that hides the sidebar where the chats'
 head holds it, item 577) and the tabs in four groups (Interface, Models, How Dot works, This Mac), each with what it
 holds at its right (the main model, how many AI services have a key, how many notes Dot keeps, how many items the vault
-holds, a green dot when a phone reaches Dot); whether the daemon answers and the emergency stop are the page's, as on
+holds, a dot when a phone reaches Dot); whether the daemon answers and the emergency stop are the page's, as on
 every page. The page is the open tab alone, in a column of 920 px under its own name and the line that says what it is
 for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On
 a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
@@ -998,7 +1000,11 @@ blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing
 contrast's mixing, the families typed, the theme generator, the theme file with its checks and the VS Code import are a
 port of an MIT-licensed project to plain ES modules; its notice is `static/js/appearance/LICENSE`, and Dot is not
 affiliated with that project. The looks are one visual system. Colour: every colour is a token of `themes.css` naming
-its light and its dark value in one place; surfaces step up by lightness (page, sunken sidebar, raised cards) rather
+its light and its dark value in one place; colour is for what waits for you (the warning's amber), what failed (red)
+and what is unread (the dot), and a state that is fine (done, ready, connected, understood) wears the text's second
+ink on a soft fill (`--fine` and `--fine-weak`, item 839: they were green), while green stays where it is a
+convention of the data (a diff's additions, a string in code, a trade that rose); surfaces step up by lightness (page,
+sunken sidebar, raised cards) rather
 than by shadow in dark; borders are the text colour at a small alpha so they sit on every surface; the text tiers are
 measured against every surface by a unit test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones; the
 neutral and the paper look hold the muted one to 4.5:1 too, the sidebar's group labels being set in it); the yellow is
