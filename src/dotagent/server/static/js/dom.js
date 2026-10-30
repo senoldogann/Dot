@@ -150,14 +150,6 @@ export function clip(text, limit) {
   return flat.length <= limit ? flat : `${flat.slice(0, limit - 1)}…`;
 }
 
-/** The first `words` words of `text`, and at most `limit` characters, with an ellipsis when something was cut. */
-export function clipWords(text, words, limit) {
-  const flat = text.replace(/\s+/g, " ").trim();
-  const parts = flat.split(" ");
-  const short = parts.length <= words ? flat : `${parts.slice(0, words).join(" ")}…`;
-  return short.length <= limit ? short : clip(short, limit);
-}
-
 // A reply of fewer words, after its first line, is the answer said again only word for word (item 567).
 const REPEAT_MIN_WORDS = 20;
 // A reply's first line is the answer's reworded when at least this share of its words are in the answer's first line.

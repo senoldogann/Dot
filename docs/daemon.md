@@ -35,16 +35,23 @@ loop takes its mark with it. A campaign's conversation wears another mark at the
 on a disc of orange and pink, so that a chat a schedule asks again and one a campaign drives are told apart; deleted,
 the campaign takes its mark with it.
 Each chat stands once (item 202):
-while its latest run works, a chat leaves its day for the **Working** section above the list, and goes back once the run
-ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,
+while its latest run works, a chat leaves its day for the rows of what works, above the list, and goes back once the
+run ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,
 **Working** and how long since the run was asked for ("12s", "4m", "1h 5m", read again every second).
 Under its name, in the line its last words would take, stand the faces of the runs it delegated (item 507), those at
 work and those that ended: three at most, laid over one another as the marks of the connected apps stand in the foot, the
 rest counted, and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
-whose conversation and Agents tab hold those runs. Working lists too what is no chat's: the session of a campaign
-(which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and
-its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working hides its rows,
-the open chat's too, and keeps its count (item 513), and the search finds the chats at work, folded or not.
+whose conversation and Agents tab hold those runs. What works lists too what is no chat's: the session of a campaign
+(which works in a thread of its own). A chat that waits for you (item 836) leaves its day too and stands first, above
+what works, as its own row with its menu, its creature waiting: its last line says **Waiting for you:** and what
+has waited longest, with how many more wait ("(+1)"), in the warning's ink, the dot of a run that waits stands in its
+age's place, and its name for a screen reader names each thing and how it waits; a pinned chat stays under Pinned,
+saying it there. A chat that waits while its run goes on (a step kept for you, item 482) stands once, with what
+waits. What waits that is no listed chat's (a run whose chat is not listed, a session of a campaign) is a row
+of the same shape: its creature, what waits, and **Waiting for you** with how it waits. Neither has a heading, nor
+folds, as a messaging app's rows say what they are themselves (until item 836, **Waiting for you** and **Working**
+were sections with a label, a count and a fold, item 513); a search keeps what waits in sight, and its Enter and the
+arrows reach what waits first, then what works and the list, as the search finds them.
 **The chats a channel's messages made** (item 619, [Channels](channels.md): today the **iMessage** chat, a thread whose
 `source` is the channel's id) leave the days for a section of their own at the foot of the list, under the days, with
 its name and how many chats it holds: **iMessage 1**, with no mark, its words where Chats' are (item 828). Its label
@@ -56,7 +63,7 @@ no mark, so that their words stand where Chats' do, and under a folded Chats the
 follows another (item 827).
 Folded over a chat you have not read, the label shows the accent's dot after its count. Its chat is a row like any
 chat's, with its menu; Select and the arrow keys reach it, and a search shows what it finds in it, folded or not. A
-chat of it at work stands under Working like every chat (item 202) and comes back once the run ends, and one you
+chat of it at work stands with what works like every chat (item 202) and comes back once the run ends, and one you
 pinned stays under Pinned.
 Above the list: a search over the titles (⌘K or `/`) and the ways to **Agents**, **Campaigns** and **Schedules** (a
 page of its own since item 401); a new chat is the **+** at the right of the sidebar's head (⇧⌘O; item 834, where a
@@ -72,8 +79,8 @@ the red square of the **Emergency stop**, which stays there while the sidebar is
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
 longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
-while it is being made or lost; what works stands under Working. The sections (Waiting for you, Working, Chats, and
-a channel's) fold on a click of their label, and the folds are kept between visits. The sidebar's head holds
+while it is being made or lost; what works stands at the top of the list. The sections (Chats, and a channel's) fold
+on a click of their label, and the folds are kept between visits. The sidebar's head holds
 the button that folds it away, at its left, and the **+** of a new chat. **Select** turns the list into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
 and approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to
@@ -110,18 +117,17 @@ arguments of an approval. **Mark as read** moves the moment on, kept in this bro
 first visit marks it and shows nothing, so the card never pours out the past, and the server reads a week back at most.
 A run started with **Run now** is one of them.
 
-Above the chats, two sections appear while they have rows: **Waiting for you** (the approvals and questions runs wait
-for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, and a run
-delegated by another; a schedule about to fire is no work yet, and stands under the home's **Due today**, item 608),
-each row with its state dot, the first words of its title on one
-line, and under it the channel it last worked in (browser, files, shell, desktop, mail) and what it needs; a row opens
-the run. A run at work that is no chat's latest run, a later session of a campaign among them, is drawn under
-**Working** as a chat is (item 705): its creature, its name over what it is, and **Working** with how long at the
-right; a session wears the campaign's target at the foot of its creature. They are `GET /api/activity`, which carries
-the runs that ended today too, for the home's **Today** strip; the
-Activity page that showed it all is gone (item 364), and its address leads to the home. A run that ended shows how long
-it took and what it cost in tokens. The sections and the strip follow the lifecycle stream, so a run moves between the
-sections the moment it starts, waits, is taken over or
+Above the chats stand, while they have rows, what waits for you (the approvals and questions runs wait for, those
+left or kept for you, and a run whose browser you took over) and what works (the runs going on, a session of a
+campaign, and a run delegated by another; a schedule about to fire is no work yet, and stands under the home's **Due
+today**, item 608), each a chat's row with no heading over it (item 836), its group named for a screen reader
+(**Waiting for you**, **Working**); a row opens the run. A run at work that is no chat's latest run, a later session
+of a campaign among them, is drawn as a chat is (item 705): its creature, its name over what it is, and **Working**
+with how long at the right; a session wears the campaign's target at the foot of its creature. They are `GET
+/api/activity`, which carries the runs that ended today too, for the home's **Today** strip; the Activity page that
+showed it all is gone (item 364), and its address leads to the home. A run that ended shows how long
+it took and what it cost in tokens. The rows of what waits and what works, and the strip, follow the lifecycle
+stream, so a run moves between them the moment it starts, waits, is taken over or
 ends. The stream replays nothing after a break of the connection (the network dropped, the daemon restarted), so once it
 is back every page that follows it, the run's page and its queue among them, reads again what it shows; so does every
 page when the stream fell so far behind that events were lost (`resync`). A page that cannot read again keeps what it

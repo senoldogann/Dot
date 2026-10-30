@@ -187,15 +187,19 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
                 for slot in await section.locator(".side-working").all():
                     await expect(slot).to_have_text(_WORKING)
                     await expect(slot.locator("svg[data-icon='circleDashed']")).to_have_count(1)
-                # The chat at work says so in its age's place; the one that waits keeps its age among the days, its
-                # creature waiting.
+                # The chat at work says so in its age's place; the one that waits stands first, out of its day, its
+                # creature waiting and the dot of a run that waits in its age's place (item 836).
                 busy: Locator = section.locator(f".side-chat a.side-run[href='#/runs/{working.id}']")
                 await expect(busy.locator(".side-working")).to_have_text(_WORKING)
                 await expect(busy.locator(".side-age")).to_have_count(0)
-                waiting: Locator = sidebar.locator(f".side-runs a.side-run[href='#/runs/{asking.id}']")
+                waiting: Locator = sidebar.locator(f"[data-section=waiting] a.side-run[href='#/runs/{asking.id}']")
                 await expect(waiting.locator(".avatar[data-state='waiting']")).to_have_count(1)
-                await expect(waiting.locator(".side-age")).to_have_count(1)
+                await expect(waiting.locator(".side-waits-dot")).to_have_count(1)
+                await expect(waiting.locator(".side-age")).to_have_count(0)
                 await expect(waiting.locator(".side-working")).to_have_count(0)
+                await expect(sidebar.locator(f".side-runs a.side-run[href='#/runs/{asking.id}']")).to_have_count(0)
+                # Every chat waits or works here, so there is none to choose for deletion: Select is not offered.
+                await expect(sidebar.get_by_role("button", name="Select", exact=True)).to_be_hidden()
                 if index == 0:
                     # The seconds count while the page rests.
                     figure: Locator = busy.locator(".side-working-time")
@@ -204,6 +208,55 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
                     await expect(figure).not_to_have_text(before)
                 await page.screenshot(path=str(tmp_path / f"working-{width}-{scheme}.png"))
                 await page.close()
+            # A step kept for the owner while the run goes on (item 482) makes its chat wait and work at once: it stands
+            # once, with what waits (item 836's pre-push review: it stood with what works too); pinned, it says so
+            # under Pinned, and once the step is answered its row is what works again.
+            assert working.thread_id is not None
+            kept: ApprovalRecord = await runtime.store.create_kept_approval(
+                working.id,
+                "write_file",
+                "Write notes.md",
+                "handoff",
+                {
+                    "tool": "write_file",
+                    "kind": "write",
+                    "risk": "medium",
+                    "target": "notes.md",
+                    "amount": None,
+                    "flags": [],
+                },
+                "digest-836",
+                time.time() + 3600,
+                working.thread_id,
+                None,
+            )
+            page = await _open_sidebar(browser, address, 1280, "light")
+            sidebar = page.locator("#sidebar")
+            rows: Locator = sidebar.locator(f"a.side-run[href='#/runs/{working.id}']")
+            await expect(rows).to_have_count(1)
+            held: Locator = sidebar.locator(f"[data-section=waiting] a.side-run[href='#/runs/{working.id}']")
+            await expect(held.locator(".side-chat-waits")).to_have_text("Waiting for you: Write notes.md")
+            # Its creature waits, as the row says, though its run goes on.
+            await expect(held.locator(".avatar[data-state='waiting']")).to_have_count(1)
+            await expect(
+                sidebar.locator(f"[data-section=working] a.side-run[href='#/runs/{working.id}']")
+            ).to_have_count(0)
+            await page.get_by_role("button", name="More for Count the files").click()
+            await page.get_by_role("menuitem", name="Pin").click()
+            pinned: Locator = sidebar.locator(".side-runs .side-group").first.locator(
+                f"a.side-run[href='#/runs/{working.id}']"
+            )
+            await expect(pinned.locator(".side-chat-waits")).to_have_text("Waiting for you: Write notes.md")
+            await expect(rows).to_have_count(1)
+            await page.evaluate(
+                "async (id) => { const { api } = await import('/js/api.js');"
+                " await api.post(`/approvals/${id}/decision`, { approve: false }); }",
+                kept.id,
+            )
+            await expect(pinned.locator(".side-chat-waits")).to_have_count(0)
+            await expect(pinned.locator(".side-working")).to_have_text(_WORKING)
+            await expect(rows).to_have_count(1)
+            await page.close()
             for run in (delegated, working, asking):
                 manager.cancel(run.id)
             async with asyncio.timeout(_RUN_WAIT_S):

@@ -290,7 +290,7 @@ async def test_a_chat_at_work_stands_under_working_as_every_chat_does_and_comes_
         try:
             page: Page = await _open(browser, address, width)
             working: Locator = page.locator("#sidebar [data-section=working]")
-            await expect(working.locator(".side-label")).to_have_text("Working 1")
+            await expect(working.locator(".side-chat")).to_have_count(1)
             chat: Locator = working.locator(".side-chat").filter(
                 has=page.locator(f"a.side-run[href='#/runs/{run.id}']")
             )

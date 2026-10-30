@@ -13,7 +13,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -246,13 +246,15 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     if width < 860:
                         await page.get_by_role("button", name="Show sidebar").click()
                     sidebar = page.locator("#sidebar")
-                    await expect(sidebar.locator("[data-section=waiting] .side-label")).to_have_text(
-                        "Waiting for you 1"
-                    )
+                    # What waits stands first, as its chat's row with no heading over it (item 836): its last
+                    # line says what waits.
+                    await expect(sidebar.locator(".side-activity-nav .side-label")).to_have_count(0)
+                    waiting_rows: Locator = sidebar.locator("[data-section=waiting] .side-chat > a.side-run")
+                    await expect(waiting_rows).to_have_count(1)
+                    await expect(waiting_rows.locator(".side-chat-waits")).to_contain_text("Waiting for you: ")
                     # Working holds the chat at work (item 202), and the campaign's session, which works in a thread
                     # of its own that is not among the chats: drawn as a chat's row is, with the mark of its campaign
                     # at the foot of its face (item 705).
-                    await expect(sidebar.locator("[data-section=working] .side-label")).to_have_text("Working 2")
                     await expect(sidebar.locator("[data-section=working] .side-chat")).to_have_count(2)
                     session_row = sidebar.locator("[data-section=working] .side-chat > a.side-run").filter(
                         has_text="Find leads"
@@ -276,7 +278,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     await expect(sidebar.locator("[data-section=working] .side-children")).to_have_count(0)
                     assert "1 helper" in (await working_row.get_attribute("aria-label") or "")
                     await page.screenshot(path=str(tmp_path / f"sidebar-{width}-{scheme}.png"))
-                    await sidebar.locator("[data-section=waiting] a.side-activity").click()
+                    await waiting_rows.click()
                     await expect(page).to_have_url(f"http://{host}:{port}/#/runs/{asking.id}")
                     # In the parent's chat, the delegated run's card shows its progress and opens its own page.
                     await page.goto(f"http://{host}:{port}/#/runs/{working.id}")

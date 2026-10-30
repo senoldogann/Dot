@@ -810,42 +810,12 @@
   line-clamp: 2;
 }
 
-/* The activity sections above the chats: a row is a short chat row (a few words of the title on one line) with a
-   second, smaller line of facts, on one line too; the rows keep the compact padding whatever the density (item 95). */
+/* What waits for you and what works stand above the chats as their rows (item 836), with no heading: a row says what
+   it is itself. Before, two folding sections held shorter rows of their own. */
 .side-activity-nav {
   display: flex;
   flex-direction: column;
   margin-top: 4px;
-}
-
-.side-activity {
-  padding: 4px 8px;
-}
-
-.side-activity .side-run-goal {
-  display: flex;
-  flex-direction: column;
-  white-space: normal;
-}
-
-.side-activity-title,
-.side-activity-detail {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.side-activity-detail {
-  font-size: var(--text-xs);
-  line-height: var(--leading-xs);
-  color: var(--muted);
-}
-
-/* A face in an activity row, where the agent or the campaign at work stands in its dot's place (item 202). */
-.side-activity .avatar {
-  width: 20px;
-  height: 20px;
 }
 
 /* A chat's row (item 277), after a messenger's list: its creature, its name over its last line, and at its right its
@@ -1008,6 +978,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A row that waits for you (item 836) says so in its last line, in the warning's ink, and has the dot of a run that
+   waits at its right, where a row at rest has its age. */
+.side-chat-last.side-chat-waits {
+  color: var(--warn);
+}
+
+.side-waits-dot {
+  width: 8px;
+  height: 8px;
 }
 
 /* The team a chat is with (item 610), ahead of its last words: its name keeps a share of the line and gives way to the
@@ -1284,12 +1265,6 @@
 
   .side-chat > .side-run {
     padding-right: 36px;
-  }
-
-  /* What a run does now reads at a hint's size; the ages and times stay the smallest. */
-  .side-activity-detail {
-    font-size: var(--text-sm);
-    line-height: var(--leading-sm);
   }
 }
 

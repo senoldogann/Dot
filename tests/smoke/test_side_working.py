@@ -1,8 +1,9 @@
 """The side menu shows each chat once (item 202): a chat at work stands in Working, as a chat with its menu, its time
 and the faces of the runs it delegated (item 507), and not again among the days; a pinned chat at work stays among the
-pinned ones, wearing the same faces there; what waits for an answer stays above, and its chat keeps its place. Folded,
-Working hides its rows, the open chat's too (item 513); the search finds the chats at work, folded or not; once the runs
-end, the chats are back among the days. Scripted runs, served by a real server, wide and on a phone, light and dark."""
+pinned ones, wearing the same faces there; what waits for an answer stands first, as its chat's row out of its day,
+saying what waits (item 836), and a pinned one stays pinned, saying it there; neither has a heading or folds; the
+search finds the chats at work and keeps what waits in sight; once the runs end, the chats are back among the days.
+Scripted runs, served by a real server, wide and on a phone, light and dark."""
 
 import asyncio
 import re
@@ -213,8 +214,10 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(chats.locator(".side-group").first).to_be_visible()
                 await expect(working).to_be_visible()
                 await page.screenshot(path=str(tmp_path / f"side-{width}-{scheme}.png"))
-                # Working: the chat at work, once, as a chat with its menu, its time and the faces of what it delegated.
-                await expect(working.locator(".side-label")).to_have_text("Working 1")
+                # Working: the chat at work, once, as a chat with its menu, its time and the faces of what it delegated;
+                # no heading over it, as a messaging app's rows (item 836): the row says it works itself.
+                await expect(sidebar.locator(".side-activity-nav .side-label")).to_have_count(0)
+                await expect(working).to_have_attribute("aria-label", "Working")
                 row: Locator = working.locator(".side-chat").filter(
                     has=page.locator(f"a.side-run[href='#/runs/{shelves.id}']")
                 )
@@ -236,46 +239,61 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(pinned.locator(".side-chat-helpers .side-helper")).to_have_count(1)
                 assert "1 helper" in (await pinned.locator("a.side-run").get_attribute("aria-label") or "")
                 await expect(working.locator(f"a[href='#/runs/{boxes.id}']")).to_have_count(0)
-                # What waits for an answer is above; its chat keeps its place among the days, its creature waiting.
-                await expect(sidebar.locator("[data-section=waiting] .side-label")).to_have_text("Waiting for you 1")
-                await expect(sidebar.locator("[data-section=waiting] a.side-activity")).to_contain_text("Which shelf?")
+                # What waits for an answer stands first (item 836): its chat, once, out of its day, its last line
+                # saying what waits in the warning's ink, the dot of a run that waits at its right, its creature
+                # waiting; its name for a screen reader says what waits and how.
+                waiting: Locator = sidebar.locator("[data-section=waiting]")
+                await expect(waiting).to_have_attribute("aria-label", "Waiting for you")
+                asked: Locator = waiting.locator(f".side-chat > a.side-run[href='#/runs/{asking.id}']")
+                await expect(asked).to_have_count(1)
+                await expect(asked.locator(".side-run-goal")).to_have_text("Pick a shelf")
+                await expect(asked.locator(".side-chat-waits")).to_have_text("Waiting for you: Which shelf?")
+                await expect(asked.locator(".side-waits-dot")).to_have_count(1)
+                await expect(asked.locator(".avatar[data-state='waiting']")).to_have_count(1)
+                assert "waiting for you: Which shelf?, waits for your answer" in (
+                    await asked.get_attribute("aria-label") or ""
+                )
+                assert await waiting.evaluate(
+                    "(group) => group.compareDocumentPosition("
+                    "document.querySelector('#sidebar [data-section=working]')) & Node.DOCUMENT_POSITION_FOLLOWING"
+                )
                 today: Locator = chats.locator(".side-group").nth(1)
-                await expect(_titles(today)).to_have_text(["Pick a shelf", "Plan the garden"])
-                await expect(
-                    today.locator(f"a.side-run[href='#/runs/{asking.id}'] .avatar[data-state='waiting']")
-                ).to_have_count(1)
+                await expect(_titles(today)).to_have_text(["Plan the garden"])
                 if index == 0:
-                    # Folded, Working hides every row, the open chat's too (item 513), and keeps its count; a search
-                    # shows the chats at work it finds, folded or not.
+                    # Neither folds: a search keeps what waits in sight, shows the chats at work it finds, and Enter
+                    # opens the first row it found, what waits first.
                     await row.locator("a.side-run").click()
                     await expect(page).to_have_url(re.compile(f"#/runs/{shelves.id}$"))
-                    fold: Locator = working.locator(".side-label button")
-                    await fold.click()
-                    await expect(fold).to_have_attribute("aria-expanded", "false")
-                    await expect(row).to_be_hidden()
-                    await expect(working.locator(".side-label")).to_have_text("Working 1")
-                    await page.screenshot(path=str(tmp_path / f"side-folded-{width}-{scheme}.png"))
-                    finder: Locator = page.get_by_role("searchbox", name="Search chats")
-                    await finder.fill("shel")
-                    await expect(row).to_be_visible()
-                    await finder.fill("")
-                    await expect(row).to_be_hidden()
-                    await today.locator("a.side-run", has_text="Plan the garden").click()
-                    await expect(page).to_have_url(re.compile(f"#/runs/{garden.id}$"))
-                    await fold.click()
-                    await expect(fold).to_have_attribute("aria-expanded", "true")
-                    await expect(row).to_be_visible()
-                    # The search finds the chats at work too, and Enter opens the first chat it found.
                     search: Locator = page.get_by_role("searchbox", name="Search chats")
                     await search.fill("garden")
                     await expect(working).to_have_count(0)
+                    await expect(asked).to_be_visible()
                     await expect(_titles(chats)).to_have_text(["Plan the garden"])
+                    await search.press("Enter")
+                    await expect(page).to_have_url(re.compile(f"#/runs/{garden.id}$"))
                     await search.fill("shel")
                     await expect(_titles(working)).to_have_text(["Read the shelves"])
-                    await expect(_titles(chats)).to_have_text(["Pick a shelf"])
+                    await expect(_titles(waiting)).to_have_text(["Pick a shelf"])
+                    await expect(_titles(chats)).to_have_count(0)
                     await page.screenshot(path=str(tmp_path / f"side-search-{width}-{scheme}.png"))
                     await search.press("Enter")
-                    await expect(page).to_have_url(re.compile(f"#/runs/{shelves.id}$"))
+                    await expect(page).to_have_url(re.compile(f"#/runs/{asking.id}$"))
+                    await search.fill("")
+                    # Pinned, the chat that waits stays among the pinned ones, saying there what waits; unpinned, it
+                    # stands first again.
+                    # Its menu offers no Select: it is not in the list, where the chats are chosen.
+                    await waiting.get_by_role("button", name="More for Pick a shelf").click()
+                    await expect(page.get_by_role("menuitem", name="Pin")).to_be_visible()
+                    await expect(page.get_by_role("menuitem", name="Select")).to_have_count(0)
+                    await page.get_by_role("menuitem", name="Pin").click()
+                    held: Locator = pinned.locator(f".side-chat > a.side-run[href='#/runs/{asking.id}']")
+                    await expect(held.locator(".side-chat-waits")).to_have_text("Waiting for you: Which shelf?")
+                    await expect(asked).to_have_count(0)
+                    await expect(waiting).to_have_count(0)
+                    await pinned.get_by_role("button", name="More for Pick a shelf").click()
+                    await page.get_by_role("menuitem", name="Unpin").click()
+                    await expect(asked).to_have_count(1)
+                    await expect(held).to_have_count(0)
                 await page.close()
             # Once nothing works, Working goes and every chat is back in its place, with its age, on the page as it is.
             page = await _open_sidebar(browser, address, 1280, "light")
