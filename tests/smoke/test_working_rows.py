@@ -198,6 +198,8 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
                 await expect(waiting.locator(".side-age")).to_have_count(0)
                 await expect(waiting.locator(".side-working")).to_have_count(0)
                 await expect(sidebar.locator(f".side-runs a.side-run[href='#/runs/{asking.id}']")).to_have_count(0)
+                # Every chat waits or works here, so there is none to choose for deletion: Select is not offered.
+                await expect(sidebar.get_by_role("button", name="Select", exact=True)).to_be_hidden()
                 if index == 0:
                     # The seconds count while the page rests.
                     figure: Locator = busy.locator(".side-working-time")
@@ -234,6 +236,8 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
             await expect(rows).to_have_count(1)
             held: Locator = sidebar.locator(f"[data-section=waiting] a.side-run[href='#/runs/{working.id}']")
             await expect(held.locator(".side-chat-waits")).to_have_text("Waiting for you: Write notes.md")
+            # Its creature waits, as the row says, though its run goes on.
+            await expect(held.locator(".avatar[data-state='waiting']")).to_have_count(1)
             await expect(
                 sidebar.locator(f"[data-section=working] a.side-run[href='#/runs/{working.id}']")
             ).to_have_count(0)

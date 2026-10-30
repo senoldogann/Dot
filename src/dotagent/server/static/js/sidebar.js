@@ -404,7 +404,8 @@ function placeWaiting(rows, chats) {
   const byRun = new Map(chats.map((chat) => [chat.latest_run_id, chat]));
   const waiting = [];
   const byChat = new Map();
-  for (const row of rows) {
+  // Oldest first whatever order they came in, so that a chat's line names what has waited longest.
+  for (const row of [...rows].sort((one, other) => one.since - other.since)) {
     const chat = row.run_id === null ? undefined : byRun.get(row.run_id);
     if (chat === undefined) {
       waiting.push({ chat: null, row });
@@ -818,7 +819,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
 
   function paintChats() {
-    selectButton.hidden = selecting || chats === null || chats.every((chat) => atWork(chat));
+    selectButton.hidden = selecting || chats === null || chats.every((chat) => atWork(chat) || waitsAtTop(chat));
     head.hidden = selecting;
     bar.hidden = !selecting;
     // The chats fold under their label (item 95); choosing chats to delete needs them in sight.
@@ -1006,7 +1007,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   // A chat's creature: the one drawn for it before, while the same one wears the same look in the same state.
   function faceOf(chat) {
-    const { id, state, look } = chatFaceOf(chat);
+    const { id, state: latest, look } = chatFaceOf(chat);
+    // A chat that waits for the owner wears a waiting creature, whatever its run did (item 836's pre-push review: a
+    // question left on a run that failed looked sad, and a step kept while the run goes on looked at work).
+    const state = waits.byChat.has(chat.id) ? "waiting" : latest;
     // A chat that wears its team wears the faces of its agents (item 610): kept while they and the state are the same.
     // Whose face it is goes in the key: a team's chat whose latest run became an agent's at rest, the page seeing
     // only the end of it, wears the agent's face, and an agent's new look is drawn.
