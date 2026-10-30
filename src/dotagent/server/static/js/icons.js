@@ -438,7 +438,6 @@ export function wordmark() {
   return copy;
 }
 
-/** An inline SVG icon; its size follows the font size of the surrounding text. */
 // The frame each shape is seen through (item 849): `[x, y, side]` of the square of the 24 grid the icon shows, so that
 // every icon draws about the same area (that of an 18.5 by 18.5 square, its longer side at most 22) whatever its shape: a
 // "+" or a speaker no smaller beside a copy. Measured from the shapes' drawn boxes; a shape not listed fills its 24 grid
@@ -504,6 +503,7 @@ const FRAMES = {
   x: [4.22, 4.22, 15.57],
 };
 
+/** An inline SVG icon; its size follows the font size of the surrounding text. */
 export function icon(name) {
   const shapes = SHAPES[name];
   if (shapes === undefined) {
