@@ -106,9 +106,6 @@ export function applyStoredWork() {
   document.documentElement.dataset.work = isWork(stored) ? stored : DEFAULT_WORK;
 }
 
-// The event that tells what is drawn already that the choice of the work shown changed (item 830); its detail is the id.
-export const WORK_CHANGED_EVENT = "dot:work-changed";
-
 /** Switch what a chat shows of the work and remember the choice. */
 export function chooseWork(id) {
   if (!isWork(id)) {
@@ -116,7 +113,6 @@ export function chooseWork(id) {
   }
   document.documentElement.dataset.work = id;
   writePref(WORK_KEY, id);
-  window.dispatchEvent(new CustomEvent(WORK_CHANGED_EVENT, { detail: id }));
 }
 
 /** Whether the sidebar is open on a wide screen; open until the user hides it. */

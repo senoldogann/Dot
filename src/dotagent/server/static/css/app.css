@@ -7266,14 +7266,14 @@ summary:has(> .chev)::-webkit-details-marker {
   margin-left: calc(-1 * var(--space-2));
 }
 
-/* A line the agent says inside its flow has no face of its own: it takes the width the answer's face leaves and lines
-   up with the answer's words (item 374). */
-.bubble.say[role="article"] {
+/* A line the agent says inside its flow takes the width a face leaves and lines up with the answer's words (item 374);
+   the first after someone else spoke wears the face itself (item 859). */
+.bubble.say[role="article"]:not(:has(> .turn-face)) {
   grid-template-columns: minmax(0, 1fr);
   padding-left: calc(28px + var(--space-2));
 }
 
-.bubble.say[role="article"] > * {
+.bubble.say[role="article"]:not(:has(> .turn-face)) > * {
   grid-column: 1;
 }
 

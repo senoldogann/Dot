@@ -7,6 +7,7 @@ repeat. Live-only events (the deltas of a reply being written) have no id.
 import asyncio
 import base64
 import json
+import time
 from collections.abc import AsyncIterator, Iterable
 
 from starlette.responses import StreamingResponse
@@ -83,6 +84,13 @@ LIFECYCLE_KINDS: frozenset[str] = frozenset(
 
 _PAGE: int = 500
 _KEEPALIVE_S: float = 15.0
+# How long a stream waits after an event for the next before it writes a keepalive (item 859): WebKit (Safari, the
+# iPhone, Dot.app) hands the page the first of a few writes that come close together and holds the rest until the next
+# write. A run that asks writes its policy line and its card a moment apart and then waits for the owner: the card came
+# with the next keepalive, 15 s on, as if the chat had not asked. The keepalive a quarter of a second after the last
+# event hands it over. Both are counted from the stream's own last write: a run's stream hears every run's events,
+# and another run streaming its words must not put them off.
+_FLUSH_S: float = 0.25
 _FINISHED: str = "run_finished"
 _QUEUED: str = "run_queued"
 _PARENT_KEY: str = "parent_run_id"
@@ -138,14 +146,17 @@ async def _widen(store: Store, family: set[str]) -> None:
         family.update(child.id for child in await store.list_child_runs(member))
 
 
-async def _next_event(queue: asyncio.Queue[EventRecord], stopping: asyncio.Event) -> EventRecord | None:
-    """The next event of ``queue``; ``None`` when none came within the keepalive interval or the daemon is stopping."""
+async def _next_event(
+    queue: asyncio.Queue[EventRecord], stopping: asyncio.Event, timeout_s: float = _KEEPALIVE_S
+) -> EventRecord | None:
+    """The next event of ``queue``; ``None`` when none came within ``timeout_s`` (the keepalive interval) or the daemon
+    is stopping."""
     if stopping.is_set():
         return None
     getter: asyncio.Task[EventRecord] = asyncio.create_task(queue.get())
     stopper: asyncio.Task[bool] = asyncio.create_task(stopping.wait())
     try:
-        await asyncio.wait({getter, stopper}, timeout=_KEEPALIVE_S, return_when=asyncio.FIRST_COMPLETED)
+        await asyncio.wait({getter, stopper}, timeout=timeout_s, return_when=asyncio.FIRST_COMPLETED)
         return getter.result() if getter.done() else None
     finally:
         getter.cancel()
@@ -213,6 +224,8 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
         if ended or stored_only:
             return
         dropped: int = 0
+        owed: bool = False
+        written: float = time.monotonic()
         while True:
             if run_id not in ctx.manager.active_run_ids() and run_id not in ctx.manager.elsewhere_run_ids():
                 # The run is over; whatever it stored since is still in the database.
@@ -220,19 +233,24 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
                 if frames:
                     yield frames
                 return
-            incoming: EventRecord | None = await _next_event(feed.queue, ctx.stopping)
+            due: float = (_FLUSH_S if owed else _KEEPALIVE_S) - (time.monotonic() - written)
+            incoming: EventRecord | None = await _next_event(feed.queue, ctx.stopping, max(0.0, due))
             if incoming is None:
                 if ctx.stopping.is_set():
                     return
+                owed = False
+                written = time.monotonic()
                 yield KEEPALIVE
                 continue
             if feed.dropped != dropped:
                 dropped = feed.dropped
                 frames, _ = await stored(False)
                 if frames:
+                    owed, written = True, time.monotonic()
                     yield frames
             pending: bytes | None = live(incoming)
             if pending is not None:
+                owed, written = True, time.monotonic()
                 yield pending
             if incoming.kind == _FINISHED and incoming.run_id == run_id:
                 return
@@ -244,14 +262,17 @@ async def follow_lifecycle(bus: EventBus, stopping: asyncio.Event) -> AsyncItera
     nothing. Ends when the daemon starts to stop."""
     async with bus.subscribe_kinds(LIFECYCLE_KINDS) as feed:
         dropped: int = 0
+        owed: bool = False
         while True:
-            event: EventRecord | None = await _next_event(feed.queue, stopping)
+            event: EventRecord | None = await _next_event(feed.queue, stopping, _FLUSH_S if owed else _KEEPALIVE_S)
             if feed.dropped != dropped:
                 dropped = feed.dropped
                 yield RESYNC
             if event is None:
                 if stopping.is_set():
                     return
+                owed = False
                 yield KEEPALIVE
             else:
+                owed = True
                 yield encode_event(event)

@@ -15,7 +15,7 @@ import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
 import { helperCard } from "./helpercard.js";
 import { icon } from "./icons.js";
-import { currentWork, foldSteps, WORK_CHANGED_EVENT } from "./layout.js";
+import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, scheduleLine, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
@@ -51,14 +51,33 @@ const FLOCK_FACES = 3;
 const PREVIEW_CHARS = 240;
 // The blocks of agents' messages in the conversation and who wrote in each, in order (item 668; see agentSaid).
 const SAID_BLOCKS = new WeakMap();
-// A choice of the work shown made while they are drawn opens or folds the agents' messages as a new block would be
-// (item 830): open with what the run is doing, folded with every step.
-window.addEventListener(WORK_CHANGED_EVENT, (event) => {
-  const open = /** @type {CustomEvent<string>} */ (event).detail === "status";
-  for (const block of document.querySelectorAll("details.agent-said")) {
-    /** @type {HTMLDetailsElement} */ (block).open = open;
+// The blocks of agents' messages the reader opened, in this tab (item 859): a block is folded until they open it, and
+// stays as they left it when the chat is drawn again (another page and back, a reload).
+const SAID_OPEN_KEY = "dot.saidOpen";
+const SAID_OPEN_MOST = 200;
+
+/** The keys of the blocks of agents' messages opened in this tab. */
+function saidOpened() {
+  try {
+    const kept = JSON.parse(sessionStorage.getItem(SAID_OPEN_KEY) ?? "[]");
+    return Array.isArray(kept) ? kept.filter((key) => typeof key === "string") : [];
+  } catch {
+    return [];
   }
-});
+}
+
+/** Keep whether the block `key` is open, the newest SAID_OPEN_MOST of them. */
+function keepSaidOpen(key, open) {
+  const kept = saidOpened().filter((each) => each !== key);
+  if (open) {
+    kept.push(key);
+  }
+  try {
+    sessionStorage.setItem(SAID_OPEN_KEY, JSON.stringify(kept.slice(-SAID_OPEN_MOST)));
+  } catch {
+    // A tab that keeps nothing (a private window's storage full) folds them again: the default.
+  }
+}
 // The tool that hands a part to one of the owner's agents (item 668): its call shows that the part is on its way.
 const MESSAGE_AGENT_TOOL = "message_agent";
 // How much of an agent's reply its message in the conversation shows; the rest is on its run's page.
@@ -108,13 +127,32 @@ export function flockState(statuses) {
 // `drawn` holds the lines each of its blocks was drawn from, `queued` is set while a draw waits for the next frame and
 // `ended` once the message is in or the step is asked again.
 function newBubble(scope, step, live) {
-  // The words of the flow wear no face of their own (item 374): the face belongs to the answer that closes the turn,
-  // and the words line up with the answer's.
+  // The first of the agent's lines after someone else spoke (you, its helpers, its agents) wears its face, as a chat
+  // shows who speaks (item 859, the owner's ask; item 374 kept the face for the answer alone); the lines that follow it
+  // line up with its words. The steps, the thoughts and the notes between them are not someone speaking.
   const body = el("div", { class: live ? "prose stream" : "" });
-  const node = el("div", { class: live ? "bubble live say" : "bubble say", role: "article", "aria-label": "Dot" }, body);
+  const face = speaksFirst(scope.container) ? el("span", { class: "turn-face" }, actorFace(scope.actorId, "idle", null)) : null;
+  const node = el("div", { class: live ? "bubble live say" : "bubble say", role: "article", "aria-label": "Dot" }, face, body);
   scope.container.append(node);
   const caret = el("span", { class: "stream-caret", "aria-hidden": "true" });
   return { node, body, step, text: "", drawn: [], caret, queued: false, ended: false };
+}
+
+// What stands between two of the agent's lines without anyone else speaking: its steps, thoughts and notes, and what
+// it asks or shows on the way (a card, a hand-off to an agent, a page, a restart).
+const NOT_SPEAKING = "details.steps, details.thought, .note, .approval, .agent-handoff, .shown-page, details.restart";
+
+/** Whether a line of the agent's put at the end of `container` is the first since someone else spoke. */
+function speaksFirst(container) {
+  for (let at = container.lastElementChild; at !== null; at = at.previousElementSibling) {
+    if (at.matches(".bubble.say")) {
+      return false;
+    }
+    if (!at.matches(NOT_SPEAKING)) {
+      return true;
+    }
+  }
+  return true;
 }
 
 // What holds the last line of a message: a list's last item, a table's last cell, a quote's last block.
@@ -779,8 +817,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     let block = last !== null && SAID_BLOCKS.has(last) ? last : null;
     if (block === null) {
       const head = el("summary", { class: "agent-said-head" }, el("span", { class: "agent-said-names" }), el("span", { class: "agent-said-count" }), el("span", { class: "chev" }, icon("chevron")));
-      // Open where the chat shows what the run is doing rather than its steps (item 830): agents speak as people do.
-      block = el("details", { class: "agent-said", open: currentWork() === "status" }, head, el("div", { class: "agent-said-body" }));
+      // Folded until the reader opens it, whatever the chat shows of the work (item 859, the owner's word: item 830 had it
+      // open with what the run is doing, and every return to the chat opened it again); opened, it stays open here.
+      const key = `${scope.runId}:${ts}`;
+      block = el("details", { class: "agent-said", open: saidOpened().includes(key) }, head, el("div", { class: "agent-said-body" }));
+      block.addEventListener("toggle", () => keepSaidOpen(key, /** @type {HTMLDetailsElement} */ (block).open));
       SAID_BLOCKS.set(block, []);
       place(scope, block, ts);
     }

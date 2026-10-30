@@ -131,22 +131,21 @@ async def test_the_agents_answer_is_its_message_in_the_conversation(own_home: Pa
                     said = page.locator(".agent-said")
                     await expect(said.locator(".agent-said-names")).to_have_text("Message from Scout")
                     message = said.locator(".agent-message")
+                    # Folded until the reader opens it, whatever the chat shows of the work (items 733 and 859): Dot's
+                    # own answer keeps the conversation, and a return to the chat leaves it folded.
+                    await expect(said).not_to_have_attribute("open", "")
+                    await expect(message).to_be_hidden()
+                    await page.goto(f"{address}/#/runs")
+                    await page.goto(f"{address}/#/runs/{run.id}")
+                    await expect(said).not_to_have_attribute("open", "")
                     if work == "steps":
-                        # With every step shown, folded until the reader opens it (item 733): Dot's own answer keeps
-                        # the conversation.
-                        await expect(said).not_to_have_attribute("open", "")
-                        await expect(message).to_be_hidden()
                         await page.screenshot(path=str(tmp_path / f"said-{width}-folded.png"))
-                        await said.locator(".agent-said-head").click()
-                    else:
-                        # With what the run is doing shown, open: agents speak in the conversation as people do (item
-                        # 830).
-                        await expect(said).to_have_attribute("open", "")
-                        # A choice made while it is drawn folds and opens it as a new block would be.
-                        await page.evaluate("import('/js/layout.js').then((layout) => layout.chooseWork('steps'))")
-                        await expect(said).not_to_have_attribute("open", "")
-                        await page.evaluate("import('/js/layout.js').then((layout) => layout.chooseWork('status'))")
-                        await expect(said).to_have_attribute("open", "")
+                    await said.locator(".agent-said-head").click()
+                    # Opened, it stays open when the chat is drawn again.
+                    await expect(said).to_have_attribute("open", "")
+                    await page.goto(f"{address}/#/runs")
+                    await page.goto(f"{address}/#/runs/{run.id}")
+                    await expect(said).to_have_attribute("open", "")
                     await expect(message).to_be_visible()
                     await expect(message.locator(".agent-message-name")).to_have_text("Scout")
                     # Opened, the message is as wide as Dot's own answer, on a phone too.
