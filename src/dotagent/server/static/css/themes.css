@@ -121,6 +121,8 @@
   --shadow-ink-soft: light-dark(rgb(28 27 25 / 10%), rgb(0 0 0 / 30%));
   --shadow-ink-deep: light-dark(rgb(28 27 25 / 24%), rgb(0 0 0 / 60%));
   --shadow: 0 1px 2px var(--shadow-ink), 0 4px 16px var(--shadow-ink);
+  /* Under a box of the pages, which has no frame (item 837): a hairline of shadow and a soft one round it. */
+  --shadow-card: 0 1px 2px var(--shadow-ink), 0 4px 14px var(--shadow-ink);
   /* The focus ring: the accent at a third, so focus is seen without a dark frame (item 95). */
   --ring: color-mix(in srgb, var(--accent) 38%, transparent);
   --shadow-seg: 0 1px 2px var(--shadow-ink-soft);
@@ -171,9 +173,6 @@
   --shadow-ink: light-dark(rgb(20 20 19 / 5%), transparent);
   --shadow-ink-soft: light-dark(rgb(20 20 19 / 10%), rgb(0 0 0 / 30%));
   --shadow-ink-deep: light-dark(rgb(20 20 19 / 22%), rgb(0 0 0 / 60%));
-  --radius: 12px;
-  --radius-control: 8px;
-  --radius-lg: 20px;
   --voice: var(--family-serif);
 }
 
@@ -249,4 +248,11 @@
 :root[data-contrast] body {
   --msg-me: light-dark(var(--text), var(--surface-3));
   --on-msg-me: light-dark(var(--surface), var(--text));
+}
+
+/* The boxes and the buttons have no frame (item 837); with the contrast set they are framed again, in its stronger
+   lines, so that their edges are seen. */
+:root[data-contrast] body {
+  --box-border: var(--border);
+  --button-border: var(--border-strong);
 }

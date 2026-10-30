@@ -90,14 +90,21 @@
   --weight-title: 600;
   --tracking-title: -0.01em;
   --tracking-caps: 0.04em;
-  /* Shape: the radii of marks, controls, cards, bubbles and pills. A look may round them differently (themes.css). */
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-control: 8px;
-  --radius: 12px;
-  --radius-lg: 20px;
+  /* Shape: the radii of marks, controls, cards, bubbles and pills, soft as a messaging app's (item 837: they were 6, 8,
+     8, 12 and 20 px). A look may round them differently (themes.css). */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-control: 10px;
+  --radius: 16px;
+  --radius-lg: 24px;
   --radius-composer: 24px;
   --radius-pill: 999px;
+  /* A box of the pages, a card or a settings' group (item 837): no frame, a soft shadow under its surface; the contrast
+     setting draws the frame again (themes.css). */
+  --box-border: transparent;
+  --box-shadow: var(--shadow-card);
+  /* A button's frame (item 837): none, as its fill says it is one; the contrast setting draws it (themes.css). */
+  --button-border: transparent;
   /* The composer's lift (item 121): a hairline of shadow and a soft one that falls below it. */
   --shadow-composer: 0 1px 2px var(--shadow-ink), 0 12px 28px -18px var(--shadow-ink-deep);
   /* The glass of what stands over the conversation at the foot (item 401): the composer and the bar over it, a
@@ -781,6 +788,8 @@ a.pill:hover {
 
 /* One grammar for the controls (item 80): a button, an input and a select are 36 px tall on an 8 px radius with a
    hairline of the strong border; the small button and select are 32; the focus ring is the page's 2 px accent outline. */
+/* A button is a soft fill with no frame (item 837), a step darker under the pointer; the first of a page's is ink
+   (`.primary`), a quiet one has no fill (`.ghost`), and the contrast setting frames them again (themes.css). */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -789,8 +798,8 @@ a.pill:hover {
   min-height: 36px;
   padding: 0 16px;
   border-radius: var(--radius-control);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
+  border: 1px solid var(--button-border);
+  background: var(--surface-2);
   color: var(--text);
   font-weight: var(--weight-label);
   cursor: pointer;
@@ -802,7 +811,7 @@ a.pill:hover {
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 
 .btn:disabled {
@@ -1319,8 +1328,9 @@ a.pill:hover {
 /* A card is flat (item 79): a surface with a hairline, no shadow; shadows belong to what floats (menus, dialogs). */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
   border-radius: var(--radius);
+  box-shadow: var(--box-shadow);
 }
 
 .card-pad {
@@ -1397,6 +1407,7 @@ a.pill:hover {
   :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor):has(> .card-head) {
     border: 0;
     background: none;
+    box-shadow: none;
   }
 
   :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor) > .card-head {
@@ -1412,9 +1423,10 @@ a.pill:hover {
   }
 
   :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor) > .card-head + * {
-    border: 1px solid var(--border);
+    border: 1px solid var(--box-border);
     border-radius: var(--radius);
     background: var(--surface);
+    box-shadow: var(--box-shadow);
   }
 }
 
@@ -1674,7 +1686,7 @@ a.pill:hover {
   padding: 0 8px;
   border-radius: var(--radius-xs);
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   color: var(--text-2);
   font-size: var(--text-xs);
   line-height: var(--leading-ui);
@@ -1829,7 +1841,8 @@ a.pill:hover {
   gap: 12px;
   min-width: 0;
   padding: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
+  box-shadow: var(--box-shadow);
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -2300,7 +2313,8 @@ a.pill:hover {
   gap: var(--space-3);
   min-width: 0;
   padding: var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
+  box-shadow: var(--box-shadow);
   border-radius: var(--radius);
   background: var(--surface);
   transition:
@@ -2819,11 +2833,13 @@ a.pill:hover {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+/* An account inside the card of the accounts: a soft fill with no frame (item 837), as a box within a box is, rather
+   than a second shadow. */
 .account-provider {
   padding: var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
   border-radius: var(--radius);
-  background: light-dark(var(--surface), var(--surface-2));
+  background: var(--surface-2);
 }
 
 /* A skill's card lifts under the pointer as a plugin's does, its mark light on a tile of its colour. */
