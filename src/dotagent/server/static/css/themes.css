@@ -257,10 +257,12 @@
 }
 
 /* The boxes and the buttons have no frame (item 837); with the contrast set they are framed again, in its stronger
-   lines, so that their edges are seen. A fine state's ink (item 839) is made again where the text is, so that it takes
-   its stronger ink too. */
+   lines, so that their edges are seen. A button's tint and a fine state's ink (item 839) are made again where the text
+   is, so that they take its stronger ink too. */
 :root[data-contrast] body {
   --box-border: var(--border);
   --button-border: var(--border-strong);
+  --button-fill: color-mix(in srgb, var(--text) 6%, transparent);
+  --button-fill-hover: color-mix(in srgb, var(--text) 10%, transparent);
   --fine: var(--text-2);
 }
