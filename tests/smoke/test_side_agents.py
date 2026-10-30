@@ -146,8 +146,10 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
     """Item 835: the owner's agents stand as faces at the sidebar's top, as a messaging app's people: each its face
-    over its name, read whole, to its page, the open one marked; the last tile, All, leads to every agent, as the Agents
-    row did, and the row gives way to that row while the owner has no agent. Wide and on a phone, light and dark."""
+    over its name, to its page, the open one marked; the last tile, All, leads to every agent, as the Agents row did,
+    and the row gives way to that row while the owner has no agent. Since item 855 the row holds the three that worked
+    last and All, whole in the sidebar's width (it scrolled, a face cut at the edge), each name on one line. Wide and
+    on a phone, light and dark."""
     _, address = served
     agents: dict[str, str] = {}
     async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
@@ -168,16 +170,25 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                         page: Page = await _open_sidebar(browser, address, width, scheme)
                         faces: Locator = page.get_by_role("navigation", name="Your agents")
                         await expect(faces.get_by_role("link")).to_have_count(3)
+                        # The newest first, as neither has worked yet (item 855: the ones that worked last first).
                         await expect(faces.locator(".side-agent-name")).to_have_text(
-                            [re.compile(r"^Scout( Two)?$"), "Competitor Watch", "All"]
+                            ["Competitor Watch", re.compile(r"^Scout( Two)?$"), "All"]
+                        )
+                        # The row holds every tile whole: it does not scroll, and no tile runs past its edge.
+                        assert await faces.evaluate(
+                            "row => row.scrollWidth <= row.clientWidth + 1"
+                            " && [...row.children].every((tile) => tile.getBoundingClientRect().right"
+                            " <= row.getBoundingClientRect().right + 1)"
                         )
                         scout: Locator = faces.get_by_role("link", name=re.compile(r"^Scout( Two)?$"))
                         await expect(scout).to_have_attribute("href", f"#/agents/{agents['Scout']}")
                         await expect(scout).to_have_attribute("title", re.compile(r"^Scout( Two)?: Looks things up$"))
-                        # A name of two words reads whole, on two lines; each tile is a finger's size and more.
+                        # A name is one line, cut with an ellipsis where it is long, its whole in the tile's name; each
+                        # tile is a finger's size and more.
                         watch: Locator = faces.get_by_role("link", name="Competitor Watch")
                         assert await watch.locator(".side-agent-name").evaluate(
-                            "name => name.scrollHeight <= name.clientHeight && name.scrollWidth <= name.clientWidth"
+                            "name => getComputedStyle(name).whiteSpace === 'nowrap'"
+                            " && getComputedStyle(name).textOverflow === 'ellipsis'"
                         )
                         tile = await watch.bounding_box()
                         assert tile is not None and tile["height"] >= 44 and tile["width"] >= 44, tile
@@ -213,7 +224,7 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                                 " instructions: '', model: '', effort: null, approvals: null }); }",
                                 agents["Scout"],
                             )
-                            await expect(faces.locator(".side-agent-name").first).to_have_text("Scout Two")
+                            await expect(faces.get_by_role("link", name="Scout Two")).to_be_visible()
                         await page.close()
                     # An agent deleted from its page leaves the row at once; with none left, the Agents row is back.
                     page = await _open_sidebar(browser, address, 1280, "light")

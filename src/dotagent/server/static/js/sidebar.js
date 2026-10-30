@@ -50,18 +50,20 @@ const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
 const CONNECTED_MARKS = 3;
 // Where Connect apps leads (item 545): the services' tab of Customize.
 const CONNECTORS_PATH = "#/customize/connectors";
-// Which sections the owner folded (`chats`, and a channel's by its id: `imessage`), kept between visits; a fold of
-// `waiting` or `working` kept from before item 836, whose groups no longer fold, is not read.
+// Which sections at the foot the owner folded, by their ids (`work`, `imessage`), kept between visits; a fold of
+// `chats`, `initiative` or `schedule` kept from before item 855, or of `waiting` or `working` from before item 836,
+// whose groups no longer fold, is not read.
 const FOLDS_KEY = "dot.sideFolds";
-// The channels whose chats stand in a section of their own (item 619), by the `source` their threads have (the channel's
-// id, as the router makes the thread): the name of the section and whether it starts folded. A thread of any other
-// source is a chat among the days. Dot's own runs (item 822): one chat a thing of its list, one a schedule. No label has
-// a mark, so that every section's words stand where Chats' do (items 827 and 828).
+// The sections at the foot of the list (item 619), by the `source` of the threads each holds (a channel's id, as the
+// router makes the thread): the section's name and whether it starts folded. Dot's own work, the chats of its own
+// initiative and of its schedules, is one (item 855, after "On its own" and "Scheduled" of their own, items 822 and
+// 827), folded until the owner opens it; iMessage's another. A thread of any other source is a chat among the days. No
+// label has a mark, so that it stands where the days' labels do (items 827, 828 and 855).
 const CHANNEL_SECTIONS = {
-  initiative: { label: "On its own", folded: true },
-  schedule: { label: "Scheduled", folded: true },
-  imessage: { label: "iMessage", folded: false },
+  work: { label: "Dot's work", folded: true, sources: ["initiative", "schedule"] },
+  imessage: { label: "iMessage", folded: false, sources: ["imessage"] },
 };
+const SECTION_OF_SOURCE = new Map(Object.entries(CHANNEL_SECTIONS).flatMap(([id, section]) => section.sources.map((source) => [source, id])));
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
 // The states of a run that is over: only such a chat can be marked unread (item 131).
@@ -109,7 +111,7 @@ function groupChats(chats, now) {
 /** The channel whose messages made `chat` (item 619), or null: a thread whose source is a channel's id. A chat the
  * owner pinned stays under Pinned, where they put it. */
 function channelOf(chat) {
-  return chat.pinned_at === null && typeof chat.source === "string" && Object.hasOwn(CHANNEL_SECTIONS, chat.source) ? chat.source : null;
+  return chat.pinned_at === null && typeof chat.source === "string" ? (SECTION_OF_SOURCE.get(chat.source) ?? null) : null;
 }
 
 function matchesQuery(chat, needle) {
@@ -172,6 +174,8 @@ function chatFace(chat, state) {
 // The faces a row shows of the runs it delegated, the rest counted (item 507), as the marks of the connected apps stand
 // over one another in the foot.
 const SIDE_HELPERS = 3;
+// How many of the owner's agents the row at the top shows, with All beside them (item 855).
+const SIDE_FACES = 3;
 
 /** What a row delegated, in words: "1 helper", "4 helpers", nothing for a row that delegated none (item 507). */
 function helperWords(children) {
@@ -529,8 +533,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     writePref(FOLDS_KEY, JSON.stringify(folds));
     paintLists();
   }
-  const chatsLabel = foldLabel("h2", folds.chats === true, () => toggleFold("chats"), "Chats");
-  const head = el("div", { class: "side-list-head" }, chatsLabel, selectButton);
+  // The chats have no heading of their own (item 855): Select stands at the right of their first group's label, and
+  // the days no longer fold away under a "Chats" that only named the list.
+  const head = el("div", { class: "side-list-head" }, selectButton);
   const count = el("span", { class: "grow side-count" });
   const allButton = el("button", { class: "btn sm", type: "button", onclick: () => toggleAll() }, "Select all");
   const deleteButton = el(
@@ -562,7 +567,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   let above = new Set();
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
   const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
-  const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
+  // Campaigns and Schedules are icons in the head, beside the "+" (item 855, the owner's ask: two rows of their own
+  // before the chats).
+  const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: "Campaigns", "aria-label": "Campaigns", onclick: onNavigate }, icon("target"));
   // Settings is its cog at the foot, beside Connect apps (item 492); its name stays for a reader of the screen.
   const settingsLink = el(
     "a",
@@ -570,9 +577,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     icon("settings"),
     el("span", null, "Settings"),
   );
-  const schedulesLink = el("a", { class: "side-link", href: "#/schedules", onclick: onNavigate }, icon("calendar"), el("span", null, "Schedules"));
+  const schedulesLink = el("a", { class: "icon-btn side-page", href: "#/schedules", title: "Schedules", "aria-label": "Schedules", onclick: onNavigate }, icon("calendar"));
   // The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name, to its
-  // page, where a message to it starts; the row scrolls sideways when they are more than the sidebar holds, and its
+  // page, where a message to it starts; the three that worked last (item 855: the row scrolled and cut a face), and its
   // last tile, All, is the page of every agent and team, which the Agents row is while the owner has no agent of their
   // own. A list that did not load leaves the row as it was.
   const facesNav = el("nav", { class: "side-agent-faces", "aria-label": "Your agents", hidden: true });
@@ -588,7 +595,13 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // pointer on one stays (the pre-push review).
   let facesDrawn = null;
   function paintFaces(found) {
-    const mine = found.filter(({ record }) => record.id !== DOT_ID);
+    // As many as the sidebar holds whole beside All (item 855: the row scrolled, and a face cut at its edge looked
+    // broken): the agents that worked last first.
+    const worked = (summary) => summary.latest?.created_at ?? summary.record.created_at;
+    const mine = found
+      .filter(({ record }) => record.id !== DOT_ID)
+      .sort((one, other) => worked(other) - worked(one))
+      .slice(0, SIDE_FACES);
     const drawn = JSON.stringify(mine.map(({ record }) => [record.id, record.name, record.role, record.look]));
     if (drawn !== facesDrawn) {
       facesDrawn = drawn;
@@ -809,13 +822,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
 
   function paintChats() {
-    selectButton.hidden = selecting || chats === null || chats.every(aboveTheList);
+    // Select stands on the line of the days' first label (item 855): with no chat among the days there is none, and a
+    // chat of a section at the foot is chosen from its row's menu.
+    selectButton.hidden = selecting || chats === null || chats.every((chat) => aboveTheList(chat) || channelOf(chat) !== null);
     head.hidden = selecting;
     bar.hidden = !selecting;
-    // The chats fold under their label (item 95); choosing chats to delete needs them in sight.
-    const foldedChats = folds.chats === true && !selecting;
-    chatsLabel.firstChild.setAttribute("aria-expanded", foldedChats ? "false" : "true");
-    list.hidden = foldedChats;
+    list.hidden = false;
     if (failure !== null) {
       channelsNav.replaceChildren();
       list.replaceChildren(
@@ -1480,7 +1492,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     { class: "side-body" },
     searchBox,
     facesNav,
-    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, schedulesLink),
+    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink),
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav),
   );
@@ -1541,7 +1553,13 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
   paintConnected();
   const foot = el("div", { class: "side-foot" }, settingsLink, connectButton);
-  const sideHead = el("div", { class: "side-head", "data-tauri-drag-region": "" }, close, el("span", { class: "side-title" }, dotName()));
+  const sideHead = el(
+    "div",
+    { class: "side-head", "data-tauri-drag-region": "" },
+    close,
+    el("span", { class: "side-title" }, dotName()),
+    el("nav", { class: "side-pages", "aria-label": "Pages" }, campaignsLink, schedulesLink),
+  );
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
     if (PHONE.matches) {
