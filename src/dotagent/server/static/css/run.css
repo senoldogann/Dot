@@ -217,8 +217,20 @@
   opacity: 1;
 }
 
-.work-status[data-state="over"] :is(.work-status-dots, .work-status-words) {
+.work-status[data-state="over"] :is(.work-status-dots, .work-status-words, .turn-face) {
   display: none;
+}
+
+/* The line of the work is the agent typing (item 843): its face in the place the answer's takes, the dots where the
+   words of the messages start, close under the message before it rather than a section's gap away. */
+:root[data-work="status"] .run-thread > .work-status {
+  margin-top: var(--space-2);
+}
+
+.work-status > .turn-face {
+  flex: none;
+  width: 28px;
+  padding-top: 0;
 }
 
 @media (hover: none) {

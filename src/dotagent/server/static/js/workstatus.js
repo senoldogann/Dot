@@ -34,15 +34,25 @@ const UNSAID_TOOLS = new Set(["finish", "react"]);
 const QUIET = new Set(["approval_requested", "question_left"]);
 
 /**
- * The line of `rootRunId`'s work. `push(record)` takes each event of the chat as the timeline does, `setActive(bool)`
+ * The line of `rootRunId`'s work, after `face` (the still face of who works, or null). `push(record)` takes each event of
+ * the chat as the timeline does, `setActive(bool)`
  * says whether the run is at work, and `dispose()` stops its timer. `onToggle(shown)` runs when the reader asks for the
  * steps (`shown` true) or folds them back.
  */
-export function createWorkStatus({ rootRunId, active, onToggle }) {
+export function createWorkStatus({ rootRunId, active, onToggle, face = null }) {
   const dots = el("span", { class: "work-status-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span"));
   let words = el("span", { class: "work-status-words" });
   const more = el("span", { class: "work-status-more" });
-  const element = el("button", { class: "work-status", type: "button", "aria-pressed": "false" }, dots, words, more);
+  // The face of who works stands before the dots, as a messaging app's typing has it (item 843), in the place the
+  // answer's face takes, so that the dots line up with the words of the messages.
+  const element = el(
+    "button",
+    { class: "work-status", type: "button", "aria-pressed": "false" },
+    face === null ? null : el("span", { class: "turn-face", "aria-hidden": "true" }, face),
+    dots,
+    words,
+    more,
+  );
   let working = active;
   let kind = "thinking";
   let name = "";
