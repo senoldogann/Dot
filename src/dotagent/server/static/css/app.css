@@ -103,8 +103,11 @@
      setting draws the frame again (themes.css). */
   --box-border: transparent;
   --box-shadow: var(--shadow-card);
-  /* A button's frame (item 837): none, as its fill says it is one; the contrast setting draws it (themes.css). */
+  /* A button's frame (item 837): none, as its fill says it is one; the contrast setting draws it (themes.css). Its
+     fill is the second surface; a box whose own ground is that surface gives its buttons the first, so that a button
+     never wears the ground it stands on (the pre-push review: a signed-in account's Sign out did). */
   --button-border: transparent;
+  --button-fill: var(--surface-2);
   /* The composer's lift (item 121): a hairline of shadow and a soft one that falls below it. */
   --shadow-composer: 0 1px 2px var(--shadow-ink), 0 12px 28px -18px var(--shadow-ink-deep);
   /* The glass of what stands over the conversation at the foot (item 401): the composer and the bar over it, a
@@ -788,10 +791,11 @@ a.pill:hover {
 
 /* ---------- controls ---------- */
 
-/* One grammar for the controls (item 80): a button, an input and a select are 36 px tall on an 8 px radius with a
-   hairline of the strong border; the small button and select are 32; the focus ring is the page's 2 px accent outline. */
-/* A button is a soft fill with no frame (item 837), a step darker under the pointer; the first of a page's is ink
-   (`.primary`), a quiet one has no fill (`.ghost`), and the contrast setting frames them again (themes.css). */
+/* One grammar for the controls (item 80): a button, an input and a select are 36 px tall on a 10 px radius (item 837);
+   the small button and select are 32; the focus ring is the page's 2 px accent outline. An input and a select keep a
+   hairline of the strong border. A button is a soft fill with no frame (item 837), a step darker under the pointer;
+   the first of a page's is ink (`.primary`), a quiet one has no fill (`.ghost`), and the contrast setting frames them
+   again (themes.css). */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -801,7 +805,7 @@ a.pill:hover {
   padding: 0 16px;
   border-radius: var(--radius-control);
   border: 1px solid var(--button-border);
-  background: var(--surface-2);
+  background: var(--button-fill);
   color: var(--text);
   font-weight: var(--weight-label);
   cursor: pointer;
@@ -1327,7 +1331,8 @@ a.pill:hover {
 
 /* ---------- cards and badges ---------- */
 
-/* A card is flat (item 79): a surface with a hairline, no shadow; shadows belong to what floats (menus, dialogs). */
+/* A card is a box of the page (item 837; flat with a hairline since item 79): a surface with no frame and a soft
+   shadow under it (`--box-border`, `--box-shadow`); the contrast setting frames it again. */
 .card {
   background: var(--surface);
   border: 1px solid var(--box-border);
@@ -2838,6 +2843,7 @@ a.pill:hover {
 /* An account inside the card of the accounts: a soft fill with no frame (item 837), as a box within a box is, rather
    than a second shadow. */
 .account-provider {
+  --button-fill: var(--surface);
   padding: var(--space-3);
   border: 1px solid var(--box-border);
   border-radius: var(--radius);
