@@ -1,9 +1,10 @@
-// What the chat's run changed on this Mac (item 597): at the head of the side panel's Changes tab (item 841: it stood
-// under the answer, which a chat with a personal agent does not want, Dot being no editor), once it has ended, the files its file tools
-// created and changed, as the undo journal has them (`GET /runs/{id}/actions`), each a button to the file beside the
-// conversation, with Review, the side panel's Changes tab and their diffs, and Undo, which takes the changes back after
-// a question. Not an editor's list: one line of what Dot did and the way back, and nothing for a run that changed no
-// file. A command's own writes are in no journal and so not here (docs/autonomy.md); the run's own notes are left out.
+// What the chat's run changed on this Mac (item 597), once it has ended: at the head of the side panel's Changes tab
+// (item 841: it stood under the answer, which a chat with a personal agent does not want, Dot being no editor), the
+// files its file tools created and changed, as the undo journal has them (`GET /runs/{id}/actions`), each a button to
+// the file beside the conversation, and Undo, which takes the changes back after a question; Review, which opened the
+// Changes tab, is left out where the line stands in it. Not an editor's list: one line of what Dot did and the way
+// back, and nothing for a run that changed no file. A command's own writes are in no journal and so not here
+// (docs/autonomy.md); the run's own notes are left out.
 
 import { api } from "./api.js";
 import { el, requestFile } from "./dom.js";
@@ -67,8 +68,9 @@ function baseName(path) {
 }
 
 /**
- * The card of what the run `runId` changed, under its answer. `onReview()` opens the Changes tab; `onUndone()` runs
- * after an Undo, for the page to read its Changes and Files again. Returns `{ element, load() }`: `load()` reads the
+ * The card of what the run `runId` changed, at the head of the Changes tab (item 841). `onReview()` opens that tab, and
+ * null leaves Review out, as the run page does; `onUndone()` runs after an Undo, for the page to read its Changes and
+ * Files again. Returns `{ element, load() }`: `load()` reads the
  * run's undo plan and draws the card, which stays empty and hidden for a run that changed no file.
  */
 export function runChangesCard({ runId, onReview, onUndone }) {
