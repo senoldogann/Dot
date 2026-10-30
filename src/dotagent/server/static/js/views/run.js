@@ -1576,12 +1576,14 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     },
     onGoalFiles: goalMessage === null ? null : (files) => showMessageFiles(goalMessage, files),
     onGoalPicks: goalMessage === null ? null : (picks) => showMessagePicks(goalMessage, picks),
-    // Dot's reaction stands on the latest message of yours on the page as the event comes (item 664): the run's own or one
-    // you sent it since.
+    // Dot's reaction stands on the latest message of yours to the run as the event comes (item 664): its own or one you
+    // sent it since; a run that follows up a reaction of yours has none of its own (item 844), and the turns before keep
+    // theirs as they were, as they do once the page is read again.
     onDotReaction: (reaction) => {
-      const mine = threadBox?.querySelectorAll(".user-message") ?? [];
-      if (mine.length > 0) {
-        showDotReaction(mine[mine.length - 1], reaction);
+      const sent = threadBox?.querySelectorAll(".run-thread > .timeline .user-message") ?? [];
+      const mine = sent.length > 0 ? sent[sent.length - 1] : goalMessage?.classList.contains("user-message") ? goalMessage : null;
+      if (mine !== null) {
+        showDotReaction(mine, reaction);
       }
     },
     reactions,

@@ -405,13 +405,34 @@ async def test_a_queued_follow_up_edited_with_a_file_starts_with_that_file(login
         session.model.open(3)
         assert (await session.ended(working.id)).status == "done"
         follow: RunRecord = await session.next_run(first.thread_id, {first.id, working.id})
-        assert (await session.ended(follow.id)).goal == THUMB_DOWN
+        ended: RunRecord = await session.ended(follow.id)
+        # With a file of the owner's on it, the message is theirs, and the conversation draws it (item 844).
+        assert (ended.goal, ended.follows_reaction) == (THUMB_DOWN, None)
         # The file goes with the owner's words and the quote of the message, and the page is told of it as for any run.
         read: str = session.model.told(4)
         assert THUMB_DOWN in read and f"«{ANSWER}»" in read and "two lines" in read
         attached: list[EventRecord] = await session.events(follow.id, "attachments")
         assert [[file["name"] for file in event.data["files"]] for event in attached] == [["notes.txt"]]  # type: ignore[union-attr, index]
         assert await session.runtime.store.list_queued(first.thread_id) == []
+
+
+async def test_a_queued_follow_up_whose_words_the_owner_changed_is_their_message(login_env: dict[str, str]) -> None:
+    """Item 844: the conversation draws no message for a follow-up in Dot's words for the reaction, but words the owner
+    wrote over them in the queue are theirs, and stand as their message."""
+    turns: list[ScriptedTurn] = [finish(ANSWER), says("Working on it."), finish("Done."), finish("Reconsidered.")]
+    async with open_session(login_env, turns, held={3}) as session:
+        first: RunRecord = await session.start()
+        await session.ended(first.id)
+        working: RunRecord = await session.start(first.thread_id)
+        await session.model.started(3)
+        await session.reactions.add(first.id, "answer", "wrong")
+        [queued] = await session.runtime.store.list_queued(first.thread_id)
+        await session.manager.edit_queued(queued.id, "No, the beds face west: check the plan.")
+        session.model.open(3)
+        assert (await session.ended(working.id)).status == "done"
+        follow: RunRecord = await session.next_run(first.thread_id, {first.id, working.id})
+        ended: RunRecord = await session.ended(follow.id)
+        assert (ended.goal, ended.follows_reaction) == ("No, the beds face west: check the plan.", None)
 
 
 async def test_a_queued_follow_up_in_an_agents_chat_starts_as_the_agents_run_with_the_file_put_on_it(
