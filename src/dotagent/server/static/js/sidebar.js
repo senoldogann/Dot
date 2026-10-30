@@ -51,8 +51,8 @@ const CONNECTED_MARKS = 3;
 // Where Connect apps leads (item 545): the services' tab of Customize.
 const CONNECTORS_PATH = "#/customize/connectors";
 const MARKS_TURN_MS = 6000;
-// Which sections the owner folded (`waiting`, `working`, `chats`, and a channel's by its id: `imessage`), kept between
-// visits.
+// Which sections the owner folded (`chats`, and a channel's by its id: `imessage`), kept between visits; a fold of
+// `waiting` or `working` kept from before item 836, whose groups no longer fold, is not read.
 const FOLDS_KEY = "dot.sideFolds";
 // The channels whose chats stand in a section of their own (item 619), by the `source` their threads have (the channel's
 // id, as the router makes the thread): the name of the section and whether it starts folded. A thread of any other
@@ -380,22 +380,22 @@ function waitingRow(row, onNavigate) {
     el(
       "a",
       {
-        class: "side-run side-activity",
+        class: "side-run",
         href: row.href,
         title: clip(row.title, 240),
         "aria-label": `${clip(row.title, 120)} (${[WAITS_WORDS.toLowerCase(), ...facts].join(", ")})`,
         onclick: onNavigate,
       },
       face,
-      el("span", { class: "side-chat-text" }, el("span", { class: "side-run-goal side-activity-title" }, clip(row.title, 120)), waitsLine([WAITS_WORDS, ...facts].join(" · "))),
+      el("span", { class: "side-chat-text" }, el("span", { class: "side-run-goal" }, clip(row.title, 120)), waitsLine([WAITS_WORDS, ...facts].join(" · "))),
       el("span", { class: "side-chat-meta" }, waitsDot()),
     ),
   );
 }
 
 /**
- * Where what waits for the owner stands (item 836), as `placeWork` places what works. `rows` are Waiting's, oldest
- * first. A row whose run is a listed chat's latest stands as that chat, once however many of its rows wait, its last
+ * Where what waits for the owner stands (item 836), as `placeWork` places what works. `rows` are Waiting's, read
+ * oldest first. A row whose run is a listed chat's latest stands as that chat, once however many of its rows wait, its last
  * line saying what waits (`waiting`, `{ chat, row }`), unless the chat is pinned, which keeps it under Pinned; either
  * way its row says so (`byChat`, the rows of each chat that waits, oldest first). A row that is no listed chat's stands
  * as it is, its `chat` null.
@@ -565,6 +565,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   let work = { working: [], pinned: new Map() };
   // Where what waits for the owner stands (`placeWaiting`), worked out at each paint (item 836).
   let waits = { waiting: [], byChat: new Map() };
+  // The chats that stand above the list, with what waits (item 836) and what works (item 202), worked out at each
+  // paint. They are not in the list, where the chats are chosen, and every question of whether a chat is in it asks
+  // this one set (item 836's pre-push review found the question asked apart in four places, each round one of them
+  // missing a group).
+  let above = new Set();
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
   const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
@@ -658,18 +663,14 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return [...nodes].filter((node) => node.getClientRects().length > 0);
   }
 
-  function atWork(chat) {
-    return work.working.some((entry) => entry.chat !== null && entry.chat.id === chat.id);
+  // Whether a chat stands above the list, with what waits or what works, rather than in it.
+  function aboveTheList(chat) {
+    return above.has(chat.id);
   }
 
-  // Whether a chat stands with what waits for the owner, at the top of the list (item 836).
-  function waitsAtTop(chat) {
-    return waits.waiting.some((entry) => entry.chat !== null && entry.chat.id === chat.id);
-  }
-
-  // The chats of the list: every chat but those that stand with what works (item 202) and what waits (item 836).
+  // The chats of the list: every chat but those that stand above it.
   function shownChats() {
-    return chats === null ? [] : chats.filter((chat) => !atWork(chat) && !waitsAtTop(chat) && matchesQuery(chat, needle));
+    return chats === null ? [] : chats.filter((chat) => !aboveTheList(chat) && matchesQuery(chat, needle));
   }
 
   function markCurrent() {
@@ -794,12 +795,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       ...waits,
       waiting: waits.waiting.map((entry) => (entry.chat === null ? entry : { ...entry, family: families.get(entry.chat.id) ?? null })),
     };
-    // A chat chosen for deletion whose run starts leaves the list for what works, and the choice goes with it: a chat
-    // at work cannot be deleted. So does one that comes to wait for the owner (item 836), which leaves the list too.
-    for (const entry of [...work.working, ...waits.waiting]) {
-      if (entry.chat !== null) {
-        selected.delete(entry.chat.id);
-      }
+    above = new Set([...work.working, ...waits.waiting].flatMap((entry) => (entry.chat === null ? [] : [entry.chat.id])));
+    // A chat chosen for deletion that comes to stand above the list leaves the choice: one at work cannot be deleted,
+    // and one that waits for the owner (item 836) is not in the list, where the chats are chosen.
+    for (const id of above) {
+      selected.delete(id);
     }
     paintActivity();
     paintChats();
@@ -819,7 +819,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
 
   function paintChats() {
-    selectButton.hidden = selecting || chats === null || chats.every((chat) => atWork(chat) || waitsAtTop(chat));
+    selectButton.hidden = selecting || chats === null || chats.every(aboveTheList);
     head.hidden = selecting;
     bar.hidden = !selecting;
     // The chats fold under their label (item 95); choosing chats to delete needs them in sight.
@@ -1093,8 +1093,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       { label: "Rename", icon: "pencil", run: () => renameChat(chat) },
       { label: "Copy link", icon: "link", run: () => attempt(() => copyLink(chat)) },
       "separator",
-      // A chat under Working is not in the list, where the chats are chosen.
-      atWork(chat) ? null : { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
+      // A chat above the list, with what waits or what works, is not in it, where the chats are chosen.
+      aboveTheList(chat) ? null : { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
       { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
     ];
     return actions.filter((item) => item !== null);

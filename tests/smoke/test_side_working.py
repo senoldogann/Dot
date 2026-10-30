@@ -281,7 +281,10 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                     await search.fill("")
                     # Pinned, the chat that waits stays among the pinned ones, saying there what waits; unpinned, it
                     # stands first again.
+                    # Its menu offers no Select: it is not in the list, where the chats are chosen.
                     await waiting.get_by_role("button", name="More for Pick a shelf").click()
+                    await expect(page.get_by_role("menuitem", name="Pin")).to_be_visible()
+                    await expect(page.get_by_role("menuitem", name="Select")).to_have_count(0)
                     await page.get_by_role("menuitem", name="Pin").click()
                     held: Locator = pinned.locator(f".side-chat > a.side-run[href='#/runs/{asking.id}']")
                     await expect(held.locator(".side-chat-waits")).to_have_text("Waiting for you: Which shelf?")
