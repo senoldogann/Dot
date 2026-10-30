@@ -1,5 +1,5 @@
-// The sidebar while the settings are open (item 562): Back to chats and the tabs in their groups with what each holds
-// (the main model, how many providers are signed in, how many notes Dot keeps, whether a phone reaches Dot). sidebar.js
+// The sidebar while the settings are open (item 562): Back to chats and the seven sections (item 845) with what each holds
+// (the main model, how many notes Dot keeps, how many entries the Vault holds, whether a phone reaches Dot). sidebar.js
 // shows it in the place of the chats and its pages (a Mac's window; a phone has the list of tabs for a page of its own,
 // views/settings.js). The daemon's state is the page's (shell.js): the connection, and the emergency stop's banner.
 
@@ -7,12 +7,14 @@ import { api, query } from "./api.js";
 import { el, modelName, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { LAST_CHAT_KEY, readPref } from "./prefs.js";
-import { GROUPS, TABS, tabAt } from "./settingstabs.js";
+import { SECTIONS, sectionOf, tabAt } from "./settingstabs.js";
 import { getSnapshot, onChange } from "./state.js";
 
 // The chat the owner was on last, which main.js keeps; Back to chats leads there.
 // What the phone needs asked of Tailscale is read again no sooner than this: a tab's visit should not ask it each time.
 const PHONE_FRESH_MS = 60_000;
+// The tabs whose count, model or state the nav shows at their section's right (paintModel and readValues).
+const NAV_VALUES = new Set(["models", "memory", "vault", "phone"]);
 
 /**
  * Build the nav. `homeHref` is where Back to chats leads when no chat was open before. `onNavigate` runs after a link is
@@ -22,20 +24,22 @@ const PHONE_FRESH_MS = 60_000;
 export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
   const hide = el("button", { class: "icon-btn", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse }, icon("panelLeft"));
   const back = el("a", { class: "settings-back", href: homeHref, onclick: onNavigate }, icon("arrowLeft"), el("span", null, "Back to chats"));
-  const values = new Map(TABS.map((tab) => [tab.id, el("span", { class: "settings-nav-value" })]));
-  const links = new Map(
-    TABS.map((tab) => [
-      tab.id,
-      el("a", { class: "settings-nav-link", href: `#/settings/${tab.id}`, onclick: onNavigate }, icon(tab.icon), el("span", { class: "settings-nav-label" }, tab.label), values.get(tab.id)),
-    ]),
+  // What a section holds, by the tab it is read from (`value` of the section), for the tabs the nav reads: the theme
+  // is the phone's list's alone.
+  const values = new Map(
+    SECTIONS.filter((section) => NAV_VALUES.has(section.value)).map((section) => [section.value, el("span", { class: "settings-nav-value" })]),
   );
-  const groups = GROUPS.map((group) =>
-    el(
-      "section",
-      { class: "settings-nav-group" },
-      el("h3", { class: "settings-nav-group-title" }, group.title),
-      group.tabs.map((id) => links.get(id)),
-    ),
+  const links = new Map(
+    SECTIONS.map((section) => [
+      section.id,
+      el(
+        "a",
+        { class: "settings-nav-link", href: `#/settings/${section.tabs[0]}`, onclick: onNavigate },
+        icon(section.icon),
+        el("span", { class: "settings-nav-label" }, section.label),
+        values.get(section.value) ?? null,
+      ),
+    ]),
   );
   // Inside the desktop shell (item 88) the window's traffic lights stand at the top left: the first row is theirs, with
   // the button that hides the sidebar beside them where the chats' head holds it (items 113 and 134), and Back to chats
@@ -47,14 +51,15 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
     el("div", { class: "settings-nav-top", "data-tauri-drag-region": "" }, lights ? hide : [back, hide]),
     lights ? back : null,
     el("h2", { class: "settings-nav-title" }, "Settings"),
-    el("div", { class: "settings-nav-groups" }, groups),
+    el("div", { class: "settings-nav-groups" }, el("section", { class: "settings-nav-group" }, [...links.values()])),
   );
 
   let disposed = false;
   let phoneReadAt = 0;
 
   function paintCurrent() {
-    const current = tabAt(location.hash);
+    const tab = tabAt(location.hash);
+    const current = tab === null ? null : (sectionOf(tab)?.id ?? null);
     for (const [id, link] of links) {
       if (id === current) {
         link.setAttribute("aria-current", "page");
@@ -70,18 +75,13 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
 
   /** What the tabs hold, read from the daemon each time the nav is shown or the tab changes; one that cannot be read leaves its place empty. */
   async function readValues() {
-    const [keys, notes, vault, phone] = await Promise.allSettled([
-      api.get("/keys"),
+    const [notes, vault, phone] = await Promise.allSettled([
       api.get(`/memories${query({ limit: 1, offset: 0 })}`),
       api.get("/vault/counts"),
       Date.now() - phoneReadAt < PHONE_FRESH_MS ? Promise.resolve(null) : api.get("/phone"),
     ]);
     if (disposed) {
       return;
-    }
-    if (keys.status === "fulfilled") {
-      const signedIn = keys.value.keys.filter((key) => key.source !== null).length;
-      setText(values.get("keys"), signedIn === 0 ? "" : String(signedIn));
     }
     if (notes.status === "fulfilled") {
       setText(values.get("memory"), notes.value.total === 0 ? "" : String(notes.value.total));

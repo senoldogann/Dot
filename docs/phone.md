@@ -109,11 +109,12 @@ file's panel keeps the room for the file's name, and Open on the Mac is its icon
 have space between them; a ready team the owner has already says so under its words, which have the card's width; and
 the name of a plugin is not cut by an ellipsis while there is room for it, which WebKit did to every name of two words.
 
-On a phone the settings open on a list of their pages in groups (item 330): Interface, Models, How Dot works and This
-Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes there are, whether a
-version of the harness is in use). A row opens its page on its own, the bar naming it, and a card's name stands over the
+On a phone the settings open on a list of their seven sections (items 330 and 845): General, Appearance, Models, Rules
+and memory, Browser and Vault, Phone and channels and System, each row a section's name and what it holds (the theme on
+screen, the main model, how many notes there are, how many items the vault holds). A row opens its section on its own,
+the bar naming it and the row of the section's tabs under it, and a card's name stands over the
 card, as a section's title does on the redrawn tabs (item 576); a card that folds keeps its name on its ground. In a
-Mac's window the sidebar is the settings' nav while they are open, the tabs in the same four groups (item 562); see
+Mac's window the sidebar is the settings' nav while they are open, the same seven sections (item 562); see
 [the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
 Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px
 (item 331). A service's page of Customize › Connectors and an agent's editor name their cards the same way, a row of the

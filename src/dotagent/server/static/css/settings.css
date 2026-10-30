@@ -41,6 +41,24 @@
   letter-spacing: var(--tracking-title);
 }
 
+/* The row of a section's tabs, under its name (item 845); a row wider than the page scrolls sideways. */
+.settings-parts {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.settings-parts a {
+  flex: none;
+}
+
+.settings-parts + .set-lead {
+  margin-top: var(--space-3);
+}
+
 .set-lead {
   max-width: 64ch;
   margin: 4px 0 0;
@@ -1149,9 +1167,9 @@
   }
 }
 
-/* On a phone the settings open on a list of their tabs in groups (item 330): each group's name over a
-   card of rows, a row the tab's mark, its name, what it holds and an arrow. A row opens its tab as a page of its own,
-   whose way back to the list is the bar's Back at the top left (item 338). */
+/* On a phone the settings open on a list of their seven sections (items 330 and 845): a card of rows, a row the
+   section's mark, its name, what it holds and an arrow. A row opens its section as a page of its own, whose way back to
+   the list is the bar's Back at the top left (item 338). */
 .settings-list {
   display: flex;
   flex-direction: column;

@@ -135,7 +135,7 @@ async def _open(browser: Browser, address: str, width: int = 1280, height: int =
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     await page.goto(f"{address}/#/settings/vault")
-    await expect(page.get_by_role("heading", name="Vault", level=1)).to_be_visible()
+    await expect(page.get_by_role("heading", name="Browser and Vault", level=1)).to_be_visible()
     return page
 
 
@@ -186,8 +186,11 @@ async def test_an_empty_vault_says_so_and_what_dot_never_sees(browser: Browser, 
         for name in ("All, 0", "Logins, 0", "Cards, 0", "Contacts, 0"):
             await expect(_tab(page, name)).to_be_visible()
         await expect(page.get_by_role("searchbox", name="Search the vault")).to_be_visible()
-        # The tab stands in the settings' list, in the group of this Mac.
-        await expect(page.get_by_role("link", name="Vault")).to_have_attribute("aria-current", "page")
+        # The tab stands in the settings' section Browser and Vault (item 845), marked in the row of its tabs.
+        await expect(page.locator(".settings-nav-link[aria-current='page']")).to_have_text("Browser and Vault")
+        await expect(
+            page.get_by_role("navigation", name="Browser and Vault").get_by_role("link", name="Vault")
+        ).to_have_attribute("aria-current", "page")
         button: Locator = page.get_by_role("button", name="New item")
         await button.click()
         menu: Locator = page.get_by_role("menu", name="New item")

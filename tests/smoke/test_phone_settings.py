@@ -1,12 +1,12 @@
-"""On a phone the settings are a list of their tabs in groups (item 330), in WebKit as the owner's iPhone (440 px wide)
-and as a small one (320 px), on a served daemon with three notes and the Ocean theme.
+"""On a phone the settings are a list of their sections (items 330 and 845), in WebKit as the owner's iPhone (440 px
+wide) and as a small one (320 px), on a served daemon with three notes and the Ocean theme.
 
 On a phone:
 
-- `#/settings` is four groups of rows, nine in all (Skills is a tab of Customize, item 317, Schedules a page of its
-  own): Appearance tells the theme on screen, Models the main model and Memory how many notes Dot keeps;
-- a row opens its tab as a page of its own: the bar names the tab, its Back at the top left (item 338) is the one
-  way back and no rail or row of tabs shows; Back leads to the list;
+- `#/settings` is one card of seven rows, one a section (item 845, after four groups of fifteen tabs): Appearance tells
+  the theme on screen, Models the main model and Rules and memory how many notes Dot keeps;
+- a row opens its section's first tab as a page of its own: the bar names the section, its Back at the top left (item
+  338) is the one way back and no rail shows, only the row of the section's tabs; Back leads to the list;
 - a card's name stands over the card, out of its surface;
 - neither the list nor any tab runs wider than the screen.
 
@@ -44,22 +44,14 @@ TOKEN: str = "phone-settings-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _PHONES: tuple[str, ...] = ("iPhone 17 Pro Max", "iPhone SE")
 # The list's groups and their rows, in order.
-_GROUPS: list[str] = ["Interface", "Models", "How Dot works", "This Mac"]
+# The list's rows, in order, by the tab each opens.
 _TABS: dict[str, str] = {
     "general": "General",
     "appearance": "Appearance",
     "models": "Models",
-    "keys": "AI services",
-    "websearch": "Web search",
-    "rules": "Rules",
-    "memory": "Memory",
-    "harness": "Self-improvement",
-    "browser": "Browser",
-    "vault": "Vault",
-    "trading": "Trading",
-    "phone": "Phone",
-    "channels": "Channels",
-    "snapshots": "Snapshots",
+    "rules": "Rules and memory",
+    "browser": "Browser and Vault",
+    "phone": "Phone and channels",
     "system": "System",
 }
 _NOTES: tuple[str, ...] = (
@@ -71,7 +63,7 @@ _NOTES: tuple[str, ...] = (
 _VALUES: dict[str, str] = {
     "Appearance": "Ocean",
     "Models": SCRIPTED_MODEL.partition(":")[2],
-    "Memory": str(len(_NOTES)),
+    "Rules and memory": str(len(_NOTES)),
 }
 # How far past the screen's edge the page may reach: none, but the rounding of a fraction.
 _OVER_PX: int = 1
@@ -175,7 +167,7 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/settings")
                 listed: Locator = page.get_by_role("navigation", name="Settings")
-                await expect(listed.get_by_role("heading")).to_have_text(_GROUPS)
+                await expect(listed.get_by_role("heading")).to_have_count(0)
                 rows: Locator = listed.get_by_role("link")
                 await expect(rows.locator(".settings-row-label")).to_have_text(list(_TABS.values()))
                 for name, value in _VALUES.items():
@@ -196,8 +188,8 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                     faults += await _fits(page, f"{device} {tab}")
                     await back.click()
                     await expect(page).to_have_url(f"{address}/#/settings")
-                    await expect(page.get_by_role("navigation", name="Settings").get_by_role("heading")).to_have_text(
-                        _GROUPS
+                    await expect(page.get_by_role("navigation", name="Settings").get_by_role("link")).to_have_count(
+                        len(_TABS)
                     )
 
                 # A card's name stands over the card, and the card's ground is its parts'.

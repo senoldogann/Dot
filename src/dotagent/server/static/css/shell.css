@@ -1340,21 +1340,6 @@
   overscroll-behavior: contain;
 }
 
-.settings-nav-group + .settings-nav-group {
-  margin-top: 20px;
-}
-
-.settings-nav-group-title {
-  margin: 0 0 8px;
-  padding: 0 12px;
-  font-size: var(--text-xs);
-  line-height: var(--leading-xs);
-  font-weight: var(--weight-label);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
 .settings-nav-link {
   display: flex;
   align-items: center;
