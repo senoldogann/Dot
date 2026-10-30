@@ -26,7 +26,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     # A reply, a summary, a stream, a record of a step, the tail of a log, the errors of a server: the model's own words
     # and what was done, masked where they are made.
     "agent/aside.py:answer_aside": (True,),
-    "agent/executor.py:_execute_one": (True,),
+    # The events of a call, then what its tool returned (item 857: before the run reads it).
+    "agent/executor.py:_execute_one": (True, True),
     "agent/gate.py:_shown": (True,),
     "agent/loop.py:_compact": (True,),
     "agent/manager.py:RunManager._record_end": (True,),

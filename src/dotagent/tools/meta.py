@@ -1,11 +1,13 @@
 """Meta tools: finishing a run, asking the user, notifying them, reacting to their message, keeping a visible plan and
 turning on a tool group."""
 
+import asyncio
 from typing import Annotated, Literal, Self, get_args
 
 from pydantic import AfterValidator, Field, StringConstraints, model_validator
 
 from dotagent.agent.approvals import ApprovalOutcome
+from dotagent.agent.held_secrets import SECRET_SEVERITY, checked_name, held_secrets
 from dotagent.agent.plan import (
     EMPTY_PLAN,
     EVIDENCE_MAX_CHARS,
@@ -23,6 +25,7 @@ from dotagent.agent.plan import (
     with_step_status,
 )
 from dotagent.agent.questions import Option, QuestionOption, answered
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo
@@ -35,6 +38,8 @@ _log = get_logger(__name__)
 
 FINISH_TOOL: str = "finish"
 ASK_USER_TOOL: str = "ask_user"
+# Asks the owner for a key, a token or a password on a card of its own (item 857); the value never reaches the run.
+ASK_SECRET_TOOL: str = "ask_secret"
 UPDATE_PLAN_TOOL: str = "update_plan"
 MARK_PLAN_STEP_TOOL: str = "mark_plan_step"
 USE_TOOLS_TOOL: str = "use_tools"
@@ -423,10 +428,77 @@ def _use_tools_tool() -> RegisteredTool:
     )
 
 
+class AskSecretArgs(ToolArgs):
+    name: str = Field(description="The environment variable your commands read it as: CLOUDFLARE_API_TOKEN.")
+    label: str = Field(min_length=1, max_length=120, description="The card's title: what it is and its least access.")
+    why: str = Field(min_length=1, max_length=1500, description="Why you need it, and how to make it, step by step.")
+    replace: bool = Field(default=False, description="True to ask again for one this chat holds that is wrong.")
+
+
+def _held_line(name: str) -> str:
+    return (
+        f"The user saved it securely: your commands in this chat read it as ${name} for 24 hours. Its value is never "
+        "shown to you: use the variable, and never print, echo, save or send the value itself anywhere it does not "
+        "need to go."
+    )
+
+
+def _ask_secret_tool() -> RegisteredTool:
+    def classify(args: AskSecretArgs, ctx: ToolContext) -> ActionInfo:
+        return _meta_action(ASK_SECRET_TOOL, f"Ask the user for a secret: {args.label}")
+
+    async def run(args: AskSecretArgs, ctx: ToolContext) -> ToolResult:
+        try:
+            name: str = checked_name(args.name)
+        except InvalidValueError as error:
+            return fail(error.message)
+        # One the chat holds already is not asked for again, unless the run says it must be replaced.
+        if not args.replace and name in {held.name for held in await asyncio.to_thread(held_secrets, ctx.thread_id)}:
+            return ok(_held_line(name))
+        details: JsonObject = {"name": name, "label": args.label, "why": args.why}
+        # Nobody watches the run (item 857): the card stays for the user, and the secret, once given, holds for this
+        # chat's later runs.
+        if ctx.questions == "leave":
+            await ctx.runtime.approvals.leave(ctx.run_id, ASK_SECRET_TOOL, args.label, SECRET_SEVERITY, details)
+            try:
+                await ctx.runtime.notify("Dot asks for a secret", args.label)
+            except Exception as error:  # noqa: BLE001 - a notification that fails must not fail the question
+                _log.warning("secret_notify_failed", run_id=ctx.run_id, error=str(error))
+            return ok(
+                f"The card asking for {args.label} is left for the user, who does not answer during this run. Once "
+                f"they save it, this chat's commands read it as ${name}. Go on with what does not need it."
+            )
+        outcome: ApprovalOutcome = await ctx.runtime.approvals.request(
+            ctx.run_id, ASK_SECRET_TOOL, args.label, SECRET_SEVERITY, details
+        )
+        held_now = await asyncio.to_thread(held_secrets, ctx.thread_id)
+        if outcome.status == "approved" and name in {held.name for held in held_now}:
+            return ok(_held_line(name))
+        return ok(
+            f"The user did not give {args.label} ({outcome.status}). Do not ask for it in a message; go on without "
+            "it, or call finish and say what it would have allowed."
+        )
+
+    return make_tool(
+        name=ASK_SECRET_TOOL,
+        description=(
+            "Ask the user for a key, token or password on a card: kept out of the chat and your sight, this chat's "
+            "commands read it as $name for 24 hours. Never ask for a secret in a message or with ask_user."
+        ),
+        args_model=AskSecretArgs,
+        modes=ALL_MODES,
+        parallel_safe=False,
+        timeout_s=86400.0,
+        classify=classify,
+        run=run,
+    )
+
+
 def build_meta_tools() -> tuple[RegisteredTool, ...]:
     return (
         _finish_tool(),
         _ask_user_tool(),
+        _ask_secret_tool(),
         _notify_tool(),
         _react_tool(),
         _update_plan_tool(),

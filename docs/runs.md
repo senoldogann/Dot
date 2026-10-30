@@ -485,7 +485,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821) |
-| Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `react`, `finish`, `use_tools`                 |
+| Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools` |
 | Team            | `create_agent`, `message_agent`                                                                                    |
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Pages           | `show_page`                                                                                                        |

@@ -30,7 +30,8 @@ INSTRUCTIONS: str = "Only read; never act on the Mac."
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 # What the agent is bound to, and what a bound run has besides: finishing, asking the owner, turning tool groups on.
 _BOUND: frozenset[str] = frozenset({"read_file", "delegate"})
-_CORE: frozenset[str] = frozenset({"finish", "ask_user", "use_tools", "react"})
+# What every agent keeps (agent/loop.py's AGENT_CORE_TOOLS), ask_secret among them since item 857.
+_CORE: frozenset[str] = frozenset({"finish", "ask_user", "ask_secret", "use_tools", "react"})
 
 
 def _call(tool: str, **arguments: str | bool) -> ScriptedTurn:

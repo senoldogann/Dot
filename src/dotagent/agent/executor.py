@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 
 from dotagent.agent.authorization import Authorization, StepDecision
 from dotagent.agent.gate import RunGate, hold_note, masked_action
+from dotagent.agent.held_secrets import all_held_values
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
 from dotagent.core.errors import (
     ApprovalParked,
@@ -24,7 +25,7 @@ from dotagent.core.errors import (
     WebTransportError,
 )
 from dotagent.core.logs import get_logger
-from dotagent.core.text import redact_json, redact_known, strip_blobs_keep_text, truncate_middle
+from dotagent.core.text import mask_known, redact_json, redact_known, strip_blobs_keep_text, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolCall, invalid_arguments_text
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo
@@ -380,7 +381,14 @@ async def _execute_one(
         # A call of a tool whose group was off ran as any call does (its arguments, the policy, the approval): the loop
         # turns the group on for the next step, and the result says so, since the model chose the call blind.
         result = result.model_copy(update={"text": f"{_group_turned_on_note(call.name, group)}\n\n{result.text}"})
-    clipped: ToolResult = result.model_copy(update={"text": truncate_middle(result.text, ctx.output_chars)})
+    # Every secret Dot holds is masked in what any tool returns, before the run, its history or a later prompt reads it
+    # (item 857): a command that prints one the owner gave a chat on a card, or writes it to a file another tool reads,
+    # shows it masked. Read again after the call, so that a secret given while it waited is among them, with every
+    # chat's from their files: a `dotx run` is a process of its own, and a secret given on the daemon's page is masked
+    # in the daemon's memory alone.
+    known = (*await asyncio.to_thread(known_secrets, filled=True), *await asyncio.to_thread(all_held_values))
+    seen: str = mask_known(result.text, known)
+    clipped: ToolResult = result.model_copy(update={"text": truncate_middle(seen, ctx.output_chars)})
     seconds: float = time.monotonic() - started
     files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
     # The step as its record shows it: a command or an address carries the secrets Dot holds as the call's arguments do,

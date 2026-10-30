@@ -587,6 +587,30 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
 
 **Secrets.**
 
+- A run that needs a key, a token or a password of yours asks for it on a card of its own (`ask_secret`, item 857),
+  never in a message. The card holds four things: the run's title for what it is, why it needs it and how to make
+  it, a box that shows no letter of it, and **Save securely** or **Decline**.
+  - The value goes to the daemon alone (`POST /api/approvals/{id}/secret`). It is held for that chat's commands
+    (`shell`, `terminal_open`) under the name the run asked for, for 24 hours, in a file of the chat's own under
+    Dot's home (`held-secrets/<chat>.json`, mode 0600).
+  - It is written nowhere else: no event, no approval, no message of the chat's history, no prompt and no log line.
+  - It is masked in what any tool returns, before the run reads it, so a command that prints it, or writes it to a
+    file another tool reads, shows it masked. A daemon started again masks it again.
+  - The run reads only its name. The folder of the chats' files is guarded as `.env` is: outside `yolo` no command
+    or file tool reads or changes it, so a chat's command reads its own secrets from its environment alone. A `yolo`
+    run may read any file, this one too, and what it reads of a value is masked; a name it writes there that the
+    shell or the loader reads is not given to a command.
+  - A mask lasts while the secret holds and while the daemon runs: after 24 hours, a daemon started again masks it
+    no more, and a copy a command made of it (in a project's `.env`, a tool's login) prints bare then.
+  - The card's plain decision refuses a yes with no value. A value shorter than 8 characters is refused, as a mask
+    would not reach it, and the spaces and line ends around a value are dropped. A name the shell, the loader or a
+    connection reads (`PATH`, `HOME`, `DYLD_*`, `LD_*`, `GIT_*`, `HTTPS_PROXY`, `SSLKEYLOGFILE` and the like) is
+    refused.
+  - The terminal of `dotx run` takes no secret: it says to give it on the card of Dot's page, and Enter declines.
+  - A run nobody watches leaves the card for you; once saved, the chat's later runs read it.
+  - A delegated run asks for none, and its commands, in a chat of their own, do not get the chat's.
+  - What a command does with the variable is the command's, judged as any command is (the guard reads `$NAME`, not
+    the value): give a token the least it needs.
 - The memory tools refuse a note that holds a key-like string or one of the keys Dot holds (`memory_save`,
   `memory_update`), and tell the model to record where the key lives, not the key. A password that a login of 1Password
   or of Dot's vault filled into a page is not one of the keys (see Dot's own vault, below): a note that holds it is

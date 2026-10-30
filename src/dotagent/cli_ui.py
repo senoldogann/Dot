@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from dotagent.agent.declined import CLI_DECIDER
 from dotagent.agent.gate import YOLO_DECIDER
+from dotagent.agent.held_secrets import SECRET_SEVERITY
 from dotagent.agent.helpers import Unavailable, unavailable_text
 from dotagent.agent.lessons import LessonView, RunLessons
 from dotagent.agent.limits import LimitReached, RunLimits, limit_spent
@@ -683,6 +684,17 @@ class TerminalUi:
         if not self._options.interactive:
             self._line(self._paint("    no interactive terminal: denied", "2"))
             await self._resolve(request, approve=False, note="no interactive terminal was available")
+            return
+        if request.severity == SECRET_SEVERITY:
+            # A secret is given on the card of Dot's page alone (item 857): typed here it would stand in the terminal,
+            # and a yes with no value would tell the run it was given.
+            asked: PromptReply = await self._read_unless_decided(
+                request.approval_id, "    give it on the card of Dot's page; press Enter to decline> "
+            )
+            if asked.decided is not None:
+                self._say_decided(asked.decided)
+                return
+            await self._resolve(request, approve=False, note="")
             return
         prompt: str = (
             "    do this step yourself, then press Enter (any other answer skips it)> "
