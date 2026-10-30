@@ -61,11 +61,18 @@ class Spawner(Protocol):
         ...
 
     async def delegate(
-        self, parent_run_id: str, goal: str, mode: RunMode, model: str | None, agent_id: str | None
+        self,
+        parent_run_id: str,
+        goal: str,
+        mode: RunMode,
+        model: str | None,
+        agent_id: str | None,
+        opening: str | None = None,
     ) -> DelegateOutcome:
         """Run ``goal`` as a run of its own on ``model`` (``None``: the parent's model), as a run of the agent
         ``agent_id`` names when one is (item 87: its instructions, its tools and its bounds), wait until it ends and
-        report how it ended."""
+        report how it ended. ``opening`` is the first message its model reads in place of the goal, when it is more
+        than the goal (item 831: a group chat's conversation); the goal stays what its row and its page name."""
         ...
 
 

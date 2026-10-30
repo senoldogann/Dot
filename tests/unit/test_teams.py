@@ -251,7 +251,10 @@ def test_the_prompt_of_the_run_that_leads_a_team_opens_with_the_team_its_purpose
     assert "every message in this chat is for the team" in head
     assert "which you follow within the rules below: Researches a subject with sources, then edits the draft" in head
     assert "  - Research Desk: Finds the sources\n  - Copy Editor: Edits until it reads well" in head
-    assert "with message_agent" in head and "put their answers together into one answer for the owner" in head
+    # A group chat (item 831): the plan first, every agent named and sent its part at once, a short answer last.
+    assert "This chat is a group chat" in head and "naming each agent as @Name" in head
+    assert "call message_agent for every agent the plan names, all at once" in head
+    assert "end with one short message to the owner" in head
     assert "Answer yourself only what no agent's role covers." in head
     # A prompt of a run that leads no team says nothing of one.
     assert "You lead the team" not in _prompt(None, [MESSAGE_AGENT_TOOL])
@@ -260,11 +263,11 @@ def test_the_prompt_of_the_run_that_leads_a_team_opens_with_the_team_its_purpose
 def test_a_team_with_no_agent_left_says_so_and_a_run_without_the_message_tool_does_the_work_itself() -> None:
     empty: str = _prompt(DESK.model_copy(update={"members": ()}), [MESSAGE_AGENT_TOOL]).split("\n\n", 1)[0]
     assert "The team has no agent now, so there is nobody to hand a part to: do the work yourself." in empty
-    assert "Research Desk" not in empty and "with message_agent" not in empty
+    assert "Research Desk" not in empty and "This chat is a group chat" not in empty
     without: str = _prompt(DESK, ["shell"]).split("\n\n", 1)[0]
     assert "  - Research Desk: Finds the sources" in without
     assert "This run has no message_agent tool, so it cannot hand the agents a part: do the work yourself." in without
-    assert "Hand each agent the part" not in without
+    assert "This chat is a group chat" not in without
 
 
 def test_the_team_stands_as_the_owners_words_on_one_line_each_and_an_agents_voice_still_opens_an_agents_run() -> None:

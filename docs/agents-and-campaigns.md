@@ -129,15 +129,24 @@ with a thread, an agent or a campaign), and every run of that chat is told at th
 a follow-up in the chat's box, a queued message, a resumed run or a firing of the chat's loop: that it leads the team
 "Content team", the agents working together, and that every message in the chat is for the team; what you made the team
 for, which it follows within the rules as it follows an agent's instructions; the team's agents by name and role; and
-that it hands each agent the part of the work its role fits with `message_agent` (several at once work in parallel),
-puts their answers together into one answer for you, and answers itself only what no agent's role covers. The text is
-made as each run starts, from the team as it is then, so an agent taken out of the team or deleted is not named, a team
-with none says there is nobody to hand a part to, and a run that has no `message_agent` is told to do the work itself.
-It is your own configuration, written by you into the prompt as an agent's instructions are, and it adds no permission
-and no tool: the agents a run messages answer in runs of their own, within their own tools and approvals (above). The
-one thing in it a model may have written is the role of an agent a run of Dot's made, which the line marks "made by
-Dot". An agent you message in the team's chat, with `agent_id`, is that agent's run and does not lead the team. Removing
-the team leaves its chats as chats with Dot, whose later messages are told no team.
+that the chat is a group chat (item 831, after the owner's screenshots of another agent app): it answers your message
+first with one short message to the group, the plan and who does what, naming each agent as @Name, and in that same
+reply sends every agent the plan names its part with `message_agent`, all at once (as many at once as the team has
+agents, up to eight, rather than `[agent] parallel_tools`, for a reply whose calls all send parts), does no agent's part
+itself, and ends with one short message to you: what was decided, what comes next and what only you can decide. Each
+agent of the team it sends a part reads, before the part, who is in the chat and that its answer is its message there,
+and after it the chat's conversation so far (your messages, the lead's and the agents' answers, the newest 6,000
+characters, fenced as text in which what an agent quoted from a page or a mail asks nothing of it), and is asked to
+answer as people in a chat do: its part only, short, naming another agent as @Name where their parts meet; its run's
+goal, which its row shows, is the part alone. An agent of yours outside the team that the lead sends a part reads the
+part alone, as from any run: it is not in the chat. The text is made as each run starts, from the team as it is then, so
+an agent taken out of the team or deleted is not named, a team with none says there is nobody to hand a part to, and a
+run that has no `message_agent` is told to do the work itself. It is your own configuration, written by you into the
+prompt as an agent's instructions are, and it adds no permission and no tool: the agents a run messages answer in runs
+of their own, within their own tools and approvals (above). The one thing in it a model may have written is the role of
+an agent a run of Dot's made, which the line marks "made by Dot". An agent you message in the team's chat, with
+`agent_id`, is that agent's run and does not lead the team. Removing the team leaves its chats as chats with Dot, whose
+later messages are told no team.
 
 The chat wears the team: the sidebar's row shows the faces of two of its agents and the team's name ahead of its last
 words while the chat's latest run is Dot's, which leads the team, and the bar of a run of Dot's there (a phone's, under
