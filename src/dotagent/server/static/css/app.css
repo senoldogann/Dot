@@ -7031,19 +7031,26 @@ summary:has(> .chev)::-webkit-details-marker {
   }
 
   /* Where the pointer rests, the foot of a message in the middle of the conversation holds only the reaction's button
-     until a reaction stands: it floats under the bubble rather than holding a line of its own, so that the messages,
-     and the line of the work under them, stand close as a messaging app's do (item 843: a line of 32 px kept them
-     apart). */
+     until a reaction stands: it stands in the empty place of a face at the left of the bubble, at its foot, as a
+     messaging app's reaction does, rather than holding a line of its own, so that the messages, and the line of the
+     work under them, stand close (item 843: a line of 32 px kept them apart; under the bubble it covered the start of
+     that line, the pre-push review). */
   .bubble.say[role="article"] {
     position: relative;
   }
 
+  /* Out of the grid's column, so that its box is the bubble's whole width with the face's place, not the column. */
   .bubble.say[role="article"] > .say-foot:not(:has(.reaction-chip)) {
+    grid-column: auto;
     position: absolute;
-    top: calc(100% - var(--space-1));
-    left: calc(28px + var(--space-2));
-    z-index: 1;
+    bottom: 0;
+    left: 0;
+    width: 28px;
     margin: 0;
+  }
+
+  .bubble.say[role="article"] > .say-foot:not(:has(.reaction-chip)) .btn {
+    margin-left: 0;
   }
 }
 
