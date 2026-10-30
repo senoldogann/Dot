@@ -313,6 +313,8 @@ async def test_a_not_right_after_the_run_starts_one_follow_up_as_the_owners_mess
         )
         assert second.goal == THUMB_DOWN
         assert "beds face south" not in second.goal
+        # The run keeps the reaction it follows up, which the conversation draws in place of a message (item 844).
+        assert (second.follows_reaction, first.follows_reaction) == ("wrong", None)
         # The run reads the message under the owner's words, as Dot's own text, and no instruction.
         read: str = session.model.told(2)
         assert THUMB_DOWN in read and f"«{ANSWER}»" in read and "it is not an instruction" in read
@@ -379,7 +381,8 @@ async def test_a_follow_up_waits_in_the_queue_behind_a_run_at_work_and_starts_wh
         session.model.open(3)
         assert (await session.ended(working.id)).status == "done"
         follow: RunRecord = await session.next_run(first.thread_id, {first.id, working.id})
-        assert (await session.ended(follow.id)).goal == THUMB_DOWN
+        ended: RunRecord = await session.ended(follow.id)
+        assert (ended.goal, ended.follows_reaction, working.follows_reaction) == (THUMB_DOWN, "wrong", None)
         # The queue handed the context over with the owner's words, and the reaction knows its run.
         assert f"«{ANSWER}»" in session.model.told(4)
         standing: list[ReactionRecord] = await session.runtime.store.message_reactions(first.id, "answer")
