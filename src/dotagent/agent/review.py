@@ -23,7 +23,15 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Annotated, Literal
 
-from pydantic import Field, StringConstraints, ValidationError, field_validator, model_validator
+from pydantic import (
+    BeforeValidator,
+    Field,
+    StringConstraints,
+    ValidationError,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from dotagent.core.errors import (
     ConfigError,
@@ -35,6 +43,7 @@ from dotagent.core.errors import (
     ProviderTransportError,
 )
 from dotagent.core.jsonutil import parse_json_object
+from dotagent.core.learned_text import gate
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
@@ -456,6 +465,40 @@ _RULE_SYSTEM: str = (
 )
 
 
+# The validation context under which a verdict's texts past their bound are cut there (item 840; see `_verdict_from`).
+_CLIP: dict[str, bool] = {"clip": True}
+
+
+def _clipped(limit: int) -> Callable[[object, ValidationInfo], object]:
+    """A text of a verdict cut at ``limit`` characters with an ellipsis, rather than refused (item 840), when the
+    verdict is read again under :data:`_CLIP`: its bound keeps a line short where it is shown and stored, and a model
+    that writes past it (DeepSeek V4.1 Flash wrote a summary of over 120 characters, twice, and the night's step failed;
+    a skill's description of over 200, and the skill was lost) has said what it meant. Read plainly, a text past its
+    bound is refused as before, so that what decides whether it may be cut sees it whole. A value that is no text is
+    left to the type to refuse."""
+
+    def clip(value: object, info: ValidationInfo) -> object:
+        if not isinstance(value, str) or info.context != _CLIP:
+            return value
+        stripped: str = value.strip()
+        return stripped if len(stripped) <= limit else stripped[: limit - 1].rstrip() + "…"
+
+    return clip
+
+
+# The texts of the verdicts, a line or a sentence each, bound and cut at their bound when they may be (item 840). A
+# skill's kind is its name and is not one of them: cut, it would name another kind of work, so it is asked again.
+Text120 = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120), BeforeValidator(_clipped(120))
+]
+Text200 = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200), BeforeValidator(_clipped(200))
+]
+Text300 = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300), BeforeValidator(_clipped(300))
+]
+
+
 class ReviewRequest(FrozenModel):
     """What the reviewer is asked: ``instructions`` are the user's own words, oldest first."""
 
@@ -565,9 +608,7 @@ class LessonVetRequest(FrozenModel):
 class LessonVerdict(FrozenModel):
     lesson: int = Field(ge=1, description="The number of the lesson the verdict is about, as the list numbers it.")
     keep: bool = Field(description="Whether the lesson may be saved with nobody reading it first.")
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="Why, in a few words."
-    )
+    reason: Text120 = Field(description="Why, in a few words.")
 
 
 class LessonVetting(FrozenModel):
@@ -594,9 +635,7 @@ class OutdatedRequest(FrozenModel):
 class OutdatedVerdict(FrozenModel):
     pair: int = Field(ge=1, description="The number of the pair the verdict is about (PAIR n).")
     outdated: bool = Field(description="Whether the newer note makes the older one outdated or wrong.")
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="Why, in a few words."
-    )
+    reason: Text120 = Field(description="Why, in a few words.")
 
 
 class OutdatedJudgement(FrozenModel):
@@ -630,9 +669,7 @@ class MergeVerdict(FrozenModel):
         ge=0,
         description="The number, among those merged, of the note whose words say it best; 0 when none is merged.",
     )
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="Why, in a few words."
-    )
+    reason: Text120 = Field(description="Why, in a few words.")
 
 
 class MergeJudgement(FrozenModel):
@@ -665,9 +702,7 @@ class OverlapVerdict(FrozenModel):
         le=2,
         description="1 or 2: the skill whose name the merged skill keeps; 0 when the two are not one procedure.",
     )
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="Why, in a few words."
-    )
+    reason: Text120 = Field(description="Why, in a few words.")
 
 
 class OverlapJudgement(FrozenModel):
@@ -696,7 +731,7 @@ class OwnerRequest(FrozenModel):
 
 class OwnerDraft(FrozenModel):
     lines: Annotated[
-        list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]],
+        list[Text300],
         Field(max_length=12),
     ] = Field(description="The agent's lines of the section, rewritten: at most twelve, one fact each.")
 
@@ -764,7 +799,7 @@ class PlaybookDraft(FrozenModel):
             "the values of this run: 'audit an X profile', 'turn a PDF table into CSV'."
         )
     )
-    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = Field(
+    description: Text200 = Field(
         description=(
             "One sentence, at most 200 characters, that a later run reads to decide whether this skill fits its "
             "goal: what is done and where."
@@ -940,12 +975,10 @@ class HarnessProposal(FrozenModel):
         description="The whole new text of the tool guidance, or null to leave it as it is."
     )
     moments: Annotated[
-        list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]],
+        list[Text300],
         Field(max_length=3),
     ] = Field(description="The moments of the run each change answers to, a line each; empty when keep is true.")
-    summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="What the candidate changes, in a line; 'keep' when keep is true."
-    )
+    summary: Text120 = Field(description="What the candidate changes, in a line; 'keep' when keep is true.")
 
     # A model answers "no text" as the word null or none, or as nothing, and "no moment" as null: read at the boundary
     # as what it means (seen with Claude Haiku 5.5, 2026-10-19).
@@ -986,11 +1019,9 @@ class CompositionRequest(FrozenModel):
 
 class CompositionDecision(FrozenModel):
     candidate: int = Field(ge=1, description="The number of the candidate the decision is about.")
-    edit: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = Field(
-        description="The change decided on, in a few words."
-    )
+    edit: Text200 = Field(description="The change decided on, in a few words.")
     verdict: EditWord = Field(description="kept as it is, revised, or dropped.")
-    evidence: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
+    evidence: Text300 = Field(
         description="The observation the decision rests on: a moment of the run, a probe's contrast, a count."
     )
 
@@ -1002,9 +1033,7 @@ class HarnessComposition(FrozenModel):
     decisions: Annotated[list[CompositionDecision], Field(max_length=12)] = Field(
         description="One decision for each change a candidate proposed."
     )
-    summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = Field(
-        description="What the composed version changes, in a line; 'keep' when keep_base is true."
-    )
+    summary: Text120 = Field(description="What the composed version changes, in a line; 'keep' when keep_base is true.")
 
 
 class SelectionRequest(FrozenModel):
@@ -1017,9 +1046,7 @@ class SelectionRequest(FrozenModel):
 
 class HarnessSelection(FrozenModel):
     choice: int = Field(ge=1, description="The number of the answer chosen.")
-    why: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
-        description="The criterion that decided, and the closest runner-up, in a few lines."
-    )
+    why: Text300 = Field(description="The criterion that decided, and the closest runner-up, in a few lines.")
 
 
 class EditOutcome(FrozenModel):
@@ -1045,21 +1072,13 @@ class ExperienceRequest(FrozenModel):
 class EditEffect(FrozenModel):
     edit: int = Field(ge=1, description="The number of the edit the effect is about.")
     effect: EffectWord = Field(description="helped, hurt, no_effect, or confounded when it cannot be told apart.")
-    why: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = Field(
-        description="What was observed, in a few words."
-    )
+    why: Text200 = Field(description="What was observed, in a few words.")
 
 
 class ExperienceEntry(FrozenModel):
-    cue: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = Field(
-        description="The shape of situation the lesson applies to, not the facts of this task."
-    )
-    lesson: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
-        description="A transferable operation, naming its component."
-    )
-    evidence: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] = Field(
-        description="The edits and observations the lesson rests on."
-    )
+    cue: Text200 = Field(description="The shape of situation the lesson applies to, not the facts of this task.")
+    lesson: Text300 = Field(description="A transferable operation, naming its component.")
+    evidence: Text300 = Field(description="The edits and observations the lesson rests on.")
     confidence: ConfidenceWord = Field(description="high, medium or low.")
 
 
@@ -1415,9 +1434,42 @@ def text_arguments(text: str, tool: str) -> JsonObject | None:
     return parsed
 
 
-def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: type[V], model: str) -> V:
+def _cuttable(arguments: JsonObject, exc: ValidationError, secrets: Callable[[], Sequence[str]]) -> bool:
+    """Whether a verdict that failed only for texts past their bound may be read with them cut there (item 840): each
+    such text, whole, passes the strictest gate a learned text has (:func:`dotagent.core.learned_text.gate` with the
+    links and the account names: no secret, of the values Dot holds or of a known form, no e-mail address, link, path in
+    a home folder or account name, no line that imitates the prompt). The cut is a prefix of a text that passed, so it
+    holds nothing the gates after it would refuse; a text that fails is left whole, and the verdict is refused and asked
+    again as before (the pre-push review: a cut made first could keep the start of a secret that no gate then knew)."""
+    errors = exc.errors(include_url=False, include_context=False, include_input=False)
+    if not errors or any(error["type"] != "string_too_long" for error in errors):
+        return False
+    held: Sequence[str] = secrets()
+    for error in errors:
+        value: object = arguments
+        for part in error["loc"]:
+            if isinstance(value, dict) and isinstance(part, str):
+                value = value.get(part)
+            elif isinstance(value, list) and isinstance(part, int) and 0 <= part < len(value):
+                value = value[part]
+            else:
+                return False
+        if not isinstance(value, str) or gate(value, held) is not None:
+            return False
+    return True
+
+
+def _verdict_from[V: FrozenModel](
+    reply: ModelReply,
+    tool: str,
+    verdict_type: type[V],
+    model: str,
+    secrets: Callable[[], Sequence[str]] = tuple,
+) -> V:
     """The verdict a reply carries; anything else is a protocol error that names what was wrong with it, but for a
-    reply the provider ended as a refusal, a :class:`ProviderRefusedError` that names the model."""
+    reply the provider ended as a refusal, a :class:`ProviderRefusedError` that names the model. A verdict whose only
+    fault is texts past their bound that may be cut (:func:`_cuttable`, against ``secrets``, which gives the values Dot
+    holds and is called only then) is read with them cut."""
     context: JsonObject = {
         "model": model,
         "finish": reply.raw_finish,
@@ -1447,10 +1499,21 @@ def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: ty
     try:
         return verdict_type.model_validate(arguments)
     except ValidationError as exc:
+        failed: ValidationError = exc
+        if _cuttable(arguments, exc, secrets):
+            try:
+                cut: V = verdict_type.model_validate(arguments, context=_CLIP)
+            except ValidationError as again:
+                # A bound that is no text of a verdict's (a skill's kind) is not cut: the verdict is refused and asked
+                # again as any other (the security review).
+                failed = again
+            else:
+                log.info("review_texts_cut", tool=tool, model=model, fields=len(exc.errors()))
+                return cut
         raise ProviderProtocolError(
-            f"the arguments of {tool} are not a valid verdict ({_fields_wrong(exc)})",
-            {**context, "errors": exc.json(include_url=False, include_context=False, include_input=False)},
-        ) from exc
+            f"the arguments of {tool} are not a valid verdict ({_fields_wrong(failed)})",
+            {**context, "errors": failed.json(include_url=False, include_context=False, include_input=False)},
+        ) from failed
 
 
 def _fields_wrong(exc: ValidationError) -> str:
@@ -1463,6 +1526,11 @@ def _fields_wrong(exc: ValidationError) -> str:
         where: tuple[int | str, ...] = error["loc"][:-1] if error["type"] == "extra_forbidden" else error["loc"]
         problems.append(f"{'.'.join(str(part) for part in where) or 'the arguments'}: {error['msg']}")
     return truncate_middle("; ".join(problems), _FIELDS_WRONG_CHARS)
+
+
+def _refused_values() -> tuple[str, ...]:
+    """The values Dot holds as a refusing gate reads them (``filled`` false), for :func:`_cuttable` (item 840)."""
+    return known_secrets(filled=False)
 
 
 async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V:
@@ -1490,7 +1558,12 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
         raise ProviderTransportError(
             "the review model did not answer in time", {"model": ref.label, "timeout_s": question.timeout_s}
         ) from exc
-    return _verdict_from(reply, question.tool.name, question.verdict_type, ref.label)
+    # A text past its bound is cut only when, whole, it holds none of the values Dot holds (item 840): refused, as the
+    # gates of what is learned refuse, so `filled` is false; read only when a text would be cut, off the event loop,
+    # as every read of them is (the pre-push review).
+    return await asyncio.to_thread(
+        _verdict_from, reply, question.tool.name, question.verdict_type, ref.label, _refused_values
+    )
 
 
 def _as_is[V: FrozenModel](verdict: V) -> V:
