@@ -1009,8 +1009,9 @@ chips, 13/18 meta and hints, 14/20 the interface, 15/24 prose and the composer, 
 test refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: a box of the
 pages (a card, a settings' group, a tile) has no frame, a surface on a 16 px corner with a soft shadow under it
 (`--box-border` and `--box-shadow`, item 837: it had a hairline on a 12 px corner and no shadow), and the contrast
-setting frames it again; a box within a box is a soft fill rather than a second shadow; shadows otherwise stay on
-what floats (menus, dialogs, the composer); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
+setting frames it again; a box within a box is a soft fill rather than a second shadow; a card holds 20 px of room
+(item 838, 16 before; the compact density keeps 12); shadows otherwise stay on what floats (menus, dialogs, the
+composer); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
 string; an empty page or list stands a mark in a quiet ring, a title and one line that says what brings something there,
 in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages in an ink
 bubble (`--msg-me`: the text's colour in light, one surface raised in the dark), and what Dot and its agents say, the
