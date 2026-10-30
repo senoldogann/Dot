@@ -324,9 +324,11 @@ others can write (web pages, mail, downloads), a lesson with an address to go to
 is left out before it is asked. The kept lessons are saved as notes tagged `lesson` whose source is the
 run, and "Lessons from this task", at the head of the side panel's Task tab of the run's page, which counts them
 (item 842: they stood in the conversation; there they stand now only while a lesson waits for your decision, notes
-wait for your look after a 👎 or they could not be drawn), says "Saved on its own" with Undo, which forgets the note (a note that was there
+wait for your look after a 👎 or they could not be drawn), says "Saved on its own" with Undo, which forgets the note (a
+note that was there
 before, or that was rewritten since, stays); a lesson left out says why, with Save anyway. With `propose` the lessons
-wait on that card, in the conversation: Save to memory keeps one, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save`,
+wait on that card, in the conversation: Save to memory keeps one, Dismiss drops it (`POST
+/api/runs/{id}/lessons/{index}/save`,
 `/dismiss` and `/undo`). A lesson is what its last decision made it, and
 every decision waits for the one before it: a second save or dismissal of a lesson decided already is refused, save the
 Save anyway of one `auto` left out. `dotx run` and `dotx resume` show the lessons after the answer; Ctrl-C skips the
