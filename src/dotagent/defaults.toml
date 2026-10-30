@@ -439,10 +439,12 @@ preset = "aggressive"
 # yolo a change of Dot's own files (its code, plugins, skills, playbooks, emergency stop) asks you, never the review
 # model, and secrets and exfiltration are refused (yolo lets them through without asking, item 433). In every mode
 # that asks, money and credentials are handed to you, a message or a post in your name waits for your yes (the review
-# model answers it in auto), and Dot types into no password, one-time-code or card field. A yolo run asks nothing at
-# all (item 443): those steps it does, records what it would have asked, and types the code it can read or the password
-# it was given. A research run stays read-only, the desktop tools never control a password manager, and the pace of a
-# site holds (a rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off).
+# model answers it in auto), and Dot types into no password, one-time-code or card field. A yolo run asks nothing else
+# (item 443): those steps it does, records what it would have asked, and types the code it can read or the password it
+# was given; in a chat you opened, a payment, a message or mail sent for you and a public post are still yours (item
+# 860: the review model judges a message or a post of a schedule's run there), and a chat of a schedule's own asks
+# nothing. A research run stays read-only, the desktop tools never control a password manager, and the pace of a site
+# holds (a rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off).
 approvals = "ask"
 # A yolo run that read outside content (a page, a mail, a tool's answer) has the review model check, before it does it,
 # a step that sends, posts, uploads, pays, reads a secret, installs, schedules or saves a note, changes Dot's own files,

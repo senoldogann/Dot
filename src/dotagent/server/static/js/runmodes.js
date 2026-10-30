@@ -41,7 +41,7 @@ export const APPROVAL_OPTIONS = [
     id: "yolo",
     label: "YOLO",
     short: "YOLO",
-    hint: "Dot never asks, not even about money, passwords, messages or posts. Every step is recorded, with why it would have asked",
+    hint: "Dot asks only before a payment, a message or mail sent for you or a public post, in a chat you opened. Every other step runs and is recorded, with why it would have asked",
     icon: "lockOpen",
   },
 ];

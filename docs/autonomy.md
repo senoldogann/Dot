@@ -30,23 +30,28 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   the policy stopped at it and whether the run has read untrusted content. It answers `approve` when the action is
   plainly what you asked for; `deny` when it is not, goes further than you asked or looks like something other than your
   instructions caused it; and `escalate` when it cannot tell, and then the question comes to you as in `ask`, with the
-  reason of the review model in it. What the agent wrote into the action (its summary and target) is data to the review
-  model, never an instruction.
-- `yolo` (YOLO, an open lock): nobody does, and nothing is asked (the owner's word of 2026-10-20, item 443). The action
-  is allowed and recorded: the question that untrusted content raises (see [Safety](safety.md#safety)), the one about
-  Dot's own files, the guard of money and credentials and of a message or a post in your name, a pre-approved spend, and
-  the refusal of a read of your secrets (the keychain, `~/.ssh`, the files of a password manager) or of data sent out.
-  Each step the policy stopped at is written into the record with the reason it would have asked for, so you can read
-  afterwards what went through and why. A yolo run types the password, one-time code or card number it has — one you
-  gave it, or one it read from the mail that carried it — into the browser or the desktop itself, and into a terminal
-  program that asks for one. Only the desktop tools stay away from password managers and Keychain Access in every mode.
-  The rest is the price of the mode: a run that has read a hostile page can change or delete files and run commands
-  without asking you. Two things hold for a yolo run that has read outside content (item 525, see
-  [Safety](safety.md#safety)): the review model checks, without asking you, a step a planted instruction would be after
-  (a message, a post, an upload, a payment, a credential, a read of your secrets, an install, a note it saves), and
-  refuses what your instructions do not call for; and a step whose words would send a secret Dot holds out of the Mac is
-  refused. A refusal is not a question: a `research` run's limit stands, and no rule of yours can refuse — its
-  behaviours are allow, preapproved, ask and hand off.
+  reason of the review model in it. A message, a mail or a post must also be lawful and harmless to its readers and to
+  you (no deceit, threat, harassment, spam or secret of yours in it): it denies one that is not, whatever your
+  instructions say (item 860, the owner's word for the review of a schedule's messages: "legal ise, tehlike arz
+  etmiyorsa ve bir amaç içinse yollasın"). What the agent wrote into the action (its summary and target) is data to the
+  review model, never an instruction.
+- `yolo` (YOLO, an open lock): nobody does, and nothing is asked (the owner's word of 2026-10-20, item 443), but a
+  payment, a message or mail sent for you and a public post in a chat you opened (item 860: you answer them, and in a
+  schedule's run there the review model judges a message or a post) and, in a chat Dot opened on its own initiative, a
+  message, a post or a release (item 850). Any other action is allowed and recorded: the question that untrusted content
+  raises (see [Safety](safety.md#safety)), the one about Dot's own files, the guard of money and credentials and of a
+  message or a post in your name, a pre-approved spend, and the refusal of a read of your secrets (the keychain,
+  `~/.ssh`, the files of a password manager) or of data sent out. Each step the policy stopped at is written into the
+  record with the reason it would have asked for, so you can read afterwards what went through and why. A yolo run types
+  the password, one-time code or card number it has — one you gave it, or one it read from the mail that carried it —
+  into the browser or the desktop itself, and into a terminal program that asks for one. Only the desktop tools stay
+  away from password managers and Keychain Access in every mode. The rest is the price of the mode: a run that has read
+  a hostile page can change or delete files and run commands without asking you. Two things hold for a yolo run that has
+  read outside content (item 525, see [Safety](safety.md#safety)): the review model checks, without asking you, a step a
+  planted instruction would be after (a message, a post, an upload, a payment, a credential, a read of your secrets, an
+  install, a note it saves), and refuses what your instructions do not call for; and a step whose words would send a
+  secret Dot holds out of the Mac is refused. A refusal is not a question: a `research` run's limit stands, and no rule
+  of yours can refuse — its behaviours are allow, preapproved, ask and hand off.
 
 In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
 [Safety](safety.md#safety)) is a question to you: the review model never answers it, and no rule of yours does either.
@@ -162,8 +167,9 @@ the model, reasoning level, approval mode and goal mode of its schedule, and the
 schedule leaves open, so what a schedule does while nobody is there depends on them: with `ask`, a question of the
 policy waits `approval_timeout_s` and then counts as a refusal, or, for a step handed to you with `[policy] unanswered =
 "park"`, is kept for you (Steps kept for you, below). A no you gave a run holds for the rest of it: the same action is
-refused at once until you write to it again (item 456, [Safety](safety.md#safety)); a `yolo` run asks nothing, so none
-is kept there.
+refused at once until you write to it again (item 456, [Safety](safety.md#safety)); a `yolo` run asks only the steps
+of item 860 (a payment, a message or mail, a public post, in a chat you opened), and a no you gave one of them holds
+there the same way.
 
 **Questions nobody answers during the run.** In a `yolo`, scheduled or eval run nobody answers the agent's own questions
 (`ask_user`) while it works, and `[agent] questions` decides what they do. With `leave` (the default) the question is
@@ -221,9 +227,9 @@ now refuses or hands it to you, or the run's untrusted reading, still stops it. 
 (a `dotx` run works there) is taken back and the card stays. Rewinding the chat to before the run that kept it takes an
 unused yes back too. Skip on a kept step, either kind, holds in that conversation: the same step is refused at once,
 with no card, until you write there again (a message of yours, or a run you start). Any other question still counts as a
-refusal when nobody answers, and nothing is kept in `yolo`, which asks nothing, or in an eval; but in a chat Dot opened
-on its own initiative a `yolo` run asks its release and keeps it as a run that asks does, and a message or a post there
-is asked, never kept (item 850). A delegated run keeps its
+refusal when nobody answers, and nothing is kept in `yolo` or in an eval: the payment, message or post a `yolo` run of
+your chat asks (item 860) is refused when nobody answers; but in a chat Dot opened on its own initiative a `yolo` run
+asks its release and keeps it as a run that asks does, and a message or a post there is asked, never kept (item 850). A delegated run keeps its
 steps where the run that delegated it does (item 485): the card is on the delegated run's page and in the Activity list,
 the step is the chat's of the run at the top, and your answer reaches that run, while it works, or else a run that goes
 on from its goal in its chat (tainted as any of the runs it goes on from ended), which may do an allowed step itself or

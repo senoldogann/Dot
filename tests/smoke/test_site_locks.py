@@ -22,7 +22,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime, close_runtime, open_runtime
-from dotagent.server import UI_SOURCE
+from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.store.models import RunRecord
 from dotagent.tools.shell import read_login_env
 
@@ -97,15 +97,16 @@ async def test_two_runs_of_one_manager_cannot_both_take_the_last_public_action_o
     async with _session(login_env, model) as (runtime, manager):
         runs: list[RunRecord] = [
             await manager.start(
-                GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+                GOAL, "task", SCRIPTED_MODEL, None, SCHEDULE_SOURCE, None, None, "standard", None, "yolo", False, ()
             )
             for _ in range(_RUNS)
         ]
         async with asyncio.timeout(WAIT_S):
             await model.all_held.wait()
         gates: list[RunGate] = [manager._handle(run.id).gate for run in runs]
-        # A yolo run asks nothing (item 443): the two runs race for the last public action of the day, and the site's
-        # pace lets one of them take it and refuses the other.
+        # A yolo run nobody watches asks nothing (items 443 and 860: a chat the owner opened asks them before a post):
+        # the two runs race for the last public action of the day, and the site's pace lets one of them take it and
+        # refuses the other.
         outcomes: list[str | BaseException] = await asyncio.wait_for(
             asyncio.gather(*(gate.authorize(POST) for gate in gates), return_exceptions=True), WAIT_S
         )

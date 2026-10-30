@@ -188,7 +188,8 @@ comes beside the microphone once there are words or a file (it stays where the b
 always in sight. The run's choices wait behind the **+** menu's **Model and options**, which brings them on a bar of
 their own under the words, with the send, and **Hide the model and options** puts them away again; the choice is kept
 in that browser for every box, those open at the time included. While they are away, YOLO still shows as its pill,
-since the run then asks nothing (by its open lock alone on a phone's narrow line, so that the words keep their room),
+since the run then asks next to nothing (item 860: a payment, a message or a post; by its open lock alone on a phone's
+narrow line, so that the words keep their room),
 and so does the size of the chat once it is near full. The bar of the choices never wraps: the **+** and the mode at
 the left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
 reads, when they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir

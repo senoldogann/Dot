@@ -154,7 +154,7 @@ function foot(count, onSeeAll) {
     el(
       "p",
       null,
-      "Dot's built-in safety checks come first, and your rules cannot switch them off: spending money, passwords, posts and messages in your name, and changes to Dot's own files. YOLO mode, which asks nothing at all, is the one exception.",
+      "Dot's built-in safety checks come first, and your rules cannot switch them off: spending money, passwords, posts and messages in your name, and changes to Dot's own files. YOLO mode is the one exception: there Dot asks only before a payment, a message or mail sent for you or a public post, in a chat you opened.",
     ),
     el("button", { class: "set-link rule-see-all", type: "button", onclick: onSeeAll }, "See them all"),
   );

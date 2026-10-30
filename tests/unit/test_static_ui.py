@@ -218,3 +218,15 @@ def test_every_export_of_the_interface_is_used_somewhere() -> None:
         if re.search(rf"\b{re.escape(name)}\b", elsewhere) is None
     ]
     assert unused == [], f"exported and never imported: {unused}"
+
+
+def test_the_cards_words_of_the_owners_questions_are_the_policys() -> None:
+    """The card of a question only the owner answers in yolo tells it by the reason's words (items 850 and 860): the
+    words it looks for stand at the head of the reasons the policy gives, or it falls back to the plain note."""
+    from dotagent.policy.engine import _INITIATIVE_REASON, OWNERS_REASON
+
+    card: str = (JS_DIR / "approvals.js").read_text(encoding="utf-8")
+    for constant, reason in (("INITIATIVE_WORDS", _INITIATIVE_REASON), ("OWNERS_WORDS", OWNERS_REASON)):
+        found = re.search(rf'const {constant} = "([^"]+)";', card)
+        assert found is not None, constant
+        assert reason.startswith(found.group(1)), (constant, found.group(1), reason)

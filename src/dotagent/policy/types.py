@@ -86,6 +86,8 @@ DecisionSource = Literal[
     "spend",
     # The owner's question for a message, a post or a release in a chat of Dot's own initiative (item 850).
     "initiative",
+    # The owner's question in yolo for a payment, a message or mail, a post in a chat they opened (item 860).
+    "owner_asks",
 ]
 
 # Who answers a question the policy raised, strictest first: ``supervised`` the user, who is also asked before every

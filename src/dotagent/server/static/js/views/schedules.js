@@ -776,7 +776,7 @@ export function mount(root, ctx) {
   // No question first: the button says what it starts, and its run's page, where it can be stopped, opens at once.
   async function runNow(record) {
     const run = await api.post(`/schedules/${record.id}/run`, null);
-    toast("ok", run.approvals === "yolo" ? `Started ${record.name}: it asks nothing.` : `Started ${record.name}.`);
+    toast("ok", `Started ${record.name}.`);
     ctx.navigate(`/runs/${run.id}`);
   }
 

@@ -227,7 +227,9 @@ This holds for every run of that chat, as the owner's answers in it start runs t
   its chat (item 482). A message or a post never is, since a yes given later never covers a step that reaches other
   people (item 483).
 
-Your own chats and your schedules ask nothing of the kind in `yolo`.
+In `yolo` your own chats ask you before a payment, a message or mail sent for you and a public post (item 860); in a
+schedule's run in one of your chats the review model judges a message or a post, and a payment is handed to you; a
+schedule's own chat asks nothing of the kind.
 
 A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or
 let go. Done, it is marked so with the first line of the run's answer and you are told ("Dot did on its own", the push,

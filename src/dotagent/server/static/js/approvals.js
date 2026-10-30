@@ -152,7 +152,8 @@ function takeoverOffer(runId, onUseHere) {
 }
 
 // What the policy asks the owner about in every mode that asks, whatever their rules say (item 429): a rule offered for
-// it would never apply. A yolo run asks nothing at all (item 443), so no card of these comes its way.
+// it would never apply. A yolo run asks nothing else (item 443) but a payment, a message and a post in a chat the owner
+// opened (item 860) and those of item 850.
 // A login filled from the password manager (item 493) is asked as a message is, in every mode but yolo, and a change of
 // Dot's own files (`self_change`, item 398) before any rule is read (`own_files` in policy/engine.py, item 559). So is
 // an order with real money on the owner's trading account (`trade`, item 763).
@@ -176,9 +177,18 @@ function guarded(approval) {
   return Array.isArray(flags) && flags.some((flag) => typeof flag === "string" && GUARDED_FLAGS.has(flag));
 }
 
+// The words of the question a yolo run of a chat the owner opened asks of a payment, a message or a post (item 860,
+// `OWNERS_REASON` in policy/engine.py).
+const OWNERS_WORDS = "In yolo too, Dot asks you before";
+
 /** Whether `approval` is the question of a chat Dot opened on its own initiative (item 850), asked in YOLO too. */
 function initiativeAsked(approval) {
   return typeof approval.summary === "string" && approval.summary.includes(INITIATIVE_WORDS);
+}
+
+/** Whether `approval` is the question a yolo run of a chat the owner opened asks (item 860). */
+function ownersAsked(approval) {
+  return typeof approval.summary === "string" && approval.summary.includes(OWNERS_WORDS);
 }
 
 /**
@@ -360,9 +370,11 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           ? null
           : initiativeAsked(approval)
             ? el("div", { class: "small muted" }, "In a chat Dot opened on its own initiative, Dot always asks you about this, YOLO too. No rule can turn that off.")
-            : guarded(approval)
-              ? el("div", { class: "small muted" }, "Dot always asks you about this, in every mode except YOLO. No rule can turn that off.")
-              : ruleOffer(approval),
+            : ownersAsked(approval)
+              ? el("div", { class: "small muted" }, "A payment, a message or mail sent for you and a public post wait for you in YOLO too. No rule can turn that off.")
+              : guarded(approval)
+                ? el("div", { class: "small muted" }, "Dot always asks you about this in every mode that asks. No rule can turn that off.")
+                : ruleOffer(approval),
         isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId, onUseHere) : null,
         el(
           "div",
