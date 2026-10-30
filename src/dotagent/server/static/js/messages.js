@@ -129,7 +129,9 @@ export function showMessagePicks(message, picks) {
 export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false, reactions = null, runId = null }) {
   const outcome = OUTCOMES[status] ?? { label: status, empty: "" };
   const written = text.trim() !== "";
-  const facts = [stamp(endedAt, dateTimeFull(endedAt)), el("span", null, outcome.label)];
+  // A run that ended well needs no word for it, as a message that arrived needs none (item 832); a failure and a stop
+  // say so.
+  const facts = [stamp(endedAt, dateTimeFull(endedAt)), status === "done" ? null : el("span", null, outcome.label)];
   if (startedAt !== null) {
     facts.push(el("span", { class: "answer-took" }, duration(Math.max(0, endedAt - startedAt))));
   }

@@ -383,7 +383,7 @@ while it works, an amber ring while it waits for you, a green tick for a moment 
 failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
 agent, model, approval mode, goal mode, campaign, work, time, mode, start and id) are under More on the panel's Task tab,
 closed the first time (items 452 and 544). Your goal is the
-first message, in the bubble of your messages on the raised surface. What you write reads there as markdown, as an
+first message, in the ink bubble of your messages (item 832). What you write reads there as markdown, as an
 answer does: its headings, lists (nested as far as their items are indented, with a block of code or a quote under an
 item, numbered on from the number they begin at, and task lists with their boxes), tables (their columns aligned as
 the rule line says), code (whatever follows the fence's language, `title="x.py"` or `python:x.py`, is read, so the
@@ -985,7 +985,14 @@ test refuses any size, weight, line-height or family in the sheets that is not o
 flat, a surface with a hairline and a 12 px radius and no shadow (shadows stay on what floats: menus, dialogs, the
 composer in focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
 string; an empty page or list stands a mark in a quiet ring, a title and one line that says what brings something there,
-in the middle of its place (item 407); your messages sit on the raised surface. Controls: buttons, inputs and selects 36
+in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages in an ink
+bubble (`--msg-me`: the text's colour in light, one surface raised in the dark), and what Dot and its agents say, the
+answer and the lines along the way, in a soft one (`--msg-agent`), a bubble holding a table, code or a picture as wide
+as the column; the line under an answer that ended well and under your message shows where the pointer rests or the
+focus is (a reaction that stands, a failure and a stop stay in sight; a touch screen shows them always), an answer that
+ended well says no word for it ("Finished" went), a file a message names is a chip of its name (its path in the chip's
+title and in a copy of the message), and what a run changed is an attachment in the answer's fill. Controls:
+buttons, inputs and selects 36
 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus ring on each, a select with its
 own drawn chevron, a range on a hairline track filled with the accent up to its value under the switch's knob, field
 labels on the interface line and hints on the small one, the composer's menus as round pills of 32 px (an icon of 16 px,
