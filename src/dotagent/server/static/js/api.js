@@ -225,6 +225,13 @@ export const TEAMS_CHANGED_EVENT = "dot:teams-changed";
 // A request that changes a team: one of /teams, a ready team's Use, or an agent that is changed or deleted.
 const TEAM_CHANGE = /^\/(teams(\/|$|\?)|agent-teams\/[^/]+\/use$|agents\/[^/]+$)/;
 
+/** The event the page sends once a request of it made, changed or deleted an agent (item 835): the daemon tells of no
+ * change of one, and the sidebar shows the owner's agents as faces at its top. */
+export const AGENTS_CHANGED_EVENT = "dot:agents-changed";
+// A request that changes an agent: one of /agents (a new one, an import, a change, its look, a pause, a delete), or an
+// agent made from a template or a ready team.
+const AGENT_CHANGE = /^\/(agents(\/|$|\?)|agent-templates\/[^/]+\/use$|agent-teams\/[^/]+\/use$)/;
+
 export async function request(method, path, body) {
   await proven();
   const headers = authHeaders();
@@ -247,6 +254,9 @@ export async function request(method, path, body) {
   }
   if (method !== "GET" && TEAM_CHANGE.test(path)) {
     window.dispatchEvent(new CustomEvent(TEAMS_CHANGED_EVENT));
+  }
+  if (method !== "GET" && AGENT_CHANGE.test(path)) {
+    window.dispatchEvent(new CustomEvent(AGENTS_CHANGED_EVENT));
   }
   const text = await response.text();
   if (text === "") {

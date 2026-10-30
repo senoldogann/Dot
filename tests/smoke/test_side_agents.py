@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Literal
 
+import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
@@ -138,6 +139,92 @@ async def _open_sidebar(browser: Browser, address: str, width: int, scheme: Lite
     if width < 860:
         await page.get_by_role("button", name="Show sidebar").click()
     return page
+
+
+async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_to_every_agent(
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
+) -> None:
+    """Item 835: the owner's agents stand as faces at the sidebar's top, as a messaging app's people: each its face
+    over its name, read whole, to its page, the open one marked; the last tile, All, leads to every agent, as the Agents
+    row did, and the row gives way to that row while the owner has no agent. Wide and on a phone, light and dark."""
+    _, address = served
+    agents: dict[str, str] = {}
+    async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+        for name, role in (("Scout", "Looks things up"), ("Competitor Watch", "Watches the competitors' prices")):
+            made: httpx.Response = await client.post(
+                "/api/agents",
+                json={"name": name, "role": role, "instructions": "", "model": "", "effort": None, "approvals": None},
+            )
+            assert made.status_code == 201, made.text
+            agents[name] = made.json()["id"]
+        try:
+            async with async_playwright() as playwright:
+                browser: Browser = await playwright.chromium.launch(
+                    channel=runtime.config.browser.channel, headless=True
+                )
+                try:
+                    for width, scheme in _SHOTS:
+                        page: Page = await _open_sidebar(browser, address, width, scheme)
+                        faces: Locator = page.get_by_role("navigation", name="Your agents")
+                        await expect(faces.get_by_role("link")).to_have_count(3)
+                        await expect(faces.locator(".side-agent-name")).to_have_text(
+                            ["Scout", "Competitor Watch", "All"]
+                        )
+                        await expect(faces.get_by_role("link", name="Scout")).to_have_attribute(
+                            "href", f"#/agents/{agents['Scout']}"
+                        )
+                        await expect(faces.get_by_role("link", name="Scout")).to_have_attribute(
+                            "title", "Scout: Looks things up"
+                        )
+                        # A name of two words reads whole, on two lines; each tile is a finger's size and more.
+                        watch: Locator = faces.get_by_role("link", name="Competitor Watch")
+                        assert await watch.locator(".side-agent-name").evaluate(
+                            "name => name.scrollHeight <= name.clientHeight && name.scrollWidth <= name.clientWidth"
+                        )
+                        tile = await watch.bounding_box()
+                        assert tile is not None and tile["height"] >= 44 and tile["width"] >= 44, tile
+                        # The faces stand for the Agents row, whose way is All's.
+                        await expect(
+                            page.locator("#sidebar nav.side-links").get_by_text("Agents", exact=True)
+                        ).to_be_hidden()
+                        await expect(faces.get_by_role("link", name="All agents")).to_have_attribute("href", "#/agents")
+                        await page.screenshot(path=str(tmp_path / f"faces-{width}-{scheme}.png"), animations="disabled")
+                        if width >= 860:
+                            # The face of the agent whose page is open is marked, and All on the page of every agent.
+                            await watch.click()
+                            await expect(page).to_have_url(f"{address}/#/agents/{agents['Competitor Watch']}")
+                            await expect(watch).to_have_attribute("aria-current", "page")
+                            await expect(faces.get_by_role("link", name="Scout")).not_to_have_attribute(
+                                "aria-current", "page"
+                            )
+                            await faces.get_by_role("link", name="All agents").click()
+                            await expect(page).to_have_url(f"{address}/#/agents")
+                            await expect(faces.get_by_role("link", name="All agents")).to_have_attribute(
+                                "aria-current", "page"
+                            )
+                            await expect(watch).not_to_have_attribute("aria-current", "page")
+                        await page.close()
+                    # An agent deleted from its page leaves the row at once; with none left, the Agents row is back.
+                    page = await _open_sidebar(browser, address, 1280, "light")
+                    faces = page.get_by_role("navigation", name="Your agents")
+                    await expect(faces.get_by_role("link")).to_have_count(3)
+                    for agent_id in agents.values():
+                        await page.evaluate(
+                            "async (id) => { const { api } = await import('/js/api.js');"
+                            " await api.del(`/agents/${id}`); }",
+                            agent_id,
+                        )
+                    agents.clear()
+                    await expect(faces).to_be_hidden()
+                    await expect(
+                        page.locator("#sidebar nav.side-links").get_by_role("link", name="Agents", exact=True)
+                    ).to_be_visible()
+                    await page.close()
+                finally:
+                    await browser.close()
+        finally:
+            for agent_id in agents.values():
+                await client.delete(f"/api/agents/{agent_id}")
 
 
 async def test_the_side_menu_shows_every_agent_of_a_run_on_the_chats_row(

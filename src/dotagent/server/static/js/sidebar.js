@@ -12,10 +12,10 @@
 // finds its chats as it finds the others. Dot's own work does too (item 822): the chats of On its own and of the
 // schedules stand folded at the foot, so that the days hold the owner's own chats.
 
-import { ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
+import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
 import { icon } from "./icons.js";
-import { actorFace, lookOf, teamDuo } from "./actors.js";
+import { actorFace, DOT_ID, lookOf, teamDuo } from "./actors.js";
 import { onAssistant } from "./assistant.js";
 import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
@@ -437,6 +437,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   let failure = null;
   let needle = "";
   let routeRunId = null;
+  // The tab of the page that is open (`setRoute`), which marks the pages' links and the faces of the agents.
+  let routeTab = null;
   // The chat that holds the run on the page; resolved from the list when the run is the latest one of a chat, otherwise
   // asked from the daemon.
   let routeThreadId = null;
@@ -531,6 +533,65 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el("span", null, "Settings"),
   );
   const schedulesLink = el("a", { class: "side-link", href: "#/schedules", onclick: onNavigate }, icon("calendar"), el("span", null, "Schedules"));
+  // The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name, to its
+  // page, where a message to it starts; the row scrolls sideways when they are more than the sidebar holds, and its
+  // last tile, All, is the page of every agent and team, which the Agents row is while the owner has no agent of their
+  // own. A list that did not load leaves the row as it was.
+  const facesNav = el("nav", { class: "side-agent-faces", "aria-label": "Your agents", hidden: true });
+  const allAgents = el(
+    "a",
+    { class: "side-agent-face side-agent-all", href: "#/agents", title: "All agents", "aria-label": "All agents", onclick: onNavigate },
+    el("span", { class: "side-agent-mark" }, icon("users")),
+    el("span", { class: "side-agent-name", "aria-hidden": "true" }, "All"),
+  );
+  const faceLinks = new Map();
+  let facesTicket = 0;
+  function paintFaces(found) {
+    const mine = found.filter(({ record }) => record.id !== DOT_ID);
+    faceLinks.clear();
+    for (const { record } of mine) {
+      faceLinks.set(
+        record.id,
+        el(
+          "a",
+          {
+            class: "side-agent-face",
+            href: `#/agents/${record.id}`,
+            title: record.role === "" ? record.name : `${record.name}: ${record.role}`,
+            "aria-label": record.name,
+            onclick: onNavigate,
+          },
+          actorFace(record.id, "idle", record.look),
+          el("span", { class: "side-agent-name", "aria-hidden": "true" }, record.name),
+        ),
+      );
+    }
+    facesNav.replaceChildren(...faceLinks.values(), allAgents);
+    facesNav.hidden = mine.length === 0;
+    agentsLink.hidden = mine.length > 0;
+    markFaces();
+  }
+  async function loadFaces() {
+    const mine = ++facesTicket;
+    let found;
+    try {
+      found = await api.get("/agents");
+    } catch (error) {
+      console.warn("the agents could not be read for their faces in the sidebar", error);
+      return;
+    }
+    if (!disposed && mine === facesTicket) {
+      paintFaces(found);
+    }
+  }
+  // The face of the agent whose page is open is marked as a row of the list is, and All on the page of every agent.
+  function markFaces() {
+    const open = /^#\/agents\/([A-Za-z0-9_-]+)$/.exec(location.hash)?.[1] ?? null;
+    for (const [id, link] of faceLinks) {
+      mark(link, routeTab === "agents" && id === open);
+    }
+    mark(allAgents, routeTab === "agents" && (open === null || !faceLinks.has(open)));
+  }
 
   // The rows the arrow keys walk and the search's Enter opens, in order: Working's, the list's and the channels'; while
   // chats are being chosen, their boxes. A row folded away is left out.
@@ -1209,6 +1270,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   async function load() {
     loadActivity();
+    loadFaces();
     const mine = ++chatsTicket;
     try {
       const all = await api.get(`/threads?limit=${listLimit}`);
@@ -1251,6 +1313,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   window.addEventListener(SCHEDULES_CHANGED_EVENT, reloadSoon);
   // Nor of a team's (item 610): the chats with it are named and drawn as the team is now.
   window.addEventListener(TEAMS_CHANGED_EVENT, reloadSoon);
+  // Nor of an agent's (item 835): the faces at the top are the agents as they are now.
+  window.addEventListener(AGENTS_CHANGED_EVENT, reloadSoon);
   document.addEventListener("visibilitychange", onBackInView);
   window.addEventListener("focus", onBackInView);
 
@@ -1344,6 +1408,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     "div",
     { class: "side-body" },
     searchBox,
+    facesNav,
     el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, schedulesLink),
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav),
@@ -1428,7 +1493,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     foot,
     settingsNav.element,
   );
-  let routeTab = null;
   function paintMode() {
     if (routeTab === "settings" && !PHONE.matches) {
       element.dataset.mode = "settings";
@@ -1463,6 +1527,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       routeTab = tab;
       paintMode();
       mark(agentsLink, tab === "agents");
+      markFaces();
       mark(campaignsLink, tab === "campaigns");
       mark(schedulesLink, tab === "schedules");
       mark(settingsLink, tab === "settings");
@@ -1492,6 +1557,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       stopStream();
       window.removeEventListener(SCHEDULES_CHANGED_EVENT, reloadSoon);
       window.removeEventListener(TEAMS_CHANGED_EVENT, reloadSoon);
+      window.removeEventListener(AGENTS_CHANGED_EVENT, reloadSoon);
       document.removeEventListener("visibilitychange", onBackInView);
       window.removeEventListener("focus", onBackInView);
       window.removeEventListener("keydown", onEscape);
