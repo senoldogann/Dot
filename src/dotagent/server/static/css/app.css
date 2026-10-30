@@ -3844,6 +3844,32 @@ dialog.modal.versions-dialog {
   margin-inline-end: auto;
 }
 
+/* The box as one line, as a messaging app's (item 833): the "+", the words and the microphone. The run's choices (its
+   mode, agent, model, reasoning and options) wait behind the "+" menu's "Model and options", and come back on the line
+   under the words when chosen. YOLO stays in sight, as the pill it is, with no tint (item 500: YOLO warns of
+   nothing): in that mode the run asks nothing, which the box must say. The size of the chat shows once it is near
+   full. */
+.composer[data-quiet] .composer-bar > .composer-field {
+  flex: 1 1 0;
+  order: 0;
+}
+
+.composer[data-quiet] .composer-options {
+  flex: none;
+}
+
+.composer[data-quiet] .composer-options > :not([data-pill="options"][data-yolo]),
+.composer[data-quiet] .context-meter[data-level="room"] {
+  display: none;
+}
+
+/* With a microphone, the send waits for words or a file, and the microphone stands alone at the end until then. The
+   microphone stays once there are words, so that more can be dictated after them (items 574 and 605). A Stop stays in
+   sight (item 120). */
+.composer[data-quiet][data-empty]:not([data-stop]):not(:has(> .attach-list:not([hidden]))) > .composer-bar.has-mic > .btn.send {
+  display: none;
+}
+
 .composer .plus-button,
 .composer .mic-button {
   width: 32px;

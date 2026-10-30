@@ -154,7 +154,13 @@ async def _page(browser: Browser, address: str, width: int, scheme: Literal["lig
     context: BrowserContext = await browser.new_context(
         viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
     )
+    await context.add_init_script(
+        "localStorage.setItem('dot.composer.choices', 'shown')"
+    )  # the choices this test reads (item 833)
     page: Page = await context.new_page()
+    await page.add_init_script(
+        "localStorage.setItem('dot.composer.choices', 'shown')"
+    )  # the choices this test reads (item 833)
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")

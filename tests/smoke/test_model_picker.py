@@ -152,7 +152,13 @@ async def _page(browser: Browser, address: str, width: int, scheme: Literal["lig
     context: BrowserContext = await browser.new_context(
         viewport={"width": width, "height": 860}, color_scheme=scheme, reduced_motion="reduce"
     )
+    await context.add_init_script(
+        "localStorage.setItem('dot.composer.choices', 'shown')"
+    )  # the choices this test reads (item 833)
     page: Page = await context.new_page()
+    await page.add_init_script(
+        "localStorage.setItem('dot.composer.choices', 'shown')"
+    )  # the choices this test reads (item 833)
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
@@ -316,7 +322,13 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
             touch: BrowserContext = await browser.new_context(
                 viewport={"width": 390, "height": 860}, is_mobile=True, has_touch=True, reduced_motion="reduce"
             )
+            await touch.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             phone: Page = await touch.new_page()
+            await phone.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             await phone.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await phone.goto(ui_url(host, port, TOKEN))
             await phone.locator(".composer .composer-pill[data-pill='model']").tap()
@@ -340,7 +352,13 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
             early: BrowserContext = await browser.new_context(
                 viewport={"width": 1280, "height": 860}, reduced_motion="reduce"
             )
+            await early.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             late: Page = await early.new_page()
+            await late.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             await late.route("**/api/models", held)
             await late.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await late.goto(ui_url(host, port, TOKEN))
@@ -381,7 +399,13 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             context: BrowserContext = await browser.new_context(
                 viewport={"width": 1280, "height": 860}, reduced_motion="reduce", service_workers="block"
             )
+            await context.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             page: Page = await context.new_page()
+            await page.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
@@ -496,7 +520,13 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             touch: BrowserContext = await browser.new_context(
                 viewport={"width": 390, "height": 860}, is_mobile=True, has_touch=True, reduced_motion="reduce"
             )
+            await touch.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             phone: Page = await touch.new_page()
+            await phone.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             await phone.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await phone.goto(ui_url(host, port, TOKEN))
             await phone.locator(".composer .composer-pill[data-pill='model']").tap()

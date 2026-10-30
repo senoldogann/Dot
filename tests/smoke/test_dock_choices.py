@@ -152,7 +152,13 @@ async def _page(browser: Browser, address: str) -> tuple[Page, list[str]]:
     context: BrowserContext = await browser.new_context(
         viewport={"width": 1280, "height": 800}, color_scheme="light", reduced_motion="reduce"
     )
+    await context.add_init_script(
+        "localStorage.setItem('dot.composer.choices', 'shown')"
+    )  # the choices this test reads (item 833)
     page: Page = await context.new_page()
+    await page.add_init_script(
+        "localStorage.setItem('dot.composer.choices', 'shown')"
+    )  # the choices this test reads (item 833)
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")

@@ -255,6 +255,9 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                 page: Page = await browser.new_page(
                     viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
                 )
+                await page.add_init_script(
+                    "localStorage.setItem('dot.composer.choices', 'shown')"
+                )  # the choices this test reads (item 833)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{first.id}")
                 pill: Locator = page.locator(".dock .composer-pill[data-pill='reasoning']")

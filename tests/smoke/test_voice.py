@@ -955,16 +955,31 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_box_on_
             composer: Locator = page.locator(".composer").last
             bar: Locator = composer.locator(".composer-bar")
             await expect(bar).to_have_class("composer-bar has-mic")
-            mic: Locator = composer.locator(".mic-button")
             send: Locator = composer.locator(".btn.send")
-            box = await mic.bounding_box()
-            sent = await send.bounding_box()
-            field = await composer.locator(".composer-field").bounding_box()
-            assert box is not None and sent is not None and field is not None
-            # The microphone is a finger's size on a phone. On a desk it stands left of the send, on the line of the
-            # choices; on a phone the box keeps its line with the "+" and the send, and the microphone is under it, at
-            # the right.
+            words: Locator = composer.locator("textarea")
+            # The microphone is a finger's size on a phone.
             expected: float = 36 if width < 720 else 32
+            # As one line (item 833), on a phone too: the microphone stands right of the words, alone until words are
+            # typed, and the send then comes right of it. All three are read in one frame.
+            await expect(composer).to_have_attribute("data-quiet", "")
+            await expect(send).to_be_hidden()
+            await words.fill("a word")
+            await expect(send).to_be_visible()
+            box, sent, field = await _boxes(composer)
+            assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
+            assert box["x"] >= field["x"] + field["width"] - 1, f"{place} {width}: it is not right of the words"
+            assert box["x"] + box["width"] <= sent["x"] + 1, f"{place} {width}: it is not left of the send"
+            assert abs((box["y"] + box["height"] / 2) - (field["y"] + field["height"] / 2)) < 8, (
+                f"{place} {width}: it is not on the line of the words"
+            )
+            await words.fill("")
+            # With the run's choices shown, the box takes a line of its own. On a desk the microphone stands left of
+            # the send, on the line of the choices; on a phone the box keeps its line with the "+" and the send, and
+            # the microphone is under it, at the right.
+            await composer.locator(".plus-button").click()
+            await page.get_by_role("menuitem", name="Model and options").click()
+            await expect(composer).not_to_have_attribute("data-quiet", "")
+            box, sent, field = await _boxes(composer)
             assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
             if width < 720:
                 assert box["y"] >= field["y"] + field["height"] - 1, (
@@ -980,4 +995,19 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_box_on_
                 )
                 assert abs((box["y"] + box["height"]) - (sent["y"] + sent["height"])) < 2
             await _fits(page, f"{width} {place}")
+            # The choices away again, for the next place and the tests after this one.
+            await composer.locator(".plus-button").click()
+            await page.get_by_role("menuitem", name="Hide the model and options").click()
+            await expect(composer).to_have_attribute("data-quiet", "")
+            await _fits(page, f"{width} {place} as one line")
         await page.context.close()
+
+
+async def _boxes(composer: Locator) -> list[dict[str, float]]:
+    """The microphone's, the send's and the box's rectangles, read in one frame."""
+    boxes: list[dict[str, float]] = await composer.evaluate(
+        "composer => ['.mic-button', '.btn.send', '.composer-field'].map((part) => {"
+        " const rect = composer.querySelector(part).getBoundingClientRect();"
+        " return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; })"
+    )
+    return boxes

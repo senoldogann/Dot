@@ -696,6 +696,18 @@
     grid-area: meter;
   }
 
+  /* One line on a phone too while the run's choices are away (item 833): the "+", the words, the YOLO tag, the size of
+     a chat near full, and the microphone or the send at the thumb. */
+  .composer[data-quiet] .composer-bar,
+  .composer[data-quiet] .composer-bar.has-mic {
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
+    grid-template-areas: "plus field options meter mic send";
+  }
+
+  .composer[data-quiet] .composer-bar > .composer-options {
+    min-height: 0;
+  }
+
   /* No bar covers the conversation's top: what the column goes to stands right there. */
   html.chat-shell .run-thread .answer,
   html.chat-shell .run-thread .bubble.user {

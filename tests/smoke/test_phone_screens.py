@@ -209,6 +209,9 @@ async def _phone(browser: Browser, address: str, route: str, inset: int = 0) -> 
             await served.fulfill(response=sheet, body=f"{body}\n:root {{ --safe-top: {inset}px !important; }}\n")
 
         await page.route("**/css/app.css*", with_inset)
+    await page.add_init_script(
+        "localStorage.setItem('dot.composer.choices', 'shown')"
+    )  # the choices it reads (item 833)
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     await page.goto(f"{address}/#{route}")

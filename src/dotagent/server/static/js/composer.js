@@ -32,6 +32,9 @@ export const CHAT_BOX_PX = 160;
 
 /** The draft kept under `key` (`{ text, files, picks }`, `picks` missing from a draft of before item 318), or null when
  * there is none or it is not one. */
+// Whether the boxes show the run's choices on a line of their own (item 833): "shown", or nothing for one line.
+const CHOICES_KEY = "dot.composer.choices";
+
 function readDraft(key) {
   const stored = readPref(`${DRAFT_PREFIX}${key}`);
   if (stored === null) {
@@ -300,8 +303,20 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
  * draft, a queued message being edited, item 376, the draft stays as it was) and `dispose()`.
  */
 export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, send, sendLabel, draftKey, listener, threadId = null }) {
-  const textarea = el("textarea", { class: "textarea", rows: "1", placeholder, "aria-label": boxLabel });
+  const textarea = el("textarea", {
+    class: "textarea",
+    rows: "1",
+    placeholder,
+    "aria-label": boxLabel,
+    title: "Type @ for apps, / for skills and commands",
+  });
   const element = el("section", { class: "card composer", "aria-label": label });
+  // The box as one line until the owner asks for the run's choices (item 833): the "+" menu shows and hides them, and
+  // the choice is kept for every box.
+  let choicesShown = readPref(CHOICES_KEY) === "shown";
+  function paintQuiet() {
+    element.toggleAttribute("data-quiet", !choicesShown);
+  }
   const key = draftKey === null ? null : `${DRAFT_PREFIX}${draftKey}`;
 
   let drafting = true;
@@ -369,6 +384,22 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   function plusMenu() {
     const box = plusButton.getBoundingClientRect();
     const items = [{ label: "Add files", icon: "plus", run: () => attachments.openPicker() }];
+    // A box whose run has choices (its mode, agent, model, reasoning and options) offers them here (item 833).
+    if (options.childElementCount > 0) {
+      items.push({
+        label: choicesShown ? "Hide the model and options" : "Model and options",
+        icon: "sliders",
+        run: () => {
+          choicesShown = !choicesShown;
+          if (choicesShown) {
+            writePref(CHOICES_KEY, "shown");
+          } else {
+            removePref(CHOICES_KEY);
+          }
+          paintQuiet();
+        },
+      });
+    }
     if (threadId !== null) {
       items.push({
         label: "Teach a task",
@@ -423,6 +454,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     requestAnimationFrame(wired.autosize);
   }
   paintEmpty();
+  paintQuiet();
   // The box's own height, on the box itself, for the menu that opens above it (item 447): a phone's keyboard leaves only
   // what is above the box, and the box grows with a draft, its chips and its files. It stays on the box rather than the
   // page, where the curtain's composer and a page's live at once (waiting.js) and would write over each other.

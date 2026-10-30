@@ -161,6 +161,9 @@ async def _signed_in(browser: Browser, address: str, width: int, scheme: Literal
     page: Page = await browser.new_page(
         viewport={"width": width, "height": 844}, color_scheme=scheme, reduced_motion="reduce"
     )
+    await page.add_init_script(
+        "localStorage.setItem('dot.composer.choices', 'shown')"
+    )  # the choices this test reads (item 833)
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     return page
 

@@ -214,9 +214,10 @@ async def test_a_first_open_has_dot_greet_the_owner_name_itself_and_say_what_it_
             await expect(first).to_contain_text("I ask you before what is yours to decide")
             # Dot's browser here has no window: the card says so instead of offering a sign-in.
             await expect(first.locator(".first-connect")).to_contain_text("works without a window")
-            await expect(page.get_by_role("textbox", name="Goal")).to_have_attribute(
-                "placeholder", "Message Miro (@ for apps, / for skills and commands)"
-            )
+            # A messaging app's few words (item 833); what the at sign and the slash open is the box's tooltip.
+            goal_box = page.get_by_role("textbox", name="Goal")
+            await expect(goal_box).to_have_attribute("placeholder", "Message Miro")
+            await expect(goal_box).to_have_attribute("title", "Type @ for apps, / for skills and commands")
             assert 'name = "Miro"' in _written()
             await first.get_by_role("button", name="Skip the introduction").click()
             await expect(page.locator("section.first-chat")).to_have_count(0)

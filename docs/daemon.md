@@ -158,9 +158,16 @@ about; two rows a section (a run without the runs it delegated), then **Show N m
 in place (item 364), and the page scrolls to what does not fit. A section folds on a click of
 its title, which counts its rows, and the folds are kept in that browser. The line and the strip follow the lifecycle
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
-and `due`. The composer is one frame on a 24 px corner with a soft shadow under it: the goal in a box of one line that
-grows with it, the files attached and the picks under it, then one bar that never wraps: the **+** and the mode at the
-left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
+and `due`. The composer is one frame on a 24 px corner with a soft shadow under it, as a messaging app's box (item 833):
+one line of the **+**, the words ("Message Miro", the name you call Dot by; "Follow up" in the box of a run; the box's
+tooltip says that @ opens the apps and / the skills and commands), which grows with them, and the microphone at the
+right, with the files attached and the picks above the line. On that line the send comes beside the microphone once
+there are words or a file (it stays where the browser cannot listen), and a Stop is always in sight. The run's choices
+wait behind the **+** menu's **Model and options**, which brings them on a bar of their own under the words, with the
+send, and **Hide the model and options** puts them away again; the choice is kept in that browser for every box. While
+they are away, YOLO still shows as its pill, since the run then asks nothing, and so does the size of the chat once it
+is near full. The bar of the choices never wraps: the **+** and the mode at the left. A message is on **Auto** (item
+495), which shows no mode pill: its words settle its mode, research, which only
 reads, when they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir
 şeyi değiştirme", "sadece araştır"; "read-only" or "salt okunur" opening a sentence counts, "stay", "remain", "work", "operate",
 "run", "go" or "keep things read-only" where a sentence or a clause starts (after a comma, a semicolon, a colon, a dash,
@@ -180,7 +187,9 @@ at a thumbnail's size, its name its tooltip and its × at its corner, where anot
 size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
-the bar is still one line. On a phone the bar's buttons are 36 px and answer a finger's 44 px around them (item
+the bar is still one line; with the choices shown, a phone keeps the words on their line with the **+** and the send,
+and puts the microphone under them, on the line of the choices. On a phone the bar's buttons are 36 px and answer a
+finger's 44 px around them (item
 787, as every icon button of the bars and the lists does), and the box's text is the size chosen for it, at
 least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item
 311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a pick or Escape
@@ -204,7 +213,7 @@ in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
 links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
-sent is the text as typed. A **microphone** by the send (item 574) turns the controls under the box into a recorder
+sent is the text as typed. A **microphone** by the send (item 574) turns the box's controls into a recorder
 while it listens (item 605), as a phone's apps do. It listens one of two ways, which the page chooses as it starts (item
 626):
 

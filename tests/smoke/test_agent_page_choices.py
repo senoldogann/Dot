@@ -180,11 +180,17 @@ async def test_the_agents_box_starts_from_the_agents_bounds_and_a_choice_there_s
             context: BrowserContext = await browser.new_context(
                 viewport={"width": 1280, "height": 860}, reduced_motion="reduce"
             )
+            await context.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             # This browser has chosen the loosest mode and the top reasoning level on the home's box before.
             await context.add_init_script(
                 f"localStorage.setItem('dot.approvals', 'yolo'); localStorage.setItem('dot.effort.{DEEP}', 'max')"
             )
             page: Page = await context.new_page()
+            await page.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             await page.goto(ui_url("127.0.0.1", int(served.rpartition(":")[2]), TOKEN))
@@ -216,6 +222,9 @@ async def test_the_agents_box_starts_from_the_agents_bounds_and_a_choice_there_s
             phone: Page = await browser.new_page(
                 viewport={"width": 390, "height": 800}, color_scheme="dark", reduced_motion="reduce"
             )
+            await phone.add_init_script(
+                "localStorage.setItem('dot.composer.choices', 'shown')"
+            )  # the choices this test reads (item 833)
             await phone.goto(ui_url("127.0.0.1", int(served.rpartition(":")[2]), TOKEN))
             await phone.goto(f"{served}/#/agents/{scout}")
             await expect(phone.locator(BOX)).to_be_visible()
