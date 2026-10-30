@@ -394,7 +394,7 @@ function toolPicks(names, chosen) {
  * The form that makes an agent (`record` null) or changes one. `onSaved(record)` runs with the saved agent; `onCancel`
  * closes the form.
  */
-function agentForm({ record, onSaved, onCancel }) {
+export function agentForm({ record, onSaved, onCancel }) {
   const defaults = getSnapshot().status;
   const name = el("input", { class: "input", type: "text", maxlength: "60", autocomplete: "off", placeholder: "Scout", "aria-label": "Name" });
   const role = el("input", { class: "input", type: "text", maxlength: "120", autocomplete: "off", placeholder: "Finds and checks sources", "aria-label": "Role" });

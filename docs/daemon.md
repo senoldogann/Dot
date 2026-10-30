@@ -644,7 +644,11 @@ model and its reasoning level, the approval mode, goal mode when it is on, the c
 (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as compactions,
 reviews and the goal check), the compactions once there is one, the duration, and the run's mode, its start and its id
 (with a copy button); its other tabs hold the files the chat changed (Changes), the
-plan, the agents of the chat and the screen (Dot's computer and the latest screenshots). Each tab wears its icon, and where the strip has no room for
+plan, the agents of the chat and the screen (Dot's computer and the latest screenshots). The Agents tab opens with who
+the chat is with (item 846), as a messaging app's panel shows the contact: for one of your agents its face, name and
+role, its model, approvals and actions, what it learned, its instructions, **Edit**, which opens the agent's editor in
+the panel and shows the agent as saved, and **Open its page** (the Trader's also opens the trading desk); for Dot its
+model, its name and look, its rules and its memory, each a link to the settings that hold it. Each tab wears its icon, and where the strip has no room for
 every name, the tabs not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs
 the chat's runs handed work to: five at first and the rest on **Show N more**, each with its face and goal, its
 provider's mark, model and state, what it does now (or did last, from the conversation on the page) and how long it

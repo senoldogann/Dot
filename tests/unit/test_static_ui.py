@@ -30,6 +30,11 @@ REFERENCE: re.Pattern[str] = re.compile(r'(?:src|href)="([^"]+)"')
 MODULE_ENTRY: re.Pattern[str] = re.compile(r'<script type="module" src="(?P<src>[^"]+)"></script>')
 MODULEPRELOAD: re.Pattern[str] = re.compile(r'<link rel="modulepreload" href="(?P<place>[^"]+)">')
 IMPORT_ON_DEMAND: re.Pattern[str] = re.compile(r'import\("(?P<specifier>[^"]+)"\)')
+# A script that takes names of one loaded on demand (item 846: the side panel takes the agent's editor of the Agents
+# page when Edit is pressed): `const { a, b } = await import("./x.js")`.
+IMPORT_NAMES_ON_DEMAND: re.Pattern[str] = re.compile(
+    r'const\s*\{(?P<names>[^}]*)\}\s*=\s*await\s+import\("(?P<specifier>[^"]+)"\)'
+)
 # The scripts the page loads itself: nothing imports what they export.
 ENTRY_SCRIPTS: frozenset[str] = frozenset({"main.js", "boot.js"})
 TESTS_DIR: Path = Path(__file__).resolve().parents[1]
@@ -196,6 +201,10 @@ def test_every_export_of_the_interface_is_used_somewhere() -> None:
                 whole.add(target)
         for statement in IMPORT_ON_DEMAND.finditer(source):
             named.setdefault((path.parent / statement["specifier"]).resolve(), set()).add("mount")
+        for statement in IMPORT_NAMES_ON_DEMAND.finditer(source):
+            named.setdefault((path.parent / statement["specifier"]).resolve(), set()).update(
+                exported for exported, _ in names_in(statement["names"])
+            )
     elsewhere: str = "\n".join(
         file.read_text(encoding="utf-8")
         for folder, pattern in (("js", "*.js"), ("smoke", "*.py"), ("unit", "*.py"))
