@@ -19,28 +19,26 @@ Appearance › *Fold steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). Settings › Interface › *Work in a chat* (item 663)
 chooses between **Every step** and **What it is doing**, the default since item 830 (the conversation as people chat,
 as the owner's screenshots of another agent app showed it): the steps and the thoughts of every turn are out
-of the conversation, and one line under it, the face of who works and three of Dot's dots, as a messaging app shows
-someone typing, lined up with the words of the messages and close under the last of them (item 843), and a few words,
-says what the run does now, from its
-latest event: "Thinking…" while the model thinks, "Running a command…", "Searching the web…", "Reading a page…",
-"Working on the Mac…", "Asking Scout…" for a message to an agent, and so on, the words for the same work turning every
-four seconds ("Working in the terminal…") so that a long step reads as alive. Nothing is said that the run is not
-doing: while it writes a message, or a card waits for you, the line is not there. Pressed, it shows every step of the
-chat again, and pressed again folds them back; once the run is over and has its answer, the line goes and **Show the
-steps** stands in the answer's foot, beside the copy, the speaker and the time, where the pointer rests (item 842; a
-touch screen always shows it), and turns to *Hide the steps* once pressed. Approvals, questions,
-notes and the messages stay in sight either way; the changes of the memory stand with the steps, and an agent's message
-is open, with **What it is doing** (item 830). The choice is kept by the browser. A run says what it does as it works,
-in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it, now …"): those lines are its
-messages in the conversation, in either choice.
-The short marks at the left of the
+of the conversation, and one line under it says what the run does now, in a few words from its latest event. The line
+starts with the face of who works and three of Dot's dots, as a messaging app shows someone typing, lined up with the
+words of the messages and close under the last of them (item 843); its words are "Thinking…" while the model thinks,
+"Running a command…", "Searching the web…", "Reading a page…", "Working on the Mac…", "Asking Scout…" for a message to
+an agent, and so on, the words for the same work turning every four seconds ("Working in the terminal…") so that a long
+step reads as alive. Nothing is said that the run is not doing: while it writes a message, or a card waits for you, the
+line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
+over and has its answer, the line goes and **Show the steps** stands in the answer's foot, beside the copy, the speaker
+and the time, where the pointer rests (item 842; a touch screen always shows it), and turns to *Hide the steps* once
+pressed. Approvals, questions, notes and the messages stay in sight either way; the changes of the memory stand with the
+steps, and an agent's message is open, with **What it is doing** (item 830). The choice is kept by the browser. A run
+says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
+now …"): those lines are its messages in the conversation, in either choice. The short marks at the left of the
 conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
 work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out; the page
 reads the latest 200 runs of a chat, the most the daemon lists at once, so a chat of more says that its earlier runs are
 not shown, with no count (item 559). A chat opened when its run is over reads its record, its bill and its Changes once,
-as it opens: the events it then puts in, its end among them, read none of them again (item 646; the Changes of a
-long chat take half a second to make). While a chat is read, its page shows three dots of Dot's yellow that rise in turn
-in the middle of the room (items 502 and 643), and only once the read has taken 300 ms, so a chat that opens at once
+as it opens: the events it then puts in, its end among them, read none of them again (item 646; the Changes of a long
+chat take half a second to make). While a chat is read, its page shows three dots of Dot's yellow that rise in turn in
+the middle of the room (items 502 and 643), and only once the read has taken 300 ms, so a chat that opens at once
 flashes nothing; a screen reader is told the chat is opening, and with reduced motion the dots stand still.
 
 `finish` takes the `answer` and a `success` flag. The `answer` is the complete message the user reads (the findings, the
