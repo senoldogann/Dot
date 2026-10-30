@@ -1559,8 +1559,11 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
             "the review model did not answer in time", {"model": ref.label, "timeout_s": question.timeout_s}
         ) from exc
     # A text past its bound is cut only when, whole, it holds none of the values Dot holds (item 840): refused, as the
-    # gates of what is learned refuse, so `filled` is false; read only when a text would be cut, a small file.
-    return _verdict_from(reply, question.tool.name, question.verdict_type, ref.label, _refused_values)
+    # gates of what is learned refuse, so `filled` is false; read only when a text would be cut, off the event loop,
+    # as every read of them is (the pre-push review).
+    return await asyncio.to_thread(
+        _verdict_from, reply, question.tool.name, question.verdict_type, ref.label, _refused_values
+    )
 
 
 def _as_is[V: FrozenModel](verdict: V) -> V:
