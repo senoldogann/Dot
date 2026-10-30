@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
-from playwright.async_api import Browser, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -138,15 +138,23 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 async with asyncio.timeout(30):
                     assert (await manager.wait(run.id)).status == "done"
                 await expect(line).to_have_attribute("data-state", "over")
-                await expect(line).to_have_text("Show the steps")
                 await expect(page.locator(".answer .prose")).to_have_text("Done.")
-                await line.click()
+                # Over, with an answer, the way to the steps is in the answer's foot and the line goes (item 842).
+                await expect(line).to_be_hidden()
+                steps: Locator = page.locator(".answer .answer-foot").get_by_role("button", name="Show the steps")
+                await page.locator(".answer").hover()
+                await steps.click()
                 await expect(page.locator("details.steps").first).to_be_visible()
-                await expect(line).to_have_text("Hide the steps")
+                await expect(page.locator(".answer-steps")).to_have_text("Hide the steps")
+                await expect(page.locator(".answer-steps")).to_have_attribute("aria-pressed", "true")
+                await page.locator(".answer-steps").click()
+                await expect(page.locator("details.steps")).to_be_hidden()
                 await page.close()
-                # On a phone's width the line is there, and the steps fold out of the conversation as wide.
+                # On a phone's width the button is in the foot, which a touch screen always shows, and the steps fold
+                # out of the conversation as wide.
                 phone: Page = await _open(browser, port, address, run.id, "status", 390)
-                await expect(phone.locator(".work-status")).to_have_text("Show the steps")
+                await expect(phone.locator(".answer-steps")).to_have_text("Show the steps")
+                await expect(phone.locator(".work-status")).to_be_hidden()
                 await expect(phone.locator("details.steps")).to_be_hidden()
                 await phone.screenshot(path=str(tmp_path / "phone.png"))
                 await phone.close()
@@ -166,7 +174,8 @@ async def test_by_default_the_steps_fold_away_and_the_line_offers_them(own_home:
                 page: Page = await _open(browser, port, address, run.id, None, 1280)
                 await expect(page.locator(".answer .prose")).to_have_text("Done.")
                 await expect(page.locator("details.steps").first).to_be_hidden()
-                await expect(page.locator(".work-status")).to_be_visible()
+                await expect(page.locator(".answer-steps")).to_have_count(1)
+                await expect(page.locator(".work-status")).to_be_hidden()
                 await page.close()
             finally:
                 await browser.close()

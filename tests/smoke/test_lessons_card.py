@@ -158,7 +158,12 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
         try:
             for width, scheme in _SHOTS:
                 page, errors = await _page(browser, address, run.id, width, scheme)
-                card: Locator = page.get_by_role("region", name="Lessons from this task")
+                # Saved and left out on their own, the lessons wait for nothing of the owner's: they head the side
+                # panel's Task tab, which counts them, and the conversation holds none of them (item 842).
+                await expect(page.locator(".lessons-place .lessons-card")).to_have_count(0)
+                await page.get_by_role("button", name="Task details").first.click()
+                await expect(page.get_by_role("tab", name="Task")).to_contain_text("3")
+                card: Locator = page.locator(".lessons-slot").get_by_role("region", name="Lessons from this task")
                 await expect(card).to_be_visible()
                 assert not await card.locator(".lesson").first.is_visible(), "the lessons arrive folded"
                 assert await card.get_attribute("open") is None
@@ -205,7 +210,14 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
                 (None, "could not be drawn"),
             ):
                 page, errors = await _page_with_lessons(browser, address, run.id, lessons)
-                count: Locator = page.get_by_role("region", name="Lessons from this task").locator(".lessons-count")
+                # Lessons that wait for a decision stand in the conversation; lessons that could not be drawn ask
+                # nothing of the owner and head the Task tab (item 842).
+                if lessons is None:
+                    await page.get_by_role("button", name="Task details").first.click()
+                place: str = ".lessons-place" if lessons is not None else ".lessons-slot"
+                count: Locator = (
+                    page.locator(place).get_by_role("region", name="Lessons from this task").locator(".lessons-count")
+                )
                 await expect(count).to_have_text(said)
                 await expect(count).to_have_attribute("data-tone", "warn" if lessons is not None else "bad")
                 assert errors == []

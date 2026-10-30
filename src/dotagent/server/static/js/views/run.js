@@ -442,6 +442,14 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     ),
     lessonsBody,
   );
+  // Where the lessons stand (item 842): in the conversation while one waits for your decision or notes wait for your
+  // look, else at the head of the side panel's Task tab, which counts them. A chat says only what needs you.
+  const lessonsPlace = el("div", { class: "lessons-place" });
+  const lessonsSlot = el("div", { class: "lessons-slot" });
+  function placeLessons(needsYou, count) {
+    (needsYou ? lessonsPlace : lessonsSlot).append(lessonsCard);
+    inspector.setCount("run", needsYou || lessonsCard.hidden || count === 0 ? "" : String(count));
+  }
   // The lessons being saved or dismissed, by index, so that a second press does not send the same decision twice.
   const decidingLessons = new Set();
 
@@ -571,6 +579,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       lessonsCount.dataset.tone = "";
       lessonCuts.disconnect();
       lessonsBody.replaceChildren(...doubted);
+      placeLessons(doubted.length > 0, 0);
       return;
     }
     const proposed = lessons.lessons.filter((lesson) => lesson.state === "proposed").length;
@@ -595,6 +604,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       ].filter((node) => node !== null),
       ...doubted,
     );
+    placeLessons(proposed > 0 || doubted.length > 0, lessons.lessons.length);
   }
 
   // ------------------------------------------------------------------------------------------ questions
@@ -1220,6 +1230,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     answerNode = node;
     // What the run changed on this Mac, with the way back (item 597), read as the answer comes, in the Changes tab.
     undoLine.load();
+    // The way to the steps is in the answer's foot, where the pointer rests (item 842), not a line of its own under it.
+    node.querySelector(".answer-foot .answer-facts")?.before(
+      el("button", { class: "btn ghost sm answer-steps", type: "button", "aria-pressed": "false", onclick: () => workStatus.toggle() }, "Show the steps"),
+    );
     if (openedFinished) {
       // A chat that is over when it opens starts at its foot, on the newest message (item 440), and keeps there while
       // what is above it settles (pictures, a table's width) until the reader scrolls up.
@@ -1445,7 +1459,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Task", icon: "info", sections: [recap.element, ...context.elements, more.element] },
+      { id: "run", label: "Task", icon: "info", sections: [lessonsSlot, recap.element, ...context.elements, more.element] },
       { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
@@ -1571,7 +1585,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const workStatus = createWorkStatus({
     rootRunId: runId,
     active,
-    onToggle: (shown) => threadBox?.classList.toggle("steps-shown", shown),
+    onToggle: (shown) => {
+      threadBox?.classList.toggle("steps-shown", shown);
+      for (const button of threadBox?.querySelectorAll(".answer-steps") ?? []) {
+        setText(button, shown ? "Hide the steps" : "Show the steps");
+        button.setAttribute("aria-pressed", String(shown));
+      }
+    },
   });
   const problem =
     historyProblem === null
@@ -1619,7 +1639,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     workStatus.element,
     waitingList,
     questionsList,
-    lessonsCard,
+    lessonsPlace,
   );
   paintWorking();
   const main = el("div", { class: "run-main" }, thread, dock);
