@@ -158,13 +158,20 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
         try:
             for width, scheme in _SHOTS:
                 page, errors = await _page(browser, address, run.id, width, scheme)
-                # Saved and left out on their own, the lessons wait for nothing of the owner's: they head the side
-                # panel's Task tab, which counts them, and the conversation holds none of them (item 842).
+                # Saved and left out on their own, the lessons wait for nothing of the owner's: they stand at the foot
+                # of the side panel's Task tab (items 842 and 856), which counts them, after its other sections in
+                # their order, and the conversation holds none of them.
                 await expect(page.locator(".lessons-place .lessons-card")).to_have_count(0)
                 await page.get_by_role("button", name="Task details").first.click()
                 await expect(page.get_by_role("tab", name="Task")).to_contain_text("3")
                 card: Locator = page.locator(".lessons-slot").get_by_role("region", name="Lessons from this task")
                 await expect(card).to_be_visible()
+                assert await page.locator(".lessons-slot").evaluate(
+                    "(slot) => slot.parentElement.lastElementChild === slot"
+                ), "the lessons stand at the foot of the tab"
+                assert (
+                    await card.locator(".lessons-mark").evaluate("(mark) => getComputedStyle(mark).display") == "none"
+                )
                 assert not await card.locator(".lesson").first.is_visible(), "the lessons arrive folded"
                 assert await card.get_attribute("open") is None
                 await card.scroll_into_view_if_needed()

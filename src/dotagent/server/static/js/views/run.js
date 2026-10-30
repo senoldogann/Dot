@@ -444,8 +444,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     lessonsBody,
   );
   // Where the lessons stand (item 842): in the conversation while one waits for your decision, notes wait for your
-  // look or they could not be drawn, else at the head of the side panel's Task tab, which counts them. A chat says
-  // only what needs you.
+  // look or they could not be drawn, else at the foot of the side panel's Task tab (item 856), which counts them. A
+  // chat says only what needs you.
   const lessonsPlace = el("div", { class: "lessons-place" });
   const lessonsSlot = el("div", { class: "lessons-slot" });
   function placeLessons(needsYou, count) {
@@ -1472,7 +1472,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Task", icon: "info", sections: [lessonsSlot, recap.element, ...context.elements, more.element] },
+      // The lessons at the tab's foot, after what the run did (item 856, the owner's ask: they stood at its head).
+      { id: "run", label: "Task", icon: "info", sections: [recap.element, ...context.elements, more.element, lessonsSlot] },
       { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [withSection.element, agents.element] },
