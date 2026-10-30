@@ -315,11 +315,13 @@ async def test_what_is_tapped_on_a_phone_is_a_fingers_size(browser: Browser, ser
     # The tabs of the run's details, and the files the run changed.
     page: Page = await _phone(browser, address, f"/runs/{run_id}")
     try:
-        await expect(page.locator(".run-changes-file")).to_be_visible(timeout=15_000)
-        small += await _too_small(page, ".run-changes-file")
         await page.get_by_role("button", name="Task details").click()
         await expect(page.locator(".inspector[data-mode='drawer']")).to_have_attribute("data-open", "true")
         small += await _too_small(page, ".inspector-tab")
+        # The files the run changed head the Changes tab (item 841).
+        await page.get_by_role("tab", name="Changes").click()
+        await expect(page.locator(".run-changes-file")).to_be_visible(timeout=15_000)
+        small += await _too_small(page, ".run-changes-file")
     finally:
         await page.context.close()
     # The list of models the composer's model opens: a star for each and the word that changes the default.
@@ -401,6 +403,9 @@ async def test_a_file_opened_beside_a_run_keeps_the_room_for_its_name(
     address, run_id = served
     page: Page = await _phone(browser, address, f"/runs/{run_id}")
     try:
+        # The files the run changed head the side panel's Changes tab (item 841).
+        await page.get_by_role("button", name="Task details").click()
+        await page.get_by_role("tab", name="Changes").click()
         await page.locator(".run-changes-file").click(timeout=15_000)
         head: Locator = page.locator(".file-view .file-head")
         await expect(head.locator(".file-name")).to_have_text("flights.md")

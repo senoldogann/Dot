@@ -1687,14 +1687,16 @@ a.pill:hover {
   animation-play-state: var(--endless);
 }
 
+/* A chip is a tint of the ink with no frame (item 837), as a button is, so that it is a step from every ground, the
+   second surface's too; the contrast setting frames it, as it frames a box. */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 0 8px;
   border-radius: var(--radius-xs);
-  background: var(--surface-2);
-  border: 1px solid transparent;
+  background: var(--button-fill);
+  border: 1px solid var(--box-border);
   color: var(--text-2);
   font-size: var(--text-xs);
   line-height: var(--leading-ui);
@@ -6869,6 +6871,11 @@ summary:has(> .chev)::-webkit-details-marker {
   background: var(--msg-agent);
   color: var(--text-2);
   font-size: var(--text-sm);
+}
+
+/* At the head of the side panel's Changes tab (item 841), over the files, not under the answer. */
+.changes-holder > .run-changes {
+  margin: 0 0 var(--space-3);
 }
 
 .run-changes > .icon {

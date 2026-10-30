@@ -1,4 +1,5 @@
-// What the chat's run changed on this Mac (item 597): under its answer, once it has ended, the files its file tools
+// What the chat's run changed on this Mac (item 597): at the head of the side panel's Changes tab (item 841: it stood
+// under the answer, which a chat with a personal agent does not want, Dot being no editor), once it has ended, the files its file tools
 // created and changed, as the undo journal has them (`GET /runs/{id}/actions`), each a button to the file beside the
 // conversation, with Review, the side panel's Changes tab and their diffs, and Undo, which takes the changes back after
 // a question. Not an editor's list: one line of what Dot did and the way back, and nothing for a run that changed no
@@ -110,7 +111,7 @@ export function runChangesCard({ runId, onReview, onUndone }) {
       el(
         "div",
         { class: "run-changes-actions" },
-        el("button", { class: "btn ghost sm", type: "button", onclick: onReview }, "Review"),
+        onReview === null ? null : el("button", { class: "btn ghost sm", type: "button", onclick: onReview }, "Review"),
         undo,
       ),
     );
