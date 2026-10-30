@@ -3,6 +3,7 @@
 
 import { actorFace, dotFace, setActorState, teamDuo } from "../actors.js";
 import { agentList } from "../agentlist.js";
+import { agentPanel } from "../agentpanel.js";
 import { api, eventNotShown, follow, query, sse } from "../api.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
@@ -1443,8 +1444,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     name: actorName,
     sizes: stage.chooser,
   });
-  // The agents of the chat: the runs its runs handed work to (item 227).
+  // The agents of the chat: the runs its runs handed work to (item 227), under who the chat is with and how it is set
+  // (item 846), Dot or one of your agents, as a messaging app's panel shows the contact.
   const agents = agentList({ threadId: run.thread_id, helper: (id) => timeline.helper(id) });
+  const withAgent = agentPanel({ agent });
+  const withSection = panelSection({ id: "run-agent", title: "Agent", actions: null, body: withAgent.element });
   // The Screen tab with nothing yet (item 401): Dot's computer is quiet, and what it shows and the screenshots it takes
   // stand there once it works. The empty panel is the page's own, in Dot's voice; the card of the page takes its place
   // as soon as there is a page.
@@ -1471,7 +1475,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       { id: "run", label: "Task", icon: "info", sections: [lessonsSlot, recap.element, ...context.elements, more.element] },
       { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
-      { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
+      { id: "agents", label: "Agents", icon: "users", sections: [withSection.element, agents.element] },
       { id: "screen", label: "Screen", icon: "monitor", sections: [screenQuiet, computer.element] },
     ],
     screensIn: "screen",
@@ -1847,6 +1851,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     stopLifecycle();
     stopBack();
     computer.dispose();
+    withAgent.dispose();
     reactions.dispose();
     inspector.dispose();
     stage.dispose();

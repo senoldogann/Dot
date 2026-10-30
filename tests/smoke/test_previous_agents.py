@@ -200,7 +200,8 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
                 await agents_tab.click()
                 await expect(agents_tab).to_have_attribute("aria-selected", "true")
                 shown: Locator = panel.locator(".inspector-panel:not([hidden])")
-                await expect(shown.locator(".panel-section-title")).to_have_text(["Previous agents"])
+                # Who the chat is with stands over the helpers (item 846).
+                await expect(shown.locator(".panel-section-title")).to_have_text(["Agent", "Previous agents"])
                 rows: Locator = shown.locator(".agent-row")
                 await expect(rows).to_have_count(_FIRST_ROWS)
                 await expect(rows.locator(".agent-title")).to_have_text(

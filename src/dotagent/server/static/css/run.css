@@ -2736,3 +2736,60 @@ dialog.computer-full::backdrop {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* Who the chat is with, at the head of the side panel's Agents tab (item 846): the face, the name and the role, the
+   facts of how it is set, its instructions and Edit, as a messaging app's panel shows the contact. */
+.agent-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.agent-panel-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.agent-panel-who .avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+
+.agent-panel-names {
+  min-width: 0;
+}
+
+.agent-panel-name {
+  font-weight: var(--weight-title);
+  overflow-wrap: anywhere;
+}
+
+.agent-panel-role {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.agent-panel-label {
+  margin: 0 0 var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-label);
+}
+
+.agent-panel-instructions p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The editor in the panel's width: its fields one under the other. */
+.agent-panel .agent-editor .form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The agent's section keeps its whole height over the helpers: its editor is a form to fill, not a list to scroll. */
+.inspector-panel > .panel-section > #panel-run-agent {
+  max-height: none;
+  overflow: visible;
+}
