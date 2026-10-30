@@ -1593,6 +1593,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const workStatus = createWorkStatus({
     rootRunId: runId,
     active,
+    face: actorFace(agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id, "working", null),
     onToggle: (shown) => {
       threadBox?.classList.toggle("steps-shown", shown);
       for (const button of threadBox?.querySelectorAll(".answer-steps") ?? []) {

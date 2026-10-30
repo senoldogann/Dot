@@ -19,7 +19,9 @@ Appearance › *Fold steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). Settings › Interface › *Work in a chat* (item 663)
 chooses between **Every step** and **What it is doing**, the default since item 830 (the conversation as people chat,
 as the owner's screenshots of another agent app showed it): the steps and the thoughts of every turn are out
-of the conversation, and one line under it, three of Dot's dots and a few words, says what the run does now, from its
+of the conversation, and one line under it, the face of who works and three of Dot's dots, as a messaging app shows
+someone typing, lined up with the words of the messages and close under the last of them (item 843), and a few words,
+says what the run does now, from its
 latest event: "Thinking…" while the model thinks, "Running a command…", "Searching the web…", "Reading a page…",
 "Working on the Mac…", "Asking Scout…" for a message to an agent, and so on, the words for the same work turning every
 four seconds ("Working in the terminal…") so that a long step reads as alive. Nothing is said that the run is not

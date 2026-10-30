@@ -127,6 +127,14 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 words = line.locator(".work-status-words")
                 await expect(line).to_have_attribute("data-state", "working")
                 await expect(words).to_have_text(re.compile(_COMMAND_WORDS))
+                # The agent typing (item 843): its face first, in the answer's face's place, and the dots where the
+                # words of the messages start, 28 px of face and a gap of 8 on.
+                await expect(line.locator(".turn-face .avatar")).to_have_count(1)
+                face_x, dots_x = await line.evaluate(
+                    "(line) => ['.turn-face', '.work-status-dots'].map((part) =>"
+                    " line.querySelector(part).getBoundingClientRect().x)"
+                )
+                assert dots_x - face_x == 36, (face_x, dots_x)
                 await expect(page.locator("details.steps")).to_be_hidden()
                 await page.screenshot(path=str(tmp_path / "working.png"))
                 # Pressed while the run works, the line shows the steps; pressed again, it folds them back; pressed a
