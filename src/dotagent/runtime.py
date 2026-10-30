@@ -13,6 +13,7 @@ from pydantic import SecretStr
 
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import SiteLocks
+from dotagent.agent.held_secrets import held_dir, mask_all_held
 from dotagent.agent.judge import SwitchedJudge, TypeSafeService, judge_for
 from dotagent.agent.peers import Peers
 from dotagent.agent.sizes import ContextSizes
@@ -305,7 +306,8 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     writes back what a journal says), the locks that tell which process drives a run, the ledger of the tabs Dot has
     open in the Chrome of the user (item 703: Dot writes and reads it outside the sandbox), and the daemon's pid file
     and mark, which it opens and writes at its start (item 676), and the copies of the files a run uploaded, which the
-    browser reads (item 681: one may be of a file the owner allowed from a place a command may not read)."""
+    browser reads (item 681: one may be of a file the owner allowed from a place a command may not read), and the
+    secrets the owner gave the chats on a card (item 857: a chat's commands read its own from their environment)."""
     database: Path = db_path()
     return (
         env_file_path(),
@@ -330,6 +332,7 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         pid_path(),
         running_mark_path(),
         uploads_dir(),
+        held_dir(),
     )
 
 
@@ -509,6 +512,8 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
     protected, dot_paths, sandbox = confinement.protected, confinement.dot_paths, confinement.sandbox
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
+    # The secrets the owner gave chats on a run's card (item 857) are masked again, as a process starts with none.
+    await asyncio.to_thread(mask_all_held)
     # Keys of services the daemon starts without: a Keychain that does not answer does not stop it (item 558).
     ollama_key: str | None = await asyncio.to_thread(optional_secret, config.providers.ollama.api_key_env)
     anthropic_key: str | None = await asyncio.to_thread(optional_secret, config.providers.anthropic.api_key_env)

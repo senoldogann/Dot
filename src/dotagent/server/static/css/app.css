@@ -6198,6 +6198,46 @@ a.schedule-line:hover .schedule-made {
   gap: 8px;
 }
 
+/* The card of a secret (item 857): what it is, why and how in the run's words, a box and Save securely on one line,
+   and at its foot where the secret goes, with Decline. */
+.secret-label {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.secret-why {
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.secret-entry {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.secret-entry > .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.secret-entry > .btn {
+  flex: none;
+}
+
+.secret-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.secret-foot > .icon {
+  flex: none;
+}
+
 /* The way from an approval to a rule (item 110): a quiet link under the action, apart from the answers. */
 .approval-rule {
   display: inline-flex;

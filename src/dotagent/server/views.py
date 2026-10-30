@@ -550,6 +550,13 @@ class RecapRequest(FrozenModel):
     force: bool = False
 
 
+class SecretRequest(FrozenModel):
+    """The secret the owner gives a run's card (item 857): the value alone, which the daemon holds for the chat's
+    commands and writes nowhere else."""
+
+    value: str = Field(min_length=1, max_length=8192)
+
+
 class DecisionRequest(FrozenModel):
     """Approve or deny. For a question the run asked, ``note`` carries the answer."""
 

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from pydantic import Field
 
+from dotagent.agent.held_secrets import held_values
 from dotagent.config import ShellConfig
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.runenv import RUN_SHELL_MARKER
@@ -207,8 +208,10 @@ def build_shell_tool() -> RegisteredTool:
         if not await asyncio.to_thread(cwd.is_dir):
             raise ToolExecutionError("working directory does not exist", {"cwd": str(cwd)})
         timeout_s: int = min(args.timeout_s or shell_config.default_timeout_s, shell_config.max_timeout_s)
+        # The secrets the owner gave this chat on a card (item 857) join its commands' environment, by their names.
+        held: dict[str, str] = await asyncio.to_thread(held_values, ctx.thread_id)
         code, output, seconds, timed_out = await run_command(
-            args.command, run_sandbox(ctx).commands, cwd, ctx.runtime.shell_env, timeout_s
+            args.command, run_sandbox(ctx).commands, cwd, {**ctx.runtime.shell_env, **held}, timeout_s
         )
         header: str = (
             f"[timed out after {timeout_s}s and was killed]" if timed_out else f"[exit {code} in {seconds:.1f}s]"

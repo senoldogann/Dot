@@ -562,6 +562,9 @@ export function toolIconName(tool) {
   if (tool === "ask_user") {
     return "help";
   }
+  if (tool === "ask_secret") {
+    return "key";
+  }
   if (tool === "notify") {
     return "bell";
   }

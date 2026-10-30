@@ -286,6 +286,7 @@ from dotagent.tools.groups import (
 )
 from dotagent.tools.mail_calendar import account_lines
 from dotagent.tools.meta import (
+    ASK_SECRET_TOOL,
     ASK_USER_TOOL,
     FINISH_TOOL,
     MARK_PLAN_STEP_TOOL,
@@ -308,9 +309,10 @@ EMBEDDING_FAILED: str = "embedding_failed"
 
 # A delegated run reports to its parent: it neither delegates again nor asks the user, and its parent asks the helpers.
 # The tools every agent keeps whatever its list says (item 86): the ones that end a run, ask, and turn groups on.
-AGENT_CORE_TOOLS: tuple[str, ...] = (FINISH_TOOL, ASK_USER_TOOL, USE_TOOLS_TOOL, REACT_TOOL)
+AGENT_CORE_TOOLS: tuple[str, ...] = (FINISH_TOOL, ASK_USER_TOOL, ASK_SECRET_TOOL, USE_TOOLS_TOOL, REACT_TOOL)
+# A delegated run asks the owner nothing, a secret neither (item 857): its parent asks, in its own chat.
 _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
-    {DELEGATE_TOOL, ASK_USER_TOOL, CONSULT_TOOL, MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL}
+    {DELEGATE_TOOL, ASK_USER_TOOL, ASK_SECRET_TOOL, CONSULT_TOOL, MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL}
 )
 # The sources of runs no message of the owner's started (item 664). "background" is agent/manager.py's
 # BACKGROUND_SOURCE, which imports this module.

@@ -9,6 +9,8 @@ import { icon } from "./icons.js";
 import { toastError } from "./ui.js";
 
 const STATUS_BADGE = { approved: "b-ok", denied: "b-bad", expired: "b-muted" };
+// The shortest secret a card takes: one shorter would stand bare where a command prints it (held_secrets.py, item 857).
+const SECRET_LEAST_CHARS = 8;
 const STATUS_LABEL = { approved: "Approved", denied: "Denied", expired: "Expired", pending: "Waiting for you" };
 // What becomes of the answer to a question a run left (`leftNote` of a card): it carries the work on in the run's
 // conversation, or, for a session of a campaign, reaches the session while it works and the next session after that.
@@ -100,6 +102,9 @@ function titleOf(severity) {
   if (severity === "question") {
     return "Dot is asking you";
   }
+  if (severity === "secret") {
+    return "Dot asks for a secret";
+  }
   if (severity === "handoff") {
     return "Dot needs you to take over this step";
   }
@@ -109,6 +114,9 @@ function titleOf(severity) {
 function iconOf(severity) {
   if (severity === "question") {
     return "help";
+  }
+  if (severity === "secret") {
+    return "key";
   }
   return severity === "handoff" ? "hand" : "shield";
 }
@@ -243,6 +251,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
   const node = el("div", { class: "approval" });
   const isQuestion = approval.severity === "question";
   const isHandoff = approval.severity === "handoff";
+  // A card that asks for a key, a token or a password (item 857): its value goes to its own route alone, never as a note.
+  const isSecret = approval.severity === "secret";
   // An answer to a question the run left goes on with the work in the run's conversation, so it needs words.
   const isLeft = approval.status === "left";
   // A step handed to the owner that nobody answered in time, kept for them until it lapses (item 482).
@@ -365,7 +375,94 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     );
   }
 
+  /** The card of a secret (item 857): what it is and why, in the run's words, a box that shows no letter of it, Save
+   * securely, which sends the value to the daemon's own route for it (held for this chat's commands, written nowhere
+   * else), and Decline. The box is emptied once it is sent. */
+  function renderSecret() {
+    node.className = "approval secret";
+    const label = typeof approval.args.label === "string" ? approval.args.label : approval.summary;
+    const why = typeof approval.args.why === "string" ? approval.args.why : "";
+    const value = el("input", {
+      class: "input mono",
+      type: "password",
+      autocomplete: "off",
+      autocapitalize: "off",
+      spellcheck: "false",
+      maxlength: "8192",
+      placeholder: label,
+      "aria-label": label,
+    });
+    const save = el("button", { class: "btn primary", type: "button" }, "Save securely");
+    const decline = el("button", { class: "btn ghost", type: "button", onclick: () => decide(false, "") }, "Decline");
+    async function give() {
+      if (busy) {
+        return;
+      }
+      if (value.value.trim().length < SECRET_LEAST_CHARS) {
+        value.focus();
+        return;
+      }
+      busy = true;
+      node.querySelectorAll("button, input").forEach((control) => {
+        control.disabled = true;
+      });
+      let decided;
+      try {
+        decided = await api.post(`/approvals/${approval.id}/secret`, { value: value.value });
+      } catch (error) {
+        busy = false;
+        node.querySelectorAll("button, input").forEach((control) => {
+          control.disabled = false;
+        });
+        toastError(error);
+        if (error.status === 409) {
+          onSettled(null);
+        }
+        return;
+      }
+      value.value = "";
+      onSettled(decided);
+    }
+    save.addEventListener("click", () => give());
+    value.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        give();
+      }
+    });
+    node.replaceChildren(
+      ...present(
+        el("div", { class: "approval-head" }, icon("key"), el("span", null, titleOf("secret")), el("span", { class: "spacer" }), heading),
+        el("div", { class: "approval-text secret-label" }, label),
+        why === "" ? null : el("div", { class: "secret-why" }, why),
+        el("div", { class: "secret-entry" }, value, save),
+        el(
+          "div",
+          { class: "secret-foot" },
+          icon("shield"),
+          el("span", { class: "grow" }, "Kept out of the chat and out of Dot's sight: this chat's commands read it for 24 hours."),
+          decline,
+        ),
+      ),
+    );
+  }
+
   function settle(status, note) {
+    if (isSecret) {
+      node.className = "approval decided";
+      node.replaceChildren(
+        el(
+          "div",
+          { class: "approval-head" },
+          icon("key"),
+          el("span", null, typeof approval.args.label === "string" ? approval.args.label : approval.summary),
+          el("span", { class: `badge ${STATUS_BADGE[status] ?? "b-muted"}` }, status === "approved" ? "Saved securely" : (STATUS_LABEL[status] ?? status)),
+          el("span", { class: "spacer" }),
+          heading,
+        ),
+      );
+      return;
+    }
     node.className = "approval decided";
     const text = isQuestion && typeof approval.args.question === "string" ? approval.args.question : approval.summary;
     node.replaceChildren(
@@ -385,7 +482,9 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     );
   }
 
-  if (approval.status === "pending" || isLeft) {
+  if ((approval.status === "pending" || isLeft) && isSecret) {
+    renderSecret();
+  } else if (approval.status === "pending" || isLeft) {
     renderPending();
   } else {
     settle(approval.status, approval.note);

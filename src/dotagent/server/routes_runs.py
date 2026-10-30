@@ -13,6 +13,7 @@ from fastapi.responses import StreamingResponse
 from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_attachments, store_attachment
 from dotagent.agent.campaign import session_number
+from dotagent.agent.held_secrets import SECRET_SEVERITY, HeldSecret, forget_secret, save_secret
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import disliked_of, run_lessons
 from dotagent.agent.mode_words import resolved_mode
@@ -28,7 +29,8 @@ from dotagent.agent.rewind import (
     take_back,
 )
 from dotagent.browser.remote_input import InputBatch, InputResult
-from dotagent.core.errors import InvalidValueError
+from dotagent.core.errors import InvalidValueError, RunConflict
+from dotagent.core.logs import get_logger
 from dotagent.core.paths import workspace_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.scheduler.loops import LoopRhythm, loop_goal, loop_name, loop_rhythm
@@ -63,6 +65,7 @@ from dotagent.server.views import (
     RunDetail,
     RunsQuery,
     SavedSkill,
+    SecretRequest,
     StartRunRequest,
     SteerRequest,
     StreamQuery,
@@ -92,6 +95,8 @@ from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_chi
 
 # As many events as the Actions panel reads of a run: the acting steps are among them.
 _ACTION_EVENTS: int = 20_000
+
+log = get_logger(__name__)
 
 
 def _loop_schedule(text: str, every: str, mode: RunMode, options: ScheduleOptions) -> ScheduleRequest:
@@ -530,7 +535,37 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     @router.post("/approvals/{approval_id}/decision")
     async def decide_approval(approval_id: str, request: DecisionRequest) -> ApprovalRecord:
         """Decide an approval or answer a question; the answer to a question a run left carries the work on in its
-        thread (see ``RunManager.decide``)."""
+        thread (see ``RunManager.decide``). A card that asks for a secret (item 857) is answered with its value through
+        its own route alone: here it may only be skipped, as a yes with no value would tell the run one was given."""
+        if request.approve and (await store.get_approval(approval_id)).severity == SECRET_SEVERITY:
+            raise InvalidValueError(
+                "a card that asks for a secret is answered with the secret, at /approvals/{id}/secret",
+                {"approval_id": approval_id},
+            )
         return await ctx.manager.decide(approval_id, request.approve, UI_SOURCE, request.note)
+
+    @router.post("/approvals/{approval_id}/secret")
+    async def give_secret(approval_id: str, request: SecretRequest) -> ApprovalRecord:
+        """Give the secret a run's card asks for (item 857): held for the run's chat, under the name the card names,
+        for its commands, 24 hours; the card is then answered with no note, and nothing records the value. A card
+        that is no secret's, or no longer open, is refused before anything is held."""
+        record: ApprovalRecord = await store.get_approval(approval_id)
+        if record.severity != SECRET_SEVERITY or record.status not in ("pending", "left"):
+            raise InvalidValueError("no open card asks for a secret here", {"approval_id": approval_id})
+        name: object = record.args.get("name")
+        label: object = record.args.get("label")
+        if not isinstance(name, str) or not isinstance(label, str):
+            raise InvalidValueError("the card names no secret", {"approval_id": approval_id})
+        run: RunRecord = await store.get_run(record.run_id)
+        # Held before the card is answered, so that the run, woken by the answer, finds it; taken back when the card
+        # was answered otherwise meanwhile (two tabs, its deadline).
+        saved: HeldSecret = await asyncio.to_thread(save_secret, run.thread_id, name, label, request.value)
+        try:
+            answered: ApprovalRecord = await ctx.runtime.approvals.resolve(approval_id, True, UI_SOURCE, "")
+        except RunConflict:
+            await asyncio.to_thread(forget_secret, saved, run.thread_id, request.value)
+            raise
+        log.info("secret_held", approval_id=approval_id, run_id=record.run_id, name=name)
+        return answered
 
     return router

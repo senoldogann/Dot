@@ -30,6 +30,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
+from dotagent.agent.held_secrets import held_values
 from dotagent.core.errors import TerminalInputFullError, ToolExecutionError, ToolInputError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import duration_text, redact_known, truncate_middle
@@ -406,7 +407,8 @@ class Terminals:
                 stdout=follower,
                 stderr=follower,
                 cwd=str(cwd),
-                env=self._env,
+                # The secrets the owner gave this chat on a card (item 857), by their names.
+                env={**self._env, **await asyncio.to_thread(held_values, thread_id)},
                 start_new_session=True,
                 preexec_fn=_controlling_terminal,
             )

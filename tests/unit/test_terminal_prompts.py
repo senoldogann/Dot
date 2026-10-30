@@ -129,3 +129,28 @@ async def test_a_hand_off_is_done_only_on_enter_or_a_yes(
     assert decision[:2] == ("apr_1", done)
     assert ("completed" in decision[2]) is done
     assert "any other answer skips it" in asked[0]
+
+
+@pytest.mark.parametrize("answer", ["y", "yes", "made-up-token-0123456789", ""])
+async def test_a_card_that_asks_for_a_secret_is_never_answered_yes_in_the_terminal(
+    answer: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 857: a secret is given on the card of Dot's page alone; what is typed here, a yes or the value, declines
+    it and is written nowhere."""
+    asked: list[str] = []
+
+    async def typed_at_the_prompt(prompt: str, fresh: bool = False) -> str:
+        asked.append(prompt)
+        return answer
+
+    monkeypatch.setattr(cli_ui, "read_line", typed_at_the_prompt)
+    runtime: _Runtime = _Runtime()
+    ui: TerminalUi = TerminalUi(
+        cast(Runtime, runtime), UiOptions(interactive=True, stream_text=False, show_thinking=False, verbose=False)
+    )
+    request: ApprovalPayload = ApprovalPayload(
+        approval_id="apr_2", tool="ask_secret", summary="Demo API token", severity="secret", args={}
+    )
+    await ui._ask_approval(request)
+    assert runtime.approvals.decided == [("apr_2", False, "")]
+    assert "Dot's page" in asked[0]

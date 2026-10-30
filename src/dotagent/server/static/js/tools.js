@@ -242,6 +242,7 @@ const TOOL_WORDS = {
   show_page: "Show page",
   draft_message: "Draft message",
   ask_user: "Ask you",
+  ask_secret: "Ask you for a secret",
   finish: "Finish",
   use_tools: "Turn on more actions",
   schedule_create: "Add schedule",
