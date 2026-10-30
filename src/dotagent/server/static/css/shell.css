@@ -757,9 +757,16 @@
   padding: var(--space-1) 0;
   border-radius: var(--radius-control);
   color: var(--text-2);
-  font-size: var(--text-xs);
-  line-height: var(--leading-xs);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
   text-decoration: none;
+}
+
+/* A phone reads the names at its reading size (item 329), on tiles wide enough for a long word at it. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .side-agent-face {
+    width: 88px;
+  }
 }
 
 .side-agent-face:hover {
