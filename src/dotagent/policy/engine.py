@@ -50,7 +50,7 @@ _TRADE_REASON: str = (
     "Dot asks before it places an order with real money on your trading account, whatever your rules say"
 )
 # The sources of a question that only the owner answers, whatever the approval mode.
-_OWNERS_SOURCES: frozenset[str] = frozenset({"own_files", "vault", "trade"})
+_OWNERS_SOURCES: frozenset[str] = frozenset({"own_files", "vault", "trade", "initiative"})
 _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset(
     {"privilege", "system_settings", "public_post", "external_send", "protected_read"}
 )
@@ -152,6 +152,26 @@ def guard(info: ActionInfo) -> Decision | None:
         reason="Dot asks before a message or a post in your name, whatever your rules say",
         rule_id=None,
     )
+
+
+# What waits for the owner in a chat Dot opened on its own initiative, in every mode, yolo's too (item 850, the
+# owner's word of 2026-10-30: "yolo yine bir şey sormasın ama … kritik durumlarda", of Dot's initiative alone): a
+# message sent for them, a post in their name, a project's change put live.
+_INITIATIVE_FLAGS: frozenset[Flag] = frozenset({"message_send", "public_post", "release"})
+_INITIATIVE_REASON: str = (
+    "On its own initiative, Dot asks before it sends a message for you, posts in your name or puts a project's change "
+    "live, in every mode"
+)
+
+
+def initiative_guard(info: ActionInfo) -> Decision | None:
+    """The owner's question for a step of a chat Dot opened on its own initiative that sends a message for them, posts
+    in their name or puts a project's change live (item 850), whatever the run's approval mode: never waived, never a
+    review model's to answer, and no rule of theirs lets it through; a refusal or a hand-off stands (the gate,
+    :meth:`dotagent.agent.gate.RunGate._decide_spent`). None for any other step."""
+    if not _intersect(info, _INITIATIVE_FLAGS):
+        return None
+    return Decision(verdict="ask", source="initiative", reason=_INITIATIVE_REASON, rule_id=None)
 
 
 def vault_guard(info: ActionInfo) -> Decision | None:

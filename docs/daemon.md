@@ -84,8 +84,8 @@ that shows, under the bar, the line that says what the page is for (item 848: Ag
 Handoffs, Diagnostics and the licences open on what they hold), and so do the parts of the Agents page and Customize's
 proposals; a row of the Memory, Vault and Schedules pages shows one action (a schedule's switch) and keeps the rest in
 its **…**. Every icon draws about the same area at its size, with the same stroke (item 849): a "+", a speaker or
-a microphone no smaller than a copy beside it, each shape seen through a frame of its own (`icons.js`). The sections (Chats, and a channel's) fold
-on a click of their label, and the folds are kept between visits. The sidebar's head holds
+a microphone no smaller than a copy beside it, each shape seen through a frame of its own (`icons.js`). The sections
+(Chats, and a channel's) fold on a click of their label, and the folds are kept between visits. The sidebar's head holds
 the button that folds it away, at its left, and the **+** of a new chat. **Select** turns the list into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
 and approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to

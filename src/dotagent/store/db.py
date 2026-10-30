@@ -5317,6 +5317,12 @@ class Store:
         )
         await self._db.commit()
 
+    async def opened_by(self, thread_id: str) -> str | None:
+        """The source the chat ``thread_id`` was made with, which nothing changes, a rewind neither: ``initiative`` for
+        a chat Dot opened on its own initiative (item 850); None for no chat."""
+        row = await self._one("SELECT source FROM threads WHERE id = ?", (thread_id,))
+        return None if row is None else str(row["source"])
+
     async def schedule_of_thread(self, thread_id: str) -> str | None:
         """The schedule whose chat ``thread_id`` is (item 257), None for a chat of no schedule or one not there."""
         row = await self._one("SELECT schedule_id FROM threads WHERE id = ?", (thread_id,))

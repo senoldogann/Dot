@@ -60,6 +60,10 @@ Flag = Literal[
     # owner says yes, in every mode but yolo, never a review model's to answer (``policy.engine.trade_guard``). Not
     # ``financial``, whose hand-off leaves the step to the owner's own hands: Dot is the one that places the order.
     "trade",
+    # The action puts a project's change live (item 850): a deploy to production, a merge of a pull request, a push
+    # that names the main branch, as the shell guard reads their names. It asks the owner in a chat Dot opened on its
+    # own initiative, in every mode (``policy.engine.initiative_guard``), and nowhere else.
+    "release",
 ]
 
 Preset = Literal["aggressive", "balanced", "cautious"]
@@ -80,6 +84,8 @@ DecisionSource = Literal[
     "supervised",
     "pace",
     "spend",
+    # The owner's question for a message, a post or a release in a chat of Dot's own initiative (item 850).
+    "initiative",
 ]
 
 # Who answers a question the policy raised, strictest first: ``supervised`` the user, who is also asked before every

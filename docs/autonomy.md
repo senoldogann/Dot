@@ -221,7 +221,9 @@ now refuses or hands it to you, or the run's untrusted reading, still stops it. 
 (a `dotx` run works there) is taken back and the card stays. Rewinding the chat to before the run that kept it takes an
 unused yes back too. Skip on a kept step, either kind, holds in that conversation: the same step is refused at once,
 with no card, until you write there again (a message of yours, or a run you start). Any other question still counts as a
-refusal when nobody answers, and nothing is kept in `yolo`, which asks nothing, or in an eval. A delegated run keeps its
+refusal when nobody answers, and nothing is kept in `yolo`, which asks nothing, or in an eval; but in a chat Dot opened
+on its own initiative a `yolo` run asks its release and keeps it as a run that asks does, and a message or a post there
+is asked, never kept (item 850). A delegated run keeps its
 steps where the run that delegated it does (item 485): the card is on the delegated run's page and in the Activity list,
 the step is the chat's of the run at the top, and your answer reaches that run, while it works, or else a run that goes
 on from its goal in its chat (tainted as any of the runs it goes on from ended), which may do an allowed step itself or
@@ -387,11 +389,11 @@ leave `lessons_failed` with why on the run's page, skill work that failed `playb
 runs of each. The card of a run's lessons arrives folded (item 374); its head says "could not be drawn" in red, or how
 many lessons wait for your decision in amber, else how many there are, and opened it shows why, or the lessons.
 
-**The reflection tidies the notes and forgets none (item 584).** In the same night it rests the lessons that say what
-a rule of the adopted habits or tool guidance says already (log line `lesson_retired`, reason `habit`); it shows the
-review model the notes that are at least `[memory] merge_similarity` (0.80) close in meaning and merges the ones it
-says are the same, at most `merges_per_night` (20) a night (the merged note keeps one source's words, the sources
-rest whole, and **Undo the merge**, in the note's **…** on the Memory page, brings them back); it counts the notes that rested for
+**The reflection tidies the notes and forgets none (item 584).** In the same night it rests the lessons that say what a
+rule of the adopted habits or tool guidance says already (log line `lesson_retired`, reason `habit`); it shows the
+review model the notes that are at least `[memory] merge_similarity` (0.80) close in meaning and merges the ones it says
+are the same, at most `merges_per_night` (20) a night (the merged note keeps one source's words, the sources rest whole,
+and **Undo the merge**, in the note's **…** on the Memory page, brings them back); it counts the notes that rested for
 `forget_after_days` (90) as proposals for you to forget or keep, and forgets none; and it deletes from the trash the
 notes you forgot more than `trash_days` (30) ago, the only thing it deletes. A note you wrote, a lesson you saved, a
 pinned note (the standing notes, a `core` note you wrote or pinned, among them) and a journal are never merged, rested

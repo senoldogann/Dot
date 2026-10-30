@@ -149,6 +149,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   offer any number of tools. The groups a grouped run has on (those its chat used, the servers picked for its message,
   those it turns on) may still bring a request past that; it then fails with the provider's error. The side panel's Task
   tab shows under Set up the groups a grouped run starts with, why it is grouped, and each group it turns on.
+- Both prompts tell every run four rules of work in the user's projects (item 851):
+  - in a project outside its workspace, work in a git worktree of its own, never in the main checkout;
+  - put a site or an app live only through the project's own release (its CI), never by hand and never from a build
+    made for local testing;
+  - say of the user's own products only what their source says, and mark what it could not check as not verified;
+  - keep to the plan and the timing it wrote, or say first that it departs from them.
 - `prompt` in `[agent]` decides how much the system prompt says (item 280). `full`, the default, says how to work and
   each kind of tool at length (the web, the browser, the desktop, memory, schedules). `lean` keeps the rules of trust
   and safety, of hesitating and of how a run ends as `full` has them, word for word where they are the same rule, and
