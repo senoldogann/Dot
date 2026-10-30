@@ -193,7 +193,8 @@ extra checker (the typed judge) off, add or switch on a rule that lets steps thr
 switch off a rule that asks, or move any rule; what narrows (a rule that asks, the safe box on) it still does. What is
 shown or connected on the Mac alone (the eye of the vault, 1Password, a sign-in of Google or Microsoft, the microphone's
 pane of System Settings) answers the installation's token alone, never a phone's key, whatever address a phone's request
-names. `yolo`, which asks nothing, is yours to use from the phone as from the Mac: a phone's key can start a run, a chat
+names. `yolo`, which asks nothing but a payment, a message or mail and a public post in a chat you opened (item 860), is
+yours to use from the phone as from the Mac: a phone's key can start a run, a chat
 or a campaign in `yolo`, make a schedule, a loop of a chat (`/loop`) or an agent kept in `yolo`, switch one on or let
 one go on, and what such a run does is not held by these limits (it may do whatever your account may). Removing a phone
 does not undo what it did: a phone that may have been used against you is removed, the installation's key made new as

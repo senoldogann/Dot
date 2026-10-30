@@ -9,8 +9,9 @@ it lets a run do as much as by how it reads.
 
 - Goal: work on a goal until it is done, acting without asking, but stop for what it must not decide alone (money,
   credentials, public posts, messages sent for the owner, privilege, system settings) — in every mode but `yolo`, which
-  asks nothing at all (item 443), save in a chat Dot opened on its own initiative, where a message, a post or a release
-  waits for the owner in every mode (item 850) — record everything it does, and stop at once when told to.
+  asks nothing (item 443) but a payment, a message or mail and a public post in a chat the owner opened (item 860), and
+  in a chat Dot opened on its own initiative a message, a post or a release, in every mode (item 850) — record
+  everything it does, and stop at once when told to.
   [Safety](docs/safety.md) is the contract.
 - Non-goal: any platform but macOS (it depends on PyObjC and drives macOS's own applications).
 

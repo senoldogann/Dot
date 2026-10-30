@@ -298,10 +298,25 @@ trading off.
    filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, except that in `auto` you answer
    it, not the review model, and so is one of Dot's own vault (item 621, below), and an order with real money on your
    trading account (`trade`, item 763, [Trading](trading.md)), which Dot places on your yes. A `yolo` run asks nothing
-   and makes the step, its record keeping the reason it would have asked for (item 443). In a chat Dot opened on its
-   own initiative it does not (item 850): a message, a post and a `release` there wait for your own yes in every mode,
-   `yolo`'s and `auto`'s too, never the review model's, and no rule of yours that allows them answers for you;
-   [Proactive](proactive.md) says how.
+   else and makes the step, its record keeping the reason it would have asked for (item 443), but in a chat you opened a
+   payment, a message or mail sent for you and a public post are yours there too (item 860, your word: "sadece e-posta
+   gönderme ya da ödeme yapma gibi şeyler bana sorsun"), whatever started the run in it, a schedule that a run of the
+   chat made among them. While you are there (a run of yours, or the one that tells the chat its command in the
+   background ended), a payment is handed to you, as in every mode that asks, one within a cap you pre-approved for its
+   site asks your yes, as in `ask`, and a message or a post asks your yes; one you do not answer in time is refused. In
+   a run that a schedule, a watcher or a notice started there, which nobody watches, the review model judges a message
+   or a post against your words, lawful, harmless and called for ("legal ise, tehlike arz etmiyorsa ve bir amaç içinse
+   yollasın; ajanın niyeti önemli"): its yes sends it, its no refuses it, and what it cannot tell comes to you; a
+   payment is still handed to you. Its words are the goal of the schedule, which a run of the chat may have written
+   (`schedule_create`); the rule of lawful and harmless holds whatever it says, and a run that read outside content is
+   checked before it makes a schedule (item 525). Such a run resumed after a restart is taken as yours, there to
+   answer: its message waits for your yes. No rule of yours answers for you. A chat a schedule, a watcher, a notice, the
+   reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
+   Schedules page runs in a chat of its own). A delegated run, an agent's too, is its parent's. Everything else
+   (commands, MCP tools, files, the web, a release, a trade within its limits) runs in `yolo` without a question. In a
+   chat Dot opened on its own initiative (item 850): a message, a post and a `release` there wait for your own yes in
+   every mode, `yolo`'s and `auto`'s too, never the review model's, and no rule of yours that allows them answers for
+   you; [Proactive](proactive.md) says how.
    - `release` is a project's change put live. The guard reads it from these command names:
      - `wrangler deploy`, `wrangler pages deploy`, `wrangler versions deploy` and their `publish`;
      - `vercel` with `--prod` (or `--target production`) and `vercel promote`;
@@ -559,8 +574,9 @@ the tool list whole up to 1,200 characters and has the same author. Nothing is a
 reads them once, when the server connects. `[agent] mcp_purposes = false` keeps every word of a server out of the
 instructions.
 
-**Outside content in yolo** (item 525). A `yolo` run asks nothing, and a run marked untrusted may be steered by what a
-stranger wrote. Two checks hold for such a run, and neither asks you:
+**Outside content in yolo** (item 525). A `yolo` run asks nothing but the steps of items 850 and 860 (a payment, a
+message or a post in a chat you opened, and those of a chat of Dot's own initiative), and a run marked untrusted may be
+steered by what a stranger wrote. Two checks hold for such a run, and neither asks you:
 
 - *The taint check.* Before a yolo run marked untrusted does a step an instruction planted in what it read would be
   after (a message, a post, an upload or data sent out, a payment, an order with real money on your trading account
@@ -1133,7 +1149,8 @@ nobody answered are not; and an action whose card shows less than all of it is a
 what it writes or types (a file's text, a field's), and a card that cut its text (`…`, an MCP call's long arguments
 among them), told a text by its length (`(42 chars)`) or masked a secret (`***`), since two actions such a card cannot
 tell apart are not one. This is the default approval mode, `ask`, and `supervised` asks before every change as well; in
-`auto` the questions of the policy are answered for you, and a `yolo` run asks nothing at all (item 443). In every mode
+`auto` the questions of the policy are answered for you, and a `yolo` run asks nothing (item 443) but a payment, a
+message or mail sent for you and a public post, in a chat you opened (item 860). In every mode
 that asks (item 429), money and credentials are handed to you on a card in the chat, and a message or a post in your
 name waits there for your yes in `supervised` and `ask`, for the review model's in `auto`. In a chat Dot opened on its
 own initiative, a message, a post or a release waits for your own yes in every mode, `yolo` and `auto` too (item 850).

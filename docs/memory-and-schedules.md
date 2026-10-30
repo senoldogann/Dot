@@ -300,8 +300,10 @@ one's choices. On a phone the dialog is a sheet of the window's width whose foot
 **Run now** (in a schedule's row's **…**, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
 once, switched on or off, due or not; the choice says, where the pointer rests on it, that it does real work, as at its time, with the approvals its run
 takes, and the run's page opens, where Stop is. The run goes as a firing goes: unattended, with the schedule's own
-choices (a yolo schedule's run asks nothing), the digest of its earlier runs, in a chat of its own titled `<name> ·
-<time> · by hand` (or in the schedule's chat, with "the same chat"), and its first message says it was started by hand.
+choices (a yolo schedule's run asks nothing in a chat of its own; in one of your chats, with "the same chat", the review
+model judges its messages and posts and a payment is handed to you, item 860), the digest of its earlier runs, in a
+chat of its own titled `<name> · <time> · by hand` (or in the schedule's chat, with "the same chat"), and its first
+message says it was started by hand.
 Nothing of when the schedule fires next nor of whether it is switched on changes: a one-time schedule is still due at
 its moment. It does not start while the emergency stop is engaged, nor while a run of the schedule is at work or being
 started (409), in a daemon that runs no scheduler either; a repeating schedule's firing whose time comes meanwhile is

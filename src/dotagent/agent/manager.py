@@ -110,7 +110,7 @@ from dotagent.evals import EVAL_SOURCE
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.llm.types import ONE_MESSAGE_LEVELS, Effort, ModelInfo, OneMessage, Speed, user_message
-from dotagent.memory.service import SavedMemory
+from dotagent.memory.service import REFLECTION_SOURCE, SavedMemory
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
@@ -199,6 +199,20 @@ _THREAD_INSTRUCTION_RUNS: int = 30
 # 715), and a resumed run, whose goal is the goal of the run it resumes, which counts or not as that run's does (the
 # code review of item 715: a resume of Dot's own run made its words the owner's).
 _NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset({BACKGROUND_SOURCE, INITIATIVE_SOURCE, RESUME_SOURCE})
+# The sources of runs and chats nobody watches or that are Dot's own (item 860): a chat one of them opened is not the
+# owner's, and a run one of them started in the owner's chat has no owner there to answer. Not the run that tells a
+# chat its command in the background ended (``BACKGROUND_SOURCE``): it goes on with the owner's chat, under their eyes
+# (the independent review of item 860: a mail its run had put off until a command ended went out unasked).
+_NOBODY_WATCHES: frozenset[str] = frozenset(
+    {
+        SCHEDULE_SOURCE,
+        WATCHER_SOURCE,
+        NOTICE_SOURCE,
+        REFLECTION_SOURCE,
+        EVAL_SOURCE,
+        INITIATIVE_SOURCE,
+    }
+)
 # The approval modes from the strictest to the loosest: the user answers before every change, the user answers, the
 # review model answers, no one is asked.
 _APPROVALS_STRICTEST_FIRST: tuple[ApprovalMode, ...] = ("supervised", "ask", "auto", "yolo")
@@ -2635,10 +2649,27 @@ class RunManager:
             )
             # A chat Dot opened on its own initiative (item 850): its runs, the ones the owner's answers start there
             # among them, and their helpers ask the owner before a message, a post or a release, in every mode.
+            opener: str | None = None if parent_run_id is not None else await runtime.store.opened_by(thread_id)
             owners_word: bool = (
                 (parent is not None and parent.gate.owners_word)
                 if parent_run_id is not None
-                else source == INITIATIVE_SOURCE or await runtime.store.opened_by(thread_id) == INITIATIVE_SOURCE
+                else source == INITIATIVE_SOURCE or opener == INITIATIVE_SOURCE
+            )
+            # A chat the owner opened (item 860): in yolo its payments, messages and posts are theirs, whatever started
+            # the run there (a schedule a run of the chat made goes on in it: the third pre-push review of item 860). A
+            # chat of a schedule, a watcher or Dot's own is not. A delegated run takes its parent's.
+            owners_chat: bool = (
+                (parent is not None and parent.gate.owners_chat)
+                if parent_run_id is not None
+                else not owners_word and opener not in _NOBODY_WATCHES
+            )
+            # Whether the owner is there to answer (item 860): a run of theirs is; one a schedule, a watcher or a notice
+            # started is not, and the review model judges its messages and posts (the owner's word of 2026-10-30:
+            # "e-posta … legal ise, tehlike arz etmiyorsa ve bir amaç içinse yollasın; ajanın niyeti önemli").
+            owner_there: bool = (
+                (parent is not None and parent.gate.owner_there)
+                if parent_run_id is not None
+                else source not in _NOBODY_WATCHES
             )
             gate: RunGate = RunGate(
                 runtime.store,
@@ -2661,6 +2692,8 @@ class RunManager:
                 runtime.site_locks,
                 taint_check=runtime.config.policy.yolo_taint_check,
                 owners_word=owners_word,
+                owners_chat=owners_chat,
+                owner_there=owner_there,
             )
             if starts_tainted:
                 gate.taint()

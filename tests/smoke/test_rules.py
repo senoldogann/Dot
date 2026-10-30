@@ -796,7 +796,9 @@ async def test_the_card_of_the_rules_offers_sentences_while_it_is_empty_and_says
                 await expect(foot).to_contain_text(
                     "Dot's built-in safety checks come first, and your rules cannot switch"
                 )
-                await expect(foot).to_contain_text("YOLO mode, which asks nothing at all, is the one exception.")
+                await expect(foot).to_contain_text(
+                    "YOLO mode is the one exception: there Dot asks only before a payment"
+                )
                 # Advanced is shut; the foot's way to it opens it.
                 advanced: Locator = page.locator("details.rule-advanced")
                 await expect(advanced).not_to_have_attribute("open", "")

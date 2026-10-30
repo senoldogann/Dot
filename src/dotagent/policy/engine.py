@@ -50,7 +50,7 @@ _TRADE_REASON: str = (
     "Dot asks before it places an order with real money on your trading account, whatever your rules say"
 )
 # The sources of a question that only the owner answers, whatever the approval mode.
-_OWNERS_SOURCES: frozenset[str] = frozenset({"own_files", "vault", "trade", "initiative"})
+_OWNERS_SOURCES: frozenset[str] = frozenset({"own_files", "vault", "trade", "initiative", "owner_asks"})
 _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset(
     {"privilege", "system_settings", "public_post", "external_send", "protected_read"}
 )
@@ -172,6 +172,23 @@ def initiative_guard(info: ActionInfo) -> Decision | None:
     if not _intersect(info, _INITIATIVE_FLAGS):
         return None
     return Decision(verdict="ask", source="initiative", reason=_INITIATIVE_REASON, rule_id=None)
+
+
+# What a yolo run of a chat the owner opened asks them (item 860, the owner's word of 2026-10-30: "sadece e-posta
+# gönderme ya da ödeme yapma gibi şeyler … bana sorsun"): a payment, a message or mail sent for them, a public post.
+_OWNERS_FLAGS: frozenset[Flag] = frozenset({"financial", "message_send", "public_post"})
+OWNERS_REASON: str = "In yolo too, Dot asks you before it pays, sends a message or mail for you or posts in your name"
+
+
+def owners_guard(info: ActionInfo) -> Decision | None:
+    """The owner's question for a step of a yolo run of a chat they opened that pays, sends a message or mail for them
+    or posts in their name (item 860): never waived, never a review model's to answer, and no rule of theirs lets it
+    through; a refusal or a hand-off stands (the gate). A payment is handed to them by the money stop, as in every mode
+    that asks; one within the caps they pre-approved for its site is a question instead (:mod:`dotagent.policy.spend`),
+    theirs as in ``ask``. None for any other step: yolo asks nothing else (item 443)."""
+    if not _intersect(info, _OWNERS_FLAGS):
+        return None
+    return Decision(verdict="ask", source="owner_asks", reason=OWNERS_REASON, rule_id=None)
 
 
 def vault_guard(info: ActionInfo) -> Decision | None:
