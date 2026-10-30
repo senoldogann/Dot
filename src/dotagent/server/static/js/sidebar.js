@@ -301,7 +301,8 @@ function chatLink(chat, onNavigate, face, children, waits = null) {
     chat.team === null || chat.team === undefined ? undefined : `with ${chat.team.name}`,
     waits === null ? STATUS_WORD[chat.latest_status] : `${WAITS_WORDS.toLowerCase()}: ${waits.map((row) => `${row.title}, ${row.detail}`).join("; ")}`,
     helperWords(children),
-    chat.unread === true ? "unread" : undefined,
+    // While it waits its row shows no dot of an unread chat, so its name says none either (the pre-push review).
+    chat.unread === true && waits === null ? "unread" : undefined,
     loop === null ? undefined : loop.toLowerCase(),
     campaignWords(chat)?.toLowerCase(),
   ]

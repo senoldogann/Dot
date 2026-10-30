@@ -126,8 +126,8 @@ of a campaign among them, is drawn as a chat is (item 705): its creature, its na
 with how long at the right; a session wears the campaign's target at the foot of its creature. They are `GET
 /api/activity`, which carries the runs that ended today too, for the home's **Today** strip; the Activity page that
 showed it all is gone (item 364), and its address leads to the home. A run that ended shows how long
-it took and what it cost in tokens. The sections and the strip follow the lifecycle stream, so a run moves between the
-sections the moment it starts, waits, is taken over or
+it took and what it cost in tokens. The rows of what waits and what works, and the strip, follow the lifecycle
+stream, so a run moves between them the moment it starts, waits, is taken over or
 ends. The stream replays nothing after a break of the connection (the network dropped, the daemon restarted), so once it
 is back every page that follows it, the run's page and its queue among them, reads again what it shows; so does every
 page when the stream fell so far behind that events were lost (`resync`). A page that cannot read again keeps what it
