@@ -301,48 +301,119 @@ async def test_the_writer_keeps_a_skill_answered_in_text_at_the_first_answer() -
     assert len(provider.asked) == 1
 
 
-def test_a_verdicts_text_past_its_bound_is_cut_there_rather_than_refused() -> None:
+def _called(tool: str, arguments: JsonObject) -> ModelReply:
+    """A reply that calls ``tool`` with ``arguments``."""
+    return ModelReply(
+        model="scripted",
+        text="",
+        thinking="",
+        tool_calls=(ToolCall(id="call-1", name=tool, arguments=arguments),),
+        usage=Usage(input_tokens=1, output_tokens=1, cached_tokens=0),
+        finish="tool_calls",
+        raw_finish="tool_use",
+        raw=(),
+    )
+
+
+def _proposal(summary: str, moment: str = "step 3 read the wrong shelf") -> JsonObject:
+    return {"keep": False, "habits": "Plan first.", "tool_guidance": None, "moments": [moment], "summary": summary}
+
+
+def test_a_verdicts_text_past_its_bound_is_cut_there_when_it_holds_nothing_a_gate_refuses() -> None:
     """Item 840: the night's step of 2026-10-30 failed as "the proposer failed in the domain scope: the arguments of
     propose_harness are not a valid verdict (summary: String should have at most 120 characters)", DeepSeek V4.1 Flash
-    writing past the bound twice, and a skill was lost the same way on its description's 200. The text is cut at its
-    bound with an ellipsis; the tool's schema still tells the model the bound."""
-    from dotagent.agent.review import HarnessProposal
+    writing past the bound twice, and a skill was lost the same way on its description's 200. A text past its bound is
+    cut there with an ellipsis when, whole, it holds nothing the strictest gate of what is learned refuses; the tool's
+    schema still tells the model the bound."""
+    from dotagent.agent.review import PROPOSE_TOOL, HarnessProposal
 
     long_summary: str = (
         "Plan the shelves first, then " + "read each shelf with its own tool and say what was found " * 4
     )
-    proposal: HarnessProposal = HarnessProposal.model_validate(
-        {
-            "keep": False,
-            "habits": "Plan first.",
-            "tool_guidance": None,
-            "moments": ["step 3 read the wrong shelf"],
-            "summary": long_summary,
-        }
+    proposal: HarnessProposal = _verdict_from(
+        _called(PROPOSE_TOOL, _proposal(long_summary)), PROPOSE_TOOL, HarnessProposal, "ollama:deepseek", ()
     )
     assert len(proposal.summary) == 120
     assert proposal.summary.endswith("…")
     assert proposal.summary.startswith("Plan the shelves first, then read each shelf")
-    draft: PlaybookDraft = PlaybookDraft.model_validate(
-        {
-            "kind": "audit a shelf",
-            "description": "Reads every shelf and lists what is on it. " * 8,
-            "when": "A shelf to audit.",
-            "steps": ["Open the shelf."],
-            "parameters": [],
-        }
+    draft: PlaybookReply = _verdict_from(
+        _called(
+            PLAYBOOK_TOOL,
+            {
+                "kind": "audit a shelf",
+                "description": "Reads every shelf and lists what is on it. " * 8,
+                "when": "A shelf to audit.",
+                "steps": ["Open the shelf."],
+                "parameters": [],
+                "recurs": True,
+            },
+        ),
+        PLAYBOOK_TOOL,
+        PlaybookReply,
+        "ollama:deepseek",
+        (),
     )
     assert len(draft.description) == 200 and draft.description.endswith("…")
-    # A text within its bound is kept as written, and an empty one is still refused.
-    assert (
-        HarnessProposal.model_validate(
-            {"keep": True, "habits": None, "tool_guidance": None, "moments": [], "summary": "keep"}
-        ).summary
-        == "keep"
-    )
+    # Read plainly, the type still refuses a text past its bound, and a text within it is kept as written.
     with pytest.raises(ValidationError):
-        HarnessProposal.model_validate(
-            {"keep": True, "habits": None, "tool_guidance": None, "moments": [], "summary": " "}
+        HarnessProposal.model_validate(_proposal(long_summary))
+    assert HarnessProposal.model_validate(_proposal("Plan first")).summary == "Plan first"
+    assert HarnessProposal.model_json_schema()["properties"]["summary"]["maxLength"] == 120
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        "and its key is sk-ant-api03-" + "Q" * 40,
+        "the run read /Users/ada/Documents/shelves/inventory-of-the-shelves.csv",
+        "and the run wrote to ada@example.com about it",
+    ],
+)
+def test_a_text_past_its_bound_that_holds_what_a_gate_refuses_is_not_cut_but_asked_again(tail: str) -> None:
+    """Item 840's pre-push review: a cut made before the gates could keep the start of a secret, a path or an address
+    where it straddles the bound, which no gate then knew. Such a text is left whole and refused, as before, and so is
+    one the gate refuses for a value Dot holds; a verdict wrong in another way is not cut either."""
+    from dotagent.agent.review import PROPOSE_TOOL, HarnessProposal
+
+    summary: str = "Plan the shelves first and read each one with care, " * 2 + tail
+    assert len(summary) > 120
+    with pytest.raises(ProviderProtocolError) as raised:
+        _verdict_from(_called(PROPOSE_TOOL, _proposal(summary)), PROPOSE_TOOL, HarnessProposal, "m", ())
+    assert "summary: String should have at most 120 characters" in raised.value.message
+    held: str = "correct-horse-battery-staple-9"
+    with pytest.raises(ProviderProtocolError):
+        _verdict_from(
+            _called(PROPOSE_TOOL, _proposal("Plan the shelves first and read each one with care, " * 2 + held)),
+            PROPOSE_TOOL,
+            HarnessProposal,
+            "m",
+            (held,),
         )
-    schema = HarnessProposal.model_json_schema()
-    assert schema["properties"]["summary"]["maxLength"] == 120
+    wrong_too: JsonObject = {**_proposal("Plan the shelves first, " * 8), "keep": "maybe"}
+    with pytest.raises(ProviderProtocolError):
+        _verdict_from(_called(PROPOSE_TOOL, wrong_too), PROPOSE_TOOL, HarnessProposal, "m", ())
+
+
+def test_a_skills_kind_past_its_bound_is_not_cut_and_the_skill_is_asked_again() -> None:
+    """Item 840's security review: a skill's kind (its name, 60 characters) is no text that is cut; past its bound,
+    with a description past its own, the verdict is refused as a protocol error, which is asked again, never a bare
+    error of the type that would pass the retry by."""
+    with pytest.raises(ProviderProtocolError) as raised:
+        _verdict_from(
+            _called(
+                PLAYBOOK_TOOL,
+                {
+                    "kind": "audit every shelf of the shop and count what stands on each of them, then report",
+                    "description": "Reads every shelf and lists what is on it. " * 8,
+                    "when": "A shelf to audit.",
+                    "steps": ["Open the shelf."],
+                    "parameters": [],
+                    "recurs": True,
+                },
+            ),
+            PLAYBOOK_TOOL,
+            PlaybookReply,
+            "m",
+            (),
+        )
+    assert "kind: String should have at most 60 characters" in raised.value.message

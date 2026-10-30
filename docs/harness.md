@@ -310,10 +310,14 @@ conformance, fidelity, consistency, fitness and finish, never on length) and the
 (`write_experience`: what each edit did, and an experience only when an edit helped or hurt with evidence). An answer
 that breaks its rules (a habits or tool guidance text past the bounds, a change with no moment, an experience with no
 effect behind it) is asked once more with what was wrong (the fields and their problems, never a key the model made
-up, as the step says them when it fails), then the step fails and says so. A line of an answer past its bound (a
-summary's 120 characters, an edit's or a cue's 200, a moment's, a piece of evidence's or a lesson's 300, and so a
-skill's description's 200) is cut there with an ellipsis rather than refused (item 840: on 2026-10-30 DeepSeek V4.1
-Flash wrote a summary past 120 twice and the night's step failed, and a skill was lost on its description).
+up, as the step says them when it fails), then the step fails and says so. An answer whose only fault is a line past
+its bound (a summary's 120 characters, an edit's or a cue's 200, a moment's, a piece of evidence's or a lesson's 300,
+and so a skill's description's 200) is read with the line cut there with an ellipsis, when each such line, whole,
+passes the strictest gate of what is learned (no secret, of the values Dot holds or of a known form, no e-mail
+address, link, path in a home folder or account name, no line that imitates the prompt); otherwise it is asked again
+and refused as before, so that no cut keeps the start of what a gate would refuse (item 840: on 2026-10-30 DeepSeek
+V4.1 Flash wrote a summary past 120 twice and the night's step failed, and a skill was lost on its description). A
+skill's kind is its name and is never cut.
 `[harness] proposer`, `composer`, `selector` and `experience` name a model for each; "" is `[models] review`.
 `dotx harness propose RUN_ID [--scope invariant|domain]` asks the proposer about one run by hand and writes its
 candidate, whose notes keep the scope and the moments; `keep` writes nothing.

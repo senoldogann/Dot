@@ -23,7 +23,15 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Annotated, Literal
 
-from pydantic import BeforeValidator, Field, StringConstraints, ValidationError, field_validator, model_validator
+from pydantic import (
+    BeforeValidator,
+    Field,
+    StringConstraints,
+    ValidationError,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from dotagent.core.errors import (
     ConfigError,
@@ -35,6 +43,7 @@ from dotagent.core.errors import (
     ProviderTransportError,
 )
 from dotagent.core.jsonutil import parse_json_object
+from dotagent.core.learned_text import gate
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
@@ -456,14 +465,20 @@ _RULE_SYSTEM: str = (
 )
 
 
-def _clipped(limit: int) -> Callable[[object], object]:
-    """A text of a verdict cut at ``limit`` characters with an ellipsis, rather than refused (item 840): its bound keeps
-    a line short where it is shown and stored, and a model that writes past it (DeepSeek V4.1 Flash wrote a summary of
-    over 120 characters, twice, and the night's step failed; a skill's description of over 200, and the skill was
-    lost) has said what it meant. A value that is no text is left to the type to refuse."""
+# The validation context under which a verdict's texts past their bound are cut there (item 840; see `_verdict_from`).
+_CLIP: dict[str, bool] = {"clip": True}
 
-    def clip(value: object) -> object:
-        if not isinstance(value, str):
+
+def _clipped(limit: int) -> Callable[[object, ValidationInfo], object]:
+    """A text of a verdict cut at ``limit`` characters with an ellipsis, rather than refused (item 840), when the
+    verdict is read again under :data:`_CLIP`: its bound keeps a line short where it is shown and stored, and a model
+    that writes past it (DeepSeek V4.1 Flash wrote a summary of over 120 characters, twice, and the night's step failed;
+    a skill's description of over 200, and the skill was lost) has said what it meant. Read plainly, a text past its
+    bound is refused as before, so that what decides whether it may be cut sees it whole. A value that is no text is
+    left to the type to refuse."""
+
+    def clip(value: object, info: ValidationInfo) -> object:
+        if not isinstance(value, str) or info.context != _CLIP:
             return value
         stripped: str = value.strip()
         return stripped if len(stripped) <= limit else stripped[: limit - 1].rstrip() + "…"
@@ -471,15 +486,16 @@ def _clipped(limit: int) -> Callable[[object], object]:
     return clip
 
 
-# The texts of the verdicts, a line or a sentence each, bound and clipped at their bound (item 840).
+# The texts of the verdicts, a line or a sentence each, bound and cut at their bound when they may be (item 840). A
+# skill's kind is its name and is not one of them: cut, it would name another kind of work, so it is asked again.
 Text120 = Annotated[
-    str, BeforeValidator(_clipped(120)), StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120), BeforeValidator(_clipped(120))
 ]
 Text200 = Annotated[
-    str, BeforeValidator(_clipped(200)), StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200), BeforeValidator(_clipped(200))
 ]
 Text300 = Annotated[
-    str, BeforeValidator(_clipped(300)), StringConstraints(strip_whitespace=True, min_length=1, max_length=300)
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300), BeforeValidator(_clipped(300))
 ]
 
 
@@ -1418,9 +1434,37 @@ def text_arguments(text: str, tool: str) -> JsonObject | None:
     return parsed
 
 
-def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: type[V], model: str) -> V:
+def _cuttable(arguments: JsonObject, exc: ValidationError, secrets: Sequence[str]) -> bool:
+    """Whether a verdict that failed only for texts past their bound may be read with them cut there (item 840): each
+    such text, whole, passes the strictest gate a learned text has (:func:`dotagent.core.learned_text.gate` with the
+    links and the account names: no secret, of the values Dot holds or of a known form, no e-mail address, link, path in
+    a home folder or account name, no line that imitates the prompt). The cut is a prefix of a text that passed, so it
+    holds nothing the gates after it would refuse; a text that fails is left whole, and the verdict is refused and asked
+    again as before (the pre-push review: a cut made first could keep the start of a secret that no gate then knew)."""
+    errors = exc.errors(include_url=False, include_context=False, include_input=False)
+    if not errors or any(error["type"] != "string_too_long" for error in errors):
+        return False
+    for error in errors:
+        value: object = arguments
+        for part in error["loc"]:
+            if isinstance(value, dict) and isinstance(part, str):
+                value = value.get(part)
+            elif isinstance(value, list) and isinstance(part, int) and 0 <= part < len(value):
+                value = value[part]
+            else:
+                return False
+        if not isinstance(value, str) or gate(value, secrets) is not None:
+            return False
+    return True
+
+
+def _verdict_from[V: FrozenModel](
+    reply: ModelReply, tool: str, verdict_type: type[V], model: str, secrets: Sequence[str] = ()
+) -> V:
     """The verdict a reply carries; anything else is a protocol error that names what was wrong with it, but for a
-    reply the provider ended as a refusal, a :class:`ProviderRefusedError` that names the model."""
+    reply the provider ended as a refusal, a :class:`ProviderRefusedError` that names the model. A verdict whose only
+    fault is texts past their bound that may be cut (:func:`_cuttable`, against ``secrets``, the values Dot holds) is
+    read with them cut."""
     context: JsonObject = {
         "model": model,
         "finish": reply.raw_finish,
@@ -1450,10 +1494,21 @@ def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: ty
     try:
         return verdict_type.model_validate(arguments)
     except ValidationError as exc:
+        failed: ValidationError = exc
+        if _cuttable(arguments, exc, secrets):
+            try:
+                cut: V = verdict_type.model_validate(arguments, context=_CLIP)
+            except ValidationError as again:
+                # A bound that is no text of a verdict's (a skill's kind) is not cut: the verdict is refused and asked
+                # again as any other (the security review).
+                failed = again
+            else:
+                log.info("review_texts_cut", tool=tool, model=model, fields=len(exc.errors()))
+                return cut
         raise ProviderProtocolError(
-            f"the arguments of {tool} are not a valid verdict ({_fields_wrong(exc)})",
-            {**context, "errors": exc.json(include_url=False, include_context=False, include_input=False)},
-        ) from exc
+            f"the arguments of {tool} are not a valid verdict ({_fields_wrong(failed)})",
+            {**context, "errors": failed.json(include_url=False, include_context=False, include_input=False)},
+        ) from failed
 
 
 def _fields_wrong(exc: ValidationError) -> str:
@@ -1493,7 +1548,10 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
         raise ProviderTransportError(
             "the review model did not answer in time", {"model": ref.label, "timeout_s": question.timeout_s}
         ) from exc
-    return _verdict_from(reply, question.tool.name, question.verdict_type, ref.label)
+    # A text past its bound is cut only when, whole, it holds none of the values Dot holds (item 840): refused, as the
+    # gates of what is learned refuse, so `filled` is false.
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
+    return _verdict_from(reply, question.tool.name, question.verdict_type, ref.label, held)
 
 
 def _as_is[V: FrozenModel](verdict: V) -> V:
