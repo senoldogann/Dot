@@ -5,6 +5,7 @@ lights stand on that line, with the sidebar docked, closed and a drawer, and in 
 chats stands under the lights (item 577); a browser's page keeps its own bars."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -140,6 +141,10 @@ async def test_in_the_desktop_shell_the_bars_stand_on_the_line_of_the_lights(
             hide_left: float = await _left(hide)
             assert hide_left >= LIGHTS_ROOM
             await _on_line(page.locator(".stagebar-row"), LIGHTS_Y)
+            # The "+" of a new chat stands at the head's right, on the same line (item 834).
+            compose: Locator = page.locator("#sidebar .side-head").get_by_role("link", name="New chat")
+            await _on_line(compose, LIGHTS_Y)
+            assert await _left(compose) > hide_left
             await page.screenshot(path=str(tmp_path / "lights-1280-docked.png"), animations="disabled")
 
             # Closed, the top bar's opener takes the button's place, alone: the emergency stop stays in the sidebar
@@ -218,6 +223,24 @@ async def test_a_browsers_page_keeps_its_own_bars(runtime: Runtime, address: str
             await _on_line(hide, _BROWSER_HEAD_Y)
             assert abs(await _left(hide) - _BROWSER_LEFT) <= _TOLERANCE_PX
             await _on_line(page.locator(".stagebar-row"), _BROWSER_BAR_Y)
+            # The "+" of a new chat at the head's right, on its line, ends where the search below it ends (item 834);
+            # the row that said New chat under the search is gone, and the "+" opens a new chat.
+            head: Locator = page.locator("#sidebar .side-head")
+            compose: Locator = head.get_by_role("link", name="New chat")
+            await _on_line(compose, _BROWSER_HEAD_Y)
+            compose_box = await compose.bounding_box()
+            search_box = await page.locator("#sidebar .side-search").bounding_box()
+            assert compose_box is not None and search_box is not None
+            assert abs((compose_box["x"] + compose_box["width"]) - (search_box["x"] + search_box["width"])) <= 4, (
+                compose_box,
+                search_box,
+            )
+            await expect(compose).to_have_attribute("title", "New chat (⇧⌘O)")
+            await expect(page.locator("#sidebar").get_by_role("link", name="New chat")).to_have_count(1)
+            await page.goto(f"{address}/#/agents")
+            await compose.click()
+            await expect(page).to_have_url(re.compile(r"#/runs$"))
+            await expect(page.get_by_role("textbox", name="Goal")).to_be_focused()
             await hide.click()
             show: Locator = page.get_by_role("button", name="Show sidebar")
             await _on_line(show, _BROWSER_BAR_Y)

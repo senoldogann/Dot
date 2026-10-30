@@ -58,8 +58,9 @@ Folded over a chat you have not read, the label shows the accent's dot after its
 chat's, with its menu; Select and the arrow keys reach it, and a search shows what it finds in it, folded or not. A
 chat of it at work stands under Working like every chat (item 202) and comes back once the run ends, and one you
 pinned stays under Pinned.
-Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
-and **Schedules** (a page of its own since item 401); in the foot, the cog of **Settings**, **Connect apps** beside it
+Above the list: a search over the titles (⌘K or `/`) and the ways to **Agents**, **Campaigns** and **Schedules** (a
+page of its own since item 401); a new chat is the **+** at the right of the sidebar's head (⇧⌘O; item 834, where a
+row under the search said New chat), and on a phone the round **+** of the foot; in the foot, the cog of **Settings**, **Connect apps** beside it
 ([Connect apps](extending.md#connect-apps), items 492 and 545), which opens
 [Customize › Connectors](extending.md#customize--connectors), and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
@@ -67,8 +68,8 @@ sidebar's opener alone, the size of the sidebar's own buttons and of the side pa
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
 longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
 while it is being made or lost; what works stands under Working. The sections (Waiting for you, Working, Chats, and
-a channel's) fold on a click of their label, and the folds are kept between visits. The sidebar's head holds only
-the button that folds it away. **Select** turns the list into checkboxes, each chat keeping its creature and the mark of
+a channel's) fold on a click of their label, and the folds are kept between visits. The sidebar's head holds
+the button that folds it away, at its left, and the **+** of a new chat. **Select** turns the list into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
 and approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to
 end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a

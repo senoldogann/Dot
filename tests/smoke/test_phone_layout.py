@@ -253,6 +253,8 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     foot: Locator = sidebar.locator(".side-foot")
                     await expect(foot.get_by_role("searchbox", name="Search chats")).to_be_visible()
                     await expect(foot.get_by_role("link", name="New chat")).to_be_visible()
+                    # The "+" of a new chat is the foot's, at the thumb, and the head has none (item 834).
+                    await expect(sidebar.locator(".side-head .side-compose")).to_have_count(0)
                     await expect(foot.get_by_role("link", name="Settings")).to_be_visible()
                     await page.screenshot(path=str(tmp_path / f"chats-{scheme}.png"))
                     await context.close()

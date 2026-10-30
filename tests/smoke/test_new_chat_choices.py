@@ -154,10 +154,10 @@ async def _keep_going(page: Page) -> Locator:
 
 
 async def _away_and_back(page: Page, address: str) -> None:
-    """To another page, and back to a new chat by the sidebar's New chat."""
+    """To another page, and back to a new chat by the "+" of the sidebar's head."""
     await page.goto(f"{address}/#/agents")
     await expect(page.locator(GOAL)).to_have_count(0)
-    await page.locator(".side-btn", has_text="New chat").click()
+    await page.locator("#sidebar .side-head").get_by_role("link", name="New chat").click()
     await expect(page.locator(GOAL)).to_be_visible()
 
 
@@ -243,7 +243,7 @@ async def test_a_new_chat_keeps_its_choices_until_its_message_goes(
             await page.goto(f"{served}/#/agents")
             await expect(page.locator(GOAL)).to_have_count(0)
             await page.route("**/api/agents", lambda route: route.fulfill(status=503, body="not now"))
-            await page.locator(".side-btn", has_text="New chat").click()
+            await page.locator("#sidebar .side-head").get_by_role("link", name="New chat").click()
             await expect(page.locator(GOAL)).to_have_value(WORDS)
             await _pick(page, "mode", "Mode", "Research")
             await page.unroute("**/api/agents")
@@ -255,7 +255,7 @@ async def test_a_new_chat_keeps_its_choices_until_its_message_goes(
             await page.locator(GOAL).press("Enter")
             await page.wait_for_url(re.compile(r"#/runs/[^/]+$"))
             run_id: str = page.url.rpartition("/")[2]
-            await page.locator(".side-btn", has_text="New chat").click()
+            await page.locator("#sidebar .side-head").get_by_role("link", name="New chat").click()
             await expect(page.locator(GOAL)).to_have_value("")
             await expect(_pill(page, "mode")).to_be_hidden()
             await expect(_pill(page, "model")).to_contain_text("scripted")
