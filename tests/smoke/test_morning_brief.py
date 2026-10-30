@@ -25,6 +25,7 @@ from form_dialogs import (
 )
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 from pydantic import TypeAdapter
+from row_menu import choose
 from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
@@ -753,11 +754,11 @@ async def test_the_settings_open_in_a_dialog_set_the_brief_the_list_labels_it_an
                 dialog = await open_form(page, settings, "Morning brief")
                 await expect(dialog.get_by_text("Next ")).to_be_visible()
                 await closes_with_escape(page, dialog, settings)
-                # The list shows it as the brief, a read-only run; its pencil opens the settings, not a form in the row.
+                # The list shows it as the brief, a read-only run; its Edit opens the settings, not a form in the row.
                 row: Locator = page.locator(f'[data-schedule="{saved["schedule_id"]}"]')
                 await expect(row.locator(".badge", has_text="Brief")).to_be_visible()
                 await expect(row.locator(".chip", has_text="research")).to_be_visible()
-                await row.get_by_role("button", name="Edit Morning brief").click()
+                await choose(row, "Edit the brief's settings")
                 await expect(dialog).to_be_visible()
                 await expect(dialog.get_by_label("Time")).to_be_focused()
                 await expect(page.locator("[data-schedule-form]")).to_have_count(0)

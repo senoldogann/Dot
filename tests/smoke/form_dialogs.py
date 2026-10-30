@@ -8,6 +8,7 @@ a form moved back into the page, or a dialog whose foot goes out of sight, fails
 notice."""
 
 import re
+from collections.abc import Awaitable, Callable
 
 from playwright.async_api import Locator, Page, expect
 
@@ -38,8 +39,14 @@ async def settled_height(page: Page) -> int:
 async def open_form(page: Page, opener: Locator, title: str | re.Pattern[str]) -> Locator:
     """Press `opener`: the dialog named `title` opens over the page, which keeps its height, with the focus in a field
     or on a button of the dialog (never left on the page behind). Returns the dialog."""
+    return await open_form_by(page, opener.click, title)
+
+
+async def open_form_by(page: Page, press: Callable[[], Awaitable[None]], title: str | re.Pattern[str]) -> Locator:
+    """As :func:`open_form`, the dialog opened by `press`: a choice of a row's "…" (item 848), whose menu is opened
+    once the page holds still, since a scroll closes it."""
     before: int = await settled_height(page)
-    await opener.click()
+    await press()
     dialog: Locator = page.get_by_role("dialog", name=title)
     await expect(dialog).to_be_visible()
     assert await page_height(page) == before, "the page grew when the form opened: it stands in the page, not over it"

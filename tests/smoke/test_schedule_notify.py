@@ -13,6 +13,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from row_menu import choose
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -324,7 +325,7 @@ async def test_the_row_says_its_notifications_and_a_one_time_schedule_no_switch_
                 await expect(single.locator(".chip", has_text="Switch off")).to_have_count(0)
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"notify-{width}-{scheme}.png"), full_page=True)
-                await page.get_by_role("button", name="Edit told on trouble").click()
+                await choose(page.locator("[data-schedule]", has_text="told on trouble").first, "Edit")
                 level: Locator = page.get_by_role("combobox", name="Notifications")
                 await expect(level).to_have_value("problems")
                 await expect(level.locator("option")).to_have_text(

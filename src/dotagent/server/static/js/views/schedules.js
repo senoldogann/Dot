@@ -14,6 +14,7 @@ import { mountWatchers } from "../watcherspanel.js";
 import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
+import { moreButton } from "../menu.js";
 import { loopRhythm } from "../rhythm.js";
 import { emptyPanel, errorPanel, field, loadingPanel, markOpener, pageHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
@@ -226,17 +227,6 @@ function firingsList(firings) {
 
 function scheduleRow(view, handlers) {
   const { record, agent } = view;
-  const runNow = el(
-    "button",
-    {
-      class: "btn ghost sm icon-only",
-      type: "button",
-      title: runNowTitle(record, agent),
-      "aria-label": `Run ${record.name} now`,
-      onclick: () => handlers.onRunNow(record),
-    },
-    icon("play"),
-  );
   const open = handlers.firingsOpen(record.id);
   const firings = el("div", { class: "firings", hidden: !open, dataset: { firings: record.id } });
   const firingsToggle = el(
@@ -263,28 +253,17 @@ function scheduleRow(view, handlers) {
     disabled: done,
     onclick: () => handlers.onToggle(record),
   });
-  const edit = el(
-    "button",
-    {
-      class: "btn ghost sm icon-only",
-      type: "button",
-      title: view.brief ? "Edit the morning brief's settings" : "Edit this schedule",
-      "aria-label": `Edit ${record.name}`,
-      onclick: () => handlers.onEdit(view),
-    },
-    icon("pencil"),
-  );
-  const remove = el(
-    "button",
-    {
-      class: "btn ghost sm icon-only",
-      type: "button",
-      title: "Delete this schedule",
-      "aria-label": `Delete ${record.name}`,
-      onclick: () => handlers.onDelete(record),
-    },
-    icon("trash"),
-  );
+  // One action a row (item 848): its switch; its "…" holds Run now (whose words say it does real work, as at its time,
+  // under the approvals the row's chips name), Edit and Delete.
+  const more = moreButton({
+    name: record.name,
+    items: () => [
+      { label: "Run now", icon: "play", title: runNowTitle(record, agent), run: () => handlers.onRunNow(record) },
+      { label: view.brief ? "Edit the brief's settings" : "Edit", icon: "pencil", run: () => handlers.onEdit(view) },
+      "separator",
+      { label: "Delete", icon: "trash", danger: true, run: () => handlers.onDelete(record) },
+    ],
+  });
   let next = null;
   if (done) {
     // Grey, as it says nothing of how the run went: the badge of its last status beside it says that.
@@ -340,7 +319,7 @@ function scheduleRow(view, handlers) {
       ),
       firings,
     ),
-    el("div", { class: "row-actions" }, runNow, edit, remove),
+    el("div", { class: "row-actions" }, more),
   );
 }
 
@@ -848,7 +827,7 @@ export function mount(root, ctx) {
       size: "wide",
       ready: form.ready,
       // A schedule's row is painted again once it is saved: its Edit button is found anew.
-      returnFocus: () => (record === null ? addButton : holder.querySelector(`[data-schedule="${record.id}"] [aria-label^="Edit "]`)),
+      returnFocus: () => (record === null ? addButton : holder.querySelector(`[data-schedule="${record.id}"] .row-more`)),
       onSubmit: async () => {
         if ((await form.submit()) === false) {
           return false;
@@ -890,12 +869,11 @@ export function mount(root, ctx) {
   schedulerNote.hidden = status === null || status.scheduler_running;
   ctx.setTitle("Schedules");
   root.append(
-    pageHead("Schedules", "Goals that Dot works on by itself, once or on a repeating schedule.", null),
-    el(
-      "div",
-      { class: "note" },
-      icon("clock"),
-      el("span", null, "Schedules work only while Dot is running and this Mac is awake. A time that passes while Dot is off is skipped, not made up later."),
+    // What the page is for, and when schedules work, behind the (i) of the bar (item 848).
+    pageHead(
+      "Schedules",
+      "Goals that Dot works on by itself, once or on a repeating schedule. Schedules work only while Dot is running and this Mac is awake: a time that passes while Dot is off is skipped, not made up later.",
+      null,
     ),
     schedulerNote,
     el(

@@ -21,7 +21,7 @@ import { customizeHead } from "../customizehead.js";
 import { compact, el, foldSearch, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { tintMark } from "../marks.js";
-import { emptyPanel, errorPanel, loadingPanel, segmented } from "../panels.js";
+import { aboutToggle, emptyPanel, errorPanel, loadingPanel, segmented } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 /** The kinds of the gallery's plugins, in their words, each with the colour of themes.css (`--mark-<hue>`) of the tile
@@ -136,13 +136,15 @@ export function mount(root, ctx) {
     allGrid,
   );
   const scoutGrid = el("div", { class: "scout-grid" });
-  const scoutLine = el("p", { class: "hint scout-line" });
+  // What the nightly look does and found stands behind the (i) beside the part's name (item 848).
+  const scoutAbout = aboutToggle("", "About the proposals", "hint scout-line");
+  const scoutLine = scoutAbout.note;
   const lookButton = el("button", { class: "btn sm scout-look", type: "button" }, icon("refresh"), "Look now");
   lookButton.addEventListener("click", () => attempt(lookNow));
   const scoutSection = el(
     "section",
     { class: "gallery-section scout-section", dataset: { section: "proposals" }, hidden: true },
-    el("div", { class: "gallery-section-head" }, el("h2", { class: "section-label gallery-section-title" }, "Proposed for you"), lookButton),
+    el("div", { class: "gallery-section-head" }, el("h2", { class: "section-label gallery-section-title" }, "Proposed for you"), scoutAbout.button, lookButton),
     scoutLine,
     scoutGrid,
   );

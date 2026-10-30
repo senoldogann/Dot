@@ -79,7 +79,11 @@ the red square of the **Emergency stop**, which stays there while the sidebar is
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
 longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
-while it is being made or lost; what works stands at the top of the list. The sections (Chats, and a channel's) fold
+while it is being made or lost; what works stands at the top of the list. A page's name in the top bar has an (i) beside it
+that shows, under the bar, the line that says what the page is for (item 848: Agents, Schedules, Campaigns,
+Handoffs, Diagnostics and the licences open on what they hold), and so do the parts of the Agents page and Customize's
+proposals; a row of the Memory, Vault and Schedules pages shows one action (a schedule's switch) and keeps the rest in
+its **…**. The sections (Chats, and a channel's) fold
 on a click of their label, and the folds are kept between visits. The sidebar's head holds
 the button that folds it away, at its left, and the **+** of a new chat. **Select** turns the list into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
@@ -872,8 +876,9 @@ not in Dot's database; what Dot sees and what it cannot see is in [Safety](safet
 and billing addresses), and **New item**, a menu of **Login**, **Card**, **Contact** and **Import from CSV…**. An empty
 vault says "Nothing saved yet. Add a login, a card or contact details with New item." Each item is a row with its mark,
 its label (a login's site, a card's nickname or brand, a contact's label), the line under it (a login's username, a
-card's brand and last four digits, a contact's details) and **Edit** and **Delete** (which asks first). The list scrolls
-in its card and draws more rows as it is scrolled (item 768).
+card's brand and last four digits, a contact's details) and its **…**, which holds **Edit** and **Delete** (which asks
+first; item 848: a row shows one action). The list scrolls in its card and draws more rows as it is scrolled (item
+768).
 
 - **Select** (beside New item, item 768) turns each row into a tick: a click on the row ticks it, a shift-click ticks
   every row from the one ticked last, and a bar over the list says how many are ticked, with **Select all** (every item

@@ -16,10 +16,10 @@ from form_dialogs import (
     closes_with_escape,
     foot_is_in_view,
     keeps_inside_the_window,
-    open_form,
     shows_the_failure,
 )
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from row_menu import choose, more_of, open_row_form
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -153,11 +153,10 @@ async def test_a_note_is_kept_with_its_tags_from_the_card_at_the_head(
             "Dot already remembers exactly this note; the tags were merged into it."
         )
         await expect(row).to_have_count(1)
-        # A note is corrected in a dialog (item 615), and forgotten, from the buttons at the right of its row; the card
-        # at the head, the page's main input, stays where it is.
-        edit: Locator = row.get_by_role("button", name="Edit this note")
-        await expect(edit).to_have_attribute("aria-haspopup", "dialog")
-        dialog: Locator = await open_form(page, edit, "Edit note")
+        # A note is corrected in a dialog (item 615), and forgotten, from the "…" at the right of its row (item 848);
+        # the card at the head, the page's main input, stays where it is.
+        await expect(more_of(row)).to_have_attribute("aria-haspopup", "menu")
+        dialog: Locator = await open_row_form(page, row, "Edit", "Edit note")
         await expect(dialog.get_by_role("textbox", name="Note")).to_have_value(
             "My invoices live in ~/Documents/Invoices, one folder a year."
         )
@@ -180,7 +179,7 @@ async def test_a_note_is_kept_with_its_tags_from_the_card_at_the_head(
         await dialog.get_by_role("button", name="Save").click()
         await expect(dialog).to_have_count(0)
         await expect(row.locator(".chip")).to_have_text(["work", "invoices"])
-        await row.get_by_role("button", name="Forget this note").click()
+        await choose(row, "Forget")
         await page.get_by_role("dialog").get_by_role("button", name="Forget").click()
         await expect(page.get_by_text("Nothing remembered yet")).to_be_visible()
         await page.screenshot(path=tmp_path / "memory-empty-1280.png", full_page=True)
@@ -355,8 +354,8 @@ async def test_a_note_is_corrected_in_a_dialog_that_fits_a_phone_and_asks_before
         await page.goto(f"{address}/#/settings/memory")
         row: Locator = page.locator("[data-memory]")
         await expect(row).to_have_count(1)
-        edit: Locator = row.get_by_role("button", name="Edit this note")
-        dialog: Locator = await open_form(page, edit, "Edit note")
+        edit: Locator = more_of(row)
+        dialog: Locator = await open_row_form(page, row, "Edit", "Edit note")
         words: Locator = dialog.get_by_role("textbox", name="Note")
         await expect(words).to_have_value(note)
         await expect(words).to_be_focused()
@@ -364,10 +363,10 @@ async def test_a_note_is_corrected_in_a_dialog_that_fits_a_phone_and_asks_before
         await foot_is_in_view(page, dialog)
         await page.screenshot(path=tmp_path / "memory-edit-390.png")
         await closes_with_escape(page, dialog, edit)
-        dialog = await open_form(page, edit, "Edit note")
+        dialog = await open_row_form(page, row, "Edit", "Edit note")
         await asks_before_dropping(page, dialog, words, "The user likes strong coffee.")
         # No words, nothing to keep: the dialog stays and the note has the focus; the note is as it was.
-        dialog = await open_form(page, edit, "Edit note")
+        dialog = await open_row_form(page, row, "Edit", "Edit note")
         await words.fill("   ")
         await dialog.get_by_role("button", name="Save").click()
         await expect(dialog).to_be_visible()

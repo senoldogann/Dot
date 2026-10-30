@@ -37,10 +37,12 @@ the run or since, is handed again after the summary, as it stands then.
 The notes can be put in order, pinned, merged and forgotten with your yes (item 584). **Sort by**, over the notes'
 card and outside the choices and the search, lists them by when they were changed, when a run was last handed them,
 how often, or the least used first (the notes no run was handed come first); a search lists by how well a note
-matches, and the choice is off while it runs. The pin on a note's row keeps it awake: a pinned note never rests, and
+matches, and the choice is off while it runs. A note's row keeps its actions in its **…** (item 848): **Pin it** (or
+**Take the pin off**), **Edit**, **Undo the merge** for a merged note, and **Forget**. The pin keeps a note awake: a
+pinned note never rests, and
 pinning one that rests wakes it. A note that rests says since when ("Resting since 13 Oct"). A note the nightly
 reflection merged into another says "Merged into another note", and the note that merged them says "Merged from 2
-notes" and has **Undo this merge**: the notes it took in wake apart and the merged note goes to the trash.
+notes" and has **Undo the merge** in its **…**: the notes it took in wake apart and the merged note goes to the trash.
 **Proposed to forget** is a card above the notes, there while a note has rested for `[memory] forget_after_days`
 (90): each note with **Keep** (it wakes, and is proposed again only after as long a rest) and **Forget**, and
 **Forget all N**, which asks first and forgets the notes the card lists, all in sight in a box that scrolls. Nothing
@@ -144,7 +146,7 @@ dotx memory reindex      # embed every note again, for example after changing [m
   in a note is rewritten), the tags of all of them, their uses added up and the dates of the oldest and the newest,
   and the mark of outside content if any of them has it. Every source rests, whole, and names the merged note, so
   nothing is deleted; the merged note lists what it was made of (`merged_from`, with each source's run, dates, tags
-  and uses). **Undo this merge** (`POST /api/memories/{id}/unmerge`, `dotx memory unmerge`) wakes the sources, tags
+  and uses). **Undo the merge** (`POST /api/memories/{id}/unmerge`, `dotx memory unmerge`) wakes the sources, tags
   them `keep-separate` and puts the merged note in the trash. A note you wrote, a lesson you saved, a pinned note, a
   `core` note and a journal are never merged, and the merges never touch What Dot knows about you. A chat that was
   handed a note that was merged away since is handed the merged note in its place and told the old one is gone.
@@ -275,7 +277,8 @@ under it (item 571) is not a schedule: it looks at mail, calendar events and Git
 you care about.
 
 On Schedules the list is the page and **New schedule** opens the form, in a dialog over the page (item 615), as a
-schedule's pencil opens the same dialog filled. Past its third schedule, **Your schedules** scrolls inside (item 634):
+schedule's **Edit**, in its row's **…** (item 848: the row shows its switch, and the rest is a press away), opens the
+same dialog filled. Past its third schedule, **Your schedules** scrolls inside (item 634):
 it shows the first three and the top of the fourth, and it is never taller than most of the window (a phone's rows are
 taller). Painted again, as a switch or the end of a run paints it, it keeps where it was scrolled to. A schedule is
 created and edited
@@ -294,8 +297,8 @@ changed a field. A schedule the daemon refuses (a cron that fires every minute) 
 foot, with what you typed still there; a form made anew for each schedule starts from the defaults, not from the last
 one's choices. On a phone the dialog is a sheet of the window's width whose foot stays in view above the keyboard.
 
-**Run now** (the play button of a schedule's row, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
-once, switched on or off, due or not; the button says that it does real work, as at its time, with the approvals its run
+**Run now** (in a schedule's row's **…**, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
+once, switched on or off, due or not; the choice says, where the pointer rests on it, that it does real work, as at its time, with the approvals its run
 takes, and the run's page opens, where Stop is. The run goes as a firing goes: unattended, with the schedule's own
 choices (a yolo schedule's run asks nothing), the digest of its earlier runs, in a chat of its own titled `<name> ·
 <time> · by hand` (or in the schedule's chat, with "the same chat"), and its first message says it was started by hand.

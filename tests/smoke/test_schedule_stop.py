@@ -11,6 +11,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from row_menu import choose
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -276,7 +277,7 @@ async def test_the_row_says_how_many_runs_failed_in_a_row_and_the_form_offers_th
                 await expect(badge).to_have_attribute("title", "It switches itself off at 5 failed tasks in a row")
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"stop-{width}-{scheme}.png"), full_page=True)
-                await page.get_by_role("button", name="Edit watched").click()
+                await choose(page.locator("[data-schedule]", has_text="watched").first, "Edit")
                 limit: Locator = page.get_by_role("combobox", name="Switch off after")
                 await expect(limit).to_have_value("5")
                 await expect(limit.locator("option")).to_contain_text(["Default (Never)", "Never"])
