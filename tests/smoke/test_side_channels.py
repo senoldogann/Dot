@@ -1,11 +1,11 @@
 """The chats a channel's messages made (item 619) stand in a section of their own at the foot of the sidebar:
-"iMessage", with a count and no mark (item 828), outside the days. It folds like the Chats group does, keeps its fold
-over a reload and is not folded by Chats; a chat at work stands under Working, as every chat does (item 202), and comes
-back to its section; a search finds its chats folded or not; a pinned one stays under Pinned; choosing chats to delete
-and the arrow keys reach it. Scripted runs, served by a real server, wide and on a phone."""
+"iMessage", with a count and no mark (item 828), outside the days, its label where the days' labels stand. It folds
+and keeps its fold over a reload, and the days have no fold or heading of their own since item 855; a chat at work
+stands under Working, as every chat does (item 202), and comes back to its section; a search finds its chats folded or
+not; a pinned one stays under Pinned; choosing chats to delete and the arrow keys reach it. Scripted runs, served by a
+real server, wide and on a phone."""
 
 import asyncio
-import itertools
 import json
 import re
 import time
@@ -188,8 +188,8 @@ async def test_the_chats_of_a_channel_stand_at_the_foot_with_a_count_and_not_amo
         # The days hold the other chat alone; the channel's chat is not among them.
         await expect(days.locator(".side-group > .side-label")).to_have_text(["Today"])
         await expect(days.locator(".side-chat > a.side-run .side-run-goal")).to_have_text(["Plan the garden"])
-        # Its section: the name and how many, with no mark, its words where Chats' are (item 828), then its chat as any
-        # chat's row is, opening its latest run.
+        # Its section: the name and how many, with no mark, its label where the days' labels stand (items 828 and
+        # 855), then its chat as any chat's row is, opening its latest run.
         await expect(_section(page)).to_have_count(1)
         await expect(_section(page).locator("> .side-label")).to_have_text("iMessage 1")
         await expect(_section(page).locator("> .side-label svg")).to_have_count(1)  # the chevron alone
@@ -216,7 +216,7 @@ async def test_the_chats_of_a_channel_stand_at_the_foot_with_a_count_and_not_amo
         await page.context.close()
 
 
-async def test_the_section_folds_keeps_its_fold_over_a_reload_and_chats_does_not_fold_it(
+async def test_the_section_folds_and_keeps_its_fold_over_a_reload(
     runtime: Runtime, browser: Browser, address: str, garden: RunRecord, imessage: ThreadRecord, tmp_path: Path
 ) -> None:
     for width in _WIDTHS:
@@ -245,13 +245,8 @@ async def test_the_section_folds_keeps_its_fold_over_a_reload_and_chats_does_not
         await expect(_fold(page)).to_have_attribute("aria-expanded", "false")
         await expect(sidebar.locator(".side-runs .side-chat")).to_have_count(1)
         await expect(row).to_have_count(0)
-        # Folding Chats folds the days and leaves this section as it is, and the section's fold leaves Chats alone.
-        chats: Locator = sidebar.locator(".side-list-head .side-fold")
-        await chats.click()
-        await expect(sidebar.locator(".side-runs")).to_be_hidden()
-        await expect(_section(page)).to_be_visible()
-        await chats.click()
-        await expect(sidebar.locator(".side-runs")).to_be_visible()
+        # The days have no fold of their own (item 855): no "Chats" label to fold them.
+        await expect(sidebar.locator(".side-list-head .side-fold")).to_have_count(0)
         await _fold(page).click()
         await expect(_fold(page)).to_have_attribute("aria-expanded", "true")
         await expect(row).to_have_count(1)
@@ -396,24 +391,21 @@ async def test_choosing_chats_to_delete_includes_the_chat_of_a_channel_and_the_a
         await page.context.close()
 
 
-# Where the words of Chats' label and of another section's label begin, in pixels from the left.
+# Where a day's label and a section's label begin, in pixels from the left (item 855: they stand on one line).
 _WORDS_LEFT: str = """(selector) => {
-  const words = (button) => {
-    const text = [...button.childNodes].find((node) => node.nodeType === 3 && node.textContent.trim() !== "");
-    const range = document.createRange();
-    range.selectNodeContents(text);
-    return range.getBoundingClientRect().left;
-  };
-  const chats = document.querySelector("#sidebar .side-list-head .side-fold");
-  return [words(chats), words(document.querySelector(`#sidebar .side-channels ${selector}`))];
+  const day = document.querySelector("#sidebar .side-runs .side-group > .side-label");
+  const fold = document.querySelector(`#sidebar .side-channels ${selector}`);
+  const chevron = fold.querySelector("svg").getBoundingClientRect();
+  return [day.getBoundingClientRect().left, fold.closest(".side-label").getBoundingClientRect().left, chevron.left];
 }"""
 
 
 async def test_dots_own_chats_stand_folded_at_the_foot_and_open_as_the_owner_leaves_them(
     runtime: Runtime, browser: Browser, address: str, manager: RunManager, replies: Replies, garden: RunRecord
 ) -> None:
-    """Item 822: the chats of On its own (one a thing of Dot's list) and of the schedules left the days for sections of
-    their own at the foot, folded until the owner opens one; the days hold the owner's own chats."""
+    """Item 822: the chats of Dot's own initiative (one a thing of Dot's list) and of the schedules left the days for
+    the foot, folded until the owner opens them; since item 855 they are one section, Dot's work. The days hold the
+    owner's own chats."""
     own: ThreadRecord = await runtime.store.create_thread("Tidy the notes", "initiative")
     await _done(manager, replies, "On my own initiative: Tidy the notes", "initiative", own.id)
     timed: ThreadRecord = await runtime.store.create_thread("Morning check", "schedule")
@@ -426,49 +418,45 @@ async def test_dots_own_chats_stand_folded_at_the_foot_and_open_as_the_owner_lea
         goals: Locator = sidebar.locator(".side-runs .side-chat > a.side-run .side-run-goal")
         await expect(goals).not_to_contain_text(["Tidy the notes"])
         await expect(goals).not_to_contain_text(["Morning check"])
-        for channel, label, title in (
-            ("initiative", "On its own 1", "Tidy the notes"),
-            ("schedule", "Scheduled 1", "Morning check"),
-        ):
-            section: Locator = sidebar.locator(f".side-channels section[data-channel={channel}]")
-            fold: Locator = section.locator("> .side-label .side-fold")
-            await expect(section.locator("> .side-label")).to_have_text(label)
-            # No mark: its words stand where Chats' do (item 827).
-            await expect(section.locator("> .side-label svg")).to_have_count(1)  # the chevron alone
-            lefts: object = await page.evaluate(
-                _WORDS_LEFT, f"section[data-channel={channel}] > .side-label .side-fold"
-            )
-            assert isinstance(lefts, list) and abs(lefts[0] - lefts[1]) <= 0.5, lefts
-            await expect(fold).to_have_attribute("aria-expanded", "false")
-            await expect(section.locator(".side-chat")).to_have_count(0)
-            await fold.click()
-            await expect(fold).to_have_attribute("aria-expanded", "true")
-            await expect(section.locator(".side-chat a.side-run .side-run-goal")).to_have_text(title)
+        await expect(sidebar.locator(".side-channels section[data-channel=initiative]")).to_have_count(0)
+        await expect(sidebar.locator(".side-channels section[data-channel=schedule]")).to_have_count(0)
+        section: Locator = sidebar.locator(".side-channels section[data-channel=work]")
+        fold: Locator = section.locator("> .side-label .side-fold")
+        await expect(section.locator("> .side-label")).to_have_text("Dot's work 2")
+        # No mark: the chevron alone, its label where the days' labels stand (items 827 and 855).
+        await expect(section.locator("> .side-label svg")).to_have_count(1)
+        lefts: object = await page.evaluate(_WORDS_LEFT, "section[data-channel=work] > .side-label .side-fold")
+        assert isinstance(lefts, list) and abs(lefts[0] - lefts[1]) <= 0.5, lefts
+        await expect(fold).to_have_attribute("aria-expanded", "false")
+        await expect(section.locator(".side-chat")).to_have_count(0)
+        await fold.click()
+        await expect(fold).to_have_attribute("aria-expanded", "true")
+        await expect(section.locator(".side-chat a.side-run .side-run-goal")).to_have_text(
+            ["Morning check", "Tidy the notes"]
+        )
         folds: object = json.loads(await page.evaluate(f"() => localStorage.getItem('{_FOLDS}')"))
-        assert isinstance(folds, dict) and folds.get("initiative") is False and folds.get("schedule") is False
-        # Opened, they stay open over a reload, as the owner left them.
+        assert isinstance(folds, dict) and folds.get("work") is False
+        # Opened, it stays open over a reload, as the owner left it.
         await _reopen(page, width)
-        await expect(sidebar.locator(".side-channels section[data-channel=initiative] .side-chat")).to_have_count(1)
+        await expect(section.locator(".side-chat")).to_have_count(2)
         await _fits(page, f"{width} with Dot's own sections")
         await page.context.close()
 
 
-async def test_under_a_folded_chats_the_first_section_follows_as_one_section_follows_another(
+async def test_the_chats_have_no_heading_and_select_stands_on_the_line_of_their_first_label(
     browser: Browser, address: str, garden: RunRecord, imessage: ThreadRecord
 ) -> None:
-    """Item 827: with the days folded, the gap from Chats to the first section below is the gap from one section to the
-    next, not 11 px more."""
+    """Item 855: the owner found the sidebar busy. The chats have no "Chats" heading of their own, and Select, which
+    starts choosing chats to delete, stands at the right of the first day's label, on its line."""
     page: Page = await _open(browser, address, 1280)
     sidebar: Locator = page.locator("#sidebar")
-    await sidebar.locator(".side-list-head .side-fold").click()
-    await expect(sidebar.locator(".side-runs")).to_be_hidden()
-    tops: object = await page.evaluate(
-        """() => [document.querySelector('#sidebar .side-list-head .side-fold'),
-                 ...document.querySelectorAll('#sidebar .side-channels section > .side-label .side-fold')]
-                 .map((fold) => fold.getBoundingClientRect().top)"""
-    )
-    assert isinstance(tops, list) and len(tops) >= 3, tops
-    steps: list[float] = [after - before for before, after in itertools.pairwise(tops)]
-    assert abs(steps[0] - steps[1]) <= 4, steps
-    await sidebar.locator(".side-list-head .side-fold").click()
+    await expect(sidebar.get_by_role("heading", name="Chats")).to_have_count(0)
+    select: Locator = sidebar.get_by_role("button", name="Select", exact=True)
+    await expect(select).to_be_visible()
+    first: Locator = sidebar.locator(".side-runs .side-group > .side-label").first
+    label = await first.bounding_box()
+    button = await select.bounding_box()
+    assert label is not None and button is not None
+    assert abs((label["y"] + label["height"] / 2) - (button["y"] + button["height"] / 2)) <= 4, (label, button)
+    assert button["x"] > label["x"] + 100, (label, button)
     await page.context.close()

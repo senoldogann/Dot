@@ -157,9 +157,12 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             at: FloatRect = await _box(button)
             assert at["x"] >= settings["x"] + settings["width"] and at["y"] + at["height"] <= 860, (at, settings)
             assert abs((at["y"] + at["height"] / 2) - (settings["y"] + settings["height"] / 2)) <= 1, (at, settings)
-            await expect(page.locator("#sidebar nav.side-links a.side-link")).to_have_text(
-                ["Agents", "Campaigns", "Schedules"]
+            # The pages are Agents' row (while there is no agent of one's own) and the head's icons (item 855).
+            await expect(page.locator("#sidebar nav.side-links a.side-link")).to_have_text(["Agents"])
+            heads: list[str] = await page.locator("#sidebar .side-head nav.side-pages a").evaluate_all(
+                "(links) => links.map((link) => link.getAttribute('aria-label'))"
             )
+            assert heads == ["Campaigns", "Schedules"], heads
             marks: Locator = button.locator(".side-connect-mark")
             await expect(marks).to_have_count(1)
             await expect(marks.locator("img")).to_have_attribute("src", f"/icons/plugins/{sentry.logo}")

@@ -260,7 +260,9 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
                 # Customize is reached from Connect apps at the foot of the sidebar (items 492 and 545), which opens
                 # Connectors itself; the list of pages names it no more.
                 pages: Locator = page.locator("#sidebar nav.side-links a.side-link")
-                await expect(pages).to_have_text(["Agents", "Campaigns", "Schedules"])
+                await expect(pages).to_have_text(["Agents"])
+                # Campaigns and Schedules are icons in the head (item 855).
+                await expect(page.locator("#sidebar .side-pages").get_by_role("link")).to_have_count(2)
                 connect: Locator = page.locator("#sidebar .side-foot").get_by_role("button", name="Connect apps")
                 link_box: FloatRect = await _box(connect)
                 assert link_box["y"] + link_box["height"] <= 860, link_box
