@@ -129,16 +129,24 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 await expect(words).to_have_text(re.compile(_COMMAND_WORDS))
                 await expect(page.locator("details.steps")).to_be_hidden()
                 await page.screenshot(path=str(tmp_path / "working.png"))
-                # Pressed while the run works, the line shows the steps; pressed again, it folds them back.
+                # Pressed while the run works, the line shows the steps; pressed again, it folds them back; pressed a
+                # third time, the steps stay shown when the answer comes.
                 await line.click()
                 await expect(page.locator("details.steps").first).to_be_visible()
                 await expect(line).to_have_attribute("aria-pressed", "true")
                 await line.click()
                 await expect(page.locator("details.steps")).to_be_hidden()
+                await line.click()
                 async with asyncio.timeout(30):
                     assert (await manager.wait(run.id)).status == "done"
                 await expect(line).to_have_attribute("data-state", "over")
                 await expect(page.locator(".answer .prose")).to_have_text("Done.")
+                # The foot's button starts from that: the steps are shown, and it folds them (the review of item 842).
+                await expect(page.locator(".answer-steps")).to_have_text("Hide the steps")
+                await expect(page.locator(".answer-steps")).to_have_attribute("aria-pressed", "true")
+                await page.locator(".answer").hover()
+                await page.locator(".answer-steps").click()
+                await expect(page.locator("details.steps")).to_be_hidden()
                 # Over, with an answer, the way to the steps is in the answer's foot and the line goes (item 842).
                 await expect(line).to_be_hidden()
                 steps: Locator = page.locator(".answer .answer-foot").get_by_role("button", name="Show the steps")

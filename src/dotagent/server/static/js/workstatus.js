@@ -144,8 +144,9 @@ export function createWorkStatus({ rootRunId, active, onToggle }) {
     element,
     push,
     setActive,
-    // The steps shown or folded back from elsewhere: the answer's foot (item 842).
+    // The steps shown or folded back from elsewhere: the answer's foot (item 842), which starts from whether they are.
     toggle,
+    shown: () => shown,
     dispose: () => window.clearInterval(timer),
   };
 }
