@@ -710,7 +710,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       const found = inChannels || work.working.some((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
       return found ? [] : [el("div", { class: "side-note" }, `No chat matches “${search.value.trim()}”.`)];
     }
-    return chats.length === 0 ? [el("div", { class: "side-note" }, "No chats yet. Start one with New chat.")] : [];
+    return chats.length === 0 ? [el("div", { class: "side-note" }, "No chats yet. Start one with the +.")] : [];
   }
 
   // The "…" button beside the link `node` of a chat; null beside a box.
