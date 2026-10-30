@@ -641,11 +641,18 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
                 await expect(options).to_be_visible()
                 await expect(options).to_contain_text("YOLO")
                 await expect(options).not_to_have_attribute("data-tone", "warn")
-                # On a phone's line its open lock alone, so that the words keep their room; its name still says YOLO.
+                # On a line of 440 px or less (the bar's own width, which its container query reads) its open lock
+                # alone, so that the words keep their room; its name still says YOLO.
                 await expect(options).to_have_accessible_name(re.compile(r"\bYOLO\b"))
                 pill = await options.bounding_box()
                 assert pill is not None
-                assert (pill["width"] <= 44) == (width < 720), f"{width}: the YOLO pill is {pill['width']} px wide"
+                line: float = await composer.locator(".composer-bar").evaluate(
+                    "bar => { const style = getComputedStyle(bar);"
+                    " return bar.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight); }"
+                )
+                assert (pill["width"] <= 44) == (line <= 440), (
+                    f"{width}: the YOLO pill is {pill['width']} px wide on a line of {line} px"
+                )
                 await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_hidden()
                 assert await page.evaluate("() => localStorage.getItem('dot.composer.choices')") is None
                 # Back to the mode the module's other tests expect.
