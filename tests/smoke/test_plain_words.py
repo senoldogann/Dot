@@ -32,6 +32,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from channel_stand_ins import FakeMacos, Osascript
+from composer_choices import show_choices
 from messages_db import MessagesDb
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
@@ -449,6 +450,8 @@ async def _context(browser: Browser, served: Served, width: int) -> BrowserConte
         service_workers="block",
     )
     context.set_default_timeout(10_000)
+    # The run's choices shown in the box, so that their words are read too (item 833).
+    await show_choices(context)
     return context
 
 
@@ -582,7 +585,9 @@ async def test_a_chat_its_messages_menus_and_cards_say_what_they_mean(browser: B
         await reader.go("/runs", "New chat", "textarea")
         await reader.opens("The model menu", page.locator("button[title='ollama:scripted']").first)
         await reader.opens("The options menu", page.locator("button[title^='Approvals:']").first)
-        await reader.opens("The plus menu", page.get_by_role("button", name="Add files or teach a task"))
+        await reader.opens(
+            "The plus menu", page.get_by_role("button", name="Add files, model and options, or teach a task")
+        )
         goal: Locator = page.get_by_role("textbox", name="Goal")
         for trigger, label in (("/", "The slash menu"), ("@", "The at menu")):
             await goal.fill(trigger)

@@ -697,9 +697,10 @@
   }
 
   /* One line on a phone too while the run's choices are away (item 833): the "+", the words, the YOLO tag, the size of
-     a chat near full, and the microphone or the send at the thumb. */
-  .composer[data-quiet] .composer-bar,
-  .composer[data-quiet] .composer-bar.has-mic {
+     a chat near full, and the microphone or the send at the thumb. While the microphone listens, the recorder takes
+     the line under the words, as it does with the choices shown (app.css). */
+  .composer[data-quiet] .composer-bar:not(.recording),
+  .composer[data-quiet] .composer-bar.has-mic:not(.recording) {
     grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
     grid-template-areas: "plus field options meter mic send";
   }

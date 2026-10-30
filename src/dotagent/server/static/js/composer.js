@@ -29,12 +29,13 @@ const DRAFT_PREFIX = "dot.draft.";
 export const NEW_CHAT_DRAFT = "home";
 // The tallest box of a chat's composer, on its page (views/run.js) and on the curtain while Dot opens (waiting.js).
 export const CHAT_BOX_PX = 160;
+// Whether the boxes show the run's choices on a line of their own (item 833): "shown", or nothing for one line.
+const CHOICES_KEY = "dot.composer.choices";
+// What the "+" opens, said by its tooltip and to a screen reader: the run's choices are behind it too (item 833).
+const PLUS_WORDS = "Add files, model and options, or teach a task";
 
 /** The draft kept under `key` (`{ text, files, picks }`, `picks` missing from a draft of before item 318), or null when
  * there is none or it is not one. */
-// Whether the boxes show the run's choices on a line of their own (item 833): "shown", or nothing for one line.
-const CHOICES_KEY = "dot.composer.choices";
-
 function readDraft(key) {
   const stored = readPref(`${DRAFT_PREFIX}${key}`);
   if (stored === null) {
@@ -412,7 +413,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
 
   const plusButton = el(
     "button",
-    { class: "btn ghost sm plus-button", type: "button", title: "Add files or teach a task", "aria-label": "Add files or teach a task", onclick: plusMenu },
+    { class: "btn ghost sm plus-button", type: "button", title: PLUS_WORDS, "aria-label": PLUS_WORDS, onclick: plusMenu },
     icon("plus"),
   );
   element.append(

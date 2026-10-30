@@ -306,6 +306,17 @@ def _recorder(page: Page) -> Locator:
     return page.locator(".composer .mic-recorder")
 
 
+async def _rects(composer: Locator, *parts: str) -> list[dict[str, float]]:
+    """The rectangles of `parts` of `composer` (selectors of its parts), read in one frame."""
+    rects: list[dict[str, float]] = await composer.evaluate(
+        "(composer, parts) => parts.map((part) => {"
+        " const rect = composer.querySelector(part).getBoundingClientRect();"
+        " return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; })",
+        list(parts),
+    )
+    return rects
+
+
 async def test_the_microphone_records_and_puts_the_words_in_the_box_when_the_owner_is_done(
     browser: Browser, address: str, runtime: Runtime
 ) -> None:
@@ -334,6 +345,13 @@ async def test_the_microphone_records_and_puts_the_words_in_the_box_when_the_own
         await expect(recorder.locator(".mic-time")).to_have_text("0:01", timeout=4000)
         assert await page.locator(".composer .mic-bar").count() > 20
         await _fits(page, f"{width} while the microphone listens")
+        # The box keeps its line and the recorder takes the whole line under it, with the box as one line too (item
+        # 833's pre-push review: the one line's grid on a phone held the recorder in a column of its own beside it).
+        recorded, field = await _rects(page.locator(".composer").last, ".mic-recorder", ".composer-field")
+        assert recorded["y"] >= field["y"] + field["height"] - 1, f"{width}: the recorder is not under the box"
+        assert abs(recorded["width"] - field["width"]) < 2, (
+            f"{width}: the recorder is {recorded['width']} px wide under a box of {field['width']} px"
+        )
         # The page's language, given its region (item 593).
         assert await _voice(page, "[voice.starts, voice.langs[0]]") == [1, "en-US"]
         # The engine is asked for what makes a dictation: the session goes on and the words come as they are heard.
@@ -965,7 +983,7 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_box_on_
             await expect(send).to_be_hidden()
             await words.fill("a word")
             await expect(send).to_be_visible()
-            box, sent, field = await _boxes(composer)
+            box, sent, field = await _rects(composer, ".mic-button", ".btn.send", ".composer-field")
             assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
             assert box["x"] >= field["x"] + field["width"] - 1, f"{place} {width}: it is not right of the words"
             assert box["x"] + box["width"] <= sent["x"] + 1, f"{place} {width}: it is not left of the send"
@@ -979,7 +997,7 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_box_on_
             await composer.locator(".plus-button").click()
             await page.get_by_role("menuitem", name="Model and options").click()
             await expect(composer).not_to_have_attribute("data-quiet", "")
-            box, sent, field = await _boxes(composer)
+            box, sent, field = await _rects(composer, ".mic-button", ".btn.send", ".composer-field")
             assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
             if width < 720:
                 assert box["y"] >= field["y"] + field["height"] - 1, (
@@ -1001,13 +1019,3 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_box_on_
             await expect(composer).to_have_attribute("data-quiet", "")
             await _fits(page, f"{width} {place} as one line")
         await page.context.close()
-
-
-async def _boxes(composer: Locator) -> list[dict[str, float]]:
-    """The microphone's, the send's and the box's rectangles, read in one frame."""
-    boxes: list[dict[str, float]] = await composer.evaluate(
-        "composer => ['.mic-button', '.btn.send', '.composer-field'].map((part) => {"
-        " const rect = composer.querySelector(part).getBoundingClientRect();"
-        " return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; })"
-    )
-    return boxes

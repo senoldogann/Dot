@@ -12,6 +12,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -195,13 +196,8 @@ async def test_a_new_chat_keeps_its_choices_until_its_message_goes(
             context: BrowserContext = await browser.new_context(
                 viewport={"width": 1280, "height": 860}, reduced_motion="reduce"
             )
-            await context.add_init_script(
-                "localStorage.setItem('dot.composer.choices', 'shown')"
-            )  # the choices this test reads (item 833)
+            await show_choices(context)
             page: Page = await context.new_page()
-            await page.add_init_script(
-                "localStorage.setItem('dot.composer.choices', 'shown')"
-            )  # the choices this test reads (item 833)
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             await page.goto(ui_url("127.0.0.1", int(served.rpartition(":")[2]), TOKEN))

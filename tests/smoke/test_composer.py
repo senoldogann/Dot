@@ -14,6 +14,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -159,9 +160,7 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
         try:
             for width in (1280, 390):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
-                await page.add_init_script(
-                    "localStorage.setItem('dot.composer.choices', 'shown')"
-                )  # the choices this test reads (item 833)
+                await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 goal = page.locator(GOAL)
                 menu = page.locator(".composer .slash-menu")
@@ -229,9 +228,7 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
         try:
             for width in (1280, 390):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
-                await page.add_init_script(
-                    "localStorage.setItem('dot.composer.choices', 'shown')"
-                )  # the choices this test reads (item 833)
+                await show_choices(page)
                 refused: list[str] = []
                 page.on("console", _collect_refusals(refused))
                 await page.route("**/api/models", _with_a_thinking_model)
@@ -426,9 +423,7 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
         try:
             for width in (1280, 800, 560, 390):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
-                await page.add_init_script(
-                    "localStorage.setItem('dot.composer.choices', 'shown')"
-                )  # the choices this test reads (item 833)
+                await show_choices(page)
                 await page.route("**/api/models", _with_a_thinking_model)
                 await page.goto(ui_url(host, port, TOKEN))
                 await expect(page.locator(".composer-pill[data-pill='agent']")).to_be_visible()
@@ -501,9 +496,7 @@ async def test_a_photo_in_the_box_shows_its_picture_beside_the_files_it_came_wit
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
-            await page.add_init_script(
-                "localStorage.setItem('dot.composer.choices', 'shown')"
-            )  # the choices this test reads (item 833)
+            await show_choices(page)
             await page.goto(ui_url(host, port, TOKEN))
             await page.locator(".composer input[type=file]").set_input_files(
                 [

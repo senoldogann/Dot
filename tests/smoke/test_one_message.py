@@ -15,6 +15,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -299,9 +300,7 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 page: Page = await browser.new_page(
                     viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
                 )
-                await page.add_init_script(
-                    "localStorage.setItem('dot.composer.choices', 'shown')"
-                )  # the choices this test reads (item 833)
+                await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs")
                 pill: Locator = page.locator(".composer-pill[data-pill='reasoning']")
@@ -348,9 +347,7 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
             # Sonnet offers Max alone, so Ultrathink alone; Haiku offers neither, so the menu has no such choice.
             for run, offered in ((sonnet, ["Ultrathink"]), (haiku, [])):
                 page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
-                await page.add_init_script(
-                    "localStorage.setItem('dot.composer.choices', 'shown')"
-                )  # the choices this test reads (item 833)
+                await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")
                 await page.locator(".dock .composer-pill[data-pill='reasoning']").click()

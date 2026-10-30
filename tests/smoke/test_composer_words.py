@@ -17,6 +17,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -185,9 +186,7 @@ async def test_the_word_in_the_box_is_the_choice_for_that_message(
                 page: Page = await browser.new_page(
                     viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
                 )
-                await page.add_init_script(
-                    "localStorage.setItem('dot.composer.choices', 'shown')"
-                )  # the choices this test reads (item 833)
+                await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs")
                 frame: Locator = page.locator(_HOME_FRAME)
@@ -267,9 +266,7 @@ async def test_while_a_run_works_the_word_goes_with_a_queued_message_and_not_wit
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
                 page: Page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
-                await page.add_init_script(
-                    "localStorage.setItem('dot.composer.choices', 'shown')"
-                )  # the choices this test reads (item 833)
+                await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{held}")
                 dock: Locator = page.locator(".dock .composer")
