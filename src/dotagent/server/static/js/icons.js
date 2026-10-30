@@ -439,16 +439,86 @@ export function wordmark() {
 }
 
 /** An inline SVG icon; its size follows the font size of the surrounding text. */
+// The frame each shape is seen through (item 849): `[x, y, side]` of the square of the 24 grid the icon shows, so that
+// every icon draws about the same area (that of an 18.5 by 18.5 square, its longer side at most 22) whatever its shape: a
+// "+" or a speaker no smaller beside a copy. Measured from the shapes' drawn boxes; a shape not listed fills its 24 grid
+// as drawn (the chevrons, marks of a fold, keep their own size). `--icon-scale` keeps the stroke as thick as everyone's.
+const FRAMES = {
+  arrowDown: [2.92, 2.92, 18.16],
+  arrowLeft: [2.92, 2.92, 18.16],
+  arrowRight: [2.92, 2.92, 18.16],
+  arrowUp: [2.92, 2.92, 18.16],
+  arrowUpDown: [0.99, 0.99, 22.02],
+  badgeCheck: [-0.97, -0.97, 25.95],
+  brain: [-0.97, -0.97, 25.95],
+  check: [3.27, 2.77, 17.45],
+  circleDashed: [-0.97, -0.97, 25.95],
+  clock: [-0.97, -0.97, 25.95],
+  cloud: [1.09, 1.09, 21.82],
+  copy: [-0.97, -0.97, 25.95],
+  cornerUpRight: [2.92, 2.92, 18.16],
+  creditCard: [1.09, 1.09, 21.82],
+  ellipsis: [3.27, 3.27, 17.45],
+  eye: [1.09, 1.09, 21.82],
+  eyeOff: [-0.97, -0.97, 25.95],
+  globe: [-0.97, -0.97, 25.95],
+  grip: [4.15, 4.15, 15.71],
+  hammer: [3.24, 4.29, 19.11],
+  hand: [-1.06, -1.01, 26.01],
+  help: [-0.97, -0.97, 25.95],
+  info: [-0.97, -0.97, 25.95],
+  key: [-0.72, -1.02, 25.03],
+  layers: [-0.97, -0.97, 25.95],
+  link: [-0.86, -0.86, 25.82],
+  list: [2.18, 2.18, 19.64],
+  listOrdered: [2.29, 2.29, 19.42],
+  message: [-0.82, 0.18, 24.65],
+  mic: [1.09, 1.09, 21.82],
+  palette: [-0.97, -0.97, 25.95],
+  paperclip: [-1.08, -0.78, 25.55],
+  pause: [3.01, 3.01, 17.98],
+  pencil: [-0.97, -0.97, 25.95],
+  pin: [1.09, 1.09, 21.82],
+  pinOff: [-0.97, -0.97, 25.95],
+  play: [2.7, 1.7, 20.59],
+  plug: [1.09, 1.09, 21.82],
+  plus: [2.92, 2.92, 18.16],
+  pointer: [0.47, 0.47, 22.05],
+  puzzle: [-0.97, -0.97, 25.95],
+  send: [-0.97, -0.97, 25.95],
+  smartphone: [1.09, 1.09, 21.82],
+  smilePlus: [-0.97, -1.07, 25.95],
+  sparkle: [-0.97, -0.97, 25.95],
+  squarePen: [0.18, -0.82, 24.65],
+  star: [-0.64, -1.14, 25.29],
+  stop: [2.92, 2.92, 18.16],
+  sun: [-0.97, -0.97, 25.95],
+  target: [-0.97, -0.97, 25.95],
+  terminal: [2.29, 2.29, 19.42],
+  trendingUp: [1.09, 1.09, 21.82],
+  undo: [1.62, 1.62, 20.76],
+  user: [1.7, 1.7, 20.59],
+  volume: [1.09, 1.04, 21.82],
+  wrapText: [1.7, 2.7, 20.59],
+  wrench: [0.18, -0.82, 24.65],
+  x: [4.22, 4.22, 15.57],
+};
+
 export function icon(name) {
   const shapes = SHAPES[name];
   if (shapes === undefined) {
     throw new Error(`unknown icon: ${name}`);
   }
-  return svg(
+  const frame = FRAMES[name];
+  const node = svg(
     "svg",
-    { class: "icon", "data-icon": name, viewBox: "0 0 24 24", "aria-hidden": "true", focusable: "false" },
+    { class: "icon", "data-icon": name, viewBox: frame === undefined ? "0 0 24 24" : `${frame[0]} ${frame[1]} ${frame[2]} ${frame[2]}`, "aria-hidden": "true", focusable: "false" },
     shapes.map(([tag, attrs]) => svg(tag, attrs)),
   );
+  if (frame !== undefined) {
+    node.style.setProperty("--icon-scale", String(24 / frame[2]));
+  }
+  return node;
 }
 
 /** The icon that stands for a tool, chosen from its name. */
