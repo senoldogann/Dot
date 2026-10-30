@@ -1322,40 +1322,28 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   // On a phone the sidebar is the list of chats over the whole screen (item 294): Dot's name
   // at its head beside the close, and at its foot, under the thumb, Settings, the search and a new chat. The search
-  // moves between the head of the list and the foot as the width changes; there is one box.
+  // moves between the head of the list and the foot as the width changes; there is one box. A new chat is a "+" (item
+  // 834), as a messaging app's: at the right of the head on a desk, where the "New chat" row under the search was, and
+  // in the foot on a phone.
   const searchBox = el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K"));
   const compose = el(
     "a",
     {
-      class: "side-compose",
+      class: "icon-btn side-compose",
       href: homeHref,
-      title: "New chat",
+      title: "New chat (⇧⌘O)",
       "aria-label": "New chat",
       onclick: () => {
         requestCompose();
         onNavigate();
       },
     },
-    icon("squarePen"),
+    icon("plus"),
   );
   const body = el(
     "div",
     { class: "side-body" },
     searchBox,
-    el(
-      "a",
-      {
-        class: "side-btn",
-        href: homeHref,
-        onclick: () => {
-          requestCompose();
-          onNavigate();
-        },
-      },
-      icon("pencil"),
-      el("span", { class: "grow" }, "New chat"),
-      el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
-    ),
     el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, schedulesLink),
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav),
@@ -1415,13 +1403,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       showMarks();
     }
   }, MARKS_TURN_MS);
-  const foot = el("div", { class: "side-foot" }, settingsLink, connectButton, compose);
+  const foot = el("div", { class: "side-foot" }, settingsLink, connectButton);
+  const sideHead = el("div", { class: "side-head", "data-tauri-drag-region": "" }, close, el("span", { class: "side-title" }, dotName()));
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
     if (PHONE.matches) {
       connectButton.after(searchBox);
+      foot.append(compose);
     } else {
       body.prepend(searchBox);
+      sideHead.append(compose);
     }
   }
   placeForWidth();
@@ -1432,7 +1423,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const element = el(
     "aside",
     { class: "sidebar", id: "sidebar", "aria-label": "Sidebar" },
-    el("div", { class: "side-head", "data-tauri-drag-region": "" }, close, el("span", { class: "side-title" }, dotName())),
+    sideHead,
     body,
     foot,
     settingsNav.element,

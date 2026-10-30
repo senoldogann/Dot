@@ -226,9 +226,10 @@
   padding: 12px 8px 8px 16px;
 }
 
-/* The head holds the button that folds the sidebar away and nothing else (item 113): at the left, where the top bar's
-   opener sits while the sidebar is away, so the button does not move under the pointer. The rest of the head is the
-   desktop shell's drag region, and a drag starts only on the element that carries it. */
+/* The head holds the button that folds the sidebar away (item 113): at the left, where the top bar's opener sits while
+   the sidebar is away, so the button does not move under the pointer; and at its right the "+" of a new chat (item
+   834). The rest of the head is the desktop shell's drag region, and a drag starts only on the element that carries
+   it. */
 .side-body {
   flex: 1;
   min-height: 0;
@@ -265,7 +266,6 @@
 }
 
 /* Rows never carry muted text while they are tinted: the tint would take it below the contrast limit. */
-.side-btn,
 .side-link,
 .side-run {
   display: flex;
@@ -277,12 +277,6 @@
   color: var(--text-2);
 }
 
-.side-btn {
-  color: var(--text);
-  font-weight: var(--weight-label);
-}
-
-.side-btn:hover,
 .side-link:hover,
 .side-run:hover,
 :where(.side-chat:hover) > .side-run {
@@ -1044,10 +1038,14 @@
 
 /* ---------- a phone (items 294 and 295) ---------- */
 
-/* The sidebar's title and its round new chat are a phone's. */
-.side-title,
-.side-compose {
+/* The sidebar's title is a phone's. A new chat is a "+" at the right of the head (item 834), a round button of the foot
+   on a phone. */
+.side-title {
   display: none;
+}
+
+.side-head > .side-compose {
+  margin-inline-start: auto;
 }
 
 /* A screen used by touch shows no keys to press. */
@@ -1118,12 +1116,7 @@
     border-top: 1px solid var(--border);
   }
 
-  /* The foot under the thumb: Settings and a new chat in round buttons either side of the search, a pill. The body's
-     own New chat gives way to the foot's. */
-  .side-body > .side-btn {
-    display: none;
-  }
-
+  /* The foot under the thumb: Settings and a new chat in round buttons either side of the search, a pill. */
   .side-foot {
     flex-wrap: nowrap;
     gap: 8px;
@@ -1199,7 +1192,6 @@
     inset: -4px;
   }
 
-  .side-btn,
   .side-link,
   .side-run,
   .side-fold {
