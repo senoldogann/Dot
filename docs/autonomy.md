@@ -221,7 +221,9 @@ now refuses or hands it to you, or the run's untrusted reading, still stops it. 
 (a `dotx` run works there) is taken back and the card stays. Rewinding the chat to before the run that kept it takes an
 unused yes back too. Skip on a kept step, either kind, holds in that conversation: the same step is refused at once,
 with no card, until you write there again (a message of yours, or a run you start). Any other question still counts as a
-refusal when nobody answers, and nothing is kept in `yolo`, which asks nothing, or in an eval. A delegated run keeps its
+refusal when nobody answers, and nothing is kept in `yolo`, which asks nothing, or in an eval; but in a chat Dot opened
+on its own initiative a `yolo` run asks its release and keeps it as a run that asks does, and a message or a post there
+is asked, never kept (item 850). A delegated run keeps its
 steps where the run that delegated it does (item 485): the card is on the delegated run's page and in the Activity list,
 the step is the chat's of the run at the top, and your answer reaches that run, while it works, or else a run that goes
 on from its goal in its chat (tainted as any of the runs it goes on from ended), which may do an allowed step itself or

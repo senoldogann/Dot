@@ -460,7 +460,8 @@ approval_timeout_s = 900.0
 # and the run may do that exact step once in that conversation within permit_hours; never a question raised by what the
 # run read, nor one about Dot's own files. A campaign's sessions keep theirs for the campaign, and an answer brings its
 # next session forward (item 484); a delegated run keeps them where the run that delegated it does, which the answer
-# reaches (item 485). Never in yolo, which asks nothing; an eval refuses as before.
+# reaches (item 485). Never in yolo, which asks nothing, but for the release a run asks in a chat Dot opened on its own
+# initiative (item 850); an eval refuses as before.
 unanswered = "refuse"
 parked_hours = 72.0
 permit_hours = 24.0
@@ -1053,7 +1054,8 @@ runs_per_day = 0
 # The approval mode its runs start in, whatever [policy] approvals says: "yolo" asks nothing (the owner's choice, item
 # 756: a run of its own that asked waited on nobody, since nobody watches it). In yolo the review model still refuses a
 # message, a post, a payment or an upload that no word of yours calls for, in a run that read content others can write
-# (item 525). "ask", "auto" or "supervised" make its runs ask as yours do.
+# (item 525). "ask", "auto" or "supervised" make its runs ask as yours do. In every mode, a message sent for you, a post
+# in your name or a project's change put live, in a chat it opened, waits for your yes (item 850).
 approvals = "yolo"
 # The hours of a weekday, in UTC, in which none of its runs starts but an urgent thing of yours (item 826): two hours,
 # from the first up to the second, such as [12, 18], Ollama Cloud's dearer hours (its price is half the rest of the

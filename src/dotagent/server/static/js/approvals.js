@@ -157,11 +157,20 @@ const GUARDED_FLAGS = new Set([
   "trade",
   "self_change",
 ]);
+// The words of the question a chat Dot opened on its own initiative asks of a message, a post or a release (item 850,
+// `_INITIATIVE_REASON` in policy/engine.py, which the card's summary ends with): the owner's in every mode, whatever
+// their rules say, so no rule is offered for it; the same step elsewhere keeps its offer.
+const INITIATIVE_WORDS = "On its own initiative, Dot asks before";
 
 /** Whether the owner answers `approval` in every mode that asks, whatever their rules say (item 429). */
 function guarded(approval) {
   const flags = approval.args.flags;
   return Array.isArray(flags) && flags.some((flag) => typeof flag === "string" && GUARDED_FLAGS.has(flag));
+}
+
+/** Whether `approval` is the question of a chat Dot opened on its own initiative (item 850), asked in YOLO too. */
+function initiativeAsked(approval) {
+  return typeof approval.summary === "string" && approval.summary.includes(INITIATIVE_WORDS);
 }
 
 /**
@@ -339,9 +348,11 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         isQuestion ? options : technicalDetails(approval.args),
         isQuestion || isHandoff
           ? null
-          : guarded(approval)
-            ? el("div", { class: "small muted" }, "Dot always asks you about this, in every mode except YOLO. No rule can turn that off.")
-            : ruleOffer(approval),
+          : initiativeAsked(approval)
+            ? el("div", { class: "small muted" }, "In a chat Dot opened on its own initiative, Dot always asks you about this, YOLO too. No rule can turn that off.")
+            : guarded(approval)
+              ? el("div", { class: "small muted" }, "Dot always asks you about this, in every mode except YOLO. No rule can turn that off.")
+              : ruleOffer(approval),
         isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId, onUseHere) : null,
         el(
           "div",

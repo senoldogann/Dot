@@ -2633,6 +2633,13 @@ class RunManager:
                 },
                 True,
             )
+            # A chat Dot opened on its own initiative (item 850): its runs, the ones the owner's answers start there
+            # among them, and their helpers ask the owner before a message, a post or a release, in every mode.
+            owners_word: bool = (
+                (parent is not None and parent.gate.owners_word)
+                if parent_run_id is not None
+                else source == INITIATIVE_SOURCE or await runtime.store.opened_by(thread_id) == INITIATIVE_SOURCE
+            )
             gate: RunGate = RunGate(
                 runtime.store,
                 runtime.bus,
@@ -2653,6 +2660,7 @@ class RunManager:
                 instructions,
                 runtime.site_locks,
                 taint_check=runtime.config.policy.yolo_taint_check,
+                owners_word=owners_word,
             )
             if starts_tainted:
                 gate.taint()
@@ -2660,8 +2668,11 @@ class RunManager:
             # where [policy] unanswered says so (items 482, 483): in its chat, or for a session of a campaign in the
             # campaign's conversation, shared by its sessions (item 484); a delegated run keeps them where the run that
             # delegated it does, so that the answer reaches the run at the top (item 485); never in yolo or an eval.
+            # A yolo run of a chat of Dot's own initiative asks its questions of item 850, and keeps them as a run that
+            # asks does.
+            kept_mode: ApprovalMode = "ask" if owners_word and approval_mode == "yolo" else approval_mode
             if parent_run_id is not None:
-                gate.keep_for(None if parent is None or approval_mode == "yolo" else parent.gate.parking)
+                gate.keep_for(None if parent is None or kept_mode == "yolo" else parent.gate.parking)
             else:
                 conversation_id: str = (
                     thread_id if campaign_id is None else (await runtime.store.get_campaign(campaign_id)).thread_id
@@ -2669,7 +2680,7 @@ class RunManager:
                 gate.keep_for(
                     parking_for(
                         runtime.config.policy,
-                        approval_mode,
+                        kept_mode,
                         source == EVAL_SOURCE,
                         conversation_id,
                         campaign_id,
