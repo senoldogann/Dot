@@ -376,8 +376,8 @@
 }
 
 .phone-reach-tile.ready {
-  background: var(--ok-weak);
-  color: var(--ok);
+  background: var(--fine-weak);
+  color: var(--fine);
 }
 
 .phone-reach-tile .icon {
@@ -420,7 +420,7 @@
 }
 
 .phone-progress-part.done {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .phone-progress-part.now {
@@ -501,8 +501,8 @@
 
 :is(.phone-guide-step, .phone-step).done .phone-mark {
   border-color: transparent;
-  background: var(--ok-weak);
-  color: var(--ok);
+  background: var(--fine-weak);
+  color: var(--fine);
 }
 
 :is(.phone-guide-step, .phone-step).current .phone-mark {
@@ -885,7 +885,7 @@
 }
 
 .provider-dot[data-tone="ok"] {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .provider-dot[data-tone="bad"] {
@@ -927,7 +927,7 @@
 }
 
 .provider-state[data-tone="ok"] {
-  color: var(--ok);
+  color: var(--fine);
 }
 
 /* The way back to the list on a phone: the chevron alone, on the page's own ground, tall enough for a thumb. */
@@ -1466,7 +1466,7 @@
 }
 
 .set-dot[data-tone="ok"] {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .set-dot[data-tone="warn"] {
@@ -1608,7 +1608,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  color: var(--ok);
+  color: var(--fine);
   font-size: var(--text-sm);
 }
 
@@ -1627,7 +1627,7 @@
 }
 
 .fold-count.ok {
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .fold-count.warn {
@@ -3209,7 +3209,7 @@
 .rule-understood > .icon {
   align-self: center;
   flex: none;
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .rule-understood-label {
@@ -3647,7 +3647,7 @@
 .rule-always-list .icon {
   flex: none;
   margin-top: var(--space-half);
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .rule-always-note {
@@ -3923,7 +3923,7 @@
 }
 
 .night-cell.done {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .night-cell.failed {
@@ -4354,7 +4354,7 @@
 }
 
 .websearch-ready {
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .websearch-needs,

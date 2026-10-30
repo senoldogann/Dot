@@ -52,6 +52,7 @@ _ON: tuple[tuple[str, str], ...] = (
     ("--on-accent", "--accent"),
     ("--on-bubble", "--bubble"),
     ("--ok", "--ok-weak"),
+    ("--fine", "--fine-weak"),
     ("--warn", "--warn-weak"),
     ("--bad", "--bad-weak"),
     ("--on-bad", "--bad"),
