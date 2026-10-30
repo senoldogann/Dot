@@ -6873,6 +6873,11 @@ summary:has(> .chev)::-webkit-details-marker {
   font-size: var(--text-sm);
 }
 
+/* At the head of the side panel's Changes tab (item 841), over the files, not under the answer. */
+.changes-holder > .run-changes {
+  margin: 0 0 var(--space-3);
+}
+
 .run-changes > .icon {
   flex: none;
   color: var(--muted);

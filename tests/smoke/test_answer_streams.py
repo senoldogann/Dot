@@ -1,6 +1,7 @@
 """An answer that ends a run under the reader's eyes is written in (item 366): its words come a few at a time, formatted
-as they stay, and its foot and the line of what the run changed (item 597) show once they are all in. Under reduced
-motion, and on a run opened after it ended, the answer shows at once. A real server on a scripted model, in Chrome."""
+as they stay, and its foot shows once they are all in; what the run changed is no line under it (item 841). Under
+reduced motion, and on a run opened after it ended, the answer shows at once. A real server on a scripted model, in
+Chrome."""
 
 import asyncio
 import time
@@ -67,7 +68,7 @@ _SAMPLER: str = """() => {
 
 
 def _script() -> list[ScriptedTurn]:
-    # Each run writes a file, so that the line of what it changed comes under its answer.
+    # Each run writes a file, so that a line of what it changed would come, and it is not under the answer (item 841).
     write = ScriptedTurn(
         text="", calls=(ScriptedCall(tool="write_file", arguments={"path": "shelves.md", "content": "Dry.\n"}),)
     )
@@ -180,10 +181,10 @@ async def test_an_answer_that_ends_a_run_under_the_readers_eyes_is_written_in(se
             assert len(partial) >= 5, f"the words came at once: {sorted(set(lengths))[:12]} of {whole}"
             assert lengths == sorted(lengths), "the words only ever grew"
             assert lengths[-1] == whole
-            # The foot and the line of what the run changed wait until the words are all in.
+            # The foot waits until the words are all in.
             assert all(shown == "hidden" for _, shown, _, _ in partial)
-            assert all(changed in (None, "hidden") for _, _, _, changed in partial)
-            assert seen[-1][3] == "visible"
+            # The answer holds no line of what the run changed, which heads the side panel's Changes tab (item 841).
+            assert all(changed is None for _, _, _, changed in seen)
             # The words are written in sight, where the answer stands: its top in the upper half of the window, still
             # once the page has landed on it.
             tops = [int(top) for _, _, top, _ in partial[2:] if isinstance(top, int)]

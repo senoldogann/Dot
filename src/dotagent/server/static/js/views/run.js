@@ -369,10 +369,14 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const setup = setupSection();
   // The files the chat's runs wrote or created (item 368), in a tab of their own that counts them; read on arrival,
   // after each write or edit a run reports, and once the run ends.
+  // What the run changed and its Undo (item 597) head the tab (item 841): a chat is a conversation, not an editor's
+  // list under each answer. Its Review would open the tab it stands in, so it has none.
+  const undoLine = runChangesCard({ runId, onReview: null, onUndone: () => refreshChanges() });
   const changes = changesSection({
     runId,
     onCount: (files) => inspector.setCount("changes", files === 0 ? "" : String(files)),
     onFiles: (files) => context.onFiles(files),
+    head: undoLine.element,
   });
   const refreshChanges = debounce(() => attempt(changes.refresh), CHANGES_SETTLE_MS);
 
@@ -1214,10 +1218,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
 
   function onAnswer(node) {
     answerNode = node;
-    // What the run changed on this Mac, under its answer, with the way back (item 597).
-    const changed = runChangesCard({ runId, onReview: () => showChanges(), onUndone: () => refreshChanges() });
-    node.querySelector(".answer-foot")?.before(changed.element);
-    changed.load();
+    // What the run changed on this Mac, with the way back (item 597), read as the answer comes, in the Changes tab.
+    undoLine.load();
     if (openedFinished) {
       // A chat that is over when it opens starts at its foot, on the newest message (item 440), and keeps there while
       // what is above it settles (pictures, a table's width) until the reader scrolls up.
