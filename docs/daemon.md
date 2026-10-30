@@ -1006,9 +1006,11 @@ the owner's bubbles. Type: Inter for the interface and the answers, Geist Mono f
 from Dot's own origin (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and
 chips, 13/18 meta and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles,
 24/32 the greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit
-test refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: cards are
-flat, a surface with a hairline and a 12 px radius and no shadow (shadows stay on what floats: menus, dialogs, the
-composer in focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
+test refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: a box of the
+pages (a card, a settings' group, a tile) has no frame, a surface on a 16 px corner with a soft shadow under it
+(`--box-border` and `--box-shadow`, item 837: it had a hairline on a 12 px corner and no shadow), and the contrast
+setting frames it again; a box within a box is a soft fill rather than a second shadow; shadows otherwise stay on
+what floats (menus, dialogs, the composer); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
 string; an empty page or list stands a mark in a quiet ring, a title and one line that says what brings something there,
 in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages in an ink
 bubble (`--msg-me`: the text's colour in light, one surface raised in the dark), and what Dot and its agents say, the
@@ -1017,8 +1019,10 @@ as the column; the line under an answer that ended well and under your message s
 focus is (a reaction that stands, a failure and a stop stay in sight; a touch screen shows them always), an answer that
 ended well says no word for it ("Finished" went), a file a message names is a chip of its name (its path in the chip's
 title and in a copy of the message), and what a run changed is an attachment in the answer's fill. Controls:
-buttons, inputs and selects 36
-px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus ring on each, a select with its
+buttons, inputs and selects 36 px tall on a 10 px corner (32 for the small ones; item 837, 8 px before): a button is a
+soft fill with no frame, a step darker under the pointer (the first of a page in ink, a quiet one with no fill, and the
+contrast setting frames them), and an input or a select keeps its hairline, as what is typed in; the same 2 px focus
+ring on each, a select with its
 own drawn chevron, a range on a hairline track filled with the accent up to its value under the switch's knob, field
 labels on the interface line and hints on the small one, the composer's menus as round pills of 32 px (an icon of 16 px,
 the value, a chevron of 12; no ground at rest, a tint under the pointer) that open a panel above them, the providers'
