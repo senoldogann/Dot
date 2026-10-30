@@ -7,6 +7,7 @@
 // back, in this home or another, from the list's Import. A team's own page is views/teams.js.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
+import { isTrader, TRADING_DESK } from "../agentpanel.js";
 import { api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
@@ -29,6 +30,8 @@ import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const DOT_ID = "dot";
+// The template of the trading desk's agent (item 847, agent/templates.py).
+const TRADER_TEMPLATE = "trader";
 const GOAL_CHARS = 90;
 const MAX_GOAL_PX = 320;
 // How many of a team's agents a card shows the face of, the rest counted (item 610).
@@ -226,6 +229,8 @@ function templateCard(template, onUse, known) {
       templateFact("Needs", "plug", template.needs),
       templateFact("Schedule", "clock", template.schedule === "" ? "When you ask" : template.schedule),
     ),
+    // The Trader's card opens the desk it moved from the settings to (item 847), where trading is set up first.
+    template.id === TRADER_TEMPLATE ? el("a", { class: "small template-desk", href: TRADING_DESK }, "Open the trading desk") : null,
     alsoRow,
     templateTools(template, known),
     use,
@@ -1196,6 +1201,8 @@ function mountPage(root, ctx, agentId) {
     ctx.setTitle(`${record.name} · Agents`);
     setStageTitle(actorFace(record.id, "idle", record.look), el("h1", { class: "stage-h1 stage-name" }, record.name));
     setStageTools(
+      // The Trader's page opens the trading desk (item 847).
+      isTrader(record) ? el("a", { class: "btn ghost sm", href: TRADING_DESK, title: "Open the trading desk" }, icon("trendingUp"), el("span", { class: "label" }, "Trading desk")) : null,
       el("button", { class: "btn ghost sm", type: "button", title: "Edit the agent", onclick: () => edit(record) }, icon("pencil"), el("span", { class: "label" }, "Edit")),
       el("button", { class: "btn ghost sm", type: "button", title: "Save the agent as a file, to import into another Dot", onclick: () => attempt(() => exportAgent(record)) }, icon("download"), el("span", { class: "label" }, "Export")),
       record.paused_at === null

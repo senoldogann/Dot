@@ -2,7 +2,7 @@
 // shows the contact, beside the conversation. For one of your agents: its face, name and role, its model, approvals and
 // actions, its instructions, what it learned, and Edit, which opens the agent's editor in the panel (views/agents.js);
 // for Dot: its model, its name and look, its rules and its memory, each a link to the settings that hold it. The agent's
-// own page stays a link away.
+// own page stays a link away, and the Trader's trading desk too (item 847).
 
 import { actorFace } from "./actors.js";
 import { api, query } from "./api.js";
@@ -15,6 +15,14 @@ import { attempt } from "./ui.js";
 
 // How much of an agent's instructions the panel shows; the editor holds them whole.
 const INSTRUCTION_CHARS = 280;
+// The trading desk (item 847): Settings › Trading, which the Trader's page, panel and template card open.
+export const TRADING_DESK = "#/settings/trading";
+
+/** Whether `record` is the Trader, the trading desk's agent (item 847): the agent of the template's name, as the agent
+ * page finds a template by its agent's name (item 722). */
+export function isTrader(record) {
+  return record.name.trim().toLowerCase() === "trader";
+}
 
 /** A row of the facts: `label` and `value` (a node or a text). */
 function fact(label, value) {
@@ -94,6 +102,7 @@ export function agentPanel({ agent }) {
         fact("Actions", record.tools.length === 0 ? "All" : plural(record.tools.length, "action", "actions")),
         record.paused_at === null ? null : fact("Schedules", "Paused"),
         learnedWords === "" ? null : fact("Learned", learnedWords),
+        isTrader(record) ? fact("Desk", el("a", { href: TRADING_DESK }, "Trading desk")) : null,
       ),
       el(
         "section",

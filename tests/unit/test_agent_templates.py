@@ -74,7 +74,7 @@ def test_a_template_that_suggests_a_schedule_carries_the_one_its_card_says() -> 
             name=template.name, goal=template.task, cron=template.cron, agent_id="agt_x", enabled=False
         )
         assert template.task.endswith("."), template.id
-    assert len(suggesting) == 10, suggesting
+    assert len(suggesting) == 11, suggesting
 
 
 def test_every_team_is_made_of_templates_there_are_each_named_once() -> None:
@@ -94,3 +94,15 @@ def test_every_team_is_made_of_templates_there_are_each_named_once() -> None:
 def test_a_team_that_is_not_there_is_a_not_found() -> None:
     with pytest.raises(NotFoundError):
         find_team("no-such-team")
+
+
+def test_the_trader_watches_and_reports_and_places_no_order() -> None:
+    """Item 847: Settings › Trading moved to the Trader. Its agent reads the desk and may pause the engine, and no tool
+    of its places an order or closes a position: the trend engine trades by its rule, within the limits in code."""
+    trader = find_template("trader")
+    assert trader.name == "Trader"
+    assert {"trading_portfolio", "trading_engine", "trading_history", "trading_market", "trading_scan"} <= set(
+        trader.tools
+    )
+    assert not {"trading_order", "trading_exit", "shell", "apple_script"} & set(trader.tools)
+    assert "Never place an order" in trader.instructions

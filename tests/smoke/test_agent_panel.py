@@ -185,3 +185,27 @@ async def test_a_chat_with_dot_shows_dots_settings_each_a_link_to_where_it_is_se
         finally:
             await browser.close()
 
+
+async def test_the_traders_panel_and_page_open_the_trading_desk(served: tuple[RunManager, httpx.AsyncClient]) -> None:
+    """Item 847: Settings › Trading moved to the Trader, the agent of the template's name: its panel and its page open
+    the desk, and another agent's do not."""
+    manager, client = served
+    made = await client.post("/api/agents", json={**_AGENT, "name": "Trader", "role": "Watches the trading desk"})
+    assert made.status_code == 201, made.text
+    trader_id: str = made.json()["id"]
+    run_id: str = await _finished(manager, client, {"goal": "Report the trading day", "agent_id": trader_id})
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page, shown = await _agents_tab(browser, client, run_id)
+            facts: Locator = shown.locator(".agent-panel-facts")
+            await expect(facts.locator("dt").last).to_have_text("Desk")
+            await expect(facts.get_by_role("link", name="Trading desk")).to_have_attribute("href", "#/settings/trading")
+            await page.goto(page.url.split("#")[0] + f"#/agents/{trader_id}")
+            desk: Locator = page.locator(".stage-tools").get_by_role("link", name="Trading desk")
+            await expect(desk).to_have_attribute("href", "#/settings/trading")
+            await desk.click()
+            await expect(page.get_by_role("heading", level=1)).to_have_text("Trading")
+            await page.close()
+        finally:
+            await browser.close()
