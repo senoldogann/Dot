@@ -45,12 +45,11 @@ const ACTIVITY_SECTIONS = [
 // What a chat's row says while something of it waits for the owner, ahead of what waits (item 836).
 const WAITS_WORDS = "Waiting for you";
 const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
-// Connect apps at the foot shows the marks of this many servers it is connected to (item 492), another few of them
-// every so often when it is connected to more (item 509).
+// Connect apps at the foot shows the logos of this many services it is connected to (item 492), the same ones while
+// they stay connected: no longer another few every so often (item 853, the owner's ask; item 509 turned them).
 const CONNECTED_MARKS = 3;
 // Where Connect apps leads (item 545): the services' tab of Customize.
 const CONNECTORS_PATH = "#/customize/connectors";
-const MARKS_TURN_MS = 6000;
 // Which sections the owner folded (`chats`, and a channel's by its id: `imessage`), kept between visits; a fold of
 // `waiting` or `working` kept from before item 836, whose groups no longer fold, is not read.
 const FOLDS_KEY = "dot.sideFolds";
@@ -168,16 +167,6 @@ function wearsTeam(chat) {
 function chatFace(chat, state) {
   const { id, look } = chatFaceOf(chat);
   return wearsTeam(chat) ? teamDuo(chat.team, state) : actorFace(id, state, look);
-}
-
-/** A copy of `items` in a random order (Fisher–Yates). */
-function shuffled(items) {
-  const copy = [...items];
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const other = Math.floor(Math.random() * (index + 1));
-    [copy[index], copy[other]] = [copy[other], copy[index]];
-  }
-  return copy;
 }
 
 // The faces a row shows of the runs it delegated, the rest counted (item 507), as the marks of the connected apps stand
@@ -1514,7 +1503,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el("span", { class: "side-connect-label" }, "Connect apps"),
     connectMarks,
   );
-  // The marks of the servers that are ready, each as its service's tile wears it (items 408 and 477).
+  // The logos of the services whose servers are ready, each as its tile wears it (items 408 and 477): only a service's
+  // own logo, not the icon or the plug a server of no logo wears, nor Dot's own (item 853), each service once, in the
+  // order of their names, so that the same ones stand there while they stay connected.
   let readyServers = [];
   async function paintConnected() {
     let found;
@@ -1527,12 +1518,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (disposed) {
       return;
     }
-    readyServers = found.servers.filter((server) => server.state === "ready" && server.mark !== null);
+    const logos = new Set();
+    readyServers = found.servers
+      .filter((server) => server.state === "ready" && server.mark !== null && server.mark.logo !== null)
+      .sort((one, other) => one.name.localeCompare(other.name))
+      .filter((server) => !logos.has(server.mark.logo) && logos.add(server.mark.logo));
     showMarks();
   }
-  /** Show a few of the ready servers' marks, chosen afresh each time. */
+  /** Show the first few of the ready services' logos. */
   function showMarks() {
-    const shown = shuffled(readyServers).slice(0, CONNECTED_MARKS);
+    const shown = readyServers.slice(0, CONNECTED_MARKS);
     connectMarks.replaceChildren(
       ...shown.map((server) => {
         const mark = el("span", { class: "side-connect-mark" }, markContent(server.mark));
@@ -1545,11 +1540,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     );
   }
   paintConnected();
-  const marksTicker = setInterval(() => {
-    if (readyServers.length > CONNECTED_MARKS) {
-      showMarks();
-    }
-  }, MARKS_TURN_MS);
   const foot = el("div", { class: "side-foot" }, settingsLink, connectButton);
   const sideHead = el("div", { class: "side-head", "data-tauri-drag-region": "" }, close, el("span", { class: "side-title" }, dotName()));
   function placeForWidth() {
@@ -1634,7 +1624,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       closeMenu();
       clearInterval(ageTicker);
       clearInterval(workTicker);
-      clearInterval(marksTicker);
       stopLifecycle();
       stopStream();
       window.removeEventListener(SCHEDULES_CHANGED_EVENT, reloadSoon);

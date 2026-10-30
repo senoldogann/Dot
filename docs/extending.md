@@ -230,8 +230,10 @@ same way (`args = ["-y", "some-mcp-server@1.2.3"]`).
 ### Connect apps
 
 **Connect apps** (items 492 and 545), at the foot of the sidebar right of the cog of Settings, on the sidebar's own
-ground as the cog is, opens Customize › Connectors, which it stands for while it is open, wearing the marks of three
-MCP servers that are ready, another three of them every few seconds when more are (item 509). It opened the services
+ground as the cog is, opens Customize › Connectors, which it stands for while it is open, wearing the logos of three
+services whose servers are ready, the first by name and each service once, the same three while they stay connected
+(item 853; item 509 turned them every few seconds): only a service's own logo, not the icon or the plug of a server
+with none, nor Dot's own. It opened the services
 in a dialog of their own until item 545, which gave the page the dialog's chips and its steps in words, so that the
 services have one place, in the look of Plugins. On a phone the button is a round one at the foot of the list of
 chats. The services, where they stand and their steps are `static/js/catalogue.js`'s.
