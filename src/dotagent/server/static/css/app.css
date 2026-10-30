@@ -5266,20 +5266,13 @@ dialog.modal.versions-dialog {
   color: inherit;
 }
 
-/* What Dot and its agents say, the answer and the lines along the way, in a soft bubble (item 832); a bubble that holds
-   a table, code or a picture takes the column's width, as those need it. */
+/* What Dot and its agents say, the answer and the lines along the way, as plain text beside the face, on no fill: only
+   your messages are bubbles (item 854, the owner's ask; item 832 had them in a soft bubble). The text starts where the
+   face's line does. */
 .answer > .prose,
 .bubble.say > .prose {
-  width: fit-content;
   max-width: 100%;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--msg-agent);
-}
-
-.answer > .prose:has(:is(pre, table, .table-scroll, .prose-code, .prose-table, figure, img)),
-.bubble.say > .prose:has(:is(pre, table, .table-scroll, .prose-code, .prose-table, figure, img)) {
-  width: 100%;
+  padding: var(--space-1) 0;
 }
 
 /* Dot's reaction on your message (item 664): a round badge on the bubble's lower left corner, as a chat shows one, away
@@ -6902,7 +6895,7 @@ summary:has(> .chev)::-webkit-details-marker {
   margin: var(--space-2) 0 var(--space-3);
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-lg);
-  /* An attachment of the answer, in the answer's own soft fill (item 832), not a boxed card. */
+  /* A soft fill of its own (`--msg-agent`, which the answers wore until item 854), not a boxed card. */
   background: var(--msg-agent);
   color: var(--text-2);
   font-size: var(--text-sm);

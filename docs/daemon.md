@@ -1043,9 +1043,9 @@ composer); section labels are sentence case; the facts of a row are spans a gap 
 string; an empty page or list stands a mark in a quiet ring, a title and one line that says what brings something there,
 in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages in an ink
 bubble (`--msg-me`: the text's colour in light, one surface raised in the dark), and what Dot and its agents say, the
-answer and the lines along the way, in a soft one (`--msg-agent`), a bubble holding a table, code or a picture as wide
-as the column; the line under an answer that ended well and under your message shows where the pointer rests or the
-focus is (a reaction that stands, a failure and a stop stay in sight; a touch screen shows them always), an answer that
+answer and the lines along the way, as plain text beside the face, on no fill (item 854: a soft bubble until then); the
+line under an answer that ended well and under your message shows where the pointer rests or the focus is (a reaction
+that stands, a failure and a stop stay in sight; a touch screen shows them always), an answer that
 ended well says no word for it ("Finished" went), a file a message names is a chip of its name (its path in the chip's
 title and in a copy of the message), and what a run changed is in the side panel's Changes tab, not under the answer
 (item 841). Controls:
