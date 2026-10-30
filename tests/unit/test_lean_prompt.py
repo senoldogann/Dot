@@ -105,6 +105,30 @@ def test_both_prompts_say_there_is_always_a_way_within_the_rules_of_trust(style:
     assert prompt.index("# There is always a way") < prompt.index("# Trust and safety")
 
 
+# What the owner asked of every run on 2026-10-30, after a day of Dot's own initiative on another project (item 851): a
+# worktree of its own there, releases through the project's CI and never a local build, the product's claims from its
+# source, and its own plan kept: the same words in both styles.
+_PROJECT_RULES: tuple[str, ...] = (
+    "work in a git worktree of your own",
+    "never in its main checkout",
+    "live only through the project's own release",
+    "never by hand or from a local build",
+    "Say of the user's own products only what their source says",
+    "as not verified",
+    "Keep to the plan and the timing you wrote yourself",
+)
+
+
+@pytest.mark.parametrize("style", ["full", "lean"])
+@pytest.mark.parametrize("approvals", ["ask", "yolo"])
+def test_every_run_is_told_how_to_work_in_anothers_project_and_of_the_owners_products(
+    style: PromptStyle, approvals: ApprovalMode
+) -> None:
+    prompt: str = _prompt(style, approvals)
+    for rule in _PROJECT_RULES:
+        assert rule in prompt, rule
+
+
 def test_the_lean_prompt_is_less_than_half_of_the_full_one_which_says_each_tool_at_length() -> None:
     full: str = _prompt("full", "ask")
     lean: str = _prompt("lean", "ask")

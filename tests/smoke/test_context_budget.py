@@ -39,10 +39,14 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 700 for the captcha skill and its prompt rule, and `drag_at` on browser_act (item 792): a human check is
 # solved in the page, so the rule and the drag's two coordinates are carried by every run (22,466 measured; system
 # 7,148, tools 15,292).
-BUDGET_TOKENS: int = 22_800
+# Raised by 100 for the four rules of work in the owner's projects (item 851, the owner's word of 2026-10-30 after a
+# day of Dot's initiative on another project): a worktree of its own, the project's release, the product's source, its
+# own plan (22,855 measured; system 7,355).
+BUDGET_TOKENS: int = 22_900
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
-SYSTEM_BUDGET_TOKENS: int = 7_300
+# Raised by 100 for the rules of item 851 above.
+SYSTEM_BUDGET_TOKENS: int = 7_400
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
