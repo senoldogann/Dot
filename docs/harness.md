@@ -446,8 +446,7 @@ run it learned from and what it decided. *How it learns*, a fold, says the test 
 (the final set), who chooses, and the limits; the test tasks are the guards and the tasks the version in use still
 fails, or, while too few are known, how many of the pool Dot has tried to find them (item 719). A night that only tried
 tasks reads *trying tasks*, and its row says it tried test tasks; one that found every task known says it tried no
-test task (item 762). On a phone the page is a row of the settings list under *How Dot works*,
-which says *built-in* or *changed*.
+test task (item 762). On a phone the page is a tab of *Rules and memory* in the settings list (item 845).
 
 ## What is built so far
 

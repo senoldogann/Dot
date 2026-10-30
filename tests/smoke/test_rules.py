@@ -239,7 +239,7 @@ async def test_a_rule_said_in_plain_words_is_drafted_read_back_and_added(
             choice: Locator = page.get_by_role("combobox", name="It should", exact=True)
             add: Locator = page.get_by_role("button", name="Add rule", exact=True)
             # The line: the box, the choice that starts at asking, and Add rule, off while the box is empty.
-            await expect(page.get_by_role("heading", level=1)).to_have_text("Rules")
+            await expect(page.get_by_role("heading", level=1)).to_have_text("Rules and memory")
             await expect(choice).to_have_value("ask")
             await expect(choice.locator("option")).to_have_text(["Allow on its own", "Ask me first", "Leave it to me"])
             await expect(add).to_be_disabled()

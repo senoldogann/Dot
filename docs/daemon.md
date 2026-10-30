@@ -787,13 +787,17 @@ their own). Which folds are open is kept in the browser. A card that folds keeps
 folded it is a row of the page, as a group of the health checks is (item 576).
 In a Mac's window the sidebar is the settings' nav while they are open (item 562): **Back to chats** (to the chat last
 open; in the desktop app under the traffic lights, whose row holds the button that hides the sidebar where the chats'
-head holds it, item 577) and the tabs in four groups (Interface, Models, How Dot works, This Mac), each with what it
-holds at its right (the main model, how many AI services have a key, how many notes Dot keeps, how many items the vault
-holds, a dot when a phone reaches Dot); whether the daemon answers and the emergency stop are the page's, as on
-every page. The page is the open tab alone, in a column of 920 px under its own name and the line that says what it is
-for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On
-a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
-phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
+head holds it, item 577) and the seven sections (item 845, after fifteen tabs in four groups): **General** (General and
+Snapshots), **Appearance**, **Models** (Models, AI services and Web search), **Rules and memory** (Rules, Memory and
+Self-improvement), **Browser and Vault**, **Phone and channels** and **System**, each with what it holds at its right
+(the main model, how many notes Dot keeps, how many items the vault holds, a dot when a phone reaches Dot); whether the
+daemon answers and the emergency stop are the page's, as on every page. The page is the open tab alone, in a column of
+920 px under its section's name, the row of the section's tabs (a section of one tab has none) and the line that says
+what the tab is for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is
+in the drawer. On a phone they are a list of the seven sections whose rows open each as a page of its own (item 330,
+under [Dot on the phone](phone.md#dot-on-the-phone)). Trading is in no section: it is the Trader agent's (item 847, see
+[Settings › Trading](#settings--trading)). The addresses of the tabs are as they were (`#/settings/keys` opens AI
+services in Models). The earlier addresses of the memory, rules and system pages lead to their tabs, and
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **Snapshots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
 
@@ -848,7 +852,7 @@ carries `positions` and `watch`), `PUT|DELETE /api/trading/key` and `POST /api/t
 
 ### Settings › Vault
 
-**Vault** (item 621, `#/settings/vault`, in the group This Mac) is where you keep the logins, cards and contact details
+**Vault** (item 621, `#/settings/vault`, in the section Browser and Vault, item 845) is where you keep the logins, cards and contact details
 you give Dot. It signs in with a login and types your contact details into pages where a form asks; a card is kept and
 shown to you, and Dot fills it into no page. A login a run made for a new account (`browser_create_login`, item 740) is
 kept here too, with the note "Made by Dot for a new account on …". Passwords and cards are kept in your Mac's Keychain,

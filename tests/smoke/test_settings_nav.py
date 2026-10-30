@@ -1,7 +1,8 @@
 """The settings nav (item 562): in a Mac's window the sidebar holds the settings while they are open, Back to chats and
-the tabs in four groups with what each holds (the daemon's state at its foot left with item 577); the page is the open
-tab alone under its own head. A window too narrow for the docked sidebar has the nav in the drawer, and a phone keeps
-its sidebar and its list of tabs. Before, the sidebar kept the chats and the tabs stood in a column beside the pane, or
+the seven sections with what each holds (item 845, after fifteen tabs in four groups; the daemon's state at its foot
+left with item 577); the page is the open tab alone under its section's head, with the row of the section's tabs. A
+window too narrow for the docked sidebar has the nav in the drawer, and a phone keeps its sidebar and its list of
+sections. Before, the sidebar kept the chats and the tabs stood in a column beside the pane, or
 in a row above it."""
 
 import asyncio
@@ -26,22 +27,13 @@ from dotagent.server.links import ui_url
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "settings-nav-test-token"
-_GROUPS: list[str] = ["Interface", "Models", "How Dot works", "This Mac"]
-_TABS: list[str] = [
+_SECTIONS: list[str] = [
     "General",
     "Appearance",
     "Models",
-    "AI services",
-    "Web search",
-    "Rules",
-    "Memory",
-    "Self-improvement",
-    "Browser",
-    "Vault",
-    "Trading",
-    "Phone",
-    "Channels",
-    "Snapshots",
+    "Rules and memory",
+    "Browser and Vault",
+    "Phone and channels",
     "System",
 ]
 
@@ -118,7 +110,7 @@ async def _opened(browser: Browser, client: httpx.AsyncClient, width: int, tab: 
     return page, base
 
 
-async def test_the_sidebar_holds_the_settings_in_groups_and_follows_the_tab(
+async def test_the_sidebar_holds_the_settings_in_seven_sections_and_follows_the_tab(
     browser: Browser, client: httpx.AsyncClient
 ) -> None:
     # What the tabs show of themselves: a note, a key and the main model.
@@ -134,29 +126,41 @@ async def test_the_sidebar_holds_the_settings_in_groups_and_follows_the_tab(
     await expect(sidebar.get_by_role("link", name="Agents")).to_be_hidden()
     await expect(sidebar.get_by_role("searchbox", name="Search chats")).to_be_hidden()
     await expect(nav.get_by_role("heading", level=2)).to_have_text("Settings")
-    await expect(nav.get_by_role("heading", level=3)).to_have_text(_GROUPS)
-    await expect(nav.locator(".settings-nav-label")).to_have_text(_TABS)
+    await expect(nav.get_by_role("heading", level=3)).to_have_count(0)
+    await expect(nav.locator(".settings-nav-label")).to_have_text(_SECTIONS)
     open_tab = nav.locator("[aria-current='page']")
     await expect(open_tab).to_have_count(1)
     await expect(open_tab.locator(".settings-nav-label")).to_have_text("Models")
-    # What a tab holds stands at the right of its row.
+    # What a section holds stands at the right of its row.
     await expect(nav.get_by_role("link", name="Models")).to_contain_text(SCRIPTED_MODEL.partition(":")[2])
-    await expect(nav.get_by_role("link", name="Memory")).to_contain_text("1")
-    await expect(nav.get_by_role("link", name="AI services")).to_contain_text("1")
+    await expect(nav.get_by_role("link", name="Rules and memory")).to_contain_text("1")
+    # Trading is the Trader agent's, in no section (item 847).
+    await expect(nav.get_by_role("link", name="Trading")).to_have_count(0)
     # Nothing stands at the foot (item 577): the daemon's state is the page's, the connection and the emergency stop's
     # banner.
     await expect(nav.get_by_role("status")).to_have_count(0)
     await expect(nav).not_to_contain_text("Daemon up")
-    # The page is the tab alone under its own head: one h1, the tab's name, and the line that says what it is for.
+    # The page is the tab alone under its section's head: one h1, the section's name, the row of its tabs with the open
+    # one marked, and the line that says what the tab is for.
     await expect(page.get_by_role("heading", level=1)).to_have_text("Models")
+    parts = page.get_by_role("navigation", name="Models")
+    await expect(parts.get_by_role("link")).to_have_text(["Models", "AI services", "Web search"])
+    await expect(parts.locator("[aria-current='page']")).to_have_text("Models")
     await expect(page.locator(".set-lead")).not_to_be_empty()
     await expect(page.locator(".stage-title")).to_be_empty()
 
-    await nav.get_by_role("link", name="AI services").click()
+    await parts.get_by_role("link", name="AI services").click()
     await expect(page).to_have_url(f"{base}/#/settings/keys")
-    await expect(page.get_by_role("heading", level=1)).to_have_text("AI services")
-    await expect(open_tab.locator(".settings-nav-label")).to_have_text("AI services")
+    await expect(page.get_by_role("heading", level=1)).to_have_text("Models")
+    await expect(parts.locator("[aria-current='page']")).to_have_text("AI services")
+    await expect(open_tab.locator(".settings-nav-label")).to_have_text("Models")
     await expect(nav.locator("[aria-current='page']")).to_have_count(1)
+    # A section of one tab has no row of tabs, and a tab of no section, Trading, is named for itself and marks none.
+    await nav.get_by_role("link", name="Appearance").click()
+    await expect(page.locator(".settings-parts")).to_have_count(0)
+    await page.goto(f"{base}/#/settings/trading")
+    await expect(page.get_by_role("heading", level=1)).to_have_text("Trading")
+    await expect(nav.locator("[aria-current='page']")).to_have_count(0)
 
     # The pages under System keep System marked.
     await page.goto(f"{base}/#/diagnostics")
@@ -178,18 +182,23 @@ async def test_the_nav_is_in_the_drawer_of_a_narrow_window(browser: Browser, cli
     await page.get_by_role("button", name="Show sidebar").click()
     nav = sidebar.get_by_role("navigation", name="Settings")
     await expect(nav).to_be_visible()
-    await nav.get_by_role("link", name="Rules").click()
+    await nav.get_by_role("link", name="Rules and memory").click()
     await expect(page).to_have_url(f"{base}/#/settings/rules")
-    await expect(page.get_by_role("heading", level=1)).to_have_text("Rules")
+    await expect(page.get_by_role("heading", level=1)).to_have_text("Rules and memory")
     await expect(sidebar).to_be_hidden()
     await page.close()
 
 
 async def test_a_phone_keeps_its_sidebar_and_its_list_of_tabs(browser: Browser, client: httpx.AsyncClient) -> None:
     page, _ = await _opened(browser, client, 390, "models")
-    # The bar names the tab; the page opens with its line, not a second name.
+    # The bar names the section; the page opens with the row of its tabs and its line, not a second name.
+    await page.goto(page.url.replace("/models", "/keys"))
     await expect(page.locator("h1.stage-h1")).to_have_text("Models")
     await expect(page.locator(".set-title")).to_be_hidden()
+    parts = page.get_by_role("navigation", name="Models")
+    await expect(parts).to_be_visible()
+    await expect(parts.locator("[aria-current='page']")).to_have_text("AI services")
+    assert await page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1
     await expect(page.locator("#sidebar")).not_to_have_attribute("data-mode", "settings")
     await expect(page.get_by_role("navigation", name="Settings")).to_have_count(0)
     await page.close()
