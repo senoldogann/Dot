@@ -1295,6 +1295,12 @@
   gap: 8px;
 }
 
+/* Back to chats, at the foot of the nav under the sections (item 852). */
+.settings-nav-foot {
+  flex: none;
+  padding-top: var(--space-2);
+}
+
 .settings-back {
   display: inline-flex;
   align-items: center;
@@ -1311,17 +1317,13 @@
 }
 
 /* In the desktop shell the nav's first row is its head, the lights' (item 577, above): it runs from the sidebar's top
-   to its edges, and Back to chats stands under it, as wide as its words (settingsnav.js). */
+   to its edges. Back to chats stands at the nav's foot (item 852, settingsnav.js). */
 :root[data-shell="desktop"] .settings-nav {
   padding-top: 0;
 }
 
 :root[data-shell="desktop"] .settings-nav-top {
   margin-inline: -8px;
-}
-
-.settings-nav > .settings-back {
-  align-self: flex-start;
 }
 
 .settings-nav-title {

@@ -794,12 +794,14 @@ that is shut until it is opened (item 625), the facts of Dot in four groups each
 value (item 378: this Dot, how it acts, what it works with and its models), the permissions and the ways to **Diagnostics** and **Open source licences**, pages of
 their own). Which folds are open is kept in the browser. A card that folds keeps its head on its ground, so that
 folded it is a row of the page, as a group of the health checks is (item 576).
-In a Mac's window the sidebar is the settings' nav while they are open (item 562): **Back to chats** (to the chat last
-open; in the desktop app under the traffic lights, whose row holds the button that hides the sidebar where the chats'
-head holds it, item 577) and the seven sections (item 845, after fifteen tabs in four groups): **General** (General and
+In a Mac's window the sidebar is the settings' nav while they are open (item 562): its first row holds the button that
+hides the sidebar where the chats' head holds it (in the desktop app beside the traffic lights, item 577), then the
+seven sections, and at its foot **Back to chats**, to the chat last open (item 852; it stood at the top). The seven
+sections (item 845, after fifteen tabs in four groups) are **General** (General and
 Snapshots), **Appearance**, **Models** (Models, AI services and Web search), **Rules and memory** (Rules, Memory and
 Self-improvement), **Browser and Vault**, **Phone and channels** and **System**, each with what it holds at its right
-(the main model, how many notes Dot keeps, how many items the vault holds, a dot when a phone reaches Dot); whether the
+(how many notes Dot keeps, how many items the vault holds, a dot when a phone reaches Dot; no model's name, item 852);
+whether the
 daemon answers and the emergency stop are the page's, as on every page. The page is the open tab alone, in a column of
 920 px under its section's name, the row of the section's tabs (a section of one tab has none) and the line that says
 what the tab is for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is
@@ -1449,7 +1451,8 @@ the agent itself. On a Mac that has no Dot, the shell installs one first (**Inst
 - **One interface.** The window is the web UI at the size the screenshot tour reviews (1280 × 860, down to a
   phone's 390 wide). The system draws only the traffic lights over the page, on the centre line of the top bars with
   room above and below them; the page keeps room for them in the sidebar's head, as tall as the top bar so that its
-  button stands on the same line (the settings' nav has the same head, with Back to chats under it, item 577), or in
+  button stands on the same line (the settings' nav has the same head, item 577, and Back to chats at its foot, item
+  852), or in
   the top bar while the sidebar is away, and the window drags by those bars.
   The themes, the colour scheme and the density are the web UI's own settings.
 - **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults without

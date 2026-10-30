@@ -113,7 +113,7 @@ async def _opened(browser: Browser, client: httpx.AsyncClient, width: int, tab: 
 async def test_the_sidebar_holds_the_settings_in_seven_sections_and_follows_the_tab(
     browser: Browser, client: httpx.AsyncClient
 ) -> None:
-    # What the tabs show of themselves: a note, a key and the main model.
+    # What the sections show of themselves: a note's count, and no model's name (item 852).
     noted = await client.post("/api/memories", json={"content": "A fact for the nav.", "tags": []})
     assert noted.status_code == 201, noted.text
     keyed = await client.post("/api/keys/OPENAI_API_KEY", json={"value": "sk-test-0123456789abcdef"})
@@ -132,7 +132,12 @@ async def test_the_sidebar_holds_the_settings_in_seven_sections_and_follows_the_
     await expect(open_tab).to_have_count(1)
     await expect(open_tab.locator(".settings-nav-label")).to_have_text("Models")
     # What a section holds stands at the right of its row.
-    await expect(nav.get_by_role("link", name="Models")).to_contain_text(SCRIPTED_MODEL.partition(":")[2])
+    # Models shows no model's name, which ran long beside it (item 852).
+    await expect(nav.get_by_role("link", name="Models")).not_to_contain_text(SCRIPTED_MODEL.partition(":")[2])
+    # Back to chats stands at the foot of the nav, under the sections (item 852).
+    back_box = await nav.get_by_role("link", name="Back to chats").bounding_box()
+    last_box = await nav.locator(".settings-nav-link").last.bounding_box()
+    assert back_box is not None and last_box is not None and back_box["y"] > last_box["y"], (back_box, last_box)
     await expect(nav.get_by_role("link", name="Rules and memory")).to_contain_text("1")
     # Trading is the Trader agent's, in no section (item 847).
     await expect(nav.get_by_role("link", name="Trading")).to_have_count(0)

@@ -4,7 +4,7 @@ wide) and as a small one (320 px), on a served daemon with three notes and the O
 On a phone:
 
 - `#/settings` is one card of seven rows, one a section (item 845, after four groups of fifteen tabs): Appearance tells
-  the theme on screen, Models the main model and Rules and memory how many notes Dot keeps;
+  the theme on screen and Rules and memory how many notes Dot keeps (Models no model's name, item 852);
 - a row opens its section's first tab as a page of its own: the bar names the section, its Back at the top left (item
   338) is the one way back and no rail shows, only the row of the section's tabs; Back leads to the list;
 - a card's name stands over the card, out of its surface;
@@ -59,10 +59,11 @@ _NOTES: tuple[str, ...] = (
     "The team stand-up is at 09:30 on weekdays.",
     "Writes reports in British English.",
 )
-# What the rows that hold something say: the theme picked (`dot.theme`), the main model's name and the notes.
+# What the rows that hold something say: the theme picked (`dot.theme`) and the notes; Models shows no model's name
+# (item 852).
 _VALUES: dict[str, str] = {
     "Appearance": "Ocean",
-    "Models": SCRIPTED_MODEL.partition(":")[2],
+    "Models": "",
     "Rules and memory": str(len(_NOTES)),
 }
 # How far past the screen's edge the page may reach: none, but the rounding of a fraction.
@@ -171,7 +172,8 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                 rows: Locator = listed.get_by_role("link")
                 await expect(rows.locator(".settings-row-label")).to_have_text(list(_TABS.values()))
                 for name, value in _VALUES.items():
-                    await expect(rows.filter(has_text=name).locator(".settings-row-value")).to_have_text(value)
+                    held: Locator = rows.filter(has_text=name).locator(".settings-row-value")
+                    await (expect(held).to_have_text(value) if value else expect(held).to_have_count(0))
                 await expect(page.locator("h1.stage-h1")).to_have_text("Settings")
                 faults += await _fits(page, f"{device} list")
 

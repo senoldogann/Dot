@@ -111,8 +111,8 @@ the name of a plugin is not cut by an ellipsis while there is room for it, which
 
 On a phone the settings open on a list of their seven sections (items 330 and 845): General, Appearance, Models, Rules
 and memory, Browser and Vault, Phone and channels and System, each row a section's name and what it holds (the theme on
-screen, the main model, how many notes there are, how many items the vault holds). A row opens its section on its own,
-the bar naming it and the row of the section's tabs under it, and a card's name stands over the
+screen, how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its
+section on its own, the bar naming it and the row of the section's tabs under it, and a card's name stands over the
 card, as a section's title does on the redrawn tabs (item 576); a card that folds keeps its name on its ground. In a
 Mac's window the sidebar is the settings' nav while they are open, the same seven sections (item 562); see
 [the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
