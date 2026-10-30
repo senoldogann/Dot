@@ -2832,11 +2832,6 @@
   justify-content: flex-end;
 }
 
-.note-pin[aria-pressed="true"],
-.note-actions .note-pin[aria-pressed="true"] {
-  color: var(--accent);
-}
-
 @container (max-width: 640px) {
   .note-order {
     padding-inline: var(--space-4);

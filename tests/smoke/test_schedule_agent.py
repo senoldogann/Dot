@@ -21,6 +21,7 @@ from form_dialogs import (
     shows_the_failure,
 )
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from row_menu import more_of, open_row_form
 
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.manager import RunManager
@@ -343,7 +344,8 @@ async def test_the_form_offers_the_agents_and_the_row_names_its_agent(
                 await expect(row.locator(".chip", has_text="Approvals: Auto-accept edits")).to_be_visible()
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"agent-{width}-{scheme}.png"), full_page=True)
-                dialog: Locator = await open_form(page, page.get_by_role("button", name="Edit guided"), "Edit schedule")
+                guided: Locator = page.locator("[data-schedule]", has_text="guided").first
+                dialog: Locator = await open_row_form(page, guided, "Edit", "Edit schedule")
                 await keeps_inside_the_window(page)
                 await foot_is_in_view(page, dialog)
                 await page.screenshot(path=str(tmp_path / f"agent-form-{width}-{scheme}.png"))
@@ -470,9 +472,10 @@ async def test_new_schedule_and_edit_are_a_dialog_that_fits_asks_before_it_drops
                 row: Locator = page.locator("[data-schedule]", has_text="Too often")
                 await expect(row).to_have_count(1)
                 await expect(opener).to_be_focused()
-                # Its Edit opens the same dialog, filled; Escape gives the focus back to that Edit button.
-                edit: Locator = row.get_by_role("button", name="Edit Too often")
-                dialog = await open_form(page, edit, "Edit schedule")
+                # Its Edit, in its "…" (item 848), opens the same dialog, filled; Escape gives the focus back to the
+                # "…".
+                edit: Locator = more_of(row)
+                dialog = await open_row_form(page, row, "Edit", "Edit schedule")
                 await expect(dialog.get_by_label("Name", exact=True)).to_have_value("Too often")
                 await expect(dialog.get_by_label("Custom timing", exact=True)).to_have_value("0 9 * * 1-5")
                 await expect(dialog.get_by_role("switch", name="Switched on")).to_have_attribute("aria-checked", "true")

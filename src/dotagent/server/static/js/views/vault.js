@@ -9,7 +9,7 @@ import { api } from "../api.js";
 import { debounce, el, foldSearch, plural, setText } from "../dom.js";
 import { dotName } from "../face.js";
 import { icon } from "../icons.js";
-import { openMenu } from "../menu.js";
+import { moreButton, openMenu } from "../menu.js";
 import { emptyPanel, inlineError, inlineLoading, segmented, setCard, setSection } from "../panels.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 import { itemMatches, reportWords, rowWords } from "../vaultitems.js";
@@ -28,21 +28,17 @@ const TABS = [
 const KIND_MARK = { login: "key", card: "creditCard", contact: "contact" };
 const KIND_NAME = { login: "login", card: "card", contact: "contact" };
 
-/** One item as a row: its mark, its words, and Edit and Delete. */
+/** One item as a row: its mark, its words, and its "…" with Edit and Delete (item 848: one action a row). */
 function itemRow(item, actions) {
   const { title, sub } = rowWords(item);
-  const edit = el(
-    "button",
-    { class: "btn ghost sm icon-only", type: "button", title: `Edit ${title}`, "aria-label": `Edit ${title}`, "aria-haspopup": "dialog" },
-    icon("pencil"),
-  );
-  const remove = el(
-    "button",
-    { class: "btn ghost sm icon-only", type: "button", title: `Delete ${title}`, "aria-label": `Delete ${title}` },
-    icon("trash"),
-  );
-  edit.addEventListener("click", () => actions.edit(item));
-  remove.addEventListener("click", () => actions.remove(item));
+  const more = moreButton({
+    name: title,
+    items: () => [
+      { label: "Edit", icon: "pencil", run: () => actions.edit(item) },
+      "separator",
+      { label: "Delete", icon: "trash", danger: true, run: () => actions.remove(item) },
+    ],
+  });
   return el(
     "div",
     { class: "vault-row", dataset: { vaultItem: item.id, kind: item.kind } },
@@ -54,7 +50,7 @@ function itemRow(item, actions) {
       el("div", { class: "vault-sub" }, sub),
       item.kind === "card" && Object.keys(item.fields).length > 0 ? el("div", { class: "vault-sub" }, "With a billing address") : null,
     ),
-    el("div", { class: "vault-actions" }, edit, remove),
+    el("div", { class: "vault-actions" }, more),
   );
 }
 
@@ -309,7 +305,7 @@ export function mount(root, ctx) {
     edit: (item) => {
       const open = { login: openLoginDialog, card: openCardDialog, contact: openContactDialog }[item.kind];
       // The list is drawn again once the item is saved: the row's own Edit is found anew.
-      open({ existing: item, returnFocus: () => root.querySelector(`[data-vault-item="${item.id}"] [aria-haspopup="dialog"]`), done: saved });
+      open({ existing: item, returnFocus: () => root.querySelector(`[data-vault-item="${item.id}"] .row-more`), done: saved });
     },
     remove: (item) =>
       attempt(async () => {

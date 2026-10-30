@@ -11,19 +11,43 @@ import { attempt, detailsFold } from "./ui.js";
 const STATUS_LABEL = { blocked: "waiting" };
 const FOLD_KEY_PREFIX = "dot.fold.";
 
-/** The heading of a page: a title, an optional one-line subtitle and optional controls on the right. */
+/** The heading of a page: a title, an optional one-line subtitle and optional controls on the right. The subtitle
+ * stands behind an (i) beside the title in the bar (item 848), so that the page opens on what it holds. */
 export function pageHead(title, subtitle, actions) {
-  setStageTitle(el("h1", { class: "stage-h1" }, title));
-  return paneHead(subtitle, actions);
+  const about = subtitle === "" ? null : aboutToggle(subtitle, `About ${title}`, "grow page-sub");
+  setStageTitle(el("h1", { class: "stage-h1" }, title), about?.button ?? null);
+  return paneHead(about?.note ?? null, actions);
 }
 
 /** The line under the bar on a page whose name the bar already shows: the description and the actions; nothing when
  * both are empty. */
-function paneHead(subtitle, actions) {
-  if (subtitle === "" && actions === null) {
+function paneHead(note, actions) {
+  if (note === null && actions === null) {
     return null;
   }
-  return el("div", { class: "page-head" }, el("div", { class: "grow page-sub" }, subtitle), actions);
+  return el("div", { class: "page-head" }, note, actions);
+}
+
+let aboutCount = 0;
+
+/**
+ * A paragraph that says what a page or a part of it is for, behind an (i) (item 848): `button`, an (i) that shows it
+ * or hides it again, and `note`, the paragraph, hidden until then; `label` names the button for a screen reader, and
+ * `noteClass` is the paragraph's class. A page that opens on its rows says in a press what they are for.
+ */
+export function aboutToggle(text, label, noteClass = "hint") {
+  aboutCount += 1;
+  const note = el("p", { class: `${noteClass} about-note`, id: `about-${aboutCount}`, hidden: true }, text);
+  const button = el(
+    "button",
+    { class: "icon-btn about-btn", type: "button", title: label, "aria-label": label, "aria-expanded": "false", "aria-controls": note.id },
+    icon("info"),
+  );
+  button.addEventListener("click", () => {
+    note.hidden = !note.hidden;
+    button.setAttribute("aria-expanded", String(!note.hidden));
+  });
+  return { button, note };
 }
 
 /**

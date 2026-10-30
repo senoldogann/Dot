@@ -19,7 +19,7 @@ export function closeMenu() {
 }
 
 /** One entry of a menu: a choice, or the line between two groups of them. */
-/** @typedef {"separator" | { label: string, icon: string, danger?: boolean, run: () => void }} MenuEntry */
+/** @typedef {"separator" | { label: string, icon: string, danger?: boolean, title?: string, run: () => void }} MenuEntry */
 
 /** Whether the menu open now is the one `button` opened. */
 export function menuOpenedBy(button) {
@@ -27,7 +27,7 @@ export function menuOpenedBy(button) {
 }
 
 /**
- * `openMenu({ label, items, at, back, button })`: `items` are `{ label, icon, danger, run }`, with `"separator"`
+ * `openMenu({ label, items, at, back, button })`: `items` are `{ label, icon, danger, title, run }`, with `"separator"`
  * between groups; `at` is the point `{ x, y }` of the window where the menu's corner goes, moved in where the window
  * ends; `back` is the element the focus goes back to when a key closes the menu; `button`, when a button opened it, is
  * left to close it again, and says the menu is open. A chosen item closes the menu and gives the focus back, then
@@ -47,7 +47,8 @@ export function openMenu({ label, items, at, back, button }) {
       }
       const choice = el(
         "button",
-        { class: item.danger ? "menu-item danger" : "menu-item", type: "button", role: "menuitem", tabindex: "-1" },
+        // `title` says more of the choice where the pointer rests on it (a schedule's Run now: it does real work).
+        { class: item.danger ? "menu-item danger" : "menu-item", type: "button", role: "menuitem", tabindex: "-1", title: item.title ?? null },
         icon(item.icon),
         el("span", null, item.label),
       );
@@ -122,4 +123,27 @@ export function openMenu({ label, items, at, back, button }) {
   window.addEventListener("resize", away);
   window.addEventListener("hashchange", away);
   choices[0]?.focus({ preventScroll: true });
+}
+
+/**
+ * A row's "…" (item 848): a button that opens the menu of `items()` (read at each press, `MenuEntry` as `openMenu`
+ * takes them) under it, and closes it when pressed again, so that a row shows one action and keeps the rest a press
+ * away. `name` says what the actions are of, for the button's name ("More for <name>") and the menu's.
+ * @param {{ name: string, items: () => MenuEntry[] }} more
+ */
+export function moreButton({ name, items }) {
+  const button = el(
+    "button",
+    { class: "btn ghost sm icon-only row-more", type: "button", title: "More", "aria-label": `More for ${name}`, "aria-haspopup": "menu", "aria-expanded": "false" },
+    icon("ellipsis"),
+  );
+  button.addEventListener("click", () => {
+    if (menuOpenedBy(button)) {
+      closeMenu();
+      return;
+    }
+    const box = button.getBoundingClientRect();
+    openMenu({ label: name, items: items(), at: { x: box.left, y: box.bottom + 4 }, back: button, button });
+  });
+  return button;
 }

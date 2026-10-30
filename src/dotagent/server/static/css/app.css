@@ -732,6 +732,30 @@ a.pill:hover {
   display: none;
 }
 
+/* With the description behind its (i) (item 848), the actions keep the right; a head with nothing shown takes no room. */
+.page-head > .page-sub[hidden] + * {
+  margin-left: auto;
+}
+
+.page-head:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+/* The (i) that shows what a page or a part of it is for: quiet until pressed, beside the name it is of. */
+.about-btn {
+  flex: none;
+  color: var(--muted);
+}
+
+.about-btn[aria-expanded="true"] {
+  color: var(--text);
+}
+
+/* Beside the name of a part, not at the far end of its head. */
+:is(.agents-part-head, .gallery-section-head) > .about-btn {
+  margin-right: auto;
+}
+
 .banner {
   display: flex;
   align-items: center;

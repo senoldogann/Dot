@@ -24,6 +24,7 @@ from form_dialogs import (
 )
 from PIL import Image, ImageDraw, ImageFont
 from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
+from row_menu import choose, open_row_form
 from test_plain_words import JARGON, RUN_AS_A_THING, VISIBLE
 from vault_stand_ins import MemorySecretStore
 
@@ -402,8 +403,8 @@ async def test_edit_shows_a_secret_only_when_its_eye_is_pressed_and_delete_remov
     page: Page = await _open(browser, address)
     try:
         row: Locator = page.locator("[data-vault-item][data-kind=login]", has_text="github.com")
-        edit: Locator = row.get_by_role("button", name="Edit github.com")
-        dialog: Locator = await open_form(page, edit, "Edit login")
+        # Edit is in the row's "…" (item 848).
+        dialog: Locator = await open_row_form(page, row, "Edit", "Edit login")
         password: Locator = dialog.get_by_label("Password", exact=True)
         await expect(dialog.get_by_role("textbox", name="Website")).to_have_value("github.com")
         await expect(password).to_have_value("")
@@ -416,7 +417,7 @@ async def test_edit_shows_a_secret_only_when_its_eye_is_pressed_and_delete_remov
             page, dialog, dialog.get_by_role("textbox", name="Username or email (optional)"), "x"
         )
         # Changing only the username keeps the password.
-        dialog = await open_form(page, row.get_by_role("button", name="Edit github.com"), "Edit login")
+        dialog = await open_row_form(page, row, "Edit", "Edit login")
         await dialog.get_by_role("textbox", name="Username or email (optional)").fill("ada@elsewhere.example")
         await dialog.get_by_role("button", name="Save login").click()
         await expect(dialog).to_have_count(0)
@@ -425,7 +426,7 @@ async def test_edit_shows_a_secret_only_when_its_eye_is_pressed_and_delete_remov
         assert PASSWORD not in await page.content()
         # A card: the saved number is hidden; the eye shows it.
         card: Locator = page.locator("[data-vault-item][data-kind=card]", has_text="Travel")
-        dialog = await open_form(page, card.get_by_role("button", name="Edit Travel"), "Edit card")
+        dialog = await open_row_form(page, card, "Edit", "Edit card")
         number: Locator = dialog.get_by_label("Card number", exact=True)
         await expect(number).to_have_attribute("placeholder", "Saved: •••• 4242")
         await expect(dialog.get_by_label("City")).to_have_value("Izmir")
@@ -435,12 +436,12 @@ async def test_edit_shows_a_secret_only_when_its_eye_is_pressed_and_delete_remov
         await expect(dialog).to_have_count(0)
         # Delete asks first; a no leaves the item; a yes removes it and its Keychain item.
         before: int = len(keychain.kept)
-        await row.get_by_role("button", name="Delete github.com").click()
+        await choose(row, "Delete")
         question: Locator = page.get_by_role("dialog", name="Delete this login?")
         await expect(question).to_be_visible()
         await question.get_by_role("button", name="Cancel").click()
         await expect(row).to_have_count(1)
-        await row.get_by_role("button", name="Delete github.com").click()
+        await choose(row, "Delete")
         await question.get_by_role("button", name="Delete", exact=True).click()
         await expect(row).to_have_count(0)
         await expect(_tab(page, "Logins, 1")).to_be_visible()
@@ -470,7 +471,7 @@ async def test_select_ticks_rows_a_shift_click_ticks_a_run_and_delete_removes_th
         await expect(boxes).to_have_count(6)
         await expect(page.get_by_role("checkbox", name="github.com, ada@example.com")).to_be_visible()
         # No Edit or Delete on a row while its tick is shown.
-        await expect(page.get_by_role("button", name="Edit github.com")).to_have_count(0)
+        await expect(page.locator(".vault-row .row-more")).to_have_count(0)
         await bar.get_by_role("button", name="Select all").click()
         await expect(bar.get_by_text("6 items selected")).to_be_visible()
         await bar.get_by_role("button", name="Clear").click()
@@ -577,7 +578,7 @@ async def test_a_saved_name_on_a_card_is_kept_when_left_alone_and_read_by_its_ey
     page: Page = await _open(browser, address)
     try:
         card: Locator = page.locator("[data-vault-item][data-kind=card]", has_text="Everyday")
-        dialog: Locator = await open_form(page, card.get_by_role("button", name="Edit Everyday"), "Edit card")
+        dialog: Locator = await open_row_form(page, card, "Edit", "Edit card")
         name: Locator = dialog.get_by_label("Name on the card (optional)")
         await expect(name).to_have_value("")
         await expect(name).to_have_attribute("placeholder", "Saved: write to change it")
@@ -589,7 +590,7 @@ async def test_a_saved_name_on_a_card_is_kept_when_left_alone_and_read_by_its_ey
         assert keychain.kept[made.id]["name"] == "Ada Lovelace"
         # The eye reads it; emptied, it goes, and the rest of the card stays.
         card = page.locator("[data-vault-item][data-kind=card]", has_text="Daily")
-        dialog = await open_form(page, card.get_by_role("button", name="Edit Daily"), "Edit card")
+        dialog = await open_row_form(page, card, "Edit", "Edit card")
         name = dialog.get_by_label("Name on the card (optional)")
         await dialog.get_by_role("button", name="Show the name on the card").click()
         await expect(name).to_have_value("Ada Lovelace")
@@ -616,7 +617,7 @@ async def test_the_eye_asks_the_daemon_each_time_it_shows_a_secret_and_hides_it_
         asked: list[str] = []
         page.on("request", lambda request: asked.append(request.url) if request.url.endswith("/reveal") else None)
         row: Locator = page.locator("[data-vault-item][data-kind=login]", has_text="github.com")
-        dialog: Locator = await open_form(page, row.get_by_role("button", name="Edit github.com"), "Edit login")
+        dialog: Locator = await open_row_form(page, row, "Edit", "Edit login")
         password: Locator = dialog.get_by_label("Password", exact=True)
         assert not shown.on_screen()
         await dialog.get_by_role("button", name="Show the password").click()
@@ -675,7 +676,7 @@ async def test_a_secret_the_eye_showed_is_not_left_in_the_page_once_it_is_hidden
         asked: list[str] = []
         page.on("request", lambda request: asked.append(request.url) if request.url.endswith("/reveal") else None)
         row: Locator = page.locator("[data-vault-item][data-kind=login]", has_text="github.com")
-        dialog: Locator = await open_form(page, row.get_by_role("button", name="Edit github.com"), "Edit login")
+        dialog: Locator = await open_row_form(page, row, "Edit", "Edit login")
         password: Locator = dialog.get_by_label("Password", exact=True)
         box: Locator = dialog.get_by_label("Notes (optional)")
         # Hidden, the saved secrets are in no box, and the notes take no text until they are shown.
@@ -725,7 +726,7 @@ async def test_a_secret_the_eye_showed_is_not_left_in_the_page_once_it_is_hidden
         assert {"password": PASSWORD, "notes": "changed notes 4455"} in saved, saved
         # A card's number: a password input while it is hidden, and nothing of a saved one is left in the page.
         card: Locator = page.locator("[data-vault-item][data-kind=card]", has_text="Travel")
-        dialog = await open_form(page, card.get_by_role("button", name="Edit Travel"), "Edit card")
+        dialog = await open_row_form(page, card, "Edit", "Edit card")
         number: Locator = dialog.get_by_label("Card number", exact=True)
         await expect(number).to_have_attribute("type", "password")
         await dialog.get_by_role("button", name="Show the card number").click()
@@ -916,12 +917,12 @@ async def test_the_page_and_its_dialogs_say_what_they_do_in_words_someone_who_kn
             await expect(importing).to_have_count(0)
             for kind, title in (("login", "github.com"), ("card", "Travel"), ("contact", "Home")):
                 row: Locator = page.locator(f"[data-vault-item][data-kind={kind}]", has_text=title)
-                dialog = await open_form(page, row.get_by_role("button", name=f"Edit {title}"), f"Edit {kind}")
+                dialog = await open_row_form(page, row, "Edit", f"Edit {kind}")
                 problems += await _jargon(page, f"Edit {kind} ({width})")
                 await page.keyboard.press("Escape")
                 await expect(dialog).to_have_count(0)
             card: Locator = page.locator("[data-vault-item][data-kind=card]", has_text="Travel")
-            await card.get_by_role("button", name="Delete Travel").click()
+            await choose(card, "Delete")
             question: Locator = page.get_by_role("dialog", name="Delete this card?")
             await expect(question).to_be_visible()
             problems += await _jargon(page, f"Delete this card? ({width})")
@@ -948,7 +949,7 @@ async def test_on_a_phone_the_page_and_every_dialog_fit_the_window(
             await page.keyboard.press("Escape")
             await expect(dialog).to_have_count(0)
         row: Locator = page.locator("[data-vault-item][data-kind=card]", has_text="Travel")
-        dialog = await open_form(page, row.get_by_role("button", name="Edit Travel"), "Edit card")
+        dialog = await open_row_form(page, row, "Edit", "Edit card")
         await foot_is_in_view(page, dialog)
         await keeps_inside_the_window(page)
         await dialog.get_by_role("button", name="Cancel").click()

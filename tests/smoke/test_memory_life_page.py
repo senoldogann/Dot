@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from row_menu import choose, more_of
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -265,22 +266,17 @@ async def test_a_note_is_pinned_and_a_merged_note_says_what_it_was_made_of_and_i
         await expect(page.locator(f"[data-memory='{one.id}']")).to_contain_text("Merged into another note")
         await expect(page.locator(f"[data-memory='{one.id}']")).to_contain_text("Resting since")
 
-        # Pin and unpin: the badge and the button say which.
+        # Pin and unpin, from the row's "…" (item 848): the badge and the menu's words say which.
         garden: Locator = page.locator(f"[data-memory='{plain.id}']")
-        pin: Locator = garden.get_by_role("button", name="Pin this note")
-        await expect(pin).to_have_attribute("aria-pressed", "false")
-        await pin.click()
+        await choose(garden, "Pin it")
         await expect(garden.locator(".badge", has_text="Pinned")).to_be_visible()
-        await expect(garden.get_by_role("button", name="Take the pin off this note")).to_have_attribute(
-            "aria-pressed", "true"
-        )
         assert (await runtime.store.get_memory(plain.id)).pinned_at is not None
-        await garden.get_by_role("button", name="Take the pin off this note").click()
+        await choose(garden, "Take the pin off")
         await expect(garden.locator(".badge", has_text="Pinned")).to_have_count(0)
         assert (await runtime.store.get_memory(plain.id)).pinned_at is None
 
         # Undo the merge: it asks, the notes it took in wake apart and the merged note goes to the trash.
-        await row.get_by_role("button", name="Undo this merge").click()
+        await choose(row, "Undo the merge")
         dialog: Locator = page.get_by_role("dialog")
         await expect(dialog).to_contain_text("2 notes come back on their own")
         await dialog.get_by_role("button", name="Undo the merge").click()
@@ -371,7 +367,7 @@ async def test_the_life_of_the_notes_fits_a_phone(
                 _proposed(page).get_by_role("button", name="Forget all 2"),
                 _proposed(page).get_by_role("button", name="Keep", exact=True).first,
                 _trash(page).get_by_role("button", name="Restore"),
-                page.get_by_role("button", name="Undo this merge"),
+                more_of(page.locator("[data-memory]", has=page.locator(".badge", has_text="Merged from"))),
             ):
                 box = await locator.bounding_box()
                 assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= width, (width, box)

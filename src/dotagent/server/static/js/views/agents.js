@@ -18,7 +18,7 @@ import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
 import { readFolds, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
-import { errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
+import { aboutToggle, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { APPROVAL_OPTIONS, heldChoice, KEPT_GOAL_MODE } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { setStageTitle, setStageTools } from "../stage.js";
@@ -570,20 +570,23 @@ function mountList(root, ctx) {
   const editorSlot = el("div", null);
   // The page in parts (items 509 and 610): the teams the owner has, the agents the owner has, then the ready-made ones
   // to add, a team or one agent at a time, one of the two shown.
+  // What each part is for stands behind an (i) beside its name (item 848).
   const teamsCount = el("span", { class: "agents-count" });
+  const teamsAbout = aboutToggle("Open a team to give it work: Dot leads it, hands each agent the part its role fits and puts their answers together.", "About your teams");
   const yourTeams = el(
     "section",
     { class: "agents-part", "aria-label": "Your teams" },
-    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your teams", teamsCount)),
-    el("p", { class: "hint" }, "Open a team to give it work: Dot leads it, hands each agent the part its role fits and puts their answers together."),
+    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your teams", teamsCount), teamsAbout.button),
+    teamsAbout.note,
     teamsHolder,
   );
   const mineCount = el("span", { class: "agents-count" });
+  const mineAbout = aboutToggle("Open one to give it work, read its chats or change it. Ask Dot for a big job and it hands parts to them.", "About your agents");
   const yours = el(
     "section",
     { class: "agents-part", "aria-label": "Your agents" },
-    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your agents", mineCount)),
-    el("p", { class: "hint" }, "Open one to give it work, read its chats or change it. Ask Dot for a big job and it hands parts to them."),
+    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your agents", mineCount), mineAbout.button),
+    mineAbout.note,
     holder,
   );
   const templates = el("section", { class: "agents-part", "aria-label": "Templates" }, loadingPanel());
@@ -620,16 +623,20 @@ function mountList(root, ctx) {
       const listingProblem = named.problem;
       const byId = new Map(listed.map((template) => [template.id, template]));
       if (!disposed) {
-        // `replaceChildren` draws a null as the word "null": the cards' note is a child only when there is one.
+        // `replaceChildren` draws a null as the word "null": the cards' note is a child only when there is one. What each
+        // pane is for stands behind the (i) of the head, the shown pane's (item 848).
+        const abouts = {
+          teams: aboutToggle(
+            "A few agents that work together, made in one click: ask Dot or any of them, and they hand each other the parts their roles fit. An agent of that name you have already is kept, and joins the team.",
+            "About the ready-made teams",
+          ),
+          single: aboutToggle("One agent of yours, to change as you like. What one writes to a person is a draft that you send.", "About the ready-made agents"),
+        };
         const panes = {
           teams: el(
             "div",
             { class: "stack tight", dataset: { pane: "teams" } },
-            el(
-              "p",
-              { class: "hint" },
-              "A few agents that work together, made in one click: ask Dot or any of them, and they hand each other the parts their roles fit. An agent of that name you have already is kept, and joins the team.",
-            ),
+            abouts.teams.note,
             ...(summaries.problem === null
               ? []
               : [
@@ -644,7 +651,7 @@ function mountList(root, ctx) {
           single: el(
             "div",
             { class: "stack tight", dataset: { pane: "single" } },
-            el("p", { class: "hint" }, "One agent of yours, to change as you like. What one writes to a person is a draft that you send."),
+            abouts.single.note,
             ...(listingProblem === null
               ? []
               : [
@@ -669,6 +676,7 @@ function mountList(root, ctx) {
           }
           for (const [key, pane] of Object.entries(panes)) {
             pane.hidden = key !== id;
+            abouts[key].button.hidden = key !== id;
           }
         };
         show(shownPane);
@@ -677,6 +685,8 @@ function mountList(root, ctx) {
             "div",
             { class: "agents-part-head" },
             el("h2", { class: "section-label" }, "Add ready-made agents"),
+            abouts.teams.button,
+            abouts.single.button,
             el("div", { class: "segmented", role: "group", "aria-label": "Ready-made agents" }, buttons),
           ),
           panes.teams,

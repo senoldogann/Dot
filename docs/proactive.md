@@ -22,7 +22,8 @@ more than 300 characters) is said inside it, with what you typed still there.
 [Schedules](memory-and-schedules.md#schedules)), marked as the brief, so that it shows in the list under the card with a
 **Brief** label, and switches off there too, which the card follows. It fires once at its time; a firing missed because
 the daemon was off or the Mac asleep is skipped, not replayed; its failures count as any schedule's (`[scheduler]
-stop_after_failures`). Its row has no form of its own: its pencil opens the brief's settings, since its goal is not text
+stop_after_failures`). Its row has no form of its own: **Edit the brief's settings**, in its **…**, opens them, since
+its goal is not text
 you edit. A brief that was never switched on makes no schedule, and one switched off keeps its schedule (switched off)
 and what you set.
 

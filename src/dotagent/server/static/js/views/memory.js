@@ -10,6 +10,7 @@ import { api, query } from "../api.js";
 import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { orderControl, proposedSection, trashSection } from "../memorylife.js";
+import { moreButton } from "../menu.js";
 import { emptyPanel, field, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 
@@ -155,7 +156,7 @@ function mergedBadge(record) {
 }
 
 /**
- * One note with its tags, its age, who wrote it and buttons to pin, correct or forget it (and to take back the merge that
+ * One note with its tags, its age, who wrote it and its "…" to pin, correct or forget it (and to take back the merge that
  * made it). `similarity` is null unless the row is a search hit; `rested` is since when the note rests, when it does by a
  * date; `actions` is `{ forget(record), edit(record), pin(record), unmerge(record) }`, `edit` opening the dialog that
  * corrects the note (item 615).
@@ -163,48 +164,17 @@ function mergedBadge(record) {
 function memoryRow({ record, similarity, score, rested }, actions) {
   const row = el("div", { class: "note-row", dataset: { memory: record.id } });
   const pinned = record.pinned_at !== null;
-  const pin = el(
-    "button",
-    {
-      class: "btn ghost sm icon-only note-pin",
-      type: "button",
-      title: pinned ? "Take the pin off: this note may rest again" : "Pin this note: it never rests",
-      "aria-label": pinned ? "Take the pin off this note" : "Pin this note",
-      "aria-pressed": String(pinned),
-      onclick: () => actions.pin(record),
-    },
-    icon("pin"),
-  );
-  const unmerge =
-    record.merged_from.length === 0
-      ? null
-      : el(
-          "button",
-          {
-            class: "btn ghost sm icon-only",
-            type: "button",
-            title: "Undo this merge: the notes it was made from come back on their own, and this note goes to the trash",
-            "aria-label": "Undo this merge",
-            onclick: () => actions.unmerge(record),
-          },
-          icon("undo"),
-        );
-  const forget = el(
-    "button",
-    {
-      class: "btn ghost sm icon-only",
-      type: "button",
-      title: "Forget this note",
-      "aria-label": "Forget this note",
-      onclick: () => actions.forget(record),
-    },
-    icon("trash"),
-  );
-  const edit = el(
-    "button",
-    { class: "btn ghost sm icon-only", type: "button", title: "Edit this note", "aria-label": "Edit this note", "aria-haspopup": "dialog" },
-    icon("pencil"),
-  );
+  // One action a row (item 848): its "…" holds the pin, Edit, the merge's Undo and Forget.
+  const more = moreButton({
+    name: "this note",
+    items: () => [
+      { label: pinned ? "Take the pin off" : "Pin it", icon: "pin", run: () => actions.pin(record) },
+      { label: "Edit", icon: "pencil", run: () => actions.edit(record) },
+      ...(record.merged_from.length === 0 ? [] : [{ label: "Undo the merge", icon: "undo", run: () => actions.unmerge(record) }]),
+      "separator",
+      { label: "Forget", icon: "trash", danger: true, run: () => actions.forget(record) },
+    ],
+  });
   const match =
     similarity === null
       ? null
@@ -245,10 +215,9 @@ function memoryRow({ record, similarity, score, rested }, actions) {
           el("span", { class: "note-when" }, ...joined([whose, savedLine(record), restedLine(rested), ...lifespan(record), used, scoreLine(score)])),
         ),
       ),
-      el("div", { class: "note-actions" }, unmerge, pin, edit, forget),
+      el("div", { class: "note-actions" }, more),
     );
   }
-  edit.addEventListener("click", () => actions.edit(record));
   showNote();
   return row;
 }
@@ -623,8 +592,8 @@ export function mount(root, ctx) {
       description: "What Dot remembers, in your words. Tags say what it is about.",
       body: [field("Note", words, ""), field("Tags", tagInput, "Optional, separated by commas.")],
       submitLabel: "Save",
-      // The notes are drawn again once one is saved: the row's own Edit is found anew.
-      returnFocus: () => document.querySelector(`[data-memory="${record.id}"] [aria-label="Edit this note"]`),
+      // The notes are drawn again once one is saved: the row's own "…" is found anew.
+      returnFocus: () => document.querySelector(`[data-memory="${record.id}"] .row-more`),
       onSubmit: async () => {
         const text = words.value.trim();
         if (text === "") {

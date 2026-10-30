@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from form_dialogs import closes_with_escape, foot_is_in_view, keeps_inside_the_window, open_form
 from playwright.async_api import Browser, FloatRect, Locator, Page, async_playwright, expect
+from row_menu import more_of, open_row_form
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -120,6 +121,11 @@ async def _nothing(page: Page) -> None:
     return None
 
 
+async def _note_menu(page: Page) -> None:
+    """A note is corrected from its row's "…" (item 848), which the loop opens once the page holds still."""
+    await expect(page.locator("[data-memory]").first).to_be_visible()
+
+
 # Each form: the page it is on, what to do first, the button that opens it and the dialog's title.
 _FORMS: tuple[tuple[str, Callable[[Page], Awaitable[None]], str, str], ...] = (
     ("#/schedules", _nothing, "New schedule", "New schedule"),
@@ -127,7 +133,7 @@ _FORMS: tuple[tuple[str, Callable[[Page], Awaitable[None]], str, str], ...] = (
     ("#/schedules", _nothing, "New watcher", "New watcher"),
     ("#/settings/harness", _nothing, "Write your own", "Write your own version"),
     ("#/settings/keys", _key_panel, "Add key", "Add the OpenAI key"),
-    ("#/settings/memory", _nothing, "Edit this note", "Edit note"),
+    ("#/settings/memory", _note_menu, "Edit", "Edit note"),
     ("#/customize/connectors", _nothing, "Add connected app", "Add your own connected app"),
 )
 
@@ -157,9 +163,15 @@ async def test_every_form_is_a_sheet_that_fits_the_phone_with_its_foot_in_view(
                 await page.goto(f"{address}/{where}")
                 await expect(page.locator("main.page")).not_to_be_empty()
                 await prepare(page)
-                opener: Locator = page.get_by_role("button", name=opener_name, exact=True).first
-                await expect(opener).to_be_enabled()
-                dialog: Locator = await open_form(page, opener, title)
+                # A button of the page, or a choice of a note's "…", which takes the focus back (item 848).
+                note: Locator = page.locator("[data-memory]").first
+                if prepare is _note_menu:
+                    back: Locator = more_of(note)
+                    dialog: Locator = await open_row_form(page, note, opener_name, title)
+                else:
+                    back = page.get_by_role("button", name=opener_name, exact=True).first
+                    await expect(back).to_be_enabled()
+                    dialog = await open_form(page, back, title)
                 # A sheet: the window's width, standing on the window's foot, its head inside it.
                 sheet: FloatRect = await _box(dialog)
                 assert abs(sheet["x"]) <= 1 and abs(sheet["width"] - size["width"]) <= 1, (title, sheet, size)
@@ -172,7 +184,7 @@ async def test_every_form_is_a_sheet_that_fits_the_phone_with_its_foot_in_view(
                 if not device.startswith("iPhone"):
                     assert await page.evaluate(_SMALL) == [], title
                 await page.screenshot(path=str(tmp_path / f"{device.replace(' ', '-')}-{number}.png"))
-                await closes_with_escape(page, dialog, opener)
+                await closes_with_escape(page, dialog, back)
             await context.close()
         finally:
             await browser.close()

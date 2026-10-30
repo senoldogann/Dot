@@ -15,6 +15,7 @@ from typing import Literal
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, FloatRect, Locator, Page, async_playwright, expect
+from row_menu import choose, more_of
 
 from dotagent.agent.learning_health import failed_with, record_learning
 from dotagent.agent.manager import RunManager
@@ -397,10 +398,10 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
             # opens, and the notes read stay read as it closes.
             note_id: str = await notes.nth(_NOTES - 3).get_attribute("data-memory") or ""
             corrected: Locator = page.locator(f"[data-memory='{note_id}']")
-            await corrected.get_by_role("button", name="Edit this note").scroll_into_view_if_needed()
+            await more_of(corrected).scroll_into_view_if_needed()
             before: int = int(await page.evaluate("window.scrollY"))
             assert before > 400, f"the page does not scroll: {before}"
-            await corrected.get_by_role("button", name="Edit this note").click()
+            await choose(corrected, "Edit")
             dialog: Locator = page.get_by_role("dialog", name="Edit note")
             await expect(dialog.get_by_role("textbox", name="Note")).to_be_focused()
             assert await _window_kept(page, before)
@@ -415,7 +416,7 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
             assert await _window_kept(page, before)
             # Another note is forgotten: the notes read stay read, one fewer, and the page stays where it was.
             before = int(await page.evaluate("window.scrollY"))
-            await notes.last.get_by_role("button", name="Forget this note").click()
+            await choose(notes.last, "Forget")
             await page.get_by_role("dialog").get_by_role("button", name="Forget").click()
             await expect(page.locator(".toast", has_text="Forgotten.")).to_be_visible()
             await expect(notes).to_have_count(_NOTES - 1)

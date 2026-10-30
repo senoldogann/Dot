@@ -391,7 +391,7 @@ many lessons wait for your decision in amber, else how many there are, and opene
 a rule of the adopted habits or tool guidance says already (log line `lesson_retired`, reason `habit`); it shows the
 review model the notes that are at least `[memory] merge_similarity` (0.80) close in meaning and merges the ones it
 says are the same, at most `merges_per_night` (20) a night (the merged note keeps one source's words, the sources
-rest whole, and **Undo this merge** on the Memory page brings them back); it counts the notes that rested for
+rest whole, and **Undo the merge**, in the note's **…** on the Memory page, brings them back); it counts the notes that rested for
 `forget_after_days` (90) as proposals for you to forget or keep, and forgets none; and it deletes from the trash the
 notes you forgot more than `trash_days` (30) ago, the only thing it deletes. A note you wrote, a lesson you saved, a
 pinned note (the standing notes, a `core` note you wrote or pinned, among them) and a journal are never merged, rested

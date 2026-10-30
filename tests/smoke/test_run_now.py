@@ -15,6 +15,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from row_menu import item_of
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -372,11 +373,12 @@ async def test_run_now_starts_the_run_its_page_opens_and_the_firings_list_it(
                 )
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"{address}/#/schedules")
-                button: Locator = page.get_by_role("button", name="Run page check now")
-                await expect(button).to_be_visible()
-                await expect(button).to_have_attribute("title", re.compile(r"approvals: YOLO.*asking nothing", re.I))
+                # Run now is in the row's "…" (item 848), its words saying it does real work and asks nothing.
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"schedules-{width}-{scheme}.png"), full_page=True)
+                button: Locator = await item_of(page.locator("[data-schedule]", has_text="page check").first, "Run now")
+                await expect(button).to_be_visible()
+                await expect(button).to_have_attribute("title", re.compile(r"approvals: YOLO.*asking nothing", re.I))
                 await button.click()
                 await expect(page).to_have_url(re.compile(r"#/runs/run_"))
                 run_id: str = page.url.rsplit("/", 1)[-1]
