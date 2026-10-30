@@ -775,7 +775,7 @@ behind a filter; see [Models and providers](models.md#models-and-providers)), **
 search; see [Runs](runs.md)), **Browser** (which Chrome Dot browses with
 and what Chrome has to allow first; see [Browser
 use](browser-and-computer-use.md#browser-use)), **Vault** (the logins, cards and contact details you give Dot; below),
-**Trading** (whether Dot may trade crypto on Coinbase; see [Settings › Trading](#settings--trading)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
+**Trading** (whether Dot may trade crypto on Coinbase, opened from the Trader agent; see [Settings › Trading](#settings--trading)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
 what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, the
 versions, fifty at a time, with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
 harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a sign-in code for its home-screen app; see
@@ -807,8 +807,14 @@ the box by both Command keys pressed together: see below.
 
 ### Settings › Trading
 
-**Trading** (`#/settings/trading`, in the group This Mac, items 764 and 777) is a trading desk: what Dot's trading holds
-and does, with the settings under it. With trading on (Paper or Live) the page shows, top to bottom:
+**Trading** (`#/settings/trading`, items 764 and 777) is a trading desk: what Dot's trading holds and does, with the
+settings under it. It is the Trader's (item 847): the settings' nav does not list it, and the page of the agent named
+Trader, the Agents tab of its chats' side panel and the Trader's card among the ready-made agents open it. The Trader
+(`trader` in `agent/templates.py`) watches the desk and the trend engine and reports the day (every day at 09:05, the
+schedule it suggests, switched off until you read it): it reads the account, the engine, the orders, the prices and what
+moved, and may pause the engine and resume it; no tool of its places an order, closes a position or changes a limit. Its
+tools are the trading tools, which a run has only with trading on: with trading off, Use on its card is refused and
+says which tools this Dot lacks, and the card's **Open the trading desk** is where trading is switched on. With trading on (Paper or Live) the page shows, top to bottom:
 
 - **Account**: what the account is worth, large; today's change and, in Paper, the change since the account's start,
   each in green or red with its sign and its share; what is in positions and its share of the account; and two meters

@@ -20,7 +20,7 @@ from playwright.async_api import Browser, Download, Locator, Page, async_playwri
 
 from dotagent.agent import templates as gallery
 from dotagent.agent.manager import RunManager
-from dotagent.agent.templates import TEAMS, TEMPLATES, AgentTeam
+from dotagent.agent.templates import TEAMS, TEMPLATES, AgentTeam, AgentTemplate
 from dotagent.config import load_default_config
 from dotagent.core.paths import env_file_path
 from dotagent.core.types import JsonObject
@@ -38,6 +38,8 @@ from dotagent.tools.shell import read_login_env
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 TOKEN: str = "MARKER-agent-templates-token"
+# The templates this home has every tool of: all but the Trader, whose tools come with trading set up (item 847).
+USABLE: tuple[AgentTemplate, ...] = tuple(template for template in TEMPLATES if template.id != "trader")
 WAIT_S: float = 30.0
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 # Secrets no file of an agent may carry: a key known by its form, and one this home holds in its .env, whatever its
@@ -205,8 +207,16 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 first: Locator = cards.first
                 await first.locator(".template-tools > summary").click()
                 await expect(first.locator(".template-tool-chips code")).to_have_text(list(TEMPLATES[0].tools))
-                # Every tool the fourteen name is a tool this home has, so no chip is marked missing.
-                await expect(cards.locator(".template-tool-chips .chip.missing")).to_have_count(0)
+                # Every tool the templates name is a tool this home has, but the Trader's trading tools, which a home
+                # has once trading is set up in the desk its card opens (item 847).
+                trader: Locator = cards.filter(has=page.locator(".template-name", has_text="Trader"))
+                await expect(trader.locator(".template-tool-chips .chip.missing")).to_have_text(
+                    ["trading_portfolio", "trading_engine", "trading_history", "trading_market", "trading_scan"]
+                )
+                await expect(cards.locator(".template-tool-chips .chip.missing")).to_have_count(5)
+                await expect(trader.get_by_role("link", name="Open the trading desk")).to_have_attribute(
+                    "href", "#/settings/trading"
+                )
                 await page.screenshot(path=tmp_path / "templates-1280-light.png", full_page=True)
                 phone: Page = await _open(browser, address, "/agents", 390, "dark")
                 await expect(phone.locator(".template-card")).to_have_count(len(TEMPLATES))
@@ -223,17 +233,23 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await phone.screenshot(path=tmp_path / "templates-390-dark.png", full_page=True)
                 await phone.close()
 
-                # Each template becomes an agent with one click, which opens the agent's page.
+                # The Trader names the trading tools, which this home lacks with trading off: its Use is refused and
+                # says which, and nothing is made (item 847).
+                await page.goto(f"{address}/#/agents")
+                await page.get_by_role("button", name="Use the template Trader").click()
+                await expect(page.locator(".toast")).to_contain_text("do not exist here: trading_engine")
+                assert list(await runtime.store.list_agents()) == []
+                # Each other template becomes an agent with one click, which opens the agent's page.
                 made: dict[str, str] = {}
-                for template in TEMPLATES:
+                for template in USABLE:
                     await page.goto(f"{address}/#/agents")
                     await page.get_by_role("button", name=f"Use the template {template.name}").click()
                     await expect(page).to_have_url(_AGENT_URL)
                     await expect(page.locator(".agent-who .home-name")).to_have_text(template.name)
                     made[template.id] = page.url.rpartition("/")[2]
                 agents: list[AgentRecord] = list(await runtime.store.list_agents())
-                assert len(agents) == len(TEMPLATES)
-                for template in TEMPLATES:
+                assert len(agents) == len(USABLE)
+                for template in USABLE:
                     record: AgentRecord = await runtime.store.get_agent(made[template.id])
                     assert _profile(record) == {
                         "name": template.name,
@@ -270,7 +286,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                     )
                     assert changed.status_code == 200, changed.text
                     # Every template's agent goes out as a file.
-                    for template in TEMPLATES:
+                    for template in USABLE:
                         went: httpx.Response = await client.get(f"/api/agents/{made[template.id]}/export")
                         assert went.status_code == 200, (template.id, went.text)
                     # One whose instructions hold a secret does not, and the refusal does not repeat it.

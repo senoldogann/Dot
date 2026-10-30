@@ -7,7 +7,9 @@ can change them.
 
 ## Switching it on
 
-[Settings › Trading](daemon.md#settings--trading) (or `[trading]` in `config.toml`, [Configuration](configuration.md)):
+[Settings › Trading](daemon.md#settings--trading), the trading desk the Trader agent's page opens (item 847), or the
+Trader's card among the ready-made agents before there is one (or `[trading]` in `config.toml`,
+[Configuration](configuration.md)):
 
 - **Mode**: `off` (the default: runs have no trading tool at all), `paper` or `live`. A switch from `off` gives runs the
   trading tools from Dot's next start; one between `paper` and `live` holds from the next order.

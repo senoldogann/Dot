@@ -58,6 +58,9 @@ class AgentFile(FrozenModel):
     look: AgentLook | None
 
 
+# The name of the trading desk's agent (item 847): the agent of this name is the Trader, whose page and panel open the
+# desk, as the agent page finds a template by its agent's name (item 722).
+TRADER_NAME: str = "Trader"
 # What every template holds to: a draft is the only way a word of it leaves the Mac (item 314).
 _DRAFTS_ONLY: str = (
     "Anything that leaves this Mac for a person, an email or a message, is a draft for the owner: write it with "
@@ -505,6 +508,46 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         schedule="",
         cron="",
         task="",
+    ),
+    # The trading desk's agent (item 847): Settings › Trading moved to it, and its page and its chat's panel open the
+    # desk. It watches and reports; the trend engine trades by its rule (item 818), and no tool of its places an order.
+    AgentTemplate(
+        id="trader",
+        name=TRADER_NAME,
+        role="Watches the trading desk and the trend engine, and reports the day",
+        instructions="You watch the owner's trading on Coinbase and report it; the trend engine trades by its rule.\n"
+        + _steps(
+            "Read the account with trading_portfolio, the engine with trading_engine status and the day's orders with "
+            "trading_history; read prices with trading_market and what moved with trading_scan.",
+            "Say what the engine did and why, the account's worth and its day against the limits, and each open "
+            "position with its stop and target.",
+            "Pause the engine with trading_engine only when it breaks its own rule or the account nears the day's "
+            "loss limit, and say why; resume it once that is over.",
+            "Never place an order and never change a limit: the limits are the owner's, in code, and the engine "
+            "trades.",
+            _DRAFTS_ONLY,
+            "End with the day in three lines: the worth and its change, what the engine did, and what to watch.",
+        ),
+        tools=(
+            "trading_portfolio",
+            "trading_engine",
+            "trading_history",
+            "trading_market",
+            "trading_scan",
+            *_WEB,
+            *_KEEP,
+            *_WORK,
+            "draft_message",
+        ),
+        look=AgentLook(shape="triangle", expression="proud", colour="amber"),
+        needs="Trading set up in its desk (Coinbase, or the paper account)",
+        schedule="Every day at 9:05: the trading day's report",
+        cron="5 9 * * *",
+        task=(
+            "Report the trading day: read the account, the trend engine's status and the day's orders, say what the "
+            "engine did and why, the worth against the limits and each open position with its stop and target. Place "
+            "no order and change no limit. End with the worth and its change, what the engine did and what to watch."
+        ),
     ),
 )
 
