@@ -202,8 +202,10 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                             # The same agents read again leave the tiles standing, the focus on one among them; an
                             # agent renamed from a page shows its new name at once.
                             await watch.focus()
-                            await page.evaluate("() => window.dispatchEvent(new CustomEvent('dot:agents-changed'))")
-                            await page.wait_for_timeout(600)
+                            # The agents' answer awaited, then a frame for the paint, so that the look is after it.
+                            async with page.expect_response(re.compile(r"/api/agents$")):
+                                await page.evaluate("() => window.dispatchEvent(new CustomEvent('dot:agents-changed'))")
+                            await page.evaluate("() => new Promise((done) => requestAnimationFrame(() => done(null)))")
                             await expect(watch).to_be_focused()
                             await page.evaluate(
                                 "async (id) => { const { api } = await import('/js/api.js');"
