@@ -404,8 +404,9 @@ step, a delegated run, an eval's, one of OpenCode's agent, a chat-mode run and a
 skill**, under a **More** button, until item 406.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
-while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
-failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
+while it works, an amber ring while it waits for you, a tick in the text's ink for a moment when the run ends done
+(item 839: it was green), red when it failed (with reduced motion the tick simply shows). The panel button sits on the
+right; the run's facts (its state,
 agent, model, approval mode, goal mode, campaign, work, time, mode, start and id) are under More on the panel's Task tab,
 closed the first time (items 452 and 544). Your goal is the
 first message, in the ink bubble of your messages (item 832). What you write reads there as markdown, as an
@@ -429,8 +430,9 @@ chat's box when it was the first. **Also undo the file changes** also takes back
 the file tools, each file that is as they left it; a file changed since is left and named, and what a command changed
 stays. A message sent before Dot kept the place of each message in its chat has no Edit from here, nor has one that
 steered a turn at work, and a chat is not rewound while a run works on it or messages wait in its queue. A delegated run
-is a row: the face with its state at the corner (turning while it works, amber while it waits for you, green with a
-check when it is done, red when it failed), its name and its goal over the last thing it did and, once it ended, the
+is a row: the face with its state at the corner (turning while it works, amber while it waits for you, a check in
+the text's ink when it is done, item 839, red when it failed), its name and its goal over the last thing it did and,
+once it ended, the
 start of its answer (item 245): an agent's run is named by the agent ("Scout"), any other by its place among the
 helpers of the run that started it ("Helper 1", "Helper 2"), and the goal follows quieter, its paths cut to their last
 two parts ("…/housestory/brief.md"); the last thing it did names the tool in the words the steps use ("step 32 ·
@@ -787,7 +789,7 @@ In a Mac's window the sidebar is the settings' nav while they are open (item 562
 open; in the desktop app under the traffic lights, whose row holds the button that hides the sidebar where the chats'
 head holds it, item 577) and the tabs in four groups (Interface, Models, How Dot works, This Mac), each with what it
 holds at its right (the main model, how many AI services have a key, how many notes Dot keeps, how many items the vault
-holds, a green dot when a phone reaches Dot); whether the daemon answers and the emergency stop are the page's, as on
+holds, a dot when a phone reaches Dot); whether the daemon answers and the emergency stop are the page's, as on
 every page. The page is the open tab alone, in a column of 920 px under its own name and the line that says what it is
 for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On
 a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
@@ -998,7 +1000,11 @@ blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing
 contrast's mixing, the families typed, the theme generator, the theme file with its checks and the VS Code import are a
 port of an MIT-licensed project to plain ES modules; its notice is `static/js/appearance/LICENSE`, and Dot is not
 affiliated with that project. The looks are one visual system. Colour: every colour is a token of `themes.css` naming
-its light and its dark value in one place; surfaces step up by lightness (page, sunken sidebar, raised cards) rather
+its light and its dark value in one place; colour is for what waits for you (the warning's amber), what failed (red)
+and what is unread (the dot), and a state that is fine (done, ready, connected, understood) wears the text's second
+ink on a soft fill (`--fine` and `--fine-weak`, item 839: they were green), while green stays where it is a
+convention of the data (a diff's additions, a string in code, a trade that rose); surfaces step up by lightness (page,
+sunken sidebar, raised cards) rather
 than by shadow in dark; borders are the text colour at a small alpha so they sit on every surface; the text tiers are
 measured against every surface by a unit test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones; the
 neutral and the paper look hold the muted one to 4.5:1 too, the sidebar's group labels being set in it); the yellow is
@@ -1006,9 +1012,12 @@ the owner's bubbles. Type: Inter for the interface and the answers, Geist Mono f
 from Dot's own origin (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and
 chips, 13/18 meta and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles,
 24/32 the greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit
-test refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: cards are
-flat, a surface with a hairline and a 12 px radius and no shadow (shadows stay on what floats: menus, dialogs, the
-composer in focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
+test refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: a box of the
+pages (a card, a settings' group, a tile) has no frame, a surface on a 16 px corner with a soft shadow under it
+(`--box-border` and `--box-shadow`, item 837: it had a hairline on a 12 px corner and no shadow), and the contrast
+setting frames it again; a box within a box is a soft fill rather than a second shadow; a card holds 20 px of room
+(item 838, 16 before; the compact density keeps 12); shadows otherwise stay on what floats (menus, dialogs, the
+composer); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
 string; an empty page or list stands a mark in a quiet ring, a title and one line that says what brings something there,
 in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages in an ink
 bubble (`--msg-me`: the text's colour in light, one surface raised in the dark), and what Dot and its agents say, the
@@ -1017,8 +1026,10 @@ as the column; the line under an answer that ended well and under your message s
 focus is (a reaction that stands, a failure and a stop stay in sight; a touch screen shows them always), an answer that
 ended well says no word for it ("Finished" went), a file a message names is a chip of its name (its path in the chip's
 title and in a copy of the message), and what a run changed is an attachment in the answer's fill. Controls:
-buttons, inputs and selects 36
-px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus ring on each, a select with its
+buttons, inputs and selects 36 px tall on a 10 px corner (32 for the small ones; item 837, 8 px before): a button is a
+soft fill with no frame, a step darker under the pointer (the first of a page in ink, a quiet one with no fill, and the
+contrast setting frames them), and an input or a select keeps its hairline, as what is typed in; the same 2 px focus
+ring on each, a select with its
 own drawn chevron, a range on a hairline track filled with the accent up to its value under the switch's knob, field
 labels on the interface line and hints on the small one, the composer's menus as round pills of 32 px (an icon of 16 px,
 the value, a chevron of 12; no ground at rest, a tint under the pointer) that open a panel above them, the providers'

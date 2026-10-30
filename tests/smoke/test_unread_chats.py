@@ -23,7 +23,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import RunRecord, ThreadSummary
+from dotagent.store.models import ApprovalRecord, RunRecord, ThreadSummary
 from dotagent.tools.meta import FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -31,11 +31,12 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 TOKEN: str = "unread-chats-token"
 PHOTOS: str = "Sort the photos."
 FOLDERS: str = "Name the folders."
+SHELVES: str = "Label the shelves."
 # The menu of a read chat whose run is over.
 _MENU: list[str] = ["Pin", "Mark unread", "Rename", "Copy link", "Select", "Delete"]
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
-# Three runs, each finished at its first step.
-_RUNS: int = 3
+# Four runs, each finished at its first step.
+_RUNS: int = 4
 _RUN_WAIT_S: float = 30.0
 _MARK_WAIT_S: float = 10.0
 
@@ -205,5 +206,55 @@ async def test_a_chat_whose_run_ends_out_of_sight_is_unread_until_it_is_opened(
             await expect(folders_dot).to_have_count(0)
             await _until_unread(runtime, folders_run.thread_id, False)
             assert errors == []
+        finally:
+            await browser.close()
+
+
+async def test_a_chat_that_waits_says_what_waits_and_shows_no_unread_dot_until_nothing_waits(
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
+) -> None:
+    """Item 836's pre-push review: a chat whose run ended out of sight is unread, but while a step of it waits for the
+    owner its row says what waits, with the dot of a run that waits and no unread dot, and its name says no unread;
+    once nothing waits, the chat is back among the days with its unread dot."""
+    manager, address = served
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    run: RunRecord = await _ended(manager, SHELVES, None)
+    assert run.thread_id is not None
+    kept: ApprovalRecord = await runtime.store.create_kept_approval(
+        run.id,
+        "write_file",
+        "Write shelves.md",
+        "handoff",
+        {"tool": "write_file", "kind": "write", "risk": "medium", "target": "shelves.md", "amount": None, "flags": []},
+        "digest-836-unread",
+        time.time() + 3600,
+        run.thread_id,
+        None,
+    )
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url(host, port, TOKEN))
+            waiting: Locator = page.locator("#sidebar [data-section=waiting] .side-chat").filter(has_text=SHELVES)
+            link: Locator = waiting.locator("a.side-run")
+            await expect(link.locator(".side-chat-waits")).to_have_text("Waiting for you: Write shelves.md")
+            await expect(link.locator(".side-waits-dot")).to_have_count(1)
+            await expect(link.locator(".side-unread")).to_have_count(0)
+            label: str = await link.get_attribute("aria-label") or ""
+            assert "unread" not in label, label
+            await _until_unread(runtime, run.thread_id, True)
+            await page.screenshot(path=str(tmp_path / "waiting-unread.png"), animations="disabled")
+            # The step answered from the page: nothing waits, and the chat is among the days again, unread.
+            await page.evaluate(
+                "async (id) => { const { api } = await import('/js/api.js');"
+                " await api.post(`/approvals/${id}/decision`, { approve: false }); }",
+                kept.id,
+            )
+            back: Locator = _row(page, SHELVES)
+            await expect(back.locator(".side-unread")).to_have_count(1)
+            await expect(back.locator("a.side-run")).to_have_attribute("aria-label", f"{SHELVES} (unread)")
+            await expect(waiting).to_have_count(0)
         finally:
             await browser.close()

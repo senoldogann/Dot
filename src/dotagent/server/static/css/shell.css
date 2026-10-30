@@ -1416,5 +1416,5 @@
   height: 8px;
   flex: none;
   border-radius: var(--radius-pill);
-  background: var(--ok);
+  background: var(--fine);
 }

@@ -90,14 +90,25 @@
   --weight-title: 600;
   --tracking-title: -0.01em;
   --tracking-caps: 0.04em;
-  /* Shape: the radii of marks, controls, cards, bubbles and pills. A look may round them differently (themes.css). */
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-control: 8px;
-  --radius: 12px;
-  --radius-lg: 20px;
+  /* Shape: the radii of marks, controls, cards, bubbles and pills, soft as a messaging app's (item 837: they were 6, 8,
+     8, 12 and 20 px). A look may round them differently (themes.css). */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-control: 10px;
+  --radius: 16px;
+  --radius-lg: 24px;
   --radius-composer: 24px;
   --radius-pill: 999px;
+  /* A box of the pages, a card or a settings' group (item 837): no frame, a soft shadow under its surface; the contrast
+     setting draws the frame again (themes.css). */
+  --box-border: transparent;
+  --box-shadow: var(--shadow-card);
+  /* A button's frame (item 837): none, as its fill says it is one; the contrast setting draws it (themes.css). Its
+     fill is a tint of the ink over whatever it stands on, so that it is a step from every ground by itself (the
+     pre-push reviews: a fill of the second surface vanished on the boxes, the notes and the sidebar of that ground). */
+  --button-border: transparent;
+  --button-fill: color-mix(in srgb, var(--text) 6%, transparent);
+  --button-fill-hover: color-mix(in srgb, var(--text) 10%, transparent);
   /* The composer's lift (item 121): a hairline of shadow and a soft one that falls below it. */
   --shadow-composer: 0 1px 2px var(--shadow-ink), 0 12px 28px -18px var(--shadow-ink-deep);
   /* The glass of what stands over the conversation at the foot (item 401): the composer and the bar over it, a
@@ -114,7 +125,9 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
-  --pad-card: var(--space-4);
+  /* A card's room (item 838: 16 px before), so that a soft box breathes as a messaging app's; the compact density keeps
+     its own (below). */
+  --pad-card: var(--space-5);
   --pad-row: var(--space-3) var(--space-4);
   --pad-side: var(--space-2) var(--space-2);
   --gap-stack: var(--space-3);
@@ -670,7 +683,7 @@ a.pill:hover {
 }
 
 .live-dot.live {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .live-dot.reconnecting {
@@ -779,8 +792,11 @@ a.pill:hover {
 
 /* ---------- controls ---------- */
 
-/* One grammar for the controls (item 80): a button, an input and a select are 36 px tall on an 8 px radius with a
-   hairline of the strong border; the small button and select are 32; the focus ring is the page's 2 px accent outline. */
+/* One grammar for the controls (item 80): a button, an input and a select are 36 px tall on a 10 px radius (item 837);
+   the small button and select are 32; the focus ring is the page's 2 px accent outline. An input and a select keep a
+   hairline of the strong border. A button is a soft fill with no frame (item 837), a step darker under the pointer;
+   the first of a page's is ink (`.primary`), a quiet one has no fill (`.ghost`), and the contrast setting frames them
+   again (themes.css). */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -789,8 +805,8 @@ a.pill:hover {
   min-height: 36px;
   padding: 0 16px;
   border-radius: var(--radius-control);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
+  border: 1px solid var(--button-border);
+  background: var(--button-fill);
   color: var(--text);
   font-weight: var(--weight-label);
   cursor: pointer;
@@ -802,7 +818,7 @@ a.pill:hover {
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--surface-2);
+  background: var(--button-fill-hover);
 }
 
 .btn:disabled {
@@ -1316,11 +1332,13 @@ a.pill:hover {
 
 /* ---------- cards and badges ---------- */
 
-/* A card is flat (item 79): a surface with a hairline, no shadow; shadows belong to what floats (menus, dialogs). */
+/* A card is a box of the page (item 837; flat with a hairline since item 79): a surface with no frame and a soft
+   shadow under it (`--box-border`, `--box-shadow`); the contrast setting frames it again. */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
   border-radius: var(--radius);
+  box-shadow: var(--box-shadow);
 }
 
 .card-pad {
@@ -1397,6 +1415,7 @@ a.pill:hover {
   :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor):has(> .card-head) {
     border: 0;
     background: none;
+    box-shadow: none;
   }
 
   :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor) > .card-head {
@@ -1412,9 +1431,10 @@ a.pill:hover {
   }
 
   :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor) > .card-head + * {
-    border: 1px solid var(--border);
+    border: 1px solid var(--box-border);
     border-radius: var(--radius);
     background: var(--surface);
+    box-shadow: var(--box-shadow);
   }
 }
 
@@ -1595,8 +1615,8 @@ a.pill:hover {
 
 .badge.s-done,
 .badge.b-ok {
-  background: var(--ok-weak);
-  color: var(--ok);
+  background: var(--fine-weak);
+  color: var(--fine);
 }
 
 .badge.s-failed,
@@ -1654,7 +1674,7 @@ a.pill:hover {
 }
 
 .status-dot.s-done {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .status-dot.s-failed {
@@ -1674,7 +1694,7 @@ a.pill:hover {
   padding: 0 8px;
   border-radius: var(--radius-xs);
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   color: var(--text-2);
   font-size: var(--text-xs);
   line-height: var(--leading-ui);
@@ -1829,7 +1849,8 @@ a.pill:hover {
   gap: 12px;
   min-width: 0;
   padding: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
+  box-shadow: var(--box-shadow);
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -2300,7 +2321,8 @@ a.pill:hover {
   gap: var(--space-3);
   min-width: 0;
   padding: var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
+  box-shadow: var(--box-shadow);
   border-radius: var(--radius);
   background: var(--surface);
   transition:
@@ -2819,11 +2841,13 @@ a.pill:hover {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+/* An account inside the card of the accounts: a soft fill with no frame (item 837), as a box within a box is, rather
+   than a second shadow. */
 .account-provider {
   padding: var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
   border-radius: var(--radius);
-  background: light-dark(var(--surface), var(--surface-2));
+  background: var(--surface-2);
 }
 
 /* A skill's card lifts under the pointer as a plugin's does, its mark light on a tile of its colour. */
@@ -2893,7 +2917,7 @@ a.pill:hover {
   flex: none;
   align-items: center;
   gap: var(--space-1);
-  color: var(--ok);
+  color: var(--fine);
   font-size: var(--text-xs);
   font-weight: var(--weight-label);
 }
@@ -3460,7 +3484,7 @@ dialog.modal.versions-dialog {
 }
 
 .first-connect.connected .first-connect-hint {
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .first-actions {
@@ -5092,9 +5116,9 @@ dialog.modal.versions-dialog {
 }
 
 .plan-step.done .mark {
-  background: var(--ok);
-  border-color: var(--ok);
-  color: var(--on-ok);
+  background: var(--fine);
+  border-color: var(--fine);
+  color: var(--on-fine);
 }
 
 .plan-step.done .mark .icon {
@@ -5924,7 +5948,7 @@ a.schedule-line:hover .schedule-made {
 }
 
 .note.ok {
-  color: var(--ok);
+  color: var(--fine);
 }
 
 /* What was decided in place of the person, kept inside the group of the step it belongs to. */
@@ -6777,8 +6801,8 @@ summary:has(> .chev)::-webkit-details-marker {
 }
 
 .status-ring.s-done {
-  border-color: var(--ok);
-  background: var(--ok);
+  border-color: var(--fine);
+  background: var(--fine);
 }
 
 .status-ring.s-done::after {
@@ -8135,8 +8159,8 @@ dialog.lightbox img {
 
 .callback-status.ok {
   border-color: transparent;
-  background: var(--ok-weak);
-  color: var(--ok);
+  background: var(--fine-weak);
+  color: var(--fine);
 }
 
 .callback-status.bad {
@@ -8328,7 +8352,7 @@ dialog.lightbox img {
 @keyframes ring-ok {
   0%,
   80% {
-    stroke: var(--ok);
+    stroke: var(--fine);
     stroke-opacity: 1;
   }
 
@@ -10796,7 +10820,7 @@ dialog.teach {
 }
 
 .first-step[data-done="true"] .first-step-mark {
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .first-step-words {

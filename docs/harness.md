@@ -418,8 +418,9 @@ version in use it says that the part that fails is left out of every run (item 5
 
 A row of four tiles in one card comes first (items 527 and 566): what is in use (*Built-in*, or *A version* with its
 summary), the number of versions with how many are in each state, the steps of learning, nightly and by hand, with the
-last one's outcome (or when the next is, or that the learning is off) over a strip of the newest 14 (green a change,
-grey none, red a failure, named in a legend and each step on a hover), and the lessons kept. The two counts are of every
+last one's outcome (or when the next is, or that the learning is off) over a strip of the newest 14 (a change in the
+text's ink, item 839, where it was green; grey none, red a failure, named in a legend and each step on a hover), and the
+lessons kept. The two counts are of every
 step and lesson, past the newest the lists below show. On a phone the tiles go two to a row, and no column of the page
 is wider than the screen, the narrowest iPhone's too.
 

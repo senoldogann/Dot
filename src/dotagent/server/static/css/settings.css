@@ -114,7 +114,8 @@
 
 /* A card of rows: a row's title and the muted line under it on the left, its control on the right. */
 .set-card {
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
+  box-shadow: var(--box-shadow);
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -179,6 +180,7 @@
   .settings-pane .card:not(.fold):has(> .card-head) {
     border: 0;
     background: none;
+    box-shadow: none;
   }
 
   .settings-pane .card:not(.fold) > .card-head {
@@ -190,9 +192,10 @@
   }
 
   .settings-pane .card:not(.fold) > .card-head + * {
-    border: 1px solid var(--border);
+    border: 1px solid var(--box-border);
     border-radius: var(--radius);
     background: var(--surface);
+    box-shadow: var(--box-shadow);
   }
 }
 
@@ -373,8 +376,8 @@
 }
 
 .phone-reach-tile.ready {
-  background: var(--ok-weak);
-  color: var(--ok);
+  background: var(--fine-weak);
+  color: var(--fine);
 }
 
 .phone-reach-tile .icon {
@@ -417,7 +420,7 @@
 }
 
 .phone-progress-part.done {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .phone-progress-part.now {
@@ -498,8 +501,8 @@
 
 :is(.phone-guide-step, .phone-step).done .phone-mark {
   border-color: transparent;
-  background: var(--ok-weak);
-  color: var(--ok);
+  background: var(--fine-weak);
+  color: var(--fine);
 }
 
 :is(.phone-guide-step, .phone-step).current .phone-mark {
@@ -882,7 +885,7 @@
 }
 
 .provider-dot[data-tone="ok"] {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .provider-dot[data-tone="bad"] {
@@ -924,7 +927,7 @@
 }
 
 .provider-state[data-tone="ok"] {
-  color: var(--ok);
+  color: var(--fine);
 }
 
 /* The way back to the list on a phone: the chevron alone, on the page's own ground, tall enough for a thumb. */
@@ -1414,7 +1417,8 @@
   gap: var(--space-1);
   min-width: 0;
   padding: 16px 20px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
+  box-shadow: var(--box-shadow);
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -1462,7 +1466,7 @@
 }
 
 .set-dot[data-tone="ok"] {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .set-dot[data-tone="warn"] {
@@ -1604,7 +1608,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  color: var(--ok);
+  color: var(--fine);
   font-size: var(--text-sm);
 }
 
@@ -1623,7 +1627,7 @@
 }
 
 .fold-count.ok {
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .fold-count.warn {
@@ -1829,7 +1833,8 @@
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
+  box-shadow: var(--box-shadow);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
@@ -1975,7 +1980,8 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-4) var(--space-3) var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
+  box-shadow: var(--box-shadow);
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -2340,7 +2346,8 @@
   gap: var(--space-3);
   min-width: 0;
   padding: var(--space-4);
-  border: 1px solid var(--border);
+  border: 1px solid var(--box-border);
+  box-shadow: var(--box-shadow);
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -3202,7 +3209,7 @@
 .rule-understood > .icon {
   align-self: center;
   flex: none;
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .rule-understood-label {
@@ -3640,7 +3647,7 @@
 .rule-always-list .icon {
   flex: none;
   margin-top: var(--space-half);
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .rule-always-note {
@@ -3916,7 +3923,7 @@
 }
 
 .night-cell.done {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .night-cell.failed {
@@ -4347,7 +4354,7 @@
 }
 
 .websearch-ready {
-  color: var(--ok);
+  color: var(--fine);
 }
 
 .websearch-needs,
@@ -5017,7 +5024,7 @@
 }
 
 .trading-watch-line.ok .trading-dot {
-  background: var(--ok);
+  background: var(--fine);
 }
 
 .trading-watch-line.warn .trading-dot {

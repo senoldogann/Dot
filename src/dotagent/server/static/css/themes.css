@@ -51,6 +51,12 @@
   --ok: light-dark(#1b7349, #62cf98);
   --ok-weak: light-dark(#e3f2e8, #163527);
   --on-ok: light-dark(#ffffff, #0f2419);
+  /* A state that is fine (item 839): no colour of its own, as a messaging app's, so that colour stays for what waits
+     (the warning's), what failed (the bad's) and what is unread (the dot). Made of each look's own ink and surfaces;
+     the ok colours stay for what is a convention of the data (a diff's additions, a string in code, a trade that rose). */
+  --fine: var(--text-2);
+  --fine-weak: var(--surface-2);
+  --on-fine: var(--surface);
   --warn: light-dark(#8a5400, #ecb458);
   --warn-weak: light-dark(#fbefd6, #362a10);
   --warn-border: light-dark(#e3c37a, #6a5020);
@@ -121,6 +127,8 @@
   --shadow-ink-soft: light-dark(rgb(28 27 25 / 10%), rgb(0 0 0 / 30%));
   --shadow-ink-deep: light-dark(rgb(28 27 25 / 24%), rgb(0 0 0 / 60%));
   --shadow: 0 1px 2px var(--shadow-ink), 0 4px 16px var(--shadow-ink);
+  /* Under a box of the pages, which has no frame (item 837): a hairline of shadow and a soft one round it. */
+  --shadow-card: 0 1px 2px var(--shadow-ink), 0 4px 14px var(--shadow-ink);
   /* The focus ring: the accent at a third, so focus is seen without a dark frame (item 95). */
   --ring: color-mix(in srgb, var(--accent) 38%, transparent);
   --shadow-seg: 0 1px 2px var(--shadow-ink-soft);
@@ -171,9 +179,6 @@
   --shadow-ink: light-dark(rgb(20 20 19 / 5%), transparent);
   --shadow-ink-soft: light-dark(rgb(20 20 19 / 10%), rgb(0 0 0 / 30%));
   --shadow-ink-deep: light-dark(rgb(20 20 19 / 22%), rgb(0 0 0 / 60%));
-  --radius: 12px;
-  --radius-control: 8px;
-  --radius-lg: 20px;
   --voice: var(--family-serif);
 }
 
@@ -249,4 +254,13 @@
 :root[data-contrast] body {
   --msg-me: light-dark(var(--text), var(--surface-3));
   --on-msg-me: light-dark(var(--surface), var(--text));
+}
+
+/* The boxes and the buttons have no frame (item 837); with the contrast set they are framed again, in its stronger
+   lines, so that their edges are seen. A fine state's ink (item 839) is made again where the text is, so that it takes
+   its stronger ink too. */
+:root[data-contrast] body {
+  --box-border: var(--border);
+  --button-border: var(--border-strong);
+  --fine: var(--text-2);
 }
