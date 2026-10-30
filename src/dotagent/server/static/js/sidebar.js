@@ -751,7 +751,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // every chat stands under Working or in a channel's section, or while one there matches.
   function emptyNote(inChannels) {
     if (needle !== "") {
-      const found = inChannels || work.working.some((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
+      const found =
+        inChannels ||
+        [...work.working, ...waits.waiting].some((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
       return found ? [] : [el("div", { class: "side-note" }, `No chat matches “${search.value.trim()}”.`)];
     }
     return chats.length === 0 ? [el("div", { class: "side-note" }, "No chats yet. Start one with the +.")] : [];
@@ -779,9 +781,21 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const loading = chats === null && failure === null;
     work = placeWork(activity === null || loading ? [] : [...activity.working, ...activity.ended_delegated], chats ?? []);
     waits = placeWaiting(activity === null || loading ? [] : activity.waiting, chats ?? []);
-    // A chat chosen for deletion whose run starts leaves the list for Working, and the choice goes with it: a chat at
-    // work cannot be deleted.
-    for (const entry of work.working) {
+    // What waits for the owner while its run goes on (a step kept for them, item 482) stands once, with what waits,
+    // wearing what it delegated (the pre-push review: it stood with what works too, twice).
+    const families = new Map(work.working.filter((entry) => entry.chat !== null).map((entry) => [entry.chat.id, entry]));
+    const waitingRuns = new Set(waits.waiting.filter((entry) => entry.chat === null).map((entry) => entry.row.run_id));
+    work = {
+      ...work,
+      working: work.working.filter((entry) => (entry.chat === null ? !waitingRuns.has(entry.row.run_id) : !waits.byChat.has(entry.chat.id))),
+    };
+    waits = {
+      ...waits,
+      waiting: waits.waiting.map((entry) => (entry.chat === null ? entry : { ...entry, family: families.get(entry.chat.id) ?? null })),
+    };
+    // A chat chosen for deletion whose run starts leaves the list for what works, and the choice goes with it: a chat
+    // at work cannot be deleted. So does one that comes to wait for the owner (item 836), which leaves the list too.
+    for (const entry of [...work.working, ...waits.waiting]) {
       if (entry.chat !== null) {
         selected.delete(entry.chat.id);
       }
@@ -948,7 +962,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // A chat's entry in the list as it was painted last, while what it shows is the same; else a new one (item 328).
   function keptEntry(chat) {
     const family = work.pinned.get(chat.id) ?? null;
-    const key = JSON.stringify([chat, family]);
+    // What waits of it is in the key: a pinned chat whose step was answered, or that gained one, is drawn anew (the
+    // pre-push review of item 836).
+    const key = JSON.stringify([chat, family, waits.byChat.get(chat.id) ?? null]);
     const kept = keptRows.get(chat.id);
     if (kept !== undefined && kept.key === key) {
       rowNodes.set(chat.id, kept.link);
@@ -959,8 +975,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return node;
   }
 
-  // The sections above the chats. Working's entries are all painted, and `markCurrent` hides them while Working is
-  // folded; the search leaves there only the chats it finds (item 202), and shows them folded or not.
   // What waits and what works, at the top of the list as rows (item 836): what waits first, in every search, so that
   // what the owner must answer is never out of sight; what works as a search finds it. Neither folds, as a row says
   // what it is itself.
@@ -980,7 +994,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (entry.chat === null) {
       return waitingRow(entry.row, onNavigate);
     }
-    const node = chatEntry(entry.chat, null);
+    const node = chatEntry(entry.chat, entry.family ?? null);
     node.toggleAttribute("data-found", needle !== "" && matchesQuery(entry.chat, needle));
     return node;
   }

@@ -46,7 +46,8 @@ whose conversation and Agents tab hold those runs. What works lists too what is 
 what works, as its own row with its menu, its creature waiting: its last line says **Waiting for you:** and what
 has waited longest, with how many more wait ("(+1)"), in the warning's ink, the dot of a run that waits stands in its
 age's place, and its name for a screen reader names each thing and how it waits; a pinned chat stays under Pinned,
-saying it there. What waits that is no listed chat's (a run whose chat is not listed, a session of a campaign) is a row
+saying it there. A chat that waits while its run goes on (a step kept for you, item 482) stands once, with what
+waits. What waits that is no listed chat's (a run whose chat is not listed, a session of a campaign) is a row
 of the same shape: its creature, what waits, and **Waiting for you** with how it waits. Neither has a heading, nor
 folds, as a messaging app's rows say what they are themselves (until item 836, **Waiting for you** and **Working**
 were sections with a label, a count and a fold, item 513); a search keeps what waits in sight, and its Enter and the
