@@ -546,27 +546,34 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   const faceLinks = new Map();
   let facesTicket = 0;
+  // What the tiles show, as last drawn: the same agents read again leave them standing, so that the focus or the
+  // pointer on one stays (the pre-push review).
+  let facesDrawn = null;
   function paintFaces(found) {
     const mine = found.filter(({ record }) => record.id !== DOT_ID);
-    faceLinks.clear();
-    for (const { record } of mine) {
-      faceLinks.set(
-        record.id,
-        el(
-          "a",
-          {
-            class: "side-agent-face",
-            href: `#/agents/${record.id}`,
-            title: record.role === "" ? record.name : `${record.name}: ${record.role}`,
-            "aria-label": record.name,
-            onclick: onNavigate,
-          },
-          actorFace(record.id, "idle", record.look),
-          el("span", { class: "side-agent-name", "aria-hidden": "true" }, record.name),
-        ),
-      );
+    const drawn = JSON.stringify(mine.map(({ record }) => [record.id, record.name, record.role, record.look]));
+    if (drawn !== facesDrawn) {
+      facesDrawn = drawn;
+      faceLinks.clear();
+      for (const { record } of mine) {
+        faceLinks.set(
+          record.id,
+          el(
+            "a",
+            {
+              class: "side-agent-face",
+              href: `#/agents/${record.id}`,
+              title: record.role === "" ? record.name : `${record.name}: ${record.role}`,
+              "aria-label": record.name,
+              onclick: onNavigate,
+            },
+            actorFace(record.id, "idle", record.look),
+            el("span", { class: "side-agent-name", "aria-hidden": "true" }, record.name),
+          ),
+        );
+      }
+      facesNav.replaceChildren(...faceLinks.values(), allAgents);
     }
-    facesNav.replaceChildren(...faceLinks.values(), allAgents);
     facesNav.hidden = mine.length === 0;
     agentsLink.hidden = mine.length > 0;
     markFaces();
@@ -653,6 +660,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function onBackInView() {
     keptUnread = null;
     seeOpenChat();
+    if (document.visibilityState === "visible") {
+      reloadFacesSoon();
+    }
   }
 
   function paintBar() {
@@ -1270,7 +1280,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   async function load() {
     loadActivity();
-    loadFaces();
     const mine = ++chatsTicket;
     try {
       const all = await api.get(`/threads?limit=${listLimit}`);
@@ -1303,18 +1312,29 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const reloadSoon = debounce(() => {
     load();
   }, 250);
+  // The agents are read when the page may not know them as they are: as it opens, once a run ended (a run can make
+  // one), when a page of it changed one, when the stream comes back and when the page comes back into view.
+  const reloadFacesSoon = debounce(() => {
+    loadFaces();
+  }, 250);
   const stopLifecycle = onLifecycle((event) => {
     if (RELOAD_KINDS.has(event.kind)) {
       reloadSoon();
     }
+    if (event.kind === "run_finished") {
+      reloadFacesSoon();
+    }
   });
-  const stopStream = onStreamBack(reloadSoon);
+  const stopStream = onStreamBack(() => {
+    reloadSoon();
+    reloadFacesSoon();
+  });
   // The daemon tells of no change of a schedule: a page that made one says so, and the marks of the loops follow.
   window.addEventListener(SCHEDULES_CHANGED_EVENT, reloadSoon);
   // Nor of a team's (item 610): the chats with it are named and drawn as the team is now.
   window.addEventListener(TEAMS_CHANGED_EVENT, reloadSoon);
   // Nor of an agent's (item 835): the faces at the top are the agents as they are now.
-  window.addEventListener(AGENTS_CHANGED_EVENT, reloadSoon);
+  window.addEventListener(AGENTS_CHANGED_EVENT, reloadFacesSoon);
   document.addEventListener("visibilitychange", onBackInView);
   window.addEventListener("focus", onBackInView);
 
@@ -1383,6 +1403,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   paintLists();
   load();
+  loadFaces();
 
   // On a phone the sidebar is the list of chats over the whole screen (item 294): Dot's name
   // at its head beside the close, and at its foot, under the thumb, Settings, the search and a new chat. The search
@@ -1557,7 +1578,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       stopStream();
       window.removeEventListener(SCHEDULES_CHANGED_EVENT, reloadSoon);
       window.removeEventListener(TEAMS_CHANGED_EVENT, reloadSoon);
-      window.removeEventListener(AGENTS_CHANGED_EVENT, reloadSoon);
+      window.removeEventListener(AGENTS_CHANGED_EVENT, reloadFacesSoon);
       document.removeEventListener("visibilitychange", onBackInView);
       window.removeEventListener("focus", onBackInView);
       window.removeEventListener("keydown", onEscape);

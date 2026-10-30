@@ -4,6 +4,7 @@ many there are. The side menu counts the chats at work (item 202). Scripted runs
 phone, light and dark."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -168,14 +169,11 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                         faces: Locator = page.get_by_role("navigation", name="Your agents")
                         await expect(faces.get_by_role("link")).to_have_count(3)
                         await expect(faces.locator(".side-agent-name")).to_have_text(
-                            ["Scout", "Competitor Watch", "All"]
+                            [re.compile(r"^Scout( Two)?$"), "Competitor Watch", "All"]
                         )
-                        await expect(faces.get_by_role("link", name="Scout")).to_have_attribute(
-                            "href", f"#/agents/{agents['Scout']}"
-                        )
-                        await expect(faces.get_by_role("link", name="Scout")).to_have_attribute(
-                            "title", "Scout: Looks things up"
-                        )
+                        scout: Locator = faces.get_by_role("link", name=re.compile(r"^Scout( Two)?$"))
+                        await expect(scout).to_have_attribute("href", f"#/agents/{agents['Scout']}")
+                        await expect(scout).to_have_attribute("title", re.compile(r"^Scout( Two)?: Looks things up$"))
                         # A name of two words reads whole, on two lines; each tile is a finger's size and more.
                         watch: Locator = faces.get_by_role("link", name="Competitor Watch")
                         assert await watch.locator(".side-agent-name").evaluate(
@@ -194,15 +192,26 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                             await watch.click()
                             await expect(page).to_have_url(f"{address}/#/agents/{agents['Competitor Watch']}")
                             await expect(watch).to_have_attribute("aria-current", "page")
-                            await expect(faces.get_by_role("link", name="Scout")).not_to_have_attribute(
-                                "aria-current", "page"
-                            )
+                            await expect(scout).not_to_have_attribute("aria-current", "page")
                             await faces.get_by_role("link", name="All agents").click()
                             await expect(page).to_have_url(f"{address}/#/agents")
                             await expect(faces.get_by_role("link", name="All agents")).to_have_attribute(
                                 "aria-current", "page"
                             )
                             await expect(watch).not_to_have_attribute("aria-current", "page")
+                            # The same agents read again leave the tiles standing, the focus on one among them; an
+                            # agent renamed from a page shows its new name at once.
+                            await watch.focus()
+                            await page.evaluate("() => window.dispatchEvent(new CustomEvent('dot:agents-changed'))")
+                            await page.wait_for_timeout(600)
+                            await expect(watch).to_be_focused()
+                            await page.evaluate(
+                                "async (id) => { const { api } = await import('/js/api.js');"
+                                " await api.put(`/agents/${id}`, { name: 'Scout Two', role: 'Looks things up',"
+                                " instructions: '', model: '', effort: null, approvals: null }); }",
+                                agents["Scout"],
+                            )
+                            await expect(faces.locator(".side-agent-name").first).to_have_text("Scout Two")
                         await page.close()
                     # An agent deleted from its page leaves the row at once; with none left, the Agents row is back.
                     page = await _open_sidebar(browser, address, 1280, "light")
