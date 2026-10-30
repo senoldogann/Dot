@@ -113,9 +113,21 @@ function nodes(node) {
 }
 
 /** What the owner picked for the message `message` in the composer (item 318; `picks`, a `picks` event's data), once
- * it is known: over its foot, after its files. */
+ * it is known: words at the head of its text, in their colours (item 858); a message whose text opens with no
+ * paragraph (a list, a quote, code) has them on a line of their own over it. */
 export function showMessagePicks(message, picks) {
-  message.querySelector(".message-foot").before(sentPicks(picks));
+  const text = message.querySelector(".bubble.user .prose");
+  if (text === null) {
+    message.querySelector(".message-foot").before(sentPicks(picks));
+    return;
+  }
+  const opening = text.firstElementChild;
+  const words = sentPicks(picks, true);
+  if (opening instanceof HTMLParagraphElement) {
+    opening.prepend(words, " ");
+  } else {
+    text.prepend(el("p", null, words));
+  }
 }
 
 /**

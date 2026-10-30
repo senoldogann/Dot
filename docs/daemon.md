@@ -381,14 +381,14 @@ task](browser-and-computer-use.md#teaching-a-task)); its tooltip says so: "Add f
 task". The slash menu picks **Plugins** (the MCP servers with tools) and
 **Skills**, as `GET /api/palette` lists them; the at menu picks the plugins and the Google and Microsoft accounts signed
 in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
-model; one that is no longer signed in is refused). A plugin, an account or a skill picked is a chip under the box in a
-colour of its name, which its × takes away; the chip of a server wears its service's mark as the menus do (item 530: the
+model; one that is no longer signed in is refused). A plugin, an account or a skill picked stands under the box as its mark and its name in a
+colour of its name, with no border (item 858), which its × takes away; the chip of a server wears its service's mark as the menus do (item 530: the
 logo, the icon or the letters, on the tile's light ground), Dot's own icon for a server of no service, and for any
 server until the daemon's palette has named it (a draft kept, a message sent; the plug before item 581); Plan first is a
 chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **Options** menu's
 **How Dot works** group, under the approvals (item 353). The picks go with the message (`plugins`, `skills`, `accounts` and
-`plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is sent they stand under it as chips
-(the run's `picks` event); a message that steers the run under way leaves them for the next one, and the page says so,
+`plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is sent they stand at the head of its text as
+words in their colours, with no border, as a skill stands in a line of text (the run's `picks` event; item 858); a message that steers the run under way leaves them for the next one, and the page says so,
 and a queued message with picks is not steered into the run at work: it stays queued to start a run of its own. A run
 sent with picks starts with each picked server's tool group on from its first step when its tools are grouped (with
 every tool offered they are on anyway), and its first message is your words, then a line that names the servers to use,

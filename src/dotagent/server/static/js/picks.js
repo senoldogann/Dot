@@ -1,7 +1,7 @@
 // What the owner picks in the composer for one message (item 318, after Codex's composer): MCP servers whose tools the
 // run starts with, accounts signed in whose mail and calendar it starts with (item 496) and skills whose instructions
-// it starts with, as chips under the box, each in a colour of its own and taken away by its × (a server's chip wears
-// its service's mark, as the at menu does, item 530), and Plan first, by which the run writes its plan and asks before
+// it starts with, under the box, each its mark and its name in a colour of its own with no border (item 858) and taken
+// away by its × (a server's wears its service's mark, as the at menu does, item 530), and Plan first, by which the run writes its plan and asks before
 // it changes anything. They go
 // with the message that starts a run and are put away once it went (`sent()`); a steer leaves them for the next one.
 
@@ -102,17 +102,29 @@ function pickChip(kind, name, onRemove) {
   return chip;
 }
 
-/** The picks a message went with (`data`, a `picks` event's: `{ plugins, skills, plan_first, accounts }`), as chips
- * under it. An event recorded before item 496 names no accounts. */
-export function sentPicks(data) {
+/** The picks a message went with (`data`, a `picks` event's: `{ plugins, skills, plan_first, accounts }`), as a row
+ * under it, or, with `inline`, as words of its text (item 858: its mark and its name in its colour, with no chip
+ * round them, as a skill stands in a line of text). An event recorded before item 496 names no accounts. */
+export function sentPicks(data, inline = false) {
   return el(
-    "div",
-    { class: "pick-list sent", role: "list", "aria-label": "Picked for this message" },
-    data.plan_first ? pickChip("plan", PLAN_FIRST, null) : null,
-    data.plugins.map((name) => pickChip("plugin", name, null)),
-    (data.accounts ?? []).map((name) => pickChip("account", name, null)),
-    data.skills.map((name) => pickChip("skill", name, null)),
+    inline ? "span" : "div",
+    { class: inline ? "pick-list sent inline" : "pick-list sent", role: "list", "aria-label": "Picked for this message" },
+    spaced(
+      [
+        data.plan_first ? pickChip("plan", PLAN_FIRST, null) : null,
+        ...data.plugins.map((name) => pickChip("plugin", name, null)),
+        ...(data.accounts ?? []).map((name) => pickChip("account", name, null)),
+        ...data.skills.map((name) => pickChip("skill", name, null)),
+      ].filter((chip) => chip !== null),
+      inline,
+    ),
   );
+}
+
+/** `chips` as they stand: in a line of text with a space between them, so that a selection or a reader reads them as
+ * words; in a row as they are. */
+function spaced(chips, inline) {
+  return inline ? chips.flatMap((chip, at) => (at === 0 ? [chip] : [" ", chip])) : chips;
 }
 
 /** Whether `value`, read from a draft, holds picks as `saved()` gives them; a draft kept before item 496 names no

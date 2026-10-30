@@ -40,9 +40,16 @@ function replyBody(node) {
   return node.querySelector(".prose") ?? node.querySelector(".stream") ?? node.querySelector(":scope > .muted");
 }
 
-/** The words of `node` as they read, a space between its paragraphs and items: read when a mark is chosen, not before. */
+/** The words of `node` as they read, a space between its paragraphs and items: read when a mark is chosen, not before.
+ * The picks at the head of a message's text (item 858) are not its words. */
 function words(node) {
-  return node === null ? "" : folded(node.innerText);
+  if (node === null) {
+    return "";
+  }
+  const all = folded(node.innerText);
+  const picks = node.querySelector(".pick-list.inline");
+  const named = picks === null ? "" : folded(picks.innerText);
+  return named !== "" && all.startsWith(named) ? all.slice(named.length).trim() : all;
 }
 
 /**
