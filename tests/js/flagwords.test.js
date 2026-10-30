@@ -9,7 +9,7 @@ test("every flag the policy raises has words of its own, none of them its progra
   const flags = [
     "destructive", "financial", "credential", "system_settings", "privilege", "external_send", "message_send",
     "public_post", "social", "install", "secret_access", "protected_read", "exfiltration", "outside_workspace",
-    "persistence", "upload", "self_change", "vault_fill", "trade",
+    "persistence", "upload", "self_change", "vault_fill", "trade", "release",
   ];
   for (const flag of flags) {
     const words = flagWords(flag);

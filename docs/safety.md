@@ -298,7 +298,22 @@ trading off.
    filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, except that in `auto` you answer
    it, not the review model, and so is one of Dot's own vault (item 621, below), and an order with real money on your
    trading account (`trade`, item 763, [Trading](trading.md)), which Dot places on your yes. A `yolo` run asks nothing
-   and makes the step, its record keeping the reason it would have asked for (item 443).
+   and makes the step, its record keeping the reason it would have asked for (item 443). In a chat Dot opened on its
+   own initiative it does not (item 850): a message, a post and a `release` there wait for your own yes in every mode,
+   `yolo`'s and `auto`'s too, never the review model's, and no rule of yours that allows them answers for you;
+   [Proactive](proactive.md) says how.
+   - `release` is a project's change put live. The guard reads it from these command names:
+     - `wrangler deploy`, `wrangler pages deploy`, `wrangler versions deploy` and their `publish`;
+     - `vercel` with `--prod` (or `--target production`) and `vercel promote`;
+     - `netlify deploy --prod`;
+     - `firebase deploy`;
+     - `fly deploy`, `flyctl deploy`;
+     - `gh pr merge`;
+     - a `git push` that names `main` or `master`, or pushes `--all` or `--mirror`.
+   - Anywhere else `release` asks nothing: it is in no preset's set.
+   - What it does not read: a push that names no branch from a checkout on main, a deploy inside a script or a
+     package's script (`npm run deploy`), an API called with `curl`, a console clicked in the browser. For these the
+     run's instructions say to put a site live only through the project's own release (item 851).
    What the policy cannot tell for a message is not guarded: a key that sends in a web page's chat box, a page's own script
    (`browser_eval`), a program of the shell that talks to a mail server or a chat's API itself (`curl`, a script).
    For an AppleScript or JXA script (the tool `apple_script`, and `osascript` in a command line) the guard reads the
@@ -432,8 +447,9 @@ trading off.
    waits to be added.
    An approval card offers *Make a rule of this*, which opens the tab with what Dot wanted to do in the box and *Allow
    on its own* as the choice (`#/settings/rules?wants=…&should=allow`); the card of what no rule decides (money,
-   credentials, a message or a post in your name, a login from your password manager, a change of Dot's own files)
-   offers none and says so (items 429 and 559).
+   credentials, a message or a post in your name, a login from your password manager, a change of Dot's own files, and
+   a message, a post or a release in a chat Dot opened on its own initiative) offers none and says so (items 429, 559
+   and 850).
 7. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
    when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 
@@ -1095,7 +1111,8 @@ among them), told a text by its length (`(42 chars)`) or masked a secret (`***`)
 tell apart are not one. This is the default approval mode, `ask`, and `supervised` asks before every change as well; in
 `auto` the questions of the policy are answered for you, and a `yolo` run asks nothing at all (item 443). In every mode
 that asks (item 429), money and credentials are handed to you on a card in the chat, and a message or a post in your
-name waits there for your yes in `supervised` and `ask`, for the review model's in `auto`.
+name waits there for your yes in `supervised` and `ask`, for the review model's in `auto`. In a chat Dot opened on its
+own initiative, a message, a post or a release waits for your own yes in every mode, `yolo` and `auto` too (item 850).
 A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer; one it can
 go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with

@@ -30,6 +30,7 @@ from dotagent.policy.engine import (
     checked_when_tainted,
     decide,
     decide_past_review,
+    initiative_guard,
     mode_gate,
     route_for,
     supervised,
@@ -154,7 +155,9 @@ class RunGate:
     and only a record is kept). A yolo run asks nothing at all (item 443) — the guard of money, credentials, messages
     and posts of item 429 included, and the refusal of secrets and exfiltration of item 433 — and the record of the step
     keeps the reason it would have asked for. A change of Dot's own files is the user's in every mode but yolo (item
-    398); a research run stays read-only and a refusal that stands still refuses.
+    398); a research run stays read-only and a refusal that stands still refuses. ``owners_word`` is set for a run of
+    a chat Dot opened on its own initiative (item 850): a message, a post or a release there is the owner's question
+    in every mode, yolo's and auto's too (:func:`dotagent.policy.engine.initiative_guard`).
     ``instructions`` are the user's own words so far, which is all the reviewer takes as authority. ``pace`` bounds the
     public and social actions of the browser on each site, in every mode. ``locks`` are the runtime's
     :class:`SiteLocks`, shared with the gates of the other runs.
@@ -175,8 +178,12 @@ class RunGate:
         instructions: tuple[str, ...],
         locks: SiteLocks,
         taint_check: bool = True,
+        owners_word: bool = False,
     ) -> None:
         self._store: Store = store
+        # Whether the run is of a chat Dot opened on its own initiative (item 850), whose messages, posts and releases
+        # wait for the owner whatever the mode.
+        self.owners_word: bool = owners_word
         # Whether a yolo run that read outside content has the review model check the steps an instruction planted in
         # that content is after, before it does them (item 525, ``[policy] yolo_taint_check``).
         self._taint_check: bool = taint_check
@@ -371,7 +378,14 @@ class RunGate:
                 # would have asked (item 443).
                 decided = rest.model_copy(update={"reason": f"{rest.reason}; also {review.reason}"})
         decision: Decision = supervised(decided, info) if self._approval_mode == "supervised" else decided
-        note, answered_by = await self._authorize_decision(info, decision, rules, tainted)
+        held: Decision | None = initiative_guard(info) if self.owners_word else None
+        if held is not None and decision.verdict in ("allow", "ask"):
+            # In a chat of Dot's own initiative a message, a post or a release is the owner's question, in every mode:
+            # what any mode, rule or review made of it gives way, but a refusal or a hand-off, which is stricter.
+            decision = held
+        # Whatever it became, such a step is the owner's: a hand-off of theirs too, which yolo would waive (the
+        # independent review of item 850: a hand-off rule, or a step that also carried a credential, went through).
+        note, answered_by = await self._authorize_decision(info, decision, rules, tainted, held is not None)
         if allowance is not None and state is not None:
             # The payment goes ahead under its caps, whichever question let it through (the guard asks first when the
             # step also sends or posts, item 429): it counts against the site's day. A refusal or a hand-off raised.
@@ -404,17 +418,18 @@ class RunGate:
         return spend_state(self._spend, info.target, info.amount, spent)
 
     async def _authorize_decision(
-        self, info: ActionInfo, decision: Decision, rules: list[RuleRecord], tainted: bool
+        self, info: ActionInfo, decision: Decision, rules: list[RuleRecord], tainted: bool, owners: bool = False
     ) -> tuple[str, Answerer]:
         """What the decision means in this approval mode: a waiver, a refusal, the review model or the user; with the
         owner's note and who answered (item 468). ``tainted`` is the taint the policy weighed: the review model reads
         it, and the policy event keeps it (item 474), however long an answer takes."""
         if decision.verdict == "allow":
             return "", "policy"
-        if self._approval_mode == "yolo" and decision.verdict != "deny":
+        if self._approval_mode == "yolo" and decision.verdict != "deny" and not owners:
             # A yolo run asks nothing (the owner's word of 2026-10-20, item 443): money, a credential, a message or a
             # post in their name, a spend, Dot's own files, the review's refusal — the step does it, and the record says
-            # what it would have asked. A refusal is not a question and stands below.
+            # what it would have asked. A refusal is not a question and stands below; nor is a step of a chat of Dot's
+            # own initiative that sends, posts or releases waived (item 850, ``owners``), its question or hand-off.
             return await self._waive(info, decision), "yolo"
         if decision.verdict == "deny":
             shown, said = await _shown(info, decision)
@@ -431,7 +446,9 @@ class RunGate:
         allowed: ApprovalRecord | None = await self._kept_answer(info, decision, tainted)
         if allowed is not None:
             return allowed.note.strip(), "user"
-        route: Route = route_for(decision, self._approval_mode)
+        # The question or the hand-off of such a step of a chat of Dot's own initiative is the owner's in every mode
+        # (item 850).
+        route: Route = "user" if owners else route_for(decision, self._approval_mode)
         if route == "waived":
             return await self._waive(info, decision), "yolo"
         if route == "reviewer":

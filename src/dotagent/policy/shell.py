@@ -3046,6 +3046,63 @@ def _uploads(command: str, args: list[str]) -> bool:
     return False
 
 
+# The command lines that put a project's change live (item 850), read by their names: a deploy of Cloudflare, Firebase
+# or Fly, a pull request merged, and, in :func:`_releases`, a Vercel or Netlify deploy to production and a push that
+# names the main branch. What the guard does not read (a push with no branch named, a deploy in a script or a
+# package's script, an API called by curl, a console clicked) goes by the run's instructions (docs/safety.md).
+_RELEASES: dict[str, tuple[tuple[str, ...], ...]] = {
+    "wrangler": (("deploy",), ("publish",), ("pages", "deploy"), ("pages", "publish"), ("versions", "deploy")),
+    "firebase": (("deploy",),),
+    "fly": (("deploy",),),
+    "flyctl": (("deploy",),),
+    "gh": (("pr", "merge"),),
+}
+_MAIN_BRANCHES: frozenset[str] = frozenset({"main", "master"})
+_NETLIFY_PRODUCTION: frozenset[str] = frozenset({"--prod", "-p", "--prodIfUnlocked", "--prod-if-unlocked"})
+
+
+def _names_main(word: str) -> bool:
+    """Whether a refspec of ``git push`` names the main branch: ``main``, ``HEAD:main``, ``x:refs/heads/master``."""
+    target: str = word.lstrip("+").rsplit(":", 1)[-1].removeprefix("refs/heads/")
+    return target.lower() in _MAIN_BRANCHES
+
+
+def _releases(command: str, args: list[str]) -> bool:
+    """Whether ``command args`` puts a project's change live (item 850): a verb of :data:`_RELEASES`, ``vercel`` to
+    production (``--prod``, ``--target production``, ``promote``), ``netlify deploy`` to production, or a ``git push``
+    that names the main branch or pushes every branch (``--all``, ``--mirror``)."""
+    # A runner's pinned version is the same tool (`npx wrangler@3 deploy`, the independent review of item 850).
+    if not command.startswith("@") and "@" in command:
+        command = command.split("@", 1)[0]
+    starts: list[list[str]] = _verbs_at(args)
+    for words in starts:
+        lowered: list[str] = [word.lower() for word in words]
+        if any(lowered[: len(wanted)] == list(wanted) for wanted in _RELEASES.get(command, ())):
+            return True
+    if command == "vercel":
+        targets: bool = any(
+            arg == "--target" and index + 1 < len(args) and args[index + 1] == "production"
+            for index, arg in enumerate(args)
+        )
+        return (
+            "--prod" in args
+            or "--target=production" in args
+            or targets
+            or any(words[:1] == ["promote"] for words in starts)
+        )
+    if command == "netlify":
+        return any(words[:1] == ["deploy"] for words in starts) and bool(_NETLIFY_PRODUCTION & set(args))
+    if command == "git":
+        for words in starts:
+            if words[:1] != ["push"]:
+                continue
+            rest: list[str] = args[args.index(words[0]) + 1 :]
+            return any(arg in ("--all", "--mirror") for arg in rest) or any(
+                _names_main(arg) for arg in rest if not arg.startswith("-")
+            )
+    return False
+
+
 def _assess_sender(command: str, args: list[str]) -> Finding | None:
     """A package published, an image pushed or a file sent out by a tool of :data:`_PUBLISHES`, the upload tools
     (:data:`_UPLOAD_READS`, :data:`_UPLOAD_ANY`, :data:`_STORAGE_SERVICES`, Subversion) (item 725); None for another
@@ -3806,6 +3863,15 @@ def _assess_osascript(args: list[str], scope: ShellScope, given: _Input) -> list
 
 
 def _assess_command(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
+    """Judge one command, its reserved words, assignments and wrappers already looked through; one that puts a project's
+    change live also carries ``release`` (item 850, :func:`_releases`)."""
+    found: list[Finding] = _assess_command_body(command, args, scope, given)
+    if _releases(command, args):
+        return [*found, _fetching("medium", ("release",), f"{command} puts a project's change live")]
+    return found
+
+
+def _assess_command_body(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
     """Judge one command, its reserved words, assignments and wrappers already looked through."""
     if command in _SHELLS:
         return _assess_shell_call(command, args, scope, given)

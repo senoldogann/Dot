@@ -207,9 +207,28 @@ model takes none of it as your instruction, in that run or in a later one of its
 what reaches others), and a thing that a run put on the list after reading content third parties can author (a mail, a
 page) is done by a run that starts untrusted, so that in `yolo` too the review model refuses a message, a post, a
 payment or an upload that no word of yours calls for (item 525). A run that read nothing of the kind (a thing from your
-own chats) asks nothing and is checked by nobody in `yolo`: a message, a payment or a post it decides on goes out as it
-decides, which is what `yolo` means (item 443); `[initiative] approvals` set to `auto` or `ask` has such a run ask you
-first. A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or
+own chats) is checked by nobody in `yolo`, and a payment it decides on goes out as it decides, which is what `yolo`
+means (item 443); `[initiative] approvals` set to `auto` or `ask` has such a run ask you first.
+
+But in a chat Dot opened on its own initiative, three steps wait for you in every mode, `yolo` and `auto` too (item
+850, your word of 2026-10-30):
+- a message sent for you: an email, a chat or text message, a reply;
+- a post in your name;
+- a project's change put live: a deploy to production, a pull request merged, a push that names the main branch
+  (see [Safety](safety.md#safety)).
+
+This holds for every run of that chat, as the owner's answers in it start runs too, and for the runs they delegate.
+- The question is yours alone: the review model never answers it, and a rule of yours that allows the step does not
+  answer it either.
+- Its card shows the step as the policy reads it, and your yes is for that step.
+- Nobody watches the run. Its question waits for you while the run waits, and one nobody answers in time is a
+  refusal, after which the run goes on with the rest. With `[policy] unanswered = "park"` a release is kept for you in
+  its chat (item 482). A message or a post never is, since a yes given later never covers a step that reaches other
+  people (item 483).
+
+Your own chats and your schedules ask nothing of the kind in `yolo`.
+
+A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or
 let go. Done, it is marked so with the first line of the run's answer and you are told ("Dot did on its own", the push,
 the desktop, iMessage when it is on). A run that failed leaves it to do, up to `attempts` (3) runs; then it is let go
 and you are told. A run you stopped lets it go at once; one the daemon's stop or the emergency stop ended (the stop of
