@@ -112,6 +112,8 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     const badge = shown === null ? null : approvalBadge(shown);
     optionsPill.setValue(badge === null ? "" : badge.short, "");
     optionsPill.setIcon(icon(badge === null ? "lock" : badge.icon));
+    // In YOLO the run asks nothing: the box says so even while its choices are away (item 833).
+    optionsPill.element.toggleAttribute("data-yolo", shown === "yolo");
     setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);
   }, told(kept.approvals));
   const goalMode = goalModePicker(told(kept.goalMode));

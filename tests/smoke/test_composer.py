@@ -14,6 +14,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -159,6 +160,7 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
         try:
             for width in (1280, 390):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
+                await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 goal = page.locator(GOAL)
                 menu = page.locator(".composer .slash-menu")
@@ -226,6 +228,7 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
         try:
             for width in (1280, 390):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
+                await show_choices(page)
                 refused: list[str] = []
                 page.on("console", _collect_refusals(refused))
                 await page.route("**/api/models", _with_a_thinking_model)
@@ -420,6 +423,7 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
         try:
             for width in (1280, 800, 560, 390):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
+                await show_choices(page)
                 await page.route("**/api/models", _with_a_thinking_model)
                 await page.goto(ui_url(host, port, TOKEN))
                 await expect(page.locator(".composer-pill[data-pill='agent']")).to_be_visible()
@@ -492,6 +496,7 @@ async def test_a_photo_in_the_box_shows_its_picture_beside_the_files_it_came_wit
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await show_choices(page)
             await page.goto(ui_url(host, port, TOKEN))
             await page.locator(".composer input[type=file]").set_input_files(
                 [
@@ -571,5 +576,83 @@ async def test_a_photo_in_the_box_shows_its_picture_beside_the_files_it_came_wit
             await expect(photos.first).to_have_attribute("title", "sunset.png")
             assert (await photos.first.text_content() or "").strip() == ""
             await expect(photos.first.locator("img.attach-thumb")).to_have_attribute("src", re.compile(r"^blob:"))
+        finally:
+            await browser.close()
+
+
+async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 833: the box as one line, the "+", the words and the microphone, as a messaging app's; the run's choices
+    wait behind the "+" menu's "Model and options", which shows and hides them and is kept; YOLO stays in sight while
+    they are away; the microphone stands alone until words are typed, and the send then comes beside it."""
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width in (1280, 390):
+                page: Page = await browser.new_page(viewport={"width": width, "height": 900}, reduced_motion="reduce")
+                await page.goto(ui_url(host, port, TOKEN))
+                composer: Locator = page.locator(".composer").last
+                await expect(composer).to_have_attribute("data-quiet", "")
+                await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_hidden()
+                # One line: the "+" and the words share it.
+                plus: Locator = composer.locator(".plus-button")
+                field: Locator = composer.locator(".composer-field")
+                await expect(field).to_be_visible()
+                # Both read in one frame: the home's box still settling between two reads put them apart.
+                centres: list[float] = await composer.evaluate(
+                    "box => ['.plus-button', '.composer-field'].map((part) => {"
+                    " const rect = box.querySelector(part).getBoundingClientRect(); return rect.y + rect.height / 2; })"
+                )
+                assert abs(centres[0] - centres[1]) <= 8, centres
+                # The microphone alone until words are typed, then the send beside it: more can still be dictated.
+                mic: Locator = composer.locator(".mic-button")
+                send: Locator = composer.locator(".btn.send")
+                await expect(mic).to_be_visible()
+                await expect(send).to_be_hidden()
+                await composer.locator("textarea").fill("Plan the garden")
+                await expect(send).to_be_visible()
+                await expect(mic).to_be_visible()
+                # A box that grows keeps the "+", the microphone and the send at its last line, read in one frame.
+                await composer.locator("textarea").fill("Plan the garden\nwhat to sow\nwhat to plant\nwhat to dig")
+                bottoms: list[float] = await composer.evaluate(
+                    "box => ['.plus-button', '.mic-button', '.btn.send', '.composer-field'].map((part) => {"
+                    " const rect = box.querySelector(part).getBoundingClientRect(); return rect.bottom; })"
+                )
+                assert all(abs(bottom - bottoms[-1]) <= 4 for bottom in bottoms[:-1]), bottoms
+                await composer.locator("textarea").fill("")
+                # The "+" shows the choices, and the choice is kept.
+                await plus.click()
+                await page.get_by_role("menuitem", name="Model and options").click()
+                await expect(composer).not_to_have_attribute("data-quiet", "")
+                options: Locator = composer.locator(".composer-pill[data-pill='options']")
+                await expect(options).to_be_visible()
+                assert await page.evaluate("() => localStorage.getItem('dot.composer.choices')") == "shown"
+                # YOLO chosen, then the choices hidden: its pill stays in sight, with no tint.
+                await options.click()
+                await page.locator(".composer-popover .pop-option[data-mode='yolo']").click()
+                await page.keyboard.press("Escape")
+                await plus.click()
+                await page.get_by_role("menuitem", name="Hide the model and options").click()
+                await expect(composer).to_have_attribute("data-quiet", "")
+                await expect(options).to_be_visible()
+                await expect(options).to_contain_text("YOLO")
+                await expect(options).not_to_have_attribute("data-tone", "warn")
+                # On a phone's line its open lock alone, so that the words keep their room; its name still says YOLO.
+                await expect(options).to_have_accessible_name(re.compile(r"\bYOLO\b"))
+                pill = await options.bounding_box()
+                assert pill is not None
+                assert (pill["width"] <= 44) == (width < 720), f"{width}: the YOLO pill is {pill['width']} px wide"
+                await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_hidden()
+                assert await page.evaluate("() => localStorage.getItem('dot.composer.choices')") is None
+                # Back to the mode the module's other tests expect.
+                await plus.click()
+                await page.get_by_role("menuitem", name="Model and options").click()
+                await options.click()
+                await page.locator(".composer-popover .pop-option[data-mode='ask']").click()
+                await page.close()
         finally:
             await browser.close()

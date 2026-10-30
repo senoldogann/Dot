@@ -1070,7 +1070,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       : steers(false)
         ? narrowOr("Steer this task (or /btw)", "Steer this task, or /btw to ask on the side")
         : narrowOr("Queue a message (or /btw)", "Queue a message, or /btw to ask on the side");
-    input.placeholder = active ? working : narrowOr("Follow up (@ or /)", "Follow up (@ for apps, / for skills and commands, or /btw to ask on the side)");
+    // A messaging app's few words (item 833); what the at sign and the slash open is the box's tooltip.
+    input.placeholder = active ? working : "Follow up";
     keepLook();
     const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);

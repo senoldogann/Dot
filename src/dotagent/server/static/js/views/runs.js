@@ -15,7 +15,7 @@ import { buildFirstChat } from "../firstchat.js";
 import { buildFirstSteps } from "../firststeps.js";
 import { forgetLevel, KEPT_SPEED, ONE_MESSAGE, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
-import { narrowOr, PHONE, touchFirst, trackHeight } from "../layout.js";
+import { PHONE, touchFirst, trackHeight } from "../layout.js";
 import { LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
 import { anchoredPopover } from "../popover.js";
 import { readPref, removePref, writePref } from "../prefs.js";
@@ -96,10 +96,10 @@ const HOME_KEPT = {
   goalMode: KEPT_GOAL_MODE,
 };
 
-/** The words in the home's empty box, with the name the owner calls Dot by (item 420); a phone's line holds about thirty
- * characters, so it only says that the at sign and the slash open something. */
+/** The words in the home's empty box, with the name the owner calls Dot by (item 420), as a messaging app's few
+ * (item 833); what the at sign and the slash open is the box's tooltip. */
 function placeholderFor(name) {
-  return narrowOr(`Message ${name} (@ or /)`, `Message ${name} (@ for apps, / for skills and commands)`);
+  return `Message ${name}`;
 }
 
 /** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */

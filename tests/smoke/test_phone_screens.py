@@ -30,6 +30,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, FloatRect, Locator, Page, Route, ViewportSize, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -209,6 +210,7 @@ async def _phone(browser: Browser, address: str, route: str, inset: int = 0) -> 
             await served.fulfill(response=sheet, body=f"{body}\n:root {{ --safe-top: {inset}px !important; }}\n")
 
         await page.route("**/css/app.css*", with_inset)
+    await show_choices(page)
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     await page.goto(f"{address}/#{route}")

@@ -15,6 +15,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, BrowserContext, FloatRect, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -244,6 +245,7 @@ async def test_a_run_makes_a_lasting_teammate_and_learns_of_it_at_its_next_step(
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             context: BrowserContext = await browser.new_context(viewport={"width": 1280, "height": 860})
+            await show_choices(context)
             page_ui: Page = await context.new_page()
             await page_ui.goto(ui_url(host, port, TOKEN))
             await page_ui.wait_for_timeout(_SETTLE_MS)
@@ -346,6 +348,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             context: BrowserContext = await browser.new_context(
                 viewport={"width": 1280, "height": 860}, device_scale_factor=1
             )
+            await show_choices(context)
             page_ui: Page = await context.new_page()
             await page_ui.goto(ui_url(host, port, TOKEN))
             await page_ui.wait_for_timeout(_SETTLE_MS)
@@ -503,6 +506,7 @@ async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_lev
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             context: BrowserContext = await browser.new_context(viewport={"width": 1280, "height": 860})
+            await show_choices(context)
             page: Page = await context.new_page()
             await page.route("**/api/tools", held)
             await page.goto(ui_url(host, port, TOKEN))
@@ -548,6 +552,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 860})
+            await show_choices(page)
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"http://{host}:{port}/#/agents/{agent_id}")
             await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()

@@ -24,6 +24,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -480,6 +481,7 @@ async def _home_page(browser: Browser, address: str, width: int, scheme: Literal
     page: Page = await browser.new_page(
         viewport={"width": width, "height": _HEIGHT}, color_scheme=scheme, reduced_motion="reduce"
     )
+    await show_choices(page)
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     await page.goto(f"{address}/#/runs")
     return page
@@ -925,6 +927,7 @@ async def test_a_server_chip_drawn_before_the_palette_arrives_wears_dots_icon_an
                 page: Page = await browser.new_page(
                     viewport={"width": 1280, "height": _HEIGHT}, color_scheme="light", reduced_motion="reduce"
                 )
+                await show_choices(page)
                 await page.add_init_script(f"localStorage.setItem('dot.draft.home', {json.dumps(json.dumps(draft))})")
                 await page.route("**/api/palette", answer)
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))

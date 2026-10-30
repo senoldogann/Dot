@@ -696,6 +696,19 @@
     grid-area: meter;
   }
 
+  /* One line on a phone too while the run's choices are away (item 833): the "+", the words, the YOLO tag, the
+     microphone, the size of a chat near full and the send, at the thumb, as a row rather than the grid, so that a part
+     that is not there leaves no gap beside the words. While the microphone listens, the recorder takes the line under
+     the words, as it does with the choices shown (app.css). */
+  .composer[data-quiet] .composer-bar:not(.recording) {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+
+  .composer[data-quiet] .composer-bar > .composer-options {
+    min-height: 0;
+  }
+
   /* No bar covers the conversation's top: what the column goes to stands right there. */
   html.chat-shell .run-thread .answer,
   html.chat-shell .run-thread .bubble.user {

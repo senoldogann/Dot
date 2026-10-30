@@ -16,6 +16,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, BrowserContext, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -152,6 +153,7 @@ async def _page(browser: Browser, address: str, width: int, scheme: Literal["lig
     context: BrowserContext = await browser.new_context(
         viewport={"width": width, "height": 860}, color_scheme=scheme, reduced_motion="reduce"
     )
+    await show_choices(context)
     page: Page = await context.new_page()
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
@@ -316,6 +318,7 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
             touch: BrowserContext = await browser.new_context(
                 viewport={"width": 390, "height": 860}, is_mobile=True, has_touch=True, reduced_motion="reduce"
             )
+            await show_choices(touch)
             phone: Page = await touch.new_page()
             await phone.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await phone.goto(ui_url(host, port, TOKEN))
@@ -340,6 +343,7 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
             early: BrowserContext = await browser.new_context(
                 viewport={"width": 1280, "height": 860}, reduced_motion="reduce"
             )
+            await show_choices(early)
             late: Page = await early.new_page()
             await late.route("**/api/models", held)
             await late.add_init_script("sessionStorage.setItem('dot.opened', '1')")
@@ -381,6 +385,7 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             context: BrowserContext = await browser.new_context(
                 viewport={"width": 1280, "height": 860}, reduced_motion="reduce", service_workers="block"
             )
+            await show_choices(context)
             page: Page = await context.new_page()
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
@@ -496,6 +501,7 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             touch: BrowserContext = await browser.new_context(
                 viewport={"width": 390, "height": 860}, is_mobile=True, has_touch=True, reduced_motion="reduce"
             )
+            await show_choices(touch)
             phone: Page = await touch.new_page()
             await phone.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await phone.goto(ui_url(host, port, TOKEN))

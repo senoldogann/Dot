@@ -12,6 +12,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, BrowserContext, FloatRect, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -180,6 +181,7 @@ async def test_the_agents_box_starts_from_the_agents_bounds_and_a_choice_there_s
             context: BrowserContext = await browser.new_context(
                 viewport={"width": 1280, "height": 860}, reduced_motion="reduce"
             )
+            await show_choices(context)
             # This browser has chosen the loosest mode and the top reasoning level on the home's box before.
             await context.add_init_script(
                 f"localStorage.setItem('dot.approvals', 'yolo'); localStorage.setItem('dot.effort.{DEEP}', 'max')"
@@ -216,6 +218,7 @@ async def test_the_agents_box_starts_from_the_agents_bounds_and_a_choice_there_s
             phone: Page = await browser.new_page(
                 viewport={"width": 390, "height": 800}, color_scheme="dark", reduced_motion="reduce"
             )
+            await show_choices(phone)
             await phone.goto(ui_url("127.0.0.1", int(served.rpartition(":")[2]), TOKEN))
             await phone.goto(f"{served}/#/agents/{scout}")
             await expect(phone.locator(BOX)).to_be_visible()

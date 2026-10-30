@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from composer_choices import show_choices
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -152,6 +153,7 @@ async def _page(browser: Browser, address: str) -> tuple[Page, list[str]]:
     context: BrowserContext = await browser.new_context(
         viewport={"width": 1280, "height": 800}, color_scheme="light", reduced_motion="reduce"
     )
+    await show_choices(context)
     page: Page = await context.new_page()
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))

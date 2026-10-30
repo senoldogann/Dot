@@ -14,6 +14,7 @@ import httpx
 import pytest
 import pytest_asyncio
 import uvicorn
+from composer_choices import show_choices
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
@@ -255,6 +256,7 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                 page: Page = await browser.new_page(
                     viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
                 )
+                await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{first.id}")
                 pill: Locator = page.locator(".dock .composer-pill[data-pill='reasoning']")
