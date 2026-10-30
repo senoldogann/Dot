@@ -104,10 +104,11 @@
   --box-border: transparent;
   --box-shadow: var(--shadow-card);
   /* A button's frame (item 837): none, as its fill says it is one; the contrast setting draws it (themes.css). Its
-     fill is the second surface; a box whose own ground is that surface gives its buttons the first, so that a button
-     never wears the ground it stands on (the pre-push review: a signed-in account's Sign out did). */
+     fill is a tint of the ink over whatever it stands on, so that it is a step from every ground by itself (the
+     pre-push reviews: a fill of the second surface vanished on the boxes, the notes and the sidebar of that ground). */
   --button-border: transparent;
-  --button-fill: var(--surface-2);
+  --button-fill: color-mix(in srgb, var(--text) 6%, transparent);
+  --button-fill-hover: color-mix(in srgb, var(--text) 10%, transparent);
   /* The composer's lift (item 121): a hairline of shadow and a soft one that falls below it. */
   --shadow-composer: 0 1px 2px var(--shadow-ink), 0 12px 28px -18px var(--shadow-ink-deep);
   /* The glass of what stands over the conversation at the foot (item 401): the composer and the bar over it, a
@@ -817,7 +818,7 @@ a.pill:hover {
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--surface-3);
+  background: var(--button-fill-hover);
 }
 
 .btn:disabled {
@@ -2843,7 +2844,6 @@ a.pill:hover {
 /* An account inside the card of the accounts: a soft fill with no frame (item 837), as a box within a box is, rather
    than a second shadow. */
 .account-provider {
-  --button-fill: var(--surface);
   padding: var(--space-3);
   border: 1px solid var(--box-border);
   border-radius: var(--radius);
