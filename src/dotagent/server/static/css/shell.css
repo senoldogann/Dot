@@ -732,6 +732,77 @@
   margin-top: 4px;
 }
 
+/* The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name, on two
+   lines at most so that a name of two words reads whole, the row scrolling sideways past what the sidebar holds with
+   no bar, and never squeezed by the list under it, which scrolls; the tile that is open is a surface step up, as a row
+   is (item 74). All is a round mark the size of a face. */
+.side-agent-faces {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
+  margin: 0 calc(-1 * var(--space-2));
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.side-agent-face {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 76px;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  text-decoration: none;
+}
+
+.side-agent-face:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.side-agent-face[aria-current="page"] {
+  background: var(--surface);
+  box-shadow: 0 1px 2px var(--shadow-ink);
+  color: var(--text);
+}
+
+.side-agent-face .avatar,
+.side-agent-mark {
+  width: 40px;
+  height: 40px;
+}
+
+.side-agent-face .avatar[data-state="idle"] {
+  animation: none;
+}
+
+.side-agent-mark {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+
+.side-agent-name {
+  display: -webkit-box;
+  max-width: 100%;
+  padding: 0 var(--space-half);
+  overflow: hidden;
+  overflow-wrap: break-word;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
 /* The activity sections above the chats: a row is a short chat row (a few words of the title on one line) with a
    second, smaller line of facts, on one line too; the rows keep the compact padding whatever the density (item 95). */
 .side-activity-nav {
