@@ -160,14 +160,15 @@ its title, which counts its rows, and the folds are kept in that browser. The li
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
 and `due`. The composer is one frame on a 24 px corner with a soft shadow under it, as a messaging app's box (item 833):
 one line of the **+**, the words ("Message Miro", the name you call Dot by; "Follow up" in the box of a run; the box's
-tooltip says that @ opens the apps and / the skills and commands), which grows with them, and the microphone at the
-right, with the files attached and the picks above the line. On that line the send comes beside the microphone once
-there are words or a file (it stays where the browser cannot listen), and a Stop is always in sight. The run's choices
-wait behind the **+** menu's **Model and options**, which brings them on a bar of their own under the words, with the
-send, and **Hide the model and options** puts them away again; the choice is kept in that browser for every box. While
-they are away, YOLO still shows as its pill, since the run then asks nothing, and so does the size of the chat once it
-is near full. The bar of the choices never wraps: the **+** and the mode at the left. A message is on **Auto** (item
-495), which shows no mode pill: its words settle its mode, research, which only
+tooltip says that @ opens the apps and / the skills and commands) and the microphone at the right, with the files
+attached and the picks above it; as the words take more lines, the buttons stay at the last. On that line the send
+comes beside the microphone once there are words or a file (it stays where the browser cannot listen), and a Stop is
+always in sight. The run's choices wait behind the **+** menu's **Model and options**, which brings them on a bar of
+their own under the words, with the send, and **Hide the model and options** puts them away again; the choice is kept
+in that browser for every box, those open at the time included. While they are away, YOLO still shows as its pill,
+since the run then asks nothing (by its open lock alone on a phone's narrow line, so that the words keep their room),
+and so does the size of the chat once it is near full. The bar of the choices never wraps: the **+** and the mode at
+the left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
 reads, when they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir
 şeyi değiştirme", "sadece araştır"; "read-only" or "salt okunur" opening a sentence counts, "stay", "remain", "work", "operate",
 "run", "go" or "keep things read-only" where a sentence or a clause starts (after a comma, a semicolon, a colon, a dash,
@@ -353,8 +354,11 @@ composer and scrolls inside it. A run that waits for your approval is listed und
 and leads to its chat: the card stands there alone (item 434). Once you allow it, the card leaves the chat with the line
 that asked for it, as the page opens again too; refused, it stays and says so, and a question keeps its answer.
 
-The **+** at the left of the bar (item 318, after Codex's composer) opens the file picker at once (documents, photos and
-screenshots alike; a phone opens its own sheet). The slash menu picks **Plugins** (the MCP servers with tools) and
+The **+** at the left of the box (item 318, after Codex's composer) opens a menu: **Add files**, which opens the file
+picker (documents, photos and screenshots alike; a phone opens its own sheet), **Model and options** in a box whose run
+has choices (item 833, above), and **Teach a task** in a chat (item 423, [Teaching a
+task](browser-and-computer-use.md#teaching-a-task)); its tooltip says so: "Add files, model and options, or teach a
+task". The slash menu picks **Plugins** (the MCP servers with tools) and
 **Skills**, as `GET /api/palette` lists them; the at menu picks the plugins and the Google and Microsoft accounts signed
 in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
 model; one that is no longer signed in is refused). A plugin, an account or a skill picked is a chip under the box in a

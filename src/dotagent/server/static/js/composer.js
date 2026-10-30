@@ -31,6 +31,9 @@ export const NEW_CHAT_DRAFT = "home";
 export const CHAT_BOX_PX = 160;
 // Whether the boxes show the run's choices on a line of their own (item 833): "shown", or nothing for one line.
 const CHOICES_KEY = "dot.composer.choices";
+// The event that tells every box on the page that the choices were shown or hidden in one of them: the curtain's box
+// while Dot opens (waiting.js) stands beside the page's.
+const CHOICES_EVENT = "dot:composer-choices";
 // What the "+" opens, said by its tooltip and to a screen reader: the run's choices are behind it too (item 833).
 const PLUS_WORDS = "Add files, model and options, or teach a task";
 
@@ -313,11 +316,16 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   });
   const element = el("section", { class: "card composer", "aria-label": label });
   // The box as one line until the owner asks for the run's choices (item 833): the "+" menu shows and hides them, and
-  // the choice is kept for every box.
+  // the choice is kept for every box, those on the page at the time included.
   let choicesShown = readPref(CHOICES_KEY) === "shown";
   function paintQuiet() {
     element.toggleAttribute("data-quiet", !choicesShown);
   }
+  function choicesChanged() {
+    choicesShown = readPref(CHOICES_KEY) === "shown";
+    paintQuiet();
+  }
+  window.addEventListener(CHOICES_EVENT, choicesChanged);
   const key = draftKey === null ? null : `${DRAFT_PREFIX}${draftKey}`;
 
   let drafting = true;
@@ -391,13 +399,12 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
         label: choicesShown ? "Hide the model and options" : "Model and options",
         icon: "sliders",
         run: () => {
-          choicesShown = !choicesShown;
           if (choicesShown) {
-            writePref(CHOICES_KEY, "shown");
-          } else {
             removePref(CHOICES_KEY);
+          } else {
+            writePref(CHOICES_KEY, "shown");
           }
-          paintQuiet();
+          window.dispatchEvent(new CustomEvent(CHOICES_EVENT));
         },
       });
     }
@@ -523,6 +530,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);
       textarea.removeEventListener("blur", onBlur);
+      window.removeEventListener(CHOICES_EVENT, choicesChanged);
     },
   };
 }

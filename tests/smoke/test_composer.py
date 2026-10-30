@@ -616,6 +616,13 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
                 await composer.locator("textarea").fill("Plan the garden")
                 await expect(send).to_be_visible()
                 await expect(mic).to_be_visible()
+                # A box that grows keeps the "+", the microphone and the send at its last line, read in one frame.
+                await composer.locator("textarea").fill("Plan the garden\nwhat to sow\nwhat to plant\nwhat to dig")
+                bottoms: list[float] = await composer.evaluate(
+                    "box => ['.plus-button', '.mic-button', '.btn.send', '.composer-field'].map((part) => {"
+                    " const rect = box.querySelector(part).getBoundingClientRect(); return rect.bottom; })"
+                )
+                assert all(abs(bottom - bottoms[-1]) <= 4 for bottom in bottoms[:-1]), bottoms
                 await composer.locator("textarea").fill("")
                 # The "+" shows the choices, and the choice is kept.
                 await plus.click()
@@ -634,6 +641,11 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
                 await expect(options).to_be_visible()
                 await expect(options).to_contain_text("YOLO")
                 await expect(options).not_to_have_attribute("data-tone", "warn")
+                # On a phone's line its open lock alone, so that the words keep their room; its name still says YOLO.
+                await expect(options).to_have_accessible_name(re.compile(r"\bYOLO\b"))
+                pill = await options.bounding_box()
+                assert pill is not None
+                assert (pill["width"] <= 44) == (width < 720), f"{width}: the YOLO pill is {pill['width']} px wide"
                 await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_hidden()
                 assert await page.evaluate("() => localStorage.getItem('dot.composer.choices')") is None
                 # Back to the mode the module's other tests expect.

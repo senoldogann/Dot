@@ -3858,9 +3858,16 @@ dialog.modal.versions-dialog {
   flex: none;
 }
 
+/* What is out of sight leaves no gap: the choices but YOLO's pill, and their line when YOLO is not chosen. */
 .composer[data-quiet] .composer-options > :not([data-pill="options"][data-yolo]),
+.composer[data-quiet] .composer-options:not(:has(> [data-pill="options"][data-yolo])),
 .composer[data-quiet] .context-meter[data-level="room"] {
   display: none;
+}
+
+/* A box that grows keeps the "+", the microphone and the send at its last line, as a messaging app's does. */
+.composer[data-quiet] .composer-bar {
+  align-items: flex-end;
 }
 
 /* With a microphone, the send waits for words or a file, and the microphone stands alone at the end until then. The
@@ -4289,6 +4296,17 @@ dialog.modal.versions-dialog {
   .composer-pill > .icon,
   .composer-pill[data-pill="agent"] .composer-pill-value {
     display: none;
+  }
+
+  /* On a phone's line of one, YOLO is its open lock alone, so that the words keep their room (item 833); its name
+     stays for a screen reader and in its tooltip, and its menu says what it means. */
+  .composer[data-quiet] .composer-pill[data-pill="options"] .composer-pill-value {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
