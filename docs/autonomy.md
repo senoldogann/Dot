@@ -403,8 +403,9 @@ meaning (`[agent] skill_merge_similarity`, 0.75) are one procedure: each yes is 
 Customize › Skills, at most `skill_proposals_per_night` (3) a night, for your yes. No skill is written, rested or
 deleted by it: see Learned skills in [Extending Dot](extending.md).
 
-**Taking back the file changes of a run.** Under the answer of a chat's run, its line of what it changed has an
-**Undo**, which does what follows for the files it lists (item 597).
+**Taking back the file changes of a run.** At the head of the side panel's Changes tab of a chat's run (item 841;
+under its answer until then), its line of what it changed has an **Undo**, which does what follows for the files it
+lists (item 597).
 Before `write_file` or `edit_file` changes a file, the run notes the change
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
 the change cannot be noted (a full disk, say), the file is not changed and the model is told why; a note the disk cut

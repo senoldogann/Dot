@@ -501,13 +501,13 @@ without a jump: the chat stands where it was, at its foot, inert, until the next
 never lifted to its top and dropped back. The answer of the run is the last message, with a copy button
 (its icon turns to a check once the answer is on the clipboard) and, where the browser can speak, a speaker (item 574),
 when it came and how the run ended under it; how long the run took shows where the pointer rests on it (on a touch
-screen it always shows). Over that line, once the run of the page has ended, one line says what its file tools created
-and changed on this Mac (item 597: "Created a file and changed 1", from the undo journal, the run's own notes left
-out), the files by name, each a button to the file beside the conversation, with **Review**, which opens the side
-panel's Changes tab and their diffs, and **Undo**, which asks first, then deletes the files the run created and puts
-back the ones it changed that are as it left them; the line then says its changes were taken back. A run that changed
-no file shows nothing there: not an editor's list, which the Changes tab is, and a command's own writes, which no
-journal holds, are not in it.
+screen it always shows). The answer holds no line of the files the run changed (item 841: Dot is a personal agent, not
+an editor; the line stood under the answer since item 597): once the run of the page has ended, the side panel's
+**Changes** tab opens on one line of what its file tools created and changed on this Mac ("Created a file and changed
+1", from the undo journal, the run's own notes left out), the files by name, each a button to the file, and **Undo**,
+which asks first, then deletes the files the run created and puts back the ones it changed that are as it left them;
+the line then says its changes were taken back. The files and their diffs follow under it. A run that changed no file
+has no line, and a command's own writes, which no journal holds, are not in it.
 The speaker reads the answer aloud with the browser's own voice, in the language of Settings ›
 General › Voice (with a voice kept on this Mac when the browser has one for the language, a network voice only when it
 has not: [what leaves this Mac](safety.md#what-leaves-this-mac)), leaving out its code, its addresses and the marks of
@@ -1025,7 +1025,8 @@ answer and the lines along the way, in a soft one (`--msg-agent`), a bubble hold
 as the column; the line under an answer that ended well and under your message shows where the pointer rests or the
 focus is (a reaction that stands, a failure and a stop stay in sight; a touch screen shows them always), an answer that
 ended well says no word for it ("Finished" went), a file a message names is a chip of its name (its path in the chip's
-title and in a copy of the message), and what a run changed is an attachment in the answer's fill. Controls:
+title and in a copy of the message), and what a run changed is in the side panel's Changes tab, not under the answer
+(item 841). Controls:
 buttons, inputs and selects 36 px tall on a 10 px corner (32 for the small ones; item 837, 8 px before): a button is a
 soft fill with no frame, a step darker under the pointer (the first of a page in ink, a quiet one with no fill, and the
 contrast setting frames them), and an input or a select keeps its hairline, as what is typed in; the same 2 px focus

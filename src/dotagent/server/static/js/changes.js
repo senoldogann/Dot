@@ -60,11 +60,13 @@ function fileRow(file, open) {
 
 /**
  * The Changes section of the run `runId`'s chat: `refresh()` reads them again, a file opened staying open; `onCount(n)`
- * gets the number of files each time they changed, `onFiles(files)` the files themselves.
+ * gets the number of files each time they changed, `onFiles(files)` the files themselves; `head`, a node over the files
+ * (item 841: what the run changed, with its Undo).
  */
-export function changesSection({ runId, onCount, onFiles }) {
+export function changesSection({ runId, onCount, onFiles, head = null }) {
   const body = el("div", { class: "changes" });
-  const section = panelSection({ id: "run-changes", title: "Changes", actions: null, body });
+  // `head` stands over the files: the line of what the run changed and its Undo (item 841, runchanges.js).
+  const section = panelSection({ id: "run-changes", title: "Changes", actions: null, body: el("div", { class: "changes-holder" }, head, body) });
   // What the section was last drawn from: the same changes read again are not drawn again.
   let drawn = null;
 
