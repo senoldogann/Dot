@@ -1,20 +1,20 @@
 // The sidebar while the settings are open (item 562): Back to chats and the seven sections (item 845) with what each holds
-// (the main model, how many notes Dot keeps, how many entries the Vault holds, whether a phone reaches Dot). sidebar.js
+// (how many notes Dot keeps, how many entries the Vault holds, whether a phone reaches Dot). sidebar.js
 // shows it in the place of the chats and its pages (a Mac's window; a phone has the list of tabs for a page of its own,
 // views/settings.js). The daemon's state is the page's (shell.js): the connection, and the emergency stop's banner.
 
 import { api, query } from "./api.js";
-import { el, modelName, setText } from "./dom.js";
+import { el, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { LAST_CHAT_KEY, readPref } from "./prefs.js";
 import { SECTIONS, sectionOf, tabAt } from "./settingstabs.js";
-import { getSnapshot, onChange } from "./state.js";
 
 // The chat the owner was on last, which main.js keeps; Back to chats leads there.
 // What the phone needs asked of Tailscale is read again no sooner than this: a tab's visit should not ask it each time.
 const PHONE_FRESH_MS = 60_000;
-// The tabs whose count, model or state the nav shows at their section's right (paintModel and readValues).
-const NAV_VALUES = new Set(["models", "memory", "vault", "phone"]);
+// The tabs whose count or state the nav shows at their section's right (readValues); the main model's name, which ran
+// long beside Models, it shows no more (item 852).
+const NAV_VALUES = new Set(["memory", "vault", "phone"]);
 
 /**
  * Build the nav. `homeHref` is where Back to chats leads when no chat was open before. `onNavigate` runs after a link is
@@ -41,17 +41,16 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
       ),
     ]),
   );
-  // Inside the desktop shell (item 88) the window's traffic lights stand at the top left: the first row is theirs, with
-  // the button that hides the sidebar beside them where the chats' head holds it (items 113 and 134), and Back to chats
-  // stands under it (item 577). In a browser the two share the row.
-  const lights = document.documentElement.dataset.shell === "desktop";
+  // The first row holds the button that hides the sidebar where the chats' head holds it (items 113 and 134), beside
+  // the traffic lights of the desktop shell (item 88); Back to chats stands at the foot of the nav, under the sections
+  // (item 852, the owner's ask: it stood at the top, item 577).
   const element = el(
     "nav",
     { class: "settings-nav", "aria-label": "Settings" },
-    el("div", { class: "settings-nav-top", "data-tauri-drag-region": "" }, lights ? hide : [back, hide]),
-    lights ? back : null,
+    el("div", { class: "settings-nav-top", "data-tauri-drag-region": "" }, hide),
     el("h2", { class: "settings-nav-title" }, "Settings"),
     el("div", { class: "settings-nav-groups" }, el("section", { class: "settings-nav-group" }, [...links.values()])),
+    el("div", { class: "settings-nav-foot" }, back),
   );
 
   let disposed = false;
@@ -67,10 +66,6 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
         link.removeAttribute("aria-current");
       }
     }
-  }
-
-  function paintModel(snapshot) {
-    setText(values.get("models"), snapshot.status === null ? "" : modelName(snapshot.status.models.main));
   }
 
   /** What the tabs hold, read from the daemon each time the nav is shown or the tab changes; one that cannot be read leaves its place empty. */
@@ -98,8 +93,6 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
   }
 
   paintCurrent();
-  paintModel(getSnapshot());
-  const stopChange = onChange(paintModel);
 
   return {
     element,
@@ -115,7 +108,6 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
     },
     dispose() {
       disposed = true;
-      stopChange();
     },
   };
 }

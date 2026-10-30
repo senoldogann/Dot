@@ -1450,10 +1450,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       note(scope, record.ts, "list", `Plan: ${done} of ${steps.length} steps done${failedText}`, "");
     },
 
-    plan_reminder(scope, record) {
-      const numbers = record.data.open_steps.join(", ");
-      note(scope, record.ts, "list", `Dot wanted to finish with plan steps ${numbers} still open and was asked to close them first`, "warn");
-    },
+    // Dot was asked to close its plan's open steps before it finished: a note of the machinery, which the plan's own
+    // marks show, and no line of the conversation (item 852, the owner's ask).
+    plan_reminder() {},
 
     // The run called finish in the same reply as a call that did not work, so its answer was written before it saw the
     // result: it was sent back once to read it and finish again (item 552).

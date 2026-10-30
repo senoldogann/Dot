@@ -28,7 +28,7 @@ export const TABS = [
 export const SECTIONS = [
   { id: "general", label: "General", icon: "sliders", tabs: ["general", "snapshots"], value: null },
   { id: "appearance", label: "Appearance", icon: "palette", tabs: ["appearance"], value: "appearance" },
-  { id: "models", label: "Models", icon: "layers", tabs: ["models", "keys", "websearch"], value: "models" },
+  { id: "models", label: "Models", icon: "layers", tabs: ["models", "keys", "websearch"], value: null },
   { id: "rules", label: "Rules and memory", icon: "shield", tabs: ["rules", "memory", "harness"], value: "memory" },
   { id: "browser", label: "Browser and Vault", icon: "globe", tabs: ["browser", "vault"], value: "vault" },
   { id: "phone", label: "Phone and channels", icon: "smartphone", tabs: ["phone", "channels"], value: "phone" },

@@ -4,13 +4,12 @@
 // (item 330). Each tab is drawn by the module that owns it.
 
 import { api, query } from "../api.js";
-import { el, modelName } from "../dom.js";
+import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { PHONE } from "../layout.js";
 import { settingsHead } from "../panels.js";
 import { DEFAULT_TAB, SECTIONS, sectionOf, TABS } from "../settingstabs.js";
 import { setStageTitle } from "../stage.js";
-import { getSnapshot, onChange } from "../state.js";
 import { findTheme, onSchemeChange, onThemeChange, shownScheme, themePicks } from "../theme.js";
 import { attempt } from "../ui.js";
 import * as appearance from "./appearance.js";
@@ -73,7 +72,7 @@ function partsRow(section, open) {
   );
 }
 
-/** The phone's list of the settings' sections. Appearance tells the theme on screen, Models the main model, Rules and
+/** The phone's list of the settings' sections. Appearance tells the theme on screen, Rules and
  * memory how many notes Dot keeps and Browser and Vault how many entries the Vault holds. */
 function mountList(root, ctx) {
   ctx.setTitle("Settings");
@@ -90,12 +89,8 @@ function mountList(root, ctx) {
   function paintTheme() {
     values.get("appearance").textContent = findTheme(themePicks()[shownScheme()]).label;
   }
-  function paintModel(snapshot) {
-    values.get("models").textContent = snapshot.status === null ? "" : modelName(snapshot.status.models.main);
-  }
   paintTheme();
-  paintModel(getSnapshot());
-  const stops = [onThemeChange(paintTheme), onSchemeChange(paintTheme), onChange(paintModel)];
+  const stops = [onThemeChange(paintTheme), onSchemeChange(paintTheme)];
   SYSTEM_DARK.addEventListener("change", paintTheme);
   attempt(async () => {
     const notes = await api.get(`/memories${query({ limit: 1, offset: 0 })}`);

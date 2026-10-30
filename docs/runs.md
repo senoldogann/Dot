@@ -94,9 +94,10 @@ are independent, so the run can hand each to `delegate` in one turn, naming the 
 closes the step (done with the report's start as evidence, or failed) without a mark of the run's own; a step the plan
 does not have (a slip, or a delegate before the plan) does not stop the delegation: the run goes, the result's first
 line says the step was not in the plan, and nothing is marked. A `delegate` call waits up to four hours for its
-run's report. A run that calls `finish` with steps still open is asked
-once to close them. A plan can also hold the run's targets (`targets` of `update_plan`, at most 600 characters): for a
-goal that names an outcome, what the run will reach and how its own tools measure it. They stay until new targets
+run's report. A run that calls `finish` with steps still open is asked once to close them; the conversation draws no line
+for it (item 852), the plan's marks show the steps. A plan can also hold the run's targets (`targets` of `update_plan`,
+at most 600 characters): for a goal that names an outcome, what the run will reach and how its own tools measure it.
+They stay until new targets
 replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are the first line of the plan in
 the web UI and are printed under "plan" by `dotx run`, go into every note that carries the plan (a compaction, a
 reminder, a resumed run) and, in goal mode, to the goal check.
