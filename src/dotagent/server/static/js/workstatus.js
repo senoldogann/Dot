@@ -35,9 +35,8 @@ const QUIET = new Set(["approval_requested", "question_left"]);
 
 /**
  * The line of `rootRunId`'s work, after `face` (the still face of who works, or null). `push(record)` takes each event of
- * the chat as the timeline does, `setActive(bool)`
- * says whether the run is at work, and `dispose()` stops its timer. `onToggle(shown)` runs when the reader asks for the
- * steps (`shown` true) or folds them back.
+ * the chat as the timeline does, `setActive(bool)` says whether the run is at work, and `dispose()` stops its timer.
+ * `onToggle(shown)` runs when the reader asks for the steps (`shown` true) or folds them back.
  */
 export function createWorkStatus({ rootRunId, active, onToggle, face = null }) {
   const dots = el("span", { class: "work-status-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span"));
