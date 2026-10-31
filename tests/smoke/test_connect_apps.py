@@ -34,9 +34,12 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "connect-apps-token"
 FIXTURE: Path = Path(__file__).resolve().parent.parent / "fixtures" / "mcp_fixture_server.py"
-# The fixture server of the config, and the service the test has the daemon count it as.
+# The fixture server of the config, and the service the test has the daemon count it as; and a second one counted as a
+# service with no logo of its own, whose mark is an icon, which the button leaves out (item 853).
 _SERVER: str = "fixture"
 _AS_SERVICE: str = "sentry"
+_PLAIN: str = "plain-fixture"
+_AS_PLAIN: str = "context7"
 # The sections as the page titles them (views/connectors.js).
 _TITLES: dict[str, str] = {
     "popular": "Popular",
@@ -58,7 +61,9 @@ _PHONE_PX: int = 720
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     """A runtime in a throw-away home whose browser has no window, with the MCP fixture as a server of its config."""
     home: Path = tmp_path_factory.mktemp("home")
-    server: str = f'[[mcp]]\nname = "{_SERVER}"\ncommand = "{sys.executable}"\nargs = ["{FIXTURE}"]\n'
+    server: str = "\n".join(
+        f'[[mcp]]\nname = "{name}"\ncommand = "{sys.executable}"\nargs = ["{FIXTURE}"]\n' for name in (_SERVER, _PLAIN)
+    )
     (home / "config.toml").write_text(f"[browser]\nheadless = true\n\n{server}", encoding="utf-8")
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
@@ -67,7 +72,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     found = routes_mcp.service_of
 
     def as_service(config: McpServerConfig) -> str | None:
-        return _AS_SERVICE if config.name == _SERVER else found(config)
+        return {_SERVER: _AS_SERVICE, _PLAIN: _AS_PLAIN}.get(config.name) or found(config)
 
     patch.setattr(routes_mcp, "service_of", as_service)
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
@@ -163,6 +168,7 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
                 "(links) => links.map((link) => link.getAttribute('aria-label'))"
             )
             assert heads == ["Campaigns", "Schedules"], heads
+            # The ready server with no logo shows none: one mark, the logo's.
             marks: Locator = button.locator(".side-connect-mark")
             await expect(marks).to_have_count(1)
             await expect(marks.locator("img")).to_have_attribute("src", f"/icons/plugins/{sentry.logo}")

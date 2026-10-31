@@ -17,6 +17,7 @@ import pytest_asyncio
 from composer_choices import show_choices
 from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
+import dotagent.skills as skills_pkg
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -27,6 +28,13 @@ from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
+
+# The skills that come with Dot: a folder each (skills/builtin).
+_BUILT_IN: tuple[str, ...] = tuple(
+    sorted(
+        path.name for path in (Path(skills_pkg.__file__).parent / "builtin").iterdir() if (path / "SKILL.md").is_file()
+    )
+)
 
 TOKEN: str = "composer-test-token"
 # A model that offers reasoning levels, added in the page to the daemon's list (the scripted model offers none), so the
@@ -138,14 +146,11 @@ async def test_the_palette_names_the_skills_and_the_servers(client: httpx.AsyncC
     answer: httpx.Response = await client.get("/api/palette")
     assert answer.status_code == 200, answer.text
     found: dict[str, list[dict[str, str]]] = answer.json()
-    # By name, the owner's skill among the three that come with Dot (item 196).
-    assert [(skill["name"], skill["source"]) for skill in found["skills"]] == [
-        ("excel", "built-in"),
-        ("onedrive", "built-in"),
-        ("scan-catalogue", "home"),
-        ("word", "built-in"),
-    ]
-    assert found["skills"][2]["description"] == "Scan a product catalogue page by page and report the items."
+    # By name, the owner's skill among those that come with Dot (item 196), whichever they are now.
+    listed: list[tuple[str, str]] = [(skill["name"], skill["source"]) for skill in found["skills"]]
+    assert listed == sorted([*((name, "built-in") for name in _BUILT_IN), ("scan-catalogue", "home")])
+    (own,) = [skill for skill in found["skills"] if skill["name"] == "scan-catalogue"]
+    assert own["description"] == "Scan a product catalogue page by page and report the items."
     assert found["servers"] == []
 
 
@@ -168,9 +173,9 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
                 await goal.click()
                 await goal.type("/")
                 await expect(menu).to_be_visible()
-                # Five commands (Auto and the three modes, item 495, and /loop, item 400), the owner's skill and the
-                # three that come with Dot (item 196).
-                await expect(menu.locator("[role=option]")).to_have_count(9)
+                # Five commands (Auto and the three modes, item 495, and /loop, item 400), the owner's skill and those
+                # that come with Dot (item 196).
+                await expect(menu.locator("[role=option]")).to_have_count(5 + 1 + len(_BUILT_IN))
                 # The sections have no titles on the page (item 537); a screen reader hears each.
                 labels: list[str | None] = [
                     await section.get_attribute("aria-label") for section in await menu.locator("[role=group]").all()

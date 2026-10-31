@@ -1,4 +1,4 @@
-// A panel that opens above a control of a frame (the composer's pills): built when it opens, closed by Escape, by a
+// A panel that opens above a control of a frame (the composer's pills), or below it where there is more room: built when it opens, closed by Escape, by a
 // click outside it, or by whoever opened it. The control says aria-expanded. The focus moves into the panel when it
 // opens (to a control marked `data-autofocus`, else the chosen option, or the first control), the arrow keys move it
 // between the panel's controls unless a control answered them itself, and it goes back to the control when the panel
@@ -28,9 +28,39 @@ export function anchoredPopover({ anchor, frame, label, build }) {
     const at = anchor.getBoundingClientRect();
     const room = frame.clientWidth - panel.offsetWidth - EDGE_PX;
     panel.style.left = `${Math.max(EDGE_PX, Math.min(at.left - box.left - frame.clientLeft, room))}px`;
-    panel.style.bottom = `${frame.clientHeight - (at.top - box.top - frame.clientTop) + EDGE_PX}px`;
-    // The height the window has above the control, which the panel keeps within (app.css), so its top never leaves it.
-    panel.style.setProperty("--room-above", `${Math.max(0, at.top - 2 * EDGE_PX)}px`);
+    // Above the control, where it fits. Else below it, where it fits there: the home's box stands mid-screen, and on a
+    // phone-sized window the four modes scrolled in the room above it. Else, when the window holds it whole, below
+    // and moved up over the control as far as it must to end inside the window. Else on the roomier side. The panel
+    // keeps within the room it is given (app.css), so it never leaves the window.
+    const needed = panel.scrollHeight;
+    const whole = Math.max(0, window.innerHeight - 2 * EDGE_PX);
+    const above = Math.max(0, at.top - 2 * EDGE_PX);
+    const below = Math.max(0, window.innerHeight - at.bottom - 2 * EDGE_PX);
+    let side = "above";
+    let top = 0;
+    let height = above;
+    if (needed > above && below >= needed) {
+      side = "below";
+      top = at.bottom + EDGE_PX;
+      height = below;
+    } else if (needed > above && needed <= whole) {
+      side = "over";
+      top = Math.min(at.bottom + EDGE_PX, window.innerHeight - EDGE_PX - needed);
+      height = whole;
+    } else if (needed > above && below > above) {
+      side = "below";
+      top = at.bottom + EDGE_PX;
+      height = below;
+    }
+    if (side === "above") {
+      panel.style.top = "";
+      panel.style.bottom = `${frame.clientHeight - (at.top - box.top - frame.clientTop) + EDGE_PX}px`;
+    } else {
+      panel.style.bottom = "";
+      panel.style.top = `${top - box.top - frame.clientTop}px`;
+    }
+    panel.dataset.side = side;
+    panel.style.setProperty("--room", `${height}px`);
   }
 
   function focusChoice() {

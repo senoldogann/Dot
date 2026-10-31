@@ -4380,7 +4380,7 @@ dialog.modal.versions-dialog {
   gap: 4px;
   width: 320px;
   max-width: calc(100% - 16px);
-  max-height: min(360px, var(--room-above, 360px));
+  max-height: min(360px, var(--room, 360px));
   overflow-y: auto;
   padding: 8px;
   border-radius: var(--radius);
@@ -4394,7 +4394,7 @@ dialog.modal.versions-dialog {
    menus, its head saying how far the plan has come, its steps as the Plan tab draws them, and the way to that tab. */
 .composer-popover:has(.plan-popover-head) {
   width: 380px;
-  max-height: min(480px, var(--room-above, 480px));
+  max-height: min(480px, var(--room, 480px));
   gap: var(--space-2);
   padding: var(--space-3);
 }
@@ -4436,7 +4436,7 @@ dialog.modal.versions-dialog {
 /* The Options menu: the four approval modes with what each does, YOLO chosen in the warning ink (item 398), then
    Execution's switches (Keep going, Goal mode, Plan first), whole where the window has the room. */
 .composer-popover:has(.approval-list) {
-  max-height: min(640px, var(--room-above, 640px));
+  max-height: min(640px, var(--room, 640px));
 }
 
 .pop-option {
@@ -5346,9 +5346,10 @@ dialog.modal.versions-dialog {
 }
 
 /* A phone's button is a finger's width: the room is added at its left, so its mark stays at the right edge of the
-   message, as on a wider window (items 360 and 374). */
+   message, as on a wider window (items 360 and 374). Not an icon's button, which is 36 px wide on a phone with a ring
+   that answers a tap around it (item 787): the room pushed its icon out of the button (item 861). */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
-  .message-foot .btn:last-child {
+  .message-foot .btn:last-child:not(.icon-only) {
     padding-left: 16px;
   }
 }
@@ -10525,6 +10526,12 @@ button.attach-chip:hover {
     content: "";
     position: absolute;
     inset: -4px;
+  }
+
+  /* The last button of a message's foot ends at the conversation's edge (item 374): its ring stops there, or it widened
+     the conversation by its 4 px and it scrolled sideways (item 861). */
+  .message-foot .btn.icon-only:last-child::before {
+    right: 0;
   }
 
   .composer {

@@ -24,6 +24,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
+from dotagent.policy.engine import _INITIATIVE_REASON, OWNERS_REASON
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -161,3 +162,43 @@ async def _another_run_streams(manager: RunManager) -> None:
     while True:
         await manager._runtime.bus.emit("run_another", "delta", {"step": 1, "text": "word "}, False)
         await asyncio.sleep(0.05)
+
+
+# The card of a question only the owner answers in yolo (items 850 and 860), drawn as the page draws one from its event:
+# the line under it says why no rule is offered.
+_CARD_LINES: str = """async ([initiative, owners]) => {
+  const { approvalCard, fromEvent } = await import("/js/approvals.js");
+  const args = {
+    tool: "browser_act", kind: "browser_click", risk: "medium", summary: "click 'Post'", target: "", amount: null,
+    flags: ["public_post"],
+  };
+  return [initiative, owners].map((reason, at) => {
+    const summary = `click 'Post' — ${reason}`;
+    const data = { approval_id: `apr_${at}`, tool: "browser_act", summary, severity: "high", args };
+    const approval = fromEvent("run_x", data);
+    const card = approvalCard({ approval, heading: null, onSettled: () => undefined, leftNote: "", onUseHere: null });
+    return [card.node.textContent, card.node.querySelector(".approval-rule") !== null];
+  });
+}"""
+
+
+async def test_the_owners_questions_in_yolo_say_so_and_offer_no_rule(
+    served: tuple[RunManager, httpx.AsyncClient],
+) -> None:
+    _, client = served
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser = await playwright.webkit.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            (initiative, initiative_rule), (owners, owners_rule) = await page.evaluate(
+                _CARD_LINES, [_INITIATIVE_REASON, OWNERS_REASON]
+            )
+            assert "Dot opened on its own initiative, Dot always asks you about this, YOLO too" in initiative
+            assert "wait for you in YOLO too" in owners
+            assert not initiative_rule and not owners_rule
+        finally:
+            await browser.close()
