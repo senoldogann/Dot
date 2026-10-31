@@ -85,6 +85,7 @@ def test_each_tool_is_in_the_group_of_what_it_reaches(tool: str, group: str) -> 
 
 def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_tool_definitions() -> None:
     assert groups_of(TASK_TOOLS) == (
+        "waits",
         "browser",
         "memory_admin",
         "todos",
@@ -165,6 +166,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "terminal",
         "todos",
         "vault",
+        "waits",
     }
     assert (hidden["apple_script"], hidden["memory_forget"]) == ("desktop", "memory_admin")
 
@@ -216,6 +218,7 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
     section: list[str] = grouped[start:end].split("\n")
     assert "Turn a group on with use_tools before you use its tools." in section[1]
     assert section[2:] == [
+        "- waits: waiting in code until a file is there, an address answers or a check passes (wait_until)",
         "- browser: Chrome, for pages that need JavaScript, a log-in or clicking (browser_open, browser_new_tab, "
         "browser_snapshot, browser_find, browser_links, browser_act, browser_eval, browser_scroll, browser_read_text, "
         "browser_requests, browser_extract, browser_console, browser_viewport, browser_screenshot, "

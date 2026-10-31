@@ -138,7 +138,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
   step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
   the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
-  `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, and `mcp__<server>` for each MCP server) are
+  `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, `waits`, and `mcp__<server>` for each MCP server) are
   listed in the system prompt with what they are for and
   their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. A
   server's line says what the server is for, in your words, Dot's or the server's own, quoted as its claim
@@ -480,6 +480,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | --------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Shell and files | `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`, `search_files`, `write_notes`           |
 | Terminal        | `terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`                                                |
+| Waits           | `wait_until` (item 887, tool group `waits`): a wait in code for a check, an address or a file                       |
 | Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`, `judge_items`                                               |
 | Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_requests`, `browser_extract` (item 714), `browser_console` and `browser_viewport` (item 746), `browser_wait_text`, `browser_act`, `browser_eval`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab`, `browser_create_login` (item 740), and, while 1Password is connected or the vault holds a login, `browser_logins` and `browser_fill_login` (items 493 and 621) |
 | Vault           | `vault_contacts` (item 621): the contact details you saved in Settings › Vault and the billing address of each card, for a run to type where a form asks; it never shows a password, a card number, an expiry or a security code (a card is kept, and no tool of a run fills it) |
@@ -671,6 +672,35 @@ other than Ctrl-C, Ctrl-U) leaves a line Dot cannot tell, and running it asks; o
 in another directory, so later lines are judged from the home folder. A chat keeps at most `[shell] terminal_sessions`
 sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
 when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
+
+`wait_until` (item 887, after OpenMausBot's waits) waits for something to happen, checked in code, with no model turn
+spent on the wait. It names one condition:
+
+- a command that only reads on this Mac: it holds when the command exits 0 (`test -f out/report.pdf`, `grep -q done
+  build.log`);
+- an address: it holds when the address answers 2xx or 3xx;
+- a file: it holds when the file is there.
+
+`contains` narrows each one to output, a page or a file that holds a text. The tool checks every `every_s` seconds (2
+to 600, 10 by default) for up to `within_minutes` (60 at most, 10 by default). It says when the condition held and after
+how many checks, or what the last check saw. On the owner's Mac, the runs of one week slept and polled 131 times in 41
+runs (`sleep 60; gh pr checks …`), each poll a model turn.
+
+Each condition is classified as the tool it stands for, under that tool's name: a command as `shell`, an address as
+`web_fetch`, a file as `read_file`. So your rules for those tools in Settings › Rules bind a wait as they bind the tool.
+A command is a check only when the shell guard reads it as reading on this Mac: risk `safe`, with no flag, no file it
+changes and nothing it fetches. It runs again and again, and a line that sends, writes or removes would do so each time,
+so any other line is refused before it runs. That includes a line the guard lets run unasked as `low`, such as `git
+pull`, `git commit`, a script or `gh pr checks`, and a line that reaches the network even when the guard reads it as
+safe (`git ls-remote`). Such a step runs once with `shell`, and the wait is on what shows it is done:
+a file, or a public address.
+
+An address is checked where `web_fetch` may go. That excludes an address on the local network unless `[web]
+allow_private_hosts` is set, and such an address ends the wait at once: no later check reaches it either. Only the
+status and whether the page holds the text come back. A file is judged as `read_file` judges it, so a protected place
+asks, and it is opened as `read_file` opens one, with no link followed along its path (item 681). A link that came there
+after the call was allowed ends the wait, and it is not read. Only whether it is there and holds the text comes back.
+The owner's stop and the emergency stop end a wait as they end any call.
 
 A command that runs long and ends by itself, as an eval or a long build, past the 30 minutes that `shell` may wait
 (`[shell] max_timeout_s`), or for minutes while the run has other work to do (item 508), goes to a terminal session in

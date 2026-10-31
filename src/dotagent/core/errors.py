@@ -199,6 +199,11 @@ class WebError(DotError):
     """A web request was refused by the address rules, failed on the network, or returned something unusable."""
 
 
+class PrivateHostRefused(WebError):
+    """An address on the local network, which the web tools do not reach while ``[web] allow_private_hosts`` is off: no
+    later request reaches it either (``wait_until`` ends its wait at once, item 887)."""
+
+
 class WebTransportError(WebError):
     """A web request failed in transit (timeout, reset connection); trying again can help."""
 

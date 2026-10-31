@@ -116,6 +116,7 @@ from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.todos import build_todo_tools
 from dotagent.tools.trading import build_trading_tools
+from dotagent.tools.waits import build_wait_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.trading.coinbase import CoinbaseBroker, kept_key
 from dotagent.trading.market import CoinbaseMarket
@@ -248,6 +249,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
     core: tuple[tuple[RegisteredTool, ...], ...] = (
         build_file_tools(),
         (build_shell_tool(),),
+        build_wait_tools(),
         build_browser_tools(),
         build_web_tools(),
         build_notes_tools(),

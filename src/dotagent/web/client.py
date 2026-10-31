@@ -13,7 +13,7 @@ import httpx
 
 from dotagent.browser.safety import check_url
 from dotagent.config import WebConfig
-from dotagent.core.errors import WebError, WebTransportError
+from dotagent.core.errors import PrivateHostRefused, WebError, WebTransportError
 from dotagent.core.logs import get_logger
 from dotagent.core.retry import RetryPolicy, retry_async
 from dotagent.web.addresses import is_public_address, order_addresses
@@ -140,6 +140,13 @@ def _deny_all_cookies() -> httpx.Cookies:
     return httpx.Cookies(http.cookiejar.CookieJar(policy=http.cookiejar.DefaultCookiePolicy(allowed_domains=[])))
 
 
+# The words of the refusal of an address on the local network (:class:`PrivateHostRefused`).
+PRIVATE_HOST_REFUSAL: str = (
+    "the host is on a private or local network address; the web tools only reach the public internet "
+    "(web.allow_private_hosts)"
+)
+
+
 async def checked_addresses(host: str, port: int, *, allow_private_hosts: bool) -> tuple[str, ...]:
     """The addresses ``host`` resolves to, checked a moment before a connection is opened: every one of them has to be
     public unless ``allow_private_hosts``, so a name with a private address among its answers cannot reach the local
@@ -155,11 +162,7 @@ async def checked_addresses(host: str, port: int, *, allow_private_hosts: bool) 
     found: tuple[str, ...] = order_addresses([str(info[4][0]) for info in infos])
     private: tuple[str, ...] = tuple(address for address in found if not is_public_address(address))
     if private and not allow_private_hosts:
-        raise WebError(
-            "the host is on a private or local network address; the web tools only reach the public internet "
-            "(web.allow_private_hosts)",
-            {"host": _shown(host), "addresses": list(private)},
-        )
+        raise PrivateHostRefused(PRIVATE_HOST_REFUSAL, {"host": _shown(host), "addresses": list(private)})
     return found
 
 
