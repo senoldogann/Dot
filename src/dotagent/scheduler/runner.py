@@ -53,7 +53,7 @@ from dotagent.scheduler.failures import (
     retry_after,
 )
 from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
-from dotagent.scheduler.notices import BY_HAND_LEVEL, notify_level, tells
+from dotagent.scheduler.notices import BY_HAND_LEVEL, notify_level, said_nothing_new, tells
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.timing import format_local, next_firing
 from dotagent.store.db import Store
@@ -738,7 +738,9 @@ class Scheduler:
                 if started is None and made:
                     await self._drop_chat(record.id, thread_id)
             run: RunRecord = started
-            await self._track(record.id, run, BY_HAND_LEVEL if signal is None else self._level(record))
+            await self._track(
+                record.id, run, BY_HAND_LEVEL if signal is None else self._level(record), by_hand=signal is None
+            )
             try:
                 await store.record_schedule_hand_run(record.id, now, thread_id)
             except DotError as exc:
@@ -836,7 +838,7 @@ class Scheduler:
         """How the ends of ``record``'s runs are told (item 461): its own level, else the configured one."""
         return notify_level(record.options.notify, self._runtime.config.scheduler.notify)
 
-    async def _track(self, schedule_id: str, run: RunRecord, level: NotifyLevel) -> None:
+    async def _track(self, schedule_id: str, run: RunRecord, level: NotifyLevel, by_hand: bool = False) -> None:
         """Keep ``run`` as the schedule's run at work until it ends; its watch, which starts first, frees the schedule
         and writes the end even when the store fails a write after this, and tells the end at ``level``, read when
         the run started, so a schedule deleted meanwhile still tells it. An emergency stop engaged while it was being
@@ -846,7 +848,7 @@ class Scheduler:
             self._manager.end_by_emergency_stop(run.id)
         self._in_flight[schedule_id] = run.id
         watcher: asyncio.Task[None] = asyncio.create_task(
-            self._watch(schedule_id, run.id, level), name=f"watch-{run.id}"
+            self._watch(schedule_id, run.id, level, by_hand), name=f"watch-{run.id}"
         )
         self._watchers.add(watcher)
         watcher.add_done_callback(self._watcher_done)
@@ -891,7 +893,7 @@ class Scheduler:
         except DotError as exc:
             log.error("campaign_session_start_failed", campaign_id=campaign_id, error=exc.message, context=exc.context)
 
-    async def _watch(self, schedule_id: str, run_id: str, level: NotifyLevel) -> None:
+    async def _watch(self, schedule_id: str, run_id: str, level: NotifyLevel, by_hand: bool = False) -> None:
         """Write the outcome of a run to its schedule once the run is over, with its row of failed runs (item 458); a
         repeating schedule whose runs failed so many times in a row is switched off, and the owner told once. The end
         is told at ``level`` (item 461) even when the write or the switch-off failed."""
@@ -912,18 +914,21 @@ class Scheduler:
                 if finished.status == "failed" and failed_in_row is not None:
                     await self._stop_if_failing(schedule_id, failed_in_row)
             finally:
-                await self._tell_end(schedule_id, finished, level, failed_in_row)
+                await self._tell_end(schedule_id, finished, level, failed_in_row, by_hand)
         finally:
             self._in_flight.pop(schedule_id, None)
 
     async def _tell_end(
-        self, schedule_id: str, finished: RunRecord, level: NotifyLevel, failed_in_row: int | None
+        self, schedule_id: str, finished: RunRecord, level: NotifyLevel, failed_in_row: int | None, by_hand: bool
     ) -> None:
         """Tell the end of a schedule's run when ``level`` tells it: what it needs from the owner is in its last
         ``run_finished`` event."""
         ended: EventRecord | None = await self._runtime.store.last_event(finished.id, "run_finished")
         needs: object = None if ended is None else ended.data.get("needs")
-        if not tells(level, finished.status, needs if isinstance(needs, str) else "", failed_in_row):
+        # A run started by hand is told whatever it found: the owner asked for it (item 880).
+        quiet: bool = not by_hand and await said_nothing_new(self._runtime.store, finished.id)
+        if not tells(level, finished.status, needs if isinstance(needs, str) else "", failed_in_row, quiet):
+            log.info("schedule_end_not_told", schedule_id=schedule_id, run_id=finished.id, nothing_new=quiet)
             return
         if finished.status == "done" and await is_brief(self._runtime.store, schedule_id):
             # The brief is told in its own words, its first line, and opens in its chat (item 570).

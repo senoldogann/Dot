@@ -500,6 +500,12 @@ _UNATTENDED_LEAVING: str = (
     "needs to know into the final answer."
 )
 
+# Item 880: a schedule's run that found nothing new is not pushed to the owner.
+_NOTHING_NEW: str = (
+    "When this run finds nothing new for the user since its last run (no new mail, reply, result or problem), finish "
+    "with nothing_new true and say so in a sentence: its end is then not pushed to them."
+)
+
 _LEFT_QUESTIONS: str = (
     "Questions: nobody answers during this run. ask_user leaves your question for the user and returns at once; go on "
     "with what does not depend on the answer. If nothing can be done without it, end the run and say exactly what you "
@@ -671,6 +677,8 @@ def _environment(inputs: PromptInputs) -> str:
         lines.append(f"- {_SPLIT_TEXT}")
     if inputs.source in (SCHEDULE_SOURCE, WATCHER_SOURCE, INITIATIVE_SOURCE):
         lines.append(f"- {_UNATTENDED_LEAVING if inputs.questions == 'leave' else _UNATTENDED}")
+    if inputs.source == SCHEDULE_SOURCE:
+        lines.append(f"- {_NOTHING_NEW}")
     if inputs.source == DELEGATE_SOURCE:
         lines.append(f"- {_DELEGATED}")
     channel: str | None = next((title for name, title in TITLES.items() if name == inputs.source), None)
