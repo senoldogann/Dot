@@ -6199,6 +6199,26 @@ a.schedule-line:hover .schedule-made {
   gap: 8px;
 }
 
+/* "Don't ask again in this chat" (item 866), beside Deny and Approve: the yes holds for the step's kind in the chat. */
+.approval-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.approval-remember-box {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 /* The card of a secret (item 857): what it is, why and how in the run's words, a box and Save securely on one line,
    and at its foot where the secret goes, with Decline. */
 .secret-label {

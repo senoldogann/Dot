@@ -177,7 +177,8 @@ _CARD_LINES: str = """async ([initiative, owners]) => {
     const data = { approval_id: `apr_${at}`, tool: "browser_act", summary, severity: "high", args };
     const approval = fromEvent("run_x", data);
     const card = approvalCard({ approval, heading: null, onSettled: () => undefined, leftNote: "", onUseHere: null });
-    return [card.node.textContent, card.node.querySelector(".approval-rule") !== null];
+    const has = (selector) => card.node.querySelector(selector) !== null;
+    return [card.node.textContent, has(".approval-rule"), has(".approval-remember")];
   });
 }"""
 
@@ -194,9 +195,11 @@ async def test_the_owners_questions_in_yolo_say_so_and_offer_no_rule(
             page = await browser.new_page()
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
-            (initiative, initiative_rule), (owners, owners_rule) = await page.evaluate(
+            (initiative, initiative_rule, initiative_box), (owners, owners_rule, owners_box) = await page.evaluate(
                 _CARD_LINES, [_INITIATIVE_REASON, OWNERS_REASON]
             )
+            # "Don't ask again in this chat" (item 866): on the owner's question, never on one of Dot's initiative.
+            assert owners_box and not initiative_box
             assert "Dot opened on its own initiative, Dot always asks you about this, YOLO too" in initiative
             assert "wait for you in YOLO too" in owners
             assert not initiative_rule and not owners_rule

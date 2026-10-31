@@ -24,6 +24,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_known
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
+from dotagent.policy.chat_permits import CHAT_PERMIT_DECIDER, key_of_action, may_remember
 from dotagent.policy.egress import carries_secret
 from dotagent.policy.engine import (
     approval_severity,
@@ -184,6 +185,7 @@ class RunGate:
         owners_word: bool = False,
         owners_chat: bool = False,
         owner_there: bool = True,
+        chat_id: str | None = None,
     ) -> None:
         self._store: Store = store
         # Whether the run is of a chat Dot opened on its own initiative (item 850), whose messages, posts and releases
@@ -195,6 +197,9 @@ class RunGate:
         # Whether the owner is there to answer such a step (item 860): in a run that a schedule, a watcher or a notice
         # started in their chat, the review model judges a message or a post, and passes on what it cannot tell.
         self.owner_there: bool = owner_there
+        # The chat whose "don't ask again" yeses answer this run's questions (item 866): its own chat's, or for a
+        # delegated run its parent's; ``None``: none answer them.
+        self.chat_id: str | None = chat_id
         # Whether a yolo run that read outside content has the review model check the steps an instruction planted in
         # that content is after, before it does them (item 525, ``[policy] yolo_taint_check``).
         self._taint_check: bool = taint_check
@@ -485,9 +490,40 @@ class RunGate:
         route: Route = "reviewer" if judged else "user" if owners else route_for(decision, self._approval_mode)
         if route == "waived":
             return await self._waive(info, decision), "yolo"
+        # The owner's yes for the kind in this chat answers before the review model would (item 866: in `auto`, and a
+        # schedule's message in their chat, the review model's pass-on had shown the box and then ignored its yes).
+        if await self._permitted_in_chat(info, decision):
+            return "", "user"
         if route == "reviewer":
             return await self._review(info, decision, tainted)
         return await self._ask_user(info, decision, "", tainted), "user"
+
+    async def _permitted_in_chat(self, info: ActionInfo, decision: Decision) -> bool:
+        """Whether the owner's "don't ask again in this chat" answers this question (item 866): a yes of theirs for the
+        step's kind in this run's chat, on a question that may be remembered, in a chat that is not of Dot's own
+        initiative. A run that read outside content uses it too, the owner's choice (``NOT_REMEMBERED_SOURCES``).
+        Such a step is recorded as answered from that yes."""
+        if self.chat_id is None or self.owners_word or decision.verdict != "ask":
+            return False
+        severity: str = approval_severity(info)
+        if not may_remember(info.flags, severity, decision.source, info.tool, info.kind):
+            return False
+        given: str | None = await self._store.chat_permit(self.chat_id, key_of_action(info))
+        if given is None:
+            return False
+        shown, said = await _shown(info, decision)
+        await self._approvals.record_automatic(
+            self._run_id,
+            info.tool,
+            f"{shown.summary} — {said.reason}",
+            severity,
+            _describe(shown),
+            "approved",
+            CHAT_PERMIT_DECIDER,
+            f"allowed in this chat by your earlier yes ({given})",
+        )
+        log.info("chat_permit_used", run_id=self._run_id, tool=info.tool, approval_id=given)
+        return True
 
     async def _kept_answer(self, info: ActionInfo, decision: Decision, tainted: bool) -> ApprovalRecord | None:
         """What the owner answered to this step when it was kept for them where this run keeps its steps (items 482 to

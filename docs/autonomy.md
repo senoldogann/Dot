@@ -59,7 +59,8 @@ Allowed, the run makes the change with the file tools; a command line never make
 agent, which writes past the journal `dotx undo` reads (item 398). So is a login filled from your 1Password (item 493)
 or from Dot's own vault (item 621): the review model never answers it, and a rule of yours can only hand it to you.
 
-Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, the summary is the action
+Every automatic answer is an ordinary approval record (`decided_by` is `reviewer`, `yolo`, `permit` for a kept step you
+allowed, or `chat-permit` for a step of a kind you allowed for the rest of the chat, item 866; the summary is the action
 and the note holds the reason) and an `approval_auto` event, so you can see afterwards what went through and why. A chat
 draws a line in the timeline for the review model's decisions ("The reviewer approved: click 'Reply' — untrusted content is
 in context and this action reaches outside the Mac"), and none for a step yolo waived: the mode says nothing of what it
@@ -226,7 +227,9 @@ and only where it would ask you does your yes let it through, once, recorded as 
 now refuses or hands it to you, or the run's untrusted reading, still stops it. A yes that cannot reach the conversation
 (a `dotx` run works there) is taken back and the card stays. Rewinding the chat to before the run that kept it takes an
 unused yes back too. Skip on a kept step, either kind, holds in that conversation: the same step is refused at once,
-with no card, until you write there again (a message of yours, or a run you start). Any other question still counts as a
+with no card, until you write there again (a message of yours, or a run you start). Allow once is for one step; a
+question open now has **Don't ask again in this chat** too, whose yes holds for the step's kind for the rest of the
+chat (item 866, [Safety](safety.md#safety) says which kinds and what never). Any other question still counts as a
 refusal when nobody answers, and nothing is kept in `yolo` or in an eval: the payment, message or post a `yolo` run of
 your chat asks (item 860) is refused when nobody answers; but in a chat Dot opened on its own initiative a `yolo` run
 asks its release and keeps it as a run that asks does, and a message or a post there is asked, never kept (item 850). A delegated run keeps its

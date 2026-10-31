@@ -230,3 +230,13 @@ def test_the_cards_words_of_the_owners_questions_are_the_policys() -> None:
         found = re.search(rf'const {constant} = "([^"]+)";', card)
         assert found is not None, constant
         assert reason.startswith(found.group(1)), (constant, found.group(1), reason)
+
+
+def test_the_card_offers_dont_ask_again_on_the_steps_the_policy_may_remember() -> None:
+    """Item 866: the flags whose card shows no "don't ask again in this chat" are those the route refuses it for."""
+    from dotagent.policy.chat_permits import NEVER_REMEMBERED
+
+    card: str = (JS_DIR / "approvals.js").read_text(encoding="utf-8")
+    found = re.search(r"const NEVER_REMEMBERED = new Set\(\[([^\]]*)\]\);", card)
+    assert found is not None
+    assert set(re.findall(r'"([a-z_]+)"', found.group(1))) == set(NEVER_REMEMBERED)
