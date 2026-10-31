@@ -376,7 +376,13 @@ inside a word, as in an address, opens nothing. On a phone either menu takes the
 composer and scrolls inside it. A run that waits for your approval is listed under Waits for you, below the composer,
 and leads to its chat: the card stands there alone (item 434), with no line above it that says the same (item 871).
 Once you allow it, the card leaves the chat, as the page opens again too; refused, it stays and says so, and a question
-keeps its answer.
+keeps its answer. A waiting card says each thing once (item 872, after OpenMausBot's quiet approvals): the command or
+what the step acts on in its box alone, not in the words above it again, which keep what the step does ("Runs vercel;
+vercel puts a project's change live"); why Dot asks once: the line under the box says it for a chat of Dot's own
+initiative and for what yolo asks you, and the words above leave out only that sentence; any other reason (a payment's
+amount and caps, a guard's why) and what the review model passed on to you stay under the words; and no chip that the
+words say already, in whole words. On a phone the note has its row, and Deny and Approve share the
+next one.
 
 The **+** at the left of the box (item 318, after Codex's composer) opens a menu: **Add files**, which opens the file
 picker (documents, photos and screenshots alike; a phone opens its own sheet), **Model and options** in a box whose run
