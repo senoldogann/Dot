@@ -228,7 +228,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "(mail_search, mail_read, calendar_events)",
         "- schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, "
         "schedule_delete)",
-        "- team: making a lasting teammate agent for a role the work needs again or in parallel (create_agent)",
+        "- team: making a lasting teammate agent for a role the work needs again or in parallel (create_agent, "
+        "create_team)",
         "- recon: a site or host you own: addresses, TLS, headers, technology, open ports, and a form's payload check "
         "(recon, security_scan)",
         "- pages: showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views "

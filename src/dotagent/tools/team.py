@@ -18,7 +18,7 @@ from dotagent.core.text import truncate_tail, unclosing
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import Message
 from dotagent.policy.types import ActionInfo
-from dotagent.store.models import AgentRecord, RunMode, RunRecord, TeamRecord, ThreadRecord
+from dotagent.store.models import AgentRecord, EventRecord, RunMode, RunRecord, TeamRecord, ThreadRecord
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -35,6 +35,7 @@ from dotagent.tools.delegate import default_child_mode
 
 MESSAGE_AGENT_TOOL: str = "message_agent"
 CREATE_AGENT_TOOL: str = "create_agent"
+CREATE_TEAM_TOOL: str = "create_team"
 TEAM_SOURCE: str = "team"
 _NONCE_BYTES: int = 8
 _TIMEOUT_S: float = 3600.0
@@ -45,8 +46,15 @@ _NO_REPLY: str = "(it replied nothing)"
 _NAME_CHARS: int = 60
 _ROLE_CHARS: int = 120
 _INSTRUCTIONS_CHARS: int = 8000
-# The most agents one run makes (item 307): a team for the work at hand, not a crowd.
-_MOST_MADE_PER_RUN: int = 3
+# The most agents one run makes (item 307): a team for the work at hand, not a crowd. Six since item 864, so that a run
+# can make the team the owner asks for (the owner: "takım oluştur agentler ile").
+_MOST_MADE_PER_RUN: int = 6
+# The bounds of a team, the Agents page's (TeamRequest), and the most teams one run makes.
+_TEAM_PURPOSE_CHARS: int = 500
+_MOST_TEAM_AGENTS: int = 12
+_MOST_TEAMS_PER_RUN: int = 2
+# The most calls of create_team one run makes, the refused ones among them: a run that keeps being refused stops.
+_MOST_TEAM_CALLS: int = 4
 
 
 class MessageAgentArgs(ToolArgs):
@@ -302,5 +310,94 @@ def _create_agent_tool() -> RegisteredTool:
     )
 
 
+class CreateTeamArgs(ToolArgs):
+    name: str = Field(min_length=1, max_length=_NAME_CHARS, description="The team's name.")
+    purpose: str = Field(default="", max_length=_TEAM_PURPOSE_CHARS, description="What it is for.")
+    agents: list[str] = Field(min_length=2, max_length=_MOST_TEAM_AGENTS, description="Its agents' names.")
+
+
+def _team_name_of(call: EventRecord) -> str:
+    """The name a ``create_team`` call gave, folded; "" for a call whose arguments cannot be read."""
+    args: object = call.data.get("args")
+    name: object = args.get("name") if isinstance(args, dict) else None
+    return name.strip().casefold() if isinstance(name, str) else ""
+
+
+def render_team(team: TeamRecord, members: Sequence[AgentRecord]) -> str:
+    """The tool's result: the team, who is in it, and where the owner finds it."""
+    names: str = ", ".join(agent.name for agent in members)
+    return (
+        f"Made the team {team.name}: {names}. It is the owner's, under Agents › Teams and in the sidebar, where they "
+        "start a chat with it; its agents stay theirs. Send each one work with message_agent."
+    )
+
+
+def _create_team_tool() -> RegisteredTool:
+    def classify(args: CreateTeamArgs, ctx: ToolContext) -> ActionInfo:
+        return ActionInfo(
+            tool=CREATE_TEAM_TOOL,
+            kind="meta",
+            risk="low",
+            summary=f"Make the team {args.name.strip()} of {', '.join(name.strip() for name in args.agents)}",
+            target="",
+            # A team lasts beyond the run, as an agent does.
+            flags=("persistence",),
+        )
+
+    async def run(args: CreateTeamArgs, ctx: ToolContext) -> ToolResult:
+        """A team of agents the owner has (item 864): their own, and those a run made, which are theirs too."""
+        name: str = args.name.strip()
+        if ctx.run_tools is None:
+            # A delegated run and one that answers a message make no team, as they make no agent.
+            raise ToolExecutionError("this run cannot make teams", {"run_id": ctx.run_id})
+        agents: list[AgentRecord] = await ctx.runtime.store.list_agents()
+        members: list[AgentRecord] = []
+        unknown: list[str] = []
+        for asked in args.agents:
+            found: AgentRecord | None = find_agent(agents, asked)
+            if found is None:
+                unknown.append(asked.strip())
+            elif all(member.id != found.id for member in members):
+                members.append(found)
+        if unknown:
+            known: str = ", ".join(agent.name for agent in agents) or "none"
+            raise ToolInputError(
+                f"no agent has the name {', '.join(unknown)}; make it with create_agent first. The agents: {known}",
+                {"agents": ", ".join(unknown)},
+            )
+        if len(members) < 2:
+            raise ToolInputError(
+                "a team has two agents at least", {"agents": ", ".join(agent.name for agent in members)}
+            )
+        teams: list[TeamRecord] = await ctx.runtime.store.list_teams()
+        if any(team.name.casefold() == name.casefold() for team in teams):
+            raise ToolInputError("a team has that name already; choose another", {"team": name})
+        # The run's calls, this one among them, all of them however long the run: what it made counts by the teams
+        # under the names it gave.
+        calls: list[EventRecord] = await ctx.runtime.store.tool_calls_named(ctx.run_id, CREATE_TEAM_TOOL)
+        named: set[str] = {_team_name_of(call) for call in calls}
+        made_here: int = sum(1 for team in teams if team.name.casefold() in named)
+        if made_here >= _MOST_TEAMS_PER_RUN or len(calls) > _MOST_TEAM_CALLS:
+            raise ToolInputError(
+                f"a run makes at most {_MOST_TEAMS_PER_RUN} teams, in {_MOST_TEAM_CALLS} tries",
+                {"made": str(made_here)},
+            )
+        team: TeamRecord = await ctx.runtime.store.create_team(
+            name, args.purpose.strip(), [agent.id for agent in members], None
+        )
+        return ok(render_team(team, members))
+
+    return make_tool(
+        name=CREATE_TEAM_TOOL,
+        description="Make a team of agents (the owner's, or ones you made) when the owner asks for a team.",
+        args_model=CreateTeamArgs,
+        modes=ACTING_MODES,
+        parallel_safe=False,
+        timeout_s=_CREATE_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
 def build_team_tools() -> tuple[RegisteredTool, ...]:
-    return (_message_agent_tool(), _create_agent_tool())
+    return (_message_agent_tool(), _create_agent_tool(), _create_team_tool())

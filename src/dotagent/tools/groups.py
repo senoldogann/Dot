@@ -43,6 +43,7 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "draft_message": "drafts",
     # Making a teammate is rare (item 99); the core group stays about a third of the tool definitions.
     "create_agent": "team",
+    "create_team": "team",
     "show_page": "pages",
     # The owner's saved contact details (item 621).
     "vault_contacts": "vault",
