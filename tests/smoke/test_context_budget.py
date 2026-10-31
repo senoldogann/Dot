@@ -49,7 +49,10 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 300 for `wait_until` (item 887): a run waits for a file, an address or a check in code, where runs of one
 # week of the owner's slept and polled 131 times, each poll a model turn; its words cut to 316 tokens (23,606
 # measured; tools 16,190).
-BUDGET_TOKENS: int = 23_700
+# Raised by 100 for `nothing_new` on `finish` (item 880: a scheduled client mail check told its owner seven times in a
+# day that nobody had answered) and `refuses` on `create_agent` (item 875: an agent Dot makes has the edges of its job),
+# their descriptions cut to a line each (23,725 measured with item 887; tools 16,299).
+BUDGET_TOKENS: int = 23_800
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -58,8 +61,8 @@ SYSTEM_BUDGET_TOKENS: int = 7_400
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
 # Raised by 300 for `ask_secret` (item 857) above, by 200 for `create_team` (item 864), and by 300 for `wait_until`
-# (item 887) above.
-TOOLS_BUDGET_TOKENS: int = 16_300
+# (item 887) above, and by 100 for items 880 and 875 above.
+TOOLS_BUDGET_TOKENS: int = 16_400
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

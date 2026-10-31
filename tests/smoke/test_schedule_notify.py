@@ -46,6 +46,7 @@ class Outcomes:
     def __init__(self) -> None:
         self.succeed: bool = True
         self.needs: str = ""
+        self.nothing_new: bool = False
         self.held: asyncio.Event | None = None
 
     @property
@@ -58,6 +59,8 @@ class Outcomes:
         answer: JsonObject = {"answer": "Done." if self.succeed else "The site moved.", "success": self.succeed}
         if self.needs != "":
             answer["needs_from_user"] = self.needs
+        if self.nothing_new:
+            answer["nothing_new"] = True
         finish: ScriptedTurn = ScriptedTurn(text="", calls=(ScriptedCall(tool="finish", arguments=answer),))
         return await ScriptedProvider(self.name, [finish]).complete(request, sink)
 
@@ -233,6 +236,29 @@ async def test_each_level_tells_the_ends_it_is_for_once(
         await scheduler.drain()
     await asyncio.sleep(0.1)
     assert told.runs.count(by_hand.id) == 1, told.runs
+
+
+async def test_a_run_that_found_nothing_new_is_not_told_unless_it_was_started_by_hand(
+    runtime: Runtime, manager: RunManager, scheduler: Scheduler, client: httpx.AsyncClient, told: Told
+) -> None:
+    """Item 880: at "always", a firing that says it found nothing new is not pushed; one started by hand is."""
+    always: ScheduleRecord = await _schedule(
+        client, {"name": "mail check", "goal": "Look.", "cron": "*/5 * * * *", "approvals": "yolo"}
+    )
+    MODEL.nothing_new = True
+    try:
+        quiet: str = await _fired(runtime, manager, scheduler, always.id, True, "")
+        assert told.runs.count(quiet) == 0, told.runs
+        assert (await runtime.store.get_run(quiet)).status == "done"
+        started: httpx.Response = await client.post(f"/api/schedules/{always.id}/run")
+        assert started.status_code == 201, started.text
+        async with asyncio.timeout(_WAIT_S):
+            by_hand: RunRecord = await manager.wait(started.json()["id"])
+            await scheduler.drain()
+        await asyncio.sleep(0.1)
+        assert told.runs.count(by_hand.id) == 1, told.runs
+    finally:
+        MODEL.nothing_new = False
 
 
 async def test_a_schedule_deleted_while_its_run_works_still_tells_its_end(

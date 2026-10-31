@@ -3226,6 +3226,20 @@ class Store:
         )
         return None if row is None else _event(row)
 
+    async def last_ok_call_of(self, run_id: str, tool: str) -> EventRecord | None:
+        """The newest ``tool_call`` event of a run that called ``tool`` and whose result did not fail, or ``None``: a
+        call refused (arguments that did not fit, a finish turned back) says nothing of how the run ended."""
+        row = await self._one(
+            "SELECT c.* FROM events c JOIN events r ON r.id = ("
+            "SELECT MIN(f.id) FROM events f WHERE f.run_id = c.run_id AND f.kind = 'tool_result' AND f.id > c.id"
+            " AND json_extract(f.data, '$.call_id') = json_extract(c.data, '$.call_id'))"
+            " AND json_extract(r.data, '$.ok') = 1"
+            " WHERE c.run_id = ? AND c.kind = 'tool_call' AND json_extract(c.data, '$.tool') = ?"
+            " ORDER BY c.id DESC LIMIT 1",
+            (run_id, tool),
+        )
+        return None if row is None else _event(row)
+
     async def count_model_calls(self, run_id: str, purpose: CallPurpose) -> int:
         """How many model calls for ``purpose`` a run made, the ones that failed included."""
         row: aiosqlite.Row | None = await self._one(

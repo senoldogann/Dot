@@ -88,6 +88,12 @@ class FinishArgs(ToolArgs):
             "the answer. Leave it out when nothing is needed."
         ),
     )
+    # A schedule's run that found nothing new is not told (item 880): the owner's client mail ran every two hours on
+    # 2026-10-30 and told them seven times that nobody had answered.
+    nothing_new: bool = Field(
+        default=False,
+        description="A scheduled run that found nothing new since its last: true, and its end is not pushed.",
+    )
 
 
 def _finish_tool() -> RegisteredTool:
