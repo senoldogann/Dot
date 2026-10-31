@@ -11,10 +11,11 @@ import { attempt, toast } from "./ui.js";
 const NAME_CHARS = 60;
 const PURPOSE_CHARS = 500;
 
-/** The agents in the order the form lists them: those the team has, in the team's order, then the others as they come. */
-function listed(team, agents) {
+/** The agents in the order the form lists them: those the team has, in the team's order (a new team's, those `chosen`),
+ * then the others as they come. */
+function listed(team, agents, chosen) {
   const byId = new Map(agents.map((agent) => [agent.id, agent]));
-  const members = team === null ? [] : team.agents.filter((id) => byId.has(id)).map((id) => byId.get(id));
+  const members = (team === null ? chosen : team.agents).filter((id) => byId.has(id)).map((id) => byId.get(id));
   const inTeam = new Set(members.map((agent) => agent.id));
   return [...members, ...agents.filter((agent) => !inTeam.has(agent.id))];
 }
@@ -22,9 +23,10 @@ function listed(team, agents) {
 /**
  * The form that makes a team (`team` null) or changes one, over `agents` (the records of the agents the owner has). The
  * agents the team has are listed first, in its order, and the order of the ticked ones is what is saved.
+ * `chosen` are the ids of the agents a new team starts with, ticked (item 867: the agents picked on the Agents page).
  * `onSaved(record)` runs with the saved team; `onCancel` closes the form. Returns `element`, `focus()`.
  */
-export function teamForm({ team, agents, onSaved, onCancel }) {
+export function teamForm({ team, agents, onSaved, onCancel, chosen = [] }) {
   const name = el("input", { class: "input", type: "text", maxlength: String(NAME_CHARS), autocomplete: "off", placeholder: "Content team", "aria-label": "Name" });
   const purpose = el("textarea", {
     class: "textarea",
@@ -37,8 +39,8 @@ export function teamForm({ team, agents, onSaved, onCancel }) {
     name.value = team.name;
     purpose.value = team.purpose;
   }
-  const inTeam = new Set(team === null ? [] : team.agents);
-  const boxes = listed(team, agents).map((agent) => ({
+  const inTeam = new Set(team === null ? chosen : team.agents);
+  const boxes = listed(team, agents, chosen).map((agent) => ({
     agent,
     box: el("input", { type: "checkbox", value: agent.id, checked: inTeam.has(agent.id) }),
   }));

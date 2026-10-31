@@ -6,6 +6,7 @@ next message goes on in it; a team with no agent left takes none; a removed team
 its page says it is gone; and the owner puts agents together as a team and changes it."""
 
 import asyncio
+import re
 import secrets
 import time
 from collections.abc import AsyncIterator
@@ -501,6 +502,56 @@ async def test_a_removed_team_leaves_its_agents_and_its_chats_and_its_page_says_
         await page.goto(f"{page.url.split('#')[0]}#/runs/{run['id']}")
         await expect(page.locator(".stage-title .stage-name")).not_to_have_text("Desk")
         await expect(page.locator(".stage-title .team-duo")).to_have_count(0)
+        await page.context.close()
+    finally:
+        await browser.close()
+        await playwright.stop()
+        await _clear(client)
+
+
+async def test_agents_picked_on_their_cards_make_a_team_in_the_order_picked(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 867, the owner's ask: "kendimiz agents sayfasından ajanları seçerek bir takım oluşturabilelim". Select
+    turns the cards of the owner's agents into boxes to tick (Dot's own is none), the bar under the grid counts them,
+    and Make a team opens the form with them ticked, first, in the order picked; Cancel leaves the cards as links."""
+    scout: JsonObject = await _agent(client, "Scout", "Finds sources")
+    writer: JsonObject = await _agent(client, "Writer", "Writes copy")
+    checker: JsonObject = await _agent(client, "Checker", "Checks facts")
+    playwright, browser = await _launch(runtime)
+    try:
+        page: Page = await _open(browser, client, "/agents", 1280)
+        mine: Locator = page.get_by_role("region", name="Your agents")
+        await mine.get_by_role("button", name="Select").click()
+        bar: Locator = page.get_by_role("region", name="Agents picked for a team")
+        await expect(bar).to_contain_text("Tick the agents of the team")
+        await expect(bar.get_by_role("button", name="Make a team")).to_be_disabled()
+        await expect(mine.get_by_role("checkbox")).to_have_count(3)
+        await mine.locator(f".agent-card[data-agent='{checker['id']}']").click()
+        await mine.locator(f".agent-card[data-agent='{scout['id']}']").click()
+        await expect(mine.locator(f".agent-card[data-agent='{checker['id']}']")).to_have_attribute(
+            "aria-checked", "true"
+        )
+        await expect(bar).to_contain_text("2 agents picked")
+        # Picking stays on the page: no card led away.
+        await expect(page).to_have_url(re.compile(r"#/agents$"))
+        await page.screenshot(path=str(tmp_path / "picking.png"))
+        await bar.get_by_role("button", name="Make a team").click()
+        editor: Locator = page.locator(".team-editor")
+        await expect(editor.locator(".team-pick .team-pick-name")).to_have_text(["Checker", "Scout", "Writer"])
+        await expect(editor.locator(f".team-pick[data-agent='{checker['id']}'] input")).to_be_checked()
+        await expect(editor.locator(f".team-pick[data-agent='{writer['id']}'] input")).not_to_be_checked()
+        await editor.get_by_label("Name").fill("Fact desk")
+        await editor.get_by_role("button", name="Create team").click()
+        await expect(page.get_by_role("heading", level=1)).to_have_text("Fact desk")
+        made: JsonObject = (await client.get("/api/teams")).json()[0]["record"]
+        assert made["agents"] == [checker["id"], scout["id"]]
+        # Back on the page, Select and Cancel leave the cards as links again.
+        await page.goto(page.url.split("#")[0] + "#/agents")
+        await mine.get_by_role("button", name="Select").click()
+        await bar.get_by_role("button", name="Cancel").click()
+        await expect(mine.get_by_role("checkbox")).to_have_count(0)
+        await expect(bar).to_be_hidden()
         await page.context.close()
     finally:
         await browser.close()

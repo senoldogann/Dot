@@ -9521,6 +9521,68 @@ button.attach-chip:hover {
   align-items: center;
 }
 
+/* Picking agents for a team on their cards (item 867): a card is a box to tick, its mark at the top right, the picked
+   ones ringed in the accent; the bar under the grid makes the team. */
+.agent-card.pickable {
+  position: relative;
+  cursor: pointer;
+}
+
+.agent-pick-mark {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: transparent;
+  transition:
+    background-color var(--motion-quick) var(--ease),
+    border-color var(--motion-quick) var(--ease);
+}
+
+.agent-pick-mark .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.agent-card.pickable[aria-checked="true"] {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.agent-card.pickable[aria-checked="true"] .agent-pick-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent, var(--surface));
+}
+
+.agent-select-bar {
+  position: sticky;
+  bottom: var(--space-3);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.agent-select-bar[hidden] {
+  display: none;
+}
+
+.agent-select-count {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 .agent-card:hover,
 .owned-team:hover {
   background: color-mix(in srgb, var(--text) 3%, var(--surface));

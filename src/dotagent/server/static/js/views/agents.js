@@ -59,12 +59,20 @@ function hrefOf(record) {
  * them the title of its newest chat with when it began, or that it has none. Dot's names its newest chat of its own
  * (item 633) and opens the chats.
  */
-function agentCard({ record, latest, latest_title: latestTitle }) {
+function agentCard({ record, latest, latest_title: latestTitle }, picking = null) {
   // The chat's own title, which the owner may have named; a daemon from before it was sent says the run's goal.
   const chat = latest === null ? "No chats yet" : clip(latestTitle ?? latest.goal, GOAL_CHARS);
-  return el(
+  // While the owner picks agents for a team (item 867), a card of theirs is a box to tick, not a way to its page.
+  const pickable = picking !== null && record.id !== DOT_ID;
+  const card = el(
     "a",
-    { class: "card agent-card", href: hrefOf(record), dataset: { agent: record.id } },
+    {
+      class: pickable ? "card agent-card pickable" : "card agent-card",
+      href: hrefOf(record),
+      dataset: { agent: record.id },
+      ...(pickable ? { role: "checkbox", "aria-checked": String(picking.has(record.id)) } : {}),
+    },
+    pickable ? el("span", { class: "agent-pick-mark", "aria-hidden": "true" }, icon("check")) : null,
     faceOf(record, latest),
     el(
       "div",
@@ -86,6 +94,20 @@ function agentCard({ record, latest, latest_title: latestTitle }) {
       latest === null ? null : el("span", { class: "agent-when", dataset: { ts: String(latest.created_at) } }, ago(latest.created_at)),
     ),
   );
+  if (pickable) {
+    const toggle = (event) => {
+      event.preventDefault();
+      picking.toggle(record.id);
+      card.setAttribute("aria-checked", String(picking.has(record.id)));
+    };
+    card.addEventListener("click", toggle);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === " ") {
+        toggle(event);
+      }
+    });
+  }
+  return card;
 }
 
 /**
@@ -581,13 +603,59 @@ function mountList(root, ctx) {
     teamsHolder,
   );
   const mineCount = el("span", { class: "agents-count" });
+  // Picking agents for a team on their cards (item 867): Select ticks them, the bar under the grid makes the team.
+  let summariesShown = [];
+  let picking = null;
+  const pickedCount = el("span", { class: "agent-select-count" });
+  const makeTeamButton = el("button", { class: "btn primary", type: "button", onclick: () => attempt(() => openTeamEditor([...(picking?.ids ?? [])])) }, icon("users"), "Make a team");
+  const selectBar = el(
+    "div",
+    { class: "agent-select-bar", hidden: true, role: "region", "aria-label": "Agents picked for a team" },
+    pickedCount,
+    el("span", { class: "spacer" }),
+    el("button", { class: "btn ghost", type: "button", onclick: () => setPicking(false) }, "Cancel"),
+    makeTeamButton,
+  );
+  // Hidden until the agents are read: a list that cannot be read offers nothing to pick.
+  const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, title: "Pick agents for a team", onclick: () => setPicking(true) }, "Select");
+
+  function paintPicked() {
+    const count = picking === null ? 0 : picking.ids.length;
+    pickedCount.textContent = count === 0 ? "Tick the agents of the team" : `${plural(count, "agent", "agents")} picked`;
+    makeTeamButton.disabled = count === 0;
+  }
+
+  function drawGrid() {
+    holder.replaceChildren(el("div", { class: picking === null ? "agent-grid" : "agent-grid picking" }, summariesShown.map((summary) => agentCard(summary, picking))));
+  }
+
+  /** Start picking agents on their cards, or stop. */
+  function setPicking(on) {
+    picking = on
+      ? {
+          ids: [],
+          has(id) {
+            return this.ids.includes(id);
+          },
+          toggle(id) {
+            this.ids = this.has(id) ? this.ids.filter((each) => each !== id) : [...this.ids, id];
+            paintPicked();
+          },
+        }
+      : null;
+    selectBar.hidden = !on;
+    selectButton.hidden = on || owners.length < 2;
+    paintPicked();
+    drawGrid();
+  }
   const mineAbout = aboutToggle("Open one to give it work, read its chats or change it. Ask Dot for a big job and it hands parts to them.", "About your agents");
   const yours = el(
     "section",
     { class: "agents-part", "aria-label": "Your agents" },
-    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your agents", mineCount), mineAbout.button),
+    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your agents", mineCount), mineAbout.button, el("span", { class: "spacer" }), selectButton),
     mineAbout.note,
     holder,
+    selectBar,
   );
   const templates = el("section", { class: "agents-part", "aria-label": "Templates" }, loadingPanel());
 
@@ -776,7 +844,9 @@ function mountList(root, ctx) {
       }
       owners = summaries.map(({ record }) => record).filter((record) => record.id !== DOT_ID);
       mineCount.textContent = String(summaries.length);
-      holder.replaceChildren(el("div", { class: "agent-grid" }, summaries.map(agentCard)));
+      summariesShown = summaries;
+      selectButton.hidden = picking !== null || owners.length < 2;
+      drawGrid();
     } catch (error) {
       if (!disposed && mine === ticket) {
         holder.replaceChildren(errorPanel(error, () => attempt(reload)));
@@ -827,24 +897,29 @@ function mountList(root, ctx) {
   }
 
   // A team of the agents the owner has (item 610), put together here; Use team on a ready team makes one in a click.
-  async function openTeamEditor() {
+  async function openTeamEditor(chosen = []) {
     closeEditor();
+    if (picking !== null) {
+      setPicking(false);
+    }
     // The agents are read again, so that one made a moment ago is among them.
     await reload();
     editor = teamForm({
       team: null,
       agents: owners,
+      chosen,
       onSaved: (saved) => ctx.navigate(`/teams/${saved.id}`),
       onCancel: closeEditor,
     });
     editorSlot.replaceChildren(editor.element);
+    editor.element.scrollIntoView({ block: "start", behavior: "smooth" });
     editor.focus();
   }
 
   const newButton = el("button", { class: "btn primary", type: "button", "aria-label": "New agent", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
   const newTeamButton = el(
     "button",
-    { class: "btn", type: "button", title: "Put agents of yours together as a team", "aria-label": "New team", onclick: () => attempt(openTeamEditor) },
+    { class: "btn", type: "button", title: "Put agents of yours together as a team", "aria-label": "New team", onclick: () => attempt(() => openTeamEditor()) },
     icon("users"),
     el("span", { class: "label" }, "New team"),
   );
