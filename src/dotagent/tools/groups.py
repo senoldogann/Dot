@@ -44,6 +44,9 @@ _GROUP_OF_TOOL: dict[str, str] = {
     # Making a teammate is rare (item 99); the core group stays about a third of the tool definitions.
     "create_agent": "team",
     "create_team": "team",
+    # What the other agents do now, and reading one's chat (item 890).
+    "agents_now": "office",
+    "read_agent_chat": "office",
     "show_page": "pages",
     # The owner's saved contact details (item 621).
     "vault_contacts": "vault",
@@ -64,6 +67,7 @@ _PURPOSES: dict[str, str] = {
     "memory_admin": "correcting or forgetting saved notes",
     "drafts": "an email or a message you write for the owner, who sends it from the conversation",
     "team": "making a lasting teammate agent for a role the work needs again or in parallel",
+    "office": "what the other agents do now, and reading one's chat to help it",
     "pages": "showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views",
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",

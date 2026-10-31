@@ -77,6 +77,9 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "server/routes_harness.py:harness_router.adopt_version": (False,),
     # A note a tool saves or a pin makes is refused for a secret it holds; saved, it has the values masked.
     "tools/memory.py:_secret_refusal": (False,),
+    # What one agent quotes of the others (item 890): every secret Dot holds is masked.
+    "tools/office.py:_agents_now_tool.run": (True,),
+    "tools/office.py:_read_agent_chat_tool.run": (True,),
     "agent/reactions.py:_holds_a_secret": (False,),
     # An agent is exported only if its words hold none; the file has the values masked.
     "server/routes_agents.py:agents_router.export_agent": (False,),

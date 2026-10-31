@@ -58,8 +58,9 @@ _BROKEN_FAST: str = "broken"
 # call and Dot kept a list of its own (items 714 and 715), 30 000 for recon (item 776), whose schema of 985 characters
 # adds about 330 tokens to the fixed part, 31 000 for `todo_drop` (item 821), which took it 62 tokens over, 32 000 for
 # `nothing_new` on `finish` and `refuses` on `create_agent` (items 880 and 875) and the shell's pointer to wait_until
-# and its group's line (item 887); the window is rounded up so that the summary still has room.
-_SMALL_WINDOW: int = 32_000
+# and its group's line (item 887), 33 000 for the office's `agents_now` and `read_agent_chat` (item 890); the window is
+# rounded up so that the summary still has room.
+_SMALL_WINDOW: int = 33_000
 # Every section the continuity check asks for, and no identifier the run's history does not hold.
 _SUMMARY: str = (
     "GOAL: find why the backup failed.\nDONE: read the log page by page.\nSTATE: no failure found so far.\n"

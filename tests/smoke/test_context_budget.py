@@ -52,7 +52,10 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 100 for `nothing_new` on `finish` (item 880: a scheduled client mail check told its owner seven times in a
 # day that nobody had answered) and `refuses` on `create_agent` (item 875: an agent Dot makes has the edges of its job),
 # their descriptions cut to a line each (23,725 measured with item 887; tools 16,299).
-BUDGET_TOKENS: int = 23_800
+# Raised by 200 for `agents_now` and `read_agent_chat` (item 890: an agent sees what the others do and reads one's
+# chat to help it, the owner's ask of 2026-10-31), their descriptions a line each (23,901 measured with items 880 and
+# 875; tools 16,476).
+BUDGET_TOKENS: int = 24_000
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -62,7 +65,8 @@ SYSTEM_BUDGET_TOKENS: int = 7_400
 # by changing Dot's database instead (22,648 measured; tools 15,474).
 # Raised by 300 for `ask_secret` (item 857) above, by 200 for `create_team` (item 864), and by 300 for `wait_until`
 # (item 887) above, and by 100 for items 880 and 875 above.
-TOOLS_BUDGET_TOKENS: int = 16_400
+# Raised by 200 for the office's two tools (item 890) above.
+TOOLS_BUDGET_TOKENS: int = 16_600
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

@@ -226,6 +226,16 @@ notes by, and the ones its page shows, count its own runs alone. An agent's page
 learned": its lessons with how its runs fared after each, with Forget, and its skills with Share and Drop), and the
 Memory page marks a lesson with its agent's name. A note a run saves with `memory_save` is Dot's, for every run.
 
+**The agents know of each other** (item 890, the owner's ask of 2026-10-31). Every run, Dot's and every agent's
+whatever tools its role names, has the group **office** (turned on with `use_tools` as any group): `agents_now` lists Dot
+and every agent with its role, its teams and what it does now (working on which goal, waiting for you, or free), so a
+run knows whom a name or a team means; `read_agent_chat` reads the newest messages (20 by default, 40 at most) of an
+agent's newest chat, or Dot's, with what its run does now: what you asked, what it said, the tools it called and the
+start of what they gave. So "go and help the agent of the Engineer team" is a run that finds the Engineer, reads where
+it stands and sends it what it needs with `message_agent`. Both only read. The secrets Dot holds are masked in what
+they quote, and what a chat's runs read from pages or mails comes fenced and marks the reading run untrusted, as that
+chat was (item 243), so a page cannot steer one agent through another's chat.
+
 A run can make a teammate itself (item 99). The `create_agent` tool (a name, a role, instructions, the tools it may
 use, a model if one is wanted) makes an agent as the Agents page does, under your approvals (the `persistence` flag,
 like saving a note: `ask` asks once the run has read untrusted content, `yolo` makes it, though once the run has read

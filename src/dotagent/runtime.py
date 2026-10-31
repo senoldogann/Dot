@@ -104,6 +104,7 @@ from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.memory import build_memory_tools
 from dotagent.tools.meta import build_meta_tools
 from dotagent.tools.notes import build_notes_tools
+from dotagent.tools.office import build_office_tools
 from dotagent.tools.pages import build_page_tools
 from dotagent.tools.posts import build_post_tools
 from dotagent.tools.recon import build_recon_tool
@@ -261,6 +262,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_campaign_tools(),
         build_delegate_tools(),
         build_team_tools(),
+        build_office_tools(),
         build_consult_tools(),
         (build_recon_tool(), build_security_tool()),
         build_meta_tools(),
