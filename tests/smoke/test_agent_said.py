@@ -1,5 +1,6 @@
-"""An agent's words in the conversation that handed it a part (item 668): while the part is on its way the conversation
-shows "Sending to Scout…", which the agent's row takes over once its run starts, and the agent's answer stands as its
+"""An agent's words in the conversation that handed it a part (item 668): the part on its way shows no line of its own
+in the conversation (item 892, the owner's word: only the main agent's work is told there), the agent's row standing
+for it once its run starts, and the agent's answer stands as its
 message under "Message from Scout", with its face and name, wide and on a phone's width, and in sight when the chat
 shows only what Dot is doing (item 663); folded to that head until the reader opens it, then as wide as Dot's own
 answer (item 733). The agent's run carries its name in its queued event. Measured in Chrome on
