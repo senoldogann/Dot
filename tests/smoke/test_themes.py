@@ -42,6 +42,7 @@ _THEMES: tuple[str, ...] = (
     "solarized",
     "sepia",
     "forest",
+    "graphite",
     "contrast",
 )
 _SCHEMES: tuple[Scheme, ...] = ("light", "dark")

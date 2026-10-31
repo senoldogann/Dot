@@ -1,5 +1,6 @@
-// More palettes (beyond the six of palettes.js): Midnight, Nord, Solarized, Sepia, Forest and High contrast, for
-// light and for dark, in the roles palettes.js names. Dot's own; tokens.js holds them to the contrast rule like the rest.
+// More palettes (beyond the six of palettes.js): Midnight, Nord, Solarized, Sepia, Forest, Graphite and High
+// contrast, for light and for dark, in the roles palettes.js names. Dot's own; tokens.js holds them to the contrast
+// rule like the rest.
 
 // A palette's roles from its colours in the order of ROLES; the placeholder and the muted icons take the muted text,
 // the send button the accent.
@@ -55,6 +56,12 @@ export const MORE_PALETTES = {
     light: roles("#f3f6f1 #eaf0e7 #fbfdfa #e3ebdf #d6e0d1 #c0cebb #1d2a1f #546456 #2f7d4a #25663c #ffffff #dcebdf #e3ebdf #1d2a1f #d64545 #a83232 #f8e7e5 #d9931c #8f5d00 #f8eeda"),
     dark: roles("#111a14 #0c140f #17221a #1e2b21 #223026 #2d3d31 #e3ede4 #8fa392 #5cc489 #4bb078 #0c140f #1c3526 #1e2b21 #e3ede4 #f06767 #ff8f8f #3a1b1b #f0b24a #f5c56e #3a2e14"),
   },
+  // Grok's greys as OpenMausBot sampled them from the app (item 870): layers of neutral grey, the ink at three
+  // strengths, a white action, and colour only for what needs the owner.
+  graphite: {
+    light: roles("#ffffff #f7f7f7 #f2f2f2 #e9e9eb #e3e3e3 #cfcfcf #0d0d0d #5c5c5c #0d0d0d #2c2c2c #ffffff #eef2fb #f0f0f0 #0d0d0d #d92d20 #b42318 #fdecea #c27803 #8a5200 #fdf3e1"),
+    dark: roles("#121212 #0e0e0e #1f1f1f #2c2c2e #2a2a2a #3a3a3c #f5f5f5 #a3a3a3 #f5f5f5 #e0e0e0 #0e0e0e #1c2433 #2c2c2e #f5f5f5 #ff5c5c #ff8a8a #2e1414 #f5a524 #ffc266 #2e2210"),
+  },
   contrast: {
     light: roles("#ffffff #ffffff #ffffff #ebebeb #000000 #000000 #000000 #1f1f1f #0033cc #002299 #ffffff #dde5ff #ebebeb #000000 #cc0000 #a30000 #ffe5e5 #b36b00 #7a4300 #fff2db"),
     dark: roles("#000000 #000000 #0a0a0a #1f1f1f #8a8a8a #ffffff #ffffff #e0e0e0 #ffd400 #ffe14d #000000 #2e2a00 #1f1f1f #ffffff #ff4d4d #ff8080 #330000 #ffb000 #ffc94d #332300"),
@@ -68,5 +75,6 @@ export const MORE_THEMES = [
   ["solarized", "Solarized", "Schoonover's base tones, a calm blue accent."],
   ["sepia", "Sepia", "Old paper and coffee, a sepia-brown accent."],
   ["forest", "Forest", "Moss and pine, a leaf-green accent."],
+  ["graphite", "Graphite", "Grok's neutral greys, white ink and a white action."],
   ["contrast", "High contrast", "Pure black and white, bold edges, a strong blue."],
 ];
