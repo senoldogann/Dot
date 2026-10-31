@@ -318,6 +318,18 @@ address, link, path in a home folder or account name, no line that imitates the 
 and refused as before, so that no cut keeps the start of what a gate would refuse (item 840: on 2026-10-30 DeepSeek
 V4.1 Flash wrote a summary past 120 twice and the night's step failed, and a skill was lost on its description). A
 skill's kind is its name and is never cut.
+A field an answer leaves out is read as what leaving it out says, where it says something (item 886). On 2026-10-31
+GLM 5.3 Flash left out `keep`, `habits`, `tool_guidance` and `moments` in two answers, and the night's step failed.
+For the proposer:
+- a text left out is no new text, and moments left out are none;
+- `keep` left out is a keep when no text is given and a change when one is;
+- a keep needs no summary.
+
+A change that gives no text is still asked again, as before: the text it meant may come then.
+
+For the composer, keeping the base needs no texts, decisions or summary. For the experience writer, an entry left out
+is none. What a change cannot do without is still asked again: its summary, and a composition's texts. The tools'
+schemas still ask for every field.
 `[harness] proposer`, `composer`, `selector` and `experience` name a model for each; "" is `[models] review`.
 `dotx harness propose RUN_ID [--scope invariant|domain]` asks the proposer about one run by hand and writes its
 candidate, whose notes keep the scope and the moments; `keep` writes nothing.
