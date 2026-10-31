@@ -1194,6 +1194,61 @@ class StuckWork(FrozenModel):
     held_queues: int
 
 
+class ChatSpend(FrozenModel):
+    """What the runs of the chats of one title spent in a window (item 881): a goal started again in a new chat has
+    its title, so its chats are counted together. ``thread_id`` is the newest of them."""
+
+    thread_id: str
+    title: str
+    chats: int
+    runs: int
+    failed: int
+    tokens: int
+
+
+class TokenSpend(FrozenModel):
+    """Where a window's tokens went (item 881): all of them, and the chats that spent the most, the costliest first.
+    On the owner's Mac one goal (a hiring CTF whose flag was never found) took 64 million of 604 million tokens in a
+    week, over four chats and eight runs, and nothing said so."""
+
+    total: int
+    chats: tuple[ChatSpend, ...]
+
+
+_SPEND_SQL: str = (
+    "SELECT MAX(r.thread_id), COALESCE(t.title, ''), COUNT(DISTINCT r.thread_id), COUNT(*), SUM(r.status = 'failed'),"
+    " SUM(r.input_tokens + r.output_tokens) AS spent FROM runs r LEFT JOIN threads t ON t.id = r.thread_id"
+    " WHERE r.created_at >= ? GROUP BY COALESCE(NULLIF(t.title, ''), r.thread_id) ORDER BY spent DESC LIMIT ?"
+)
+
+
+def collect_spend(database: Path, since: float, limit: int) -> TokenSpend:
+    """:class:`TokenSpend` of the runs created since ``since``, the ``limit`` costliest chats, read on a read-only
+    connection. Blocking."""
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
+            total: tuple[object, ...] = connection.execute(
+                "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM runs WHERE created_at >= ?", (since,)
+            ).fetchone()
+            rows = connection.execute(_SPEND_SQL, (since, limit)).fetchall()
+    except sqlite3.Error as error:
+        raise StoreError("the store could not be read", {"database": str(database), "error": str(error)}) from error
+    return TokenSpend(
+        total=int(str(total[0])),
+        chats=tuple(
+            ChatSpend(
+                thread_id=str(row[0]),
+                title=str(row[1]),
+                chats=int(str(row[2])),
+                runs=int(str(row[3])),
+                failed=int(str(row[4] or 0)),
+                tokens=int(str(row[5] or 0)),
+            )
+            for row in rows
+        ),
+    )
+
+
 def _count_of(connection: sqlite3.Connection, sql: str) -> int:
     row: tuple[object, ...] = connection.execute(sql).fetchone()
     return int(str(row[0]))

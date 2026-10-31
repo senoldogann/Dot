@@ -48,9 +48,11 @@ from dotagent.store.stats import (
     StepBand,
     StuckWork,
     TimeStats,
+    TokenSpend,
     ToolStats,
     WebFailures,
     collect_run_costs,
+    collect_spend,
     collect_statistics,
     collect_stuck,
     gui_share,
@@ -377,11 +379,42 @@ async def cmd_stats(command: StatsCommand) -> int:
         lines.extend(render_learning_health(parse_health(health), time.time(), quiet_s, harness_on))
         context: list[str] = await asyncio.to_thread(read_context_parts, db_path(), since, _CONTEXT_RUNS)
         lines.extend(render_context(context))
+        spend: TokenSpend = await asyncio.to_thread(collect_spend, db_path(), since, _COSTLIEST)
+        lines.extend(render_spend(spend))
         stuck: StuckWork = await asyncio.to_thread(collect_stuck, db_path())
         failing: str | None = await asyncio.to_thread(read_kv, db_path(), SCHEDULE_FAILURES_KEY)
         lines.extend(render_stuck(stuck, parse_failures(failing)))
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
+
+
+# How many of the costliest goals ``dotx stats`` names (item 881). One started again in other chats whose runs failed
+# twice or more is marked to look at: a goal tried again and again that may be getting nowhere, which one chat of the
+# owner's own, long and busy, is not.
+_COSTLIEST: int = 5
+_RETRIED_CHATS: int = 2
+_RETRIED_FAILURES: int = 2
+_TITLE_CHARS: int = 60
+
+
+def render_spend(spend: TokenSpend) -> list[str]:
+    """Where the window's tokens went (item 881): the costliest goals (the chats of one title), each with its share,
+    its tokens, its chats, its runs and how many failed; one started again in other chats whose runs failed twice or
+    more is marked to look at."""
+    if spend.total <= 0 or not spend.chats:
+        return []
+    lines: list[str] = ["", f"Where the tokens went ({_count(spend.total)} in all), the costliest goals:"]
+    for chat in spend.chats:
+        share: float = chat.tokens / spend.total
+        title: str = chat.title if len(chat.title) <= _TITLE_CHARS else chat.title[: _TITLE_CHARS - 1] + "…"
+        retried: bool = chat.chats >= _RETRIED_CHATS and chat.failed >= _RETRIED_FAILURES
+        mark: str = "  <- started again and failing: look whether it gets anywhere" if retried else ""
+        chats: str = "" if chat.chats == 1 else f"{chat.chats} chats, "
+        lines.append(
+            f"  {share:4.0%}  {_count(chat.tokens)}  {chats}{chat.runs} runs, {chat.failed} failed  "
+            f"{title or chat.thread_id} ({chat.thread_id}){mark}"
+        )
+    return lines
 
 
 # The runs whose first step ``dotx stats`` reads for what it carries (item 735), and how many of its largest parts each
