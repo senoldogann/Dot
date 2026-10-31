@@ -6293,6 +6293,19 @@ a.schedule-line:hover .schedule-made {
   background: var(--surface);
 }
 
+/* On a phone (item 872): the note has the row, and Deny and Approve share the next one, each half of it, under the
+   thumb; Approve no longer stood alone on a line of its own at the left. */
+@media (max-width: 600px) {
+  .approval-actions .input,
+  .approval-actions .approval-remember {
+    flex-basis: 100%;
+  }
+
+  .approval-actions > .btn {
+    flex: 1 1 0;
+  }
+}
+
 /* A draft a run wrote for the owner (item 314, after Grok's): a card of the surface's colour, the recipients and the
    subject in two columns over the words, which keep their lines, and Send at the end of the row. Edit turns the fields
    and the words into a form in place; an answered draft keeps what went out, a discarded one in the quiet colour. */

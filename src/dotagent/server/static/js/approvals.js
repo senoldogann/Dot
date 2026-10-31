@@ -2,6 +2,7 @@
 // run waits for (`pending`) or left for the user and went on without (`left`).
 
 import { api } from "./api.js";
+import { cardWords, FIXED_REASONS, unsaid } from "./cardwords.js";
 import { codeBlock } from "./codeblock.js";
 import { clip, dateTime, el } from "./dom.js";
 import { capital, flagWords, kindWords } from "./flagwords.js";
@@ -170,6 +171,10 @@ const GUARDED_FLAGS = new Set([
 // `_INITIATIVE_REASON` in policy/engine.py, which the card's summary ends with): the owner's in every mode, whatever
 // their rules say, so no rule is offered for it; the same step elsewhere keeps its offer.
 const INITIATIVE_WORDS = "On its own initiative, Dot asks before";
+// The line under a card that no rule answers, which says why Dot asks.
+const INITIATIVE_LINE = "In a chat Dot opened on its own initiative, Dot always asks you about this, YOLO too. No rule can turn that off.";
+const OWNERS_LINE = "A payment, a message or mail sent for you and a public post wait for you in YOLO too. No rule can turn that off.";
+const GUARDED_LINE = "Dot always asks you about this in every mode that asks. No rule can turn that off.";
 
 /** Whether the owner answers `approval` in every mode that asks, whatever their rules say (item 429). */
 function guarded(approval) {
@@ -229,16 +234,19 @@ function present(...parts) {
   return parts.filter((part) => part !== null);
 }
 
-function technicalDetails(args) {
-  const chips = [];
+function technicalDetails(args, said) {
+  // A chip whose words the card's text says already is not shown again (item 872).
+  const named = [];
   if (typeof args.kind === "string") {
-    chips.push(el("span", { class: "chip", title: args.kind }, capital(kindWords(args.kind))));
+    named.push([args.kind, capital(kindWords(args.kind))]);
   }
   if (Array.isArray(args.flags)) {
     for (const flag of args.flags) {
-      chips.push(el("span", { class: "chip", title: String(flag) }, capital(flagWords(String(flag)))));
+      named.push([String(flag), capital(flagWords(String(flag)))]);
     }
   }
+  const fresh = new Set(unsaid(named.map(([, words]) => words), said));
+  const chips = named.filter(([, words]) => fresh.has(words)).map(([title, words]) => el("span", { class: "chip", title }, words));
   const target = typeof args.target === "string" && args.target !== "" ? args.target : null;
   if (chips.length === 0 && target === null) {
     return null;
@@ -313,7 +321,13 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
 
   function renderPending() {
     node.className = `approval${approval.severity === "high" ? " high" : ""}${isQuestion ? " question" : ""}${isHandoff ? " handoff" : ""}`;
-    const text = isQuestion && typeof approval.args.question === "string" ? approval.args.question : approval.summary;
+    // Each thing once (item 872): the command in its box, why Dot asks in the line under it that says so.
+    const asks = isQuestion || isHandoff ? null : initiativeAsked(approval) ? INITIATIVE_LINE : ownersAsked(approval) ? OWNERS_LINE : guarded(approval) ? GUARDED_LINE : null;
+    const target = typeof approval.args.target === "string" ? approval.args.target : "";
+    // What the line says is left out of the words; any other reason, and the review model's warning, stays.
+    const said = asks === INITIATIVE_LINE ? FIXED_REASONS.initiative : asks === OWNERS_LINE ? FIXED_REASONS.owners : "";
+    const words = isQuestion ? null : cardWords(approval.summary, target, said);
+    const text = isQuestion && typeof approval.args.question === "string" ? approval.args.question : words === null ? approval.summary : words.text;
     const choices = isQuestion ? questionOptions(approval.args) : [];
     // Several options may be chosen: each is ticked, and Send answer sends them with what was written.
     const several = choices.length > 0 && approval.args.multiple === true;
@@ -382,19 +396,13 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           el("span", { class: "spacer" }),
           heading,
         ),
-        el("div", { class: "approval-text" }, text),
+        text === "" ? null : el("div", { class: "approval-text" }, text),
+        words === null || words.reason === "" ? null : el("div", { class: "small muted approval-why" }, words.reason),
         several ? el("div", { class: "small muted" }, "Choose one or more, then send them.") : null,
         isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(isHandoff, approval.keptUntil, approval.scopeCampaignId !== null || leftNote === LEFT_IN_CAMPAIGN) : leftNote) : null,
-        isQuestion ? options : technicalDetails(approval.args),
-        isQuestion || isHandoff
-          ? null
-          : initiativeAsked(approval)
-            ? el("div", { class: "small muted" }, "In a chat Dot opened on its own initiative, Dot always asks you about this, YOLO too. No rule can turn that off.")
-            : ownersAsked(approval)
-              ? el("div", { class: "small muted" }, "A payment, a message or mail sent for you and a public post wait for you in YOLO too. No rule can turn that off.")
-              : guarded(approval)
-                ? el("div", { class: "small muted" }, "Dot always asks you about this in every mode that asks. No rule can turn that off.")
-                : ruleOffer(approval),
+        // A chip is left out only when the words are the step's own, the command cut out of them, never a reason's.
+        isQuestion ? options : technicalDetails(approval.args, words?.cut ? text : ""),
+        isQuestion || isHandoff ? null : asks !== null ? el("div", { class: "small muted" }, asks) : ruleOffer(approval),
         isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId, onUseHere) : null,
         el(
           "div",

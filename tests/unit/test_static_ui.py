@@ -230,6 +230,11 @@ def test_the_cards_words_of_the_owners_questions_are_the_policys() -> None:
         found = re.search(rf'const {constant} = "([^"]+)";', card)
         assert found is not None, constant
         assert reason.startswith(found.group(1)), (constant, found.group(1), reason)
+    # The sentences the card's words leave out, as the line under the box says them (item 872), are the policy's own.
+    words: str = (JS_DIR / "cardwords.js").read_text(encoding="utf-8")
+    for key, reason in (("initiative", _INITIATIVE_REASON), ("owners", OWNERS_REASON)):
+        sentence = re.search(rf'  {key}: "([^"]+)",', words)
+        assert sentence is not None and sentence.group(1) == reason, key
 
 
 def test_the_card_offers_dont_ask_again_on_the_steps_the_policy_may_remember() -> None:
