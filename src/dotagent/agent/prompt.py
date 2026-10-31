@@ -983,9 +983,10 @@ def _team_section(agent: AgentBrief | None, team: Sequence[AgentBrief], tool_nam
             [
                 "# Team",
                 "- You have no team yet. When the work splits into roles (finding sources, writing copy, checking) or "
-                "into parts that recur, make the teammates it needs with create_agent, each with only the tools its "
-                "role needs, and send them the parts with message_agent; they stay under Agents for later runs. Never "
-                "make one for a single step. Asked for a team, make its agents, then create_team.",
+                "into parts that recur, make the teammates it needs with create_agent, each with one job and only the "
+                "tools its role needs, named one by one, and send them the parts with message_agent; they stay under "
+                "Agents for later runs. Never make one for a single step. Asked for a team, make its agents, then "
+                "create_team.",
             ]
         )
     own: str = "" if agent is None else agent.team

@@ -33,8 +33,20 @@ def _call(tool: str, **arguments: object) -> ScriptedTurn:
 
 
 _TURNS: list[ScriptedTurn] = [
-    _call("create_agent", name="Press Writer", role="Writes the press mails", instructions="Short and plain."),
-    _call("create_agent", name="Launch Planner", role="Plans the launch days", instructions="One plan a day."),
+    _call(
+        "create_agent",
+        name="Press Writer",
+        role="Writes the press mails",
+        instructions="Short and plain.",
+        tools=["read_file"],
+    ),
+    _call(
+        "create_agent",
+        name="Launch Planner",
+        role="Plans the launch days",
+        instructions="One plan a day.",
+        tools=["read_file"],
+    ),
     _call(
         CREATE_TEAM_TOOL,
         name="Launch team",

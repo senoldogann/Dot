@@ -182,10 +182,11 @@ like saving a note: `ask` asks once the run has read untrusted content, `yolo` m
 untrusted content the review model checks the step first and may refuse it, item 525); the agent lasts after the
 run, its record keeps the run that made it, and the Agents page marks it "Made by Dot". The prompt's Team section
 tells a run with no team that when the work splits into roles (finding sources, writing, checking) or into parts
-that recur, it makes the teammates it needs, each with only the tools its role needs, and sends them the parts with
+that recur, it makes the teammates it needs, each with one job and only the tools its role needs, named one by one, and sends them the parts with
 `message_agent` (several at once work in parallel); with a team, it reuses a member before it makes one, never for a
-single step. An agent a run makes can do no more than the run (item 307): only tools the run has (with none named, an
-agent's run gives its own bound and Dot's run every tool), a helper model or the run's own, at most six a run (three
+single step. An agent a run makes can do no more than the run (item 307): only tools the run has, and only the ones
+it names: one that names none is refused, so that no agent a run makes gets every tool (item 873, after an agent
+library whose rule is one job and no leftover tool: four agents Dot made before it had every tool), a helper model or the run's own, at most six a run (three
 before item 864), and a research run makes none; its runs open with "an agent Dot made" and "Dot's instructions to
 you", not yours. Asked for a team, a run makes its agents, then the team of them with `create_team` (item 864: a name,
 what it is for, two to twelve agents by name, yours or ones it made). The team is yours, as one you put together on the
