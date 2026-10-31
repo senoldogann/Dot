@@ -6,6 +6,7 @@ import time
 
 from fastapi import APIRouter
 
+from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, release_playbooks
 from dotagent.agent.templates import (
     TEAMS,
@@ -29,6 +30,7 @@ from dotagent.server.views import (
     AgentLearning,
     AgentRequest,
     AgentSummary,
+    AgentUsage,
     TeamMessage,
     TeamUse,
     TeamView,
@@ -39,6 +41,7 @@ from dotagent.store.models import (
     DOT_AGENT_ID,
     AgentLook,
     AgentRecord,
+    AgentToolUse,
     MemoryRecord,
     RunRecord,
     TeamRecord,
@@ -49,6 +52,12 @@ from dotagent.tools.team import MESSAGE_AGENT_TOOL, find_agent
 _PAGE_RUNS: int = 50
 # How many of the newest messages an agent sent or received its page shows.
 _PAGE_MESSAGES: int = 50
+# How many of its newest ended runs an agent's page reads for the tools it used (item 874), and how many must have
+# ended before it names the ones none of them called: one run says little of what a role needs.
+_USAGE_WINDOW: int = 20
+_USAGE_ENOUGH: int = 3
+# What trimming never takes away: the tools every agent's run has, and its way to its team.
+_ALWAYS_KEPT: frozenset[str] = frozenset({*AGENT_CORE_TOOLS, MESSAGE_AGENT_TOOL})
 # How many of its newest lessons an agent's page shows.
 _PAGE_LESSONS: int = 100
 # What Dot's page says it learned: nothing here, since Dot's lessons and skills are the Memory and Skills pages.
@@ -105,6 +114,47 @@ def changed_agent_tools(said: list[str] | None, saved: tuple[str, ...]) -> tuple
     if said is None:
         return ()
     return tuple(said) if said else saved
+
+
+def agent_usage(record: AgentRecord, use: AgentToolUse, known: frozenset[str]) -> AgentUsage:
+    """What the page says of the tools ``record`` used in its newest ended runs (``use``, item 874): once enough of
+    them ended, the tools it names that none called, but for the ones every agent's run has (finishing, asking) and
+    ``message_agent``, its way to its team, which trimming keeps."""
+    enough: bool = use.runs >= _USAGE_ENOUGH
+    unused: tuple[str, ...] = (
+        tuple(tool for tool in record.tools if tool not in use.calls and tool not in _ALWAYS_KEPT) if enough else ()
+    )
+    return AgentUsage(
+        window=_USAGE_WINDOW,
+        runs=use.runs,
+        tokens=use.tokens,
+        newest=use.newest,
+        calls=use.calls,
+        enough=enough,
+        unused=unused,
+        # What **Keep only these** keeps besides message_agent: as :func:`trimmed_tools` keeps them.
+        own=tuple(tool for tool in use.calls if tool in known and tool not in _ALWAYS_KEPT),
+    )
+
+
+def trimmed_tools(record: AgentRecord, usage: AgentUsage, known: frozenset[str]) -> tuple[str, ...]:
+    """The tools ``record`` keeps once the ones its newest runs never called go (item 874): for an agent that names
+    its tools, those but the ``unused``; for one with every tool, the ones its runs called that are tools here
+    (``known``), but for the ones every agent's run has. ``message_agent`` stays either way, its way to its team.
+    Refused before enough runs ended, and when nothing would go or nothing would be left."""
+    if not usage.enough:
+        raise InvalidValueError(
+            f"an agent's actions are trimmed once {_USAGE_ENOUGH} of its runs have ended; it has {usage.runs}",
+            {"runs": str(usage.runs)},
+        )
+    kept: list[str] = [tool for tool in record.tools if tool not in usage.unused] if record.tools else list(usage.own)
+    if (not record.tools or MESSAGE_AGENT_TOOL in record.tools) and MESSAGE_AGENT_TOOL not in kept:
+        kept.append(MESSAGE_AGENT_TOOL)
+    # One with every action whose runs called none but the ones every run has keeps nothing of its own: refused, not
+    # cut down to message_agent alone (the review of item 874).
+    if not kept or (record.tools and tuple(kept) == record.tools) or (not record.tools and not usage.own):
+        raise InvalidValueError("no action of the agent's would go, or none would be left", {"agent_id": record.id})
+    return tuple(kept)
 
 
 async def dot_record(store: Store) -> AgentRecord:
@@ -305,11 +355,13 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     async def get_agent(agent_id: str) -> AgentDetail:
         if agent_id == DOT_AGENT_ID:
             return AgentDetail(record=await dot_record(store), runs=[], messages=[], learned=_NOTHING_LEARNED)
+        record: AgentRecord = await store.get_agent(agent_id)
         return AgentDetail(
-            record=await store.get_agent(agent_id),
+            record=record,
             runs=await store.agent_runs(agent_id, _PAGE_RUNS),
             messages=await team_messages(store, await store.agent_messages(agent_id, _PAGE_MESSAGES)),
             learned=await agent_learning(store, agent_id, ctx.runtime.config.agent.skill_rest_days),
+            usage=agent_usage(record, await store.agent_tool_use(agent_id, _USAGE_WINDOW), known()),
         )
 
     @router.put("/agents/{agent_id}")
@@ -328,6 +380,25 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             checked.approvals,
             changed_agent_tools(checked.tools, saved.tools),
             checked.look,
+        )
+
+    @router.post("/agents/{agent_id}/trim-tools")
+    async def trim_tools(agent_id: str) -> AgentRecord:
+        """Take away the actions the agent's newest runs never called (item 874); the record as it is now."""
+        if agent_id == DOT_AGENT_ID:
+            raise InvalidValueError("Dot is not an agent to change", {"agent_id": agent_id})
+        saved: AgentRecord = await store.get_agent(agent_id)
+        usage: AgentUsage = agent_usage(saved, await store.agent_tool_use(agent_id, _USAGE_WINDOW), known())
+        return await store.update_agent(
+            agent_id,
+            saved.name,
+            saved.role,
+            saved.instructions,
+            saved.model,
+            saved.effort,
+            saved.approvals,
+            trimmed_tools(saved, usage, known()),
+            saved.look,
         )
 
     @router.put("/agents/{agent_id}/look")

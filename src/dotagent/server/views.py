@@ -1064,6 +1064,24 @@ class AgentLearning(FrozenModel):
     skills: tuple[LearnedSkillView, ...]
 
 
+class AgentUsage(FrozenModel):
+    """What an agent's newest ended runs did, as its page shows it (item 874): ``runs`` of the ``window`` newest,
+    their ``tokens``, when the newest began, the calls of each tool, whether there are enough runs to judge
+    (``enough``) and the tools it may use that none of them called (``unused``, empty until enough; for an agent with
+    every tool, empty, as ``calls`` then names what it used)."""
+
+    window: int
+    runs: int
+    tokens: int
+    newest: float | None
+    calls: dict[str, int]
+    enough: bool
+    unused: tuple[str, ...]
+    # The actions its runs called but the ones every agent's run has (finishing, asking), the most called first: what
+    # **Keep only these** counts and keeps (the review of item 874).
+    own: tuple[str, ...] = ()
+
+
 class AgentDetail(FrozenModel):
     """An agent's page: the record, its newest runs (newest first), the newest messages it sent or received and what
     it learned."""
@@ -1072,6 +1090,7 @@ class AgentDetail(FrozenModel):
     runs: list[RunRecord]
     messages: list[TeamMessage]
     learned: AgentLearning
+    usage: AgentUsage | None = None
 
 
 class CampaignChip(FrozenModel):
