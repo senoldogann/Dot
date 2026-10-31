@@ -1409,3 +1409,15 @@
   border-radius: var(--radius-pill);
   background: var(--fine);
 }
+
+/* On a touch screen of a phone's width the drawer has no X (item 888, the owner's ask): a chat chosen or a swipe to the
+   left closes it, and Dot's name stands where the X stood. A narrow window of the Mac keeps its button. */
+@media (max-width: 720px) and (pointer: coarse) {
+  .side-head > .side-close {
+    display: none;
+  }
+
+  .side-head {
+    padding-left: 16px;
+  }
+}

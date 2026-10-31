@@ -263,6 +263,33 @@ async def _pages_of(playwright: Playwright, browser: Browser, device: str, addre
     return found
 
 
+# A swipe to the left on the drawer, as a finger makes it: a touch screen's drawer has no X (item 888). WebKit's phone
+# makes no touch of a page's own, so its drawer is closed with Escape there, and the swipe is Chrome's.
+_SWIPE: str = """() => {
+  const side = document.querySelector('.sidebar');
+  const at = (x, y) => new Touch({ identifier: 1, target: side, clientX: x, clientY: y });
+  const down = at(300, 400);
+  side.dispatchEvent(new TouchEvent('touchstart', { touches: [down], changedTouches: [down], bubbles: true }));
+  side.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [at(150, 410)], bubbles: true }));
+}"""
+
+
+_MAKES_TOUCHES: str = (
+    "(() => { try { new Touch({ identifier: 0, target: document.body }); return true; } catch { return false; } })()"
+)
+
+
+async def _swipe_closed(page: Page) -> None:
+    """Close the phone's drawer, which shows no X on a touch screen: a swipe to the left where the page can make one
+    (Chrome), else Escape; and wait until it is closed."""
+    await expect(page.get_by_role("button", name="Hide sidebar")).to_be_hidden()
+    if await page.evaluate(_MAKES_TOUCHES):
+        await page.evaluate(_SWIPE)
+    else:
+        await page.keyboard.press("Escape")
+    await expect(page.locator(".shell")).to_have_attribute("data-sidebar", "closed")
+
+
 async def test_no_page_slides_sideways_or_lets_the_phone_zoom_into_a_field(own_home: Path) -> None:
     async with _served(own_home) as (manager, address), async_playwright() as playwright:
         async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
@@ -434,7 +461,7 @@ async def test_the_bar_the_sidebar_the_composer_and_the_panel_keep_out_of_the_sa
             assert head["y"] >= _SAFE_TOP_PX - 0.5, head
             assert settings["y"] + settings["height"] <= height - _SAFE_BOTTOM_PX + 0.5, (settings, height)
             await page.screenshot(path=str(tmp_path / "safe-sidebar.png"))
-            await page.get_by_role("button", name="Hide sidebar").click()
+            await _swipe_closed(page)
 
             await page.get_by_role("button", name="Task details").click()
             panel: Locator = page.locator(".inspector[data-mode='drawer']")
@@ -444,6 +471,37 @@ async def test_the_bar_the_sidebar_the_composer_and_the_panel_keep_out_of_the_sa
             assert tabs["y"] >= _SAFE_TOP_PX - 0.5, tabs
             await page.screenshot(path=str(tmp_path / "safe-panel.png"))
             await page.context.close()
+        finally:
+            await browser.close()
+
+
+async def _drawer_open(page: Page) -> None:
+    await page.locator(".shell[data-sidebar]").wait_for()
+    if await page.locator(".shell").get_attribute("data-sidebar") != "open":
+        await page.get_by_role("button", name="Show sidebar").click()
+    await expect(page.locator(".shell")).to_have_attribute("data-sidebar", "open")
+
+
+async def test_a_phones_drawer_has_no_x_and_closes_with_a_swipe_to_the_left(own_home: Path) -> None:
+    """Item 888, the owner's ask: on a touch screen the drawer's X went; a swipe to the left closes it, and one up and
+    down, which scrolls the chats, does not. A Mac's narrow window, with no touch, keeps its button."""
+    async with _served(own_home) as (_manager, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await _phone(playwright, browser, "Pixel 7", address)
+            await page.goto(f"{address}/#/schedules")
+            await _drawer_open(page)
+            await expect(page.get_by_role("button", name="Hide sidebar")).to_be_hidden()
+            scroll: str = _SWIPE.replace("at(150, 410)", "at(290, 200)")
+            await page.evaluate(scroll)
+            await expect(page.locator(".shell")).to_have_attribute("data-sidebar", "open")
+            await _swipe_closed(page)
+            narrow = await browser.new_context(viewport={"width": 390, "height": 844}, reduced_motion="reduce")
+            desk: Page = await narrow.new_page()
+            await desk.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            await desk.goto(f"{address}/#/schedules")
+            await _drawer_open(desk)
+            await expect(desk.get_by_role("button", name="Hide sidebar")).to_be_visible()
         finally:
             await browser.close()
 
@@ -490,7 +548,7 @@ async def test_the_bar_the_dock_and_the_drawers_stay_on_what_is_seen_while_the_p
             await page.get_by_role("button", name="Show sidebar").click()
             await page.wait_for_function(f"(want) => {_edge('.sidebar', 'top')} === want", arg=seen_top)
             await page.wait_for_function(f"(want) => {_edge('.sidebar', 'bottom')} === want", arg=seen_bottom)
-            await page.get_by_role("button", name="Hide sidebar").click()
+            await _swipe_closed(page)
             await page.get_by_role("button", name="Task details").click()
             await page.wait_for_function(f"(want) => {_edge('.inspector', 'bottom')} === want", arg=seen_bottom)
             await page.get_by_role("button", name="Close the details").click()
