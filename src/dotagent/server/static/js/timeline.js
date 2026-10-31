@@ -1329,9 +1329,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
     approval_requested(scope, record) {
       const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined, leftNote: LEFT_IN_RUN, onUseHere });
-      const line = scope.policyLine !== null && scope.container.lastElementChild === scope.policyLine ? scope.policyLine : null;
+      // The line that asked says what the card says, word for word: the card stands alone (item 871, after
+      // OpenMausBot's quiet approvals). A line no card follows (a refusal) stays.
+      if (scope.policyLine !== null && scope.container.lastElementChild === scope.policyLine) {
+        scope.policyLine.remove();
+      }
       scope.policyLine = null;
-      cards.set(record.data.approval_id, { card, scope, line, severity: record.data.severity });
+      cards.set(record.data.approval_id, { card, scope, severity: record.data.severity });
       place(scope, card.node, record.ts);
       reveal(scope);
       markWaiting(scope, true, record.ts);
@@ -1357,12 +1361,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const entry = cards.get(record.data.approval_id);
       if (entry !== undefined) {
         cards.delete(record.data.approval_id);
-        // An action allowed, or a step the reader did, leaves the chat with the line that asked for it, live and when
-        // the chat opens again (item 434): the run goes on with it. A refusal stays, and so does a question with its
-        // answer.
+        // An action allowed, or a step the reader did, leaves the chat, live and when the chat opens again (item 434):
+        // the run goes on with it. A refusal stays, and so does a question with its answer.
         if (record.data.status === "approved" && entry.severity !== "question") {
           entry.card.node.remove();
-          entry.line?.remove();
         } else {
           entry.card.settle(record.data.status, record.data.note);
         }

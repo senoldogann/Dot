@@ -118,7 +118,7 @@ async def served(
         await close_runtime(runtime)
 
 
-async def test_each_card_stands_in_the_chat_as_its_line_does(served: tuple[RunManager, httpx.AsyncClient]) -> None:
+async def test_each_card_stands_in_the_chat_as_the_run_asks(served: tuple[RunManager, httpx.AsyncClient]) -> None:
     manager, client = served
     port: int | None = client.base_url.port
     assert port is not None
@@ -133,15 +133,13 @@ async def test_each_card_stands_in_the_chat_as_its_line_does(served: tuple[RunMa
             run_id: str = started.json()["id"]
             await page.goto(f"http://127.0.0.1:{port}/#/runs/{run_id}")
             for at in range(1, ASKS + 1):
-                line = page.locator(".note", has_text=f"touch made-{at}.txt")
-                await expect(line).to_be_visible(timeout=_WAIT_S * 1000)
+                # From the moment the run asks (the card stands alone since item 871, the line that asked gone).
+                asked: dict[str, object] = await _asked(client)
                 seen: float = time.monotonic()
                 card = page.locator(".approval", has_text=f"touch made-{at}.txt")
                 await expect(card).to_be_visible(timeout=_WAIT_S * 1000)
                 waited: float = time.monotonic() - seen
-                assert waited < MOST_S, f"card {at} came {waited:.1f} s after its line"
-                pending = (await client.get("/api/approvals", params={"status": "pending", "limit": 10})).json()
-                (asked,) = pending
+                assert waited < MOST_S, f"card {at} came {waited:.1f} s after the run asked"
                 answered = await client.post(
                     f"/api/approvals/{asked['id']}/decision", json={"approve": True, "note": ""}
                 )
@@ -155,6 +153,17 @@ async def test_each_card_stands_in_the_chat_as_its_line_does(served: tuple[RunMa
                 await expect(said.locator(".turn-face")).to_have_count(1 if at == 1 else 0)
         finally:
             await browser.close()
+
+
+async def _asked(client: httpx.AsyncClient) -> dict[str, object]:
+    """The approval the run waits on, once it asks."""
+    async with asyncio.timeout(_WAIT_S):
+        while True:
+            pending = (await client.get("/api/approvals", params={"status": "pending", "limit": 10})).json()
+            if pending:
+                (asked,) = pending
+                return dict(asked)
+            await asyncio.sleep(0.05)
 
 
 async def _another_run_streams(manager: RunManager) -> None:
