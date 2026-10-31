@@ -12,7 +12,7 @@ import { api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
-import { ago, clip, el, modelName, plural, setText, switchRow } from "../dom.js";
+import { ago, clip, compact, el, modelName, plural, setText, switchRow } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
@@ -1215,6 +1215,70 @@ function suggestedScheduleRow(template, onAdd) {
   );
 }
 
+/**
+ * What the agent's newest ended runs used (item 874): their count and tokens, the actions they called most, and,
+ * once enough of them ended, the actions it may use that none called, with a way to take them away (`onTrim()`). An
+ * agent with every action is offered to keep only the ones its runs called. None before a run of it ended.
+ */
+function usageRows(record, usage, onTrim) {
+  if (usage === null || usage === undefined || usage.runs === 0) {
+    return [];
+  }
+  const called = Object.entries(usage.calls);
+  const top = called.slice(0, 8).map(([tool, calls]) => `${tool} ×${calls}`);
+  const rows = [
+    el(
+      "div",
+      { class: "list-row", dataset: { usage: "runs" } },
+      el(
+        "div",
+        { class: "row-main" },
+        el("div", { class: "row-title" }, `Its last ${plural(usage.runs, "run", "runs")}: ${compact(usage.tokens)} tokens, ${plural(called.length, "action", "actions")} called`),
+        el("div", { class: "row-meta" }, top.length === 0 ? "It called no action." : `Most called: ${top.join(", ")}`),
+      ),
+    ),
+  ];
+  const trim = (label, title) => el("div", { class: "row-actions" }, el("button", { class: "btn sm", type: "button", title, onclick: onTrim }, label));
+  if (!usage.enough) {
+    rows.push(
+      el(
+        "div",
+        { class: "list-row", dataset: { usage: "wait" } },
+        el("div", { class: "row-main" }, el("div", { class: "row-meta" }, "Which actions it never calls is told once three of its runs have ended.")),
+      ),
+    );
+  } else if (record.tools.length === 0 && usage.own.length > 0) {
+    rows.push(
+      el(
+        "div",
+        { class: "list-row", dataset: { usage: "every" } },
+        el(
+          "div",
+          { class: "row-main" },
+          el("div", { class: "row-title" }, "It has every action"),
+          el("div", { class: "row-meta" }, `Its last ${plural(usage.runs, "run", "runs")} called ${plural(usage.own.length, "action", "actions")} of its own; an action its role does not need is a way to go astray.`),
+        ),
+        trim("Keep only these", "Give it only the actions its runs called, and message_agent"),
+      ),
+    );
+  } else if (usage.unused.length > 0) {
+    rows.push(
+      el(
+        "div",
+        { class: "list-row", dataset: { usage: "unused" } },
+        el(
+          "div",
+          { class: "row-main" },
+          el("div", { class: "row-title" }, `Not called in its last ${plural(usage.runs, "run", "runs")}: ${plural(usage.unused.length, "action", "actions")}`),
+          el("div", { class: "row-text" }, usage.unused.join(", ")),
+        ),
+        trim("Remove them", "Take these actions away; Edit gives any of them back"),
+      ),
+    );
+  }
+  return rows;
+}
+
 /** A lesson the agent learned: the note, how the agent's own runs fared after it, and Forget. */
 function lessonRow(record, score, onForget) {
   const forget = el("button", { class: "btn ghost sm", type: "button" }, "Forget");
@@ -1384,6 +1448,24 @@ function mountPage(root, ctx, agentId) {
     await refresh();
   }
 
+  /** Take away the actions the agent's runs never called (item 874), once the owner says so. */
+  async function trimTools(record, usage) {
+    const every = record.tools.length === 0;
+    const confirmed = await confirmDialog({
+      title: every ? `Keep only the actions ${record.name} used?` : `Remove ${plural(usage.unused.length, "action", "actions")} from ${record.name}?`,
+      message: every
+        ? `It keeps the ${plural(usage.own.length, "action", "actions")} its last ${plural(usage.runs, "run", "runs")} called, and message_agent. Edit gives any action back.`
+        : `${usage.unused.join(", ")}. Edit gives any of them back.`,
+      confirmLabel: every ? "Keep only these" : "Remove",
+      focusCancel: true,
+    });
+    if (confirmed) {
+      const saved = await api.post(`/agents/${record.id}/trim-tools`, null);
+      toast("ok", `${saved.name} keeps ${plural(saved.tools.length, "action", "actions")}.`);
+      await refresh();
+    }
+  }
+
   async function forget(record) {
     const confirmed = await confirmDialog({
       title: "Forget this lesson?",
@@ -1459,6 +1541,7 @@ function mountPage(root, ctx, agentId) {
         toggleFold,
       ),
       homeSection("chats", "Chats", detail.runs.map(runRow), folds, toggleFold),
+      homeSection("usage", "What it used", usageRows(detail.record, detail.usage, () => attempt(() => trimTools(detail.record, detail.usage))), folds, toggleFold),
       homeSection("learned", "What it learned", learned, folds, toggleFold),
       homeSection("messages", "Messages", detail.messages.map(messageRow), folds, toggleFold),
     ];

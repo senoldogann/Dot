@@ -226,6 +226,16 @@ class AgentLook(FrozenModel):
     colour: CharacterColour
 
 
+class AgentToolUse(FrozenModel):
+    """What an agent's newest ended runs did (item 874): how many runs, the tokens they spent, when the newest
+    began (``None`` before any ended) and the calls of each tool."""
+
+    runs: int
+    tokens: int
+    newest: float | None
+    calls: dict[str, int]
+
+
 class AgentRecord(FrozenModel):
     """An agent the owner made (item 86): a name, a role in one line, the instructions that join the system prompt of
     its runs, and the bounds of its runs: ``model`` (empty for the configured one), ``effort`` and ``approvals``

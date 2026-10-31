@@ -165,6 +165,16 @@ agent the title of the chat of its newest run (`latest_title`), and Dot the late
 chat of `GET /api/threads` and the run of `GET /api/runs/{id}` name the team they are with (`team`: its id, name and
 agents; the chat's `actor_id` is the team's id, which no agent's or campaign's is).
 
+**What it used** (item 874), on an agent's page, reads its newest twenty runs that ended: how many, the tokens
+they spent and the actions they called most, each with its count. Once three of them have ended (one run says little
+of what a role needs), it names the actions the agent may use that none of them called, but for the ones every agent's
+run has (finishing, asking) and `message_agent`, its way to its team, with **Remove them**: on your yes they go, and
+Edit gives any of them back. An agent with every action is offered **Keep only these**: the actions its runs called
+that are tools here, and `message_agent`. An action a role never needs is a way for the agent to go astray, so the
+page says which. The API: `GET /api/agents/{id}` gives `usage` (`window`, `runs`, `tokens`, `newest`, `calls`,
+`enough`, `unused`), and `POST /api/agents/{id}/trim-tools` takes them away (422 before three runs ended, and when
+nothing would go or nothing would be left).
+
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
 agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through

@@ -39,6 +39,7 @@ from dotagent.store.models import (
     WORKING_STATUSES,
     AgentLook,
     AgentRecord,
+    AgentToolUse,
     ApprovalRecord,
     ApprovalStatus,
     AutoDecisionCount,
@@ -5752,6 +5753,29 @@ class Store:
             "SELECT * FROM runs WHERE agent_id = ? ORDER BY created_at DESC LIMIT ?", (agent_id, limit)
         )
         return [_run(row) for row in rows]
+
+    async def agent_tool_use(self, agent_id: str, runs: int) -> AgentToolUse:
+        """What the agent's newest ``runs`` ended runs did (item 874): how many there were, the tokens they spent,
+        when the newest began, and how many times each tool was called in them."""
+        picked: str = (
+            "SELECT id FROM runs WHERE agent_id = ? AND finished_at IS NOT NULL ORDER BY created_at DESC LIMIT ?"
+        )
+        totals = await self._one(
+            "SELECT COUNT(*) AS runs, COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0)"
+            f" AS tokens, MAX(created_at) AS newest FROM runs WHERE id IN ({picked})",
+            (agent_id, runs),
+        )
+        rows = await self._all(
+            "SELECT json_extract(data, '$.tool') AS tool, COUNT(*) AS calls FROM events"
+            f" WHERE kind = 'tool_call' AND run_id IN ({picked}) GROUP BY tool ORDER BY calls DESC, tool",
+            (agent_id, runs),
+        )
+        return AgentToolUse(
+            runs=0 if totals is None else int(totals["runs"]),
+            tokens=0 if totals is None else int(totals["tokens"]),
+            newest=None if totals is None else totals["newest"],
+            calls={str(row["tool"]): int(row["calls"]) for row in rows if row["tool"] is not None},
+        )
 
     async def team_runs(self, since: float) -> list[RunRecord]:
         """The runs behind the messages between agents (item 87) started at or after ``since``, oldest first."""
