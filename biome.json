@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["src/dotagent/server/static/**/*.js", "desktop/ui/**/*.js", "tests/js/**/*.js"]
+    "includes": ["src/dotagent/server/static/**/*.js", "!src/dotagent/server/static/vendor", "desktop/ui/**/*.js", "tests/js/**/*.js"]
   },
   "formatter": {
     "enabled": false,

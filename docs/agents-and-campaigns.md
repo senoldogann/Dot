@@ -2,6 +2,23 @@
 
 ## Agents
 
+**The office** (item 885, the owner's ask of 2026-10-31) opens the Agents page: Dot and your agents in a room drawn in
+3D, each living its day by what it does. An agent whose run works goes to its own desk (its name on a plate), sits and
+types, and its screen lights up; one whose run waits for you (a question, a step to approve) stands at its desk, turns
+to you and waves, its tag pulsing orange; a free one has a coffee at the bar, sits on the sofa, looks out of a window,
+thinks at the whiteboard, browses the shelf or sits at its desk, and in the small hours naps. The figures are Dot's
+own, drawn in code with no model file: the head is the agent's look (its shape made solid, in its colour), with eyes
+that blink, look about and change with what it does, and Dot has gold eyes; clothes and an accessory come from its id.
+The room has the Mac's time: a wall clock that tells it, a sky behind the windows that turns from day to evening to a
+night with stars, and lamps that glow at night. A tag over each says its name and what it does; a click on a figure
+or its tag opens a panel with its face, role and what it works on ("Open its chat", "Its page") and the box to message
+it, which starts the run without leaving the room, so you see the agent walk to its desk and start. Drag turns the
+room, the wheel or two fingers zoom, the button at the corner brings the whole room back. **Hide** folds it away, which
+this browser keeps; the teams and the agents' cards stay under it. It draws only while it is on the screen, the page is shown and
+Dot's window is the one in front, one frame each time something changes when motion is reduced, and a browser without WebGL 2 is told so and
+shows the rest of the page. The room grows with the number of agents (two desks a pod). three.js 0.187.0 (MIT,
+`static/vendor/three/`, its licence beside it) draws it and is loaded only when the office opens.
+
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
 model, a reasoning level, approvals, the actions it may use (its tools); each left out takes the configured one, and **All actions**,
 over the actions' boxes, means every tool, any added later too: an agent with every tool opens with every box ticked,

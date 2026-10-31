@@ -11162,3 +11162,182 @@ dialog.teach {
     height: 44px;
   }
 }
+
+/* The office of the Agents page: a 3D room under the page's head, its agents' tags over it and a panel to message one.
+   The room is drawn on a dark stage in both themes, as a diorama is lit; the tags and the panel are the page's own. */
+.office-holder {
+  position: relative;
+}
+.office-frame {
+  position: relative;
+  height: clamp(340px, 62vh, 680px);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--office-stage);
+  touch-action: none;
+  user-select: none;
+}
+.office-canvas {
+  display: block;
+  cursor: grab;
+}
+.office-canvas:active {
+  cursor: grabbing;
+}
+.office-tags {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.office-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--office-glass);
+  color: var(--office-ink);
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: var(--leading-sm);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  will-change: transform;
+}
+.office-tag:hover,
+.office-tag:focus-visible {
+  background: var(--office-glass-strong);
+}
+@media (pointer: coarse) {
+  .office-tag {
+    min-height: 32px;
+  }
+}
+.office-tag-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--office-free);
+}
+.office-tag[data-mode="working"] .office-tag-dot {
+  background: var(--office-working);
+}
+.office-tag[data-mode="waiting"] .office-tag-dot {
+  background: var(--office-waiting);
+}
+.office-tag-name {
+  font-weight: var(--weight-label);
+}
+.office-tag-word {
+  color: var(--office-ink-soft);
+}
+.office-tag-word:empty {
+  display: none;
+}
+.office-reset {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  background: var(--office-glass);
+  color: var(--office-ink);
+}
+.office-panel-slot {
+  position: absolute;
+  left: var(--space-2);
+  top: var(--space-2);
+  bottom: var(--space-2);
+  width: min(360px, calc(100% - 2 * var(--space-2)));
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.office-panel {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 100%;
+  overflow: auto;
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--office-panel-shadow);
+}
+.office-panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.office-panel-head .avatar {
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+.office-panel-who {
+  flex: 1;
+  min-width: 0;
+}
+.office-panel-name {
+  font-weight: var(--weight-title);
+}
+.office-panel-role,
+.office-panel-doing {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  margin: 0;
+}
+.office-panel-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.office-panel-links:empty {
+  display: none;
+}
+.office-off {
+  display: grid;
+  place-items: center;
+  height: auto;
+  min-height: 120px;
+}
+.office-note {
+  color: var(--office-ink-soft);
+  margin: 0;
+  padding: var(--space-3);
+  text-align: center;
+}
+@media (max-width: 640px) {
+  /* A phone's frame is near square: the room fills its width, and the page scrolls on under it. */
+  .office-frame {
+    height: auto;
+    aspect-ratio: 1 / 1.08;
+  }
+  /* A tag takes a finger (32 px at least), as every control of a phone does. */
+  .office-tag {
+    min-height: 32px;
+    padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+    gap: var(--space-2);
+  }
+  .office-tag:not([data-mode="working"], [data-mode="waiting"]) .office-tag-word {
+    display: none;
+  }
+  .office-panel-slot {
+    top: auto;
+    left: var(--space-1);
+    right: var(--space-1);
+    bottom: var(--space-1);
+    width: auto;
+    max-height: 70%;
+  }
+}
