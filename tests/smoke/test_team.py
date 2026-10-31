@@ -300,9 +300,9 @@ async def _chat(client: httpx.AsyncClient, manager: RunManager, goal: str) -> st
 async def test_dot_builds_a_team_within_its_bounds_and_a_run_of_another_chat_sends_it_work_by_name(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
 ) -> None:
-    """Item 307: a run makes three agents, each with tools of its own (a tool the run lacks and a fourth agent are
-    refused), and sends one of them work at once; the Agents list shows the team as made by that run; a run in another
-    chat is told of the team and sends another member work by its name."""
+    """Item 307: a run makes its agents, each with tools of its own (a tool the run lacks and a seventh agent are
+    refused: six a run since item 864), and sends one of them work at once; the Agents list shows the team as made by
+    that run; a run in another chat is told of the team and sends another member work by its name."""
     MODEL.script = ScriptedProvider(
         _PROVIDER,
         [
@@ -313,6 +313,9 @@ async def test_dot_builds_a_team_within_its_bounds_and_a_run_of_another_chat_sen
                     _make("Writer", "Writes the summary", ["write_file", "read_file"]),
                     _make("Planner", "Plans the campaign", [CAMPAIGN_NOTE_TOOL]),
                     _make("Checker", "Checks the summary", ["read_file"]),
+                    _make("Editor", "Edits the summary", ["read_file"]),
+                    _make("Linker", "Checks the links", ["read_file"]),
+                    _make("Speller", "Checks the spelling", ["read_file"]),
                     _make("Extra", "Does one thing too many", ["read_file"]),
                 ),
             ),
@@ -332,11 +335,17 @@ async def test_dot_builds_a_team_within_its_bounds_and_a_run_of_another_chat_sen
         "Reader": ["read_file"],
         "Writer": ["write_file", "read_file"],
         "Checker": ["read_file"],
+        "Editor": ["read_file"],
+        "Linker": ["read_file"],
+        "Speller": ["read_file"],
     }
     # The two refusals came back as the results of their calls.
     results: list[str] = [message.content for message in MODEL.requests[asked + 1].messages if message.role == "tool"]
     assert f"an agent gets only tools this run has, not {CAMPAIGN_NOTE_TOOL}" in results
-    assert "a run makes at most 3 agents; send the work to the ones it made: Reader, Writer, Checker" in results
+    assert (
+        "a run makes at most 6 agents; send the work to the ones it made: Reader, Writer, Checker, Editor, Linker, "
+        "Speller" in results
+    )
     # Reader answered in a run of its own, in its voice, with Dot's instructions and no tool beyond its own.
     readers: ChatRequest = MODEL.requests[asked + 2]
     assert _system(readers).startswith("You are Reader, an agent Dot made: Reads the sources.")

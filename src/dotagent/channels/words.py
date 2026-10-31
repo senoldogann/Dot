@@ -259,6 +259,7 @@ STEP_KEYS: tuple[str, ...] = (
     "consult",
     "message_agent",
     "create_agent",
+    "create_team",
     "code_fetch",
     "browser_snapshot",
 )
@@ -365,6 +366,7 @@ ENGLISH: Words = Words(
         "consult": "asked a helper",
         "message_agent": "wrote to an agent",
         "create_agent": "made an agent",
+        "create_team": "made a team",
         "code_fetch": "fetched a code",
         "browser_snapshot": "looked at a page",
     },
@@ -477,6 +479,7 @@ TURKISH: Words = Words(
         "consult": "bir yardımcıya danıştım",
         "message_agent": "bir ajana yazdım",
         "create_agent": "bir ajan oluşturdum",
+        "create_team": "bir takım oluşturdum",
         "code_fetch": "bir kod aldım",
         "browser_snapshot": "bir sayfaya baktım",
     },

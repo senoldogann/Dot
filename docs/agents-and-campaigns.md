@@ -182,8 +182,13 @@ tells a run with no team that when the work splits into roles (finding sources, 
 that recur, it makes the teammates it needs, each with only the tools its role needs, and sends them the parts with
 `message_agent` (several at once work in parallel); with a team, it reuses a member before it makes one, never for a
 single step. An agent a run makes can do no more than the run (item 307): only tools the run has (with none named, an
-agent's run gives its own bound and Dot's run every tool), a helper model or the run's own, at most three a run, and a
-research run makes none; its runs open with "an agent Dot made" and "Dot's instructions to you", not yours.
+agent's run gives its own bound and Dot's run every tool), a helper model or the run's own, at most six a run (three
+before item 864), and a research run makes none; its runs open with "an agent Dot made" and "Dot's instructions to
+you", not yours. Asked for a team, a run makes its agents, then the team of them with `create_team` (item 864: a name,
+what it is for, two to twelve agents by name, yours or ones it made). The team is yours, as one you put together on the
+Agents page is: it lists under Teams and in the sidebar, where you start a chat with it. A run makes at most two
+teams; a team of an agent nobody made, of one agent, or under a name a team has already is refused, and nothing is
+made.
 `message_agent` is offered whenever `create_agent` is, so a teammate made mid-run can be messaged at once. Every step, a run that may message the team learns of the agents that joined since it started
 (made by it, by you or by another run) through a note with their names and roles. Delegated runs and the runs that
 answer a message make no agents.

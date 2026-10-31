@@ -300,7 +300,7 @@ from dotagent.tools.meta import (
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import skill_instructions
-from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
+from dotagent.tools.team import CREATE_AGENT_TOOL, CREATE_TEAM_TOOL, MESSAGE_AGENT_TOOL
 from dotagent.vault.onepassword import kept_token
 
 log = get_logger(__name__)
@@ -312,7 +312,15 @@ EMBEDDING_FAILED: str = "embedding_failed"
 AGENT_CORE_TOOLS: tuple[str, ...] = (FINISH_TOOL, ASK_USER_TOOL, ASK_SECRET_TOOL, USE_TOOLS_TOOL, REACT_TOOL)
 # A delegated run asks the owner nothing, a secret neither (item 857): its parent asks, in its own chat.
 _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
-    {DELEGATE_TOOL, ASK_USER_TOOL, ASK_SECRET_TOOL, CONSULT_TOOL, MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL}
+    {
+        DELEGATE_TOOL,
+        ASK_USER_TOOL,
+        ASK_SECRET_TOOL,
+        CONSULT_TOOL,
+        MESSAGE_AGENT_TOOL,
+        CREATE_AGENT_TOOL,
+        CREATE_TEAM_TOOL,
+    }
 )
 # The sources of runs no message of the owner's started (item 664). "background" is agent/manager.py's
 # BACKGROUND_SOURCE, which imports this module.

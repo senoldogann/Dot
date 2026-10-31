@@ -237,6 +237,7 @@ const TOOL_WORDS = {
   delegate: "Delegate",
   message_agent: "Message agent",
   create_agent: "Make agent",
+  create_team: "Make team",
   consult: "Ask a helper",
   notify: "Notify",
   show_page: "Show page",
