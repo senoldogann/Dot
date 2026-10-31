@@ -415,3 +415,47 @@ def test_a_skills_kind_past_its_bound_is_not_cut_and_the_skill_is_asked_again() 
             "m",
         )
     assert "kind: String should have at most 60 characters" in raised.value.message
+
+
+def test_the_fields_a_proposer_left_out_are_read_as_what_leaving_them_out_says() -> None:
+    """Item 886: the night's step of 2026-10-31 failed on two answers of GLM 5.3 Flash: the first left out keep and
+    tool_guidance (and wrote its summary past 120), the second left out habits, tool_guidance and moments. Left out, a
+    text is no new text, the moments are none, and keep is whether any text was given. A change that says keep false
+    and gives no text is still asked again, by the proposal's check. The schema still asks for every field."""
+    from dotagent.agent.review import PROPOSE_TOOL, HarnessProposal
+
+    first: HarnessProposal = _verdict_from(
+        _called(PROPOSE_TOOL, {"habits": "Plan the shelves first.", "moments": ["step 3 read the wrong shelf"],
+                               "summary": "Plan the shelves first, then " + "read each shelf with its tool " * 6}),
+        PROPOSE_TOOL,
+        HarnessProposal,
+        "ollama:glm",
+    )  # fmt: skip
+    assert (first.keep, first.habits, first.tool_guidance) == (False, "Plan the shelves first.", None)
+    assert len(first.summary) <= 120 and first.summary.endswith("…")
+    second: HarnessProposal = HarnessProposal.model_validate({"keep": False, "summary": "Read the log page by page"})
+    assert (second.keep, second.habits, second.tool_guidance, second.moments) == (False, None, None, [])
+    left: HarnessProposal = HarnessProposal.model_validate({"summary": "Read the log page by page"})
+    assert (left.keep, left.habits) == (True, None)
+    kept: HarnessProposal = HarnessProposal.model_validate({"keep": True})
+    assert (kept.keep, kept.summary) == (True, "keep")
+    # A change still names what it changes: no summary is asked again.
+    with pytest.raises(ValidationError):
+        HarnessProposal.model_validate({"habits": "Plan first."})
+    assert set(HarnessProposal.model_json_schema()["required"]) == {
+        "keep", "habits", "tool_guidance", "moments", "summary"
+    }  # fmt: skip
+
+
+def test_a_composition_or_an_experience_that_leaves_out_what_it_does_not_change_is_read() -> None:
+    """Item 886, the composer and the experience writer: keeping the base needs no texts of its own, and an experience
+    with no entry left out has none; a composition that changes something gives its texts whole."""
+    from dotagent.agent.review import ExperienceDraft, HarnessComposition
+
+    kept: HarnessComposition = HarnessComposition.model_validate({"keep_base": True})
+    assert (kept.keep_base, kept.decisions, kept.summary) == (True, [], "keep")
+    assert HarnessComposition.model_validate({"summary": "nothing earns a change"}).keep_base is True
+    with pytest.raises(ValidationError):
+        HarnessComposition.model_validate({"keep_base": False, "habits": "Plan first.", "summary": "plan first"})
+    effect = {"edit": 1, "effect": "no_effect", "why": "the same passes"}
+    assert ExperienceDraft.model_validate({"effects": [effect]}).entry is None
