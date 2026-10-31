@@ -202,8 +202,9 @@ of its approvals and the sender's, so an agent set to `yolo` asks when a run tha
 sender's conversation, and the reply comes back as the tool's result, the way a delegated run's report does. The prompt
 lists the team by name and role under "Team" whenever there is another agent to message; an agent does not message
 itself, and an answering run messages no one further. The sender's chat shows the exchange as a delegated row wearing
-the agent's face. While the message is on its way, until the agent's run starts and its row takes over, the conversation
-shows Dot's three dots and "Sending to Scout…" (item 668), gone once the agent's run starts (the one part on its way
+the agent's face: a line of the conversation, no card, its face in the column of the faces and its words where theirs
+start (item 884). While the message is on its way, until the agent's run starts and its row takes over, the
+conversation shows a quiet "Sending to Scout…" with Dot's three dots after it (items 668 and 884), gone once the agent's run starts (the one part on its way
 when the model wrote the agent's name otherwise than the agent has it), or at once if the call ends without a run (an
 agent not found, a refusal). The agent's answer then stands in the conversation as its message, with **Every step**
 folded under one line (item 733): "Message

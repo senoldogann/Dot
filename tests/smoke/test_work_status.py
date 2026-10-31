@@ -127,16 +127,18 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 words = line.locator(".work-status-words")
                 await expect(line).to_have_attribute("data-state", "working")
                 await expect(words).to_have_text(re.compile(_COMMAND_WORDS))
-                # The agent typing (item 843): its face first, in the answer's face's place, and the dots where the
-                # words of the messages start, 28 px of face and a gap of 8 on.
+                # The agent typing (item 843): its face first, in the answer's face's place, the words where the words
+                # of the messages start, 28 px of face and a gap of 8 on, and the dots after them (item 884).
                 await expect(line.locator(".turn-face .avatar")).to_have_count(1)
-                face_x, dots_x = await line.evaluate(
-                    "(line) => ['.turn-face', '.work-status-dots'].map((part) =>"
-                    " line.querySelector(part).getBoundingClientRect().x)"
+                face_x, words_x, words_end, dots_x = await line.evaluate(
+                    "(line) => { const box = (part) => line.querySelector(part).getBoundingClientRect();"
+                    " return [box('.turn-face').x, box('.work-status-words').x, box('.work-status-words').right,"
+                    " box('.work-status-dots').x]; }"
                 )
-                assert dots_x - face_x == 36, (face_x, dots_x)
-                # Under the pointer, the reaction of the message before the line stands beside its bubble, in the
-                # place of a face, and covers none of the line: a press on the line's face shows the steps (the
+                assert words_x - face_x == 36, (face_x, words_x)
+                assert dots_x > words_end, (words_end, dots_x)
+                # Under the pointer, the reaction of the message before the line stands under its words, where they
+                # start (item 863), and covers none of the line: a press on the line's face shows the steps (the
                 # pre-push review of item 843).
                 said: Locator = page.locator(".bubble.say").first
                 await said.hover()
@@ -144,7 +146,10 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 bubble = await said.locator(".prose").bounding_box()
                 face = await line.locator(".turn-face").bounding_box()
                 assert react is not None and bubble is not None and face is not None
-                assert react["x"] + react["width"] <= bubble["x"] + 1, (react, bubble)
+                assert react["y"] >= bubble["y"] + bubble["height"] - 1 and react["x"] >= bubble["x"] - 1, (
+                    react,
+                    bubble,
+                )
                 assert react["y"] + react["height"] <= face["y"] + 1, (react, face)
                 await page.mouse.click(face["x"] + face["width"] / 2, face["y"] + face["height"] / 2)
                 await expect(line).to_have_attribute("aria-pressed", "true")

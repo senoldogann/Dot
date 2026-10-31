@@ -783,20 +783,27 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
    * work, so it is put after it, not placed as a line of its own.
    */
   function sending(scope, callId, name) {
+    // A quiet line under the words, the dots after them (item 884, the owner's ask: the pill went); a name the model
+    // wrote as HTML ("Community &amp; Launch") is shown as the name.
     const node = el(
       "div",
       { class: "agent-handoff", role: "status" },
+      el("span", null, `Sending to ${plainName(name)}…`),
       el("span", { class: "agent-handoff-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span")),
-      el("span", null, `Sending to ${name}…`),
     );
     scope.container.append(node);
     scope.handoffs.set(callId, { node, name });
   }
 
+  /** `name` as it reads: the few entities a model writes for HTML (&amp;, &lt;, &gt;, &quot;, &#39;) as their letters. */
+  function plainName(name) {
+    return name.replace(/&(amp|lt|gt|quot|#39);/g, (_, entity) => ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" })[entity]);
+  }
+
   /** The agent `name`'s run started: the first part on its way to it in `scope` has arrived. A part sent under another
    * spelling of the name than the agent's own, when it is the one on its way, has arrived as well. */
   function arrived(scope, name) {
-    const named = [...scope.handoffs].find(([, handoff]) => handoff.name.toLowerCase() === name.toLowerCase());
+    const named = [...scope.handoffs].find(([, handoff]) => plainName(handoff.name).toLowerCase() === plainName(name).toLowerCase());
     const only = scope.handoffs.size === 1 ? [...scope.handoffs][0] : undefined;
     const [callId, handoff] = named ?? only ?? [null, null];
     if (handoff !== null) {
