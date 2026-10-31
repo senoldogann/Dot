@@ -4,6 +4,7 @@ window stays in front; an element that takes no press is clicked as before, any 
 skeleton lists its regions with what each holds. A failed call says whether the same call may be made again. The
 accessibility calls and the events are replaced: nothing reaches the screen."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -87,6 +88,31 @@ def test_a_click_on_the_ref_of_a_control_is_a_press_and_the_pointer_does_not_mov
     assert seen.pressed == ["element"]
     assert seen.posted == [] and seen.activated == []
     assert effect.pointer is None and "the pointer did not move" in effect.detail
+
+
+def test_a_press_through_accessibility_aims_dots_pointer_at_the_element_and_leaves_the_macs_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 869: the step says where Dot's own pointer is drawn, the element's press point, and still that the Mac's
+    pointer did not move; an element whose frame cannot be read is drawn nowhere and the step is done all the same."""
+    seen = _Screen(monkeypatch, "AXButton")
+    monkeypatch.setattr(actions, "_visible_frame", lambda env, element, state: Rect(100, 200, 80, 30))
+    clicked = actions._click(_env(tmp_path), Step(action="click", ref="a3"), _inspection(), 1)
+    pressed = actions._press(_env(tmp_path), Step(action="press", ref="a3"))
+    assert clicked.aim == Point(140.0, 215.0) == pressed.aim
+    assert clicked.pointer is None and pressed.pointer is None
+    assert seen.posted == [] and len(seen.pressed) == 2
+
+    def unreadable(env: object, element: object, state: object) -> Rect:
+        raise DesktopError("the element is gone", {})
+
+    monkeypatch.setattr(actions, "_visible_frame", unreadable)
+    assert actions._press(_env(tmp_path), Step(action="press", ref="a3")).aim is None
+    assert len(seen.pressed) == 3
+    # With the pointer off, nothing is read for it.
+    off: StepEnv = replace(_env(tmp_path), config=_env(tmp_path).config.model_copy(update={"show_pointer": False}))
+    monkeypatch.setattr(actions, "_visible_frame", lambda env, element, state: Rect(100, 200, 80, 30))
+    assert actions._press(off, Step(action="press", ref="a3")).aim is None
 
 
 def test_a_control_that_takes_no_press_is_clicked_with_its_window_in_front(

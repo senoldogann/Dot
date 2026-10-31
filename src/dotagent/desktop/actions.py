@@ -130,12 +130,16 @@ class Target:
 
 @dataclass(frozen=True, slots=True)
 class Effect:
-    """What a step did: the sentence for the report, where it left the pointer, whether the UI needs time to react."""
+    """What a step did: the sentence for the report, where it left the pointer, whether the UI needs time to react.
+    ``aim`` is where a step done through accessibility went, the pointer left where it was: Dot's own pointer is drawn
+    there (item 869); ``about`` what the step went to, as its review named it, which the pointer's label says."""
 
     detail: str
     pointer: Point | None
     opens_ui: bool
     switched_to: AppInfo | None
+    aim: Point | None = None
+    about: str = ""
 
 
 def _clip(text: str, limit: int) -> str:
@@ -606,8 +610,34 @@ def _focus(env: StepEnv, raw: str) -> None:
         )
 
 
-def _effect(detail: str, pointer: Point | None, opens_ui: bool) -> Effect:
-    return Effect(detail=detail, pointer=pointer, opens_ui=opens_ui, switched_to=None)
+def _effect(detail: str, pointer: Point | None, opens_ui: bool, aim: Point | None = None) -> Effect:
+    return Effect(detail=detail, pointer=pointer, opens_ui=opens_ui, switched_to=None, aim=aim)
+
+
+def _aim_at(env: StepEnv, number: int, element: AXElement, state: ElementState | None = None) -> Point | None:
+    """Where Dot's own pointer is drawn for a step done through accessibility (item 869, after vercel-labs/
+    agent-desktop's cursor): the element's press point while it shows on a display, read before the step, from
+    ``state`` when the step read it already. It only shows, so it never fails the step: an element it cannot read is
+    drawn nowhere; with the pointer off (``show_pointer``) nothing is read."""
+    if not env.config.show_pointer:
+        return None
+    try:
+        known: ElementState = state if state is not None else _state_of(env, number, element)
+        frame: Rect | None = _visible_frame(env, element, known)
+    except DesktopError:
+        return None
+    return None if frame is None else _press_point(frame, known)
+
+
+def _aim_at_ref(env: StepEnv, ref: str | None) -> Point | None:
+    """:func:`_aim_at` for the step's ``ref``, if it names one."""
+    if ref is None:
+        return None
+    try:
+        number, element = _element_for(env, ref)
+    except DesktopError:
+        return None
+    return _aim_at(env, number, element)
 
 
 # The roles a click on whose ref is a press through accessibility (item 862, after vercel-labs/agent-desktop): the
@@ -645,6 +675,7 @@ def _click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effe
         number, element = _element_for(env, step.ref)
         state: ElementState = _state_of(env, number, element)
         if pressed_on_click(step, state.role, state.enabled):
+            aim: Point | None = _aim_at(env, number, element, state)
             try:
                 ax.press(element, env.app.pid)
             except DesktopError as error:
@@ -655,7 +686,7 @@ def _click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effe
                 apps.activate(env.app, env.config.activate_timeout_s)
             else:
                 return _effect(
-                    f"clicked {inspection.target} (through accessibility: the pointer did not move)", None, True
+                    f"clicked {inspection.target} (through accessibility: the pointer did not move)", None, True, aim
                 )
         elif apps.frontmost_pid() != env.app.pid:
             # The last view showed a control the batch would press, so its window was left behind; it is no longer
@@ -687,6 +718,7 @@ def _hover(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
 def _press(env: StepEnv, step: Step) -> Effect:
     number, element = _element_for(env, _required(step.ref, "ref"))
     state: ElementState = _state_of(env, number, element)
+    aim: Point | None = _aim_at(env, number, element, state)
     try:
         ax.press(element, env.app.pid)
     except DesktopError as error:
@@ -697,12 +729,13 @@ def _press(env: StepEnv, step: Step) -> Effect:
                 {**error.context, "ref": f"a{number}"},
             ) from error
         raise
-    return _effect(f"pressed {_named(state)} a{number}", None, True)
+    return _effect(f"pressed {_named(state)} a{number}", None, True, aim)
 
 
 def _focus_step(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    aim: Point | None = _aim_at_ref(env, step.ref)
     _focus(env, _required(step.ref, "ref"))
-    return _effect(f"focused {inspection.target}", None, False)
+    return _effect(f"focused {inspection.target}", None, False, aim)
 
 
 def _normalised(text: str) -> str:
@@ -713,10 +746,11 @@ def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     _check_secure(env, inspection, "setting a value")
     number, element = _element_for(env, _required(step.ref, "ref"))
     wanted: str = _required(step.text, "text")
+    aim: Point | None = _aim_at(env, number, element)
     ax.set_attribute(element, "AXValue", wanted, env.app.pid)
     if inspection.context.secure:
         # A secure field is never read, so what it kept cannot be checked.
-        return _effect(f"set the value of {inspection.target} ({len(wanted)} chars, not read back)", None, False)
+        return _effect(f"set the value of {inspection.target} ({len(wanted)} chars, not read back)", None, False, aim)
     _, actual, _ = ax.read_text(element, env.app.pid)
     if _normalised(actual) != _normalised(wanted):
         raise DesktopError(
@@ -724,7 +758,7 @@ def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
             "Click the field and use type or paste instead",
             {"ref": f"a{number}", "wanted_chars": len(wanted), "actual_chars": len(actual)},
         )
-    return _effect(f"set the value of {inspection.target} ({len(wanted)} chars)", None, False)
+    return _effect(f"set the value of {inspection.target} ({len(wanted)} chars)", None, False, aim)
 
 
 def _pastes(text: str, context: StepContext, threshold: int) -> bool:
@@ -745,22 +779,24 @@ def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     if _pastes(text, inspection.context, env.config.paste_threshold_chars):
         return _paste(env, step, inspection)
     _check_secure(env, inspection, "typing")
+    aim: Point | None = _aim_at_ref(env, step.ref)
     if step.ref is not None:
         _focus(env, step.ref)
         _require_keyboard(env)
     # A long text is typed key by key over seconds: the emergency stop ends it between keys (item 683).
     hid.post(hid.text_events(env.source, text), partial(check_failsafe, env))
-    return _effect(f"typed {len(text)} chars into {inspection.target}", None, False)
+    return _effect(f"typed {len(text)} chars into {inspection.target}", None, False, aim)
 
 
 def _paste(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     _check_secure(env, inspection, "pasting")
+    aim: Point | None = _aim_at_ref(env, step.ref)
     if step.ref is not None:
         _focus(env, step.ref)
         _require_keyboard(env)
     text: str = _required(step.text, "text")
     hid.paste_text(env.source, text, env.config.paste_settle_ms / 1000)
-    return _effect(f"pasted {len(text)} chars into {inspection.target}", None, False)
+    return _effect(f"pasted {len(text)} chars into {inspection.target}", None, False, aim)
 
 
 def _key(env: StepEnv, step: Step, inspection: Inspection) -> Effect:

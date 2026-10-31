@@ -589,7 +589,14 @@ every mode but `yolo` (item 433).
   model never sees the arrow over what it reads; it comes back once the last of two captures at the same time has
   ended. A helper that does not answer within two seconds is ended and no pointer is drawn until the daemon starts
   again; one that died is logged (`pointer_helper_ended`) and started again with the next step. It
-  fades two and a half seconds after its last step, and when the run ends. Dot's browser does not move it: its steps
+  fades two and a half seconds after its last step, and when the run ends. A step done through accessibility (a
+  press, a click done as one, focus, set_value, and type or paste into a ref) leaves the Mac's pointer where you have
+  it, and Dot's own arrow goes to the element all the same, rippling for a press (item 869, after
+  vercel-labs/agent-desktop's cursor); an element whose frame cannot be read is drawn nowhere, and the step is done
+  as before. Beside the arrow a label says who does what, on one line of at most 56 characters: the owner's agent
+  the run runs as, or Dot, and the step, as "Trader clicks button 'Send'". Near the right edge of a screen it stands
+  on the arrow's left. The label is never shown to the model: it is drawn in the same window, which every capture of
+  Dot's leaves out. Dot's browser does not move it: its steps
   go to Chrome directly and move no pointer at all.
 - When a run that acted on the desktop ends, the application that was in front before its first act comes forward
   again, if the one the run left in front still is (item 702, `give_front_back`): not when you went to another
