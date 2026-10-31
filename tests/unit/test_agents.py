@@ -8,7 +8,9 @@ from pydantic import ValidationError
 
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs
+from dotagent.agent.templates import TEMPLATES
 from dotagent.core.errors import InvalidValueError
+from dotagent.core.paths import agent_folder
 from dotagent.harness.components import NO_HARNESS
 from dotagent.server.routes_agents import changed_agent_tools, new_agent_tools
 from dotagent.server.views import AgentRequest
@@ -80,6 +82,23 @@ def test_the_prompt_says_what_the_agent_never_does_after_its_instructions() -> N
     assert prompt.index("Ten a day.") < never
     assert "\n- Work inbound leads\n- Send a message itself" in prompt
     assert "What you never do" not in _prompt(agent.model_copy(update={"refuses": "  \n"}))
+
+
+def test_the_prompt_names_the_agents_own_folder_and_a_teammate_has_none(tmp_path: Path) -> None:
+    """Item 877: an agent's runs keep their state in its own folder, by its id, not beside every other agent's."""
+    folder: Path = agent_folder(tmp_path / "workspace", "agt_abc")
+    assert folder == tmp_path / "workspace" / "agents" / "agt_abc"
+    agent: AgentBrief = AgentBrief(
+        name="Prospector", role="Finds prospects", instructions="", made_by_dot=False, team="", folder=str(folder)
+    )
+    assert f"Your own folder is {folder}: your runs alone use it." in _prompt(agent)
+    assert "Your own folder" not in _prompt(agent.model_copy(update={"folder": ""}))
+
+
+def test_the_templates_keep_their_files_in_the_agents_folder() -> None:
+    kept: list[str] = [template.id for template in TEMPLATES if "in your folder" in template.instructions]
+    assert {"sales-outbound", "talent-scout", "research-desk", "release-qa"} <= set(kept)
+    assert not any(".csv in the workspace" in template.instructions for template in TEMPLATES)
 
 
 def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_react_and_turn_groups_on() -> None:
