@@ -47,6 +47,7 @@ RESERVED_THEME_IDS: frozenset[str] = frozenset(
         "solarized",
         "sepia",
         "forest",
+        "graphite",
         "contrast",
         "system",
         "light",
