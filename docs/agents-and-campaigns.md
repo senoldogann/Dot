@@ -115,7 +115,10 @@ now and `added` for the agents it put back; 404 for a team that is not there, 42
 **Your teams** (item 610) are the teams you have, each a record of a name, what it is for (500 characters at most) and
 agents of yours in an order, which holds nothing else: removing a team keeps its agents and its chats, and an agent that
 is deleted leaves the teams that had it. Use team makes one from a ready team, **New team** on the Agents page puts
-agents of yours together (at least one, each once; Dot is no agent to put in a team), and **Edit** in the bar of a
+agents of yours together (at least one, each once; Dot is no agent to put in a team), **Select** at the head of Your
+agents turns their cards into boxes to tick (item 867), and the bar under them counts the picked ones and opens that
+form with them ticked, first, in the order picked (**Make a team**; Cancel leaves the cards as links), and **Edit** in
+the bar of a
 team's page changes its name, purpose and agents (the agents it has first, in its order, then the others; Save writes
 the ticked ones in that order); **Remove** takes the team away and nothing it names. A team is a card with its agents'
 faces over one another (four, the rest counted), its name and purpose, how many agents it has and its newest chat with
