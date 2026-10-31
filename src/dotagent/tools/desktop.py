@@ -16,7 +16,7 @@ from typing import Literal
 from pydantic import Field
 
 from dotagent.config import AppConfig
-from dotagent.core.errors import DesktopError, ToolInputError
+from dotagent.core.errors import DesktopError, NotFoundError, ToolInputError
 from dotagent.core.text import truncate_tail
 from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
 from dotagent.desktop.apps import bundle_path
@@ -31,7 +31,7 @@ from dotagent.desktop.render import (
     render_text_read,
 )
 from dotagent.desktop.safety import StepContext, assess_step, exceeds, is_secrets_app, reaches_a_shell, shell_input
-from dotagent.desktop.session import StepReview
+from dotagent.desktop.session import DOT_NAME, StepReview
 from dotagent.desktop.types import (
     ActOutcome,
     AppView,
@@ -398,6 +398,16 @@ def _described(summary: str, kind: ActionKind, assessment: StepAssessment) -> st
     return f"{_clip(summary, _SUMMARY_CHARS - _REASONS_CHARS - 3)} — {found}"
 
 
+async def _who(ctx: ToolContext) -> str:
+    """The name Dot's pointer says does a run's steps (item 869): the owner's agent it runs as, or Dot."""
+    if ctx.agent_id is None:
+        return DOT_NAME
+    try:
+        return (await ctx.runtime.store.get_agent(ctx.agent_id)).name
+    except NotFoundError:
+        return DOT_NAME
+
+
 def _act_tool() -> RegisteredTool:
     async def classify(args: ActArgs, ctx: ToolContext) -> ActionInfo:
         steps: list[Step] = first_steps(args.steps, ctx.runtime.config.desktop.max_batch_steps)
@@ -451,6 +461,7 @@ def _act_tool() -> RegisteredTool:
             review,
             secure_field,
             snapshot_budget(ctx.runtime.config, ctx.output_chars),
+            await _who(ctx),
         )
         source: str = outcome.view.app.name if outcome.view is not None else (args.app or "application")
         note: str = batch_cut_note(len(args.steps), limit)

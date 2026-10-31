@@ -16,7 +16,16 @@ from dotagent.config import DesktopConfig, load_default_config
 from dotagent.core.errors import DesktopError
 from dotagent.desktop import memory, pointer
 from dotagent.desktop.actions import Effect, StepEnv
-from dotagent.desktop.pointer import Fades, PointerCommand, PointerOverlay, glide_s, read_command, window_origin
+from dotagent.desktop.pointer import (
+    Fades,
+    PointerCommand,
+    PointerOverlay,
+    glide_s,
+    label_flips,
+    label_of,
+    read_command,
+    window_origin,
+)
 from dotagent.desktop.session import DesktopSession, no_browser_chrome
 from dotagent.desktop.types import AppInfo, Point, ScreenshotView, Step
 
@@ -27,12 +36,14 @@ class _Pointer(PointerOverlay):
     def __init__(self) -> None:
         super().__init__(enabled=False)
         self.told: list[tuple[str, ...]] = []
+        self.labels: list[str] = []
 
     async def warm(self) -> None:
         self.told.append(("warm",))
 
-    async def move(self, x: float, y: float, click: bool) -> None:
+    async def move(self, x: float, y: float, click: bool, label: str = "") -> None:
         self.told.append(("move", f"{x:g}", f"{y:g}", str(click)))
+        self.labels.append(label)
 
     @contextlib.asynccontextmanager
     async def hidden(self) -> AsyncIterator[None]:
@@ -76,9 +87,11 @@ def _session(tmp_path: Path, shown: bool = True) -> tuple[DesktopSession, _Point
     return DesktopSession(config, tmp_path / "stop", no_browser_chrome, told), told
 
 
-def _steps_go(session: DesktopSession, monkeypatch: pytest.MonkeyPatch, where: Point | None) -> None:
+def _steps_go(
+    session: DesktopSession, monkeypatch: pytest.MonkeyPatch, where: Point | None, aim: Point | None = None
+) -> None:
     async def done(env: StepEnv, step: Step, index: int, reviewer: object) -> Effect:
-        return Effect(detail="done", pointer=where, opens_ui=False, switched_to=None)
+        return Effect(detail="done", pointer=where, opens_ui=False, switched_to=None, aim=aim, about="button 'Archive'")
 
     monkeypatch.setattr(session, "_run_step", done)
 
@@ -103,6 +116,48 @@ async def test_a_click_moves_the_pointer_where_it_went_and_ripples_and_a_key_doe
         assert told.told[-1] == ("rest",) and told.told.count(("rest",)) == 1
     finally:
         await session.close()
+
+
+async def test_a_step_done_through_accessibility_shows_dots_pointer_where_it_went_with_who_did_what(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 869, after vercel-labs/agent-desktop's cursor: a press, or a click done as one, leaves the Mac's pointer
+    where the owner has it, and Dot's own glides to the element, ripples there and says who did what. A step that
+    went nowhere a pointer shows (a key) draws none."""
+    session, told = _session(tmp_path)
+    env: StepEnv = _env(session._config, tmp_path)
+    try:
+        _steps_go(session, monkeypatch, None, Point(300.0, 120.0))
+        batch = await session._run_steps(
+            "chat", memory.fresh_thread(), env, [Step(action="press", ref="a3")], None, "Trader"
+        )  # type: ignore[arg-type]
+        await session._run_steps("chat", memory.fresh_thread(), env, [Step(action="focus", ref="a4")], None, "Trader")  # type: ignore[arg-type]
+        assert told.told == [("move", "300", "120", "True"), ("move", "300", "120", "False")]
+        assert told.labels == ["Trader presses button 'Archive'", "Trader goes to button 'Archive'"]
+        # The Mac's pointer did not move: the batch still expects it where it was.
+        assert batch.env.expected_pointer is None
+        _steps_go(session, monkeypatch, None, None)
+        await session._run_steps("chat", memory.fresh_thread(), env, [Step(action="key", key="cmd+s")], None)  # type: ignore[arg-type]
+        assert len(told.told) == 2
+    finally:
+        await session.close()
+
+
+def test_the_label_says_who_does_what_on_one_short_line_on_the_side_the_screen_has_room_on() -> None:
+    assert label_of("Dot", "click", "button 'Send'") == "Dot clicks button 'Send'"
+    assert label_of("Dot", "type", "") == "Dot types into"
+    assert label_of("Dot", "menu", "File > Save") == "Dot"
+    long: str = label_of("Press Writer", "click", "link '" + "very long title " * 10 + "'")
+    assert len(long) == pointer.LABEL_CHARS and long.endswith("…")
+    assert PointerCommand(op="move", label=long).label == long
+    assert not label_flips(100.0, 200.0, 1440.0)
+    assert label_flips(1300.0, 200.0, 1440.0)
+    # On a screen to the right of the main one, its own edge counts.
+    assert not label_flips(1500.0, 200.0, 2880.0)
+    # Flipped, the window reaches left by the label's room and the tip stays on the point.
+    left, bottom = window_origin(1300.0, 50.0, 900.0, flipped=True)
+    assert left + pointer.LABEL_ROOM_PX + pointer.TIP_PX == 1300.0
+    assert (left + pointer.LABEL_ROOM_PX, bottom) == window_origin(1300.0, 50.0, 900.0)
 
 
 async def test_with_the_setting_off_no_pointer_is_moved(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

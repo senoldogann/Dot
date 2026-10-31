@@ -1,7 +1,9 @@
 """Dot's own pointer on the screen (item 706): a glowing arrow that glides to where a step of ``desktop_act`` went
 and ripples where it clicked, the way another coding agent shows its own, so that the owner sees what Dot does and
-where.
-It only shows: the step itself is done as before, through the HID event tap, which moves the Mac's own pointer.
+where. A step done through accessibility, which leaves the Mac's pointer where it was, is shown there too, and a label
+beside the arrow says who does what (item 869, after vercel-labs/agent-desktop's cursor: "Trader clicks button
+'Send'"), on the side of the arrow the screen has room on.
+It only shows: the step itself is done as before, through the HID event tap or accessibility.
 
 The daemon has no AppKit run loop for windows of its own, so a helper process draws it (``python -m
 dotagent.desktop.pointer``), as the flight of Snapshots is drawn (:mod:`dotagent.desktop.flight`), started at the first
@@ -20,7 +22,7 @@ import threading
 from collections.abc import AsyncIterator
 from typing import Literal
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
@@ -30,6 +32,30 @@ log = get_logger(__name__)
 # The window the pointer is drawn in, and where in it the tip is: room around the arrow for its glow and its ripple.
 SIZE_PX: float = 72.0
 TIP_PX: float = 20.0
+# Beside the arrow, the room of its label (item 869): the window is this much wider, on the right of the arrow, or on
+# its left near the right edge of a screen.
+LABEL_ROOM_PX: float = 280.0
+LABEL_CHARS: int = 56
+LABEL_HEIGHT_PX: float = 22.0
+LABEL_FONT_PX: float = 12.0
+LABEL_PAD_PX: float = 9.0
+# Where the label stands from the tip: beside the arrow's tail, clear of its glow.
+LABEL_GAP_X_PX: float = 18.0
+LABEL_GAP_Y_PX: float = 20.0
+# What a step is said to do on the label, by its action.
+_DOES: dict[str, str] = {
+    "click": "clicks",
+    "double_click": "double-clicks",
+    "right_click": "right-clicks",
+    "hover": "points at",
+    "press": "presses",
+    "focus": "goes to",
+    "set_value": "fills",
+    "type": "types into",
+    "paste": "pastes into",
+    "scroll": "scrolls",
+    "drag": "drags",
+}
 # A glide over a short way is quick, one across the screen still short enough to follow; a step does not wait for it.
 GLIDE_MIN_S: float = 0.16
 GLIDE_MAX_S: float = 0.45
@@ -55,6 +81,8 @@ class PointerCommand(FrozenModel):
     x: float = 0.0
     y: float = 0.0
     click: bool = False
+    # What the label beside the arrow says; none is drawn when it is empty.
+    label: str = Field(default="", max_length=LABEL_CHARS)
     # The number of a ``hide``, which the helper's answer repeats: an answer that came too late for an earlier one is
     # not taken for this one's.
     number: int = 0
@@ -66,10 +94,26 @@ def glide_s(distance: float) -> float:
     return max(GLIDE_MIN_S, min(GLIDE_MAX_S, GLIDE_MAX_S - 0.3 * math.exp(-max(0.0, distance) / _GLIDE_SCALE_PX)))
 
 
-def window_origin(x: float, y: float, primary_height: float) -> tuple[float, float]:
+def window_origin(x: float, y: float, primary_height: float, flipped: bool = False) -> tuple[float, float]:
     """Where AppKit puts the pointer's window (its bottom left, from the bottom left of the main screen) so that the
-    tip of the arrow is at (``x``, ``y``), a point from the top left of the main screen."""
-    return x - TIP_PX, primary_height - y - (SIZE_PX - TIP_PX)
+    tip of the arrow is at (``x``, ``y``), a point from the top left of the main screen; ``flipped``, the label's room
+    is on the left of the arrow (:func:`label_flips`)."""
+    return x - TIP_PX - (LABEL_ROOM_PX if flipped else 0.0), primary_height - y - (SIZE_PX - TIP_PX)
+
+
+def label_flips(x: float, width: float, screen_right: float) -> bool:
+    """Whether the label of ``width`` points stands on the left of a tip at ``x``: on its right it would pass the
+    right edge, at ``screen_right``, of the screen the tip is on."""
+    return x + LABEL_GAP_X_PX + width > screen_right
+
+
+def label_of(who: str, action: str, about: str) -> str:
+    """What the label beside the arrow says of a step (item 869): who does it, what, and to what, at most
+    :data:`LABEL_CHARS` characters on one line: "Trader clicks button 'Send'". An action it has no word for says
+    who alone."""
+    does: str | None = _DOES.get(action)
+    line: str = " ".join(" ".join(part for part in (who, does, about if does else "") if part).split())
+    return line if len(line) <= LABEL_CHARS else f"{line[: LABEL_CHARS - 1]}…"
 
 
 def arrow(scale: float) -> tuple[tuple[float, float], ...]:
@@ -179,10 +223,11 @@ class PointerOverlay:
             return None
         return process
 
-    async def move(self, x: float, y: float, click: bool) -> None:
-        """Glide the pointer to (``x``, ``y``), from the top left of the main screen, rippling there when ``click``."""
+    async def move(self, x: float, y: float, click: bool, label: str = "") -> None:
+        """Glide the pointer to (``x``, ``y``), from the top left of the main screen, rippling there when ``click``,
+        with ``label`` beside it (:func:`label_of`)."""
         async with self._sending:
-            await self._send(PointerCommand(op="move", x=x, y=y, click=click), start=True)
+            await self._send(PointerCommand(op="move", x=x, y=y, click=click, label=label), start=True)
 
     async def warm(self) -> None:
         """Start the helper now, if it is to draw, so that it is ready by the time a step has gone somewhere."""
@@ -267,8 +312,9 @@ class _Stage:  # pragma: no cover - draws on the screen; the helper's commands a
         import AppKit
         import Quartz
 
+        width: float = SIZE_PX + LABEL_ROOM_PX
         self._window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-            AppKit.NSMakeRect(0, 0, SIZE_PX, SIZE_PX),
+            AppKit.NSMakeRect(0, 0, width, SIZE_PX),
             AppKit.NSWindowStyleMaskBorderless,
             AppKit.NSBackingStoreBuffered,
             False,
@@ -288,12 +334,39 @@ class _Stage:  # pragma: no cover - draws on the screen; the helper's commands a
             | AppKit.NSWindowCollectionBehaviorFullScreenAuxiliary
             | AppKit.NSWindowCollectionBehaviorIgnoresCycle
         )
-        view = AppKit.NSView.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, SIZE_PX, SIZE_PX))
+        view = AppKit.NSView.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, width, SIZE_PX))
         view.setWantsLayer_(True)
         window.setContentView_(view)
         root = view.layer()
         colour = Quartz.CGColorCreateGenericRGB(COLOUR[0], COLOUR[1], COLOUR[2], 1.0)
         white = Quartz.CGColorCreateGenericRGB(1.0, 1.0, 1.0, 1.0)
+        # The arrow and its ripple, in a layer of their own that stands on the left of the window, or on its right when
+        # the label is on the left (item 869).
+        body = Quartz.CALayer.layer()
+        body.setFrame_(Quartz.CGRectMake(0, 0, SIZE_PX, SIZE_PX))
+        root.addSublayer_(body)
+        self._body = body
+        # The label: who does what, white on Dot's violet, a pill beside the arrow's tail.
+        pill = Quartz.CALayer.layer()
+        pill.setBackgroundColor_(Quartz.CGColorCreateGenericRGB(COLOUR[0], COLOUR[1], COLOUR[2], 0.94))
+        pill.setCornerRadius_(LABEL_HEIGHT_PX / 2)
+        pill.setBorderColor_(Quartz.CGColorCreateGenericRGB(1.0, 1.0, 1.0, 0.55))
+        pill.setBorderWidth_(1.0)
+        pill.setHidden_(True)
+        self._font = AppKit.NSFont.systemFontOfSize_weight_(LABEL_FONT_PX, AppKit.NSFontWeightMedium)
+        text = Quartz.CATextLayer.layer()
+        text.setFont_(self._font)
+        text.setFontSize_(LABEL_FONT_PX)
+        text.setForegroundColor_(white)
+        text.setAlignmentMode_(Quartz.kCAAlignmentCenter)
+        text.setTruncationMode_(Quartz.kCATruncationEnd)
+        text.setContentsScale_(float(AppKit.NSScreen.mainScreen().backingScaleFactor()))
+        pill.addSublayer_(text)
+        root.addSublayer_(pill)
+        self._pill = pill
+        self._text = text
+        self._flipped: bool = False
+        self._label_width: float = 0.0
         # The ripple, under the arrow, centred on the tip.
         ripple = Quartz.CAShapeLayer.layer()
         ripple.setFrame_(Quartz.CGRectMake(TIP_PX - 18, SIZE_PX - TIP_PX - 18, 36, 36))
@@ -302,7 +375,7 @@ class _Stage:  # pragma: no cover - draws on the screen; the helper's commands a
         ripple.setStrokeColor_(colour)
         ripple.setLineWidth_(2.0)
         ripple.setOpacity_(0.0)
-        root.addSublayer_(ripple)
+        body.addSublayer_(ripple)
         self._ripple = ripple
         # The arrow: its tip at (TIP_PX, TIP_PX) from the top left, drawn in the layer's own space (y up).
         path = Quartz.CGPathCreateMutable()
@@ -324,7 +397,7 @@ class _Stage:  # pragma: no cover - draws on the screen; the helper's commands a
         shape.setShadowOpacity_(0.9)
         shape.setShadowRadius_(9.0)
         shape.setShadowOffset_(Quartz.CGSizeMake(0, 0))
-        root.addSublayer_(shape)
+        body.addSublayer_(shape)
         window.setAlphaValue_(0.0)
         self._at: tuple[float, float] | None = None
         self._hidden: bool = False
@@ -335,7 +408,7 @@ class _Stage:  # pragma: no cover - draws on the screen; the helper's commands a
 
         match command.op:
             case "move":
-                self._move(command.x, command.y, command.click)
+                self._move(command.x, command.y, command.click, command.label)
             case "hide":
                 self._window.orderOut_(None)
                 self._hidden = True
@@ -355,14 +428,70 @@ class _Stage:  # pragma: no cover - draws on the screen; the helper's commands a
 
         return float(AppKit.NSScreen.screens()[0].frame().size.height)
 
-    def _move(self, x: float, y: float, click: bool) -> None:
+    def _screen_right(self, x: float, y: float) -> float:
+        """The right edge of the screen the point (from the top left of the main screen) is on."""
+        import AppKit
+
+        screens = AppKit.NSScreen.screens()
+        up: float = self._primary_height() - y
+        for screen in screens:
+            frame = screen.frame()
+            if frame.origin.x <= x < frame.origin.x + frame.size.width and frame.origin.y <= up < (
+                frame.origin.y + frame.size.height
+            ):
+                return float(frame.origin.x + frame.size.width)
+        main = screens[0].frame()
+        return float(main.origin.x + main.size.width)
+
+    def _label(self, label: str) -> float:
+        """Set the label's words; its width, 0 for none."""
+        import AppKit
+
+        if not label:
+            return 0.0
+        attributes = {AppKit.NSFontAttributeName: self._font}
+        measured: float = float(
+            AppKit.NSAttributedString.alloc().initWithString_attributes_(label, attributes).size().width
+        )
+        return min(math.ceil(measured) + 2 * LABEL_PAD_PX, LABEL_ROOM_PX - LABEL_GAP_X_PX - TIP_PX)
+
+    def _lay_out(self, label: str, width: float, flipped: bool) -> None:
+        """Put the arrow and the label where ``flipped`` has them, at once (no layer animates)."""
+        import Quartz
+
+        Quartz.CATransaction.begin()
+        Quartz.CATransaction.setDisableActions_(True)
+        offset: float = LABEL_ROOM_PX if flipped else 0.0
+        self._body.setFrame_(Quartz.CGRectMake(offset, 0, SIZE_PX, SIZE_PX))
+        tip_x: float = offset + TIP_PX
+        left: float = tip_x - LABEL_GAP_X_PX - width if flipped else tip_x + LABEL_GAP_X_PX
+        # The layer's y is from the bottom: the label's top stands LABEL_GAP_Y_PX below the tip.
+        bottom: float = SIZE_PX - TIP_PX - LABEL_GAP_Y_PX - LABEL_HEIGHT_PX
+        self._pill.setFrame_(Quartz.CGRectMake(left, bottom, width, LABEL_HEIGHT_PX))
+        rise: float = (LABEL_HEIGHT_PX - LABEL_FONT_PX * 1.25) / 2
+        self._text.setFrame_(Quartz.CGRectMake(LABEL_PAD_PX / 2, rise, width - LABEL_PAD_PX, LABEL_FONT_PX * 1.3))
+        self._text.setString_(label)
+        self._pill.setHidden_(width == 0.0)
+        Quartz.CATransaction.commit()
+        self._flipped = flipped
+
+    def _move(self, x: float, y: float, click: bool, label: str) -> None:
         import AppKit
         import Quartz
         from PyObjCTools import AppHelper
 
-        left, bottom = window_origin(x, y, self._primary_height())
-        target = AppKit.NSMakeRect(left, bottom, SIZE_PX, SIZE_PX)
+        width: float = self._label(label)
+        flipped: bool = width > 0.0 and label_flips(x, width, self._screen_right(x, y))
+        height: float = self._primary_height()
         window = self._window
+        frame_width: float = SIZE_PX + LABEL_ROOM_PX
+        if flipped != self._flipped and self._at is not None and self._fades.shown:
+            # The label changes side mid-way: the window is put where the arrow stays where it is, then glides.
+            left_now, bottom_now = window_origin(self._at[0], self._at[1], height, flipped)
+            window.setFrame_display_(AppKit.NSMakeRect(left_now, bottom_now, frame_width, SIZE_PX), True)
+        self._lay_out(label, width, flipped)
+        left, bottom = window_origin(x, y, height, flipped)
+        target = AppKit.NSMakeRect(left, bottom, frame_width, SIZE_PX)
         if self._at is None or not self._fades.shown:
             window.setFrame_display_(target, True)
             seconds: float = 0.0

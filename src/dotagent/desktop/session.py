@@ -33,7 +33,7 @@ from dotagent.desktop import actions, apps, ax, memory, perms, safety, screen, s
 from dotagent.desktop import input as hid
 from dotagent.desktop.actions import Effect, Inspection, SecureFieldCheck, StepEnv
 from dotagent.desktop.memory import AppMemory, ThreadDesktop
-from dotagent.desktop.pointer import PointerOverlay
+from dotagent.desktop.pointer import PointerOverlay, label_of
 from dotagent.desktop.render import describe_step
 from dotagent.desktop.safety import StepContext
 from dotagent.desktop.types import (
@@ -43,6 +43,7 @@ from dotagent.desktop.types import (
     AXElement,
     Node,
     OpenedApp,
+    Point,
     Rect,
     ScreenshotView,
     Snapshot,
@@ -361,6 +362,10 @@ def _front_or_none() -> int | None:
 
 # The steps whose pointer ripples where it lands (item 706).
 _CLICKS: frozenset[str] = frozenset({"click", "double_click", "right_click"})
+# The steps Dot's pointer ripples for where it lands: a click, and a press through accessibility (item 869).
+_RIPPLES: frozenset[str] = _CLICKS | {"press"}
+# Who the pointer's label says does a step when no agent of the owner's does (item 869).
+DOT_NAME: str = "Dot"
 
 
 class DesktopSession:
@@ -821,10 +826,16 @@ class DesktopSession:
             env = replace(env, expected_pointer=None)
         effect: Effect = await self._call(partial(actions.execute_step, env, step, inspection))
         self._lines = safety.lines_after(typed, step, inspection.context)
-        return effect
+        return replace(effect, about=inspection.target)
 
     async def _run_steps(
-        self, thread_id: str, state: ThreadDesktop, env: StepEnv, steps: Sequence[Step], reviewer: StepReviewer
+        self,
+        thread_id: str,
+        state: ThreadDesktop,
+        env: StepEnv,
+        steps: Sequence[Step],
+        reviewer: StepReviewer,
+        who: str = DOT_NAME,
     ) -> _Batch:
         """Run the steps in order until one fails, is refused or is taken over by the user."""
         reports: list[StepReport] = []
@@ -859,10 +870,14 @@ class DesktopSession:
                 stopped = "a step failed"
                 continue
             reports.append(StepReport(index=index, description=description, outcome="done", detail=effect.detail))
-            if effect.pointer is not None and self._config.show_pointer:
-                # Dot's pointer glides to where the step went and ripples there for a click (item 706).
+            drawn: Point | None = effect.pointer if effect.pointer is not None else effect.aim
+            if drawn is not None and self._config.show_pointer:
+                # Dot's pointer glides to where the step went, the Mac's pointer moved or not (a press through
+                # accessibility, item 869), ripples there for a click or a press (item 706), and says who did what.
                 self._pointing.add(thread_id)
-                await self._pointer.move(effect.pointer.x, effect.pointer.y, step.action in _CLICKS)
+                await self._pointer.move(
+                    drawn.x, drawn.y, step.action in _RIPPLES, label_of(who, step.action, effect.about)
+                )
             side_effects = side_effects or step.has_side_effects()
             pointer = effect.pointer if effect.pointer is not None else env.expected_pointer
             env = replace(env, expected_pointer=pointer)
@@ -890,10 +905,11 @@ class DesktopSession:
         reviewer: StepReviewer,
         secure_field: SecureFieldCheck,
         max_chars: int,
+        who: str = DOT_NAME,
     ) -> ActOutcome:
         """Perform a batch of steps in one application, each reviewed first, and show the window afterwards, at most
         ``max_chars`` of its text. ``secure_field`` decides what a step does at a secure text field: a step it refuses
-        fails and stops the batch."""
+        fails and stops the batch. ``who`` is the name Dot's pointer says does the steps (item 869)."""
         async with self._turn():
             await self._prepare(self._prepare_acting)
             await self._note_front_before(thread_id)
@@ -903,7 +919,9 @@ class DesktopSession:
             state: ThreadDesktop = self._thread(thread_id)
             env: StepEnv = await self._call(partial(self._open_env, state, app, steps, secure_field))
             _log.info("desktop_act", thread=thread_id, app=env.app.name, steps=len(steps))
-            batch: _Batch = await self._run_steps(thread_id, memory.targeting(state, env.app.pid), env, steps, reviewer)
+            batch: _Batch = await self._run_steps(
+                thread_id, memory.targeting(state, env.app.pid), env, steps, reviewer, who
+            )
             if batch.side_effects:
                 quiet_s: float = self._config.settle_quiet_ms / 1000
                 await self._call(
