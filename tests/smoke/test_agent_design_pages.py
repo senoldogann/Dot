@@ -3,6 +3,7 @@ asks of an agent (items 874, 875 and 876): what its runs used and the actions no
 on the owner's yes."""
 
 import asyncio
+import re
 import secrets
 import time
 from collections.abc import AsyncIterator
@@ -275,3 +276,45 @@ async def test_the_editor_keeps_what_the_agent_never_does_and_the_page_saves_it(
     finally:
         await browser.close()
         await playwright.stop()
+
+
+async def test_a_template_asks_its_questions_at_use_and_its_agent_starts_with_the_answers(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 876: a template's first run asked what it needed; now Use asks, three questions at most."""
+    playwright, browser = await _launch(runtime)
+    try:
+        page: Page = await _open(browser, client, "/agents", 1280)
+        await page.get_by_role("group", name="Ready-made agents").get_by_role("button", name="Single agents").click()
+        await page.get_by_role("button", name="Use the template Sales Outbound").click()
+        dialog: Locator = page.get_by_role("dialog")
+        await expect(dialog).to_contain_text("Set up Sales Outbound")
+        await expect(dialog.locator("input")).to_have_count(3)
+        await dialog.get_by_label("Whom do you sell to (the kind of company, its size, the person)?").fill("Cafés")
+        await dialog.get_by_label("Where (countries or cities)?").fill("Oulu")
+        await dialog.get_by_role("button", name="Use template").click()
+        await expect(page).to_have_url(re_agent())
+        agent_id: str = page.url.rpartition("/")[2]
+        record = (await client.get(f"/api/agents/{agent_id}")).json()["record"]
+        assert record["instructions"].endswith(
+            "What the owner told you when making you:\n"
+            "- Whom do you sell to (the kind of company, its size, the person)? Cafés\n"
+            "- Where (countries or cities)? Oulu"
+        )
+        # Closing the dialog makes nothing; on a phone it fits the screen.
+        phone: Page = await _open(browser, client, "/agents", 390, phone=True)
+        await phone.get_by_role("group", name="Ready-made agents").get_by_role("button", name="Single agents").click()
+        await phone.get_by_role("button", name="Use the template Talent Scout").click()
+        await expect(phone.get_by_role("dialog")).to_contain_text("Set up Talent Scout")
+        assert await phone.evaluate(_SIDEWAYS) <= 0
+        await phone.get_by_role("dialog").get_by_role("button", name="Cancel").click()
+        await expect(phone.get_by_role("dialog")).to_have_count(0)
+        names: list[str] = [row["record"]["name"] for row in (await client.get("/api/agents")).json()]
+        assert "Talent Scout" not in names
+    finally:
+        await browser.close()
+        await playwright.stop()
+
+
+def re_agent() -> re.Pattern[str]:
+    return re.compile(r"#/agents/agt_[a-z0-9_]+$")

@@ -55,8 +55,14 @@ Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, C
 Competitor Watch, Release QA, Copy Editor, Design Critic and Trader (item 847: the trading desk's agent, whose card
 opens the desk and whose tools come with trading on; see [Settings › Trading](daemon.md#settings--trading)), each with
 its face, its role, what it needs of the Mac and
-the schedule it suggests. **Use template** makes the agent in one click and opens its page; it is then an agent like any
-other, to change in the editor. Every template names the tools its agent may use (item 425), and its card counts them
+the schedule it suggests. **Use template** makes the agent and opens its page; it is then an agent like any other, to
+change in the editor. Eleven templates first ask what their agent's first run would otherwise have to ask you (item
+876), three questions at most (Sales Outbound: whom you sell to, what you offer them, where; Release QA: which
+address, which test account by its name, which steps must always work): your answers go at the end of the agent's
+instructions, each after its question, under "What the owner told you when making you"; a blank one is left out, and
+**Skip** makes the agent as the template has it. An answer that holds a secret is refused, as in an agent's file (a
+password is asked for when it is needed). Paid Media, Expense Manager, Design Critic and Trader ask nothing and make
+the agent in one click. Every template names the tools its agent may use (item 425), and its card counts them
 under **Actions** (a 40 px row to tap on a phone) and lists the names a click below it: no template starts an agent with
 every tool, and a tool this home does not have (its group off in the configuration, or its app not here) is struck
 through with the reason, since such a template is refused on use. Every template's instructions also say that what
@@ -84,8 +90,8 @@ agent whose name, role or instructions hold a secret is not exported, and the pa
 Dot holds (any value of the home's `.env`, and a key the daemon has read from the Keychain), or a key, a token or a
 password by its form, as the masking of secrets finds them. **Import** on the Agents page makes the same agent from such
 a file, in this home or another, and opens it; a file that names a tool this home lacks is refused with the tool's name.
-The API: `GET /api/agent-templates` (each with `cron` and `task`, empty for one that suggests no schedule), `POST
-/api/agent-templates/{id}/use`, `GET /api/agents/{id}/export` and `POST /api/agents/import` (422 for Dot, for a secret,
+The API: `GET /api/agent-templates` (each with `cron` and `task`, empty for one that suggests no schedule, and its
+`questions`), `POST /api/agent-templates/{id}/use` (with `answers`, in the questions' order, 500 characters each), `GET /api/agents/{id}/export` and `POST /api/agents/import` (422 for Dot, for a secret,
 and for a file that is not an agent's or names tools not here); a template's schedule is `POST /api/schedules` with
 `"enabled": false`.
 

@@ -80,6 +80,7 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/reactions.py:_holds_a_secret": (False,),
     # An agent is exported only if its words hold none; the file has the values masked.
     "server/routes_agents.py:agents_router.export_agent": (False,),
+    "server/routes_agents.py:agents_router.use_template": (False,),
     # ----- Both: refuses by the first list, then masks by the second. -----
     # A step of a run that read outside content is refused for the secret it would send out of the Mac; its record
     # masks them all.

@@ -27,7 +27,7 @@ import { skillRow } from "./skills.js";
 import { messageRow } from "./team.js";
 import { getSnapshot, loadModels, onChange, onLifecycle, onStreamBack } from "../state.js";
 import { teamForm } from "../teamform.js";
-import { attempt, confirmDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 
 const DOT_ID = "dot";
 // The template of the trading desk's agent (item 847, agent/templates.py).
@@ -798,10 +798,42 @@ function mountList(root, ctx) {
     }
   }
 
+  /**
+   * What the owner answers a template's questions (item 876), three at most, before its agent is made: they go into
+   * its instructions, so that its first run gives a result instead of asking. Skip makes it with none; null when the
+   * dialog was closed, and nothing is made.
+   */
+  async function setupAnswers(template) {
+    const inputs = template.questions.map((question) => el("input", { class: "input", type: "text", maxlength: "500", autocomplete: "off", "aria-label": question }));
+    let answers = null;
+    const { closed } = formDialog({
+      title: `Set up ${template.name}`,
+      description: "What it needs to know to start. Leave any blank: it asks you once when it needs that.",
+      body: template.questions.map((question, index) => field(question, inputs[index], "")),
+      submitLabel: "Use template",
+      alternative: {
+        label: "Skip",
+        onSubmit: async () => {
+          answers = [];
+          return true;
+        },
+      },
+      onSubmit: async () => {
+        answers = inputs.map((input) => input.value.trim());
+        return true;
+      },
+    });
+    return (await closed) ? answers : null;
+  }
+
   // The agent, then its schedule switched off when it was asked for (item 464): the agent's page lists it with its goal
   // to read and its switch. A schedule that could not be added leaves the agent made, and the toast says why.
   async function useTemplate(template, alsoSchedule) {
-    const saved = await api.post(`/agent-templates/${template.id}/use`, null);
+    const answers = template.questions.length === 0 ? [] : await setupAnswers(template);
+    if (answers === null) {
+      return;
+    }
+    const saved = await api.post(`/agent-templates/${template.id}/use`, answers.some((answer) => answer !== "") ? { answers } : null);
     rememberLook(saved.id, saved.look);
     if (!alsoSchedule) {
       toast("ok", `${saved.name} is ready.`);
