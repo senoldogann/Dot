@@ -214,3 +214,98 @@ async def test_the_owners_questions_in_yolo_say_so_and_offer_no_rule(
             assert not initiative_rule and not owners_rule
         finally:
             await browser.close()
+
+
+# A step settled, drawn as the page draws one that a run's history holds (item 891): one line, the command on it once.
+_SETTLED: str = """async ([summary, target, question]) => {
+  const { approvalCard } = await import("/js/approvals.js");
+  const approval = {
+    id: "apr_s", runId: "run_x", tool: "shell", kind: "shell", severity: "medium", summary,
+    args: { target, command: target }, status: "expired", note: "no decision before the deadline", createdAt: 0,
+  };
+  if (question) {
+    Object.assign(approval, { tool: "ask_user", kind: "ask", severity: "question", args: { question } });
+    Object.assign(approval, { status: "approved", note: "the old one" });
+  }
+  const card = approvalCard({ approval, heading: null, onSettled: () => undefined, leftNote: "", onUseHere: null });
+  const node = card.node;
+  document.body.append(node);
+  return {
+    compact: node.classList.contains("compact"),
+    line: node.querySelector(".approval-line")?.textContent ?? "",
+    badge: node.querySelector(".badge")?.textContent ?? "",
+    times: node.textContent.split(target).length - 1,
+    lineTimes: (node.querySelector(".approval-line")?.textContent ?? "").split(target).length - 1,
+    commands: node.querySelectorAll(".approval-line .approval-command").length,
+    texts: node.querySelectorAll(".approval-text").length,
+    notes: node.querySelectorAll(".approval-note").length,
+    details: node.querySelector(".approval-more")?.textContent ?? "",
+    what: node.querySelector(".approval-what")?.textContent ?? "",
+    wraps: getComputedStyle(node.querySelector(".approval-what") ?? node).whiteSpace !== "nowrap",
+  };
+}"""
+
+
+async def test_a_settled_step_is_one_line_with_its_command_once_and_the_rest_under_details(
+    served: tuple[RunManager, httpx.AsyncClient],
+) -> None:
+    """The owner's word on an expired card (2026-10-31): the command twice, the reason twice, at the size of a card that
+    waits for an answer. Settled, a step is one line; the whole command and why Dot asked are under Details."""
+    _, client = served
+    port: int | None = client.base_url.port
+    assert port is not None
+    target: str = "cd ~/site && rm -rf .vercel/output && vercel build --prod --yes"
+    summary: str = f"Run: {target} (runs vercel; vercel puts a project's change live) — {_INITIATIVE_REASON}"
+    async with async_playwright() as playwright:
+        browser = await playwright.webkit.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            drawn = await page.evaluate(_SETTLED, [summary, target, ""])
+            assert drawn["compact"] and drawn["badge"] == "Expired"
+            assert drawn["line"].startswith("Run") and "vercel build" in drawn["line"]
+            assert drawn["texts"] == 0 and drawn["notes"] == 0, drawn
+            # The command on the line and once more whole under Details: never in a paragraph of its own.
+            assert drawn["times"] == 2, drawn
+            assert "Nobody answered in time, so the step did not run." in drawn["details"]
+            assert "Runs vercel; vercel puts a project's change live" in drawn["details"]
+            assert "On its own initiative" not in drawn["details"]
+            # A command the line cannot cut out of its summary (several lines, a folder): the summary is kept whole
+            # under Details, its folder and the review model's warning too, but for the fixed sentence (the pre-push
+            # review).
+            lines: str = "cd ~/site\nvercel build --prod"
+            where: str = (
+                "Run: cd ~/site vercel build --prod in /Users/o/site (runs vercel; vercel puts a project's change "
+                f"live) — {_INITIATIVE_REASON}. The review model warns: the page asked for this"
+            )
+            drawn = await page.evaluate(_SETTLED, [where, lines, ""])
+            assert drawn["line"].startswith("Run") and drawn["commands"] == 1, drawn
+            assert "in /Users/o/site" in drawn["details"] and "The review model warns" in drawn["details"], drawn
+            assert "On its own initiative" not in drawn["details"]
+            # A summary with no label says its target: the line says it once, with no box beside it.
+            url: str = "https://example.test/a"
+            drawn = await page.evaluate(_SETTLED, [f"Fetch {url}", url, ""])
+            assert drawn["lineTimes"] == 1 and drawn["commands"] == 0, drawn
+            assert drawn["details"].count(f"Fetch {url}") == 0, drawn
+            assert drawn["wraps"], drawn
+            # Nor when its reasons hold a ": " (the review model's words): that is no label.
+            path: str = "/Users/o/a.txt"
+            passed: str = f"Write {path} — outside the workspace. The review model passed this on to you: it may be"
+            drawn = await page.evaluate(_SETTLED, [passed, path, ""])
+            assert drawn["commands"] == 0 and drawn["wraps"] and drawn["what"] == passed, drawn
+            assert path not in drawn["details"], drawn
+            # Nor the fixed sentence of why Dot asks, nor the action again under Details (a live order in yolo).
+            buy: str = "Buy 10 USD of BTC-USD on your Coinbase account (real money)"
+            drawn = await page.evaluate(_SETTLED, [f"{buy} — {OWNERS_REASON}", "trading:live:BTC-USD", ""])
+            assert drawn["what"] == buy and "In yolo too" not in drawn["line"], drawn
+            assert buy not in drawn["details"] and "In yolo too" not in drawn["details"], drawn
+            # A step's label beside its command stays one short word on the line.
+            drawn = await page.evaluate(_SETTLED, [summary, target, ""])
+            assert drawn["what"] == "Run" and not drawn["wraps"], drawn
+            # A question answered is read whole, however long: nothing else says it.
+            asked: str = "Which Vercel project should the site go to, the old one or a new one? " * 3
+            drawn = await page.evaluate(_SETTLED, ["Ask: which project", "", asked.strip()])
+            assert drawn["what"] == asked.strip() and drawn["wraps"], drawn
+        finally:
+            await browser.close()

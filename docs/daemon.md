@@ -375,9 +375,15 @@ Customize tile and its chip too); and a skill wears the puzzle piece, here and a
 of an imported skill, the brain of a learned one; the daemon's palette says which server is of which service). An `@`
 inside a word, as in an address, opens nothing. On a phone either menu takes the room the keyboard leaves above the
 composer and scrolls inside it. A run that waits for your approval is listed under Waits for you, below the composer,
-and leads to its chat: the card stands there alone (item 434), with no line above it that says the same (item 871).
-Once you allow it, the card leaves the chat, as the page opens again too; refused, it stays and says so, and a question
-keeps its answer. A waiting card says each thing once (item 872, after OpenMausBot's quiet approvals): the command or
+and leads to its chat: the card stands there alone (item 434), with no line above it that says the same (item 871),
+wherever that line stood, a step's row between them too (item 891); a refusal, which comes with no card, keeps its
+line. Once you allow it, the card leaves the chat, as the
+page opens again too; refused, it stays and says so, and a question keeps its answer. A step settled (refused, or not
+answered in time; a question with its answer) is one quiet line, not a card (item 891, the owner's word on an expired card:
+"this looks very ugly"): what it was ("Run"), its command on one line, cut at the width, and how it ended ("Expired",
+"Denied"); its note under it; under **Details** the whole command, what the step does and a reason of its own,
+and for one nobody answered "Nobody answered in time, so the step did not run.", never the fixed sentences of why Dot
+asks again. A waiting card says each thing once (item 872, after OpenMausBot's quiet approvals): the command or
 what the step acts on in its box alone, not in the words above it again, which keep what the step does ("Runs vercel;
 vercel puts a project's change live"); why Dot asks once: the line under the box says it for a chat of Dot's own
 initiative and for what yolo asks you, and the words above leave out only that sentence; any other reason (a payment's

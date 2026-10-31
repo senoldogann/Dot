@@ -6173,6 +6173,68 @@ a.schedule-line:hover .schedule-made {
   border-color: var(--border);
 }
 
+/* A settled step is one quiet line (item 891): no card, what it was, its command on one line, how it ended; the rest
+   under Details. */
+.approval.decided.compact {
+  padding: var(--space-1) 0;
+  border-color: transparent;
+  background: transparent;
+  gap: var(--space-1);
+}
+.approval-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--text-2);
+}
+.approval-line .icon {
+  flex: none;
+  color: var(--muted);
+}
+.approval-what {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.approval-what.whole {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.approval-command {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.approval-line .badge {
+  flex: none;
+}
+.approval-more > summary {
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.approval-command-whole {
+  margin: var(--space-1) 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+
 .approval-head {
   display: flex;
   align-items: center;

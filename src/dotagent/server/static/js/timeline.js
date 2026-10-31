@@ -1330,15 +1330,21 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         `${verdict}: ${clip(data.summary, 200)} — ${clip(data.reason, 240)}`,
         data.verdict === "deny" ? "bad" : "warn",
       );
-      // A question or a hand-off: its card comes next (agent/gate.py).
+      // A question or a hand-off: its card comes next (agent/gate.py); a step refused again comes with none, and its
+      // line is its record. The line keeps the step's words, so that only its own card takes it away.
+      line.dataset.step = typeof data.summary === "string" ? data.summary : "";
       scope.policyLine = data.verdict === "deny" ? null : line;
     },
 
     approval_requested(scope, record) {
       const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined, leftNote: LEFT_IN_RUN, onUseHere });
       // The line that asked says what the card says, word for word: the card stands alone (item 871, after
-      // OpenMausBot's quiet approvals). A line no card follows (a refusal) stays.
-      if (scope.policyLine !== null && scope.container.lastElementChild === scope.policyLine) {
+      // OpenMausBot's quiet approvals). Wherever it stands, a step's row or a thought between them (item 891), but only
+      // its own step's: a refusal, with no card, keeps its line, the one record of it (the pre-push review). The card's
+      // summary is the line's step and then why Dot asks (`_ask_user` of agent/gate.py).
+      const step = scope.policyLine?.dataset.step ?? "";
+      const asked = typeof record.data.summary === "string" ? record.data.summary : "";
+      if (scope.policyLine?.isConnected && step !== "" && (asked === step || asked.startsWith(`${step} — `))) {
         scope.policyLine.remove();
       }
       scope.policyLine = null;
