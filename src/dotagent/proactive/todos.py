@@ -20,6 +20,9 @@ OWNER_SOURCE: str = "owner"
 INITIATIVE_KEY: str = "proactive.initiative"
 TITLE_CHARS: int = 200
 WHY_CHARS: int = 600
+# The note of a thing its own run let go (item 878): the owner said not to do it. The initiative reads it as the
+# end of the thing, tells the owner once and does not try it again.
+LET_GO_BY_ITS_RUN: str = "Let go by its run: "
 # A thing is not put on the list twice: not while it is to do or being done, nor for this long after it was done or let
 # go, which a run that looks for work again would otherwise find again.
 _REMEMBERED_S: float = 30 * 86_400.0

@@ -171,7 +171,7 @@ own** card under the watchers on Schedules has its switch (off until you switch 
 means to do for you, each with why it helps you, where it stands (to do, doing now, done, let go) and how many runs
 tried it; a row opens the chat of the run that did it. A run puts a thing on the list with the tool `todo_add` (a
 follow-up its work calls for, something you asked to be done later, a chore it noticed), and takes back with `todo_drop`
-one it put on it itself by mistake, with why (item 821: the look of 2026-10-29 listed an empty "placeholder" it could
+one it put on it itself by mistake, or lets go of the one it works on that you said not to do (item 878), with why (item 821: the look of 2026-10-29 listed an empty "placeholder" it could
 not take off, and the run that was then given it changed Dot's database to close it). A run's `todo_add` refuses a title
 of one word (words counted by their spaces, so a task in a script written without them is refused too), or the same as
 its reason: it says no work; your own box takes what you write. A run given a thing ends as it is done; Dot marks it
@@ -194,8 +194,8 @@ however it is marked. It does the oldest thing to do, in a chat of its own named
 the foot of the sidebar, folded, items 822 and 855); with nothing to do, it looks for work every `look_every_hours` (6)
 with a research run, which reads what it remembers of you, the record the morning brief reads (what waits for you, the
 runs
-that failed since the last look, the campaigns at work), the titles of your newest chats and the list, and puts at most
-three things on it. That run is a research run: it writes nothing but its list, its notes and Dot's memory, as any
+that failed since the last look, the campaigns at work), the titles of your newest chats and the list (a thing let go with why, so that it is not listed again in
+other words; why is quoted only when the run that wrote it read nothing third parties can author, else it says so), and puts at most three things on it: none you said not to do, which it searches its memory for first. That run is a research run: it writes nothing but its list, its notes and Dot's memory, as any
 research run may. Its record quotes no words a third party wrote unless it starts untrusted: the chats it names are the
 ones a person started (a watcher's, whose title carries a mail's subject, and Dot's own are left out), and a thing on
 the list that came from such content is counted, not quoted; the runs whose words the record does quote give it their
@@ -234,7 +234,11 @@ schedule's own chat asks nothing of the kind.
 A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or
 let go. Done, it is marked so with the first line of the run's answer and you are told ("Dot did on its own", the push,
 the desktop, iMessage when it is on). A run that failed leaves it to do, up to `attempts` (3) runs; then it is let go
-and you are told. A run you stopped lets it go at once; one the daemon's stop or the emergency stop ended (the stop of
+and you are told. A run that finds you said not to do the work (a rule of yours it remembers or read in a chat) does
+none of it and lets the thing go itself, with `todo_drop` and your words as the reason; it is not tried again, and you
+are told once ("Dot let go of a thing you said not to do", item 878: on 2026-10-31 a look listed a chapter of a
+thesis its owner had said never to touch, and three runs each refused it before it was let go). A thing let go while
+its run worked, by that run or by you, stays let go however the run ends. A run you stopped lets it go at once; one the daemon's stop or the emergency stop ended (the stop of
 every run, or the STOP file the run saw as it worked, item 790) leaves it to do; one the daemon was doing when it shut
 down is to do again when it starts, and one it was doing when it stopped
 without shutting down (a crash) counts that try, so a thing that brings Dot down is let go after `attempts` tries. A
