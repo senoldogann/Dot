@@ -235,6 +235,15 @@ def test_the_cards_words_of_the_owners_questions_are_the_policys() -> None:
     for key, reason in (("initiative", _INITIATIVE_REASON), ("owners", OWNERS_REASON)):
         sentence = re.search(rf'  {key}: "([^"]+)",', words)
         assert sentence is not None and sentence.group(1) == reason, key
+    # The daemon's notes on a step nobody answered, which a settled line reads as no answer (item 891).
+    broker: str = (STATIC_DIR.parents[1] / "agent" / "approvals.py").read_text(encoding="utf-8")
+    written: set[str] = {
+        *re.findall(r'note="([^"]+)"', broker),
+        *re.findall(r'"expired", TIMEOUT_DECIDER, "([^"]+)"', broker),
+    }
+    notes = re.search(r"const EXPIRED_NOTES = new Set\(\[([^\]]*)\]\);", card)
+    assert notes is not None and len(written) == 2, written
+    assert set(re.findall(r'"([^"]+)"', notes.group(1))) == written
 
 
 def test_the_card_offers_dont_ask_again_on_the_steps_the_policy_may_remember() -> None:

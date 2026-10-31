@@ -13,6 +13,8 @@ const STATUS_BADGE = { approved: "b-ok", denied: "b-bad", expired: "b-muted" };
 // The shortest secret a card takes: one shorter would stand bare where a command prints it (held_secrets.py, item 857).
 const SECRET_LEAST_CHARS = 8;
 const STATUS_LABEL = { approved: "Approved", denied: "Denied", expired: "Expired", pending: "Waiting for you" };
+// The note the daemon gives a step nobody answered in time (agent/approvals.py): the settled line says it in its words.
+const EXPIRED_NOTES = new Set(["no decision before the deadline", "kept past its time"]);
 // What becomes of the answer to a question a run left (`leftNote` of a card): it carries the work on in the run's
 // conversation, or, for a session of a campaign, reaches the session while it works and the next session after that.
 export const LEFT_IN_RUN = "The task went on without your answer. Your answer goes to this conversation and carries the work on.";
@@ -504,21 +506,63 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       );
       return;
     }
-    node.className = "approval decided";
-    const text = isQuestion && typeof approval.args.question === "string" ? approval.args.question : approval.summary;
+    // A step settled is one quiet line (item 891, the owner's word on a card that expired: "this looks very ugly"): what
+    // it was, its command on one line, and how it ended; the whole command and why Dot asked a click away. It said
+    // the command twice and the reason twice, at the size of a card that waits for an answer.
+    node.className = "approval decided compact";
+    const target = typeof approval.args.target === "string" ? approval.args.target : "";
+    // The action's label ("Run"): a ": " before why Dot asks, with the command right after it (its first word, as a
+    // summary folds a command's spaces). A ": " in the reasons is none (the pre-push review: "Write /a.txt — … The
+    // review model passed this on to you: …").
+    const colon = approval.summary.indexOf(": ");
+    const mark = approval.summary.indexOf(" — ");
+    const first = target.trim().split(/\s+/)[0] ?? "";
+    const labelled = colon > 0 && (mark === -1 || colon < mark) && first !== "" && approval.summary.startsWith(first, colon + 2);
+    const label = labelled ? approval.summary.slice(0, colon) : "";
+    const timedOut = status === "expired" && (note === "" || EXPIRED_NOTES.has(note));
+    const outcome = STATUS_LABEL[status] ?? status;
+    const why = timedOut ? "Nobody answered in time, so the step did not run." : "";
+    // What the step does (the policy's brackets), and a reason of its own; the fixed sentences of why Dot asks are no
+    // news once it is settled. A summary whose command could not be cut out of it (a folder, several lines, a long
+    // one) is kept whole but for that sentence: its folder and its reasons are in it (the pre-push review).
+    const fixed = Object.values(FIXED_REASONS).find((sentence) => approval.summary.includes(` — ${sentence}`)) ?? "";
+    const words = isQuestion ? null : cardWords(approval.summary, target, fixed);
+    const plain = isQuestion || words?.cut ? null : cardWords(approval.summary, "", fixed);
+    // The line: the question, the label beside its command, or the action of a summary with no label, without the
+    // fixed sentence (the pre-push review: "Buy … (real money) — In yolo too, Dot asks you …").
+    const what = isQuestion && typeof approval.args.question === "string" ? approval.args.question : label !== "" ? label : (plain?.text ?? approval.summary);
+    const parts = words === null ? [] : words.cut ? [words.text, words.reason] : [plain?.text ?? "", plain?.reason ?? ""];
+    // What the line says already is not said again under it (a summary with no label is the line itself).
+    const reason = parts.filter((part) => part !== "" && part !== what).join(". ");
+    const own = note !== "" && !timedOut;
+    const whole = isQuestion || target === "" || label === "";
+    // The whole command under Details, unless the line says it already, word for word.
+    const shown = target !== "" && !(whole && what.includes(target)) ? target : "";
     node.replaceChildren(
       ...present(
         el(
           "div",
-          { class: "approval-head" },
+          { class: "approval-line" },
           icon(iconOf(approval.severity)),
-          el("span", null, isQuestion ? "Question" : isHandoff ? "Hand-off" : "Approval"),
-          el("span", { class: `badge ${STATUS_BADGE[status] ?? "b-muted"}` }, STATUS_LABEL[status] ?? status),
-          el("span", { class: "spacer" }),
+          // A question, or a summary with no command beside it, is the line's one text: it wraps, whole, as nothing
+          // under Details says it (the pre-push review); a label beside its command stays one short word.
+          el("span", { class: whole ? "approval-what whole" : "approval-what" }, whole ? clip(what, 400) : clip(what, 160)),
+          // A summary with no label says its target already ("Fetch https://…"): it is not said again beside it.
+          target === "" || isQuestion || label === "" ? null : el("code", { class: "approval-command", title: target }, clip(target.replace(/\s+/g, " "), 160)),
+          el("span", { class: `badge ${STATUS_BADGE[status] ?? "b-muted"}`, title: why === "" ? outcome : why }, outcome),
           heading,
         ),
-        el("div", { class: "approval-text muted" }, clip(text, 400)),
-        note === "" ? null : el("div", { class: "small approval-note" }, el("span", { class: "muted" }, isQuestion ? "Answer: " : "Note: "), note),
+        own ? el("div", { class: "small approval-note" }, el("span", { class: "muted" }, isQuestion ? "Answer: " : "Note: "), note) : null,
+        shown === "" && reason === "" && why === ""
+          ? null
+          : el(
+              "details",
+              { class: "approval-more" },
+              el("summary", null, "Details"),
+              why === "" ? null : el("div", { class: "small muted" }, why),
+              shown === "" ? null : el("pre", { class: "approval-command-whole" }, shown),
+              reason === "" ? null : el("div", { class: "small muted" }, reason),
+            ),
       ),
     );
   }
