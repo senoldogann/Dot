@@ -12,6 +12,7 @@ from dotagent.agent.lessons import Disliked, RunLessons
 from dotagent.agent.resume import CutOff
 from dotagent.agent.skill_history import VersionDetail
 from dotagent.agent.skill_proposals import ProposalView
+from dotagent.agent.templates import MOST_TEMPLATE_QUESTIONS, TEMPLATE_ANSWER_CHARS
 from dotagent.browser.look import PageLook
 from dotagent.browser.profiles import ProfileView
 from dotagent.config import (
@@ -804,6 +805,14 @@ class AgentRequest(FrozenModel):
     look: AgentLook | None = None
     # What it never does, a line each (item 875); None keeps what a saved agent has, and a new one has none.
     refuses: str | None = Field(default=None, max_length=REFUSES_CHARS)
+
+
+class TemplateUse(FrozenModel):
+    """What the owner answered a template's questions at Use (item 876), in their order; an empty answer is none."""
+
+    answers: list[Annotated[str, StringConstraints(max_length=TEMPLATE_ANSWER_CHARS)]] = Field(
+        default_factory=list, max_length=MOST_TEMPLATE_QUESTIONS
+    )
 
 
 class AgentSummary(FrozenModel):

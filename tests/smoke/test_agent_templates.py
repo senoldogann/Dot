@@ -122,6 +122,12 @@ async def _open(browser: Browser, address: str, route: str, width: int, scheme: 
     return page
 
 
+async def _skip_setup(page: Page, template: AgentTemplate) -> None:
+    """Skip the questions a template asks at Use (item 876), so that its agent is made as the template has it."""
+    if template.questions:
+        await page.get_by_role("dialog").get_by_role("button", name="Skip").click()
+
+
 async def _singles(page: Page) -> None:
     """Show the single agents of the ready-made ones, which the page shows after its teams (item 509)."""
     await (
@@ -261,6 +267,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 for template in USABLE:
                     await page.goto(f"{address}/#/agents")
                     await page.get_by_role("button", name=f"Use the template {template.name}").click()
+                    await _skip_setup(page, template)
                     await expect(page).to_have_url(_AGENT_URL)
                     await expect(page.locator(".agent-who .home-name")).to_have_text(template.name)
                     made[template.id] = page.url.rpartition("/")[2]
@@ -441,6 +448,7 @@ async def test_a_template_schedule_is_added_switched_off_and_read_and_switched_o
                     await expect(also).to_have_attribute("aria-checked", "true")
                     await card.screenshot(path=tmp_path / f"template-card-{width}-{scheme}.png")
                     await card.get_by_role("button", name=f"Use the template {template.name}").click()
+                    await _skip_setup(page, template)
                     await expect(page).to_have_url(_AGENT_URL)
                     agent_id: str = page.url.rpartition("/")[2]
                     row: Locator = page.locator("[data-section='schedules'] .list-row")

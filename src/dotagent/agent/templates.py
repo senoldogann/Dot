@@ -20,6 +20,11 @@ from dotagent.store.models import REFUSES_CHARS, AgentLook, AgentRecord
 _INSTRUCTION_CHARS: int = 50_000
 
 
+# The most questions a template asks at Use (item 876), and the longest answer kept.
+MOST_TEMPLATE_QUESTIONS: int = 3
+TEMPLATE_ANSWER_CHARS: int = 500
+
+
 class AgentTemplate(FrozenModel):
     """An agent to start from. ``tools`` names the tools its agent may use, and every template names them, so that the
     card shows what a click gives and no agent starts with every tool: one that works on the web and in files names
@@ -43,6 +48,9 @@ class AgentTemplate(FrozenModel):
     task: str
     # What its agent never does, a line each (item 875): the edges of its job, which its card lists.
     refuses: tuple[str, ...] = ()
+    # What Use template asks the owner first, three at most (item 876): the answers go into the agent's instructions,
+    # so that its first run has a result to give instead of a question to ask.
+    questions: tuple[str, ...] = Field(default=(), max_length=MOST_TEMPLATE_QUESTIONS)
 
 
 class AgentFile(FrozenModel):
@@ -123,6 +131,11 @@ def _steps(*lines: str) -> str:
 TEMPLATES: tuple[AgentTemplate, ...] = (
     AgentTemplate(
         id="sales-outbound",
+        questions=(
+            "Whom do you sell to (the kind of company, its size, the person)?",
+            "What do you offer them, in a line?",
+            "Where (countries or cities)?",
+        ),
         refuses=(
             "Work inbound leads or the owner's existing deals",
             "Run or change the owner's CRM",
@@ -156,6 +169,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="talent-scout",
+        questions=(
+            "Which role (title, level)?",
+            "What must a candidate have?",
+            "Where, and remote or on site?",
+        ),
         refuses=(
             "Contact a candidate's current employer",
             "Weigh age, gender, origin or anything the role does not ask",
@@ -249,6 +267,10 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="product-performance",
+        questions=(
+            "Which product, and where are its numbers (an analytics site, a sheet)?",
+            "Which numbers matter most?",
+        ),
         refuses=(
             "Change the product, its prices or its tracking",
             "Report a figure without where and when it was read",
@@ -282,6 +304,10 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="bug-reproduction",
+        questions=(
+            "Which product or repository?",
+            "Where are the bug reports (a tracker, a mail folder)?",
+        ),
         refuses=(
             "Fix the bug, commit or push",
             "Run anything against production data",
@@ -309,6 +335,10 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="account-health",
+        questions=(
+            "Which accounts are key?",
+            "Where are their numbers (a CRM, a sheet)?",
+        ),
         refuses=(
             "Write to a customer itself",
             "Change a plan, a price or a refund",
@@ -341,6 +371,10 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="chief-of-staff",
+        questions=(
+            "Which mail accounts and calendars count?",
+            "Whose mails always matter?",
+        ),
         refuses=(
             "Accept, decline or move a meeting",
             "Send a mail or a message itself",
@@ -374,6 +408,10 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="reviewer",
+        questions=(
+            "Which repository (its folder on this Mac)?",
+            "What should a review look for most?",
+        ),
         refuses=(
             "Change, commit or push code",
             "Approve or merge a pull request",
@@ -420,6 +458,10 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="research-desk",
+        questions=(
+            "What are the answers for (a decision, a page, a talk, a chapter)?",
+            "Which topics come up most?",
+        ),
         refuses=(
             "State a claim or a figure without its link and date",
             "Answer from memory where the web can be read",
@@ -452,6 +494,10 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="competitor-watch",
+        questions=(
+            "Which competitors count (names or sites)?",
+            "What is your own product, in a line?",
+        ),
         refuses=(
             "Read a page behind a login",
             "Write to a competitor's people",
@@ -486,6 +532,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="release-qa",
+        questions=(
+            "Which address should it walk?",
+            "Which test account (its name only; it asks for a password when one is needed)?",
+            "Which steps must always work?",
+        ),
         refuses=(
             "Change the product",
             "Open a ticket before the owner names the tracker",
@@ -523,6 +574,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="copy-editor",
+        questions=("Whose voice is it (a link or a file of writing in it)?",),
         refuses=(
             "Change the meaning, a fact or a figure",
             "Overwrite the original",
@@ -696,6 +748,26 @@ def team_of(name: str) -> AgentTeam | None:
         (team for team in TEAMS if any(find_template(member).name.casefold() == wanted for member in team.members)),
         None,
     )
+
+
+def with_answers(template: AgentTemplate, answers: Sequence[str], known: Sequence[str]) -> str:
+    """The instructions of ``template``'s agent with what the owner answered its questions at Use (item 876), each
+    after its question; the instructions alone when nothing was answered. A secret is refused, as in a file: one of the
+    ``known`` ones Dot holds, or a key, a token or a password by its form."""
+    pairs: list[tuple[str, str]] = [
+        (question, answer.strip())
+        for question, answer in zip(template.questions, answers, strict=False)
+        if answer.strip()
+    ]
+    if any(redact_known(answer, known) != answer for _, answer in pairs):
+        raise InvalidValueError(
+            "an answer holds what looks like a password, a key or a token; the agent asks for one when it needs it",
+            {"template": template.id},
+        )
+    if not pairs:
+        return template.instructions
+    told: str = "\n".join(f"- {question} {answer}" for question, answer in pairs)
+    return f"{template.instructions}\n\nWhat the owner told you when making you:\n{told}"
 
 
 def agent_file(record: AgentRecord, known: Sequence[str]) -> AgentFile:

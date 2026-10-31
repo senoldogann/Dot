@@ -17,6 +17,7 @@ from dotagent.agent.templates import (
     agent_file,
     find_team,
     find_template,
+    with_answers,
 )
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import playbooks_dir
@@ -34,6 +35,7 @@ from dotagent.server.views import (
     TeamMessage,
     TeamUse,
     TeamView,
+    TemplateUse,
 )
 from dotagent.store.db import Store
 from dotagent.store.models import (
@@ -263,9 +265,15 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         return list(TEMPLATES)
 
     @router.post("/agent-templates/{template_id}/use", status_code=201)
-    async def use_template(template_id: str) -> AgentRecord:
-        """An agent made from a template: a copy, which the owner then changes as any agent."""
-        return await created(_template_request(find_template(template_id)))
+    async def use_template(template_id: str, use: TemplateUse | None = None) -> AgentRecord:
+        """An agent made from a template: a copy, which the owner then changes as any agent, with what the owner
+        answered its questions in its instructions (item 876)."""
+        chosen: AgentTemplate = find_template(template_id)
+        request: AgentRequest = _template_request(chosen)
+        if use is not None and any(answer.strip() for answer in use.answers):
+            known_now: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
+            request = request.model_copy(update={"instructions": with_answers(chosen, use.answers, known_now)})
+        return await created(request)
 
     @router.get("/agent-teams")
     async def agent_teams() -> list[AgentTeam]:
