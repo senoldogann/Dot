@@ -505,15 +505,23 @@ every mode but `yolo` (item 433).
   sent to Chrome with AppleScript reaches whichever Chrome window macOS picks; `browser_eval` runs in the run's tab.
 - `desktop_snapshot` lists an application's window as elements with a role, a name, a value, a state, a position and a
   ref (`a12`). A second view lists only what changed; `query` finds elements anywhere in the application and
-  `scope = menu_bar` lists the menu bar. `desktop_read` reads one element's full text. `desktop_clipboard_read` reads
-  the text on the clipboard, which can hold a password you just copied from your password manager, so it asks in every
+  `scope = menu_bar` lists the menu bar. `skeleton` is a dense window's map (item 862): its regions down to three
+  levels (a list, a table, a toolbar, a pane), each with how many elements it holds and how many can be acted on, and a
+  ref to read one of them with `ref` (Mail's window: 692 characters instead of 10,115). `desktop_read` reads one
+  element's full text. `desktop_clipboard_read` reads the text on the clipboard, which can hold a password you just copied from your password manager, so it asks in every
   preset, as `pbpaste` and an AppleScript that names the clipboard do (item 534); and outside a yolo run the sandbox, where
   it is on, closes the clipboard to a run's commands as well; a yolo run asks nothing (item 443).
 - `desktop_act` runs up to `max_batch_steps` steps in one call (25 by default; a longer batch is cut the same way):
   `click`, `double_click`, `right_click`, `hover`, `press`,
   `focus`, `set_value`, `type`, `paste`, `key`, `scroll`, `drag`, `menu`, `wait` and `activate`. A step names an element
   by its ref or a point by its coordinates. `press`, `focus` and `set_value` work through accessibility without moving
-  the pointer; `click`, `hover`, `scroll` and `drag` are real pointer events; `type`, `paste` and `key` are keyboard
+  the pointer, and so does a `click` on the ref of a button, a link, a menu item, a pop-up or a box to tick, with no key
+  held (item 862): it is a press, the pointer stays where you have it and your front window stays in front; one that
+  takes no press is clicked as before, its window brought forward. A real click on such a control is a `click` at its
+  `x` and `y`, for one that takes the press and does nothing. Any other `click`, and `hover`, `scroll` and `drag`,
+  are real pointer events. A failed accessibility call says whether the same step may be made again: a read is safe to
+  retry, an action that got no answer may have been done, and one the element does not support fails the same way
+  again; `type`, `paste` and `key` are keyboard
   events. A `type` text longer than `paste_threshold_chars` (40) without a line break or a tab goes in through the
   clipboard, which is put back afterwards (also when the clipboard refuses the text or the paste fails, item 555),
   unless the field is secure, is for a credential or a payment, or cannot be read, or the text looks like a key. A step

@@ -8,12 +8,14 @@ follow-up snapshot after a click costs a few lines instead of the whole window a
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from dotagent.desktop.ax import INTERACTIVE_ROLES
 from dotagent.desktop.render import (
     Delta,
     Line,
     diff_lines,
     fit_lines,
     lines_by_ref,
+    node_line,
     prefers_delta,
     render_lines,
     search_lines,
@@ -45,6 +47,7 @@ class ViewRequest:
     query: str | None
     full: bool
     max_chars: int
+    skeleton: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +172,49 @@ def _delta_for(baseline: Mapping[int, str] | None, lines: tuple[Line, ...]) -> D
     return delta if prefers_delta(delta) else None
 
 
+# How deep the skeleton of a window goes (item 862): its regions and theirs, each with what it holds, for the model to
+# read one of them by its ref.
+_SKELETON_DEPTH: int = 3
+# The items of a list or a table, and the controls: what a region holds, not a region of its own.
+_NOT_REGIONS: frozenset[str] = frozenset({"AXRow", "AXCell", "AXColumn", "AXStaticText", *INTERACTIVE_ROLES})
+
+
+def _skeleton_view(
+    app: AppView, heading: str, snapshot: Snapshot, request: ViewRequest, scale: float, notes: tuple[str, ...]
+) -> SnapshotView:
+    """The window's map (item 862, after vercel-labs/agent-desktop's skeleton): the elements down to
+    :data:`_SKELETON_DEPTH` levels that hold others, each with how many elements it holds and how many of them can be
+    acted on, so that the model reads one region by its ref rather than the whole of a dense window."""
+    nodes: Sequence[Node] = snapshot.nodes
+    lines: list[Line] = []
+    for at, node in enumerate(nodes):
+        if node.indent >= _SKELETON_DEPTH or node.role in _NOT_REGIONS:
+            continue
+        inside: list[Node] = []
+        for later in nodes[at + 1 :]:
+            if later.indent <= node.indent:
+                break
+            inside.append(later)
+        if not inside:
+            continue
+        acting: int = sum(1 for each in inside if each.role in INTERACTIVE_ROLES)
+        text: str = "  " * node.indent + node_line(node, scale) + f" · holds {len(inside)}, {acting} to act on"
+        lines.append(Line(ref=node.ref, text=text, priority=0))
+    body, omitted = fit_lines(lines, request.max_chars)
+    return SnapshotView(
+        app=app,
+        heading=f"{heading} · skeleton: read a region with its ref",
+        mode="full",
+        body=body,
+        nodes=len(nodes),
+        shown=len(lines) - omitted,
+        omitted=omitted,
+        removed=0,
+        truncated=snapshot.truncated,
+        notes=notes,
+    )
+
+
 def build_view(
     app: AppView,
     heading: str,
@@ -182,6 +228,8 @@ def build_view(
     or the whole view fitted to the request's ``max_chars``."""
     if request.query is not None:
         return ViewResult(_search_view(app, heading, snapshot, request.query, scale, notes), None)
+    if request.skeleton:
+        return ViewResult(_skeleton_view(app, heading, snapshot, request, scale, notes), None)
     lines: tuple[Line, ...] = render_lines(snapshot.nodes, scale)
     delta: Delta | None = None if request.full else _delta_for(baseline, lines)
     shown: tuple[Line, ...] = lines if delta is None else delta.changed
