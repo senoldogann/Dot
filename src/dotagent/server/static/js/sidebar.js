@@ -467,6 +467,37 @@ function chatPick(chat, checked, onToggle, face) {
  * `onNavigate()` after any link in it was followed. Returns the element, `focusSearch()`, `focusClose()`,
  * `setRoute({ tab, runId })` to mark where the user is, and `dispose()`.
  */
+// A swipe that closes the drawer on a touch screen (item 888): mostly sideways, to the left, past SWIPE_PX.
+const SWIPE_PX = 56;
+
+/** Close the drawer `element` with `onCollapse` when a finger swipes it to the left, on a phone's width. */
+function closesOnSwipe(element, onCollapse) {
+  let start = null;
+  element.addEventListener(
+    "touchstart",
+    (event) => {
+      const touch = event.touches.length === 1 ? event.touches[0] : null;
+      start = touch === null || !PHONE.matches ? null : { x: touch.clientX, y: touch.clientY };
+    },
+    { passive: true },
+  );
+  element.addEventListener(
+    "touchend",
+    (event) => {
+      const touch = event.changedTouches[0];
+      if (start !== null && touch !== undefined) {
+        const dx = touch.clientX - start.x;
+        const dy = touch.clientY - start.y;
+        if (dx < -SWIPE_PX && Math.abs(dy) < Math.abs(dx) / 2) {
+          onCollapse();
+        }
+      }
+      start = null;
+    },
+    { passive: true },
+  );
+}
+
 export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   let chats = null;
   let listLimit = LIST_LIMIT;
@@ -521,7 +552,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     autocomplete: "off",
     spellcheck: "false",
   });
-  const close = el("button", { class: "icon-btn", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse });
+  // On a touch screen the drawer has no X (item 888, the owner's ask): a chat chosen closes it, and so does a swipe to
+  // the left; a narrow window of the Mac, with no touch, keeps the button.
+  const close = el("button", { class: "icon-btn side-close", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse });
   const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, "Select");
   let folds = readFolds(FOLDS_KEY);
   // Whether a section is folded: as the owner left it, else as it starts (item 822: Dot's own work starts folded).
@@ -1578,6 +1611,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     foot,
     settingsNav.element,
   );
+  closesOnSwipe(element, onCollapse);
   function paintMode() {
     if (routeTab === "settings" && !PHONE.matches) {
       element.dataset.mode = "settings";

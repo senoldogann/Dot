@@ -93,7 +93,8 @@ into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
 and approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to
 end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a
-drawer. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
+drawer. On a touch screen of a phone's width it has no X (item 888): a chat you choose closes it, and so does a swipe
+to the left; a narrow window of the Mac keeps its button. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
 deleted under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only
 when the page comes to another chat (item 204).
 
