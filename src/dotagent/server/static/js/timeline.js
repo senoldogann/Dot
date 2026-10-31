@@ -78,8 +78,6 @@ function keepSaidOpen(key, open) {
     // A tab that keeps nothing (a private window's storage full) folds them again: the default.
   }
 }
-// The tool that hands a part to one of the owner's agents (item 668): its call shows that the part is on its way.
-const MESSAGE_AGENT_TOOL = "message_agent";
 // How much of an agent's reply its message in the conversation shows; the rest is on its run's page.
 const AGENT_SAID_CHARS = 1200;
 // What a line of the conversation says of a change of the memory (item 313); it shows this much of the note.
@@ -448,8 +446,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       // The messages of the scope's turn, each with its words: an answer that repeats one of them leaves it out.
       replies: [],
       touched: false,
-      // The parts on their way to an agent, by the call that sent them (item 668; see sending).
-      handoffs: new Map(),
       // The agent the scope's run is of, by its name, or null (item 668).
       agentName: null,
       // How many helpers that are no agent the scope's run started: the next is named after them (item 669).
@@ -768,48 +764,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
     // The agent the run is of, by its name (item 668): its answer stands in the parent's conversation as its message.
     scope.agentName = agentName;
-    if (scope.agentName !== null) {
-      arrived(parent, scope.agentName);
-    }
     scopes.set(runId, scope);
     liveChildren.add(scope);
     placeHelper(scope, ts);
     return scope;
-  }
-
-  /**
-   * A part handed to an agent is on its way (item 668): "Sending to Scout…" with Dot's three dots, at the end of the
-   * scope, until the agent's run starts and its row takes over, or the call ends without one. It splits no stretch of
-   * work, so it is put after it, not placed as a line of its own.
-   */
-  function sending(scope, callId, name) {
-    // A quiet line under the words, the dots after them (item 884, the owner's ask: the pill went); a name the model
-    // wrote as HTML ("Community &amp; Launch") is shown as the name.
-    const node = el(
-      "div",
-      { class: "agent-handoff", role: "status" },
-      el("span", null, `Sending to ${plainName(name)}…`),
-      el("span", { class: "agent-handoff-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span")),
-    );
-    scope.container.append(node);
-    scope.handoffs.set(callId, { node, name });
-  }
-
-  /** `name` as it reads: the few entities a model writes for HTML (&amp;, &lt;, &gt;, &quot;, &#39;) as their letters. */
-  function plainName(name) {
-    return name.replace(/&(amp|lt|gt|quot|#39);/g, (_, entity) => ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" })[entity]);
-  }
-
-  /** The agent `name`'s run started: the first part on its way to it in `scope` has arrived. A part sent under another
-   * spelling of the name than the agent's own, when it is the one on its way, has arrived as well. */
-  function arrived(scope, name) {
-    const named = [...scope.handoffs].find(([, handoff]) => plainName(handoff.name).toLowerCase() === plainName(name).toLowerCase());
-    const only = scope.handoffs.size === 1 ? [...scope.handoffs][0] : undefined;
-    const [callId, handoff] = named ?? only ?? [null, null];
-    if (handoff !== null) {
-      handoff.node.remove();
-      scope.handoffs.delete(callId);
-    }
   }
 
   /**
@@ -1254,9 +1212,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         scope.finishing.set(data.call_id, data.args);
         return;
       }
-      if (data.tool === MESSAGE_AGENT_TOOL && typeof data.args?.agent === "string" && data.args.agent.trim() !== "") {
-        sending(scope, data.call_id, data.args.agent.trim());
-      }
       if (scope.runId === rootRunId && data.tool.startsWith("browser_") && !browserSeen) {
         browserSeen = true;
         onBrowserStep();
@@ -1272,12 +1227,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
     tool_result(scope, record) {
       const data = record.data;
-      // The part's call ended: what is still on its way never arrived (an agent not found, a refusal).
-      const handoff = scope.handoffs.get(data.call_id);
-      if (handoff !== undefined) {
-        handoff.node.remove();
-        scope.handoffs.delete(data.call_id);
-      }
       const finishArgs = scope.finishing.get(data.call_id);
       if (finishArgs !== undefined) {
         scope.finishing.delete(data.call_id);

@@ -252,42 +252,6 @@
 
 /* ---------- the agents' words in the conversation (item 668) ---------- */
 
-/* A part on its way to an agent: "Sending to Scout…" and Dot's three dots after it, a quiet line where the words of the
-   messages start, until the agent's run starts and its row takes over (item 884: the pill it was in went). */
-.agent-handoff {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  align-self: flex-start;
-  padding: var(--space-half) 0;
-  margin-left: calc(28px + var(--space-2));
-  color: var(--muted);
-  font-size: var(--text-sm);
-  animation: fade-in var(--motion-base) var(--ease);
-}
-
-.agent-handoff-dots {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.agent-handoff-dots > span {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--brand);
-  animation: chat-dot var(--motion-dots) ease-in-out infinite;
-  animation-play-state: var(--endless);
-}
-
-.agent-handoff-dots > span:nth-child(2) {
-  animation-delay: calc(var(--motion-dots) / 8);
-}
-
-.agent-handoff-dots > span:nth-child(3) {
-  animation-delay: calc(var(--motion-dots) / 4);
-}
-
 /* What the agents answered (item 733): folded to one line, as a group of steps is, "Messages from Scout and Editor"
    with their faces and how many; opened, each message as wide as Dot's own answers, its face and name over its words,
    set apart by a rule at its left rather than a bubble. */
@@ -389,13 +353,6 @@
   display: inline-block;
   margin-top: var(--space-1);
   font-size: var(--text-sm);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-handoff,
-  .agent-handoff-dots > span {
-    animation: none;
-  }
 }
 
 /* ---------- the chat while it is read ---------- */
