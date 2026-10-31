@@ -302,12 +302,13 @@ async def test_the_turns_before_the_run_have_their_reactions_too_and_keep_them(
     earlier: Locator = page.locator(".history")
     await expect(earlier.get_by_role("article", name="Answer")).to_contain_text(ANSWER)
     said: Locator = earlier.locator(".turn-say").filter(has_text=SAID)
-    await expect(said.locator(".say-foot")).to_be_visible()
+    # A line of an earlier turn shows no button of its own (item 863: not on every line); its answer has one.
+    await expect(said.get_by_role("button", name="React to this message")).to_be_hidden()
     await _react(page, earlier.get_by_role("article", name="Answer"), "Good")
-    await _react(page, said.locator(".say-foot"), "Love it")
     assert await _standing(served, first) == ["good"]
-    assert await _standing(served, first, "step-1") == ["love"]
     assert await _standing(served, second) == []
+    # A reaction that stands on such a line still shows there, as its chip.
+    await served.reactions.add(first.id, "step-1", "love")
     await page.reload()
     await expect(earlier.get_by_role("article", name="Answer").get_by_role("button", name="Good")).to_be_visible()
     await expect(said.get_by_role("button", name="Love it")).to_be_visible()

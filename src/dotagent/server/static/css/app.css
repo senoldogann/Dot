@@ -7121,6 +7121,21 @@ summary:has(> .chev)::-webkit-details-marker {
   .bubble.say[role="article"] > .say-foot:not(:has(.reaction-chip)) .btn {
     margin-left: 0;
   }
+
+  /* A line that wears the face (item 859) has no empty place for it: its button stands under its words. */
+  .bubble.say[role="article"]:has(> .turn-face) > .say-foot:not(:has(.reaction-chip)) {
+    grid-column: 2;
+    position: static;
+    width: auto;
+  }
+}
+
+/* The button stands on the last of Dot's lines alone, where a hold (✋) or a "not right" (👎) reaches the step at work,
+   not on every line of the conversation, nor on a line of an earlier turn (item 863, the owner's word: "her textinde
+   ajanın emoji ikonu çıkmasın"); the reactions that stand show on every line. */
+.bubble.say:has(~ .bubble.say) .react-button,
+.turn-say .react-button {
+  display: none;
 }
 
 .reaction-chips {
