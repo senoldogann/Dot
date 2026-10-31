@@ -311,6 +311,20 @@ def _offers(info: ModelInfo, effort: Effort) -> bool:
     return len(info.efforts) >= 2 and effort in info.efforts
 
 
+# The levels of reasoning from the least to the most, for the nearest one a model offers (item 882).
+_LEVEL_ORDER: tuple[Effort, ...] = ("minimal", "low", "medium", "high", "xhigh", "max")
+
+
+def nearest_offered(effort: Effort, offered: Sequence[str]) -> Effort | None:
+    """The level of ``offered`` nearest to ``effort``, the higher of two as near, or ``None`` when the model offers no
+    choice or ``effort`` is no level on the scale (item 882)."""
+    choices: list[Effort] = [level for level in _LEVEL_ORDER if level in offered]
+    if len(offered) < 2 or effort not in _LEVEL_ORDER or not choices:
+        return None
+    at: int = _LEVEL_ORDER.index(effort)
+    return min(choices, key=lambda level: (abs(_LEVEL_ORDER.index(level) - at), -_LEVEL_ORDER.index(level)))
+
+
 def _check_speed(ref: ModelRef, speed: Speed) -> None:
     """Fast mode is asked only of a model that has it (item 223)."""
     if speed == "fast" and not offers_fast_mode(ref):
@@ -872,7 +886,7 @@ class RunManager:
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_speed(ref, speed)
         if effort is not None:
-            await self._check_effort(ref, effort)
+            effort = await self._firing_effort(ref, effort)
         run, _ = await self._launch(
             goal,
             mode,
@@ -2816,6 +2830,18 @@ class RunManager:
             _answer_text(question, question.note) for question in asked if question.status == "approved"
         ]
         return (*await self._instructions_for((goal,), campaign.thread_id, None, None), *answers)
+
+    async def _firing_effort(self, ref: ModelRef, effort: Effort) -> Effort | None:
+        """The level a schedule's firing runs at: its own, or, when its model does not offer it, the nearest one it
+        does (item 882). A schedule lives for weeks and its model's levels change; on the owner's Mac a schedule made in
+        a chat kept that chat's ``medium``, which DeepSeek does not offer, and every firing failed to start until the
+        schedules were deleted. A level chosen for a chat's run is still refused at once (:meth:`_check_effort`)."""
+        info: ModelInfo = await self._runtime.router.model_info(ref)
+        if _offers(info, effort):
+            return effort
+        kept: Effort | None = nearest_offered(effort, info.efforts)
+        log.warning("firing_effort_not_offered", model=ref.label, effort=effort, offered=list(info.efforts), kept=kept)
+        return kept
 
     async def _check_effort(self, ref: ModelRef, effort: Effort) -> None:
         """A level chosen for a run has to be one the model offers (a model with fewer than two has no choice)."""
