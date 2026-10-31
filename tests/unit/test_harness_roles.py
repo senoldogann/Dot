@@ -153,6 +153,20 @@ def test_a_composition_keeps_the_base_as_it_is_or_changes_it_with_decisions() ->
         check(_composition(habits=HABIT, decisions=[decision.model_copy(update={"candidate": 2})]))
 
 
+def test_a_composition_that_keeps_a_base_with_text_may_leave_the_texts_out() -> None:
+    """Item 886, its pre-push review: once a version is adopted, the base has text; a composition that keeps it and
+    leaves the texts out (GLM answered so) was asked again until the night failed. Kept, the texts come back as the
+    base's, which the step does not read; a kept base given other texts is still asked again."""
+    based: CompositionRequest = _composition_request().model_copy(update={"habits": HABIT, "tool_guidance": "Read."})
+    check = composition_check(based, ())
+    for answer in ({"keep_base": True}, {"summary": "nothing earns a change"}):
+        kept: HarnessComposition = check(HarnessComposition.model_validate(answer))
+        assert (kept.keep_base, kept.habits, kept.tool_guidance) == (True, HABIT, "Read.")
+    assert check(_composition(keep_base=True, habits=HABIT, tool_guidance="Read.")).habits == HABIT
+    with pytest.raises(ProviderProtocolError, match="given back as they are"):
+        check(_composition(keep_base=True, habits="- something else"))
+
+
 def test_a_decision_and_a_summary_of_a_composition_are_lines_that_may_be_recorded() -> None:
     """Item 587, review round 1 (N6): the decisions are kept with the composed version, and the experience writer and
     the owner read them."""

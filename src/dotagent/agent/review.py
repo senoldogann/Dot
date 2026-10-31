@@ -969,6 +969,11 @@ class ProposalRequest(FrozenModel):
     bounds: HarnessBounds
 
 
+def _blank_text(value: object) -> bool:
+    """Whether a verdict's text field says no text: left out, null, or the words null and none (item 886)."""
+    return value is None or (isinstance(value, str) and value.strip().lower() in ("", "null", "none"))
+
+
 class HarnessProposal(FrozenModel):
     keep: bool = Field(
         description="True when what the run did argues for no change: the harness stays as it is, and no text is given."
@@ -982,6 +987,26 @@ class HarnessProposal(FrozenModel):
         Field(max_length=3),
     ] = Field(description="The moments of the run each change answers to, a line each; empty when keep is true.")
     summary: Text120 = Field(description="What the candidate changes, in a line; 'keep' when keep is true.")
+
+    # A field the model left out, where leaving it out says something, is read as what it says (item 886): no text is
+    # no new text, no moment is none, and no keep is a keep when no text is given and a change when one is. On
+    # 2026-10-31 GLM 5.3 Flash left out keep, tool_guidance, habits and moments in two answers, and the night's step
+    # failed on them; the schema still asks for every field. A change that gives no text is still asked again
+    # (:func:`dotagent.harness.propose.proposal_check`): the text it meant may come then.
+    @model_validator(mode="before")
+    @classmethod
+    def _left_out_as_nothing(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        given: dict[str, object] = dict(value)
+        given.setdefault("habits", None)
+        given.setdefault("tool_guidance", None)
+        given.setdefault("moments", [])
+        if "keep" not in given:
+            given["keep"] = all(_blank_text(given[name]) for name in ("habits", "tool_guidance"))
+        if given["keep"] is True and _blank_text(given.get("summary")):
+            given["summary"] = "keep"
+        return given
 
     # A model answers "no text" as the word null or none, or as nothing, and "no moment" as null: read at the boundary
     # as what it means (seen with Claude Haiku 5.5, 2026-10-19).
@@ -1038,6 +1063,26 @@ class HarnessComposition(FrozenModel):
     )
     summary: Text120 = Field(description="What the composed version changes, in a line; 'keep' when keep_base is true.")
 
+    # As a proposal's (item 886): a composition that leaves out keep_base and gives no text keeps the base, whose texts
+    # the step does not read then; one that keeps the base needs no texts, decisions or summary of its own. One that
+    # changes something still has to give its texts whole, and is asked again when it does not.
+    @model_validator(mode="before")
+    @classmethod
+    def _left_out_as_nothing(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        given: dict[str, object] = dict(value)
+        no_text: bool = all(_blank_text(given.get(name)) for name in ("habits", "tool_guidance"))
+        if "keep_base" not in given:
+            given["keep_base"] = no_text
+        given.setdefault("decisions", [])
+        if given["keep_base"] is True:
+            given.setdefault("habits", "")
+            given.setdefault("tool_guidance", "")
+            if _blank_text(given.get("summary")):
+                given["summary"] = "keep"
+        return given
+
 
 class SelectionRequest(FrozenModel):
     """What the selector is shown: the goal, what it asked for (``checks``, a line each) and the anonymous answers."""
@@ -1092,6 +1137,12 @@ class ExperienceDraft(FrozenModel):
     entry: ExperienceEntry | None = Field(
         description="At most one experience, only when an edit helped or hurt with evidence; null otherwise."
     )
+
+    # No entry left out is none (item 886).
+    @model_validator(mode="before")
+    @classmethod
+    def _left_out_as_nothing(cls, value: object) -> object:
+        return {"entry": None, **value} if isinstance(value, dict) else value
 
 
 _REVIEW_SPEC: ToolSpec = ToolSpec(
@@ -2233,9 +2284,10 @@ def composition_check(
     request: CompositionRequest, held: Sequence[str]
 ) -> Callable[[HarnessComposition], HarnessComposition]:
     """The check of a composition for ``request``: every decision names a candidate; keep_base gives the base texts
-    back; a change gives texts that are components within the bounds carrying none of the secrets ``held``, one of
-    them differing from the base, and at least one decision; each decision and the summary are lines that may be
-    recorded (:func:`description_problem`). The texts come back normalized."""
+    back, or none (left out or blank: item 886, the step reads no text of a kept base); a change gives texts that are
+    components within the bounds carrying none of the secrets ``held``, one of them differing from the base, and at
+    least one decision; each decision and the summary are lines that may be recorded (:func:`description_problem`).
+    The texts come back normalized."""
 
     def check(composition: HarnessComposition) -> HarnessComposition:
         count: int = len(request.candidates)
@@ -2246,9 +2298,10 @@ def composition_check(
         habits: str = normalized(composition.habits)
         guidance: str = normalized(composition.tool_guidance)
         if composition.keep_base:
-            if habits != request.habits or guidance != request.tool_guidance:
+            given_back: bool = habits == request.habits and guidance == request.tool_guidance
+            if not given_back and (habits, guidance) != ("", ""):
                 raise ProviderProtocolError("keep_base is true, so the base texts are given back as they are", {})
-            return composition.model_copy(update={"habits": habits, "tool_guidance": guidance})
+            return composition.model_copy(update={"habits": request.habits, "tool_guidance": request.tool_guidance})
         _component_checked("habits", habits, request.bounds.habits_chars, request.bounds.component_lines, held)
         _component_checked(
             "tool guidance", guidance, request.bounds.tool_guidance_chars, request.bounds.component_lines, held
