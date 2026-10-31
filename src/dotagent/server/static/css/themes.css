@@ -148,6 +148,8 @@
   --office-stage: radial-gradient(120% 90% at 60% 35%, #2b2a31 0%, #17161b 70%);
   --office-glass: rgb(28 27 32 / 72%);
   --office-glass-strong: rgb(28 27 32 / 90%);
+  /* A free agent's name on a phone (item 894): quieter glass, so that the room shows through the names. */
+  --office-glass-quiet: rgb(28 27 32 / 48%);
   --office-ink: #f6f2ea;
   --office-ink-soft: rgb(246 242 234 / 66%);
   --office-free: #8a8790;

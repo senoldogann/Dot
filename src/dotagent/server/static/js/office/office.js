@@ -18,6 +18,15 @@ import { buildRoom, isNight } from "./scene.js";
 import { THREE, canDraw, loadThree } from "./three.js";
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)");
+// A phone's frame is taller than it is wide (item 894, the owner's look at it on a phone): the room is seen more from
+// above there, so that its floor fills the frame rather than a band across it.
+const NARROW = window.matchMedia("(max-width: 640px)");
+const PITCH = { wide: 0.62, narrow: 0.92 };
+
+/** The angle the room is seen at, as the frame's width wants it. */
+function restPitch() {
+  return NARROW.matches ? PITCH.narrow : PITCH.wide;
+}
 // How long a sender stays at the desk of the agent it messaged, and how often an open panel follows a stream.
 const VISIT_S = 7;
 const PANEL_REPAINT_MS = 250;
@@ -106,7 +115,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     let panel = null;
 
     // The camera turns around the room's middle: its angle round, its height and its distance.
-    const view = { yaw: Math.PI / 4, pitch: 0.62, zoom: 1, target: new THREE.Vector3(0, 0.9, 0) };
+    const view = { yaw: Math.PI / 4, pitch: restPitch(), zoom: 1, target: new THREE.Vector3(0, 0.9, 0) };
     const goal = { yaw: view.yaw, pitch: view.pitch, zoom: view.zoom, target: view.target.clone() };
     // The distance at which the whole room fits the frame from where the camera looks, measured by projecting the
     // room's corners (a fixed factor cut its front off at one shape of the frame or another); kept per view.
@@ -317,8 +326,15 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       return hits.length > 0 ? (hits[0].object.userData.figure ?? null) : null;
     }
 
+    // The one in the panel keeps its full tag on a phone, where a free agent's is its name alone (item 894); set when it
+    // is chosen, as a still room (reduced motion) draws no frame for it.
+    function markChosen() {
+      for (const actor of actors.values()) actor.tag.toggleAttribute("data-chosen", actor.summary.record.id === selected);
+    }
+
     function select(id) {
       selected = id;
+      markChosen();
       followWork();
       const actor = actors.get(id);
       if (actor !== undefined) {
@@ -330,6 +346,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
 
     function closePanel() {
       selected = null;
+      markChosen();
       panel?.dispose?.();
       panel = null;
       panelSlot.replaceChildren();
@@ -475,7 +492,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     );
     reset.addEventListener("click", () => {
       goal.yaw = Math.PI / 4;
-      goal.pitch = 0.62;
+      goal.pitch = restPitch();
       goal.zoom = 1;
       goal.target.set(0, 0.9, 0);
     });
@@ -536,6 +553,8 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         const about = mode === "free" ? actor.summary.record.name : `${actor.summary.record.name}: ${actor.summary.latest?.goal ?? ""}`;
         if (actor.tag.title !== about) actor.tag.title = about;
         actor.tag.dataset.mode = mode;
+        // A tag made after the choice (the agents read again) learns it here too.
+        if (actor.tag.hasAttribute("data-chosen") !== (actor.summary.record.id === selected)) markChosen();
       }
       room?.tick(now, date);
       view.yaw += (goal.yaw - view.yaw) * Math.min(1, dt * 8);
@@ -672,6 +691,11 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     document.addEventListener("visibilitychange", shown);
     // Motion switched back on (or off) in the Mac's settings: the loop starts again, or draws its still frame.
     REDUCED.addEventListener("change", shown);
+    // A window made narrow or wide, or a phone turned: the room is seen at the angle its new width wants.
+    const reangle = () => {
+      goal.pitch = restPitch();
+    };
+    NARROW.addEventListener("change", reangle);
     const away = new MutationObserver(shown);
     away.observe(document.documentElement, { attributes: true, attributeFilter: ["data-away"] });
 
@@ -694,6 +718,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       document.removeEventListener("visibilitychange", shown);
       away.disconnect();
       REDUCED.removeEventListener("change", shown);
+      NARROW.removeEventListener("change", reangle);
       sightings.disconnect();
       resizer.disconnect();
       panel?.dispose?.();

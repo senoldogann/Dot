@@ -20,7 +20,10 @@ one's desk and talks there a while ("Talking to Copy Editor"), then goes back to
 newest working runs, and the one whose panel is open, on one stream (`GET /api/runs/streams`): it reads each one's steps
 so far once, then the stream brings the new ones, so however many agents work it holds one connection to Dot, and a
 message you send waits behind none. A call it reads from before it opened moves nobody. Drag turns the room, the wheel
-or two fingers zoom, the button at the corner brings the whole room back. **Hide** folds it away, which this browser
+or two fingers zoom, the button at the corner brings the whole room back. On a phone (item 894, the owner's look at it
+there) the room is square and seen more from above, so that its floor fills the frame; a free agent's tag is its name
+alone, small, and those that work or wait for you, and the one whose panel is open, keep the full tag; the panel takes
+the frame's foot, and the button that brings the room back steps aside while it is open. **Hide** folds it away, which this browser
 keeps; the teams and the agents' cards stay under it. It draws only while it is on the screen, the page is shown and
 Dot's window is the one in front, at 30 frames a second while nobody walks and the camera rests, with fewer pixels when
 the Mac or the phone cannot keep up (item 889: the still room is baked into one mesh per material and its sun shadows
