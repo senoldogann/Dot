@@ -374,8 +374,9 @@ Customize tile and its chip too); and a skill wears the puzzle piece, here and a
 of an imported skill, the brain of a learned one; the daemon's palette says which server is of which service). An `@`
 inside a word, as in an address, opens nothing. On a phone either menu takes the room the keyboard leaves above the
 composer and scrolls inside it. A run that waits for your approval is listed under Waits for you, below the composer,
-and leads to its chat: the card stands there alone (item 434). Once you allow it, the card leaves the chat with the line
-that asked for it, as the page opens again too; refused, it stays and says so, and a question keeps its answer.
+and leads to its chat: the card stands there alone (item 434), with no line above it that says the same (item 871).
+Once you allow it, the card leaves the chat, as the page opens again too; refused, it stays and says so, and a question
+keeps its answer.
 
 The **+** at the left of the box (item 318, after Codex's composer) opens a menu: **Add files**, which opens the file
 picker (documents, photos and screenshots alike; a phone opens its own sheet), **Model and options** in a box whose run
