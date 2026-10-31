@@ -187,16 +187,17 @@ def test_the_harness_settings_of_the_paper_have_its_defaults() -> None:
     assert (agent.context_elide_share, agent.context_summarise_share, agent.plan_each_turn) == (0.6, 0.85, True)
 
 
-def test_an_agent_a_run_makes_gets_only_tools_the_run_has_and_with_none_named_its_makers_bound() -> None:
-    """Item 307: an agent made in a run can do no more than the run that made it."""
+def test_an_agent_a_run_makes_gets_only_the_tools_named_each_one_the_run_has() -> None:
+    """Item 307: an agent made in a run can do no more than the run that made it; item 873: and it gets the tools
+    its role needs, named, never every tool by naming none."""
     run_tools: frozenset[str] = frozenset({"shell", "read_file", "web_search"})
-    assert agent_tools(["read_file", "web_search", "read_file"], run_tools, ()) == ("read_file", "web_search")
+    assert agent_tools(["read_file", "web_search", "read_file"], run_tools) == ("read_file", "web_search")
     with pytest.raises(ToolInputError) as refused:
-        agent_tools(["read_file", "desktop_act"], run_tools, ())
+        agent_tools(["read_file", "desktop_act"], run_tools)
     assert refused.value.message == "an agent gets only tools this run has, not desktop_act"
-    # None named: Dot's run (no bound) gives every tool; an agent's bounded run gives its own bound.
-    assert agent_tools([], run_tools, ()) == ()
-    assert agent_tools([], run_tools, ("read_file",)) == ("read_file",)
+    with pytest.raises(ToolInputError) as none_named:
+        agent_tools([], run_tools)
+    assert none_named.value.message.startswith("name the tools its role needs in tools")
 
 
 def test_a_research_run_makes_no_agent_and_may_still_message_one() -> None:

@@ -209,22 +209,31 @@ class CreateAgentArgs(ToolArgs):
     instructions: str = Field(
         max_length=_INSTRUCTIONS_CHARS, description="How it works; they open the system prompt of its runs."
     )
-    tools: list[str] = Field(default_factory=list, description="Tool names it may use, of yours; empty gives it yours.")
+    tools: list[str] = Field(
+        default_factory=list,
+        description="The tools its role needs, by name, each one of yours; only those, never every tool.",
+    )
     model: str = Field(
         default="", description="A helper model (provider:model) for its runs; empty: the configured one."
     )
 
 
-def agent_tools(asked: Sequence[str], run_tools: frozenset[str], maker_tools: Sequence[str]) -> tuple[str, ...]:
-    """The tools of an agent a run makes (item 307): the ones ``asked``, each one the run has (``run_tools``), or with
-    none asked the bound of the agent whose run it is (``maker_tools``; empty, every tool, for Dot's run and for an
-    agent the owner gave every tool). An agent gets no tool its maker lacks."""
+def agent_tools(asked: Sequence[str], run_tools: frozenset[str]) -> tuple[str, ...]:
+    """The tools of an agent a run makes: the ones ``asked``, each one the run has (``run_tools``, item 307), and at
+    least one. An agent gets no tool its maker lacks, and a run that names none is refused rather than handing the
+    agent every tool (item 873): a tool its role does not need is a way for it to go sideways."""
     beyond: list[str] = sorted(set(asked) - run_tools)
     if beyond:
         raise ToolInputError(
             f"an agent gets only tools this run has, not {', '.join(beyond)}", {"tools": ", ".join(beyond)}
         )
-    return tuple(dict.fromkeys(asked)) if asked else tuple(maker_tools)
+    if not asked:
+        raise ToolInputError(
+            "name the tools its role needs in tools, each one of yours (for a writer: read_file, write_file); "
+            "an agent gets only the tools named, never every tool",
+            {"tools": ""},
+        )
+    return tuple(dict.fromkeys(asked))
 
 
 def agent_model(asked: str, allowed: Sequence[str]) -> str:
@@ -245,11 +254,10 @@ def agent_model(asked: str, allowed: Sequence[str]) -> str:
 
 def render_made(agent: AgentRecord) -> str:
     """The tool's result: the teammate, what it is, and how to work with it."""
-    tools: str = ", ".join(agent.tools) if agent.tools else "every tool"
     return (
-        f"Made the agent {agent.name} ({agent.role}); tools: {tools}. It lasts beyond this run: it has its own page "
-        f"under Agents and the owner can change it there. Send it work with message_agent (agent: {agent.name!r}); "
-        "it answers in a run of its own that cannot see this conversation."
+        f"Made the agent {agent.name} ({agent.role}); tools: {', '.join(agent.tools)}. It lasts beyond this run: it "
+        "has its own page under Agents and the owner can change it there. Send it work with message_agent "
+        f"(agent: {agent.name!r}); it answers in a run of its own that cannot see this conversation."
     )
 
 
@@ -274,8 +282,7 @@ def _create_agent_tool() -> RegisteredTool:
         unknown: list[str] = sorted(set(args.tools) - set(ctx.runtime.registry.tools))
         if unknown:
             raise ToolInputError(f"no tool has the name {', '.join(unknown)}", {"tools": ", ".join(unknown)})
-        maker: AgentRecord | None = None if ctx.agent_id is None else await ctx.runtime.store.get_agent(ctx.agent_id)
-        tools: tuple[str, ...] = agent_tools(args.tools, ctx.run_tools, () if maker is None else maker.tools)
+        tools: tuple[str, ...] = agent_tools(args.tools, ctx.run_tools)
         agents: list[AgentRecord] = await ctx.runtime.store.list_agents()
         made_here: list[str] = [agent.name for agent in agents if agent.made_by == ctx.run_id]
         if len(made_here) >= _MOST_MADE_PER_RUN:
@@ -298,8 +305,9 @@ def _create_agent_tool() -> RegisteredTool:
     return make_tool(
         name=CREATE_AGENT_TOOL,
         description=(
-            "Make a lasting teammate: an agent with a name, a role, instructions and tools, listed under Agents. "
-            "For a role the work needs again or in parallel, never for one step; send it work with message_agent."
+            "Make a lasting teammate: an agent with a name, a role, instructions and the tools its role needs, named "
+            "one by one, listed under Agents. One job each; for a role the work needs again or in parallel, never for "
+            "one step; send it work with message_agent."
         ),
         args_model=CreateAgentArgs,
         modes=ACTING_MODES,
