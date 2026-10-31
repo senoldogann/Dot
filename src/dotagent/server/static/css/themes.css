@@ -143,6 +143,17 @@
   --orb-edge-dark: inset 0 0 0 1px rgb(255 255 255 / 14%), 0 1px 2px rgb(0 0 0 / 18%);
   /* Dot's computer (run.css): the warm backdrop behind the live view, from the yellow of the bubbles. */
   --computer-backdrop: linear-gradient(160deg, color-mix(in srgb, var(--bubble) 55%, #ffffff), var(--bubble) 70%, color-mix(in srgb, var(--bubble) 80%, #000000));
+  /* The office of the Agents page (item 885): the room stands on a dark stage in every scheme, as a lit diorama does,
+     and the tags over the agents are dark glass with light words; a dot says what each one does. */
+  --office-stage: radial-gradient(120% 90% at 60% 35%, #2b2a31 0%, #17161b 70%);
+  --office-glass: rgb(28 27 32 / 72%);
+  --office-glass-strong: rgb(28 27 32 / 90%);
+  --office-ink: #f6f2ea;
+  --office-ink-soft: rgb(246 242 234 / 66%);
+  --office-free: #8a8790;
+  --office-working: #3ecf8e;
+  --office-waiting: #f08a24;
+  --office-panel-shadow: 0 18px 48px rgb(0 0 0 / 35%);
 }
 
 /* ---------- paper: warm paper, a serif voice for answers and one terracotta accent ---------- */

@@ -16,7 +16,8 @@ import { ago, clip, compact, el, modelName, plural, setText, switchRow } from ".
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
-import { readFolds, writePref } from "../prefs.js";
+import { mountOffice } from "../office/office.js";
+import { readFolds, readPref, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
 import { aboutToggle, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { APPROVAL_OPTIONS, heldChoice, KEPT_GOAL_MODE } from "../runmodes.js";
@@ -1003,6 +1004,33 @@ function mountList(root, ctx) {
       });
     }
   });
+  // The office (the owner's ask of 2026-10-31): the agents in a 3D room, living their day by what they do; shown unless
+  // it was hidden, which this browser keeps.
+  const officeHolder = el("div", { class: "office-holder" });
+  let office = null;
+  const officeToggle = el("button", { class: "btn ghost sm", type: "button", onclick: () => showOffice(officeHolder.hidden) });
+  function showOffice(on) {
+    writePref(OFFICE_KEY, on ? "on" : "off");
+    officeHolder.hidden = !on;
+    officeToggle.textContent = on ? "Hide" : "Show";
+    officeToggle.setAttribute("aria-expanded", String(on));
+    if (on && office === null) {
+      office = mountOffice(officeHolder, {
+        composerFor: (record, onStarted) => officeComposer(record, ctx, onStarted),
+        openAgent: (id) => ctx.navigate(`/agents/${id}`),
+      });
+    } else if (!on && office !== null) {
+      office.dispose();
+      office = null;
+    }
+  }
+  const officePart = el(
+    "section",
+    { class: "agents-part office-part", "aria-label": "The office" },
+    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Office"), officeToggle),
+    officeHolder,
+  );
+  showOffice(readPref(OFFICE_KEY) !== "off");
   root.append(
     pageHead(
       "Agents",
@@ -1010,6 +1038,7 @@ function mountList(root, ctx) {
       el("div", { class: "cluster" }, teamLink, importButton, chooser, newTeamButton, newButton),
     ),
     editorSlot,
+    officePart,
     yourTeams,
     yours,
     templates,
@@ -1039,7 +1068,28 @@ function mountList(root, ctx) {
     stopLifecycle();
     stopBack();
     closeEditor();
+    office?.dispose();
   };
+}
+
+// Whether the office shows on the Agents page, kept in this browser ("off" when hidden).
+const OFFICE_KEY = "dot.agents.office";
+
+/**
+ * The box of the office's panel that messages `record` (Dot, or an agent): the composer of the agent's page, whose
+ * run starts without leaving the office; `onStarted(run)` is told of it, so its figure goes to work at once.
+ */
+function officeComposer(record, ctx, onStarted) {
+  const stay = {
+    ...ctx,
+    navigate: (path) => {
+      const id = String(path).split("/").pop() ?? "";
+      onStarted({ id, status: "queued", goal: "", thread_id: "", agent_id: record.id === DOT_ID ? null : record.id, parent_run_id: null });
+      toast("ok", `${record.name} is on it.`);
+    },
+  };
+  const owner = record.id === DOT_ID ? {} : { agent_id: record.id };
+  return startComposer({ name: record.name, bounds: record, owner, ctx: stay });
 }
 
 // ------------------------------------------------------------------------------------------------- the page
