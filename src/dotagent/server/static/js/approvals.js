@@ -177,6 +177,10 @@ function guarded(approval) {
   return Array.isArray(flags) && flags.some((flag) => typeof flag === "string" && GUARDED_FLAGS.has(flag));
 }
 
+// What a "don't ask again in this chat" never covers (item 866, `NEVER_REMEMBERED` in policy/chat_permits.py): money, a
+// trade, a credential or a password manager's fill, Dot's own files. Such a card shows no box.
+const NEVER_REMEMBERED = new Set(["financial", "trade", "credential", "vault_fill", "self_change"]);
+
 // The words of the question a yolo run of a chat the owner opened asks of a payment, a message or a post (item 860,
 // `OWNERS_REASON` in policy/engine.py).
 const OWNERS_WORDS = "In yolo too, Dot asks you before";
@@ -184,6 +188,19 @@ const OWNERS_WORDS = "In yolo too, Dot asks you before";
 /** Whether `approval` is the question of a chat Dot opened on its own initiative (item 850), asked in YOLO too. */
 function initiativeAsked(approval) {
   return typeof approval.summary === "string" && approval.summary.includes(INITIATIVE_WORDS);
+}
+
+/** Whether the owner's yes to `approval` may hold for its kind in its chat (item 866): not a question, a hand-off or a
+ * card kept for later (`plain` false), not a step of a chat of Dot's own initiative, and none of its flags is one that
+ * is never remembered. */
+function rememberable(approval, plain) {
+  // A step that reaches a shell other than a command of the shell tool (typed lines, an AppleScript) is never remembered.
+  const typedShell = approval.args.kind === "shell" && approval.tool !== "shell";
+  if (plain || typedShell || approval.severity === "secret" || initiativeAsked(approval)) {
+    return false;
+  }
+  const flags = approval.args.flags;
+  return !(Array.isArray(flags) && flags.some((flag) => typeof flag === "string" && NEVER_REMEMBERED.has(flag)));
 }
 
 /** Whether `approval` is the question a yolo run of a chat the owner opened asks (item 860). */
@@ -269,7 +286,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
   const isKept = isLeft && approval.keptUntil !== null;
   let busy = false;
 
-  async function decide(approve, note) {
+  async function decide(approve, note, remember = false) {
     if (busy) {
       return;
     }
@@ -279,7 +296,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     });
     let decided;
     try {
-      decided = await api.post(`/approvals/${approval.id}/decision`, { approve, note });
+      decided = await api.post(`/approvals/${approval.id}/decision`, remember ? { approve, note, remember } : { approve, note });
     } catch (error) {
       busy = false;
       node.querySelectorAll("button, input").forEach((control) => {
@@ -308,6 +325,9 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       "aria-label": isQuestion ? "Your answer" : "Note for Dot",
     });
     const ticks = several ? choices.map((option) => el("input", { type: "checkbox", value: option.label })) : [];
+    // "Don't ask again in this chat" (item 866): on a question of the policy open now, of a step that may be
+    // remembered, in a chat that is not of Dot's own initiative.
+    const remember = rememberable(approval, isQuestion || isHandoff || isLeft) ? el("input", { type: "checkbox", class: "approval-remember-box" }) : null;
     // An answer to a question is the options ticked and what was written; it is never empty.
     const submit = (approve) => {
       const answer = isQuestion && approve ? chosenAnswer(ticks.filter((tick) => tick.checked).map((tick) => tick.value), note.value) : note.value.trim();
@@ -315,7 +335,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         note.focus();
         return;
       }
-      decide(approve, answer);
+      decide(approve, answer, approve && remember !== null && remember.checked);
     };
     // Enter sends an answer to a question; on any other card it does nothing, so a note that says "no" never
     // approves the action (item 116).
@@ -380,6 +400,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           "div",
           { class: "approval-actions" },
           note,
+          remember === null ? null : el("label", { class: "approval-remember", title: "Steps of this kind (the same tool and place) go without asking in this chat" }, remember, "Don't ask again in this chat"),
           el("button", { class: "btn", type: "button", onclick: () => submit(false) }, no),
           el("button", { class: "btn primary", type: "button", onclick: () => submit(true) }, yes),
         ),

@@ -1381,6 +1381,12 @@ class RunManager:
         except asyncio.QueueShutDown as exc:
             raise RunConflict("the run is not active", {"run_id": run_id}) from exc
 
+    def permit_chat(self, run_id: str) -> str | None:
+        """The chat whose "don't ask again" yeses answer the questions of the run ``run_id`` (item 866): its own chat,
+        or a delegated run's parent's, for a run at work in this process; ``None`` for any other."""
+        handle: RunHandle | None = self._handles.get(run_id)
+        return None if handle is None else handle.gate.chat_id
+
     def holding(self, run_id: str) -> bool:
         """Whether the owner holds the run with a ✋ (item 586): it waits for what they write next; false for a run that
         is not active."""
@@ -2694,6 +2700,10 @@ class RunManager:
                 owners_word=owners_word,
                 owners_chat=owners_chat,
                 owner_there=owner_there,
+                # The chat whose "don't ask again" answers its questions (item 866): a delegated run's parent's.
+                chat_id=(parent.gate.chat_id if parent is not None else None)
+                if parent_run_id is not None
+                else thread_id,
             )
             if starts_tainted:
                 gate.taint()

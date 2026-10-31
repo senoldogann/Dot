@@ -35,6 +35,9 @@ here points at a test that no longer exists.
   notification.
 - `tests/unit/test_limits.py::test_a_run_has_a_default_ceiling_and_zero_turns_it_off` — a run has a default
   120-minute, 10,000,000-token ceiling, and 0 turns a bound off.
+- `tests/smoke/test_chat_permits.py::test_a_permit_never_answers_money_nor_a_step_of_dots_own_initiative` — a
+  "don't ask again in this chat" never answers money nor a step of Dot's initiative, and answers one of a run that read
+  outside content, as the owner chose (item 866).
 
 ## Evidence and format
 

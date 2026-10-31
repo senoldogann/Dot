@@ -465,6 +465,26 @@ trading off.
    credentials, a message or a post in your name, a login from your password manager, a change of Dot's own files, and
    a message, a post or a release in a chat Dot opened on its own initiative) offers none and says so (items 429, 559
    and 850).
+   A card of a question open now also offers **Don't ask again in this chat** beside Deny and Approve (item 866): with
+   it ticked, your yes holds for the step's kind in that chat, its later runs and their delegated runs, and the steps
+   of the kind go without asking, each recorded as answered from that yes (`chat-permit`). The kind is the tool, its
+   flags and where it reaches: a page's site (its host, ASCII only; another address holds for itself), an MCP tool's
+   server, a desktop step's application, any other step's target. A command of the shell tool holds only for its exact
+   line in the same folder, as what a line does is not told by its program, and lines typed into a terminal or an
+   AppleScript are never remembered, as their record does not say the folder they run in: the same command run again goes, the same command to another recipient or from another
+   folder is asked. Five mails sent from one webmail go, whoever they are to; a step on another site is asked. Another
+   chat asks again. No rule, review model or run gives one, and none is given or used for money, a trade, a
+   credential, a password manager's fill, Dot's own files, a hand-off, a question of the run's, a secret's card,
+   or a step of a chat Dot opened on its own initiative:
+   the card shows no box, and the route refuses it (`POST /api/approvals/{id}/decision` with `remember`). A refusal
+   that is no question still refuses. **What it does not guard:** a run that has read outside content (a page, a mail,
+   a tool's answer) uses the yes too, your choice of 2026-10-31 ("okumuş olsa da sorma"): a mail it read could have it
+   send from the permitted webmail to whoever the mail names, unasked. A command's yes holds for its line, not for what
+   the line reads: a line that runs a script (`./send.sh`, `python3 send.py`) or takes its recipient from a file does
+   what that file says when it runs, and the run may change the file between two runs of the line. A yes is kept until
+   the chat is deleted; a rewind does not take it back. A step whose record masks a secret Dot holds never matches, and
+   is asked. A box ticked on the card of a run that no longer works in the daemon (it started again while the card
+   stood) gives that step's yes alone.
 7. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
    when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 

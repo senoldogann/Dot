@@ -562,6 +562,8 @@ class DecisionRequest(FrozenModel):
 
     approve: bool
     note: str = Field(default="", max_length=_TEXT_CHARS)
+    # With a yes, "don't ask again in this chat" (item 866): the yes holds for the step's kind in its chat.
+    remember: bool = False
 
 
 class RuleRequest(FrozenModel):

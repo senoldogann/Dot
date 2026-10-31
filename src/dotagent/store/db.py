@@ -236,6 +236,10 @@ CREATE TABLE IF NOT EXISTS teams (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, purpose TEXT NOT NULL, agents TEXT NOT NULL, created_at REAL NOT NULL,
     ready_team TEXT
 );
+CREATE TABLE IF NOT EXISTS chat_permits (
+    thread_id TEXT NOT NULL, kind TEXT NOT NULL, approval_id TEXT NOT NULL, created_at REAL NOT NULL,
+    PRIMARY KEY (thread_id, kind)
+);
 CREATE TABLE IF NOT EXISTS campaign_entries (
     id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, run_id TEXT, ts REAL NOT NULL, kind TEXT NOT NULL,
     text TEXT NOT NULL, numbers TEXT NOT NULL
@@ -2120,6 +2124,7 @@ class Store:
         await self._db.execute(f"DELETE FROM message_archive WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM queued_messages WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM queue_holds WHERE thread_id IN ({marks})", named)
+        await self._db.execute(f"DELETE FROM chat_permits WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM threads WHERE id IN ({marks})", named)
         if delegated:
             host_marks: str = ",".join("?" * len(delegated))
@@ -5848,6 +5853,26 @@ class Store:
         )
         await self._db.commit()
         return await self.get_team(team_id)
+
+    @_writing
+    async def add_chat_permit(self, thread_id: str, kind: str, approval_id: str) -> None:
+        """Keep the owner's yes ``approval_id`` for the steps of ``kind`` in the chat ``thread_id`` (item 866); a later
+        yes for the kind replaces it."""
+        await self._db.execute(
+            "INSERT INTO chat_permits(thread_id, kind, approval_id, created_at) VALUES(?, ?, ?, ?)"
+            " ON CONFLICT(thread_id, kind) DO UPDATE SET approval_id = excluded.approval_id,"
+            " created_at = excluded.created_at",
+            (thread_id, kind, approval_id, time.time()),
+        )
+        await self._db.commit()
+
+    async def chat_permit(self, thread_id: str, kind: str) -> str | None:
+        """The owner's yes that holds for the steps of ``kind`` in the chat ``thread_id`` (item 866), by its approval's
+        id; ``None`` when there is none."""
+        row = await self._one(
+            "SELECT approval_id FROM chat_permits WHERE thread_id = ? AND kind = ?", (thread_id, kind)
+        )
+        return None if row is None else str(row["approval_id"])
 
     async def get_team(self, team_id: str) -> TeamRecord:
         row = await self._one("SELECT * FROM teams WHERE id = ?", (team_id,))

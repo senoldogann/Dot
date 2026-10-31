@@ -1383,14 +1383,16 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       if (data.decided_by === "yolo") {
         return;
       }
-      // A step the owner allowed when it was kept for them (item 483), which the run did now.
+      // A step the owner allowed when it was kept for them (item 483), which the run did now; one of a kind they allowed
+      // for the rest of the chat (item 866).
       const permit = data.decided_by === "permit";
+      const chatPermit = data.decided_by === "chat-permit";
       const denied = data.status === "denied";
       // Settings › General may keep such lines out of the chat (item 346); a refusal stays, as its action did not run.
       if (!denied && settingValue(AUTO_LINES) === "hidden") {
         return;
       }
-      const verdict = permit ? "You allowed it earlier" : denied ? "The reviewer said no" : "The reviewer approved";
+      const verdict = permit ? "You allowed it earlier" : chatPermit ? "You allowed this kind in this chat" : denied ? "The reviewer said no" : "The reviewer approved";
       const said = data.note === "" || data.summary.endsWith(data.note);
       const reason = said ? "" : ` — ${clip(data.note, 240)}`;
       const text = `${verdict}: ${clip(data.summary, 200)}${reason}`;

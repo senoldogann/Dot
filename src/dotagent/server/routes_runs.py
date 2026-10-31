@@ -33,6 +33,8 @@ from dotagent.core.errors import InvalidValueError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import workspace_dir
 from dotagent.llm.router import parse_model_ref
+from dotagent.policy.chat_permits import key_of_record, may_remember
+from dotagent.proactive import INITIATIVE_SOURCE
 from dotagent.scheduler.loops import LoopRhythm, loop_goal, loop_name, loop_rhythm
 from dotagent.scheduler.plans import ScheduleRequest, create_schedule, plan_schedule
 from dotagent.secrets import known_secrets
@@ -542,7 +544,39 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                 "a card that asks for a secret is answered with the secret, at /approvals/{id}/secret",
                 {"approval_id": approval_id},
             )
-        return await ctx.manager.decide(approval_id, request.approve, UI_SOURCE, request.note)
+        if not (request.approve and request.remember):
+            return await ctx.manager.decide(approval_id, request.approve, UI_SOURCE, request.note)
+        record: ApprovalRecord = await store.get_approval(approval_id)
+        found: tuple[str, str] | None = await _rememberable(record)
+        if found is None:
+            # A run that no longer works here (the daemon started again while its card stood): the yes is stored, for
+            # this step alone.
+            return await ctx.manager.decide(approval_id, True, UI_SOURCE, request.note)
+        chat, kind = found
+        decided: ApprovalRecord = await ctx.manager.decide(approval_id, True, UI_SOURCE, request.note)
+        # Kept once the yes is stored, so that no step goes on a yes that was not (the pre-push review of item 866).
+        if decided.status == "approved":
+            await store.add_chat_permit(chat, kind, approval_id)
+            log.info("chat_permit_given", approval_id=approval_id, run_id=record.run_id, tool=record.tool)
+        return decided
+
+    async def _rememberable(record: ApprovalRecord) -> tuple[str, str] | None:
+        """The chat and the kind a "don't ask again" of the card ``record`` holds for (item 866), the refusal of a
+        card that may never hold (a step never remembered, a chat of Dot's initiative), or ``None`` for one whose run
+        no longer works here."""
+        refused = InvalidValueError("this card cannot hold for the rest of the chat", {"approval_id": record.id})
+        flags: object = record.args.get("flags")
+        listed: list[str] = [str(flag) for flag in flags] if isinstance(flags, list) else []
+        step_kind: str = str(record.args.get("kind") or "")
+        if record.status != "pending" or not may_remember(listed, record.severity, None, record.tool, step_kind):
+            raise refused
+        chat: str | None = ctx.manager.permit_chat(record.run_id)
+        kind: str | None = key_of_record(record.args, record.tool)
+        if chat is None or kind is None:
+            return None
+        if await store.opened_by(chat) == INITIATIVE_SOURCE:
+            raise refused
+        return chat, kind
 
     @router.post("/approvals/{approval_id}/secret")
     async def give_secret(approval_id: str, request: SecretRequest) -> ApprovalRecord:
