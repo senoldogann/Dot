@@ -991,10 +991,11 @@ arrow keys, Home and End move from card to card, and it opens on the theme in us
 the card takes its theme for both schemes, an orb for its own scheme only (a sun or a moon marks the picks), so light
 can wear one theme and dark another. Dot's two looks are **Neutral** (warm grey and ink, round and quiet; the default)
 and **Paper** (warm paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it
-is picked for; Dot's twelve palettes are **Clean** (near-white, grey and a blue accent), **Rose** (blush whites and a
-raspberry accent), **Grove**, **Ocean**, **Ember**, **Iris**, **Midnight**, **Nord**, **Solarized**, **Sepia**,
-**Forest** and **Contrast** (item 426; the names of all fourteen themes are taken, so a theme of your own cannot be
-saved under one). A palette's colours are mapped onto Dot's tokens (the colour a palette paints its solid controls with
+is picked for; Dot's thirteen palettes are **Clean** (near-white, grey and a blue accent), **Rose** (blush whites and
+a raspberry accent), **Grove**, **Ocean**, **Ember**, **Iris**, **Midnight**, **Nord**, **Solarized**, **Sepia**,
+**Forest**, **Graphite** (Grok's neutral greys as OpenMausBot sampled them, white ink and a white action, item 870)
+and **Contrast** (item 426; the names of all fifteen themes are taken, so a theme of your own cannot be saved under
+one). A palette's colours are mapped onto Dot's tokens (the colour a palette paints its solid controls with
 is Dot's accent) and held to the rule of the looks below: a text tier or an ink that would read under its ratio is moved
 in lightness until it reads, and in dark a card lies a step above the page; a browser test measures every theme in both
 schemes as the page paints it. The two picks are written on the page as `light-dark()` pairs (nothing when one look is
