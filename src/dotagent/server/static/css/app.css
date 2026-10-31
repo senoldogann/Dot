@@ -11395,10 +11395,25 @@ dialog.teach {
   text-align: center;
 }
 @media (max-width: 640px) {
-  /* A phone's frame is near square: the room fills its width, and the page scrolls on under it. */
+  /* A phone's frame is square, the room seen more from above in it (office.js), so that its floor fills the frame:
+     it fills its width, and the page scrolls on under it. */
   .office-frame {
     height: auto;
-    aspect-ratio: 1 / 1.08;
+    aspect-ratio: 1 / 1;
+  }
+  /* Seven tags hid a phone's small room (item 894, the owner's look): a free agent's is its name alone, small and
+     quiet, still a finger's height; those that work or wait for you, and the one in the panel, keep the full tag. */
+  .office-tag[data-mode="free"]:not([data-chosen]) {
+    padding: 0 var(--space-2);
+    font-size: var(--text-xs);
+    background: var(--office-glass-quiet);
+  }
+  .office-tag[data-mode="free"]:not([data-chosen]) .office-tag-dot {
+    display: none;
+  }
+  /* The panel takes the frame's foot, where the reset button stood over its message box. */
+  .office-holder:has(.office-panel) .office-reset {
+    display: none;
   }
   /* A tag takes a finger (32 px at least), as every control of a phone does. */
   .office-tag {

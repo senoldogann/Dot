@@ -147,11 +147,26 @@ async def test_the_office_shows_every_agent_and_dot_and_a_click_opens_the_box_to
                 await expect(office).to_have_attribute("data-draw-calls", re.compile(r"^\d+$"))
                 calls: int = int(await office.get_attribute("data-draw-calls") or "0")
                 assert 0 < calls < 300, calls
-                await tags.filter(has_text="Copy Editor").click()
+                free = tags.filter(has_text="Copy Editor")
+                if phone:
+                    # A phone's room is square and its free agents' tags are their names alone (item 894: seven full
+                    # tags hid the room on the owner's phone); a finger's height still.
+                    frame = await office.bounding_box()
+                    assert frame is not None and abs(frame["width"] - frame["height"]) <= 2, frame
+                    await expect(free.locator(".office-tag-dot")).to_be_hidden()
+                    box = await free.bounding_box()
+                    assert box is not None and box["height"] >= 32, box
+                await free.click()
                 panel = office.get_by_role("complementary", name="Copy Editor in the office")
                 await expect(panel).to_be_visible()
                 await expect(panel.get_by_role("textbox", name="Message")).to_be_visible()
+                reset = office.get_by_role("button", name=re.compile("whole room", re.I))
+                if phone:
+                    # The panel takes the frame's foot: the button that brings the room back is not over its box.
+                    await expect(reset).to_be_hidden()
+                    await expect(free.locator(".office-tag-dot")).to_be_visible()
                 await panel.get_by_role("button", name="Close").click()
+                await expect(reset).to_be_visible()
                 # The working one's panel shows its steps as they come.
                 await office.locator('.office-tag[data-mode="working"]').click()
                 await expect(office.locator(".office-panel .office-step")).to_have_text(["Web search · news"])
