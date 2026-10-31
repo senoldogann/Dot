@@ -151,7 +151,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "answer with memory_save.",
             "Find prospects on the web: the company, why it fits now (a launch, a hire, a round), and the right "
             "person with a public work address. Never guess an address.",
-            "Keep prospects.csv in the workspace (company, person, role, email, why now, status), and never write to "
+            "Keep prospects.csv in your folder (company, person, role, email, why now, status), and never write to "
             "anyone twice.",
             "Write each prospect one email of at most 120 words about their situation, with one clear question.",
             _DRAFTS_ONLY,
@@ -188,7 +188,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "answer with memory_save.",
             "Look at public profiles, portfolios, papers and code. Judge people by their work and the role's "
             "must-haves only, never by age, gender, origin or any other protected trait.",
-            "Keep candidates.csv in the workspace (name, link, why they fit, public email, status), and never write "
+            "Keep candidates.csv in your folder (name, link, why they fit, public email, status), and never write "
             "to anyone twice.",
             "Write each strong fit a note of at most 120 words that says what in their work stood out.",
             _DRAFTS_ONLY,
@@ -219,7 +219,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "Never change a budget, a bid, an audience or a campaign yourself: suggest it.",
             "Compare yesterday, and the last 7 days with the 7 before: spend, results, cost per result, return.",
             "Say what moved and why it likely moved; flag what spends without results.",
-            "Keep the figures you report in paid-media.csv in the workspace, so that the next report compares.",
+            "Keep the figures you report in paid-media.csv in your folder, so that the next report compares.",
             _DRAFTS_ONLY,
             "End with three changes at most, each with what you expect of it.",
         ),
@@ -247,7 +247,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         + _steps(
             "Find receipts in Mail, in Downloads and in the folders the owner names; read the amount, currency, "
             "date, merchant and purpose.",
-            "Keep expenses.csv in the workspace and add each receipt once; list a receipt you cannot read rather "
+            "Keep expenses.csv in your folder and add each receipt once; list a receipt you cannot read rather "
             "than guess.",
             "Put the period's receipts in one folder and sum them by category and currency.",
             "Never pay, submit or approve anything yourself.",
@@ -286,7 +286,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "the owner's own measures.",
             "For each number that moved more than usual, look for why (a release, a campaign, a broken step) and say "
             "how sure you are.",
-            "Keep the figures in metrics.csv in the workspace, so that every report compares with the last.",
+            "Keep the figures in metrics.csv in your folder, so that every report compares with the last.",
             _DRAFTS_ONLY,
             "End with a short report: what moved, why, and what to do about it, with a chart (show_page) where it "
             "helps.",
@@ -351,7 +351,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "If you do not know which accounts are key, ask once with ask_user and keep the list with memory_save.",
             "Look for signs of risk in the owner's mail, notes and tools: slower replies, complaints, usage that "
             "dropped, an unpaid invoice, a champion who left.",
-            "Rate each account green, yellow or red with the evidence, and keep accounts.csv in the workspace so "
+            "Rate each account green, yellow or red with the evidence, and keep accounts.csv in your folder so "
             "that the next check compares.",
             "For a yellow or red account, write a short, warm check-in that meets the issue.",
             _DRAFTS_ONLY,
@@ -388,7 +388,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "keep the answer with memory_save.",
             "Sort the mail: what needs the owner today, what can wait, what is noise; draft the answers it needs.",
             "For each meeting, say who it is with, what it is for and what to prepare, from the mail and notes.",
-            "Keep follow-ups.csv in the workspace (what was promised, to whom, by when) and name the ones due.",
+            "Keep follow-ups.csv in your folder (what was promised, to whom, by when) and name the ones due.",
             "Never accept, decline or move a meeting yourself: suggest it.",
             _DRAFTS_ONLY,
             "End with a brief: the three things that matter today, the meetings, the drafts waiting and the "
@@ -479,7 +479,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "claim you could not check is marked unverified with what you looked at.",
             "Say where sources disagree, which one you trust and why, and what you could not reach (a login, a "
             "paywall, a page that refused you).",
-            "Keep what you read in research-<topic>.md in the workspace (claim, link, date, what it says), so a "
+            "Keep what you read in research-<topic>.md in your folder (claim, link, date, what it says), so a "
             "later pass compares with it instead of starting again.",
             "Write the answer in the language the owner asked in, with the sources at its end as links and dates.",
             _DRAFTS_ONLY,
@@ -554,7 +554,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "never guess one, and never write it to a file, a note or the report.",
             "Say pass or fail for each step, and for a fail the fewest steps that show it, the exact error and the "
             "screenshot.",
-            "Compare with the last walk in qa-<date>.json in the workspace: what shipped, what got unshipped, what "
+            "Compare with the last walk in qa-<date>.json in your folder: what shipped, what got unshipped, what "
             "broke and what stood still.",
             "Change nothing in the product yourself, and open no ticket until the owner names the tracker.",
             _DRAFTS_ONLY,

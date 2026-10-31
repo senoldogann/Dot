@@ -181,6 +181,13 @@ makes has its edges as well. They go out in the agent's file (`refuses`; a file 
 for secrets as its instructions are. The API: an agent's `refuses` (2,000 characters at most), which a change that
 does not name it keeps.
 
+**Its own folder** (item 877): an agent's run is told its folder, `agents/<its id>/` in the workspace, made when
+the run starts, and to read what its last run left there before it starts and keep there what the next one needs (the
+files its instructions name, what was done, for whom, what is left), never a secret. The folder goes by the agent's id,
+so renaming the agent keeps it and two agents of one template never share a file. The templates keep their files there
+(Sales Outbound's `prospects.csv`, Research Desk's `research-<topic>.md`, Release QA's last walk). A teammate's folder
+is not named to another agent's run; it is a folder of the workspace, not a wall: the file tools reach it as any other.
+
 **What it used** (item 874), on an agent's page, reads its newest twenty runs that ended: how many, the tokens
 they spent and the actions they called most, each with its count. Once three of them have ended (one run says little
 of what a role needs), it names the actions the agent may use that none of them called, but for the ones every agent's

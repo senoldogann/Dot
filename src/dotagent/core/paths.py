@@ -52,6 +52,12 @@ def workspace_dir() -> Path:
     return dot_home() / "workspace"
 
 
+def agent_folder(workspace: Path, agent_id: str) -> Path:
+    """An agent's own folder in ``workspace`` (item 877), where its runs keep what the next one needs: by its id, so
+    that renaming the agent keeps it, and two agents made from one template never share a file."""
+    return workspace / "agents" / agent_id
+
+
 def screenshots_dir() -> Path:
     return dot_home() / "screenshots"
 

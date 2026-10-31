@@ -198,6 +198,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import agent_folder
 from dotagent.core.text import CHARS_PER_TOKEN, redact_known, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.harness.service import adopted_text
@@ -1316,6 +1317,13 @@ async def browser_of(runtime: Runtime, run: RunRecord) -> BrowserSession:
     return runtime.browsers.session_for(campaign.browser)
 
 
+async def _agent_folder(workspace: Path, agent_id: str) -> Path:
+    """The agent's own folder (item 877), made when its run starts, so that the prompt names one that is there."""
+    folder: Path = agent_folder(workspace, agent_id)
+    await asyncio.to_thread(folder.mkdir, parents=True, exist_ok=True)
+    return folder
+
+
 async def _session_number(agent: AgentRun, campaign_id: str) -> int:
     return session_number(await agent.runtime.store.campaign_sessions(campaign_id), agent.run.id)
 
@@ -2225,6 +2233,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     made_by_dot=agent_record.made_by is not None,
                     team=_team_name(agent_record.name),
                     refuses=agent_record.refuses,
+                    folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
                 ),
                 [
                     AgentBrief(
