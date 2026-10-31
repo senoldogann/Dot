@@ -1204,6 +1204,18 @@ class ChatSpend(FrozenModel):
     runs: int
     failed: int
     tokens: int
+    # When the newest of its runs was created (item 883): a goal still at it, or one left alone.
+    newest: float = 0.0
+    # Its chats that a schedule did not open (item 883): a schedule opens a chat of its title at each firing, which no
+    # one started again.
+    opened: int = 0
+
+    @property
+    def retried(self) -> bool:
+        """Started again in other chats with runs that failed twice or more: a goal tried again and again that may be
+        getting nowhere, which one chat of the owner's own, long and busy, is not, nor a schedule's firings (items 881
+        and 883)."""
+        return self.opened >= RETRIED_CHATS and self.failed >= RETRIED_FAILURES
 
 
 class TokenSpend(FrozenModel):
@@ -1215,11 +1227,34 @@ class TokenSpend(FrozenModel):
     chats: tuple[ChatSpend, ...]
 
 
-_SPEND_SQL: str = (
-    "SELECT MAX(r.thread_id), COALESCE(t.title, ''), COUNT(DISTINCT r.thread_id), COUNT(*), SUM(r.status = 'failed'),"
-    " SUM(r.input_tokens + r.output_tokens) AS spent FROM runs r LEFT JOIN threads t ON t.id = r.thread_id"
-    " WHERE r.created_at >= ? GROUP BY COALESCE(NULLIF(t.title, ''), r.thread_id) ORDER BY spent DESC LIMIT ?"
+# How many chats and failed runs make a goal one started again and failing (items 881 and 883).
+RETRIED_CHATS: int = 2
+RETRIED_FAILURES: int = 2
+
+_SPEND_GROUPS: str = (
+    "SELECT MAX(r.thread_id), COALESCE(t.title, ''), COUNT(DISTINCT r.thread_id), COUNT(*),"
+    " SUM(r.status = 'failed') AS failed, SUM(r.input_tokens + r.output_tokens) AS spent, MAX(r.created_at),"
+    " COUNT(DISTINCT CASE WHEN COALESCE(t.source, '') != 'schedule' THEN r.thread_id END) AS opened FROM runs r"
+    " LEFT JOIN threads t ON t.id = r.thread_id WHERE r.created_at >= ?"
+    " GROUP BY COALESCE(NULLIF(t.title, ''), r.thread_id)"
 )
+SPEND_SQL: str = f"{_SPEND_GROUPS} ORDER BY spent DESC LIMIT ?"
+# The goals that are :attr:`ChatSpend.retried`, however few tokens they spent (the review of item 883).
+RETRIED_SQL: str = f"{_SPEND_GROUPS} HAVING opened >= ? AND failed >= ? ORDER BY spent DESC LIMIT ?"
+
+
+def chat_spend(row: Sequence[object]) -> ChatSpend:
+    """A row of :data:`SPEND_SQL` as a :class:`ChatSpend`."""
+    return ChatSpend(
+        thread_id=str(row[0]),
+        title=str(row[1]),
+        chats=int(str(row[2])),
+        runs=int(str(row[3])),
+        failed=int(str(row[4] or 0)),
+        tokens=int(str(row[5] or 0)),
+        newest=float(str(row[6] or 0.0)),
+        opened=int(str(row[7] or 0)),
+    )
 
 
 def collect_spend(database: Path, since: float, limit: int) -> TokenSpend:
@@ -1230,22 +1265,12 @@ def collect_spend(database: Path, since: float, limit: int) -> TokenSpend:
             total: tuple[object, ...] = connection.execute(
                 "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM runs WHERE created_at >= ?", (since,)
             ).fetchone()
-            rows = connection.execute(_SPEND_SQL, (since, limit)).fetchall()
+            rows = connection.execute(SPEND_SQL, (since, limit)).fetchall()
     except sqlite3.Error as error:
         raise StoreError("the store could not be read", {"database": str(database), "error": str(error)}) from error
     return TokenSpend(
         total=int(str(total[0])),
-        chats=tuple(
-            ChatSpend(
-                thread_id=str(row[0]),
-                title=str(row[1]),
-                chats=int(str(row[2])),
-                runs=int(str(row[3])),
-                failed=int(str(row[4] or 0)),
-                tokens=int(str(row[5] or 0)),
-            )
-            for row in rows
-        ),
+        chats=tuple(chat_spend(row) for row in rows),
     )
 
 

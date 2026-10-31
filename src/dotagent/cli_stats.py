@@ -388,12 +388,8 @@ async def cmd_stats(command: StatsCommand) -> int:
     return 0
 
 
-# How many of the costliest goals ``dotx stats`` names (item 881). One started again in other chats whose runs failed
-# twice or more is marked to look at: a goal tried again and again that may be getting nowhere, which one chat of the
-# owner's own, long and busy, is not.
+# How many of the costliest goals ``dotx stats`` names (item 881); one :attr:`ChatSpend.retried` is marked to look at.
 _COSTLIEST: int = 5
-_RETRIED_CHATS: int = 2
-_RETRIED_FAILURES: int = 2
 _TITLE_CHARS: int = 60
 
 
@@ -407,8 +403,7 @@ def render_spend(spend: TokenSpend) -> list[str]:
     for chat in spend.chats:
         share: float = chat.tokens / spend.total
         title: str = chat.title if len(chat.title) <= _TITLE_CHARS else chat.title[: _TITLE_CHARS - 1] + "…"
-        retried: bool = chat.chats >= _RETRIED_CHATS and chat.failed >= _RETRIED_FAILURES
-        mark: str = "  <- started again and failing: look whether it gets anywhere" if retried else ""
+        mark: str = "  <- started again and failing: look whether it gets anywhere" if chat.retried else ""
         chats: str = "" if chat.chats == 1 else f"{chat.chats} chats, "
         lines.append(
             f"  {share:4.0%}  {_count(chat.tokens)}  {chats}{chat.runs} runs, {chat.failed} failed  "

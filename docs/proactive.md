@@ -43,6 +43,11 @@ dated answers of a schedule's earlier runs are:
 - what waits for you: the questions and approvals that runs left, and the drafts waiting for you to send them;
 - how many plugins the nightly look proposed wait on Customize › Plugins (only the numbers, item 711);
 - the runs that failed since the last brief, with the first line of what each said;
+- the goals of the last week started again in other chats whose runs keep failing, with a run since the last brief,
+  however few tokens they spent (a schedule's firings, each in a chat of its own, are not a goal started again):
+  each with its chats, runs, failures and share of the week's tokens, so you can stop one that gets nowhere (item 883:
+  a hiring CTF took 64 million of 604 million tokens in a week over four chats, and nothing said so; `dotx stats`
+  marks the same goals); the newest run of each gives the brief its taint;
 - the campaigns at work, with when the next session is and the last note of the ledger;
 - the schedules that fire today, with their times.
 

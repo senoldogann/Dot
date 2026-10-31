@@ -100,9 +100,15 @@ from dotagent.store.models import (
     WorkingRun,
 )
 from dotagent.store.stats import (
+    RETRIED_CHATS,
+    RETRIED_FAILURES,
+    RETRIED_SQL,
+    SPEND_SQL,
+    ChatSpend,
     ContextEvidence,
     ModelProfile,
     RunCosts,
+    chat_spend,
     collect_run_costs,
     read_context_evidence,
     read_model_profile,
@@ -3225,6 +3231,34 @@ class Store:
             "SELECT * FROM events WHERE run_id = ? AND kind = ? ORDER BY id DESC LIMIT 1", (run_id, kind)
         )
         return None if row is None else _event(row)
+
+    async def goal_spend(self, since: float, limit: int) -> list[ChatSpend]:
+        """The ``limit`` goals that spent the most tokens in the runs created since ``since``, the chats of one title
+        together (items 881 and 883), as ``dotx stats`` reads them."""
+        return [chat_spend(tuple(row)) for row in await self._all(SPEND_SQL, (since, limit))]
+
+    async def retried_goals(self, since: float, limit: int) -> list[ChatSpend]:
+        """The goals since ``since`` that are :attr:`ChatSpend.retried`, the costliest first, however few tokens they
+        spent (item 883)."""
+        rows = await self._all(RETRIED_SQL, (since, RETRIED_CHATS, RETRIED_FAILURES, limit))
+        return [chat_spend(tuple(row)) for row in rows]
+
+    async def tokens_since(self, since: float) -> int:
+        """All the tokens of the runs created since ``since``, in and out (item 883)."""
+        row = await self._one(
+            "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS spent FROM runs WHERE created_at >= ?", (since,)
+        )
+        return 0 if row is None else int(row["spent"])
+
+    async def newest_run_of_goal(self, title: str, thread_id: str, since: float) -> str | None:
+        """The newest run since ``since`` of the chats of one goal as :data:`SPEND_SQL` groups them (by its title, or
+        its chat for one with none), rewound or not: the one whose words the brief quotes (item 883)."""
+        row = await self._one(
+            "SELECT r.id FROM runs r LEFT JOIN threads t ON t.id = r.thread_id WHERE r.created_at >= ?"
+            " AND COALESCE(NULLIF(t.title, ''), r.thread_id) = ? ORDER BY r.created_at DESC LIMIT 1",
+            (since, title or thread_id),
+        )
+        return None if row is None else str(row["id"])
 
     async def last_ok_call_of(self, run_id: str, tool: str) -> EventRecord | None:
         """The newest ``tool_call`` event of a run that called ``tool`` and whose result did not fail, or ``None``: a

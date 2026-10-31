@@ -55,6 +55,7 @@ from dotagent.store.models import (
     ScheduleOptions,
     ScheduleRecord,
 )
+from dotagent.store.stats import ChatSpend
 from dotagent.tools.mail_calendar import account_reads
 
 log = get_logger(__name__)
@@ -420,6 +421,40 @@ async def _failed(store: Store, since: float) -> Quoted:
     return Quoted(lines=tuple(_section(title, shown, len(failed))), run_ids=tuple(run.id for run in asked))
 
 
+# How far back the brief looks for a goal started again and failing, and how many such goals it reads
+# (item 883).
+_RETRIED_DAYS: float = 7.0
+_SPEND_READ: int = 20
+
+
+async def _retried(store: Store, since: float, now: float) -> Quoted:
+    """The goals of the last week started again in other chats whose runs keep failing, with a run since the last brief
+    (item 883): each with its chats, runs, failures and share of the week's tokens, so the owner can stop one that
+    gets nowhere. On their Mac a hiring CTF took 64 million of 604 million tokens in a week, over four chats, and
+    nothing said so. A goal's title is its chat's, a run's words when Dot opened it: the newest run of each is quoted,
+    so the brief takes its taint."""
+    week: float = now - _RETRIED_DAYS * _DAY_S
+    # Every goal retried, however few tokens it spent, and its share of the week's tokens in all (the review of item
+    # 883); a schedule's firings, each in a chat of its own, are not a goal started again.
+    total: int = await store.tokens_since(week)
+    going: list[ChatSpend] = [chat for chat in await store.retried_goals(week, _SPEND_READ) if chat.newest >= since]
+    if not going:
+        return Quoted(lines=(), run_ids=())
+    shown: list[str] = []
+    run_ids: list[str] = []
+    for chat in going[:_SHOWN]:
+        share: str = "" if total <= 0 else f", {chat.tokens / total:.0%} of the week's tokens"
+        shown.append(
+            f"- {quoted(chat.title or chat.thread_id, _NAME_CHARS)}: {chat.chats} chats, {chat.runs} runs, "
+            f"{chat.failed} failed{share}"
+        )
+        newest: str | None = await store.newest_run_of_goal(chat.title, chat.thread_id, week)
+        if newest is not None:
+            run_ids.append(newest)
+    title: str = "Goals started again and failing this week (worth asking the owner whether to stop)"
+    return Quoted(lines=tuple(_section(title, shown, len(going))), run_ids=tuple(dict.fromkeys(run_ids)))
+
+
 async def _campaigns(store: Store, zone: ZoneInfo) -> Quoted:
     """The campaigns at work, each with its next session and the last thing its ledger says; the runs of those last
     notes are the ones whose words are quoted (a note of the harness has none)."""
@@ -541,6 +576,7 @@ async def prepare(runtime: Runtime, record: ScheduleRecord, now: float, zone: Zo
         await _waiting(store),
         await _plugins(store),
         await _failed(store, since),
+        await _retried(store, since, now),
         await _campaigns(store, zone),
         await _today(store, record, now, zone),
     ]
