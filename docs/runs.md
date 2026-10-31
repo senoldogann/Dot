@@ -352,12 +352,13 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 
 ### Reactions on Dot's messages
 
-Under each message of Dot's in a conversation, its answer and what it said in the middle of a run, a button (a
-smiley with a plus, item 586) opens a small palette of seven reactions, and Dot acts on them while the run works
+Under Dot's answer, and under the last thing it said in the middle of a run (item 863: not under every line, nor under
+a line of an earlier turn), a button (a smiley with a plus, item 586) opens a small palette of seven reactions, and Dot acts on them while the run works
 and after it ended. With a pointer the button shows on the message the pointer is on, with the keyboard on it, or while
 its palette is open (item 652); a touch screen shows it always. With a pointer, on a message in the middle of a run
 that holds no reaction yet, the button stands beside the bubble, in the empty place of a face, at its foot, rather than
-holding a line of its own under it (item 843); once a reaction stands, it is under the message with the chips. The ones
+holding a line of its own under it (item 843); a line that wears the face (item 859) has it under its words instead, as
+the face has that place; once a reaction stands, it is under the message with the chips. The ones
 that stand show as chips beside the button, always; pressing a chip, or the reaction in the palette again, takes it
 back. The palette and the chips are reached and worked by keyboard (Tab to the button,
 Enter or Space opens the palette on its first choice, the arrow keys, Home and End move between the choices, Enter
