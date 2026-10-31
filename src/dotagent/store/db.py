@@ -560,6 +560,15 @@ def _unattended(row: aiosqlite.Row) -> UnattendedRun:
     return UnattendedRun(run=_run(row), schedule_name=row["schedule_name"], campaign_title=row["campaign_title"])
 
 
+def _family_of(seed: str) -> str:
+    """The head of a query that names ``family``: the ids of the runs ``seed`` selects and of every run they delegated
+    to, and so on down."""
+    return (
+        f"WITH RECURSIVE family(id) AS ({seed}"
+        " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
+    )
+
+
 def _run(row: aiosqlite.Row) -> RunRecord:
     return RunRecord(
         id=row["id"],
@@ -2481,17 +2490,15 @@ class Store:
             marks: str = ",".join("?" * len(ids))
             await self._db.execute(f"UPDATE runs SET rewound_at = ? WHERE id IN ({marks})", (now, *ids))
             await self._db.execute(
-                f"WITH RECURSIVE family(id) AS (SELECT id FROM runs WHERE id IN ({marks})"
-                " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
-                " UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
+                _family_of(f"SELECT id FROM runs WHERE id IN ({marks})")
+                + " UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
                 " WHERE status = 'left' AND run_id IN (SELECT id FROM family)",
                 (*ids, now, "the chat was rewound to before the run that asked"),
             )
             # The owner's yes to a step those runs kept goes with them, unused (item 483).
             await self._db.execute(
-                f"WITH RECURSIVE family(id) AS (SELECT id FROM runs WHERE id IN ({marks})"
-                " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
-                " UPDATE approvals SET permit_until = NULL WHERE status = 'approved' AND used_at IS NULL"
+                _family_of(f"SELECT id FROM runs WHERE id IN ({marks})")
+                + " UPDATE approvals SET permit_until = NULL WHERE status = 'approved' AND used_at IS NULL"
                 " AND permit_until IS NOT NULL AND run_id IN (SELECT id FROM family)",
                 ids,
             )
@@ -3264,9 +3271,7 @@ class Store:
         what its arguments named of Dot's own, and whether a helper took it (item 585: what a run and its helpers
         touched, whatever its length)."""
         rows = await self._all(
-            "WITH RECURSIVE family(id) AS (SELECT ?"
-            " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
-            " SELECT e.run_id != ? AS helper, json_extract(e.data, '$.tool') AS tool,"
+            _family_of("SELECT ?") + " SELECT e.run_id != ? AS helper, json_extract(e.data, '$.tool') AS tool,"
             " json_extract(e.data, '$.kind') AS kind, json_extract(e.data, '$.target') AS target,"
             " json_extract(e.data, '$.flags') AS flags, json_extract(e.data, '$.names_dot') AS names_dot"
             " FROM events AS e WHERE e.run_id IN (SELECT id FROM family) AND e.kind = 'tool_result' ORDER BY e.id",
@@ -3830,6 +3835,16 @@ class Store:
             "SELECT * FROM approvals WHERE run_id = ? AND status = 'left' ORDER BY created_at", (run_id,)
         )
         return [_approval(row) for row in rows]
+
+    async def count_left_in_chat(self, thread_id: str) -> int:
+        """How many questions and kept steps the runs of ``thread_id``, and the runs they delegated to, left for the
+        user that are not answered or skipped yet (item 868)."""
+        row = await self._one(
+            _family_of("SELECT id FROM runs WHERE thread_id = ?") + " SELECT COUNT(*) AS left_count FROM approvals"
+            " WHERE status = 'left' AND run_id IN (SELECT id FROM family)",
+            (thread_id,),
+        )
+        return int(row["left_count"]) if row is not None else 0
 
     @_writing
     async def expire_pending_approvals(self, note: str) -> int:
@@ -5946,9 +5961,8 @@ class Store:
         )
         candidates: set[str] = await self._delete_chats(sessions) if sessions else set()
         await self._db.execute(
-            "WITH RECURSIVE family(id) AS (SELECT id FROM runs WHERE campaign_id = ?"
-            " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
-            " UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
+            _family_of("SELECT id FROM runs WHERE campaign_id = ?")
+            + " UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
             " WHERE status = 'left' AND run_id IN (SELECT id FROM family)",
             (campaign.id, time.time(), "the campaign was deleted"),
         )
