@@ -66,6 +66,22 @@ def test_the_prompt_opens_in_the_agents_voice_and_carries_the_owners_instruction
     assert "The owner's instructions" not in made
 
 
+def test_the_prompt_says_what_the_agent_never_does_after_its_instructions() -> None:
+    agent: AgentBrief = AgentBrief(
+        name="Prospector",
+        role="Finds prospects",
+        instructions="Ten a day.",
+        made_by_dot=False,
+        team="",
+        refuses="- Work inbound leads\n\n• Send a message itself\n",
+    )
+    prompt: str = _prompt(agent)
+    never: int = prompt.index("What you never do, whoever asks")
+    assert prompt.index("Ten a day.") < never
+    assert "\n- Work inbound leads\n- Send a message itself" in prompt
+    assert "What you never do" not in _prompt(agent.model_copy(update={"refuses": "  \n"}))
+
+
 def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_react_and_turn_groups_on() -> None:
     # An agent reacts to the owner's message as Dot does (item 664).
     # And asks the owner for a secret on its card (item 857), as it asks them anything.

@@ -226,6 +226,10 @@ class AgentLook(FrozenModel):
     colour: CharacterColour
 
 
+# How long what an agent never does may be (item 875): a few lines, as a template's are.
+REFUSES_CHARS: int = 2000
+
+
 class AgentToolUse(FrozenModel):
     """What an agent's newest ended runs did (item 874): how many runs, the tokens they spent, when the newest
     began (``None`` before any ended) and the calls of each tool."""
@@ -259,6 +263,7 @@ class AgentRecord(FrozenModel):
     made_by: str | None
     look: AgentLook | None
     paused_at: float | None
+    refuses: str = ""
 
 
 DOT_AGENT_ID: str = "dot"

@@ -760,6 +760,7 @@ def _agent(row: aiosqlite.Row) -> AgentRecord:
         made_by=row["made_by"],
         look=_look_of(row),
         paused_at=row["paused_at"],
+        refuses=row["refuses"],
     )
 
 
@@ -1230,6 +1231,8 @@ _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("colour", "TEXT"),
     # When the owner paused the agent (item 465); NULL while it works, as every agent did before.
     ("paused_at", "REAL"),
+    # What the agent never does, one line each (item 875); empty for none, as for every agent before.
+    ("refuses", "TEXT NOT NULL DEFAULT ''"),
 )
 # Columns of ``approvals`` added later: a step kept for the owner (item 482) has the fingerprint of its action and when
 # it lapses, the owner's yes to a kept ask (item 483) until when it holds and when it was spent, and the conversation
@@ -5611,9 +5614,11 @@ class Store:
         tools: Sequence[str],
         made_by: str | None,
         look: AgentLook | None,
+        refuses: str = "",
     ) -> AgentRecord:
         """Store a new agent (item 86); ``made_by`` is the run that made it (item 99), ``None`` for the owner; ``look``
-        is its character (item 102), ``None`` for the fallback of its id's hue."""
+        is its character (item 102), ``None`` for the fallback of its id's hue; ``refuses`` what it never does, a line
+        each (item 875)."""
         now: float = time.time()
         record: AgentRecord = AgentRecord(
             id=new_id("agt"),
@@ -5629,10 +5634,11 @@ class Store:
             made_by=made_by,
             look=look,
             paused_at=None,
+            refuses=refuses,
         )
         await self._db.execute(
             "INSERT INTO agents(id, name, role, instructions, model, effort, approvals, tools, created_at, updated_at,"
-            " made_by, shape, expression, colour) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " made_by, shape, expression, colour, refuses) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.name,
@@ -5648,6 +5654,7 @@ class Store:
                 None if look is None else look.shape,
                 None if look is None else look.expression,
                 None if look is None else look.colour,
+                refuses,
             ),
         )
         await self._db.commit()
@@ -5665,12 +5672,14 @@ class Store:
         approvals: ApprovalMode | None,
         tools: Sequence[str],
         look: AgentLook | None,
+        refuses: str | None = None,
     ) -> AgentRecord:
-        """Replace what the agent is; its id, its runs and its pause (item 465) stay."""
-        await self.get_agent(agent_id)
+        """Replace what the agent is; its id, its runs and its pause (item 465) stay, and what it never does (item
+        875) with ``refuses`` ``None``."""
+        saved: AgentRecord = await self.get_agent(agent_id)
         await self._db.execute(
             "UPDATE agents SET name = ?, role = ?, instructions = ?, model = ?, effort = ?, approvals = ?, tools = ?,"
-            " updated_at = ?, shape = ?, expression = ?, colour = ? WHERE id = ?",
+            " updated_at = ?, shape = ?, expression = ?, colour = ?, refuses = ? WHERE id = ?",
             (
                 name,
                 role,
@@ -5683,6 +5692,7 @@ class Store:
                 None if look is None else look.shape,
                 None if look is None else look.expression,
                 None if look is None else look.colour,
+                saved.refuses if refuses is None else refuses,
                 agent_id,
             ),
         )

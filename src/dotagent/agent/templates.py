@@ -14,7 +14,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 from dotagent.secrets import mask_filled
-from dotagent.store.models import AgentLook, AgentRecord
+from dotagent.store.models import REFUSES_CHARS, AgentLook, AgentRecord
 
 # The longest instructions an agent file holds: those of an agent (``AgentRequest``).
 _INSTRUCTION_CHARS: int = 50_000
@@ -41,6 +41,8 @@ class AgentTemplate(FrozenModel):
     schedule: str
     cron: str
     task: str
+    # What its agent never does, a line each (item 875): the edges of its job, which its card lists.
+    refuses: tuple[str, ...] = ()
 
 
 class AgentFile(FrozenModel):
@@ -56,6 +58,8 @@ class AgentFile(FrozenModel):
     approvals: ApprovalMode | None
     tools: tuple[str, ...]
     look: AgentLook | None
+    # What it never does (item 875); a file made before has none.
+    refuses: str = Field(default="", max_length=REFUSES_CHARS)
 
 
 # The name of the trading desk's agent (item 847): the agent of this name is the Trader, whose page and panel open the
@@ -119,6 +123,13 @@ def _steps(*lines: str) -> str:
 TEMPLATES: tuple[AgentTemplate, ...] = (
     AgentTemplate(
         id="sales-outbound",
+        refuses=(
+            "Work inbound leads or the owner's existing deals",
+            "Run or change the owner's CRM",
+            "Write to a prospect it has written to before",
+            "Invent a person, a title, an address or a fact: a field with no source stays blank",
+            "Send a message itself",
+        ),
         name="Sales Outbound",
         role="Finds prospects that fit and drafts a first email to each",
         instructions="You find companies and people who fit the owner's ideal customer, and write each a first email.\n"
@@ -145,6 +156,12 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="talent-scout",
+        refuses=(
+            "Contact a candidate's current employer",
+            "Weigh age, gender, origin or anything the role does not ask",
+            "Invent a detail of a candidate: a field with no source stays blank",
+            "Send a message itself",
+        ),
         name="Talent Scout",
         role="Finds people for an open role and drafts a note to each",
         instructions="You find people who fit an open role and write each a short note.\n"
@@ -171,6 +188,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="paid-media",
+        refuses=(
+            "Change a budget, a bid, an audience or a campaign",
+            "Start, pause or pay for an ad",
+            "Report a figure it did not read from the platform",
+        ),
         name="Paid Media",
         role="Reads the ad results and says what to change",
         instructions="You watch the owner's paid campaigns and say what to change.\n"
@@ -196,6 +218,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="expense-manager",
+        refuses=(
+            "Pay, submit or approve anything",
+            "Delete or move a receipt the owner keeps",
+            "Guess an amount it cannot read",
+        ),
         name="Expense Manager",
         role="Gathers the receipts and prepares the expense report",
         instructions="You gather the owner's receipts and prepare the expense report.\n"
@@ -222,6 +249,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="product-performance",
+        refuses=(
+            "Change the product, its prices or its tracking",
+            "Report a figure without where and when it was read",
+            "Read a user's personal data beyond the counts",
+        ),
         name="Product Performance",
         role="Watches the product's numbers and reports what moved",
         instructions="You report how the product is doing.\n"
@@ -250,6 +282,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="bug-reproduction",
+        refuses=(
+            "Fix the bug, commit or push",
+            "Run anything against production data",
+            "Close or comment on a ticket",
+        ),
         name="Bug Reproduction",
         role="Reproduces a reported bug and writes a clear report",
         instructions="You turn a bug report into steps anyone can follow.\n"
@@ -272,6 +309,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="account-health",
+        refuses=(
+            "Write to a customer itself",
+            "Change a plan, a price or a refund",
+            "Call an account healthy or at risk without its figures",
+        ),
         name="Account Health",
         role="Watches the key accounts for risk and drafts check-ins",
         instructions="You keep an eye on the owner's key customers.\n"
@@ -299,6 +341,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="chief-of-staff",
+        refuses=(
+            "Accept, decline or move a meeting",
+            "Send a mail or a message itself",
+            "Delete or archive a mail",
+        ),
         name="Chief of Staff",
         role="Keeps the owner's day in order: inbox, calendar and follow-ups",
         instructions="You prepare the owner's day and keep follow-ups from slipping.\n"
@@ -327,6 +374,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="reviewer",
+        refuses=(
+            "Change, commit or push code",
+            "Approve or merge a pull request",
+            "Review what the owner did not name",
+        ),
         name="Reviewer",
         role="Reviews a change in the owner's code against REVIEW.md and says what to fix",
         instructions="You review code the way the repository asks for it, and you change nothing.\n"
@@ -368,6 +420,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="research-desk",
+        refuses=(
+            "State a claim or a figure without its link and date",
+            "Answer from memory where the web can be read",
+            "Write the article or the post the research is for",
+        ),
         name="Research Desk",
         role="Answers a question with sources, dates and every claim checked",
         instructions="You answer questions with claims the owner can check, not with what a model remembers.\n"
@@ -395,6 +452,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="competitor-watch",
+        refuses=(
+            "Read a page behind a login",
+            "Write to a competitor's people",
+            "Copy a competitor's content",
+        ),
         name="Competitor Watch",
         role="Watches the competitors' sites, pricing and changelogs and reports what changed",
         instructions="You watch the owner's competitors and report only what changed.\n"
@@ -424,6 +486,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="release-qa",
+        refuses=(
+            "Change the product",
+            "Open a ticket before the owner names the tracker",
+            "Use a real customer's account",
+        ),
         name="Release QA",
         role="Walks the live product and says what shipped, what broke and what needs the owner",
         instructions="You are the acceptance check of what the owner ships.\n"
@@ -456,6 +523,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="copy-editor",
+        refuses=(
+            "Change the meaning, a fact or a figure",
+            "Overwrite the original",
+            "Research or add claims of its own",
+        ),
         name="Copy Editor",
         role="Rewrites a draft so it reads like a person wrote it, and shows every change",
         instructions="You edit what the owner wrote until it reads like a person wrote it, and you change nothing "
@@ -484,6 +556,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     ),
     AgentTemplate(
         id="design-critic",
+        refuses=(
+            "Edit the design itself",
+            "Judge without naming the screen and what it breaks",
+            "Redesign what it was asked to review",
+        ),
         name="Design Critic",
         role="Critiques a screen or a Figma frame and ranks the fixes",
         instructions="You critique a design and rank what to fix, and you edit nothing.\n"
@@ -513,6 +590,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
     # desk. It watches and reports; the trend engine trades by its rule (item 818), and no tool of its places an order.
     AgentTemplate(
         id="trader",
+        refuses=(
+            "Place, change or cancel an order",
+            "Change a limit",
+            "Move money in or out",
+        ),
         name=TRADER_NAME,
         role="Watches the trading desk and the trend engine, and reports the day",
         instructions="You watch the owner's trading on Coinbase and report it; the trend engine trades by its rule.\n"
@@ -621,9 +703,11 @@ def agent_file(record: AgentRecord, known: Sequence[str]) -> AgentFile:
     ``known`` secrets Dot holds (:func:`dotagent.secrets.known_secrets`), or a key, a token or a password by its form
     (:func:`~dotagent.core.text.redact_known`); the owner takes it out of the agent first. A value filled into a page
     is not among ``known`` (the refusal must not tell by it, item 621), and the file carries none: it is masked."""
-    if any(redact_known(words, known) != words for words in (record.name, record.role, record.instructions)):
+    words_of: tuple[str, ...] = (record.name, record.role, record.instructions, record.refuses)
+    if any(redact_known(words, known) != words for words in words_of):
         raise InvalidValueError(
-            "the agent's name, role or instructions hold what looks like a secret; take it out, then export the agent",
+            "the agent's name, role, instructions or what it never does hold what looks like a secret; take it out, "
+            "then export the agent",
             {"agent_id": record.id},
         )
     return AgentFile(
@@ -637,4 +721,5 @@ def agent_file(record: AgentRecord, known: Sequence[str]) -> AgentFile:
         approvals=record.approvals,
         tools=record.tools,
         look=record.look,
+        refuses=mask_filled(record.refuses),
     )

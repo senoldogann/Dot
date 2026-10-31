@@ -18,7 +18,7 @@ from dotagent.core.text import truncate_tail, unclosing
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import Message
 from dotagent.policy.types import ActionInfo
-from dotagent.store.models import AgentRecord, EventRecord, RunMode, RunRecord, TeamRecord, ThreadRecord
+from dotagent.store.models import REFUSES_CHARS, AgentRecord, EventRecord, RunMode, RunRecord, TeamRecord, ThreadRecord
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -49,6 +49,8 @@ _INSTRUCTIONS_CHARS: int = 8000
 # The most agents one run makes (item 307): a team for the work at hand, not a crowd. Six since item 864, so that a run
 # can make the team the owner asks for (the owner: "takım oluştur agentler ile").
 _MOST_MADE_PER_RUN: int = 6
+# How many lines of what it never does an agent a run makes may carry (item 875).
+_MOST_REFUSALS: int = 8
 # The bounds of a team, the Agents page's (TeamRequest), and the most teams one run makes.
 _TEAM_PURPOSE_CHARS: int = 500
 _MOST_TEAM_AGENTS: int = 12
@@ -209,12 +211,14 @@ class CreateAgentArgs(ToolArgs):
     instructions: str = Field(
         max_length=_INSTRUCTIONS_CHARS, description="How it works; they open the system prompt of its runs."
     )
-    tools: list[str] = Field(
-        default_factory=list,
-        description="The tools its role needs, by name, each one of yours; only those, never every tool.",
-    )
+    tools: list[str] = Field(default_factory=list, description="Tool names its role needs, of yours; only those.")
     model: str = Field(
         default="", description="A helper model (provider:model) for its runs; empty: the configured one."
+    )
+    refuses: list[str] = Field(
+        default_factory=list,
+        max_length=_MOST_REFUSALS,
+        description="What it never does, a line each: the edges of its job.",
     )
 
 
@@ -298,16 +302,25 @@ def _create_agent_tool() -> RegisteredTool:
                 {"agent": taken.name, "role": taken.role},
             )
         made: AgentRecord = await ctx.runtime.store.create_agent(
-            name, args.role.strip(), args.instructions.strip(), model, None, None, tools, ctx.run_id, None
+            name,
+            args.role.strip(),
+            args.instructions.strip(),
+            model,
+            None,
+            None,
+            tools,
+            ctx.run_id,
+            None,
+            "\n".join(line.strip() for line in args.refuses if line.strip())[:REFUSES_CHARS],
         )
         return ok(render_made(made))
 
     return make_tool(
         name=CREATE_AGENT_TOOL,
         description=(
-            "Make a lasting teammate: an agent with a name, a role, instructions and the tools its role needs, named "
-            "one by one, listed under Agents. One job each; for a role the work needs again or in parallel, never for "
-            "one step; send it work with message_agent."
+            "Make a lasting teammate: an agent with a name, a role, instructions and tools, listed under Agents. "
+            "One job each, for a role the work needs again or in parallel, never for one step; send it work with "
+            "message_agent."
         ),
         args_model=CreateAgentArgs,
         modes=ACTING_MODES,

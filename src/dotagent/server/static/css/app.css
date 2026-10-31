@@ -10225,18 +10225,21 @@ button.attach-chip:hover {
 
 /* A template's tools (item 425): the count under the facts, and the names themselves, wrapped, a click below it, so
    that a card keeps its height while the list stays in reach. */
-.template-tools {
+.template-tools,
+.template-refuses {
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
 }
 
-.template-tools > summary {
+.template-tools > summary,
+.template-refuses > summary {
   width: max-content;
   color: var(--muted);
   cursor: pointer;
 }
 
-.template-tools[open] > summary {
+.template-tools[open] > summary,
+.template-refuses[open] > summary {
   margin-bottom: var(--space-1);
 }
 
@@ -10247,6 +10250,13 @@ button.attach-chip:hover {
   /* A card stays as tall as its row while the names, when the list is open, scroll inside it. */
   max-height: 11rem;
   overflow: auto;
+}
+
+/* What a template's agent never does (item 875): a short list under its actions, each line a point. */
+.template-refuse-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--text);
 }
 
 /* A tool this home does not have (item 425): struck through and in the warning colour, since a template that names it
@@ -10274,7 +10284,8 @@ button.attach-chip:hover {
     grid-template-areas:
       "head use"
       "facts facts"
-      "tools tools";
+      "tools tools"
+      "refuses refuses";
     align-items: start;
     gap: var(--space-2);
     padding: var(--space-3);
@@ -10292,6 +10303,10 @@ button.attach-chip:hover {
     grid-area: tools;
   }
 
+  .template-card > .template-refuses {
+    grid-area: refuses;
+  }
+
   /* A card that offers its schedule has a row for the tick (item 464), which is tapped: a 40 px row, as the other
      rows a finger uses; a card that offers none keeps no empty row. */
   .template-card:has(> .template-also) {
@@ -10299,7 +10314,8 @@ button.attach-chip:hover {
       "head use"
       "facts facts"
       "also also"
-      "tools tools";
+      "tools tools"
+      "refuses refuses";
   }
 
   .template-card > .template-also {
@@ -10308,7 +10324,8 @@ button.attach-chip:hover {
   }
 
   /* The count that opens the tools is tapped: a 40 px row, like the other rows a finger opens, its marker kept. */
-  .template-tools > summary {
+  .template-tools > summary,
+  .template-refuses > summary {
     min-height: 40px;
     padding-block: var(--space-2);
   }

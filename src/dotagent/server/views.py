@@ -42,6 +42,7 @@ from dotagent.policy.types import ApprovalMode
 from dotagent.scheduler import NightWork
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
+    REFUSES_CHARS,
     AgentLook,
     AgentRecord,
     ApprovalRecord,
@@ -801,6 +802,8 @@ class AgentRequest(FrozenModel):
     approvals: ApprovalMode | None
     tools: list[str] | None = None
     look: AgentLook | None = None
+    # What it never does, a line each (item 875); None keeps what a saved agent has, and a new one has none.
+    refuses: str | None = Field(default=None, max_length=REFUSES_CHARS)
 
 
 class AgentSummary(FrozenModel):

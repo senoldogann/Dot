@@ -47,7 +47,17 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 FORMED_KEY: str = "MARKER- sk-0123456789abcdefghij"
 HELD_SECRET: str = "MARKER-held-by-this-home-0123"
 # What makes an agent the same agent in another home.
-PROFILE: tuple[str, ...] = ("name", "role", "instructions", "model", "effort", "approvals", "tools", "look")
+PROFILE: tuple[str, ...] = (
+    "name",
+    "role",
+    "instructions",
+    "model",
+    "effort",
+    "approvals",
+    "tools",
+    "look",
+    "refuses",
+)
 STRANGE_TOOL: str = "made_up_tool"
 # The tools that would reach Mail, Messages or a terminal on their own.
 DRIVERS: frozenset[str] = frozenset({"shell", "terminal_open", "terminal_send", "apple_script", "desktop_act"})
@@ -204,7 +214,14 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await expect(cards.locator(".template-tools > summary")).to_have_text(
                     [f"Actions ({len(template.tools)})" for template in TEMPLATES]
                 )
+                # And what its agent never does (item 875), a click below it: the edges of its job.
+                assert all(template.refuses for template in TEMPLATES), "a template says what its agent never does"
+                await expect(cards.locator(".template-refuses > summary")).to_have_text(
+                    [f"Never does ({len(template.refuses)})" for template in TEMPLATES]
+                )
                 first: Locator = cards.first
+                await first.locator(".template-refuses > summary").click()
+                await expect(first.locator(".template-refuse-list li")).to_have_text(list(TEMPLATES[0].refuses))
                 await first.locator(".template-tools > summary").click()
                 await expect(first.locator(".template-tool-chips code")).to_have_text(list(TEMPLATES[0].tools))
                 # Every tool the templates name is a tool this home has, but the Trader's trading tools, which a home
@@ -260,6 +277,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                         "approvals": None,
                         "tools": list(template.tools),
                         "look": template.look.model_dump(mode="json"),
+                        "refuses": "\n".join(template.refuses),
                     }
                 # Every template names the tools its agent may use (item 425), and drafts what it writes to a person
                 # (item 314): none starts with every tool, and one that works on the web and in files alone names no
