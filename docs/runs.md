@@ -492,6 +492,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821) |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools` |
 | Team            | `create_agent`, `create_team` (a team of agents, item 864), `message_agent`                                        |
+| Office          | `agents_now`, `read_agent_chat` (what the other agents do now and one's chat, item 890)                            |
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Pages           | `show_page`                                                                                                        |
 | Drafts          | `draft_message`                                                                                                    |
