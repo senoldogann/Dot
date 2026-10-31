@@ -217,6 +217,7 @@ async def test_a_call_of_a_tool_whose_group_is_off_turns_the_group_on_and_the_ne
         "office",
         "recon",
         "pages",
+        "skills",
         "terminal",
     ]
     assert played.groups == (
@@ -234,6 +235,7 @@ async def test_a_call_of_a_tool_whose_group_is_off_turns_the_group_on_and_the_ne
                 "office",
                 "recon",
                 "pages",
+                "skills",
                 "terminal",
             ],
             "turned_on": ["schedule"],
@@ -242,7 +244,7 @@ async def test_a_call_of_a_tool_whose_group_is_off_turns_the_group_on_and_the_ne
         {
             "step": 3,
             "on": ["core", "memory_admin", "schedule"],
-            "off": ["waits", "browser", "todos", "drafts", "team", "office", "recon", "pages", "terminal"],
+            "off": ["waits", "browser", "todos", "drafts", "team", "office", "recon", "pages", "skills", "terminal"],
             "turned_on": ["memory_admin"],
             "reason": "",
         },
@@ -272,6 +274,7 @@ async def test_the_next_run_of_a_thread_starts_with_the_groups_the_thread_used(l
                 "office",
                 "recon",
                 "pages",
+                "skills",
                 "terminal",
             ],
             "turned_on": [],

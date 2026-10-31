@@ -105,6 +105,9 @@ class ToolContext:
     # Whether the run has read content third parties can author as it stands (the gate's ``tainted``), read when a tool
     # that writes something lasting asks: the memory tools mark the notes they save with it.
     tainted: Callable[[], bool] = _untainted
+    # Whether the run has read such content at any time, which the owner's next message does not clear (the gate's
+    # ``ever_tainted``): what a tool writes that every later run follows as the owner's word reads it (item 893).
+    ever_tainted: Callable[[], bool] = _untainted
     # What the user wrote in this run, the goal and every instruction since, read when a tool must tell a secret the
     # user gave from one a page or a tool's output carries (item 797).
     user_text: Callable[[], str] = _no_user_text

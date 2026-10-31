@@ -55,7 +55,10 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 200 for `agents_now` and `read_agent_chat` (item 890: an agent sees what the others do and reads one's
 # chat to help it, the owner's ask of 2026-10-31), their descriptions a line each (23,901 measured with items 880 and
 # 875; tools 16,476).
-BUDGET_TOKENS: int = 24_000
+# Raised by 200 for `skill_save` (item 893, after a guide to Grok's bots the owner sent: "tell your bots to create
+# skills for itself as you give it instructions"): a run writes down how the owner told it to do a kind of work, in a
+# group of its own (24,110 measured with item 890; tools 16,684).
+BUDGET_TOKENS: int = 24_200
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -66,7 +69,8 @@ SYSTEM_BUDGET_TOKENS: int = 7_400
 # Raised by 300 for `ask_secret` (item 857) above, by 200 for `create_team` (item 864), and by 300 for `wait_until`
 # (item 887) above, and by 100 for items 880 and 875 above.
 # Raised by 200 for the office's two tools (item 890) above.
-TOOLS_BUDGET_TOKENS: int = 16_600
+# Raised by 200 for `skill_save` (item 893) above.
+TOOLS_BUDGET_TOKENS: int = 16_800
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

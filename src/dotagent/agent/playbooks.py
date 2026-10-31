@@ -272,6 +272,8 @@ class Playbook(FrozenModel):
     # A skill the owner taught by showing the task once (item 423) rather than one Dot learned from its own work: its
     # own header, no run behind it, and never retired for failures.
     taught: bool = False
+    # A taught skill the owner said in a chat rather than showed (item 893, ``skill_save``): its header says so.
+    said: bool = False
 
 
 type VersionChange = Literal["learned", "relearned", "taught", "restored", "merged", "revised"]
@@ -328,6 +330,8 @@ class PlaybookMeta(FrozenModel):
     # A skill the owner taught (item 423): trusted as they showed it, and never retired for the runs that failed with
     # it, which is the owner's to decide.
     taught: bool = False
+    # Taught in the owner's words in a chat (item 893), not shown in the browser.
+    said: bool = False
     last_read_at: float | None = None
     pinned: bool = False
     rested_at: float | None = None
@@ -505,12 +509,17 @@ def render_playbook(playbook: Playbook, earlier: PlaybookMeta | None) -> str:
     where: str = f" on {playbook.host}" if playbook.host != NO_SITE else ""
     if playbook.taught:
         # A skill the owner taught (item 423): its own header, no run behind it, and the same sections a run reads.
+        origin: str = (
+            f"Taught by the owner on {_date(playbook.written_at)}, in their own words in a chat: how they want this "
+            "work done, written down so that every later run does it the same way."
+            if playbook.said
+            else f"Taught by the owner on {_date(playbook.written_at)}, showing the task once in Dot's browser{where}: "
+            "the steps they took, written down so that a later run can do it again."
+        )
         return (
             f"---\n{_frontmatter(playbook.name, description)}---\n\n"
             f"# {playbook.name}\n\n"
-            f"Taught by the owner on {_date(playbook.written_at)}, showing the task once in Dot's browser{where}: the "
-            "steps they took, written down so that a later run can do it again. It is the owner's own instruction to "
-            "Dot, not advice learned from a run.\n\n"
+            f"{origin} It is the owner's own instruction to Dot, not advice learned from a run.\n\n"
             f"## Kind of work\n\n{kind}\n\n"
             f"## When\n\n{when}\n\n"
             f"## Steps\n\n{steps}\n\n"
@@ -613,6 +622,7 @@ def meta_of(playbook: Playbook, earlier: PlaybookMeta | None) -> PlaybookMeta:
             tainted=False,
             tainted_runs=(),
             taught=True,
+            said=playbook.said,
             version=1,
             versions=(SkillVersion(n=1, at=playbook.written_at, run_id=None, change="taught", tainted=False),),
         )
@@ -915,6 +925,96 @@ def update_playbook(root: Path, name: str, playbook: Playbook) -> Path:
         archive_version(folder, earlier.version)
         replace_skill(folder, text, meta_of(renamed, earlier))
     return file
+
+
+def save_said_skill(root: Path, draft: PlaybookDraft, agent_id: str | None, now: float) -> str:
+    """Write ``draft``, the owner's words in a chat on how a kind of work is done (item 893), as a taught skill of the
+    agent ``agent_id`` (``None``: Dot's), and return its name: ``taught-<kind>``, or the next free name when one is
+    there already. The caller has masked its secrets and made sure the run read nothing third parties can author."""
+    # The name is picked and then written under the lock in turn: a save of the same kind at the same moment took the
+    # name first, so this one takes the next (the pre-push review).
+    for _attempt in range(_SAID_NAME_TRIES):
+        name: str = free_name(root, taught_name(draft.kind))
+        try:
+            _write_said(root, name, draft, agent_id, now)
+        except FileExistsError:
+            continue
+        return name
+    raise InvalidValueError("no free name for the skill; try again", {"kind": draft.kind})
+
+
+_SAID_NAME_TRIES: int = 5
+
+
+def _write_said(root: Path, name: str, draft: PlaybookDraft, agent_id: str | None, now: float) -> None:
+    write_playbook(
+        root,
+        Playbook(
+            name=name,
+            kind=draft.kind,
+            host=NO_SITE,
+            draft=draft,
+            run_id="",
+            agent_id=agent_id,
+            goal=draft.description,
+            written_at=now,
+            acting_steps=len(draft.steps),
+            tainted=False,
+            taught=True,
+            said=True,
+        ),
+    )
+
+
+def revise_said_skill(root: Path, name: str, draft: PlaybookDraft, agent_id: str | None, words: str, now: float) -> int:
+    """Rewrite the skill ``name`` that the owner said in a chat (item 893) from ``draft``, as they now say it, and
+    return its new version: the file it replaces is kept as a version (item 585), the note of the new one says
+    ``revised`` with ``words``. Only a skill said in a chat, of the same agent (``None``: Dot's) and active, is
+    rewritten so: a learned skill, one shown in the browser or another agent's is :class:`InvalidValueError`."""
+    folder: Path = playbook_folder(root, name)
+    with changing(root):
+        if not (folder / SKILL_FILE).is_file():
+            raise NotFoundError("there is no active skill of that name", {"name": name})
+        meta: PlaybookMeta = read_meta(folder)
+        if not (meta.taught and meta.said) or meta.agent_id != agent_id:
+            raise InvalidValueError(
+                "only a skill saved from the owner's words in a chat of yours can be rewritten so; save a new one",
+                {"name": name},
+            )
+        number: int = meta.version + 1
+        text: str = render_playbook(
+            Playbook(
+                name=name,
+                kind=draft.kind,
+                host=meta.host,
+                draft=draft,
+                run_id="",
+                agent_id=agent_id,
+                goal=draft.description,
+                written_at=meta.written_at,
+                acting_steps=len(draft.steps),
+                tainted=False,
+                taught=True,
+                said=True,
+            ),
+            None,
+        )
+        note: SkillVersion = SkillVersion(n=number, at=now, run_id=None, change="revised", tainted=False, words=words)
+        archive_version(folder, meta.version)
+        replace_skill(
+            folder,
+            text,
+            meta.model_copy(
+                update={
+                    "kind": draft.kind,
+                    "updated_at": now,
+                    "failing": 0,
+                    "version": number,
+                    "versions": (*noted(meta), note),
+                }
+            ),
+        )
+    return number
 
 
 def read_meta(folder: Path) -> PlaybookMeta:
