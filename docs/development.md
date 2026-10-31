@@ -436,6 +436,13 @@ scheduled run of the owner's sent 50,000 to 61,000 tokens before any work on 202
 `tests/smoke/test_context_budget.py` holds a fresh home's task run under a budget (21,300 in all, the system prompt
 7,000, the tools 14,400), and a change that needs more raises it there, saying why.
 
+**Where the tokens went** (item 881): after the medians, `dotx stats` names the five goals of its window that spent
+the most tokens, the chats of one title together (a goal started again in a new chat keeps its title), each with its
+share of all of them, its tokens, its chats, its runs and how many failed. One started again in two chats or more whose
+runs failed twice or more is marked "started again and failing: look whether it gets anywhere": on the owner's Mac a
+hiring CTF whose flag was never found took 64 million of 604 million tokens in a week, over four chats, eight runs and
+five failures, and nothing said so; their own busy chat, which took more, is not marked.
+
 **`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its
 own: file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, a goal that
 asks for as much as the files give, read-only research, a task that cannot be done and has to end as an honest failure,
