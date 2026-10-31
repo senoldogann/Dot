@@ -1294,6 +1294,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* Its button stands where the chats' head holds it, 16 px in (.side-head): the nav's own 8 px and these 8 (the
+     desktop shell sets both heads to its own padding). */
+  padding-left: 8px;
 }
 
 /* Back to chats, at the foot of the nav under the sections (item 852). */
@@ -1376,7 +1379,7 @@
   color: var(--text);
 }
 
-/* The tab's name keeps its width: a long value (the default model's name) ends in an ellipsis beside it rather than
+/* The tab's name keeps its width: a long value (a count, a theme's name) ends in an ellipsis beside it rather than
    running over it (the design audit of item 778). */
 .settings-nav-label {
   flex: none;

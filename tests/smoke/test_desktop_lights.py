@@ -255,6 +255,8 @@ async def test_a_browsers_page_keeps_its_own_bars(runtime: Runtime, address: str
             back: Locator = nav.get_by_role("link", name="Back to chats")
             await expect(back).to_be_visible()
             assert await _centre_y(nav.get_by_role("button", name="Hide sidebar")) < LIGHTS_ROW
+            # It stands where the chats' head held it: opening the settings moves it neither way.
+            assert abs(await _left(nav.get_by_role("button", name="Hide sidebar")) - _BROWSER_LEFT) <= _TOLERANCE_PX
             assert await _centre_y(back) > await _centre_y(nav.locator(".settings-nav-link").last)
             assert errors == []
         finally:

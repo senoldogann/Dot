@@ -21,7 +21,7 @@ import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
 import { loopRhythm, nextFiring } from "./rhythm.js";
-import { markContent, markInk } from "./marks.js";
+import { markContent } from "./marks.js";
 import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
@@ -822,9 +822,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
 
   function paintChats() {
-    // Select stands on the line of the days' first label (item 855): with no chat among the days there is none, and a
-    // chat of a section at the foot is chosen from its row's menu.
-    selectButton.hidden = selecting || chats === null || chats.every((chat) => aboveTheList(chat) || channelOf(chat) !== null);
+    // Select stands on the line of the days' first label (item 855): with no chat among the days shown there is none
+    // (a search that finds none shows its note there instead), and a chat of a section at the foot is chosen from its
+    // row's menu.
+    selectButton.hidden = selecting || shownChats().every((chat) => channelOf(chat) !== null);
     head.hidden = selecting;
     bar.hidden = !selecting;
     list.hidden = false;
@@ -1541,14 +1542,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function showMarks() {
     const shown = readyServers.slice(0, CONNECTED_MARKS);
     connectMarks.replaceChildren(
-      ...shown.map((server) => {
-        const mark = el("span", { class: "side-connect-mark" }, markContent(server.mark));
-        const ink = markInk(server.mark.colour);
-        if (ink !== null) {
-          mark.style.setProperty("--plugin-ink", ink);
-        }
-        return mark;
-      }),
+      // Each is a logo in its own colours (item 853): no ink to set.
+      ...shown.map((server) => el("span", { class: "side-connect-mark" }, markContent(server.mark))),
     );
   }
   paintConnected();

@@ -54,8 +54,11 @@ _LANE: str = """() => {
   const face = box(document.querySelector('.answer .turn-face'));
   const words = [
     ...[...document.querySelectorAll('.bubble.say')].map((n) => ['said', box(n.querySelector('.prose') ?? n).left]),
-    // The first words of each head of a group or a step, after its mark.
-    ...[...document.querySelectorAll('.steps-head, .tool-head')].map((head) => {
+    // The first words of each head of a group or a step on the screen, after its mark (a step in a folded group shows
+    // nothing).
+    ...[...document.querySelectorAll('.steps-head, .tool-head')]
+      .filter((head) => head.getBoundingClientRect().width > 1)
+      .map((head) => {
       const first = [...head.children].slice(1).find((n) => n.getBoundingClientRect().width > 1);
       return [head.className, box(first).left];
     }),
