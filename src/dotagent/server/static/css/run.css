@@ -252,17 +252,15 @@
 
 /* ---------- the agents' words in the conversation (item 668) ---------- */
 
-/* A part on its way to an agent: Dot's three dots and "Sending to Scout…", in a pill of the lane, until the agent's run
-   starts and its row takes over. */
+/* A part on its way to an agent: "Sending to Scout…" and Dot's three dots after it, a quiet line where the words of the
+   messages start, until the agent's run starts and its row takes over (item 884: the pill it was in went). */
 .agent-handoff {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   align-self: flex-start;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
+  padding: var(--space-half) 0;
+  margin-left: calc(28px + var(--space-2));
   color: var(--muted);
   font-size: var(--text-sm);
   animation: fade-in var(--motion-base) var(--ease);
@@ -295,7 +293,13 @@
    set apart by a rule at its left rather than a bubble. */
 .agent-said {
   min-width: 0;
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+/* Folded, its head stands where the words of the lines start, under the row of the agent it is from (item 884), not
+   in the column of the faces. */
+.agent-said:not([open]) > .agent-said-head {
+  margin-left: calc(28px + var(--space-2) - 4px);
 }
 
 .agent-said-head {

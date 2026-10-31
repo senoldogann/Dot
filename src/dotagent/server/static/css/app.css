@@ -6476,41 +6476,26 @@ a.schedule-line:hover .schedule-made {
 }
 
 /* A delegated run is a row (item 82): the face with its state at the corner, the goal over its last line, the time it
-   has taken, the way to its page and a chevron; opened, the run's steps hang under it. Rows that follow each other
-   share one card, a hairline between them. */
+   has taken, the way to its page and a chevron; opened, the run's steps hang under it. Since item 884 (the owner's
+   word: the chat looked "çok çirkin") it is no card: a line of the lane on no fill, its face in the column of the
+   faces and its words where the words of the messages start, as the lines around it are; a tint under the pointer. */
 .child {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.child:has(+ .child) {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.child + .child {
-  margin-top: -8px;
-  border-top: 0;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
-
-.child + .child > summary {
-  border-top: 1px solid var(--border);
+  min-width: 0;
 }
 
 .child > summary {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: var(--space-2);
+  margin: 0 calc(var(--space-2) * -1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   list-style: none;
 }
 
 .child > summary:hover {
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
 .child > summary::-webkit-details-marker {
@@ -6529,13 +6514,13 @@ summary:has(> .chev)::-webkit-details-marker {
 .child-face {
   position: relative;
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
 }
 
 .child-face .avatar {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
 }
 
 .child-face .status-ring {
@@ -6544,7 +6529,7 @@ summary:has(> .chev)::-webkit-details-marker {
   bottom: -3px;
   width: 12px;
   height: 12px;
-  background: var(--surface);
+  background: var(--bg);
 }
 
 .child-main {
@@ -6578,9 +6563,10 @@ summary:has(> .chev)::-webkit-details-marker {
   font-size: var(--text-sm);
 }
 
+/* Opened, the run's steps hang under the row on a hairline from the face's middle, their words where the row's are. */
 .child > .timeline {
-  margin: 0 12px 12px 36px;
-  padding-left: 12px;
+  margin: var(--space-1) 0 var(--space-2) 12px;
+  padding-left: calc(28px + var(--space-2) - 12px);
   border-left: 1px solid var(--border);
 }
 
@@ -9463,6 +9449,19 @@ button.attach-chip:hover {
 .child > summary .child-open:hover {
   color: var(--text);
   background: var(--surface-2);
+}
+
+/* The way to the run's own page shows under the pointer (item 884); a phone, with no pointer, keeps it. */
+@media (hover: hover) {
+  .child > summary .child-open {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease);
+  }
+
+  .child > summary:is(:hover, :focus-visible) .child-open,
+  .child > summary .child-open:focus-visible {
+    opacity: 1;
+  }
 }
 
 /* ---------- agents (item 86) ---------- */

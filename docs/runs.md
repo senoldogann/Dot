@@ -20,8 +20,8 @@ those lines start folded (Neutral and the palettes fold them, Paper does not). S
 chooses between **Every step** and **What it is doing**, the default since item 830 (the conversation as people chat,
 as the owner's screenshots of another agent app showed it): the steps and the thoughts of every turn are out
 of the conversation, and one line under it says what the run does now, in a few words from its latest event. The line
-starts with the face of who works and three of Dot's dots, as a messaging app shows someone typing, lined up with the
-words of the messages and close under the last of them (item 843); its words are "Thinking…" while the model thinks,
+starts with the face of who works, its words where the words of the messages start and three of Dot's dots after them,
+as a messaging app shows someone typing, close under the last message (items 843 and 884); its words are "Thinking…" while the model thinks,
 "Running a command…", "Searching the web…", "Reading a page…", "Working on the Mac…", "Asking Scout…" for a message to
 an agent, and so on, the words for the same work turning every four seconds ("Working in the terminal…") so that a long
 step reads as alive. Nothing is said that the run is not doing: while it writes a message, or a card waits for you, the

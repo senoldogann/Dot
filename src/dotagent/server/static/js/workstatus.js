@@ -42,14 +42,14 @@ export function createWorkStatus({ rootRunId, active, onToggle, face = null }) {
   const dots = el("span", { class: "work-status-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span"));
   let words = el("span", { class: "work-status-words" });
   const more = el("span", { class: "work-status-more" });
-  // The face of who works stands before the dots, as a messaging app's typing has it (item 843), in the place the
-  // answer's face takes, so that the dots line up with the words of the messages.
+  // The face of who works stands first, in the place the answer's face takes (item 843), the words where the words of
+  // the messages start, and the dots after them, at the end of the line (item 884, the owner's ask).
   const element = el(
     "button",
     { class: "work-status", type: "button", "aria-pressed": "false" },
     face === null ? null : el("span", { class: "turn-face", "aria-hidden": "true" }, face),
-    dots,
     words,
+    dots,
     more,
   );
   let working = active;
