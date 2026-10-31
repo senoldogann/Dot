@@ -242,6 +242,9 @@ export function makeFigure(id, look, gold = false) {
 
   group.traverse((child) => {
     child.userData.figure = id;
+    // A figure stands on its contact shadow and casts none from the sun: the sun's shadows are drawn once, of the
+    // still room, not again at every frame for the figures that move (item 889).
+    child.castShadow = false;
   });
 
   // The joint angles of now and of the pose it eases toward.
@@ -286,6 +289,11 @@ export function makeFigure(id, look, gold = false) {
         const swing = Math.sin(t * 7) * 0.35;
         return { lean: 0, hipsY: 0.62 + Math.abs(Math.sin(t * 3.5)) * 0.02, headPitch: -0.08, headYaw: 0, arms: [0.05, 0.1, -0.15, -0.3, 2.5 + swing, -0.6], legs: [0, 0, 0, 0] };
       }
+      case "talk": {
+        // Telling another what it needs: a hand that turns as it speaks, a nod now and then.
+        const say = Math.sin(t * 5.5 + seed) * 0.25;
+        return { lean: 0.03, hipsY: 0.62 + breathe, headPitch: 0.05 + Math.sin(t * 2.2) * 0.06, headYaw: 0, arms: [0.05, 0.1, -0.15, -0.55 + say, 0.25, -1.2 - say], legs: [0, 0, 0, 0] };
+      }
       case "drink":
         return { lean: 0, hipsY: 0.62 + breathe, headPitch: -0.05 + Math.max(0, Math.sin(t * 0.8 + seed)) * -0.15, headYaw: 0, arms: [0.05, 0.08, -0.1, -0.6, 0.15, -1.9], legs: [0, 0, 0, 0] };
       case "think":
@@ -307,6 +315,7 @@ export function makeFigure(id, look, gold = false) {
         return "sleep";
       case "drink":
       case "rest":
+      case "talk":
         return "happy";
       default:
         return "open";

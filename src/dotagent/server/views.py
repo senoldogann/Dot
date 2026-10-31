@@ -287,6 +287,13 @@ class EventsQuery(FrozenModel):
     limit: int = Field(default=500, ge=1, le=2000)
 
 
+class RunsStreamQuery(FrozenModel):
+    """The runs one stream follows, their ids joined by commas (item 889), and the event id it goes on after."""
+
+    ids: str = Field(min_length=1, max_length=2000)
+    after: int = Field(default=0, ge=0)
+
+
 class StreamQuery(FrozenModel):
     """``stored``: end after the events stored when the stream was asked for, as for a run that is over (item 734)."""
 

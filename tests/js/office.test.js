@@ -101,3 +101,50 @@ test("a free agent never takes a spot another holds, and naps in the small hours
     assert.ok(spot.kind === "sofa" || spot === one.desk, spot.id);
   }
 });
+
+test("a run's events become its feed: the calls in words, the answer as written, how it ended, whom it messaged", async () => {
+  const { readEvent } = await import("../../src/dotagent/server/static/js/office/feeds.js");
+  const feed = { runId: "run_a", steps: [], text: "", ended: null, doing: "", at: 0 };
+  assert.equal(readEvent(feed, "tool_call", { tool: "web_search", args: { query: "cafés in Oulu" } }, 1), null);
+  assert.match(feed.doing, /cafés in Oulu/);
+  assert.equal(feed.steps.at(-1).ok, null);
+  readEvent(feed, "tool_result", { ok: false }, 2);
+  assert.equal(feed.steps.at(-1).ok, false);
+  readEvent(feed, "tool_call", { tool: "update_plan", args: {} }, 3);
+  assert.equal(feed.steps.length, 1, "the run's own bookkeeping is no step");
+  readEvent(feed, "delta", { kind: "thinking", text: "hm" }, 4);
+  assert.equal(feed.doing, "Thinking");
+  readEvent(feed, "delta", { text: "Found " }, 5);
+  readEvent(feed, "delta", { text: "three." }, 6);
+  assert.equal(feed.text, "Found three.");
+  assert.equal(readEvent(feed, "tool_call", { tool: "message_agent", args: { agent: " Engineer " } }, 7), "Engineer");
+  assert.equal(feed.doing, "Message Engineer");
+  readEvent(feed, "run_finished", { status: "done", result: "Three cafés." }, 8);
+  assert.equal(feed.ended, "done");
+  assert.equal(feed.doing, "");
+  assert.equal(feed.text, "Three cafés.");
+});
+
+test("a visiting agent stays at the other's desk until the visit is over, then goes back to work", async () => {
+  const { visit } = await import("../../src/dotagent/server/static/js/office/brain.js");
+  const plan = planFor(4);
+  const world = { grid: gridFor(plan), spots: plan.spots, taken: new Map() };
+  const random = seeded(5);
+  const agent = makeAgent("a", plan.desks[0], plan.desks[0]);
+  decide(agent, "working", world, 0, 14, random);
+  visit(agent, { x: plan.desks[1].x + 0.9, z: plan.desks[1].z }, 0, world, 30);
+  let now = 0;
+  for (let frame = 0; frame < 60 * 20; frame += 1) {
+    now += 1 / 60;
+    decide(agent, "working", world, now, 14, random);
+    step(agent, 1 / 60, now, 14, random);
+  }
+  assert.equal(agent.pose, "talk");
+  for (let frame = 0; frame < 60 * 30; frame += 1) {
+    now += 1 / 60;
+    decide(agent, "working", world, now, 14, random);
+    step(agent, 1 / 60, now, 14, random);
+  }
+  assert.equal(agent.visiting, 0);
+  assert.equal(agent.pose, "type");
+});

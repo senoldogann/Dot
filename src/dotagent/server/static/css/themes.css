@@ -154,6 +154,10 @@
   --office-working: #3ecf8e;
   --office-waiting: #f08a24;
   --office-panel-shadow: 0 18px 48px rgb(0 0 0 / 35%);
+  /* What a working agent does now, in a speech bubble over its tag (item 889). */
+  --office-bubble: #fffdf8;
+  --office-bubble-ink: #2a2830;
+  --office-bubble-shadow: 0 6px 18px rgb(0 0 0 / 28%);
 }
 
 /* ---------- paper: warm paper, a serif voice for answers and one terracotta accent ---------- */

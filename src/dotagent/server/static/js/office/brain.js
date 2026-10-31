@@ -12,7 +12,8 @@ import { findPath } from "./nav.js";
 /** @typedef {"working" | "waiting" | "free"} Mode */
 /**
  * @typedef {{ id: string, desk: Spot, mode: Mode, x: number, z: number, facing: number, pose: string, spot: Spot | null,
- *   path: Point[], until: number, settle: number, from: Point | null, seated: boolean, walked: number }} Agent
+ *   path: Point[], until: number, settle: number, from: Point | null, seated: boolean, walked: number,
+ *   visiting: number }} Agent
  */
 /** @typedef {{ grid: Grid, spots: Spot[], taken: Map<string, string> }} World */
 
@@ -56,6 +57,7 @@ export function makeAgent(id, desk, start) {
     from: null,
     seated: false,
     walked: 0,
+    visiting: 0,
   };
   return agent;
 }
@@ -115,8 +117,20 @@ function goTo(agent, spot, world) {
   }
 }
 
+/**
+ * Send `agent` over to talk with another at `point` (beside the other's desk), facing `facing`, until `until` (item 889:
+ * a message from one agent to another is seen as the sender walking over). It gets up first when it sits.
+ */
+export function visit(agent, point, facing, world, until) {
+  goTo(agent, { id: `visit-${agent.id}`, kind: "visit", x: point.x, z: point.z, facing, seat: null, pose: "talk" }, world);
+  agent.visiting = until;
+}
+
 /** The pose `agent` takes at its spot, in its mode and at `hour`. */
 function poseAt(agent, spot, hour) {
+  if (spot.kind === "visit") {
+    return "talk";
+  }
   if (spot === agent.desk) {
     if (agent.mode === "working") return "type";
     if (agent.mode === "waiting") return "wave";
@@ -133,6 +147,20 @@ function poseAt(agent, spot, hour) {
  * free agent whose stay is over picks its next spot. `now` is in seconds.
  */
 export function decide(agent, mode, world, now, hour, random) {
+  // Over at another agent's desk (item 889): it stays until the visit is over, then goes where its mode wants it.
+  if (agent.visiting > now) {
+    agent.mode = mode;
+    return;
+  }
+  if (agent.visiting !== 0) {
+    agent.visiting = 0;
+    agent.until = now;
+    if (mode !== "free") {
+      agent.mode = mode;
+      goTo(agent, agent.desk, world);
+      return;
+    }
+  }
   const changed = mode !== agent.mode;
   agent.mode = mode;
   if (mode !== "free") {

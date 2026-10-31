@@ -47,7 +47,14 @@ from dotagent.server.chatcontext import ChatContext, chat_context
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import local_hosts
 from dotagent.server.sending import send_once
-from dotagent.server.stream import event_stream, follow_lifecycle, follow_run, follow_screencast
+from dotagent.server.stream import (
+    MOST_FOLLOWED_RUNS,
+    event_stream,
+    follow_lifecycle,
+    follow_run,
+    follow_runs,
+    follow_screencast,
+)
 from dotagent.server.views import (
     ActivityCount,
     ActivityView,
@@ -66,6 +73,7 @@ from dotagent.server.views import (
     RunActions,
     RunDetail,
     RunsQuery,
+    RunsStreamQuery,
     SavedSkill,
     SecretRequest,
     StartRunRequest,
@@ -288,6 +296,17 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         """Save what the run did as a skill, at the owner's word (item 318, :func:`save_playbook`)."""
         name, updated = await save_playbook(ctx.runtime, await store.get_run(run_id))
         return SavedSkill(name=name, updated=updated)
+
+    @router.get("/runs/streams")
+    async def runs_stream(query: Annotated[RunsStreamQuery, Query()]) -> StreamingResponse:
+        """Several runs' events on one stream (item 889): a browser keeps six connections to a server, and a stream for
+        each working agent of the office filled them. Each run must be one; at most ``MOST_FOLLOWED_RUNS``."""
+        run_ids: frozenset[str] = frozenset(part.strip() for part in query.ids.split(",") if part.strip())
+        if not run_ids or len(run_ids) > MOST_FOLLOWED_RUNS:
+            raise InvalidValueError(f"name between 1 and {MOST_FOLLOWED_RUNS} runs", {"runs": str(len(run_ids))})
+        for run_id in run_ids:
+            await store.get_run(run_id)
+        return event_stream(follow_runs(ctx, run_ids, query.after))
 
     @router.get("/runs/{run_id}")
     async def get_run(run_id: str) -> RunDetail:
