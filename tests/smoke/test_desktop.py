@@ -25,11 +25,12 @@ from pydantic import BaseModel, ConfigDict
 
 from dotagent.config import DesktopConfig, load_config, load_default_config
 from dotagent.core.errors import FailSafeTriggered
+from dotagent.desktop import screen
 from dotagent.desktop.actions import refuse_secure_field
 from dotagent.desktop.input import PasteboardLike, PasteboardSnapshot, _restore_pasteboard, _snapshot_pasteboard
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.session import DesktopSession, StepReview, no_browser_chrome
-from dotagent.desktop.types import ActOutcome, AppView, Permissions, SnapshotView, Step, TextRead
+from dotagent.desktop.types import ActOutcome, AppView, Permissions, Point, SnapshotView, Step, TextRead
 from dotagent.desktop.views import ViewRequest
 
 _FIXTURE: Path = Path(__file__).resolve().parents[1] / "fixtures" / "dot_fixture_app.py"
@@ -199,8 +200,12 @@ async def _act(session: DesktopSession, app: FixtureApp, steps: list[Step]) -> A
 async def test_click_and_press_reach_the_button(session: DesktopSession, app: FixtureApp) -> None:
     button: str = _ref_of(await _body(session, app), r'button "Increment"')
     mark: int = _mark(app)
+    pointer: Point = screen.pointer_location()
     outcome: ActOutcome = await _act(session, app, [Step(action="click", ref=button), Step(action="press", ref=button)])
     assert [report.outcome for report in outcome.steps] == ["done", "done"]
+    # A click on a button's ref is a press through accessibility (item 862): the pointer stayed where it was.
+    assert screen.pointer_location() == pointer
+    assert "the pointer did not move" in outcome.steps[0].detail
     counts: list[int | None] = [event.count for event in _since(app, mark, "button")]
     assert len(counts) == 2
     assert counts[1] == (counts[0] or 0) + 1

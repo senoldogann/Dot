@@ -263,6 +263,10 @@ class SnapshotArgs(ToolArgs):
         description="Search the whole application for elements whose role, name or value contains this text.",
     )
     full: bool = Field(default=False, description="Show the whole view even when only a little changed since the last.")
+    skeleton: bool = Field(
+        default=False,
+        description="A dense window's map: its regions with how much each holds; then read one with its ref.",
+    )
 
 
 def _snapshot_tool() -> RegisteredTool:
@@ -273,7 +277,7 @@ def _snapshot_tool() -> RegisteredTool:
         ref: int | None = _ref_of(args.ref) if args.ref is not None else None
         budget: int = snapshot_budget(ctx.runtime.config, ctx.output_chars)
         request: ViewRequest = ViewRequest(
-            scope=args.scope, ref=ref, query=args.query, full=args.full, max_chars=budget
+            scope=args.scope, ref=ref, query=args.query, full=args.full, max_chars=budget, skeleton=args.skeleton
         )
         view: SnapshotView = await ctx.runtime.desktop.snapshot(ctx.thread_id, args.app, request)
         return _screen_result(render_snapshot(view, _nonce()))
@@ -458,7 +462,8 @@ def _act_tool() -> RegisteredTool:
         description=(
             "Operate a Mac application with real pointer and keyboard events, several steps per call. Prefer refs "
             "from the latest snapshot to coordinates. press activates a button, checkbox or menu item through "
-            "accessibility without moving the pointer; click does a real click (use it when press does nothing); "
+            "accessibility without moving the pointer, and so does click on such a ref; a real click is click with the "
+            "element's x and y (use it when press does nothing); "
             "focus puts the keyboard focus in a field; set_value replaces a field's whole value at once; type enters "
             "text key by key, a line break as Return and a tab as Tab (a long text without either is pasted, which is "
             "faster); paste is for long text; key sends a shortcut or key (cmd+s, return, escape, tab); menu "

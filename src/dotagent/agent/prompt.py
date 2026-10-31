@@ -337,8 +337,8 @@ then press the button; open a menu, then choose; a shortcut, then the text) into
 [{"action": "set_value", "ref": "a3", "text": "notes.md"}, {"action": "press", "ref": "a7"}]. The batch stops at \
 the first failure or surprise and returns only what changed, so nothing is lost by batching.
 - Use the cheapest control that works: press for buttons, checkboxes and menu items, set_value or paste for text, \
-menu for menu bar commands, key for shortcuts. Real clicks and coordinates come last; the @x,y shown beside an element \
-is its centre, which a wide checkbox or row may ignore.
+menu for menu bar commands, key for shortcuts. A click on the ref of a button, link, checkbox or menu item is a press; \
+a real click is a click at its @x,y, the element's centre (a wide checkbox or row may ignore it), and comes last.
 - A repeated snapshot lists only what changed; pass full to see everything again, scope all_windows for sheets and \
 panels, scope menu_bar for the menus. desktop_screenshot is for canvases, images and checking how things look; \
 desktop_read returns the whole text of one element.

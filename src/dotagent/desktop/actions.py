@@ -610,7 +610,57 @@ def _effect(detail: str, pointer: Point | None, opens_ui: bool) -> Effect:
     return Effect(detail=detail, pointer=pointer, opens_ui=opens_ui, switched_to=None)
 
 
+# The roles a click on whose ref is a press through accessibility (item 862, after vercel-labs/agent-desktop): the
+# element does what a click does, with the pointer left where the owner has it and their front window left in front.
+PRESSED_ON_CLICK: frozenset[str] = frozenset(
+    {
+        "AXButton",
+        "AXCheckBox",
+        "AXRadioButton",
+        "AXMenuItem",
+        "AXMenuBarItem",
+        "AXMenuButton",
+        "AXPopUpButton",
+        "AXLink",
+        "AXDisclosureTriangle",
+    }
+)
+
+
+def pressed_on_click(step: Step, role: str | None, enabled: bool) -> bool:
+    """Whether ``step`` is a plain click on the ref of an enabled element of :data:`PRESSED_ON_CLICK`: one click,
+    with no key held, which is done as a press."""
+    return (
+        step.action == "click"
+        and step.ref is not None
+        and not step.modifiers
+        and enabled
+        and role is not None
+        and role in PRESSED_ON_CLICK
+    )
+
+
 def _click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effect:
+    if count == 1 and step.ref is not None:
+        number, element = _element_for(env, step.ref)
+        state: ElementState = _state_of(env, number, element)
+        if pressed_on_click(step, state.role, state.enabled):
+            try:
+                ax.press(element, env.app.pid)
+            except DesktopError as error:
+                code: object = error.context.get("code")
+                if not (isinstance(code, int) and code in _ACTION_UNSUPPORTED):
+                    raise
+                # It takes no press: the click is a real one, with its window in front, as any click is.
+                apps.activate(env.app, env.config.activate_timeout_s)
+            else:
+                return _effect(
+                    f"clicked {inspection.target} (through accessibility: the pointer did not move)", None, True
+                )
+        elif apps.frontmost_pid() != env.app.pid:
+            # The last view showed a control the batch would press, so its window was left behind; it is no longer
+            # one (disabled meanwhile): a real click goes to its window in front, as every other click does.
+            apps.activate(env.app, env.config.activate_timeout_s)
     point: Point = _point_for(env, step.ref, step.x, step.y)
     _check_corner(env, point)
     hid.post(hid.left_click_events(env.source, point, count, step.modifiers or ()))

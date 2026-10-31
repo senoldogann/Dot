@@ -291,12 +291,17 @@ def _preview_job(
     return tuple(contexts)
 
 
-def _needs_front(steps: Sequence[Step]) -> bool:
-    """Whether the steps, up to the first one that chooses the application, need the target in front."""
+def _needs_front(steps: Sequence[Step], known: Mapping[int, Node]) -> bool:
+    """Whether the steps, up to the first one that chooses the application, need the target in front. A click that
+    is a press through accessibility (item 862) needs it no more than a press does; ``known`` holds the elements the
+    last view showed."""
     for step in steps:
         if step.action == "activate":
             return False
         if step.action in _FRONT_ACTIONS:
+            node: Node | None = _node_for(known, step.ref) if step.action == "click" else None
+            if node is not None and actions.pressed_on_click(step, node.role, node.enabled):
+                continue
             return True
     return False
 
@@ -782,7 +787,7 @@ class DesktopSession:
             secure_field=secure_field,
         )
         actions.check_failsafe(env)
-        if _needs_front(steps):
+        if _needs_front(steps, memory.known_nodes(memory.memory_of(state, app.pid))):
             apps.activate(app, self._config.activate_timeout_s)
         return replace(env, expected_front=apps.frontmost_pid())
 

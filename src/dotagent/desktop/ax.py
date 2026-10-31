@@ -205,12 +205,32 @@ def error_text(code: int) -> str:
     return _ERRORS.get(code, "unknown accessibility error")
 
 
-def failure(code: int, what: str, pid: int, attribute: str) -> DesktopError:
-    """The exception for a failed accessibility call, with the code explained."""
+# What to do after a failed call, by its code (item 862, after vercel-labs/agent-desktop's retry dispositions): whether
+# the same call may simply be made again. A read has changed nothing; an action that got no answer may have been done.
+_READ_RETRY: dict[int, str] = {
+    -25202: "take a new desktop_snapshot and use its refs",
+    -25204: "safe to retry after a moment",
+    -25206: "retrying fails the same way: use another step",
+    -25208: "retrying fails the same way: use another step",
+}
+_ACT_RETRY: dict[int, str] = {
+    -25202: "nothing was done: take a new desktop_snapshot and use its refs",
+    -25204: "not safe to retry at once: the step may have been done; take a new desktop_snapshot and look first",
+    -25206: "nothing was done, and retrying fails the same way: use another step (click, a key, the menu)",
+    -25208: "nothing was done, and retrying fails the same way: use another step (click, a key, the menu)",
+}
+
+
+def failure(code: int, what: str, pid: int, attribute: str, acting: bool = False) -> DesktopError:
+    """The exception for a failed accessibility call, with the code explained and, where it tells, whether the same
+    call may be made again (``acting``: the call was a step's action, not a read; item 862)."""
     context: dict[str, str | int] = {"pid": pid, "attribute": attribute, "code": code}
     if code == _API_DISABLED:
         return DesktopPermissionError("macOS has not granted Accessibility to the app that runs Dot", context)
-    return DesktopError(f"{what}: {error_text(code)}", context)
+    hint: str | None = (_ACT_RETRY if acting else _READ_RETRY).get(code)
+    if hint is not None:
+        context["retry"] = hint
+    return DesktopError(f"{what}: {error_text(code)}" + (f" ({hint})" if hint else ""), context)
 
 
 def app_element(pid: int, timeout_s: float) -> AXElement:
@@ -566,13 +586,13 @@ def read_text(element: AXElement, pid: int) -> tuple[str, str, int]:
 def perform(element: AXElement, action: str, pid: int) -> None:
     code: int = int(AS.AXUIElementPerformAction(element, action))
     if code != 0:
-        raise failure(code, f"{action} failed", pid, action)
+        raise failure(code, f"{action} failed", pid, action, acting=True)
 
 
 def set_attribute(element: AXElement, attribute: str, value: str | bool, pid: int) -> None:
     code: int = int(AS.AXUIElementSetAttributeValue(element, attribute, value))
     if code != 0:
-        raise failure(code, f"cannot set {attribute}", pid, attribute)
+        raise failure(code, f"cannot set {attribute}", pid, attribute, acting=True)
 
 
 def press(element: AXElement, pid: int) -> None:
