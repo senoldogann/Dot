@@ -971,3 +971,70 @@ async def test_the_line_says_a_time_set_elsewhere_and_a_brief_that_could_not_be_
             await page.close()
         finally:
             await browser.close()
+
+
+async def test_the_brief_names_a_goal_started_again_and_failing_and_takes_its_runs_taint(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 883: a hiring CTF took 64 million of 604 million tokens in a week over four chats, and nothing said so."""
+    store = runtime.store
+    await _set(client, {"enabled": True, "time": "08:00", "days": "every", "lines": []})
+    record: ScheduleRecord = await _brief_schedule(client)
+    newest: RunRecord | None = None
+    for _ in range(2):
+        thread = await store.create_thread("Solve the hiring CTF", "ui")
+        newest = await store.create_run(
+            thread.id,
+            "Get the flag",
+            "task",
+            OPUS,
+            None,
+            "ui",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
+        )
+        await store.add_run_tokens(newest.id, 900_000, 1_000)
+        await store.finish_run(newest.id, "failed", "The flag was not found.")
+    assert newest is not None
+    # A schedule's firings, each in a chat of its own, are no goal started again, however they fail.
+    for _ in range(2):
+        firing_chat = await store.create_thread("Check the client mail", "schedule")
+        fired = await store.create_run(
+            firing_chat.id,
+            "Check",
+            "task",
+            OPUS,
+            None,
+            "schedule",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
+        )
+        await store.finish_run(fired.id, "failed", "The webmail did not load.")
+    # Tokens spent elsewhere count in the week's share, however many goals spent them.
+    other = await store.create_thread("Plan my week", "ui")
+    busy = await store.create_run(
+        other.id, "Plan", "task", OPUS, None, "ui", "medium", "standard", None, "ask", False, None, None, None
+    )
+    await store.add_run_tokens(busy.id, 1_798_000, 0)
+    await store.finish_run(busy.id, "done", "Planned.")
+    firing: BriefFiring | None = await prepare(runtime, record, await _noon(runtime), _ZONE)
+    assert firing is not None
+    context: str = firing.context.text
+    assert "Goals started again and failing this week (worth asking the owner whether to stop) (1):" in context
+    spent: int = await store.tokens_since(0.0)
+    share: str = f"{1_802_000 / spent:.0%}"
+    assert f'- "Solve the hiring CTF": 2 chats, 2 runs, 2 failed, {share} of the week\'s tokens' in context
+    assert newest.id in firing.context.run_ids
+    assert '"Check the client mail": 2 chats' not in context
