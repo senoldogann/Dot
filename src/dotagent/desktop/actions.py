@@ -614,16 +614,19 @@ def _effect(detail: str, pointer: Point | None, opens_ui: bool, aim: Point | Non
     return Effect(detail=detail, pointer=pointer, opens_ui=opens_ui, switched_to=None, aim=aim)
 
 
-def _aim_at(env: StepEnv, number: int, element: AXElement) -> Point | None:
+def _aim_at(env: StepEnv, number: int, element: AXElement, state: ElementState | None = None) -> Point | None:
     """Where Dot's own pointer is drawn for a step done through accessibility (item 869, after vercel-labs/
-    agent-desktop's cursor): the element's press point while it shows on a display, read before the step. It only
-    shows, so it never fails the step: an element it cannot read is drawn nowhere."""
+    agent-desktop's cursor): the element's press point while it shows on a display, read before the step, from
+    ``state`` when the step read it already. It only shows, so it never fails the step: an element it cannot read is
+    drawn nowhere; with the pointer off (``show_pointer``) nothing is read."""
+    if not env.config.show_pointer:
+        return None
     try:
-        state: ElementState = _state_of(env, number, element)
-        frame: Rect | None = _visible_frame(env, element, state)
+        known: ElementState = state if state is not None else _state_of(env, number, element)
+        frame: Rect | None = _visible_frame(env, element, known)
     except DesktopError:
         return None
-    return None if frame is None else _press_point(frame, state)
+    return None if frame is None else _press_point(frame, known)
 
 
 def _aim_at_ref(env: StepEnv, ref: str | None) -> Point | None:
@@ -672,7 +675,7 @@ def _click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effe
         number, element = _element_for(env, step.ref)
         state: ElementState = _state_of(env, number, element)
         if pressed_on_click(step, state.role, state.enabled):
-            aim: Point | None = _aim_at(env, number, element)
+            aim: Point | None = _aim_at(env, number, element, state)
             try:
                 ax.press(element, env.app.pid)
             except DesktopError as error:
@@ -715,7 +718,7 @@ def _hover(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
 def _press(env: StepEnv, step: Step) -> Effect:
     number, element = _element_for(env, _required(step.ref, "ref"))
     state: ElementState = _state_of(env, number, element)
-    aim: Point | None = _aim_at(env, number, element)
+    aim: Point | None = _aim_at(env, number, element, state)
     try:
         ax.press(element, env.app.pid)
     except DesktopError as error:

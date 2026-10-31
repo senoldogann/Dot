@@ -4,6 +4,7 @@ window stays in front; an element that takes no press is clicked as before, any 
 skeleton lists its regions with what each holds. A failed call says whether the same call may be made again. The
 accessibility calls and the events are replaced: nothing reaches the screen."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -108,6 +109,10 @@ def test_a_press_through_accessibility_aims_dots_pointer_at_the_element_and_leav
     monkeypatch.setattr(actions, "_visible_frame", unreadable)
     assert actions._press(_env(tmp_path), Step(action="press", ref="a3")).aim is None
     assert len(seen.pressed) == 3
+    # With the pointer off, nothing is read for it.
+    off: StepEnv = replace(_env(tmp_path), config=_env(tmp_path).config.model_copy(update={"show_pointer": False}))
+    monkeypatch.setattr(actions, "_visible_frame", lambda env, element, state: Rect(100, 200, 80, 30))
+    assert actions._press(off, Step(action="press", ref="a3")).aim is None
 
 
 def test_a_control_that_takes_no_press_is_clicked_with_its_window_in_front(
