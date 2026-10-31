@@ -174,6 +174,24 @@ function templateTools(template, known) {
   );
 }
 
+/** What a template's agent never does (item 875), a click away as its actions are: the edges of its job, which
+    tell what is safe to leave it running for. */
+function templateRefuses(template) {
+  if (template.refuses.length === 0) {
+    return null;
+  }
+  return el(
+    "details",
+    { class: "template-refuses" },
+    el("summary", null, `Never does (${template.refuses.length})`),
+    el(
+      "ul",
+      { class: "template-refuse-list" },
+      template.refuses.map((line) => el("li", null, line)),
+    ),
+  );
+}
+
 /**
  * The schedules its template suggests, for each of `pairs` (`{ agent, template }`) whose template has one, switched off
  * until the owner has read the goal (item 464), unless the agent has that schedule already (its agent and its goal):
@@ -255,6 +273,7 @@ function templateCard(template, onUse, known) {
     template.id === TRADER_TEMPLATE ? el("a", { class: "small template-desk", href: TRADING_DESK }, "Open the trading desk") : null,
     alsoRow,
     templateTools(template, known),
+    templateRefuses(template),
     use,
   );
 }
@@ -428,8 +447,16 @@ export function agentForm({ record, onSaved, onCancel }) {
   const instructions = el("textarea", {
     class: "textarea",
     rows: "5",
-    placeholder: "How this agent works, what it cares about, what it never does. It reads this at the start of every chat.",
+    placeholder: "How this agent works and what it cares about. It reads this at the start of every chat.",
     "aria-label": "Instructions",
+  });
+  // What it never does, a line each (item 875): the edges of its job, which its runs hold to whoever asks.
+  const refuses = el("textarea", {
+    class: "textarea",
+    rows: "3",
+    maxlength: "2000",
+    placeholder: "Work inbound leads\nSend a message itself",
+    "aria-label": "Never does",
   });
   const model = el(
     "select",
@@ -506,6 +533,7 @@ export function agentForm({ record, onSaved, onCancel }) {
     name.value = record.name;
     role.value = record.role;
     instructions.value = record.instructions;
+    refuses.value = record.refuses ?? "";
   }
   const save = el("button", { class: "btn primary", type: "button", disabled: true }, icon(record === null ? "plus" : "check"), record === null ? "Create agent" : "Save changes");
   Promise.allSettled([modelsListed, toolsLoaded]).then(() => {
@@ -529,6 +557,7 @@ export function agentForm({ record, onSaved, onCancel }) {
       name: nameText,
       role: role.value.trim(),
       instructions: instructions.value.trim(),
+      refuses: refuses.value.trim(),
       model: model.value,
       effort: chosenLevel(models, model.value, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
       approvals: approvals.value === "" ? null : approvals.value,
@@ -563,6 +592,7 @@ export function agentForm({ record, onSaved, onCancel }) {
         field("Name", name, ""),
         field("Role", role, "One line, as it shows under the name."),
         Object.assign(field("Instructions", instructions, ""), { className: "field wide" }),
+        Object.assign(field("Never does", refuses, "One line each: the edges of its job. It stops there whoever asks, and says so."), { className: "field wide" }),
         lookField,
         field("Model", model, ""),
         effortField,

@@ -2224,6 +2224,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     instructions=agent_record.instructions,
                     made_by_dot=agent_record.made_by is not None,
                     team=_team_name(agent_record.name),
+                    refuses=agent_record.refuses,
                 ),
                 [
                     AgentBrief(

@@ -87,6 +87,7 @@ def _template_request(chosen: AgentTemplate) -> AgentRequest:
         approvals=None,
         tools=list(chosen.tools) or None,
         look=chosen.look,
+        refuses="\n".join(chosen.refuses),
     )
 
 
@@ -249,6 +250,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             new_agent_tools(checked.tools),
             None,
             checked.look,
+            checked.refuses or "",
         )
 
     @router.post("/agents", status_code=201)
@@ -338,6 +340,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
                 approvals=file.approvals,
                 tools=list(file.tools) or None,
                 look=file.look,
+                refuses=file.refuses,
             )
         )
 
@@ -380,6 +383,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             checked.approvals,
             changed_agent_tools(checked.tools, saved.tools),
             checked.look,
+            checked.refuses,
         )
 
     @router.post("/agents/{agent_id}/trim-tools")

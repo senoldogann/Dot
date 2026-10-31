@@ -246,3 +246,32 @@ async def test_an_agent_with_every_action_is_offered_to_keep_only_the_ones_its_r
     finally:
         await browser.close()
         await playwright.stop()
+
+
+async def test_the_editor_keeps_what_the_agent_never_does_and_the_page_saves_it(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 875: the edges of an agent's job are a field of their own, which its runs hold to whoever asks."""
+    agent: JsonObject = await _agent(client, "Prospector", ["web_search"])
+    playwright, browser = await _launch(runtime)
+    try:
+        page: Page = await _open(browser, client, f"/agents/{agent['id']}", 1280)
+        await page.get_by_role("button", name="Edit").click()
+        never: Locator = page.get_by_label("Never does")
+        await expect(never).to_have_value("")
+        await never.fill("Work inbound leads\nSend a message itself")
+        await page.get_by_role("button", name="Save changes").click()
+        await expect(page.locator(".toast")).to_contain_text("Agent saved.")
+        record = (await client.get(f"/api/agents/{agent['id']}")).json()["record"]
+        assert record["refuses"] == "Work inbound leads\nSend a message itself"
+        # Opened again, the editor shows it as saved.
+        await page.reload()
+        await page.get_by_role("button", name="Edit").click()
+        await expect(page.get_by_label("Never does")).to_have_value("Work inbound leads\nSend a message itself")
+        phone: Page = await _open(browser, client, f"/agents/{agent['id']}", 390, phone=True)
+        await phone.get_by_role("button", name="Edit").click()
+        await expect(phone.get_by_label("Never does")).to_be_visible()
+        assert await phone.evaluate(_SIDEWAYS) <= 0
+    finally:
+        await browser.close()
+        await playwright.stop()

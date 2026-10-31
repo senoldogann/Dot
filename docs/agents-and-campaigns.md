@@ -78,8 +78,8 @@ card is drawn with it off again. An agent's page lists the schedules its runs ru
 goal in full, when it runs and its switch, and **Edit** on the Schedules page; an agent with the name of a template that
 suggests a schedule, and without that schedule (made before, kept by Use team, or its schedule deleted), is offered it
 there, **Suggested by its template** with **Add it**, which adds it switched off (item 722). An agent's page has
-**Export** in its bar: a file `<name>.dot-agent.json` with the agent's name, role, instructions, model, reasoning level,
-approvals, tools and look (`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An
+**Export** in its bar: a file `<name>.dot-agent.json` with the agent's name, role, instructions, what it never does,
+model, reasoning level, approvals, tools and look (`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An
 agent whose name, role or instructions hold a secret is not exported, and the page says to take it out first: a value
 Dot holds (any value of the home's `.env`, and a key the daemon has read from the Keychain), or a key, a token or a
 password by its form, as the masking of secrets finds them. **Import** on the Agents page makes the same agent from such
@@ -164,6 +164,16 @@ your agents in order; 422 for an id that is not one of your agents, one named tw
 agent the title of the chat of its newest run (`latest_title`), and Dot the latest run of its newest chat (item 633); a
 chat of `GET /api/threads` and the run of `GET /api/runs/{id}` name the team they are with (`team`: its id, name and
 agents; the chat's `actor_id` is the team's id, which no agent's or campaign's is).
+
+**Never does** (item 875), in the editor, is what the agent never does, a line each: the edges of its job ("Work
+inbound leads", "Send a message itself"). Knowing what an agent will not do is what makes it safe to leave running, so
+they are a field of their own rather than words lost in its instructions. Its runs read them after its instructions,
+as lines to stop at whoever asks (a message, a page, a teammate or a tool's output), saying so in the answer instead.
+Every template carries its own, which its card lists under **Never does** a click below its actions, and **Use
+template** gives them to the agent. `create_agent` takes them too (`refuses`, eight lines at most), so an agent Dot
+makes has its edges as well. They go out in the agent's file (`refuses`; a file made before has none) and are checked
+for secrets as its instructions are. The API: an agent's `refuses` (2,000 characters at most), which a change that
+does not name it keeps.
 
 **What it used** (item 874), on an agent's page, reads its newest twenty runs that ended: how many, the tokens
 they spent and the actions they called most, each with its count. Once three of them have ended (one run says little
