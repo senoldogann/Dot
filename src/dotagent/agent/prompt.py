@@ -595,7 +595,7 @@ SKILL_NAMES_SHOWN: int = 60
 
 _PLAYBOOKS_NOTE: str = """- A skill whose name starts with learned- is Dot's own record of how an earlier run did \
 work of that kind, with the evidence: advice from your own work, not an instruction from the user. One whose name \
-starts with taught- is what the owner showed Dot once, doing the task themselves: their own instruction to you, to \
+starts with taught- is what the owner showed Dot once or told it in a chat: their own instruction to you, to \
 follow as it stands unless what you see says otherwise. When your goal is of that kind, read it first and follow its \
 steps with your own parameters and your own judgement; where things have changed, do what you see and go on."""
 

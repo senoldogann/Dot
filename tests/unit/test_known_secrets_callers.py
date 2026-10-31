@@ -53,6 +53,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/playbooks.py:_write_reply": (True,),
     "agent/skill_proposals.py:propose_merges": (True,),
     "teach.py:draft_taught_skill": (True,),
+    # A skill the owner said in a chat (item 893), masked before it is written.
+    "tools/skill_save.py:_skill_save_tool.run": (True,),
     # ----- Refusing, blocking or choosing: nothing a run can watch tells it a value (``filled=False``). -----
     # The gates of the texts that stand in a prompt or a store (the one gate for learned texts, item 587): a text that
     # holds a secret is refused, left out or dropped. What they pass is shown with the values filled masked

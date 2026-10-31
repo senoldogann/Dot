@@ -113,6 +113,7 @@ from dotagent.tools.schedule import build_schedule_tools
 from dotagent.tools.security import build_security_tool
 from dotagent.tools.shell import build_shell_tool, child_env, read_login_env
 from dotagent.tools.skill import build_skill_tool
+from dotagent.tools.skill_save import build_skill_save_tool
 from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.todos import build_todo_tools
@@ -267,7 +268,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         (build_recon_tool(), build_security_tool()),
         build_meta_tools(),
         build_page_tools(),
-        (build_skill_tool(), build_find_help_tool()),
+        (build_skill_tool(), build_find_help_tool(), build_skill_save_tool()),
         build_contacts_tools(),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),

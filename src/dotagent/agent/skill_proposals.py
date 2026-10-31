@@ -337,6 +337,7 @@ def _made(
                     acting_steps=0,
                     tainted=False,
                     taught=True,
+                    said=meta.said,
                 ),
                 None,
             )

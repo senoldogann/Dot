@@ -2317,6 +2317,20 @@ class Store:
         await self._db.commit()
         return cursor.rowcount
 
+    async def chat_ever_tainted(self, thread_id: str) -> bool:
+        """Whether a run of the chat ``thread_id`` ever read content third parties can author: an event of one of its
+        runs says it was tainted (a step's result, its start), or ``dotx prune`` recorded that one ended so (item 556).
+        The owner's later words clear a run's taint, not what it read, which the chat's history keeps (item 893)."""
+        row = await self._one(
+            "SELECT 1 FROM events JOIN runs ON runs.id = events.run_id"
+            " WHERE runs.thread_id = ? AND events.kind IN ('tool_result', 'run_queued')"
+            " AND json_extract(events.data, '$.tainted') = 1"
+            " UNION ALL SELECT 1 FROM run_taints JOIN runs ON runs.id = run_taints.run_id WHERE runs.thread_id = ?"
+            " LIMIT 1",
+            (thread_id, thread_id),
+        )
+        return row is not None
+
     async def pruned_run_tainted(self, run_id: str) -> bool:
         """Whether the run ``run_id`` ended tainted, as :meth:`delete_events_of_runs_ended_before` recorded it before it
         deleted the events that said so (item 556); False for a run it recorded nothing of."""

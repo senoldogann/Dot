@@ -58,6 +58,8 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "security_scan": "recon",
     # A wait in code for a deploy, a build or a check (item 887): rare enough to stay out of core.
     "wait_until": "waits",
+    # A skill of the owner's words in a chat (item 893): rare, asked for, so out of core.
+    "skill_save": "skills",
 }
 _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
@@ -74,6 +76,7 @@ _PURPOSES: dict[str, str] = {
     "todos": "your own list of work to do for the owner later, on your own, while the Mac is idle",
     "trading": "trading crypto on Coinbase under the owner's limits: prices, the account, orders",
     "waits": "waiting in code until a file is there, an address answers or a check passes",
+    "skills": "saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way",
     "recon": "a site or host you own: addresses, TLS, headers, technology, open ports, and a form's payload check",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.

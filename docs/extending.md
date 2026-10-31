@@ -787,7 +787,18 @@ A skill whose name starts with `taught-` is one the owner showed Dot once (item 
 they did the task in a tab, the review model wrote its steps from what they did and from their words, and they read
 the draft and saved it or threw it away. It stands behind no run, so its record says `taught` and no failure retires
 it: whether it still fits is the owner's to say, and a run of its kind writes a `learned-` skill of its own rather
-than rewriting theirs. Its trust is the owner's reading of that draft and nothing else: the steps a page put in front
+than rewriting theirs. One can be said instead of shown (item 893, after a guide to Grok's bots the owner sent: "tell
+your bots to create skills for itself as you give it instructions"): told in a chat how a kind of work is done, a run
+saves it with `skill_save` (in the tool group `skills`): its kind, a sentence of what it is for, the owner's steps in
+order, with the values that change as `<name>`. Its header says it was taught "in their own words in a chat" and its
+record `said`; it is the agent's whose run saved it, or Dot's. Told otherwise later, the run rewrites it (`replace`, a
+skill saved so, of its own agent): a new version, the one before kept, its note `revised` with what the owner wrote in
+the run. A run in a chat where any run has read content third parties can author saves none, nor a run in a chat Dot
+opened on its own initiative (a skill is the owner's instruction to every later run), and the secrets Dot holds are
+masked in it. The owner sees it under Customize › Skills with the others they taught, and changes, pins or drops it
+there. Its trust is the owner's words in a chat none of whose runs has read anything others can write (the owner's "go
+on" after a page clears a run's taint, not the page's words, which the chat's history keeps). A skill shown in the
+browser trusts the owner's reading of its draft and nothing else: the steps a page put in front
 of them (a link's text, a label, a page's own call of the recorder's binding) are in the draft they approved, so a page
 that lies reads as a strange step in the panel, not as something withheld later. It holds no value typed into a field,
 and no secret field's name, which the recorder leaves out before the draft is written. A review model that

@@ -138,7 +138,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
   step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
   the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
-  `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, `waits`, and `mcp__<server>` for each MCP server) are
+  `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, `waits`, `recon`, `skills`, and `mcp__<server>` for
+  each MCP server) are
   listed in the system prompt with what they are for and
   their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. A
   server's line says what the server is for, in your words, Dot's or the server's own, quoted as its claim
@@ -497,7 +498,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Pages           | `show_page`                                                                                                        |
 | Drafts          | `draft_message`                                                                                                    |
 | Mail, calendars | `mail_search`, `mail_read`, `calendar_events`                                                                      |
-| Skills          | `skill`, `find_help`                                                                                               |
+| Skills          | `skill`, `find_help`; `skill_save` (item 893, tool group `skills`): how the owner said to do a kind of work, kept   |
 | MCP             | `mcp__<server>__<tool>`; the server `web-research` comes with Dot (item 583): `mcp__web-research__web_scrape`, `web_map`, `web_extract` and the crawl tools `web_crawl_start`, `web_crawl_status`, `web_crawl_results`, `web_crawl_cancel` (its search is a rung of `web_search`, item 655) |
 
 The shell and the file tools work in `<home>/workspace` unless a path says otherwise. Dot is told to change the text

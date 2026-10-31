@@ -2360,6 +2360,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         spawner=agent.spawner,
         # The taint as it stands when a tool asks: a step result of this run may have set it.
         tainted=lambda: agent.gate.tainted,
+        ever_tainted=lambda: agent.gate.ever_tainted,
         run_tools=frozenset(spec.name for spec in specs),
     )
     checker: GoalChecker | None = (
