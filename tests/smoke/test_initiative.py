@@ -43,7 +43,7 @@ from dotagent.store.endings import (
     RESULT_STOPPED,
 )
 from dotagent.store.models import EventRecord, RunMode, RunRecord, TodoRecord
-from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -588,6 +588,214 @@ async def test_a_thing_whose_chat_the_owner_resumed_is_left_to_that_run(login_en
     assert (done.status, done.run_id, done.note) == ("done", runs[1].id, "Sorted 12 receipts.")
 
 
+async def test_a_thing_whose_run_left_the_owner_a_question_waits_for_their_answer_in_its_chat(
+    login_env: dict[str, str],
+) -> None:
+    """Item 868: on 2026-10-31 a run of Dot's own left "may I put the fixes live?" and ended failed; the thing was tried
+    again 15 minutes later in a new chat, and once the owner answered, two runs put the same site live side by side.
+    The thing waits for the answer, its try counted; the run the answer starts in its chat does it."""
+    turns: list[ScriptedTurn] = [
+        _call(ASK_USER_TOOL, question="The fixes are ready. May I put them live?"),
+        _finish("The fixes are ready; putting them live waits for your word.", False),
+        _finish("Put the fixes live."),
+    ]
+    async with _dot(login_env, turns) as (runtime, manager):
+        added: TodoRecord | str = await add_todo(runtime.store, "Fix the preview pages", "Broken", "owner", None, False)
+        assert isinstance(added, TodoRecord)
+        # Its last try left: the one that leaves the question.
+        await runtime.store.set_todo(added.id, "open", 1, None, "")
+        await set_initiative(runtime.store, True)
+        await note_look(runtime.store, 10_000.0)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(10_000.0)
+        await _settled(initiative)
+        [asked] = await runtime.store.list_runs(10, None)
+        assert asked.status == "failed"
+        waiting: TodoRecord = await runtime.store.get_todo(added.id)
+        # Its try is counted, and the limit (2 here) is no reason to let go of a thing that waits.
+        assert (waiting.status, waiting.attempts, waiting.run_id) == ("open", 2, asked.id)
+        # The Mac is idle and nothing else is to do: no run starts while the question waits, in any chat.
+        await initiative.tick(10_100.0)
+        assert not initiative.working()
+        assert [run.id for run in await runtime.store.list_runs(10, None)] == [asked.id]
+        [question] = await runtime.store.list_left_questions(asked.id)
+        await manager.decide(question.id, True, "ui", "Yes, put them live")
+        answered: RunRecord = (await runtime.store.list_runs(1, asked.thread_id))[0]
+        assert answered.id != asked.id
+        async with asyncio.timeout(_LIMIT_S):
+            assert (await manager.wait(answered.id)).status == "done"
+        await initiative.tick(10_200.0)
+        assert not initiative.working()
+        done: TodoRecord = await runtime.store.get_todo(added.id)
+        assert (done.status, done.run_id, done.note) == ("done", answered.id, "Put the fixes live.")
+        assert len(await runtime.store.list_runs(10, None)) == 2
+
+
+@pytest.mark.parametrize("tried", [0, 1], ids=["a try left", "its last try"])
+async def test_a_thing_whose_question_the_owner_skipped_is_tried_again_or_let_go_its_try_counted(
+    tried: int, login_env: dict[str, str]
+) -> None:
+    """The pre-push reviews of item 868: the wait ends when the question does, answered or not, and the try that left
+    it stays counted, so that the limit of tries holds: tried again with a try left, let go at its last, the owner told
+    either way as after any last try."""
+    turns: list[ScriptedTurn] = [
+        _call(ASK_USER_TOOL, question="May I put the fixes live?"),
+        _finish("Waiting for your word.", False),
+        _finish("Done."),
+    ]
+    async with _dot(login_env, turns) as (runtime, manager):
+        added: TodoRecord | str = await add_todo(runtime.store, "Fix the preview pages", "Broken", "owner", None, False)
+        assert isinstance(added, TodoRecord)
+        await runtime.store.set_todo(added.id, "open", tried, None, "")
+        await set_initiative(runtime.store, True)
+        await note_look(runtime.store, 10_000.0)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(10_000.0)
+        await _settled(initiative)
+        [asked] = await runtime.store.list_runs(10, None)
+        [question] = await runtime.store.list_left_questions(asked.id)
+        await manager.decide(question.id, False, "ui", "")
+        assert [run.id for run in await runtime.store.list_runs(10, None)] == [asked.id]
+        async with runtime.bus.subscribe(None) as subscription:
+            await initiative.tick(10_100.0)
+            await _settled(initiative)
+            told: list[str] = [event.data["title"] for event in await _told(subscription)]
+        again: TodoRecord = await runtime.store.get_todo(added.id)
+        if tried == 0:
+            assert (again.status, again.attempts) == ("done", 2)
+            assert told == ["Dot did on its own"]
+        else:
+            assert (again.status, again.attempts, again.run_id) == ("dropped", 2, asked.id)
+            assert told == ["Dot let go of a thing after 2 tries"]
+            assert [run.id for run in await runtime.store.list_runs(10, None)] == [asked.id]
+
+
+_ANSWERED: str = "\n\nAnswer to your question “May I put them live?”: Yes"
+
+
+async def _a_things_chat(
+    runtime: Runtime, todo: TodoRecord, tried: int, later: tuple[tuple[str, str, str, str], ...]
+) -> list[RunRecord]:
+    """The chat of ``todo``: the run of Dot's own that failed, then the ``later`` runs (source, what follows the thing's
+    goal in theirs or, not starting a paragraph, a goal of their own as a message's is, status, result), and ``todo``
+    to do with ``tried`` tries, its last run the first."""
+    thread = await runtime.store.create_thread(todo.title, INITIATIVE_SOURCE)
+    goal: str = f"On my own initiative: {todo.title}"
+    runs: list[RunRecord] = []
+    for source, added, status, result in ((INITIATIVE_SOURCE, "", "failed", "Waiting for your word."), *later):
+        made: RunRecord = await runtime.store.create_run(
+            thread.id,
+            f"{goal}{added}" if added == "" or added.startswith("\n\n") else added,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            source,
+            "medium",
+            "standard",
+            None,
+            "yolo",
+            False,
+            None,
+            None,
+            None,
+        )
+        if status != "queued":
+            await runtime.store.finish_run(made.id, status, result)
+        runs.append(made)
+    await runtime.store.set_todo(todo.id, "open", tried, runs[0].id, "")
+    return runs
+
+
+@pytest.mark.parametrize(
+    ("added", "status", "result", "tried", "left"),
+    [
+        (_ANSWERED, "failed", "The deploy failed.", 0, ("doing", 1)),
+        (_ANSWERED, "failed", "The deploy failed.", 1, ("dropped", 2)),
+        (_ANSWERED, "cancelled", RESULT_STOPPED, 0, ("dropped", 1)),
+        ("", "done", "Put live.", 0, ("done", 1)),
+        ("\n\nI put it live myself", "done", "Checked it is live.", 0, ("done", 1)),
+    ],
+    ids=[
+        "the answer's run failed",
+        "it failed at the last try",
+        "the owner stopped it",
+        "a kept step answered",
+        "a kept step answered with a note",
+    ],
+)
+async def test_the_end_of_a_run_that_went_on_from_the_things_is_the_things(
+    added: str, status: str, result: str, tried: int, left: tuple[str, int], login_env: dict[str, str]
+) -> None:
+    """The pre-push reviews of item 868: the run the owner's answer started failed, or the owner stopped it, and the
+    thing started again in a new chat with no try counted; the run an answered kept step started was not seen to go
+    on with it. Its end is settled as one of the thing's own runs': a failure is a counted try (the thing is tried
+    again, or let go at its last and the owner told), the owner's stop lets it go, done is done."""
+    async with _dot(login_env, [_finish("Done.")]) as (runtime, manager):
+        todo: TodoRecord | str = await add_todo(runtime.store, "Fix the preview pages", "Broken", "owner", None, False)
+        assert isinstance(todo, TodoRecord)
+        runs: list[RunRecord] = await _a_things_chat(runtime, todo, tried, (("ui", added, status, result),))
+        await set_initiative(runtime.store, True)
+        await note_look(runtime.store, 10_000.0)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        async with runtime.bus.subscribe(None) as subscription:
+            await initiative.tick(10_000.0)
+            now: TodoRecord = await runtime.store.get_todo(todo.id)
+            assert (now.status, now.attempts) == left
+            if left[0] == "doing":
+                # Tried again in a chat of its own, its try counted, as after any failure.
+                assert initiative.working() and now.run_id not in {run.id for run in runs}
+                await _settled(initiative)
+            else:
+                assert not initiative.working() and now.run_id == runs[1].id
+            told: list[str] = [event.data["title"] for event in await _told(subscription)]
+        # Let go at its last try, the owner is told; tried again, the new run ended done and they are told of that.
+        expected: dict[tuple[str, int], list[str]] = {
+            ("dropped", 2): ["Dot let go of a thing after 2 tries"],
+            ("doing", 1): ["Dot did on its own"],
+            ("done", 1): ["Dot did on its own"],
+        }
+        assert told == expected.get(left, [])
+
+
+@pytest.mark.parametrize(
+    ("added", "status"),
+    [
+        (_ANSWERED, "queued"),
+        ("", "queued"),
+        ("What is left?", "queued"),
+        (_ANSWERED, "cancelled"),
+        (_ANSWERED, "failed"),
+    ],
+    ids=["an answer at work", "a resume at work", "a message at work", "an answer stopped", "an answer failed"],
+)
+async def test_an_urgent_thing_is_not_started_on_a_busy_tick_while_its_chat_holds_it(
+    added: str, status: str, login_env: dict[str, str]
+) -> None:
+    """The second and third pre-push reviews of item 868: on a busy tick an urgent thing whose answer's run was at
+    work in its chat started again in a new chat beside it, and so did one whose answer's run the owner had stopped, or
+    that had failed, its end not settled. A run at work in a thing's chat holds it, whatever started it, and so does a
+    run that went on from it until an idle tick settles its end."""
+    async with _dot(login_env, []) as (runtime, manager):
+        todo: TodoRecord | str = await add_todo(
+            runtime.store, "[URGENT] Fix the preview pages", "Broken", OWNER_SOURCE, None, False
+        )
+        assert isinstance(todo, TodoRecord)
+        source: str = RESUME_SOURCE if added == "" else "ui"
+        result: str = RESULT_STOPPED if status == "cancelled" else "The deploy failed."
+        await _a_things_chat(runtime, todo, 0, ((source, added, status, result),))
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _BUSY)
+        await initiative.tick(10_000.0)
+        assert not initiative.working()
+        held: TodoRecord = await runtime.store.get_todo(todo.id)
+        assert (held.status, held.attempts) == ("open", 0)
+        if status == "queued":
+            # Idle, the same while the run works.
+            await note_look(runtime.store, 10_000.0)
+            await Initiative(runtime, manager, lambda: _IDLE).tick(10_000.0)
+            assert len(await runtime.store.list_runs(10, None)) == 2
+
+
 async def test_a_thing_is_not_listed_twice_however_long_the_list_grew(login_env: dict[str, str]) -> None:
     async with _dot(login_env, []) as (runtime, _manager):
         first: TodoRecord | str = await add_todo(runtime.store, "Water the plants", "Dry", "owner", None, False)
@@ -607,13 +815,14 @@ async def test_a_message_of_the_owners_in_the_chat_of_a_thing_does_not_mark_it_d
         assert isinstance(added, TodoRecord)
         thread = await runtime.store.create_thread(added.title, INITIATIVE_SOURCE)
         runs: list[RunRecord] = []
-        for source, (status, result) in (
-            (INITIATIVE_SOURCE, ("failed", "The folder is gone.")),
-            ("ui", ("done", "It failed because the folder is gone.")),
+        for source, goal, (status, result) in (
+            (INITIATIVE_SOURCE, added.title, ("failed", "The folder is gone.")),
+            # The owner's message is the goal of its run (item 868 tells such a run from one that goes on).
+            ("ui", "Why did it not work?", ("done", "It failed because the folder is gone.")),
         ):
             made: RunRecord = await runtime.store.create_run(
                 thread.id,
-                added.title,
+                goal,
                 "task",
                 SCRIPTED_MODEL,
                 None,

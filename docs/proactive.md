@@ -238,8 +238,15 @@ and you are told. A run you stopped lets it go at once; one the daemon's stop or
 every run, or the STOP file the run saw as it worked, item 790) leaves it to do; one the daemon was doing when it shut
 down is to do again when it starts, and one it was doing when it stopped
 without shutting down (a crash) counts that try, so a thing that brings Dot down is let go after `attempts` tries. A
-thing tried as often as `attempts` allows, after the limit was lowered, is let go. A thing whose run the owner resumed
+thing tried as often as `attempts` allows, after the limit was lowered, is let go, and you are told. A thing whose run the owner resumed
 is left to that resume while it works, and done once it ended done; another message in its chat is no sign it was done.
+A thing whose chat holds a question or a step left for you, unanswered, or a run at work, is not started again in
+another chat (item 868), the urgent ones too; its tries are not used up while a question waits. A run of its chat that
+goes on from its last one takes it over: a resume, the run your answer to its question started, or the one your answer
+to a step it kept started (each carries the goal of the run it goes on from; a message you write is a goal of its
+own). Its end is the thing's, as one of its own runs' is: done, the thing is done and you are told; failed, that is
+a try; stopped by you, the thing is let go. A question you skip, or a step whose time ran out, ends the wait, and the
+try that left it stays counted: a thing whose last try it was is let go then, and you are told.
 
 The settings are in `[initiative]` of `defaults.toml`: `idle_minutes`, `gap_minutes`, `look_every_hours`, `attempts`,
 `runs_per_day`, `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do) and `peak_hours_utc`;

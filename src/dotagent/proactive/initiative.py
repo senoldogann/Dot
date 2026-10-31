@@ -11,6 +11,8 @@ What holds:
   run put on the list after reading content third parties can author is done by a run that starts tainted.
 - A thing is tried ``attempts`` times at most; then it is let go and the owner is told. A run the owner stopped lets its
   thing go at once; one the daemon's stop or the emergency stop ended leaves it to do.
+- A thing whose chat holds a question or a step left for the owner, or a run at work, is not started again in another
+  chat; the run their answer starts in that chat goes on with it, and its end is the thing's (item 868).
 """
 
 import asyncio
@@ -18,11 +20,12 @@ import contextlib
 import math
 import time
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from Quartz import CGEventSourceSecondsSinceLastEventType, kCGAnyInputEventType, kCGEventSourceStateHIDSystemState
 
-from dotagent.agent.manager import RunManager, thread_title
+from dotagent.agent.manager import RunManager, goes_on_from, thread_title
 from dotagent.agent.resume import RESUME_SOURCE, cut_off_by
 from dotagent.config import InitiativeConfig
 from dotagent.core.errors import DotError, NotFoundError
@@ -51,6 +54,8 @@ _QUOTE_CHARS: int = 160
 _LATER_READ: int = 10
 # How long no run of its own is tried after one could not be started (a model or a setting that refuses it).
 _AFTER_A_FAILED_START_S: float = 600.0
+# The page whose card lists the things (item 715), which a tell of a thing no run tried opens.
+_LIST_ROUTE: str = "#/schedules"
 _STATE_WORDS: dict[str, str] = {"open": "to do", "doing": "being done", "done": "done", "dropped": "let go"}
 
 
@@ -146,6 +151,24 @@ async def _recent_chats(store: Store) -> list[str]:
     return ["The owner's newest chats:", *(f"- {quoted(chat.title, _QUOTE_CHARS)}" for chat in chats)] if chats else []
 
 
+@dataclass(frozen=True)
+class _ThingsChat:
+    """What the chat of a thing's last run holds (item 868): the runs that went on from it since, newest first; whether
+    a run works there; whether a question or a step left for the owner waits."""
+
+    later: tuple[RunRecord, ...]
+    working: bool
+    waiting: bool
+
+    @property
+    def holds(self) -> bool:
+        """Whether no run may start the thing elsewhere: one works in its chat, the owner is asked there, or a run that
+        went on from it ended and its end is not settled yet, which only :meth:`Initiative._next` may do (the third
+        pre-push review of item 868: on a busy tick, an urgent thing whose answer's run the owner stopped started again
+        in a new chat)."""
+        return self.working or self.waiting or bool(self.later)
+
+
 class Initiative:
     """Starts the runs of Dot's own initiative from the scheduler's tick (:meth:`tick`) and follows each to its end."""
 
@@ -217,57 +240,78 @@ class Initiative:
             await self._look(state, now)
 
     async def _urgent_todo(self, attempts: int) -> TodoRecord | None:
-        """The first thing marked ``[URGENT]`` in its title or why, if it has tries left.
+        """The first thing marked ``[URGENT]`` in its title or why, if it has tries left and its chat does not hold it
+        (:meth:`_chat_of`, item 868).
 
         This reads without changing the list; a busy tick must not let go of or finish anything."""
         store: Store = self._runtime.store
         for todo in await store.list_todos(("open",), _LISTED):
-            if _is_urgent(todo) and todo.attempts < attempts:
+            if not _is_urgent(todo) or todo.attempts >= attempts:
+                continue
+            chat: _ThingsChat | None = await self._chat_of(todo)
+            if chat is None or not chat.holds:
                 return todo
         return None
 
     async def _next(self, attempts: int) -> TodoRecord | None:
         """The oldest thing to do, with urgent things first. One tried ``attempts`` times already (the limit was
         lowered since) is let go, so that old things cannot keep the newer ones out of the part of the list that is
-        read; one whose chat goes on in a run the owner started there since (a Resume) is that run's: left while it
-        works, done once it ended done (the code reviews of item 715)."""
+        read. One whose chat holds it (:meth:`_chat_of`) is left: a run works there, or a question waits for the owner
+        (item 868). One whose chat went on from its last run (a resume, the run an answer of the owner's started) is
+        that run's: done once it ended done, and otherwise as its end leaves it (:meth:`_settle`; the code reviews of
+        item 715, the pre-push reviews of item 868)."""
         store: Store = self._runtime.store
         todos: list[TodoRecord] = list(await store.list_todos(("open",), _LISTED))
-        for todo in sorted(todos, key=lambda item: (not _is_urgent(item), item.created_at)):
-            if todo.attempts >= attempts:
-                await store.set_todo(
-                    todo.id, "dropped", todo.attempts, todo.run_id, f"Let go after {todo.attempts} tries."
-                )
+        for listed in sorted(todos, key=lambda item: (not _is_urgent(item), item.created_at)):
+            chat: _ThingsChat | None = await self._chat_of(listed)
+            if chat is not None and (chat.working or chat.waiting):
                 continue
-            if await self._taken_over(todo):
+            if chat is not None and chat.later:
+                # Its end is the thing's, as one of its own runs' (the fourth pre-push review of item 868: done, it
+                # is a try and the owner is told, as any done thing).
+                finished: RunRecord | None = next((run for run in chat.later if run.status == "done"), None)
+                await self._settle(listed.id, finished or chat.later[0])
+            # As the end of a run that went on from it left it (a counted try, a newer last run).
+            todo: TodoRecord = await store.get_todo(listed.id)
+            if todo.status != "open":
+                continue
+            if todo.attempts >= attempts:
+                # Tried as often as a lowered limit allows, or its last try left a question that is over now: let go,
+                # and the owner told as after any last try (the fourth pre-push review of item 868).
+                await self._let_go(todo, todo.attempts, todo.run_id, f"Let go after {todo.attempts} tries.")
                 continue
             return todo
         return None
 
-    async def _taken_over(self, todo: TodoRecord) -> bool:
-        """Whether a resume of ``todo``'s last run (a later run of its chat that goes on from it) has it: one at work,
-        or one that ended done, which marks the thing done. Another message of the owner's in that chat does not: its
-        answer is no sign the thing was done (the code review of item 715)."""
+    async def _chat_of(self, todo: TodoRecord) -> _ThingsChat | None:
+        """What the chat of ``todo``'s last run holds, read without changing anything; ``None`` when it names no run.
+
+        A run at work there, or a question or a step its runs left for the owner, unanswered, holds the thing (item
+        868): a new run in a chat of its own would do it twice. On 2026-10-31 a run left "may I put the fixes live?"
+        and ended; the thing was tried again 15 minutes later in a new chat, and when the owner answered, the two runs
+        put the same site live side by side. The later runs that go on from its last run (``goes_on_from``) are read
+        too; another message of the owner's in that chat is no sign the thing was done (the code review of item
+        715)."""
         if todo.run_id is None:
-            return False
+            return None
         store: Store = self._runtime.store
         try:
             last: RunRecord = await store.get_run(todo.run_id)
         except NotFoundError:
-            return False
-        later: list[RunRecord] = [
+            return None
+        runs: list[RunRecord] = await store.list_runs(_LATER_READ, last.thread_id)
+        later: tuple[RunRecord, ...] = tuple(
             run
-            for run in await store.list_runs(_LATER_READ, last.thread_id)
-            if run.id != last.id and run.created_at >= last.created_at and run.source == RESUME_SOURCE
-        ]
-        if any(run.status in WORKING_STATUSES for run in later):
-            return True
-        finished: RunRecord | None = next((run for run in later if run.status == "done"), None)
-        if finished is None:
-            return False
-        note: str = one_line(_first_line(finished.result), _NOTE_CHARS)
-        await store.set_todo(todo.id, "done", todo.attempts, finished.id, note)
-        return True
+            for run in runs
+            if run.id != last.id
+            and run.created_at >= last.created_at
+            and (run.source == RESUME_SOURCE or goes_on_from(run, last))
+        )
+        return _ThingsChat(
+            later=later,
+            working=any(run.status in WORKING_STATUSES for run in runs),
+            waiting=await store.count_left_in_chat(last.thread_id) > 0,
+        )
 
     async def _started_lately(self) -> int:
         """How many of its runs started in the last day, counted in the store, so that a restart of the daemon does not
@@ -415,13 +459,19 @@ class Initiative:
         ``[initiative] attempts`` times."""
         store: Store = self._runtime.store
         tried: int = todo.attempts + 1
-        if tried < self._runtime.config.initiative.attempts:
+        # One that left the owner what only they decide (item 868) stays to do, its try counted, while it waits for
+        # their answer; it is let go once it is not waiting and has no try left (:meth:`_next`).
+        if tried < self._runtime.config.initiative.attempts or await store.count_left_in_chat(ended.thread_id) > 0:
             await store.set_todo(todo.id, "open", tried, ended.id, note)
             return
-        await store.set_todo(todo.id, "dropped", tried, ended.id, note)
+        await self._let_go(todo, tried, ended.id, note)
+
+    async def _let_go(self, todo: TodoRecord, tried: int, run_id: str | None, note: str) -> None:
+        """Let go of ``todo`` after ``tried`` tries, its last run ``run_id``, and tell the owner."""
+        await self._runtime.store.set_todo(todo.id, "dropped", tried, run_id, note)
         await tell_owner(
             self._runtime.bus,
             f"Dot let go of a thing after {tried} tries",
             one_line(f"{todo.title}: {note}", _TELL_CHARS),
-            f"#/runs/{ended.id}",
+            f"#/runs/{run_id}" if run_id is not None else _LIST_ROUTE,
         )

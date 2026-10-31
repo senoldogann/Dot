@@ -270,6 +270,16 @@ def _answer_text(question: ApprovalRecord, answer: str) -> str:
     return f"Answer to your question “{question.summary}”: {answer}"
 
 
+def goes_on_from(run: RunRecord, earlier: RunRecord) -> bool:
+    """Whether ``run`` goes on with the task of ``earlier`` in its chat (item 868): a resume of it, the run the answer
+    to a question it left started (:meth:`RunManager._carry_on`), or the one the owner's answer to a step it kept
+    started (:meth:`RunManager._carry_kept`). Each carries the goal of the run it goes on from, alone or followed by
+    what was answered, as its own; a message the owner writes in the chat is a goal of its own."""
+    return run.thread_id == earlier.thread_id and (
+        run.goal == earlier.goal or run.goal.startswith(f"{earlier.goal}\n\n")
+    )
+
+
 def stricter_approvals(first: ApprovalMode, second: ApprovalMode) -> ApprovalMode:
     """The stricter of two approval modes."""
     return min(first, second, key=_APPROVALS_STRICTEST_FIRST.index)
