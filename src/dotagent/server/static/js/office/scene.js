@@ -44,8 +44,10 @@ export function roundedBox(w, h, d, r) {
     bevelEnabled: true,
     bevelThickness: radius,
     bevelSize: radius * 0.98,
-    bevelSegments: 3,
-    curveSegments: 6,
+    // Small pieces need few segments: a book or a key is a few pixels wide (the measure of item 889: the room was 615k
+    // triangles).
+    bevelSegments: radius < 0.02 ? 1 : 2,
+    curveSegments: radius < 0.02 ? 2 : 4,
   });
   geometry.rotateX(-Math.PI / 2);
   geometry.translate(0, radius, 0);
@@ -239,6 +241,8 @@ function desk(piece, name, code) {
   const screenMaterial = new THREE.MeshStandardMaterial({ color: "#11131a", roughness: 0.25, emissive: "#ffffff", emissiveIntensity: 0, emissiveMap: code });
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.36), screenMaterial);
   screen.position.set(0, 0.32, -0.019);
+  // Lit while its agent works: drawn on its own, never baked into the room.
+  screen.userData.dynamic = true;
   screen.rotation.y = Math.PI;
   monitor.add(foot, stand, frame, screen);
   group.add(monitor);
@@ -600,6 +604,7 @@ export function buildRoom(plan, names) {
   root.add(backWall, leftWall);
 
   const theClock = clock();
+  theClock.group.userData.dynamic = true;
   theClock.group.position.set(left + width * 0.42 + 1.55, 2.25, back + 0.03);
   root.add(theClock.group);
   const art = print();
@@ -669,6 +674,7 @@ export function buildRoom(plan, names) {
     }
   }
 
+  bakeStatic(root);
   let skyHour = new Date().getHours();
   return {
     root,
@@ -685,6 +691,80 @@ export function buildRoom(plan, names) {
       }
     },
   };
+}
+
+/**
+ * Bake the still parts of `root` into one mesh per material (item 889): the room was 1,420 draw calls of small meshes,
+ * each a call of its own, and a phone's GPU spends more on calls than on triangles. A part marked `userData.dynamic`
+ * (a screen that lights, the clock's hands) and what is under it stay as they are. Returns how many meshes went.
+ */
+function bakeStatic(root) {
+  root.updateMatrixWorld(true);
+  const inverse = root.matrixWorld.clone().invert();
+  /** @type {Map<string, { material: ThreeStandardMaterial, cast: boolean, parts: ThreeGeometry[] }>} */
+  const groups = new Map();
+  /** @type {ThreeMesh[]} */
+  const baked = [];
+  const visit = (node) => {
+    if (node.userData.dynamic === true) {
+      return;
+    }
+    const meshNode = /** @type {ThreeMesh} */ (node);
+    if (meshNode.isMesh === true && !Array.isArray(meshNode.material)) {
+      const material = /** @type {ThreeStandardMaterial} */ (meshNode.material);
+      const key = `${material.uuid}|${meshNode.castShadow}`;
+      let group = groups.get(key);
+      if (group === undefined) {
+        group = { material, cast: meshNode.castShadow, parts: [] };
+        groups.set(key, group);
+      }
+      const geometry = meshNode.geometry.index === null ? meshNode.geometry.clone() : meshNode.geometry.toNonIndexed();
+      geometry.applyMatrix4(inverse.clone().multiply(meshNode.matrixWorld));
+      group.parts.push(geometry);
+      baked.push(meshNode);
+    }
+    for (const child of node.children) {
+      visit(child);
+    }
+  };
+  visit(root);
+  for (const mesh of baked) {
+    mesh.removeFromParent();
+    mesh.geometry.dispose();
+  }
+  for (const { material, cast, parts } of groups.values()) {
+    const merged = mergeParts(parts);
+    for (const part of parts) part.dispose();
+    const made = new THREE.Mesh(merged, material);
+    made.castShadow = cast;
+    made.receiveShadow = true;
+    made.matrixAutoUpdate = false;
+    root.add(made);
+  }
+  return baked.length;
+}
+
+/** One geometry of non-indexed `parts`: their positions, normals and uvs one after another (a part with no uv gets
+ * zeros). */
+function mergeParts(parts) {
+  const count = parts.reduce((sum, part) => sum + part.attributes.position.count, 0);
+  const position = new Float32Array(count * 3);
+  const normal = new Float32Array(count * 3);
+  const uv = new Float32Array(count * 2);
+  let at = 0;
+  for (const part of parts) {
+    const n = part.attributes.position.count;
+    position.set(/** @type {Float32Array} */ (part.attributes.position.array), at * 3);
+    if (part.attributes.normal !== undefined) normal.set(/** @type {Float32Array} */ (part.attributes.normal.array), at * 3);
+    if (part.attributes.uv !== undefined) uv.set(/** @type {Float32Array} */ (part.attributes.uv.array), at * 2);
+    at += n;
+  }
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute("position", new THREE.BufferAttribute(position, 3));
+  merged.setAttribute("normal", new THREE.BufferAttribute(normal, 3));
+  merged.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  merged.computeBoundingSphere();
+  return merged;
 }
 
 /** Whether `hour` is night in the office: the lamps glow brighter and the sun is the moon. */

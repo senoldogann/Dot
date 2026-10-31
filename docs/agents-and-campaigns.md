@@ -6,18 +6,28 @@
 3D, each living its day by what it does. An agent whose run works goes to its own desk (its name on a plate), sits and
 types, and its screen lights up; one whose run waits for you (a question, a step to approve) stands at its desk, turns
 to you and waves, its tag pulsing orange; a free one has a coffee at the bar, sits on the sofa, looks out of a window,
-thinks at the whiteboard, browses the shelf or sits at its desk, and in the small hours naps. The figures are Dot's
-own, drawn in code with no model file: the head is the agent's look (its shape made solid, in its colour), with eyes
-that blink, look about and change with what it does, and Dot has gold eyes; clothes and an accessory come from its id.
-The room has the Mac's time: a wall clock that tells it, a sky behind the windows that turns from day to evening to a
-night with stars, and lamps that glow at night. A tag over each says its name and what it does; a click on a figure
-or its tag opens a panel with its face, role and what it works on ("Open its chat", "Its page") and the box to message
-it, which starts the run without leaving the room, so you see the agent walk to its desk and start. Drag turns the
-room, the wheel or two fingers zoom, the button at the corner brings the whole room back. **Hide** folds it away, which
-this browser keeps; the teams and the agents' cards stay under it. It draws only while it is on the screen, the page is shown and
-Dot's window is the one in front, one frame each time something changes when motion is reduced, and a browser without WebGL 2 is told so and
-shows the rest of the page. The room grows with the number of agents (two desks a pod). three.js 0.187.0 (MIT,
-`static/vendor/three/`, its licence beside it) draws it and is loaded only when the office opens.
+thinks at the whiteboard, browses the shelf or sits at its desk, and in the small hours naps. The figures are Dot's own,
+drawn in code with no model file: the head is the agent's look (its shape made solid, in its colour), with eyes that
+blink, look about and change with what it does, and Dot has gold eyes; clothes and an accessory come from its id. The
+room has the Mac's time: a wall clock that tells it, a sky behind the windows that turns from day to evening to a night
+with stars, and lamps that glow at night. A tag over each says its name and what it does, and over a working agent a
+bubble says the step it takes this moment ("Web search · cafés in Oulu", "Edit file · drafts/cafes.md", "Writing", item
+889); a click on a figure or its tag opens a panel with its face, role and what it works on, its steps live as they come
+(each marked when it went through or failed) and the answer as it is written, "Open its chat", "Its page" and the box to
+message it, which starts the run without leaving the room, so you see the agent walk to its desk and start; click
+another and message it too, and both work at once. An agent that sends another a message (`message_agent`) walks to that
+one's desk and talks there a while ("Talking to Copy Editor"), then goes back to its work. The office follows the eight
+newest working runs, and the one whose panel is open, on one stream (`GET /api/runs/streams`): it reads each one's steps
+so far once, then the stream brings the new ones, so however many agents work it holds one connection to Dot, and a
+message you send waits behind none. A call it reads from before it opened moves nobody. Drag turns the room, the wheel
+or two fingers zoom, the button at the corner brings the whole room back. **Hide** folds it away, which this browser
+keeps; the teams and the agents' cards stay under it. It draws only while it is on the screen, the page is shown and
+Dot's window is the one in front, at 30 frames a second while nobody walks and the camera rests, with fewer pixels when
+the Mac or the phone cannot keep up (item 889: the still room is baked into one mesh per material and its sun shadows
+drawn once, a few hundred draw calls where it was 1,420), one frame each time something changes when motion is reduced,
+and a browser without WebGL 2 is told so and shows the rest of the page. The room grows with the number of agents (two
+desks a pod). three.js 0.187.0 (MIT, `static/vendor/three/`, its licence beside it) draws it and is loaded only when the
+office opens.
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
 model, a reasoning level, approvals, the actions it may use (its tools); each left out takes the configured one, and **All actions**,
@@ -226,15 +236,15 @@ notes by, and the ones its page shows, count its own runs alone. An agent's page
 learned": its lessons with how its runs fared after each, with Forget, and its skills with Share and Drop), and the
 Memory page marks a lesson with its agent's name. A note a run saves with `memory_save` is Dot's, for every run.
 
-**The agents know of each other** (item 890, the owner's ask of 2026-10-31). Every run, Dot's and every agent's
-whatever tools its role names, has the group **office** (turned on with `use_tools` as any group): `agents_now` lists Dot
-and every agent with its role, its teams and what it does now (working on which goal, waiting for you, or free), so a
-run knows whom a name or a team means; `read_agent_chat` reads the newest messages (20 by default, 40 at most) of an
-agent's newest chat, or Dot's, with what its run does now: what you asked, what it said, the tools it called and the
-start of what they gave. So "go and help the agent of the Engineer team" is a run that finds the Engineer, reads where
-it stands and sends it what it needs with `message_agent`. Both only read. The secrets Dot holds are masked in what
-they quote, and what a chat's runs read from pages or mails comes fenced and marks the reading run untrusted, as that
-chat was (item 243), so a page cannot steer one agent through another's chat.
+**The agents know of each other** (item 890, the owner's ask of 2026-10-31). Every run, Dot's and every agent's whatever
+tools its role names, has the group **office** (turned on with `use_tools` as any group): `agents_now` lists Dot and
+every agent with its role, its teams and what it does now (working on which goal, waiting for you, or free), so a run
+knows whom a name or a team means; `read_agent_chat` reads the newest messages (20 by default, 40 at most) of an agent's
+newest chat, or Dot's, with what its run does now: what you asked, what it said, the tools it called and the start of
+what they gave. So "go and help the agent of the Engineer team" is a run that finds the Engineer, reads where it stands
+and sends it what it needs with `message_agent`. Both only read. The secrets Dot holds are masked in what they quote,
+and what a chat's runs read from pages or mails comes fenced and marks the reading run untrusted, as that chat was (item
+243), so a page cannot steer one agent through another's chat.
 
 A run can make a teammate itself (item 99). The `create_agent` tool (a name, a role, instructions, the tools it may
 use, a model if one is wanted) makes an agent as the Agents page does, under your approvals (the `persistence` flag,

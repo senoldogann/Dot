@@ -11221,6 +11221,83 @@ dialog.teach {
     min-height: 32px;
   }
 }
+.office-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + var(--space-1));
+  transform: translateX(-50%);
+  max-width: 240px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--office-bubble);
+  color: var(--office-bubble-ink);
+  box-shadow: var(--office-bubble-shadow);
+  font-size: var(--text-xs);
+  line-height: var(--leading-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.office-bubble[hidden] {
+  display: none;
+}
+.office-panel-live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.office-panel-live[hidden] {
+  display: none;
+}
+.office-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.office-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--text-2);
+}
+.office-step-words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.office-step-mark {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--office-working);
+}
+.office-step[data-state="ok"] .office-step-mark {
+  background: var(--office-working);
+}
+.office-step[data-state="failed"] .office-step-mark {
+  border-color: var(--bad);
+  background: var(--bad);
+}
+.office-live-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .office-tag-dot {
   width: 7px;
   height: 7px;

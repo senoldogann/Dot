@@ -69,3 +69,5 @@ type ThreeStandardMaterial = import("three").MeshStandardMaterial;
 type ThreeBasicMaterial = import("three").MeshBasicMaterial;
 type ThreePointLight = import("three").PointLight;
 type ThreeVector3 = import("three").Vector3;
+type ThreeGeometry = import("three").BufferGeometry;
+type ThreeMesh = import("three").Mesh;

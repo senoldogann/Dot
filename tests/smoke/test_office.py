@@ -4,6 +4,7 @@ without WebGL 2 is told so and keeps the lists. A real daemon in Chrome, wide an
 
 import asyncio
 import json
+import re
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -89,6 +90,28 @@ async def _working(route: Route) -> None:
     await route.fulfill(status=200, body=json.dumps(agents), headers={"content-type": "application/json"})
 
 
+async def _history(route: Route) -> None:
+    """The working run's stored events: a search it made, which went through (item 889)."""
+    events = [
+        {
+            "id": 1,
+            "run_id": "run_x",
+            "kind": "tool_call",
+            "ts": 1.0,
+            "data": {"tool": "web_search", "args": {"query": "news"}},
+        },
+        {"id": 2, "run_id": "run_x", "kind": "tool_result", "ts": 2.0, "data": {"tool": "web_search", "ok": True}},
+    ]
+    await route.fulfill(status=200, body=json.dumps(events), headers={"content-type": "application/json"})
+
+
+async def _stream(route: Route) -> None:
+    """The one stream of the followed runs: nothing new while the test looks."""
+    # Never from the start: the history was read first (and no closed office opens one).
+    assert "ids=run_x" in route.request.url and "after=2" in route.request.url, route.request.url
+    await route.fulfill(status=200, body=":\n\n", headers={"content-type": "text/event-stream"})
+
+
 async def _agents_page(page: Page, address: str) -> None:
     port: int = int(address.rpartition(":")[2])
     await page.goto(ui_url("127.0.0.1", port, TOKEN))
@@ -108,6 +131,8 @@ async def test_the_office_shows_every_agent_and_dot_and_a_click_opens_the_box_to
                 errors: list[str] = []
                 page.on("pageerror", lambda error, errors=errors: errors.append(str(error)))
                 await page.route("**/api/agents", _working)
+                await page.route("**/api/runs/run_x/events**", _history)
+                await page.route("**/api/runs/streams**", _stream)
                 await _agents_page(page, address)
                 office = page.get_by_role("region", name="The office: your agents at work")
                 await expect(office.locator("canvas.office-canvas")).to_have_count(1, timeout=20_000)
@@ -116,10 +141,24 @@ async def test_the_office_shows_every_agent_and_dot_and_a_click_opens_the_box_to
                 await expect(tags.filter(has_text="Dot")).to_have_count(1)
                 await expect(office.locator('.office-tag[data-mode="working"]')).to_have_count(1)
                 await expect(office.locator('.office-tag[data-mode="working"]')).to_contain_text("Working")
+                # What it does this moment, over its head (item 889).
+                await expect(office.locator(".office-bubble:visible")).to_have_text("Web search · news")
+                # The room is baked: a few hundred draw calls, not one per piece of furniture.
+                await expect(office).to_have_attribute("data-draw-calls", re.compile(r"^\d+$"))
+                calls: int = int(await office.get_attribute("data-draw-calls") or "0")
+                assert 0 < calls < 300, calls
                 await tags.filter(has_text="Copy Editor").click()
                 panel = office.get_by_role("complementary", name="Copy Editor in the office")
                 await expect(panel).to_be_visible()
                 await expect(panel.get_by_role("textbox", name="Message")).to_be_visible()
+                await panel.get_by_role("button", name="Close").click()
+                # The working one's panel shows its steps as they come.
+                await office.locator('.office-tag[data-mode="working"]').click()
+                await expect(office.locator(".office-panel .office-step")).to_have_text(["Web search · news"])
+                await expect(office.locator('.office-panel .office-step[data-state="ok"]')).to_have_count(1)
+                await office.get_by_role("button", name="Close").click()
+                await tags.filter(has_text="Copy Editor").click()
+                await expect(panel).to_be_visible()
                 await panel.get_by_role("button", name="Close").click()
                 await expect(panel).to_have_count(0)
                 # The lists stay under the office.
@@ -168,3 +207,35 @@ async def test_hide_keeps_the_office_hidden_and_a_browser_without_webgl_is_told_
             await blind.close()
         finally:
             await browser.close()
+
+
+async def test_one_stream_carries_several_runs_events_in_their_order(login_env: dict[str, str]) -> None:
+    """Item 889: the office follows every working agent on one stream (a browser keeps six connections to a server).
+    Runs that are over give their stored events, in the store's order, and the stream ends; an unknown run is 404 and
+    more than the stream follows is 422."""
+    async with (
+        _daemon(login_env) as address,
+        httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http,
+    ):
+        agents = (await http.get("/api/agents")).json()
+        assert len(agents) >= 2
+        made: list[str] = []
+        for goal in ("First", "Second"):
+            started = await http.post("/api/runs", json={"goal": goal, "mode": "chat"})
+            assert started.status_code == 201, started.text
+            made.append(started.json()["id"])
+        for run_id in made:
+            for _ in range(100):
+                if (await http.get(f"/api/runs/{run_id}")).json()["run"]["status"] not in ("queued", "running"):
+                    break
+                await asyncio.sleep(0.1)
+        answer = await http.get(f"/api/runs/streams?ids={','.join(made)}&after=0", timeout=20)
+        assert answer.status_code == 200, answer.text
+        frames = [json.loads(line[6:]) for line in answer.text.splitlines() if line.startswith("data: ")]
+        assert {frame["run_id"] for frame in frames} == set(made)
+        assert [frame["id"] for frame in frames] == sorted(frame["id"] for frame in frames)
+        assert [frame["kind"] for frame in frames if frame["kind"] == "run_finished"] == ["run_finished"] * 2
+        missing = await http.get("/api/runs/streams?ids=run_nobody")
+        assert missing.status_code == 404, missing.text
+        many = await http.get(f"/api/runs/streams?ids={','.join(f'run_{n}' for n in range(13))}")
+        assert many.status_code == 422, many.text

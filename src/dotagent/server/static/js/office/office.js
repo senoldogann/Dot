@@ -9,7 +9,8 @@ import { api } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack } from "../state.js";
-import { decide, makeAgent, modeOf, step } from "./brain.js";
+import { decide, heading, makeAgent, modeOf, step, visit } from "./brain.js";
+import { runFeeds } from "./feeds.js";
 import { makeFigure } from "./figure.js";
 import { planFor } from "./layout.js";
 import { gridFor } from "./nav.js";
@@ -17,6 +18,11 @@ import { buildRoom, isNight } from "./scene.js";
 import { THREE, canDraw, loadThree } from "./three.js";
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)");
+// How long a sender stays at the desk of the agent it messaged, and how often an open panel follows a stream.
+const VISIT_S = 7;
+const PANEL_REPAINT_MS = 250;
+// The gap between two frames while nothing walks: 30 a second.
+const CALM_FRAME_MS = 32;
 // How often the agents are read again besides the lifecycle stream, and how soon after an event.
 const REREAD_MS = 20_000;
 const EVENT_DELAY_MS = 400;
@@ -24,7 +30,7 @@ const MODE_WORDS = { working: "Working", waiting: "Waits for you", free: "" };
 const POSE_WORDS = { sleep: "Napping", drink: "Coffee", rest: "On the sofa", look: "", think: "Thinking", sit: "" };
 
 /**
- * @typedef {{ record: { id: string, name: string, role: string, look: object | null }, latest: { id: string,
+ * @typedef {{ record: { id: string, name: string, role: string, look: object | null }, latest: { id: string, created_at?: number,
  *   status: string, goal: string, thread_id: string } | null }} Summary
  */
 
@@ -66,6 +72,8 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     renderer.toneMappingExposure = 1.05;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
+    // The sun's shadows fall from the still room only: drawn when it is built and when day turns to night (item 889).
+    renderer.shadowMap.autoUpdate = false;
     const canvas = renderer.domElement;
     canvas.classList.add("office-canvas");
     canvas.setAttribute("aria-hidden", "true");
@@ -84,7 +92,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     const fill = new THREE.DirectionalLight("#dfe8ff", 0.35);
     scene.add(hemisphere, sun, sun.target, fill);
 
-    /** @type {Map<string, { summary: Summary, figure: ReturnType<typeof makeFigure>, agent: ReturnType<typeof makeAgent>, tag: HTMLElement, word: HTMLElement }>} */
+    /** @type {Map<string, { summary: Summary, figure: ReturnType<typeof makeFigure>, agent: ReturnType<typeof makeAgent>, tag: HTMLElement, word: HTMLElement, bubble: HTMLElement, visitWord: string }>} */
     const actors = new Map();
     /** @type {ReturnType<typeof buildRoom> | null} */
     let room = null;
@@ -179,6 +187,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       const names = new Map(summaries.map((summary, index) => [plan.desks[index].id, summary.record.name]));
       room = buildRoom(plan, names);
       scene.add(room.root);
+      renderer.shadowMap.needsUpdate = true;
       world = { grid: gridFor(plan), spots: plan.spots, taken: new Map() };
       const extent = Math.max(plan.width, plan.depth);
       sun.position.set(-plan.width * 0.35, 9, -plan.depth * 0.6);
@@ -199,15 +208,18 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         figure.group.position.set(agent.x, 0, agent.z);
         scene.add(figure.group);
         const word = el("span", { class: "office-tag-word" });
+        // What a working agent does this moment, over its tag (item 889); the panel says it to a screen reader.
+        const bubble = el("span", { class: "office-bubble", "aria-hidden": "true", hidden: true });
         const tag = el(
           "button",
           { class: "office-tag", type: "button", dataset: { agent: summary.record.id }, onclick: () => select(summary.record.id) },
+          bubble,
           el("span", { class: "office-tag-dot", "aria-hidden": "true" }),
           el("span", { class: "office-tag-name" }, summary.record.name),
           word,
         );
         tags.append(tag);
-        actors.set(summary.record.id, { summary, figure, agent, tag, word });
+        actors.set(summary.record.id, { summary, figure, agent, tag, word, bubble, visitWord: "" });
       });
       goal.target.set(0, 0.9, 0);
       placeCamera();
@@ -222,9 +234,52 @@ export function mountOffice(holder, { composerFor, openAgent }) {
           actor.summary = summary;
         }
       }
+      followWork();
       if (selected !== null) {
         paintPanel();
       }
+    }
+
+    // The streams of the working runs (item 889): each event moves the agent's bubble, its panel when open, and a message
+    // to another agent sends the sender over to the other's desk.
+    const feeds = runFeeds((runId, sentTo) => {
+      const sender = [...actors.values()].find((actor) => actor.summary.latest?.id === runId);
+      if (sender === undefined) return;
+      if (sentTo !== null) walkOver(sender, sentTo);
+      if (selected === sender.summary.record.id) panelSoon();
+      // With motion reduced the room is drawn on a change only: a step is one.
+      wake();
+    });
+    let panelTimer = 0;
+    function panelSoon() {
+      if (panelTimer !== 0) return;
+      panelTimer = window.setTimeout(() => {
+        panelTimer = 0;
+        paintPanel();
+      }, PANEL_REPAINT_MS);
+    }
+    function followWork() {
+      const waiting = waitingRuns();
+      const working = [...actors.values()]
+        .filter((actor) => modeOf(actor.summary.latest, waiting) !== "free")
+        .sort((one, other) => (other.summary.latest?.created_at ?? 0) - (one.summary.latest?.created_at ?? 0))
+        .map((actor) => actor.summary.latest?.id ?? "");
+      const open = selected === null ? undefined : actors.get(selected)?.summary.latest?.id;
+      const workingIds = working.filter((id) => id !== "");
+      feeds.sync([...new Set([...(open ? [open] : []), ...workingIds])], new Set(workingIds));
+    }
+    /** `sender` walks to the desk of the agent named `name` and talks there a while. */
+    function walkOver(sender, name) {
+      const wanted = name.toLowerCase();
+      const other = [...actors.values()].find(
+        (actor) => actor.summary.record.name.toLowerCase() === wanted || actor.summary.record.id === name,
+      );
+      if (other === undefined || other === sender || world === null) return;
+      const desk = other.agent.desk;
+      const away = Math.atan2(sender.agent.x - desk.x, sender.agent.z - desk.z);
+      const point = { x: desk.x + Math.sin(away) * 0.9, z: desk.z + Math.cos(away) * 0.9 };
+      visit(sender.agent, point, heading(point, desk), world, clockNow + VISIT_S);
+      sender.visitWord = `Talking to ${other.summary.record.name}`;
     }
 
     let reading = 0;
@@ -264,6 +319,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
 
     function select(id) {
       selected = id;
+      followWork();
       const actor = actors.get(id);
       if (actor !== undefined) {
         goal.target.set(actor.agent.x * 0.6, 0.6, actor.agent.z * 0.6);
@@ -281,6 +337,31 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       goal.zoom = 1;
     }
 
+    // The live work of the agent in the panel (item 889): its steps as they come, the newest last, and the answer as it
+    // is written; a free agent's last run, as it ended.
+    function feedView(feed, mode) {
+      if (feed === undefined || (feed.steps.length === 0 && feed.text === "")) {
+        return el("div", { class: "office-panel-live", hidden: true });
+      }
+      const steps = feed.steps
+        .slice(-8)
+        .map((one) =>
+          el(
+            "li",
+            { class: "office-step", dataset: { state: one.ok === null ? "running" : one.ok ? "ok" : "failed" } },
+            el("span", { class: "office-step-mark", "aria-hidden": "true" }),
+            el("span", { class: "office-step-words" }, one.words),
+          ),
+        );
+      const text = feed.text.trim();
+      return el(
+        "section",
+        { class: "office-panel-live", "aria-label": mode === "free" ? "What it did last" : "What it does now", "aria-live": "polite" },
+        steps.length > 0 ? el("ol", { class: "office-steps" }, ...steps) : null,
+        text !== "" ? el("p", { class: "office-live-text" }, text.length > 420 ? `…${text.slice(-420)}` : text) : null,
+      );
+    }
+
     function paintPanel() {
       const actor = selected === null ? undefined : actors.get(selected);
       if (actor === undefined) {
@@ -294,6 +375,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         { class: "office-panel-doing" },
         mode === "free" ? "Free right now." : `${MODE_WORDS[mode]}: ${latest?.goal ?? ""}`,
       );
+      const live = feedView(latest === null ? undefined : feeds.feed(latest.id), mode);
       const links = el(
         "div",
         { class: "office-panel-links" },
@@ -303,6 +385,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       if (panel !== null && panel.dispose !== undefined && panelSlot.dataset.agent === record.id) {
         // The same agent: only what it does changes, the box keeps what was typed.
         panelSlot.querySelector(".office-panel-doing")?.replaceWith(doing);
+        panelSlot.querySelector(".office-panel-live")?.replaceWith(live);
         panelSlot.querySelector(".office-panel-links")?.replaceWith(links);
         return;
       }
@@ -325,6 +408,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
             el("button", { class: "btn icon ghost", type: "button", title: "Close", "aria-label": "Close", onclick: closePanel }, icon("x")),
           ),
           doing,
+          live,
           links,
           box.element,
         ),
@@ -339,14 +423,21 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       presses.set(event.pointerId, { x: event.clientX, y: event.clientY });
       dragged = 0;
     });
+    // The figure under the pointer is looked for once a frame, not at every move of the mouse.
+    let pointerAt = null;
+    function pick() {
+      if (pointerAt === null) return;
+      const over = figureAt(pointerAt.x, pointerAt.y);
+      pointerAt = null;
+      if (over !== hovered) {
+        hovered = over;
+        canvas.style.cursor = over === null ? "grab" : "pointer";
+      }
+    }
     canvas.addEventListener("pointermove", (event) => {
       const press = presses.get(event.pointerId);
       if (press === undefined) {
-        const over = figureAt(event.clientX, event.clientY);
-        if (over !== hovered) {
-          hovered = over;
-          canvas.style.cursor = over === null ? "grab" : "pointer";
-        }
+        pointerAt = { x: event.clientX, y: event.clientY };
         return;
       }
       const dx = event.clientX - press.x;
@@ -393,6 +484,8 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     let seen = true;
     let frameId = 0;
     let ahead = 0;
+    let clockNow = 0;
+    let wasNight = null;
     let last = performance.now();
     const sightings = new IntersectionObserver((entries) => {
       seen = entries.some((entry) => entry.isIntersecting);
@@ -402,10 +495,15 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     const projected = new THREE.Vector3();
 
     function tick(now, dt) {
+      clockNow = now;
       const date = new Date();
       const hour = date.getHours();
       const waiting = waitingRuns();
       const night = isNight(hour);
+      if (night !== wasNight) {
+        wasNight = night;
+        renderer.shadowMap.needsUpdate = true;
+      }
       hemisphere.intensity = night ? 0.45 : 1.1;
       sun.intensity = night ? 0.35 : 2.2;
       sun.color.set(night ? "#9fb4ff" : "#fff0dc");
@@ -427,7 +525,13 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         if (screen !== undefined) {
           screen.emissiveIntensity += ((actor.agent.pose === "type" ? 0.9 : 0.04) - screen.emissiveIntensity) * Math.min(1, dt * 3);
         }
-        const word = mode !== "free" ? MODE_WORDS[mode] : (POSE_WORDS[actor.agent.pose] ?? "");
+        const visiting = actor.agent.visiting > now ? (actor.visitWord ?? "") : "";
+        const doing = mode === "working" ? (feeds.feed(actor.summary.latest?.id ?? "")?.doing ?? "") : "";
+        const word = visiting !== "" ? visiting : mode !== "free" ? MODE_WORDS[mode] : (POSE_WORDS[actor.agent.pose] ?? "");
+        if (actor.bubble.textContent !== doing) {
+          actor.bubble.textContent = doing;
+          actor.bubble.hidden = doing === "";
+        }
         if (actor.word.textContent !== word) actor.word.textContent = word;
         const about = mode === "free" ? actor.summary.record.name : `${actor.summary.record.name}: ${actor.summary.latest?.goal ?? ""}`;
         if (actor.tag.title !== about) actor.tag.title = about;
@@ -453,15 +557,19 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         })
         .sort((one, other) => one.depth - other.depth);
       for (const item of order) {
-        const tagWidth = item.actor.tag.offsetWidth || 90;
-        const tagHeight = item.actor.tag.offsetHeight || 22;
+        const tagWidth = Math.max(item.actor.tag.offsetWidth || 90, item.actor.bubble.hidden ? 0 : item.actor.bubble.offsetWidth);
+        // A bubble over the tag is part of what must not cover another.
+        const tagHeight = (item.actor.tag.offsetHeight || 22) + (item.actor.bubble.hidden ? 0 : item.actor.bubble.offsetHeight + 4);
         let y = item.y;
-        for (let tries = 0; tries < 6; tries += 1) {
-          const clash = placed.find((other) => Math.abs(other.x - item.x) < (other.w + tagWidth) / 2 + 2 && Math.abs(other.y - y) < tagHeight + 2);
+        // Each placed tag takes the band [y - h, y] above its anchor: one that would overlap another is lifted over it.
+        for (let tries = 0; tries < 8; tries += 1) {
+          const clash = placed.find(
+            (other) => Math.abs(other.x - item.x) < (other.w + tagWidth) / 2 + 2 && y > other.y - other.h - 2 && y - tagHeight < other.y + 2,
+          );
           if (clash === undefined) break;
-          y = clash.y - tagHeight - 3;
+          y = clash.y - clash.h - 3;
         }
-        placed.push({ x: item.x, y, w: tagWidth });
+        placed.push({ x: item.x, y, w: tagWidth, h: tagHeight });
         item.actor.tag.style.transform = `translate(${Math.round(item.x)}px, ${Math.round(y)}px) translate(-50%, -100%)`;
         item.actor.tag.hidden = item.depth > 1;
       }
@@ -473,9 +581,18 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       // (main.js marks the page away, item 662, which stills every endless animation too).
       if (disposed || !seen || document.hidden || document.documentElement.hasAttribute("data-away")) return;
       frameId = requestAnimationFrame((time) => {
+        const moving = !REDUCED.matches;
+        // Half the frames while nothing walks and the camera rests: breathing and typing read the same at 30 a second
+        // (item 889), and the GPU idles in between.
+        if (moving && !busy() && time - drawnAt < CALM_FRAME_MS) {
+          loop();
+          return;
+        }
+        pace(time - drawnAt);
+        drawnAt = time;
         const dt = Math.min(0.05, (time - last) / 1000);
         last = time;
-        const moving = !REDUCED.matches;
+        pick();
         // The simulation's clock is the frame's time plus what settling skipped ahead: it only goes forward, and it
         // keeps moving when motion comes back on (the pre-push review).
         if (moving) {
@@ -487,12 +604,63 @@ export function mountOffice(holder, { composerFor, openAgent }) {
             tick(time / 1000 + ahead, 0.5);
           }
         }
+        const began = performance.now();
         renderer.render(scene, camera);
+        measure(performance.now() - began);
         placeTags();
         if (moving) {
           loop();
         }
       });
+    }
+    // Whether something moves that 30 frames a second would show stepping: an agent walking or sitting down, or the
+    // camera on its way.
+    function busy() {
+      const turning = Math.abs(goal.yaw - view.yaw) + Math.abs(goal.pitch - view.pitch) + Math.abs(goal.zoom - view.zoom);
+      if (turning > 1e-3 || goal.target.distanceTo(view.target) > 1e-3 || presses.size > 0) return true;
+      for (const actor of actors.values()) {
+        if (actor.agent.path.length > 0 || actor.agent.settle !== 0) return true;
+      }
+      return false;
+    }
+    // The drawing's resolution follows the frames (item 889): a Mac or a phone that cannot keep up draws fewer pixels,
+    // down to one per CSS pixel, and gets them back once it can.
+    const most = Math.min(window.devicePixelRatio, 2);
+    let ratio = most;
+    let drawnAt = 0;
+    const gaps = [];
+    function pace(gap) {
+      if (gap <= 0 || gap > 250) return;
+      gaps.push(gap);
+      if (gaps.length < 45) return;
+      const sorted = [...gaps].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      gaps.length = 0;
+      const calm = !busy();
+      const budget = calm ? CALM_FRAME_MS * 1.6 : 24;
+      const before = ratio;
+      if (median > budget && ratio > 1) {
+        ratio = Math.max(1, ratio - 0.25);
+      } else if (median < (calm ? CALM_FRAME_MS * 1.15 : 18) && ratio < most) {
+        ratio = Math.min(most, ratio + 0.25);
+      }
+      if (ratio !== before) {
+        // Only on a change: setting it sizes the canvas again.
+        renderer.setPixelRatio(ratio);
+        resize();
+      }
+      frame.dataset.pixelRatio = String(ratio);
+    }
+    // What drawing costs, on the frame for a test (and anyone curious) to read: the draw calls and triangles of the
+    // last frame, and the median milliseconds of the newest frames' render calls.
+    const spent = [];
+    function measure(ms) {
+      spent.push(ms);
+      if (spent.length > 60) spent.shift();
+      const sorted = [...spent].sort((a, b) => a - b);
+      frame.dataset.drawCalls = String(renderer.info.render.calls);
+      frame.dataset.triangles = String(renderer.info.render.triangles);
+      frame.dataset.renderMs = sorted[Math.floor(sorted.length / 2)].toFixed(2);
     }
     function wake() {
       if (REDUCED.matches) loop();
@@ -529,6 +697,8 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       sightings.disconnect();
       resizer.disconnect();
       panel?.dispose?.();
+      feeds.dispose();
+      clearTimeout(panelTimer);
       for (const actor of actors.values()) {
         freeGpu(actor.figure.group);
         actor.figure.dispose();

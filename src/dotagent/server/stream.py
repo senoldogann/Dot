@@ -256,6 +256,64 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
                 return
 
 
+# The most runs one stream of several follows (item 889).
+MOST_FOLLOWED_RUNS: int = 12
+
+
+async def follow_runs(ctx: ServerContext, run_ids: frozenset[str], after: int) -> AsyncIterator[bytes]:
+    """The events of several runs on one stream (item 889, the office of the Agents page): their stored events after
+    ``after``, then the live ones, the words being written too. A browser keeps six connections to a server: a stream
+    for each working agent filled them, and the owner's message to an agent waited behind them. The runs' helpers are
+    not followed (each run's own stream has them). Ends once none of the runs works, and when the daemon starts to
+    stop; event ids are the store's, one order for every run, so a client goes on after the last one it read."""
+    store: Store = ctx.runtime.store
+    sent: set[int] = set()
+    async with ctx.runtime.bus.subscribe(None) as feed:
+
+        async def stored() -> bytes:
+            fresh: list[EventRecord] = sorted(
+                (event for event in await _stored_events(store, run_ids, after) if event.id not in sent),
+                key=lambda event: event.id,
+            )
+            sent.update(event.id for event in fresh)
+            return b"".join(encode_event(event) for event in fresh)
+
+        frames: bytes = await stored()
+        if frames:
+            yield frames
+        dropped: int = 0
+        owed: bool = False
+        written: float = time.monotonic()
+        while True:
+            working: set[str] = {*ctx.manager.active_run_ids(), *ctx.manager.elsewhere_run_ids()}
+            if not run_ids & working:
+                frames = await stored()
+                if frames:
+                    yield frames
+                return
+            due: float = (_FLUSH_S if owed else _KEEPALIVE_S) - (time.monotonic() - written)
+            incoming: EventRecord | None = await _next_event(feed.queue, ctx.stopping, max(0.0, due))
+            if incoming is None:
+                if ctx.stopping.is_set():
+                    return
+                owed = False
+                written = time.monotonic()
+                yield KEEPALIVE
+                continue
+            if feed.dropped != dropped:
+                dropped = feed.dropped
+                frames = await stored()
+                if frames:
+                    owed, written = True, time.monotonic()
+                    yield frames
+            if incoming.run_id not in run_ids or (incoming.id > 0 and incoming.id in sent):
+                continue
+            if incoming.id > 0:
+                sent.add(incoming.id)
+            owed, written = True, time.monotonic()
+            yield encode_event(incoming)
+
+
 async def follow_lifecycle(bus: EventBus, stopping: asyncio.Event) -> AsyncIterator[bytes]:
     """The moments at which the runs and approvals of any run change; clients refetch what they show. A client that
     fell so far behind that events were lost is told to read everything again (``resync``), since this stream replays
