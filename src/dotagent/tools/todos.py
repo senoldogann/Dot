@@ -15,7 +15,7 @@ from pydantic import Field, model_validator
 
 from dotagent.policy.types import ActionInfo
 from dotagent.proactive.text import one_line
-from dotagent.proactive.todos import TITLE_CHARS, WHY_CHARS, add_todo, todo_key
+from dotagent.proactive.todos import LET_GO_BY_ITS_RUN, TITLE_CHARS, WHY_CHARS, add_todo, todo_key
 from dotagent.store.models import TodoRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
@@ -95,21 +95,23 @@ def _drop_tool() -> RegisteredTool:
     async def run(args: TodoDropArgs, ctx: ToolContext) -> ToolResult:
         store = ctx.runtime.store
         kept: TodoRecord | None = await store.same_todo(todo_key(args.title), time.time())
-        if kept is None or kept.source_run_id != ctx.run_id:
+        # The run that works on a thing lets it go when the owner said not to do it (item 878): on the owner's Mac
+        # one such thing was tried three times, each run refusing it, before it was let go.
+        works_on: bool = kept is not None and kept.run_id == ctx.run_id and kept.status == "doing"
+        if kept is None or not (works_on or kept.source_run_id == ctx.run_id):
             return fail(
-                "This run put no such thing on the list: a run takes back only what it put on it. The owner takes "
-                "anything off it on the Schedules page; ending this run ends the thing it works on."
+                "This run put no such thing on the list and does not work on it: a run takes back only what it put "
+                "on it, or lets go of the thing it works on. The owner takes anything off it on the Schedules page."
             )
-        if kept.status != "open":
+        if not works_on and kept.status != "open":
             return fail(f"It is {kept.status} already, not to do: {kept.title}")
-        await store.set_todo(
-            kept.id, "dropped", kept.attempts, kept.run_id, one_line(f"Taken back: {args.reason}", 200)
-        )
+        note: str = f"{LET_GO_BY_ITS_RUN}{args.reason}" if works_on else f"Taken back: {args.reason}"
+        await store.set_todo(kept.id, "dropped", kept.attempts, kept.run_id, one_line(note, 200))
         return ok(f"Off Dot's list: {kept.title}")
 
     return make_tool(
         name=TODO_DROP_TOOL,
-        description="Take back a thing this run put on your list by mistake.",
+        description="Take back a thing this run put on your list, or let go of the one it works on.",
         args_model=TodoDropArgs,
         modes=ALL_MODES,
         parallel_safe=False,

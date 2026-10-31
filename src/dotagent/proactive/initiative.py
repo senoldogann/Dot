@@ -35,7 +35,7 @@ from dotagent.notify.owner import tell_owner
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.proactive.brief import BRIEF_CLOSE, BRIEF_OPEN, Quoted, record_parts
 from dotagent.proactive.text import one_line, quoted
-from dotagent.proactive.todos import OWNER_SOURCE, InitiativeState, note_look, read_initiative
+from dotagent.proactive.todos import LET_GO_BY_ITS_RUN, OWNER_SOURCE, InitiativeState, note_look, read_initiative
 from dotagent.runtime import Runtime
 from dotagent.store.db import Store
 from dotagent.store.endings import PREFIX_EMERGENCY_STOP, RESULT_SHUTDOWN
@@ -81,15 +81,19 @@ The work: {title}
 Why it helps them: {why}
 
 Do it as far as it goes without them. What only they can decide, leave as a question (ask_user) and go on with the \
-rest. A thing that says no work you can do (empty, or a word with no task in it): say so in a sentence and end. Dot \
-keeps the list: as this run ends it marks the thing done, or to try again when the run fails; never change the list, \
-nor Dot's database, yourself (item 821). End with one or two sentences: what you did, and where the result is."""
+rest. A thing that says no work you can do (empty, or a word with no task in it): say so in a sentence and end. Work \
+the owner said not to do (a rule of theirs you remember or read in a chat): do none of it, let the thing go with \
+todo_drop (tool group todos), their words as the reason, and end. Dot keeps the list: as this run ends it marks the \
+thing done, or to try again when the run fails; never change the list otherwise, nor Dot's database, yourself (item \
+821). End with one or two sentences: what you did, and where the result is."""
 _LOOK_GOAL: str = "On my own initiative: look for work that helps the owner"
 _LOOK_OPENING: str = """You look for work to do for the owner on your own initiative (item 715). Read what you \
-remember of them (memory_search: their projects, their wishes, what they asked to be done later), the record below, \
+remember of them (memory_search: their projects, their wishes, what they asked to be done later, and what they said \
+never to do or not to touch), the record below, \
 the chats they had lately, and their mail and calendar when an account is connected. Then put at most three things on \
 your list with todo_add (in the tool group todos: turn it on with use_tools when it is off): each a concrete piece \
-of work you can do alone, which they would thank you for, which is not on the list yet and was not done. Put nothing \
+of work you can do alone, which they would thank you for, which is not on the list yet and was not done, which they \
+did not say not to do, and which is not what was let go below for that reason. Put nothing \
 on it when nothing is worth it; one you put on it by mistake, take back with todo_drop (item 821). Change nothing \
 else. End with one sentence: what you put on the list, or that you found nothing.
 
@@ -122,10 +126,12 @@ def _first_line(text: str) -> str:
     return next((line.strip() for line in text.splitlines() if line.strip()), "")
 
 
-async def _listed(store: Store) -> list[str]:
+async def _listed(store: Store, clean: frozenset[str] = frozenset()) -> list[str]:
     """The list as the run that looks for work reads it: what is on it, and what was done or let go lately. The title
     of a thing a tainted run put on it is not quoted, only counted: it may hold what a mail or a page said (the code
-    review of item 715), and ``proactive.todos.add_todo`` keeps it from being listed twice without reading it."""
+    review of item 715), and ``proactive.todos.add_todo`` keeps it from being listed twice without reading it. Why a
+    thing was let go is quoted only when the run that wrote it is in ``clean``, those that ended having read nothing
+    third parties can author (the code review of item 878)."""
     kept: list[TodoRecord] = await store.list_todos(("open", "doing"), _LISTED)
     lately: list[TodoRecord] = [
         todo
@@ -133,7 +139,7 @@ async def _listed(store: Store) -> list[str]:
         if todo.status in ("done", "dropped")
     ]
     lines: list[str] = [
-        f"- {_STATE_WORDS[todo.status]}: {quoted(todo.title, _QUOTE_CHARS)}"
+        f"- {_STATE_WORDS[todo.status]}: {quoted(todo.title, _QUOTE_CHARS)}{_why_let_go(todo, clean)}"
         for todo in [*kept, *lately]
         if not todo.tainted
     ]
@@ -141,6 +147,18 @@ async def _listed(store: Store) -> list[str]:
     if unquoted:
         lines.append(f"- and {unquoted} more that came from content third parties wrote, not quoted here")
     return ["Your list:", *(lines or ["- nothing yet"])]
+
+
+def _why_let_go(todo: TodoRecord, clean: frozenset[str]) -> str:
+    """Why a thing was let go, after its title, for the look (item 878): one its run let go because the owner said
+    not to do it, or that the owner stopped, is not put on the list again in other words. The words are its last run's
+    (its reason, or the first line of its answer): quoted only when that run is ``clean``, else not, as a title a
+    tainted run wrote is not (the code review of item 878)."""
+    if todo.status != "dropped" or not todo.note:
+        return ""
+    if todo.run_id is None or todo.run_id not in clean:
+        return ", why not quoted: its run read content third parties wrote"
+    return f", why: {quoted(todo.note, _QUOTE_CHARS)}"
 
 
 async def _recent_chats(store: Store) -> list[str]:
@@ -382,7 +400,7 @@ class Initiative:
             BRIEF_OPEN,
             *(line for part in parts for line in part.lines),
             *await _recent_chats(store),
-            *await _listed(store),
+            *await _listed(store, await self._clean_runs()),
             BRIEF_CLOSE,
         ]
         carried: tuple[str, ...] = tuple(dict.fromkeys(run_id for part in parts for run_id in part.run_ids))
@@ -406,6 +424,20 @@ class Initiative:
             self._failed_at = time.monotonic()
             await store.delete_threads([thread.id])
             raise
+
+    async def _clean_runs(self) -> frozenset[str]:
+        """The last runs of the things let go lately that ended having read nothing third parties can author: their
+        words of why may be quoted to the look (the code review of item 878)."""
+        let_go: list[TodoRecord] = [
+            todo
+            for todo in await self._runtime.store.recent_todos(time.time() - 30 * _DAY_S, _LISTED)
+            if todo.status == "dropped" and todo.run_id is not None
+        ]
+        clean: set[str] = set()
+        for todo in let_go:
+            if todo.run_id is not None and not await self._manager.ended_tainted(todo.run_id):
+                clean.add(todo.run_id)
+        return frozenset(clean)
 
     async def _carries_taint(self, run_ids: Sequence[str]) -> bool:
         """Whether one of ``run_ids`` ended having read content third parties can author, whose words the record
@@ -438,6 +470,17 @@ class Initiative:
         todo: TodoRecord = await store.get_todo(todo_id)
         note: str = one_line(_first_line(ended.result), _NOTE_CHARS)
         url: str = f"#/runs/{ended.id}"
+        # Let go while its run worked (item 878): by that run, as the owner said not to do it, or by the owner on the
+        # Schedules page. It stays let go, however the run ended, and is not tried again.
+        if todo.status == "dropped":
+            if todo.note.startswith(LET_GO_BY_ITS_RUN):
+                await tell_owner(
+                    self._runtime.bus,
+                    "Dot let go of a thing you said not to do",
+                    one_line(f"{todo.title}: {todo.note.removeprefix(LET_GO_BY_ITS_RUN)}", _TELL_CHARS),
+                    url,
+                )
+            return
         if ended.status == "done":
             await store.set_todo(todo.id, "done", todo.attempts + 1, ended.id, note)
             await tell_owner(self._runtime.bus, "Dot did on its own", one_line(todo.title, _TELL_CHARS), url)

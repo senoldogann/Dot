@@ -1011,3 +1011,49 @@ async def test_on_a_saturday_the_dearer_hours_hold_nothing_back(login_env: dict[
         await initiative.tick(_SATURDAY_1300)
         assert initiative.working()
         await _settled(initiative)
+
+
+async def test_a_thing_the_owner_said_not_to_do_is_let_go_by_its_run_at_once_and_the_look_reads_why(
+    login_env: dict[str, str],
+) -> None:
+    """Item 878: on 2026-10-31 a look put on the list a chapter of the owner's thesis, which they had said never to
+    touch; three runs each refused it and failed, and it was let go only after the third. Its run lets it go now, it is
+    not tried again, the owner is told once, and the next look reads why it was let go."""
+    title: str = "Write chapter 3 of the thesis"
+    turns: list[ScriptedTurn] = [
+        _call("use_tools", group="todos"),
+        _call("todo_drop", title=title, reason="The owner said never to touch the thesis files"),
+        _finish("I did none of it: you said never to touch the thesis.", False),
+    ]
+    async with _dot(login_env, turns) as (runtime, manager):
+        todo: TodoRecord | str = await add_todo(runtime.store, title, "It is due", "run", None, False)
+        assert isinstance(todo, TodoRecord)
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        async with runtime.bus.subscribe(None) as subscription:
+            await initiative.tick(10_000.0)
+            await _settled(initiative)
+            told: list[EventRecord] = await _told(subscription)
+        let_go: TodoRecord = await runtime.store.get_todo(todo.id)
+        assert (let_go.status, let_go.attempts) == ("dropped", 0)
+        assert let_go.note == "Let go by its run: The owner said never to touch the thesis files"
+        assert [event.data["title"] for event in told] == ["Dot let go of a thing you said not to do"]
+        await initiative.tick(10_100.0)
+        await _settled(initiative)
+        assert [run.mode for run in await runtime.store.list_runs(10, None)] == ["research", "task"], (
+            "the next tick looks for work instead of trying the thing again"
+        )
+        assert let_go.run_id is not None
+        # Its run read nothing third parties wrote, so the look reads its words of why; else they are not quoted.
+        assert 'why: "Let go by its run: The owner said never' in "\n".join(
+            await _listed(runtime.store, await initiative._clean_runs())
+        )
+        assert "why not quoted" in "\n".join(await _listed(runtime.store, frozenset()))
+
+        async def read_a_page(run_id: str) -> bool:
+            return True
+
+        # A run that read a page while it let the thing go: its words of why are not quoted to the next look.
+        manager.ended_tainted = read_a_page  # type: ignore[method-assign]
+        listed: str = "\n".join(await _listed(runtime.store, await initiative._clean_runs()))
+        assert "why not quoted" in listed and "never to touch" not in listed
