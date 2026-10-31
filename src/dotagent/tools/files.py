@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from Foundation import NSData
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from Quartz import PDFDocument
 
 from dotagent.core.errors import ToolExecutionError
@@ -364,10 +364,14 @@ def _write_file_tool() -> RegisteredTool:
 class EditFileArgs(ToolArgs):
     path: str = Field(description="File to edit.")
     # Never empty (item 556): an empty text is found between every two characters, and replace_all wrote new there.
+    # The names other agents' edit tools give them are read too (item 879): on the owner's Mac a model sent
+    # ``new_text`` or ``new_string`` 17 times in two days, each a call refused and sent again.
     old: str = Field(
-        min_length=1, description="Exact text to replace, including whitespace. Must be unique unless replace_all."
+        min_length=1,
+        validation_alias=AliasChoices("old", "old_text", "old_string"),
+        description="Exact text to replace, including whitespace. Must be unique unless replace_all.",
     )
-    new: str = Field(description="Replacement text.")
+    new: str = Field(validation_alias=AliasChoices("new", "new_text", "new_string"), description="Replacement text.")
     replace_all: bool = Field(default=False, description="Replace every occurrence instead of requiring uniqueness.")
 
 

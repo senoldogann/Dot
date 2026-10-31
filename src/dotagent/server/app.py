@@ -21,14 +21,17 @@ from dotagent.core.errors import (
     ElsewhereError,
     GalleryError,
     InvalidValueError,
+    McpError,
     NotFoundError,
     PairingRefused,
     PhoneRefused,
     PhoneSetupError,
+    PluginError,
     PreviewError,
     ProviderError,
     RunConflict,
     SignInError,
+    SkillError,
     ToolExecutionError,
     ToolInputError,
     UndoError,
@@ -110,6 +113,11 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (ChannelError, 422),
     (SignInError, 422),
     (VoiceError, 422),
+    # An app's server that is gone, a sign-in to do again, a skill or plugin file that is not one (item 879): the
+    # owner reads why, and none is Dot's own fault to log as one.
+    (McpError, 422),
+    (SkillError, 422),
+    (PluginError, 422),
     (ProviderError, 502),
 )
 

@@ -18,7 +18,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 from urllib.parse import unquote, urlsplit
 
 from pydantic import Field, SecretStr, model_validator
@@ -89,6 +89,7 @@ from dotagent.tools.base import (
     RegisteredTool,
     ToolArgs,
     ToolResult,
+    at_most,
     fail,
     make_path_tool,
     make_reviewed_tool,
@@ -1043,7 +1044,9 @@ def _screenshot_tool() -> RegisteredTool:
 
 class WaitTextArgs(ToolArgs):
     text: str = Field(min_length=1, description="Text that should appear on the page.")
-    timeout_s: float | None = Field(default=None, ge=0.5, le=60.0, description="How long to wait (default 10).")
+    timeout_s: Annotated[float | None, at_most(60.0)] = Field(
+        default=None, ge=0.5, le=60.0, description="How long to wait (default 10)."
+    )
 
 
 def wait_text_result(wait: TextWait, nonce: str, body_budget: int) -> ToolResult:

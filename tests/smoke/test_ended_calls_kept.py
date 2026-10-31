@@ -135,3 +135,41 @@ async def test_the_results_of_the_calls_that_had_ended_stay_in_the_thread_of_a_s
             }
             # The call that had ended is answered with what it did; the one that was cut has no answer to keep.
             assert answers == {FIRST: "the message was sent"}, thread
+
+
+async def test_the_results_stay_when_the_step_is_cut_while_its_images_are_described(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 879: every call had ended, and the step was cut while a model that cannot see had their images
+    described (a stop, or the vision model failing): the results stay as well."""
+    from dotagent.agent import loop
+
+    async def describing(*_args: object) -> list[Message]:
+        raise StoreError("the vision model was being asked when the run stopped", {})
+
+    monkeypatch.setattr(loop, "_tool_messages", describing)
+    turns: list[ScriptedTurn] = [ScriptedTurn(text="", calls=(ScriptedCall(tool=FIRST, arguments={}),))]
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _session(login_env, turns) as (runtime, manager):
+            run: RunRecord = await manager.start(
+                "Send it.",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                UI_SOURCE,
+                None,
+                None,
+                "standard",
+                None,
+                "yolo",
+                False,
+                (),
+            )
+            async with asyncio.timeout(WAIT_S):
+                ended: RunRecord = await manager.wait(run.id)
+            assert ended.status in ("cancelled", "failed"), ended
+            thread: list[Message] = await runtime.store.load_messages(run.thread_id, 0)
+            answers: dict[str, str] = {
+                message.tool_name or "": message.content for message in thread if message.role == "tool"
+            }
+            assert answers == {FIRST: "the message was sent"}, thread

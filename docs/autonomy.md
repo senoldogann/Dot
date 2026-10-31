@@ -288,7 +288,8 @@ facts under More on the side panel's Task tab).
 on the run's page, `dotx resume RUN_ID` (in this terminal, like `dotx run`), or `POST /api/runs/{id}/resume`. A new run
 starts in the same chat, with the goal, model, reasoning level, approval mode and goal mode of the run it resumes, as
 the same agent when it was one of yours (item 462), and the conversation so far, where a shutdown or a restart of the
-daemon, or a closed terminal, keeps the results of the calls of the step it was in that had ended (a crash keeps none).
+daemon, or a closed terminal, keeps the results of the calls of the step it was in that had ended (a crash keeps none),
+also when it came as their images were being described for a model that cannot see (item 879).
 Its first message tells the model how that run was cut off and how each call of that step without a result ended:
 finished (with the start of its result), cut off while it ran, or not started. A call that was cut off may have changed
 something unless it only reads, and the model is told to check before it runs it again. The plan of that run is the plan

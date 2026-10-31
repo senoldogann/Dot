@@ -18,7 +18,7 @@ none.
 """
 
 from pathlib import Path
-from typing import NoReturn
+from typing import Annotated, NoReturn
 
 from pydantic import Field
 
@@ -29,7 +29,16 @@ from dotagent.policy.shell import ShellAssessment, assess_shell, assess_typed, t
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
 from dotagent.store.models import RunRecord
 from dotagent.terminal.session import TerminalSession
-from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
+from dotagent.tools.base import (
+    ACTING_MODES,
+    RegisteredTool,
+    ToolArgs,
+    ToolResult,
+    at_most,
+    make_tool,
+    mark_untrusted,
+    ok,
+)
 from dotagent.tools.context import ToolContext, run_sandbox
 
 # How long terminal_open waits for the first output of the program.
@@ -62,12 +71,16 @@ class SendArgs(ToolArgs):
         max_length=10_000,
         description="What to type. A line end (\\n) presses Enter; text without one waits on the line.",
     )
-    wait_s: float = Field(default=2.0, ge=0, le=_MAX_WAIT_S, description="Seconds to wait for the program's answer.")
+    wait_s: Annotated[float, at_most(_MAX_WAIT_S)] = Field(
+        default=2.0, ge=0, le=_MAX_WAIT_S, description="Seconds to wait for the program's answer."
+    )
 
 
 class ReadArgs(ToolArgs):
     session: str = Field(description="The session terminal_open named, such as t1.")
-    wait_s: float = Field(default=10.0, ge=0, le=_MAX_WAIT_S, description="Seconds to wait for new output.")
+    wait_s: Annotated[float, at_most(_MAX_WAIT_S)] = Field(
+        default=10.0, ge=0, le=_MAX_WAIT_S, description="Seconds to wait for new output."
+    )
 
 
 class CloseArgs(ToolArgs):
