@@ -53,6 +53,8 @@ _GROUP_OF_TOOL: dict[str, str] = {
     # The public face of a site, the ports of the owner's own (item 776), and the forms of that host (item 781).
     "recon": "recon",
     "security_scan": "recon",
+    # A wait in code for a deploy, a build or a check (item 887): rare enough to stay out of core.
+    "wait_until": "waits",
 }
 _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
@@ -67,6 +69,7 @@ _PURPOSES: dict[str, str] = {
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
     "todos": "your own list of work to do for the owner later, on your own, while the Mac is idle",
     "trading": "trading crypto on Coinbase under the owner's limits: prices, the account, orders",
+    "waits": "waiting in code until a file is there, an address answers or a check passes",
     "recon": "a site or host you own: addresses, TLS, headers, technology, open ports, and a form's payload check",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
