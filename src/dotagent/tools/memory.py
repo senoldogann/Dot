@@ -8,6 +8,7 @@ such content again. A note that holds a key or a secret Dot holds is refused: re
 
 import asyncio
 import time
+from typing import Annotated
 
 from pydantic import Field
 
@@ -34,6 +35,7 @@ from dotagent.tools.base import (
     RegisteredTool,
     ToolArgs,
     ToolResult,
+    at_most,
     fail,
     make_live_tool,
     make_tool,
@@ -193,7 +195,7 @@ class SearchArgs(ToolArgs):
     query: str = Field(
         min_length=2, max_length=400, description="What to look for: words, a name or a description of the topic."
     )
-    limit: int = Field(default=8, ge=1, le=20, description="How many notes to return at most.")
+    limit: Annotated[int, at_most(20)] = Field(default=8, ge=1, le=20, description="How many notes to return at most.")
 
 
 def _search_tool() -> RegisteredTool:

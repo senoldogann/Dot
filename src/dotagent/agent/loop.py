@@ -2783,7 +2783,17 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             if turned_on:
                 on = on | frozenset(turned_on)
                 await runtime.bus.emit(run.id, GROUPS_EVENT, groups_event(steps, groups, on, turned_on, ""), True)
-            results: list[Message] = await _tool_messages(agent, outcomes, info.vision)
+            try:
+                results: list[Message] = await _tool_messages(agent, outcomes, info.vision)
+            except BaseException:
+                # A model that cannot see has each image described by another model: a stop while it is asked cut a
+                # step whose calls had all ended (item 879), so their results stay in the thread as above, not
+                # left for the next run to read as never made and make again.
+                try:
+                    await _keep_ended(agent, reply.tool_calls, outcomes, info.vision)
+                except Exception as keeping:  # noqa: BLE001 - logged here; the error that cut the step is raised again
+                    log.error("ended_calls_not_kept", run_id=run.id, step=steps, error=str(keeping))
+                raise
             ledger = with_actions(
                 ledger, [(outcome.call, not outcome.result.is_error, outcome.result.text) for outcome in outcomes]
             )

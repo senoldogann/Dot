@@ -1367,7 +1367,9 @@ Errors come as `{"message": …, "context": {…}}`, those of the web framework 
 a path does not take) included; an error Dot did not expect is a 500 whose context names its kind and its words, and the
 log keeps its traceback once (item 558: the answer is made inside the guard, so it carries the security headers and
 `Cache-Control: no-store` of every other answer, and is not raised again for uvicorn to log a second time). Invalid
-input is a 422 with the validation errors in the context.
+input is a 422 with the validation errors in the context, and so is what failed outside Dot or in a file you gave it
+(item 879): an app's MCP server that ended or must be signed in to again, a skill or a plugin that is not one
+(`McpError`, `SkillError`, `PluginError`; these were 500s logged as Dot's own fault).
 
 **Snapshots** (item 405, after another coding agent's). In any application, both Command keys pressed together (⌘ ⌘,
 the keys on both sides of the space bar; item 414, as another coding agent's shortcut is), and, with **Double tap of ⌘

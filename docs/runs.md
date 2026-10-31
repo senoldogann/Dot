@@ -504,7 +504,11 @@ of a file with `edit_file` and to write a file whole with `write_file`, and to k
 (tests, builds, git, formatters), one mechanical change across many files and a file that is not UTF-8 (item 382): what
 the file tools change goes into the undo journal, shows in Changes and can be undone (within the journal's limits on
 a file's size and a run's copies, under [Autonomy](autonomy.md)), and what a command writes does not. Nothing stops a
-command from writing a file. Any error of a tool fails that
+command from writing a file. `edit_file` also reads its texts by
+the names other agents' edit tools give them (`old_text` and `new_text`, `old_string` and `new_string`; item 879:
+a model on the owner's Mac sent them 17 times in two days, each call refused), and a wait or a count asked past its
+bound is read as the bound (`terminal_send` and `terminal_read`'s `wait_s`, 60 s; `browser_wait_text`'s `timeout_s`,
+60 s; `memory_search`'s `limit`, 20), never a bound that keeps an action safe. Any error of a tool fails that
 call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the log
 keeps its traceback) and goes on. A read-only tool's call that fails is tried once more first, as a second read changes
 nothing; an acting one is never tried again. A browser or desktop step whose call answers with an error is followed by

@@ -3,7 +3,7 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
-from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
+from pydantic import BaseModel, BeforeValidator, ConfigDict, JsonValue, ValidationError
 
 from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.types import FrozenModel, JsonObject
@@ -22,6 +22,19 @@ class ToolArgs(BaseModel):
     """Base for tool argument models: unknown fields are rejected so typos surface immediately."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+def at_most(bound: float) -> BeforeValidator:
+    """A number past ``bound`` read as ``bound`` (item 879), for a field whose bound only keeps a call short: a wait
+    or how many results. On the owner's Mac a model asked 120 s of a 60 s wait or 50 of 20 notes, and each call was
+    refused and sent again for nothing. Never for an amount, a count of actions or anything the bound protects."""
+
+    def cap(value: object) -> object:
+        if isinstance(value, int | float) and not isinstance(value, bool) and value > bound:
+            return bound
+        return value
+
+    return BeforeValidator(cap)
 
 
 class ToolResult(FrozenModel):
