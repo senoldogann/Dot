@@ -975,16 +975,19 @@ class RunManager:
         )
         return run
 
-    async def start_own(self, goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool) -> RunRecord:
+    async def start_own(
+        self, goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+    ) -> RunRecord:
         """Queue a run Dot starts on its own initiative (item 715), in the chat ``thread_id``: ``goal`` is Dot's words,
         which the chat shows and no reviewer takes as the owner's instruction (:meth:`_instructions_for` gives none),
         and ``opening`` its first message to the model. Nobody watches it (:data:`INITIATIVE_SOURCE`); it takes the
         configured model and ``[initiative] approvals`` (``yolo`` by default, item 756); it starts tainted when what it
-        was given came from a run that had read content third parties can author (``tainted``)."""
+        was given came from a run that had read content third parties can author (``tainted``). ``model`` is the model
+        of the look for work (``[initiative] look_model``, item 910); ``None`` is the configured one."""
         run, _ = await self._launch(
             goal,
             mode,
-            None,
+            model,
             thread_id,
             INITIATIVE_SOURCE,
             None,

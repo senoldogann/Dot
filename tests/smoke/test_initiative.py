@@ -62,8 +62,11 @@ def _finish(answer: str, success: bool = True) -> ScriptedTurn:
     )
 
 
-def _config(runs_per_day: int = 0, peak: tuple[int, ...] = ()) -> AppConfig:
+def _config(runs_per_day: int = 0, peak: tuple[int, ...] = (), grouped: bool = False, **more: object) -> AppConfig:
     config: AppConfig = eval_config(load_default_config())
+    if grouped:
+        # Its tools in groups, as a run of the owner's 173 tools has them, so that what is on from its start shows.
+        config = config.model_copy(update={"agent": config.agent.model_copy(update={"tool_surface": "grouped"})})
     initiative = config.initiative.model_copy(
         update={
             "idle_minutes": 10.0,
@@ -71,6 +74,7 @@ def _config(runs_per_day: int = 0, peak: tuple[int, ...] = ()) -> AppConfig:
             "attempts": 2,
             "runs_per_day": runs_per_day,
             "peak_hours_utc": peak,
+            **more,
         }
     )
     # The owner's own mode asks, as by default: Dot's own runs start in [initiative] approvals all the same.
@@ -85,10 +89,15 @@ async def login_env() -> dict[str, str]:
 
 @asynccontextmanager
 async def _dot(
-    login_env: dict[str, str], turns: list[ScriptedTurn], runs_per_day: int = 0, peak: tuple[int, ...] = ()
+    login_env: dict[str, str],
+    turns: list[ScriptedTurn],
+    runs_per_day: int = 0,
+    peak: tuple[int, ...] = (),
+    grouped: bool = False,
+    **more: object,
 ) -> AsyncIterator[tuple[Runtime, RunManager]]:
     with scratch_home() as home, eval_environment(home, {}):
-        runtime: Runtime = await open_runtime(_config(runs_per_day, peak), login_env)
+        runtime: Runtime = await open_runtime(_config(runs_per_day, peak, grouped, **more), login_env)
         await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, turns))
         manager: RunManager = RunManager(runtime)
         try:
@@ -445,7 +454,9 @@ async def test_a_start_that_fails_leaves_no_chat_and_is_not_tried_again_at_once(
         await set_initiative(runtime.store, True)
         tried: list[str] = []
 
-        async def refused(goal: str, opening: str, mode: str, thread_id: str, tainted: bool) -> RunRecord:
+        async def refused(
+            goal: str, opening: str, mode: str, thread_id: str, tainted: bool, model: str | None = None
+        ) -> RunRecord:
             tried.append(goal)
             raise ConfigError("no such model", {})
 
@@ -469,10 +480,10 @@ async def test_the_owner_switching_it_off_while_a_look_starts_keeps_it_off(
         start_own = manager.start_own
 
         async def switched_off_meanwhile(
-            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool
+            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
         ) -> RunRecord:
             await set_initiative(runtime.store, False)
-            return await start_own(goal, opening, mode, thread_id, tainted)
+            return await start_own(goal, opening, mode, thread_id, tainted, model)
 
         monkeypatch.setattr(manager, "start_own", switched_off_meanwhile)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)

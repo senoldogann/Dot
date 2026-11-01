@@ -1074,6 +1074,10 @@ approvals = "yolo"
 # from the first up to the second, such as [12, 18], Ollama Cloud's dearer hours (its price is half the rest of the
 # week, the weekends included). A run under way goes on. Empty: no such hours.
 peak_hours_utc = []
+# The model of the run that looks for work, which judges what is worth doing (item 910): "" is [models] main. A
+# stronger model here costs little, as the look is a small share of what Dot's own work spends (8% on the owner's Mac,
+# 2026-10-29 to 11-01), and the runs that do the work stay on [models] main.
+look_model = ""
 
 [skills]
 # Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML

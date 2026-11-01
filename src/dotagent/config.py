@@ -803,6 +803,13 @@ class InitiativeConfig(FrozenModel):
     # The hours of a weekday, in UTC, from the first to the second, in which none of its runs starts but an urgent thing
     # of the owner's (item 826): a provider's dearer hours. Empty: none.
     peak_hours_utc: tuple[int, ...] = ()
+    # The model of the run that looks for work (item 910): the judgement of what is worth doing; "" is [models] main.
+    look_model: str = ""
+
+    @field_validator("look_model")
+    @classmethod
+    def _model_or_main(cls, value: str) -> str:
+        return value if value == "" else _model_reference(value)
 
     @field_validator("peak_hours_utc")
     @classmethod

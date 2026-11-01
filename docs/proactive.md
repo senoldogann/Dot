@@ -201,7 +201,10 @@ with a research run, which reads what it remembers of you, the record the mornin
 runs
 that failed since the last look, the campaigns at work), the titles of your newest chats and the list (a thing let go with why, so that it is not listed again in
 other words; why is quoted only when the run that wrote it read nothing third parties can author, else it says so), and puts at most three things on it: none you said not to do, which it searches its memory for first. That run is a research run: it writes nothing but its list, its notes and Dot's memory, as any
-research run may. Its record quotes no words a third party wrote unless it starts untrusted: the chats it names are the
+research run may. The look runs on `look_model` when it is set ("" is `[models] main`, item 910): it judges what is
+worth doing, and is a small share of what this work spends (8% on the owner's Mac, 2026-10-29 to 11-01), so a stronger
+model there costs little; the things are done on `[models] main`. Its record quotes no words a
+third party wrote unless it starts untrusted: the chats it names are the
 ones a person started (a watcher's, whose title carries a mail's subject, and Dot's own are left out), and a thing on
 the list that came from such content is counted, not quoted; the runs whose words the record does quote give it their
 taint, as the brief's do.
@@ -258,8 +261,9 @@ a try; stopped by you, the thing is let go. A question you skip, or a step whose
 try that left it stays counted: a thing whose last try it was is let go then, and you are told.
 
 The settings are in `[initiative]` of `defaults.toml`: `idle_minutes`, `gap_minutes`, `look_every_hours`, `attempts`,
-`runs_per_day`, `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do) and `peak_hours_utc`;
-the switch and the time of the last look are kept in the database.
+`runs_per_day`, `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do), `peak_hours_utc`,
+and `look_model`; the switch and the time of the last look are kept in the
+database.
 
 ### Objectives
 

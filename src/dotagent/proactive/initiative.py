@@ -409,21 +409,31 @@ class Initiative:
         ]
         carried: tuple[str, ...] = tuple(dict.fromkeys(run_id for part in parts for run_id in part.run_ids))
         tainted: bool = await self._carries_taint(carried)
+        # The look judges what is worth doing, on a model of its own when one is set (item 910); its things are done on
+        # the configured one.
+        model: str | None = self._runtime.config.initiative.look_model or None
         run: RunRecord = await self._start(
-            LOOK_TITLE, _LOOK_GOAL, _LOOK_OPENING.format(record="\n".join(lines)), "research", tainted
+            LOOK_TITLE,
+            _LOOK_GOAL,
+            _LOOK_OPENING.format(record="\n".join(lines)),
+            "research",
+            tainted,
+            model,
         )
         await note_look(store, now)
         log.info("initiative_looking", run_id=run.id, tainted=tainted)
         self._follow(run.id, None)
 
-    async def _start(self, title: str, goal: str, opening: str, mode: RunMode, tainted: bool) -> RunRecord:
+    async def _start(
+        self, title: str, goal: str, opening: str, mode: RunMode, tainted: bool, model: str | None = None
+    ) -> RunRecord:
         """Start one of its runs in a new chat named ``title``. A start that fails takes its empty chat with it and
         holds the next for :data:`_AFTER_A_FAILED_START_S` (the code review of item 715: a start that kept failing made
         a chat at every tick)."""
         store: Store = self._runtime.store
         thread = await store.create_thread(thread_title(title), INITIATIVE_SOURCE)
         try:
-            return await self._manager.start_own(goal, opening, mode, thread.id, tainted)
+            return await self._manager.start_own(goal, opening, mode, thread.id, tainted, model)
         except DotError:
             self._failed_at = time.monotonic()
             await store.delete_threads([thread.id])
