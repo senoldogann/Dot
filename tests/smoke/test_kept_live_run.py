@@ -172,13 +172,15 @@ async def test_a_run_at_work_that_is_opened_again_goes_on_from_its_newest_stored
                 await page.go_back()
             await expect(page.locator(".tool-name")).to_have_count(1)
             await expect(page.locator(".user-message")).to_have_count(1)
-            # The page went on from an event the daemon stored, not from 0.
-            followed: list[int] = [
-                int(parse_qs(urlsplit(url).query)["after"][0])
-                for url in streams
-                if urlsplit(url).path == f"/api/runs/{run.id}/stream"
+            # The page read the stored events once, when it first opened the run (item 734), and went on from an event
+            # the daemon stored, after the one its first stream started from, not from 0 again.
+            asked: list[dict[str, list[str]]] = [
+                parse_qs(urlsplit(url).query) for url in streams if urlsplit(url).path == f"/api/runs/{run.id}/stream"
             ]
-            assert len(followed) == 2 and followed[0] == 0 and followed[1] > 0, followed
+            stored: list[int] = [int(query["after"][0]) for query in asked if query.get("stored") == ["true"]]
+            followed: list[int] = [int(query["after"][0]) for query in asked if query.get("stored") != ["true"]]
+            assert stored == [0], asked
+            assert len(followed) == 2 and followed[1] > followed[0] >= 0, asked
 
             model.go_on.set()
             async with asyncio.timeout(_RUN_WAIT_S):

@@ -44,9 +44,11 @@ _ARROW_GAP_PX: float = 40.0
 TOKEN: str = "helper-pill-test-token"
 WAIT_S: float = 60.0
 HELPER_GOAL: str = "Count the books on each shelf"
-ANSWER: str = "Twelve shelves, 40 books on each."
+ANSWER: str = "Twenty shelves, 40 books on each."
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
-_SHELVES: int = 12
+# Enough for a conversation longer than the window: its lines on one grid, with no card for a row (item 884), twelve
+# no longer were.
+_SHELVES: int = 20
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (1280, "light"),
     (1280, "dark"),

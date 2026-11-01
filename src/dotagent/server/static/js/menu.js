@@ -1,7 +1,8 @@
 // A menu of actions (item 130): opened at the pointer by a right-click, or at the button
 // that opens it; its items are buttons that a click or Enter runs. The arrow keys, Home and End move between them;
-// Escape or Tab closes it and gives the focus back to where it came from; a click outside it, a scroll, a change of the
-// window's size or of the page closes it. One is open at a time.
+// Escape or Tab closes it and gives the focus back to where it came from; a click outside it, a scroll that moves what
+// opened it, a change of the window's size or of the page closes it, and so does any scroll once what opened it has
+// left the page. One is open at a time.
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -14,6 +15,18 @@ let current = null;
 /** Close the menu that is open, if one is. */
 export function closeMenu() {
   if (current !== null) {
+    current.close(false);
+  }
+}
+
+/**
+ * Closes the menu open now when what opened it is inside one of `roots`: a list painted again takes its rows away, and
+ * with them the menus opened from them, but not the menu of another part of the page (the sidebar's list, painted again
+ * whenever a run starts or ends, took the composer's "+" menu away 50 ms after it opened).
+ * @param {...Node} roots
+ */
+export function closeMenuFrom(...roots) {
+  if (current?.anchor && roots.some((root) => root.contains(current.anchor))) {
     current.close(false);
   }
 }
@@ -85,7 +98,15 @@ export function openMenu({ label, items, at, back, button }) {
     }
   }
 
-  function away() {
+  // A scroll closes the menu only when it moves what opened it: the conversation that scrolls as an answer comes in
+  // does not move the composer's "+", and its menu stays open.
+  const anchor = button ?? back;
+  /** @param {Event} event */
+  function away(event) {
+    // An anchor that left the page (its row painted again) is in no part of it: any scroll closes its menu.
+    if (event.type === "scroll" && anchor?.isConnected && event.target instanceof Node && !event.target.contains(anchor)) {
+      return;
+    }
     close(false);
   }
 
@@ -107,7 +128,7 @@ export function openMenu({ label, items, at, back, button }) {
     }
   }
 
-  const handle = { button, close };
+  const handle = { button, anchor, close };
   current = handle;
   element.addEventListener("keydown", move);
   document.body.append(element);

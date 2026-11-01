@@ -42,7 +42,11 @@ _SECTIONS: list[str] = [
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        # No embedder: a note is saved without one, as no test reaches a model (the Ollama of a Mac that has one
+        # answered it here, and the nightly runner, which has none, failed).
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[memory]\nembed_enabled = false\n\n'
+        '[providers.ollama]\nbase_url = "http://127.0.0.1:9"\n',
+        encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))

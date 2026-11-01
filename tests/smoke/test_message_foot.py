@@ -34,9 +34,10 @@ _ANSWER: str = "The weekly report is in the reports folder, with the late projec
 _RUN_WAIT_S: float = 60.0
 # How far the foot's first visible line may stand under the bubble and under the answer's last line, in pixels, as a
 # Mac's window and as a phone. Before item 336 they stood 8 and 26 px under them in the window, 13 and 23 on the phone.
+# The answer's foot keeps a breath of 4 px under its last line (item 832), on a phone as in a window: 9 px and 10.
 _MOST_GAP_PX: dict[str, dict[str, float]] = {
     "wide": {"user": 6.0, "answer": 12.0},
-    "phone": {"user": 8.0, "answer": 8.0},
+    "phone": {"user": 8.0, "answer": 12.0},
 }
 # What the page measures once the test has put on it a file sent with the message, a code block that ends the answer
 # and an answer's foot with no buttons: how far each foot stands under what is above it (review B7: the feet rose
