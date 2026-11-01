@@ -21,6 +21,8 @@ CORE_GROUP: str = "core"
 BROWSER_GROUP: str = "browser"
 # The mail and calendar tools (item 424), a run's only when the owner signed an account in.
 ACCOUNTS_GROUP: str = "accounts"
+# Dot's own list (item 715), on from the start of a run of its own initiative (item 912).
+TODOS_GROUP: str = "todos"
 
 # The groups whose tools share a name prefix. A tool with none of these prefixes is in its group of _GROUP_OF_TOOL, or
 # in core.
@@ -51,8 +53,8 @@ _GROUP_OF_TOOL: dict[str, str] = {
     # The owner's saved contact details (item 621).
     "vault_contacts": "vault",
     # Dot's own list of work for later (item 715).
-    "todo_add": "todos",
-    "todo_drop": "todos",
+    "todo_add": TODOS_GROUP,
+    "todo_drop": TODOS_GROUP,
     # What the owner wants moved forward over time, which Dot's own runs keep beside the list (item 908).
     "objective_add": "todos",
     "objective_update": "todos",

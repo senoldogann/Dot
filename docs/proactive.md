@@ -201,20 +201,33 @@ with a research run, which reads what it remembers of you, the record the mornin
 runs
 that failed since the last look, the campaigns at work), the titles of your newest chats and the list (a thing let go with why, so that it is not listed again in
 other words; why is quoted only when the run that wrote it read nothing third parties can author, else it says so), and puts at most three things on it: none you said not to do, which it searches its memory for first. That run is a research run: it writes nothing but its list, its notes and Dot's memory, as any
-research run may. Its record quotes no words a third party wrote unless it starts untrusted: the chats it names are the
+research run may. The look runs on `look_model` when it is set ("" is `[models] main`, item 910): it judges what is
+worth doing, and is a small share of what this work spends (8% on the owner's Mac, 2026-10-29 to 11-01), so a stronger
+model there costs little; the things are done on `[models] main`. Each thing done is listed to it with its day and what
+came of it (the first line of its run's answer, quoted only when that run read nothing third parties can author, item
+911), and it reads the last count of this work (below). A thing a run puts on the list that is like one done or let go
+in the last 14 days, by meaning with the embedder of the memory (a cosine of 0.73 or more between the titles) or by
+words without it (0.6 of the shorter title's words), is refused with what that one was and what came of it: the run
+puts it on the list only with `again_because`, what is new since, which the thing's why keeps (on 2026-10-30 to 11-01
+the look listed the CV's summary four times in other words, and each run rewrote it again). Its record quotes no words a
+third party wrote unless it starts untrusted: the chats it names are the
 ones a person started (a watcher's, whose title carries a mail's subject, and Dot's own are left out), and a thing on
 the list that came from such content is counted, not quoted; the runs whose words the record does quote give it their
 taint, as the brief's do.
 
-**How it does a thing.** The run is a task in `[initiative] approvals`, `yolo` by default whatever your own mode is
-(item 756: in `ask`, a run of its own asked to put a thing on its own list and waited on nobody), nobody watches it (a
-question it has is left for you, as a schedule's is), and its goal is Dot's words, "On my own initiative: …": the review
-model takes none of it as your instruction, in that run or in a later one of its chat, a resume too (`auto` asks you
-what reaches others), and a thing that a run put on the list after reading content third parties can author (a mail, a
-page) is done by a run that starts untrusted, so that in `yolo` too the review model refuses a message, a post, a
-payment or an upload that no word of yours calls for (item 525). A run that read nothing of the kind (a thing from your
-own chats) is checked by nobody in `yolo`, and a payment it decides on goes out as it decides, which is what `yolo`
-means (item 443); `[initiative] approvals` set to `auto` or `ask` has such a run ask you first.
+**How it does a thing.** The run first checks, on the thing itself (the file, the page, the mail), that the work is
+still to do, as the note it came from may be out of date, and once it is done it brings that note or plan up to date, in
+the copy the others are made from (item 912). Its list's tools are on from its first step, so that a thing you said not
+to do is let go at once rather than asked about. The run is a task in `[initiative] approvals`, `yolo` by default
+whatever your own mode is (item 756: in `ask`, a run of its own asked to put a thing on its own list and waited on
+nobody), nobody watches it (a question it has is left for you, as a schedule's is), and its goal is Dot's words, "On my
+own initiative: …": the review model takes none of it as your instruction, in that run or in a later one of its chat, a
+resume too (`auto` asks you what reaches others), and a thing that a run put on the list after reading content third
+parties can author (a mail, a page) is done by a run that starts untrusted, so that in `yolo` too the review model
+refuses a message, a post, a payment or an upload that no word of yours calls for (item 525). A run that read nothing of
+the kind (a thing from your own chats) is checked by nobody in `yolo`, and a payment it decides on goes out as it
+decides, which is what `yolo` means (item 443); `[initiative] approvals` set to `auto` or `ask` has such a run ask you
+first.
 
 But in a chat Dot opened on its own initiative, three steps wait for you in every mode, `yolo` and `auto` too (item
 850, your word of 2026-10-30):
@@ -236,30 +249,41 @@ In `yolo` your own chats ask you before a payment, a message or mail sent for yo
 schedule's run in one of your chats the review model judges a message or a post, and a payment is handed to you; a
 schedule's own chat asks nothing of the kind.
 
-A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or
-let go. Done, it is marked so with the first line of the run's answer and you are told ("Dot did on its own", the push,
-the desktop, iMessage when it is on). A run that failed leaves it to do, up to `attempts` (3) runs; then it is let go
-and you are told. A run that finds you said not to do the work (a rule of yours it remembers or read in a chat) does
-none of it and lets the thing go itself, with `todo_drop` and your words as the reason; it is not tried again, and you
-are told once ("Dot let go of a thing you said not to do", item 878: on 2026-10-31 a look listed a chapter of a
-thesis its owner had said never to touch, and three runs each refused it before it was let go). A thing let go while
-its run worked, by that run or by you, stays let go however the run ends. A run you stopped lets it go at once; one the daemon's stop or the emergency stop ended (the stop of
-every run, or the STOP file the run saw as it worked, item 790) leaves it to do; one the daemon was doing when it shut
-down is to do again when it starts, and one it was doing when it stopped
-without shutting down (a crash) counts that try, so a thing that brings Dot down is let go after `attempts` tries. A
-thing tried as often as `attempts` allows, after the limit was lowered, is let go, and you are told. A thing whose run the owner resumed
-is left to that resume while it works, and done once it ended done; another message in its chat is no sign it was done.
-A thing whose chat holds a question or a step left for you, unanswered, or a run at work, is not started again in
-another chat (item 868), the urgent ones too; its tries are not used up while a question waits. A run of its chat that
-goes on from its last one takes it over: a resume, the run your answer to its question started, or the one your answer
-to a step it kept started (each carries the goal of the run it goes on from; a message you write is a goal of its
-own). Its end is the thing's, as one of its own runs' is: done, the thing is done and you are told; failed, that is
-a try; stopped by you, the thing is let go. A question you skip, or a step whose time ran out, ends the wait, and the
-try that left it stays counted: a thing whose last try it was is let go then, and you are told.
+A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or let go.
+Done, it is marked so with the first line of the run's answer and you are told ("Dot did on its own", the push, the
+desktop, iMessage when it is on). A run that failed leaves it to do, up to `attempts` (3) runs; then it is let go and
+you are told. A run that finds you said not to do the work (a rule of yours it remembers or read in a chat) does none of
+it and lets the thing go itself, with `todo_drop` and your words as the reason; it is not tried again, and you are told
+once. ("Dot let go of a thing you said not to do", item 878: on 2026-10-31 a look listed a chapter of a thesis its owner
+had said never to touch, and three runs each refused it before it was let go). A failed try that spent more than
+`retry_under_tokens` (5 million, every model call of the run counted) lets the thing go at once and you are told, rather
+than a second try the same way (item 913: three tries of one application spent 31.6 million tokens on a puzzle its form
+asked for); a try that left you a question stays to do. A thing let go while its run worked, by that run or by you,
+stays let go however the run ends. A run you stopped lets it go at once; one the daemon's stop or the emergency stop
+ended (the stop of every run, or the STOP file the run saw as it worked, item 790) leaves it to do; one the daemon was
+doing when it shut down is to do again when it starts, and one it was doing when it stopped without shutting down (a
+crash) counts that try, so a thing that brings Dot down is let go after `attempts` tries. A thing tried as often as
+`attempts` allows, after the limit was lowered, is let go, and you are told. A thing whose run the owner resumed is left
+to that resume while it works, and done once it ended done; another message in its chat is no sign it was done. A thing
+whose chat holds a question or a step left for you, unanswered, or a run at work, is not started again in another chat
+(item 868), the urgent ones too; its tries are not used up while a question waits. A run of its chat that goes on from
+its last one takes it over: a resume, the run your answer to its question started, or the one your answer to a step it
+kept started (each carries the goal of the run it goes on from; a message you write is a goal of its own). Its end is
+the thing's, as one of its own runs' is: done, the thing is done and you are told; failed, that is a try; stopped by
+you, the thing is let go. A question you skip, or a step whose time ran out, ends the wait, and the try that left it
+stays counted: a thing whose last try it was is let go then, and you are told.
+
+**What it came to.** Every `review_every_days` (7; 0 never), once a thing was done or let go since, Dot puts on its list
+"Count what my own work since … came to" and does it as a thing (item 914). Its run is given what was done and let go
+since the last count and what that cost (the runs, the failed ones, the tokens), looks where an answer would be for what
+was sent or put live (the mail, the page, the account), and writes `own-work-review.md` in the workspace: each thing and
+what came of it, the counts, and what is worth more of its time and what to stop. It sends nothing; you are told as of
+any thing done, and the next look reads the file.
 
 The settings are in `[initiative]` of `defaults.toml`: `idle_minutes`, `gap_minutes`, `look_every_hours`, `attempts`,
-`runs_per_day`, `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do) and `peak_hours_utc`;
-the switch and the time of the last look are kept in the database.
+`runs_per_day`, `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do), `peak_hours_utc`,
+`look_model`, `retry_under_tokens` and `review_every_days`; the switch and the time of the last look are kept in the
+database.
 
 ### Objectives
 

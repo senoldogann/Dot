@@ -62,8 +62,12 @@ def _finish(answer: str, success: bool = True) -> ScriptedTurn:
     )
 
 
-def _config(runs_per_day: int = 0, peak: tuple[int, ...] = ()) -> AppConfig:
+def _config(runs_per_day: int = 0, peak: tuple[int, ...] = (), grouped: bool = False, **more: object) -> AppConfig:
     config: AppConfig = eval_config(load_default_config())
+    if grouped:
+        # Its tools in groups, as a run of the owner's 173 tools has them, so that what is on from its start shows.
+        config = config.model_copy(update={"agent": config.agent.model_copy(update={"tool_surface": "grouped"})})
+    # No count of the week's work but in the tests of it (item 914), nor a bound of tokens on a try (item 913).
     initiative = config.initiative.model_copy(
         update={
             "idle_minutes": 10.0,
@@ -71,6 +75,9 @@ def _config(runs_per_day: int = 0, peak: tuple[int, ...] = ()) -> AppConfig:
             "attempts": 2,
             "runs_per_day": runs_per_day,
             "peak_hours_utc": peak,
+            "review_every_days": 0.0,
+            "retry_under_tokens": 0,
+            **more,
         }
     )
     # The owner's own mode asks, as by default: Dot's own runs start in [initiative] approvals all the same.
@@ -85,10 +92,15 @@ async def login_env() -> dict[str, str]:
 
 @asynccontextmanager
 async def _dot(
-    login_env: dict[str, str], turns: list[ScriptedTurn], runs_per_day: int = 0, peak: tuple[int, ...] = ()
+    login_env: dict[str, str],
+    turns: list[ScriptedTurn],
+    runs_per_day: int = 0,
+    peak: tuple[int, ...] = (),
+    grouped: bool = False,
+    **more: object,
 ) -> AsyncIterator[tuple[Runtime, RunManager]]:
     with scratch_home() as home, eval_environment(home, {}):
-        runtime: Runtime = await open_runtime(_config(runs_per_day, peak), login_env)
+        runtime: Runtime = await open_runtime(_config(runs_per_day, peak, grouped, **more), login_env)
         await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, turns))
         manager: RunManager = RunManager(runtime)
         try:
@@ -445,7 +457,9 @@ async def test_a_start_that_fails_leaves_no_chat_and_is_not_tried_again_at_once(
         await set_initiative(runtime.store, True)
         tried: list[str] = []
 
-        async def refused(goal: str, opening: str, mode: str, thread_id: str, tainted: bool) -> RunRecord:
+        async def refused(
+            goal: str, opening: str, mode: str, thread_id: str, tainted: bool, model: str | None = None
+        ) -> RunRecord:
             tried.append(goal)
             raise ConfigError("no such model", {})
 
@@ -469,10 +483,10 @@ async def test_the_owner_switching_it_off_while_a_look_starts_keeps_it_off(
         start_own = manager.start_own
 
         async def switched_off_meanwhile(
-            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool
+            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
         ) -> RunRecord:
             await set_initiative(runtime.store, False)
-            return await start_own(goal, opening, mode, thread_id, tainted)
+            return await start_own(goal, opening, mode, thread_id, tainted, model)
 
         monkeypatch.setattr(manager, "start_own", switched_off_meanwhile)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
@@ -1057,3 +1071,141 @@ async def test_a_thing_the_owner_said_not_to_do_is_let_go_by_its_run_at_once_and
         manager.ended_tainted = read_a_page  # type: ignore[method-assign]
         listed: str = "\n".join(await _listed(runtime.store, await initiative._clean_runs()))
         assert "why not quoted" in listed and "never to touch" not in listed
+
+
+def _call(tool: str, **arguments: object) -> ScriptedTurn:
+    return ScriptedTurn(text="", calls=(ScriptedCall(tool=tool, arguments=arguments),))
+
+
+async def _results(runtime: Runtime, run_id: str, tool: str) -> list[tuple[bool, str]]:
+    return [
+        (bool(event.data.get("ok")), str(event.data.get("text", "")))
+        for event in await runtime.store.list_events(run_id, 0, 500)
+        if event.kind == "tool_result" and event.data.get("tool") == tool
+    ]
+
+
+_LOOK_MODEL: str = f"{_PROVIDER}:scripted-look"
+
+
+async def test_the_look_judges_on_its_own_model_and_sees_what_came_of_what_was_done(login_env: dict[str, str]) -> None:
+    """Items 910 and 911: the look starts on [initiative] look_model, reads each thing done with its day and what came
+    of it, and a thing like one done lately goes on the list only with what is new since; the thing itself is done on
+    the configured model, with the list's tools on from its start (item 912)."""
+    turns: list[ScriptedTurn] = [
+        _call("todo_add", title="Rewrite the CV summary so it leads with results", why="No answers to 19 applications"),
+        _call(
+            "todo_add",
+            title="Rewrite the CV summary so it leads with results",
+            why="No answers to 19 applications",
+            again_because="The Finnish copy was left out of the rewrite",
+        ),
+        _call("todo_add", title="Tidy the downloads folder by year", why="It is full"),
+        _finish("Put two things on the list."),
+        _finish("The Finnish summary is rewritten in cv/fi.html."),
+    ]
+    async with _dot(login_env, turns, grouped=True, look_model=_LOOK_MODEL) as (runtime, manager):
+        rewritten = await add_todo(runtime.store, "Rewrite the CV summary with results", "Asked", "run", None, False)
+        assert isinstance(rewritten, TodoRecord)
+        thread = await runtime.store.create_thread("Rewrite the CV", "ui")
+        old: RunRecord = await runtime.store.create_run(
+            thread.id,
+            "Rewrite the CV",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            INITIATIVE_SOURCE,
+            "medium",
+            "standard",
+            None,
+            "yolo",
+            False,
+            None,
+            None,
+            None,
+        )
+        await runtime.store.finish_run(old.id, "done", "The summary is rewritten in cv/en.html.")
+        await runtime.store.set_todo(rewritten.id, "done", 1, old.id, "The summary is rewritten in cv/en.html.")
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(10_000.0)
+        [look] = [run for run in await runtime.store.list_runs(10, None) if run.id != old.id]
+        await _settled(initiative)
+        looked: RunRecord = await runtime.store.get_run(look.id)
+        assert (looked.model, looked.status) == (_LOOK_MODEL, "done")
+        listed: list[str] = await _listed(runtime.store, frozenset({old.id}))
+        said: str = next(line for line in listed if "Rewrite the CV summary with results" in line)
+        assert said.startswith("- done on ") and "what came of it: " in said and "cv/en.html" in said, said
+        added: list[tuple[bool, str]] = await _results(runtime, look.id, "todo_add")
+        assert not added[0][0] and "Not put on the list: it is like" in added[0][1], added
+        assert "What came of it: The summary is rewritten in cv/en.html." in added[0][1]
+        assert added[1][0] and added[2][0], added
+        again: TodoRecord = next(
+            todo for todo in await runtime.store.list_todos(("open",), 10) if todo.title.startswith("Rewrite the CV")
+        )
+        assert again.why.endswith("Again because: The Finnish copy was left out of the rewrite")
+        # The thing is done on the configured model, with the list's tools on from its first step.
+        await initiative.tick(10_100.0)
+        did: RunRecord = next(run for run in await runtime.store.list_runs(10, None) if run.id not in (look.id, old.id))
+        await _settled(initiative)
+        assert (await runtime.store.get_run(did.id)).model == runtime.config.models.main
+        [groups] = await runtime.store.events_of_kind(did.id, "tool_groups", 1)
+        assert "todos" in groups.data["on"], groups.data
+
+
+async def test_a_try_that_spent_past_its_bound_lets_the_thing_go_at_once(login_env: dict[str, str]) -> None:
+    """Item 913: a failed try that spent more than [initiative] retry_under_tokens is not made again the same way."""
+    async with _dot(login_env, [_finish("The form wants a puzzle solved.", False)], retry_under_tokens=500) as (
+        runtime,
+        manager,
+    ):
+        todo: TodoRecord | str = await add_todo(runtime.store, "Send the application", "Asked", "owner", None, False)
+        assert isinstance(todo, TodoRecord)
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        async with runtime.bus.subscribe(None) as subscription:
+            await initiative.tick(10_000.0)
+            await _settled(initiative)
+            told: list[EventRecord] = await _told(subscription)
+        dropped: TodoRecord = await runtime.store.get_todo(todo.id)
+        assert (dropped.status, dropped.attempts) == ("dropped", 1)
+        assert dropped.note.startswith("Spent 0.0M tokens without doing it: The form wants a puzzle solved."), dropped
+        assert [event.data["title"] for event in told] == ["Dot let go of a thing after 1 try"]
+
+
+async def test_every_so_many_days_it_counts_what_its_own_work_came_to(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 914: once a run of its own was made, the count is put on the list and done as a thing, its opening the
+    record of what was done and spent; it is not put on the list again until review_every_days went by."""
+    turns: list[ScriptedTurn] = [_finish("Sorted."), _finish("Two things done, nothing came back yet.")]
+    async with _dot(login_env, turns, review_every_days=7.0) as (runtime, manager):
+        await add_todo(runtime.store, "Sort the receipts by month", "They asked for it", "owner", None, False)
+        await set_initiative(runtime.store, True)
+        openings: dict[str, str] = {}
+        start_own = manager.start_own
+
+        async def kept(
+            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+        ) -> RunRecord:
+            run: RunRecord = await start_own(goal, opening, mode, thread_id, tainted, model)
+            openings[run.id] = opening
+            return run
+
+        monkeypatch.setattr(manager, "start_own", kept)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        now: float = time.time()
+        await initiative.tick(now)
+        await _settled(initiative)
+        # Nothing was done before the first tick: nothing to count then. Now a thing was.
+        await initiative.tick(now + 60)
+        [review] = [todo for todo in await runtime.store.list_todos(("doing",), 10)]
+        assert review.source == "review" and review.title.startswith("Count what my own work since "), review
+        counting: RunRecord = await runtime.store.get_run(review.run_id or "")
+        await _settled(initiative)
+        text: str = openings[counting.id]
+        assert "own-work-review.md" in text and "1 runs of your own, 0 of them failed" in text, text
+        assert "Sort the receipts by month" in text and "what came of it: " in text and "Sorted." in text, text
+        assert (await runtime.store.get_todo(review.id)).status == "done"
+        await initiative.tick(now + 120)
+        assert not [todo for todo in await runtime.store.list_todos(("open", "doing"), 10) if todo.source == "review"]

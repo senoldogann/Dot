@@ -15,7 +15,15 @@ from pydantic import Field, model_validator
 
 from dotagent.policy.types import ActionInfo
 from dotagent.proactive.text import one_line
-from dotagent.proactive.todos import LET_GO_BY_ITS_RUN, TITLE_CHARS, WHY_CHARS, add_todo, todo_key
+from dotagent.proactive.todos import (
+    LET_GO_BY_ITS_RUN,
+    TITLE_CHARS,
+    WHY_CHARS,
+    add_todo,
+    alike_ended,
+    alike_refusal,
+    todo_key,
+)
 from dotagent.store.models import TodoRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
@@ -24,6 +32,8 @@ TODO_ADD_TOOL: str = "todo_add"
 TODO_DROP_TOOL: str = "todo_drop"
 _SUMMARY_CHARS: int = 120
 _TIMEOUT_S: float = 15.0
+# The fewest characters of again_because that say what is new (item 911).
+_AGAIN_CHARS: int = 10
 
 
 class TodoArgs(ToolArgs):
@@ -31,6 +41,11 @@ class TodoArgs(ToolArgs):
         min_length=3, max_length=TITLE_CHARS, description="The work, as an instruction you can do alone."
     )
     why: str = Field(min_length=3, max_length=WHY_CHARS, description="Why it helps the owner.")
+    again_because: str | None = Field(
+        default=None,
+        max_length=WHY_CHARS,
+        description="Only when todo_add said it is like a thing done lately: what is new since.",
+    )
 
     @model_validator(mode="after")
     def _says_work(self) -> "TodoArgs":
@@ -59,8 +74,15 @@ def _todo_tool() -> RegisteredTool:
         )
 
     async def run(args: TodoArgs, ctx: ToolContext) -> ToolResult:
+        # Like a thing done or let go lately, it goes on the list only with what is new since (item 911).
+        again: str = " ".join((args.again_because or "").split())
+        if len(again) < _AGAIN_CHARS:
+            alike: TodoRecord | None = await alike_ended(ctx.runtime.store, args.title, ctx.runtime.memory.embedder)
+            if alike is not None:
+                return fail(await alike_refusal(ctx.runtime.store, alike))
+        why: str = args.why if len(again) < _AGAIN_CHARS else f"{args.why} Again because: {again}"
         added: TodoRecord | str = await add_todo(
-            ctx.runtime.store, args.title, args.why, "run", ctx.run_id, ctx.ever_tainted()
+            ctx.runtime.store, args.title, why, "run", ctx.run_id, ctx.ever_tainted()
         )
         if isinstance(added, str):
             return fail(added)
