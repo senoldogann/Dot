@@ -8,6 +8,7 @@ import { DOT_ID, actorFace, lookOf } from "../actors.js";
 import { api } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
+import { toast, toastError } from "../ui.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack } from "../state.js";
 import { decide, heading, makeAgent, modeOf, step, visit } from "./brain.js";
 import { runFeeds } from "./feeds.js";
@@ -291,6 +292,74 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       sender.visitWord = `Talking to ${other.summary.record.name}`;
     }
 
+    // Help offers (item 896): the free agents the fast model matched with a run at work, read after the agents (the
+    // first answer of a run may take seconds). A helper walks over to offer once per run; the owner lets it help from
+    // either one's panel, which has the daemon tell the run at work, in a note of Dot's (never the owner's words).
+    /** @type {{ helper_id: string, helper_name: string, helper_role: string, to_id: string, to_name: string, run_id: string, part: string }[]} */
+    let offers = [];
+    const offered = new Set();
+    const letHelp = new Set();
+    let offering = 0;
+    async function readOffers() {
+      const ticket = ++offering;
+      try {
+        const found = await api.get("/agents/offers");
+        if (disposed || ticket !== offering) return;
+        offers = found;
+      } catch (error) {
+        console.warn("the office could not read the help offers", error);
+        return;
+      }
+      const waiting = waitingRuns();
+      for (const offer of offers) {
+        const key = `${offer.helper_id}|${offer.run_id}`;
+        const helper = actors.get(offer.helper_id);
+        if (offered.has(key) || helper === undefined || modeOf(helper.summary.latest, waiting) !== "free") continue;
+        offered.add(key);
+        walkOver(helper, offer.to_id);
+        helper.visitWord = `Offers to help ${offer.to_name}`;
+      }
+      if (selected !== null) paintPanel();
+      wake();
+    }
+    /** The offers the panel of `id` shows: those made to it while it works, and those it makes. */
+    function offersOf(id) {
+      return offers.filter((offer) => offer.to_id === id || offer.helper_id === id);
+    }
+    async function letItHelp(offer) {
+      const key = `${offer.helper_id}|${offer.run_id}`;
+      // Dot's note to the run at work, which the daemon writes from the helper's record (never the part the model
+      // wrote): it clears no mark of content others can write, as the owner's own message would.
+      try {
+        await api.post("/agents/offers/help", { helper_id: offer.helper_id, run_id: offer.run_id });
+        letHelp.add(key);
+        toast("ok", `${offer.to_name} was told ${offer.helper_name} can help.`);
+      } catch (error) {
+        toastError(error);
+      }
+      paintPanel();
+    }
+    function offersView(id) {
+      const mine = offersOf(id);
+      if (mine.length === 0) return el("div", { class: "office-offers", hidden: true });
+      return el(
+        "div",
+        { class: "office-offers" },
+        el("div", { class: "office-offers-head" }, "Offers to help"),
+        ...mine.map((offer) => {
+          const key = `${offer.helper_id}|${offer.run_id}`;
+          const done = letHelp.has(key);
+          const who = offer.to_id === id ? offer.helper_name : `${offer.helper_name} → ${offer.to_name}`;
+          return el(
+            "div",
+            { class: "office-offer" },
+            el("div", { class: "office-offer-words" }, el("span", { class: "office-offer-name" }, who), offer.part === "" ? null : el("span", { class: "office-offer-part" }, offer.part)),
+            el("button", { class: "btn sm", type: "button", disabled: done, onclick: () => letItHelp(offer) }, done ? "Told" : "Let it help"),
+          );
+        }),
+      );
+    }
+
     let reading = 0;
     async function read() {
       const ticket = ++reading;
@@ -301,6 +370,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         const dot = agents.filter((summary) => summary.record.id === DOT_ID);
         learn([...dot, ...agents.filter((summary) => summary.record.id !== DOT_ID)]);
         wake();
+        readOffers();
       } catch (error) {
         console.warn("the office could not read the agents", error);
       }
@@ -404,6 +474,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         panelSlot.querySelector(".office-panel-doing")?.replaceWith(doing);
         panelSlot.querySelector(".office-panel-live")?.replaceWith(live);
         panelSlot.querySelector(".office-panel-links")?.replaceWith(links);
+        panelSlot.querySelector(".office-offers")?.replaceWith(offersView(record.id));
         return;
       }
       panel?.dispose?.();
@@ -426,6 +497,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
           ),
           doing,
           live,
+          offersView(record.id),
           links,
           box.element,
         ),

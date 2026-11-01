@@ -254,3 +254,70 @@ async def test_one_stream_carries_several_runs_events_in_their_order(login_env: 
         assert missing.status_code == 404, missing.text
         many = await http.get(f"/api/runs/streams?ids={','.join(f'run_{n}' for n in range(13))}")
         assert many.status_code == 422, many.text
+
+
+async def test_a_free_agent_offers_help_and_the_owner_lets_it_help(login_env: dict[str, str]) -> None:
+    """Item 896: a free agent the fast model matched with a run at work walks over to offer, both panels say so, and
+    "Let it help" asks the daemon to tell the run at work, as Dot's note, of the helper (never the model's part)."""
+    steered: list[dict[str, object]] = []
+
+    async def offers(route: Route) -> None:
+        agents = await (await route.fetch(url=route.request.url.replace("/offers", ""))).json()
+        mine = [summary["record"] for summary in agents if summary["record"]["id"] != "dot"]
+        working, helper = mine[0], next(record for record in mine if record["name"] == "Copy Editor")
+        offer = {
+            "helper_id": helper["id"],
+            "helper_name": helper["name"],
+            "helper_role": helper["role"],
+            "to_id": working["id"],
+            "to_name": working["name"],
+            "run_id": "run_x",
+            "part": "tighten the brief's wording",
+        }
+        await route.fulfill(status=200, body=json.dumps([offer]), headers={"content-type": "application/json"})
+
+    async def let_help(route: Route) -> None:
+        steered.append(json.loads(route.request.post_data or "{}"))
+        await route.fulfill(status=202, body="null", headers={"content-type": "application/json"})
+
+    async with _daemon(login_env) as address, async_playwright() as playwright:
+        # The daemon's own answer: with no run at work, nobody is asked and nothing is offered (no model is called).
+        async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
+            answer = await http.get("/api/agents/offers")
+            assert answer.status_code == 200 and answer.json() == [], answer.text
+            agents = (await http.get("/api/agents")).json()
+            helper_id: str = next(summary["record"]["id"] for summary in agents if summary["record"]["id"] != "dot")
+            # Let it help: an agent that is not is 404, a run that is not at work 409.
+            missing = await http.post("/api/agents/offers/help", json={"helper_id": "agt_none", "run_id": "run_x"})
+            assert missing.status_code == 404, missing.text
+            idle = await http.post("/api/agents/offers/help", json={"helper_id": helper_id, "run_id": "run_x"})
+            assert idle.status_code in (404, 409), idle.text
+        browser = await playwright.chromium.launch(args=_ARGS)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
+            errors: list[str] = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            await page.route("**/api/agents", _working)
+            await page.route("**/api/agents/offers", offers)
+            await page.route("**/api/runs/run_x/events**", _history)
+            await page.route("**/api/runs/streams**", _stream)
+            await page.route("**/api/agents/offers/help", let_help)
+            await _agents_page(page, address)
+            office = page.get_by_role("region", name="The office: your agents at work")
+            await expect(office.locator("canvas.office-canvas")).to_have_count(1, timeout=20_000)
+            # The helper's own panel says whom it offers to help.
+            await office.locator(".office-tag", has_text="Copy Editor").click()
+            helper_panel = office.get_by_role("complementary", name="Copy Editor in the office")
+            await expect(helper_panel.locator(".office-offer")).to_contain_text("Copy Editor → ")
+            await helper_panel.get_by_role("button", name="Close").click()
+            # The working one's panel lists the offer, and the owner lets it help.
+            await office.locator('.office-tag[data-mode="working"]').click()
+            offer = office.locator(".office-panel .office-offer")
+            await expect(offer).to_contain_text("Copy Editor")
+            await expect(offer).to_contain_text("tighten the brief's wording")
+            await offer.get_by_role("button", name="Let it help").click()
+            await expect(offer.get_by_role("button", name="Told")).to_be_disabled()
+            assert len(steered) == 1 and steered[0]["run_id"] == "run_x" and set(steered[0]) == {"helper_id", "run_id"}
+            assert errors == [], errors
+        finally:
+            await browser.close()

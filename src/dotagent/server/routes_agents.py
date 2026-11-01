@@ -7,6 +7,7 @@ import time
 from fastapi import APIRouter
 
 from dotagent.agent.loop import AGENT_CORE_TOOLS
+from dotagent.agent.offers import HelpOffer, LetHelpRequest, OfferBook, at_work_and_free, help_note
 from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, release_playbooks
 from dotagent.agent.templates import (
     TEAMS,
@@ -236,6 +237,34 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             )
             for agent in await store.list_agents()
         ]
+
+    book: OfferBook = OfferBook()
+
+    @router.get("/agents/offers")
+    async def help_offers() -> list[HelpOffer]:
+        """The free agents that could help the runs at work (item 896), as the fast model matched each run once; a
+        helper that has started working since is left out."""
+        agents: list[AgentRecord] = await store.list_agents()
+        waiting: set[str] = {approval.run_id for approval in await store.list_approvals("pending", 200)}
+        work, free = at_work_and_free(agents, await store.latest_agent_runs(), await store.latest_dot_run(), waiting)
+        if not work or not free:
+            return []
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+        fast: str = ctx.runtime.roles.fast()
+        found: list[list[HelpOffer]] = await asyncio.gather(
+            *(book.offers(ctx.runtime.router, fast, item, free, held) for item in work)
+        )
+        ids: set[str] = {agent.id for agent in free}
+        return [offer for offers in found for offer in offers if offer.helper_id in ids]
+
+    @router.post("/agents/offers/help", status_code=202)
+    async def let_help(request: LetHelpRequest) -> None:
+        """The owner lets a free agent help a run at work (item 896): the run is told, as Dot's note, the helper's name
+        and role and to hand it a part with message_agent if one fits; 404 for an agent that is not, 409 for a run that
+        is not at work."""
+        helper: AgentRecord = await store.get_agent(request.helper_id)
+        await store.get_run(request.run_id)
+        ctx.manager.tell(request.run_id, help_note(helper), "note")
 
     async def created(request: AgentRequest) -> AgentRecord:
         return await saved(_checked(request, known()))
