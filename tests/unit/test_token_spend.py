@@ -47,3 +47,20 @@ async def test_a_goal_started_again_in_other_chats_and_failing_is_marked_and_one
     assert len(marked) == 1 and "3 chats, 3 runs, 3 failed  Solve the hiring CTF" in marked[0]
     assert collect_spend(tmp_path / "dot.sqlite3", time.time() + 60, 5) == TokenSpend(total=0, chats=())
     assert render_spend(TokenSpend(total=0, chats=())) == []
+
+
+async def test_chats_of_a_short_title_or_not_the_owners_are_not_one_goal(tmp_path: Path) -> None:
+    """The pre-push review of item 881: two failing chats titled "selam", or two watcher chats about mails of one
+    subject, were marked as one goal started again and failing."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "shots")
+    try:
+        for _ in range(2):
+            hello = await store.create_thread("selam", "test")
+            await _run(store, hello.id, "failed", 1_000)
+            mail = await store.create_thread("Client mail · Invoice for October", "watcher")
+            await _run(store, mail.id, "failed", 1_000)
+    finally:
+        await store.close()
+    spend: TokenSpend = collect_spend(tmp_path / "dot.sqlite3", time.time() - 3600, 10)
+    assert len(spend.chats) == 4
+    assert all(chat.chats == 1 and not chat.retried for chat in spend.chats), spend.chats

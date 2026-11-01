@@ -360,9 +360,11 @@ what moved; a schedule switched off is not started so, and the end of such a run
   `[scheduler] notify` (`always`, every end, by default, but one that found nothing new: a run told it is a schedule's
   says so when nothing changed for you since its last run, with `nothing_new` in its finish, and that end, done and
   needing nothing of you, is not pushed; item 880, after a client mail check every two hours told its owner seven
-  times in a day that nobody had answered). **Only when it fails or needs me** (`problems`) tells a run
-  that ends with something it needs from you, failed or not, and of the other failed runs the first of a row, not the
-  ones after it; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **History** and
+  times in a day that nobody had answered; not a run that read a mail, a page or other content others can write, which
+  is told whatever it says, since that content may have told it to say nothing new: item 895). **Only when it fails
+  or needs me** (`problems`) tells a run that ends with something it needs from you, failed or not, and of the other
+  failed runs the first of a row, not the ones after it: the level for a check of your mail that should tell you only
+  what needs you; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **History** and
   the run's page still show. A run started with **Run now** is told at every level, whatever it found, as are a question, an approval, a
   draft and the schedule's switch-off; a schedule deleted while its run works tells that run's end at the level it had.
 - A schedule runs as Dot or as one of your agents (item 462): **Agent** in its form, Dot by default. Its runs carry the

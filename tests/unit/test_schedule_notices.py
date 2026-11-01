@@ -100,5 +100,30 @@ async def test_nothing_new_is_read_from_the_finish_that_went_through_not_one_ref
         await store.add_event(again.id, "tool_call", {"call_id": "c", "tool": FINISH_TOOL, "args": quiet})
         await store.add_event(again.id, "tool_result", {"call_id": "c", "tool": FINISH_TOOL, "ok": False, "text": "no"})
         assert await said_nothing_new(store, again.id) is False
+        # A run that read a mail or a page says nothing new in vain: that mail may have told it to (the pre-push review
+        # of item 880); its end is told as any other.
+        read = await store.create_run(
+            thread.id,
+            "goal",
+            "task",
+            "m:m",
+            None,
+            "schedule",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
+        )
+        await store.add_event(
+            read.id, "tool_result", {"call_id": "m", "tool": "mail_read", "ok": True, "tainted": True}
+        )
+        await store.add_event(read.id, "tool_call", {"call_id": "d", "tool": FINISH_TOOL, "args": quiet})
+        await store.add_event(read.id, "tool_result", {"call_id": "d", "tool": FINISH_TOOL, "ok": True, "text": "ok"})
+        assert await said_nothing_new(store, read.id) is False
+        assert await store.run_ever_tainted(read.id) and not await store.run_ever_tainted(run.id)
     finally:
         await store.close()
