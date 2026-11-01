@@ -327,6 +327,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     let offers = [];
     const offered = new Set();
     const letHelp = new Set();
+    const askingHelp = new Set();
     let offering = 0;
     async function readOffers() {
       const ticket = ++offering;
@@ -356,14 +357,24 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     }
     async function letItHelp(offer) {
       const key = `${offer.helper_id}|${offer.run_id}`;
-      // Dot's note to the run at work, which the daemon writes from the helper's record (never the part the model
-      // wrote): it clears no mark of content others can write, as the owner's own message would.
+      // One press at a time: a second while the first is on its way starts no second helper (the pre-push review).
+      if (askingHelp.has(key) || letHelp.has(key)) return;
+      askingHelp.add(key);
+      paintPanel();
+      // The helper's run starts (item 902): it reads where the one at work stands and does its part, and its answer
+      // reaches that run as Dot's note; the room shows it at work at once (never the part the model wrote, which the
+      // daemon does not send).
       try {
-        await api.post("/agents/offers/help", { helper_id: offer.helper_id, run_id: offer.run_id });
+        const run = await api.post("/agents/offers/help", { helper_id: offer.helper_id, run_id: offer.run_id });
         letHelp.add(key);
-        toast("ok", `${offer.to_name} was told ${offer.helper_name} can help.`);
+        const helper = actors.get(offer.helper_id);
+        if (helper !== undefined) helper.summary = { ...helper.summary, latest: run };
+        toast("ok", `${offer.helper_name} is helping ${offer.to_name}.`);
+        readSoon();
       } catch (error) {
         toastError(error);
+      } finally {
+        askingHelp.delete(key);
       }
       paintPanel();
     }
@@ -382,7 +393,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
             "div",
             { class: "office-offer" },
             el("div", { class: "office-offer-words" }, el("span", { class: "office-offer-name" }, who), offer.part === "" ? null : el("span", { class: "office-offer-part" }, offer.part)),
-            el("button", { class: "btn sm", type: "button", disabled: done, onclick: () => letItHelp(offer) }, done ? "Told" : "Let it help"),
+            el("button", { class: "btn sm", type: "button", disabled: done || askingHelp.has(key), onclick: () => letItHelp(offer) }, done ? "Helping" : askingHelp.has(key) ? "Starting…" : "Let it help"),
           );
         }),
       );

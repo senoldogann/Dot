@@ -1317,6 +1317,7 @@ class RunManager:
         model: str | None,
         agent_id: str | None,
         opening: str | None = None,
+        on_start: Callable[[str], None] | None = None,
     ) -> DelegateOutcome:
         """Run ``goal`` as a run of its own on ``model``, or on the parent's model as it is stored now when that is
         ``None`` (after a switch to a standby model, the standby), and wait until it ends.
@@ -1370,6 +1371,9 @@ class RunManager:
             None,
             helper_of,
         )
+        # Who started it hears the run's id at once (item 902: the owner's Let it help shows the helper at work).
+        if on_start is not None:
+            on_start(handle.run_id)
         try:
             await handle.finished.wait()
         except asyncio.CancelledError:
@@ -1405,6 +1409,7 @@ class RunManager:
         reaction: ReactionAct | None,
         owner_text: str = "",
         files: tuple[StoredAttachment, ...] = (),
+        taints: bool = False,
     ) -> None:
         """Hand the running agent a note about a reaction of the owner (item 586), which it reads before its next
         step as it reads a steer; the note says what the owner did and what that asks. It is Dot's words, not the
@@ -1425,6 +1430,7 @@ class RunManager:
                     said="",
                     reaction=reaction,
                     owner_text=owner_text,
+                    taints=taints,
                 )
             )
         except asyncio.QueueShutDown as exc:

@@ -2,12 +2,22 @@
 what it learned for itself (item 94)."""
 
 import asyncio
+import contextlib
+import secrets
 import time
 
 from fastapi import APIRouter
 
 from dotagent.agent.loop import AGENT_CORE_TOOLS
-from dotagent.agent.offers import HelpOffer, LetHelpRequest, OfferBook, at_work_and_free, help_note
+from dotagent.agent.offers import (
+    HelpOffer,
+    LetHelpRequest,
+    OfferBook,
+    at_work_and_free,
+    help_answer_note,
+    help_goal,
+    help_note,
+)
 from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, release_playbooks
 from dotagent.agent.templates import (
     TEAMS,
@@ -20,7 +30,8 @@ from dotagent.agent.templates import (
     find_template,
     with_answers,
 )
-from dotagent.core.errors import InvalidValueError
+from dotagent.core.errors import InvalidValueError, RunConflict
+from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.secrets import known_secrets
@@ -46,10 +57,15 @@ from dotagent.store.models import (
     AgentRecord,
     AgentToolUse,
     MemoryRecord,
+    RunMode,
     RunRecord,
     TeamRecord,
 )
-from dotagent.tools.team import MESSAGE_AGENT_TOOL, find_agent
+from dotagent.tools.base import ToolResult
+from dotagent.tools.context import DelegateOutcome
+from dotagent.tools.team import MESSAGE_AGENT_TOOL, find_agent, render_reply
+
+log = get_logger(__name__)
 
 # How many of its newest runs an agent's page shows.
 _PAGE_RUNS: int = 50
@@ -257,14 +273,94 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         ids: set[str] = {agent.id for agent in free}
         return [offer for offers in found for offer in offers if offer.helper_id in ids]
 
-    @router.post("/agents/offers/help", status_code=202)
-    async def let_help(request: LetHelpRequest) -> None:
-        """The owner lets a free agent help a run at work (item 896): the run is told, as Dot's note, the helper's name
-        and role and to hand it a part with message_agent if one fits; 404 for an agent that is not, 409 for a run that
-        is not at work."""
+    relays: set[asyncio.Task[None]] = set()
+    # The agents whose helping run is being started (the pre-push review: two presses at once started two).
+    starting: set[str] = set()
+
+    def relayed(task: asyncio.Task[None]) -> None:
+        """Let a relay go, logging what failed in it: the owner was told the helper works (the pre-push review)."""
+        relays.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            log.error("help_answer_failed", task=task.get_name(), error=str(task.exception()))
+
+    async def relay(helper: AgentRecord, target: RunRecord, goal: str, started: asyncio.Future[str]) -> None:
+        """The helper's run, as a helper of the run at work (a delegation, as ``message_agent`` makes one: it answers
+        the policy's questions as that run does, an initiative's asks included, and starts as untrusted as it is); when
+        it ends, its answer goes to the run at work as Dot's note, if that run still works."""
+        mode: RunMode = "research" if target.mode == "research" else "task"
+        helping: asyncio.Task[DelegateOutcome] = asyncio.create_task(
+            ctx.manager.delegate(target.id, goal, mode, None, helper.id, None, started.set_result)
+        )
+        # The helper lives no longer than the run it helps: stopped by the owner or ended, the run at work takes its
+        # helper with it, as the run that sends a message_agent does (the pre-push review); the helper ends first.
+        over: asyncio.Task[RunRecord] = asyncio.create_task(ctx.manager.wait(target.id))
+        try:
+            await asyncio.wait({helping, over}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            if not helping.done():
+                helping.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await helping
+                log.info("help_stopped_with_its_run", target_run=target.id)
+            over.cancel()
+        if helping.cancelled():
+            return
+        outcome: DelegateOutcome = helping.result()
+        if target.id not in ctx.manager.active_run_ids():
+            log.info("help_answer_not_passed", helper_run=outcome.run.id, target_run=target.id, why="the run has ended")
+            return
+        answered: ToolResult = render_reply(helper, outcome, secrets.token_hex(8))
+        try:
+            # Fenced in the note, and the run that reads it is marked as having read what a page wrote, as a reply
+            # through message_agent marks it (the pre-push review).
+            ctx.manager.tell(target.id, help_answer_note(answered.text), "note", taints=outcome.tainted)
+        except RunConflict:
+            log.info("help_answer_not_passed", helper_run=outcome.run.id, target_run=target.id, why="the run is ending")
+            return
+        log.info("help_answer_passed", helper_run=outcome.run.id, target_run=target.id, tainted=outcome.tainted)
+
+    @router.post("/agents/offers/help", status_code=201)
+    async def let_help(request: LetHelpRequest) -> RunRecord:
+        """The owner lets a free agent help a run at work (item 902): the helper's run starts as a helper of that run,
+        reads where it stands and does the part its role fits; the run at work is told so as Dot's note, and the
+        helper's answer reaches it as another when the helper ends. The helper's run is returned. 404 for an agent or a
+        run that is not, 409 for a run that is not at work, an agent that is not free, or a run that is itself a
+        helper."""
         helper: AgentRecord = await store.get_agent(request.helper_id)
-        await store.get_run(request.run_id)
-        ctx.manager.tell(request.run_id, help_note(helper), "note")
+        target: RunRecord = await store.get_run(request.run_id)
+        if target.id not in ctx.manager.active_run_ids():
+            raise RunConflict("the run is not at work", {"run_id": target.id})
+        # Only a free agent helps, as only a free one is offered: not one at work, waiting for the owner or paused.
+        waiting: set[str] = {approval.run_id for approval in await store.list_approvals("pending", 200)}
+        _, free = at_work_and_free(await store.list_agents(), await store.latest_agent_runs(), None, waiting)
+        if all(agent.id != helper.id for agent in free) or helper.id in starting:
+            raise RunConflict("that agent is not free to help now", {"agent_id": helper.id})
+        # Held as starting until its run is there: a second press meanwhile, for this run or another, is refused.
+        starting.add(helper.id)
+        to_name: str = DOT_AGENT.name if target.agent_id is None else (await store.get_agent(target.agent_id)).name
+        started: asyncio.Future[str] = asyncio.get_running_loop().create_future()
+        task: asyncio.Task[None] = asyncio.create_task(
+            relay(helper, target, help_goal(to_name, target.id), started), name=f"help-{target.id}"
+        )
+        relays.add(task)
+        task.add_done_callback(relayed)
+        # The helper's run, once it has started; a start refused (a helper's own run, a run that ended meanwhile) is
+        # the answer, and nothing waits for nobody.
+        waits: set[asyncio.Future[object]] = {started, task}  # type: ignore[arg-type]
+        try:
+            await asyncio.wait(waits, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            starting.discard(helper.id)
+        if not started.done():
+            task.result()
+            raise RunConflict("the helper did not start", {"agent_id": helper.id})
+        helper_run: RunRecord = await store.get_run(started.result())
+        try:
+            ctx.manager.tell(target.id, help_note(helper), "note")
+        except RunConflict:
+            ctx.manager.cancel(helper_run.id)
+            raise
+        return helper_run
 
     async def created(request: AgentRequest) -> AgentRecord:
         # A new agent never takes the lead's name (the review of 2026-11-01); one named so before is still changed.

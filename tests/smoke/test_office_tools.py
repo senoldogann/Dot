@@ -12,6 +12,7 @@ import pytest_asyncio
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_default_config
+from dotagent.core.errors import ToolInputError
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import eval_config, eval_environment, scratch_home
@@ -165,3 +166,22 @@ async def test_an_agent_sees_the_others_and_reads_one_s_chat_tainted_as_that_cha
         await _call(runtime, mine, writer.id, READ_AGENT_CHAT_TOOL, {"agent": "Nobody"})
     none_yet: ToolResult = await _call(runtime, mine, writer.id, READ_AGENT_CHAT_TOOL, {"agent": "Dot"})
     assert "Dot has no chat yet" in none_yet.text
+
+
+async def test_a_named_run_is_read_and_only_one_of_the_agents_own(runtime: Runtime) -> None:
+    """Item 902: the helper the owner sends reads the work it helps (``run``), not the agent's newest chat; a run of
+    another agent's is refused."""
+    builder: AgentRecord = await _agent(runtime, "Builder", "Builds the site")
+    other: AgentRecord = await _agent(runtime, "Other", "Does other things")
+    helped: RunRecord = await _run(runtime, builder, "Ship the pricing page", tainted=False)
+    await _run(runtime, builder, "Rename the blog folder", tainted=False)
+    theirs: RunRecord = await _run(runtime, other, "Count the invoices", tainted=False)
+    reader: RunRecord = await _run(runtime, other, "Help Builder", tainted=False)
+    newest: ToolResult = await _call(runtime, reader, other.id, READ_AGENT_CHAT_TOOL, {"agent": "Builder"})
+    assert "Rename the blog folder" in newest.text
+    named: ToolResult = await _call(
+        runtime, reader, other.id, READ_AGENT_CHAT_TOOL, {"agent": "Builder", "run": helped.id}
+    )
+    assert "Ship the pricing page" in named.text and "Rename the blog folder" not in named.text
+    with pytest.raises(ToolInputError):
+        await _call(runtime, reader, other.id, READ_AGENT_CHAT_TOOL, {"agent": "Builder", "run": theirs.id})

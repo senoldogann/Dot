@@ -2442,11 +2442,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 runtime, run.thread_id, run.id, text, sent.files, info.vision
             )
             history.append(note)
-            agent.gate.heard_from_owner()
-            if sent.vouches:
-                agent.gate.clear_taint()
+            # What it does to the run's trust, as OpenCode's loop takes it too (item 902).
+            agent.gate.take(sent)
             if sent.said != "":
-                agent.gate.add_instruction(sent.said)
                 ledger = with_instruction(ledger, sent.said)
             await runtime.store.append_messages(run.thread_id, [note])
             # Taken once it is in the thread, with nothing awaited between: a stop before leaves it to the run's end.

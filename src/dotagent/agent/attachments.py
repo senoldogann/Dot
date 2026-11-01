@@ -100,6 +100,9 @@ class UserInput(FrozenModel):
     said: str
     reaction: ReactionAct | None = None
     owner_text: str = ""
+    # A note of Dot's that carries words of content third parties can author (item 902: the answer of a helper that
+    # read a page), which taints the run that reads it, as a tool's untrusted result does.
+    taints: bool = False
 
 
 class RunInbox(asyncio.Queue[UserInput]):
