@@ -35,6 +35,7 @@ from dotagent.plugins import scout_service
 from dotagent.plugins.scout_types import Candidate, ScoutState, retired
 from dotagent.plugins.scout_types import waiting as is_waiting
 from dotagent.proactive.text import one_line, quoted
+from dotagent.proactive.work import objective_lines, order_lines
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.history import Digest
@@ -477,10 +478,28 @@ async def _campaigns(store: Store, zone: ZoneInfo) -> Quoted:
     return Quoted(lines=tuple(_section("Campaigns at work", shown, len(active))), run_ids=tuple(dict.fromkeys(noted)))
 
 
+async def _objectives(store: Store) -> Quoted:
+    """The owner's objectives and the work orders that serve them (items 907, 908): what the brief and the look for work
+    serve. What a run wrote after it read outside content is counted, not quoted, so no run's taint is carried."""
+    return Quoted(lines=tuple(await objective_lines(store)), run_ids=())
+
+
+async def _orders(store: Store) -> Quoted:
+    """The work orders waiting for the lead's review or for the owner (item 907)."""
+    return Quoted(lines=tuple(await order_lines(store)), run_ids=())
+
+
 async def record_parts(store: Store, since: float, zone: ZoneInfo) -> list[Quoted]:
     """The parts of Dot's record that are not the brief's own, for a run that looks for work on Dot's own initiative
-    (item 715): what waits for the owner, the runs that failed since ``since`` and the campaigns at work."""
-    return [await _waiting(store), await _failed(store, since), await _campaigns(store, zone)]
+    (item 715): what waits for the owner, the objectives and work orders (items 907, 908), the runs that failed since
+    ``since`` and the campaigns at work."""
+    return [
+        await _waiting(store),
+        await _objectives(store),
+        await _orders(store),
+        await _failed(store, since),
+        await _campaigns(store, zone),
+    ]
 
 
 async def _today(store: Store, record: ScheduleRecord, now: float, zone: ZoneInfo) -> Quoted:
@@ -548,8 +567,9 @@ def _instructions(today: datetime, zone: ZoneInfo, reading: str) -> str:
         "4. Write the brief short. Its first line is what the owner's phone shows: one sentence of at most 140 "
         "characters with the most important thing of the day (or that nothing needs them), with no heading, no "
         "greeting and no list mark before it. Then a few lines for each part that has something, the most important "
-        "first: what needs the owner, today (the calendar and the schedules that fire), mail that needs them, and "
-        "what Dot did on its own that failed or waits. Leave out a part with nothing in it and do not pad."
+        "first: what needs the owner, today (the calendar and the schedules that fire), mail that needs them, how "
+        "their objectives stand and the work orders waiting for review or for them, and what Dot did on its own that "
+        "failed or waits. Leave out a part with nothing in it and do not pad."
     )
 
 
@@ -574,6 +594,8 @@ async def prepare(runtime: Runtime, record: ScheduleRecord, now: float, zone: Zo
     accounts: list[Account] = await runtime.accounts.accounts()
     parts: list[Quoted] = [
         await _waiting(store),
+        await _objectives(store),
+        await _orders(store),
         await _plugins(store),
         await _failed(store, since),
         await _retried(store, since, now),

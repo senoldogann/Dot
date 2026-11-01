@@ -104,6 +104,7 @@ from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.memory import build_memory_tools
 from dotagent.tools.meta import build_meta_tools
 from dotagent.tools.notes import build_notes_tools
+from dotagent.tools.objectives import build_objective_tools
 from dotagent.tools.office import build_office_tools
 from dotagent.tools.pages import build_page_tools
 from dotagent.tools.posts import build_post_tools
@@ -120,6 +121,7 @@ from dotagent.tools.todos import build_todo_tools
 from dotagent.tools.trading import build_trading_tools
 from dotagent.tools.waits import build_wait_tools
 from dotagent.tools.web import build_web_tools
+from dotagent.tools.work_orders import build_work_order_tools
 from dotagent.trading.coinbase import CoinbaseBroker, kept_key
 from dotagent.trading.market import CoinbaseMarket
 from dotagent.trading.service import Trading, TradingSettings
@@ -257,12 +259,14 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_notes_tools(),
         build_memory_tools(),
         build_todo_tools(),
+        build_objective_tools(),
         (build_draft_tool(),),
         build_mail_calendar_tools(),
         build_schedule_tools(),
         build_campaign_tools(),
         build_delegate_tools(),
         build_team_tools(),
+        build_work_order_tools(),
         build_office_tools(),
         build_consult_tools(),
         (build_recon_tool(), build_security_tool()),

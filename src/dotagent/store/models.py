@@ -34,6 +34,26 @@ DraftChannel = Literal["mail", "message"]
 DraftStatus = Literal["waiting", "sending", "sent", "discarded", "failed"]
 # Where a thing on Dot's own list stands (item 715): to do, being done by a run of its own, done, or let go.
 TodoStatus = Literal["open", "doing", "done", "dropped"]
+# Where a work order stands (item 907): ``assigned`` is recorded and its run not started; ``working`` an attempt's run
+# is at work; ``in_review`` the attempt ended (or ran past its time, or failed) and the lead has not judged it;
+# ``returned`` the lead sent it back and the next attempt has not started; ``accepted`` and ``cancelled`` are final;
+# ``escalated`` waits for the owner: the lead can only cancel it.
+WorkOrderStatus = Literal["assigned", "working", "in_review", "returned", "accepted", "escalated", "cancelled"]
+# The moves between them: the store refuses any other, so that a late end of an attempt cannot undo a verdict. A move
+# to the status an order has changes only its note and the rest.
+WORK_ORDER_MOVES: dict[WorkOrderStatus, frozenset[WorkOrderStatus]] = {
+    "assigned": frozenset({"working", "in_review", "cancelled", "escalated"}),
+    "working": frozenset({"in_review", "cancelled", "escalated"}),
+    "in_review": frozenset({"accepted", "returned", "assigned", "escalated", "cancelled"}),
+    "returned": frozenset({"working", "assigned", "cancelled", "escalated"}),
+    "escalated": frozenset({"cancelled"}),
+    "accepted": frozenset(),
+    "cancelled": frozenset(),
+}
+# An order in one of these is open: somebody still has to do or judge something about it.
+OPEN_WORK_ORDERS: tuple[WorkOrderStatus, ...] = ("assigned", "working", "in_review", "returned", "escalated")
+# Where an objective of the owner's stands (item 908).
+ObjectiveStatus = Literal["active", "done", "dropped"]
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
 # How the end of a schedule's run is told (item 461): every end, only a first failure or an end that needs the owner,
 # or nothing.
@@ -432,6 +452,60 @@ class TodoRecord(FrozenModel):
     attempts: int
     run_id: str | None
     note: str
+    created_at: float
+    updated_at: float
+
+
+class WorkOrderRecord(FrozenModel):
+    """A piece of work the lead (Dot, or an agent that leads a team) handed to one agent (item 907): what it is
+    (``title``, ``brief``), what done means (``acceptance``), the objective it serves, who has it and where it stands.
+    ``run_ids`` are the runs of its attempts in order (``attempts`` counts them); ``run_id`` and ``thread_id`` are the
+    run and the chat that assigned it, and ``lead_run_id`` the run that started the newest attempt, which is told when
+    that attempt ends. ``tainted`` says whether the words of the order or of any attempt came of content third parties
+    can author, so that no run reads them as the owner's. ``note`` is the last thing said of it: why it went to
+    review, or what the lead wrote."""
+
+    id: str
+    agent_id: str
+    title: str
+    brief: str
+    acceptance: str
+    objective_id: str | None
+    status: WorkOrderStatus
+    attempts: int
+    run_ids: tuple[str, ...]
+    run_id: str | None
+    thread_id: str | None
+    lead_run_id: str | None
+    due_at: float | None
+    tainted: bool
+    note: str
+    created_at: float
+    updated_at: float
+
+
+class ObjectiveNote(FrozenModel):
+    """One dated line of progress on an objective (item 908). ``tainted`` marks a line written by a run that had read
+    content third parties can author."""
+
+    at: float
+    text: str
+    tainted: bool
+
+
+class ObjectiveRecord(FrozenModel):
+    """Something the owner wants Dot to move forward over time (item 908): what (``title``), why it matters
+    (``why``) and how progress is judged (``measure``). ``notes`` only grow. ``tainted`` says the run that wrote it
+    had read content third parties can author: it is then Dot's note and not the owner's wish, and no run is shown
+    its words as theirs."""
+
+    id: str
+    title: str
+    why: str
+    measure: str
+    status: ObjectiveStatus
+    notes: tuple[ObjectiveNote, ...]
+    tainted: bool
     created_at: float
     updated_at: float
 

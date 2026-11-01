@@ -69,6 +69,7 @@ from dotagent.store.models import (
     ScheduleRecord,
     TeamRecord,
     ThreadSummary,
+    WorkOrderRecord,
 )
 from dotagent.tailnet import TailnetState
 from dotagent.undo.restore import UndoAction, UndoState
@@ -829,6 +830,15 @@ class AgentSummary(FrozenModel):
     record: AgentRecord
     latest: RunRecord | None
     latest_title: str | None
+
+
+class WorkOrderView(FrozenModel):
+    """A work order as the Agents page lists it (item 907): the record, the name of the agent that has it ("" when that
+    agent is gone) and the title of the objective it serves (``None`` for none)."""
+
+    order: WorkOrderRecord
+    agent_name: str
+    objective_title: str | None
 
 
 class TeamMessage(FrozenModel):

@@ -53,6 +53,10 @@ _GROUP_OF_TOOL: dict[str, str] = {
     # Dot's own list of work for later (item 715).
     "todo_add": "todos",
     "todo_drop": "todos",
+    # What the owner wants moved forward over time, which Dot's own runs keep beside the list (item 908).
+    "objective_add": "todos",
+    "objective_update": "todos",
+    "objectives": "todos",
     # The public face of a site, the ports of the owner's own (item 776), and the forms of that host (item 781).
     "recon": "recon",
     "security_scan": "recon",
@@ -73,7 +77,7 @@ _PURPOSES: dict[str, str] = {
     "pages": "showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views",
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
-    "todos": "your own list of work to do for the owner later, on your own, while the Mac is idle",
+    "todos": "your own list of work to do for the owner later, on your own while the Mac is idle, and their objectives",
     "trading": "trading crypto on Coinbase under the owner's limits: prices, the account, orders",
     "waits": "waiting in code until a file is there, an address answers or a check passes",
     "skills": "saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way",

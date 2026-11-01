@@ -261,6 +261,23 @@ The settings are in `[initiative]` of `defaults.toml`: `idle_minutes`, `gap_minu
 `runs_per_day`, `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do) and `peak_hours_utc`;
 the switch and the time of the last look are kept in the database.
 
+### Objectives
+
+**Dot keeps what you want moved forward over time** (item 908): an objective is a title, why it matters and how
+progress is judged, with dated lines of progress that only grow, and it is active, done or dropped. Dot's own runs keep
+them with `objective_add`, `objective_update` (a line of progress, and the status) and `objectives`, in the tool group
+`todos`; a run of an agent, and one another run handed its work to, has none of them, as it has no list of its own. A
+run writes one down for what you asked for or plainly want, up to twelve active at once.
+
+The look for work and the morning brief read the active objectives, each with how it is judged, its newest line of
+progress and the work orders that serve it (see [Work orders](agents-and-campaigns.md#work-orders)), and the orders
+waiting for review or for you; the look is told to prefer work that moves an objective forward, and the brief says how
+they stand. What a run wrote after it read content third parties can author (a page, a mail) is marked: it is Dot's note
+and not your wish, the look and the brief count it and do not quote it, a run that reads it back gets it fenced and is
+marked as having read outside content, and such a run may add a line of progress but never change where an objective
+stands (done, dropped); a run that read nothing of the kind does that, when you ask. The Agents page shows the active
+objectives at the top of its **Work orders** part, read only.
+
 ## Telling you
 
 What Dot tells you on its own, the brief and the watchers, goes through one function, `tell_owner(bus, title, text,
@@ -299,5 +316,7 @@ it.
 | `GET /api/initiative` | Dot's own initiative (item 715): `enabled`, `looked_at` (its last look for work), `idle_readable` (whether macOS says how long the Mac has been idle; without it nothing starts, and the card says so), `approvals` (the mode its runs start in, `[initiative] approvals`, which the card says: item 756) and `todos`, what is being done and to do, then what was done or let go in the last two weeks, each with `id`, `title`, `why`, `source` (`owner` or `run`), `status`, `attempts`, `run_id`, `note` and `updated_at` |
 | `PUT /api/initiative` | switch it: `{"enabled": true}`; a run of it under way goes on until its end or a stop |
 | `POST /api/initiative/todos` | put a thing of yours on the list, 201: `{"title", "why"}`; 422 when it is on it, or was done or let go in the last 30 days |
+| `GET /api/objectives` | Dot's objectives (item 908): the active ones, then those done or dropped, each with `id`, `title`, `why`, `measure`, `status`, `notes` (`at`, `text`, `tainted`), `tainted` and the times |
+| `GET /api/work-orders` | the work orders (item 907, [Work orders](agents-and-campaigns.md#work-orders)): the open ones first, each as `order` (its record), `agent_name` and `objective_title` |
 | `POST /api/initiative/todos/{id}/drop`, `.../again` | take a thing to do off the list; put one that was let go back, its tries from none (404 for none) |
 | `PUT /api/brief` | set it: `{"enabled": true, "time": "08:00", "days": "every" \| "weekdays", "lines": [...]}`; 422 for a time that is not `HH:MM`, a line over 300 characters, more than 20 lines, and what the scheduler refuses (too many schedules switched on) |

@@ -349,6 +349,65 @@ waits for the list, and a level the form cannot show is kept as saved), `GET /ap
 given, read at each request: a tool of an app connected after Dot started is among them, item 689), and `POST /api/runs` with `agent_id` (not with
 `standing`: a campaign is Dot's own, and the two together are refused with a 422).
 
+### Work orders
+
+**Dot runs its agents as a manager runs staff** (item 907, your ask of 2026-11-01). `message_agent` waits for the
+answer and keeps no record; a work order is recorded, its agent starts at once, nobody waits for it, and what comes back
+is judged against what the order said done means. Three tools, offered where `message_agent` is (Dot's own runs, and an
+agent's own chat; never a run another run handed work to, and not while there is no agent to give work to and none
+may be made), each asking the policy for what a delegation asks:
+
+- `assign_work(agent, title, brief, acceptance, due_hours?, objective?)` records the order and starts the agent's run
+  in the same call; it answers with the order's id at once. The agent's goal holds the title, the brief, what done
+  means and the request to end with a `Verification:` section; it cannot see the chat the order came from, so the brief
+  holds every input. Several in one step run in parallel. `objective` ties it to one of
+  [Dot's objectives](proactive.md#objectives).
+- `work_orders(status?, order?)` lists the orders (the open ones by default) with their status, agent, tries, age and
+  due time; an order's id gives it in full, with the answer of each try. Dot sees every order; an agent that leads sees
+  those its own runs handed out.
+- `review_work(order, verdict, notes, to_agent?)` judges an order: `accept`; `return` (the same agent starts again
+  with the original brief and what done means, its earlier answer in a fence and your notes, which a return must
+  have); `reassign` (the same to `to_agent`, with the first agent's answer); `escalate` (the order waits for you, and
+  you are told on the Mac and the phone as a brief is: its title, and the lead's words unless the order read outside
+  content; only an order in review, not one at work); `cancel` (stops the run at work). The third try of an order,
+  whoever made the first two, goes to you instead of a fourth when it is sent back, and so does a reassignment after six
+  tries in all. An escalated order is yours: the lead can only cancel it, and hands the work over as a new order once
+  you decide.
+
+An order is `assigned` (recorded, its run starting), `working`, `in_review` (a try ended, or ran past its due time, or
+failed, and the lead has not judged it), `returned`, `accepted`, `escalated` or `cancelled`; the store refuses any other
+move, so a try that ends late cannot undo a verdict. When a try's run ends the order is `in_review` and the lead is
+told in a note (Dot's words, not yours: it vouches for nothing) if a run of its chat is at work; a lead whose turn ended
+is told nothing and finds the order in `work_orders` at its next run, and the morning brief lists the orders that wait
+for a review for more than a day, and those waiting for you. The tries belong to the order, not to the lead's run: the
+lead's turn may end while the agent works.
+
+**What Stop does.** A work order's attempt is followed by Dot, not awaited by the lead's call, so a turn of the lead
+that ends on its own leaves the attempts going. When you stop a run of the lead's chat (Stop), or the emergency stop
+engages, the attempts still at work on the orders of that chat stop with it and the orders are `cancelled`, with a note
+that says so (an order in review whose run is still at work, past its due time, too; one that waits for the lead with
+nothing at work stays its lead's); an attempt the emergency stop ended cancels its order too, wherever its lead is. An attempt you stop on
+its own page ends its order in review, for the lead to judge.
+
+**What the tick does.** Every scheduler tick, with no model, the orders `working` whose run failed, was cancelled or was
+lost with a daemon that stopped, the ones whose run never started and the ones past their due time (their run may still
+work) go to `in_review` with a note that says so, and the lead is told as above. Up to 24 orders are open at once and a
+run hands out 10.
+
+**Words from outside.** An agent's answer is a report to check, not your word. A try that read content third parties can
+author (a page, a mail) marks the order and its note: the note's answer is in a fence and the lead's run that reads it
+is marked as having read such content, as a reply through `message_agent` marks it; the lead's later notes taint the
+order the same way when its run had read such content. An order marked so keeps every word it quotes untrusted: each
+try of it starts untrusted, whatever run sends it back (a clean run that returns or reassigns it included), its notes
+mark the run that reads them, and `review_work` and `work_orders` mark the run that calls them. Such an order's title is counted and not quoted by the brief and
+the look for work. A try starts as untrusted as the run that gave it, and answers the policy's questions as that run
+does. `dotx run` cannot hand out orders (its runs end with the process); the daemon can.
+
+The **Work orders** part of the Agents page lists them read only, under the active objectives: a badge with where the
+order stands, its title, its agent, tries, age, due time, the last note and a link to its newest task. `GET
+/api/work-orders` gives them (the open ones first, each with its agent's name and the title of its objective) and `GET
+/api/objectives` the objectives.
+
 ## Campaigns
 
 ```bash

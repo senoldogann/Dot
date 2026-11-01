@@ -92,7 +92,9 @@ remember of them (memory_search: their projects, their wishes, what they asked t
 never to do or not to touch), the record below, \
 the chats they had lately, and their mail and calendar when an account is connected. Then put at most three things on \
 your list with todo_add (in the tool group todos: turn it on with use_tools when it is off): each a concrete piece \
-of work you can do alone, which they would thank you for, which is not on the list yet and was not done, which they \
+of work you can do alone, which they would thank you for, which moves one of their objectives below forward when \
+there is one (say which in its why, and leave out what a work order below already covers), which is not on the \
+list yet and was not done, which they \
 did not say not to do, and which is not what was let go below for that reason. Put nothing \
 on it when nothing is worth it; one you put on it by mistake, take back with todo_drop (item 821). Change nothing \
 else. End with one sentence: what you put on the list, or that you found nothing.

@@ -240,7 +240,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   of a run that started is one write: its status, the scores of the notes it used and the event that tells of its end
   are stored together or not at all, and a delegated run whose end could not be stored is an error for the run that
   delegated it. A run that is stopped stops the runs it delegated, and its end is stored after theirs, so that its page
-  shows each of them ended; the page of a run stored the other way, before item 197, reads how they ended from the
+  shows each of them ended (the attempts of its chat's work orders too, item 907: a Stop of the lead, or the emergency
+  stop, stops them and cancels their orders, while a turn that ends on its own leaves them going); the page of a run stored the other way, before item 197, reads how they ended from the
   database. An end the database refused (a full disk, say) is tried again every half minute until it is stored, with the
   event that tells of it and what follows it (the chat's next message, a campaign's next session); until then the run
   stays as the database has it, and a Stop says its end is on its way. A run that could not be started is stored as
@@ -490,9 +491,9 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts`, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
-| Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821) |
+| Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools` |
-| Team            | `create_agent`, `create_team` (a team of agents, item 864), `message_agent`                                        |
+| Team            | `create_agent`, `create_team` (a team of agents, item 864), `message_agent`, `assign_work`, `work_orders`, `review_work` (work orders the agents work on without the lead waiting, item 907) |
 | Office          | `agents_now`, `read_agent_chat` (what the other agents do now and one's chat, item 890)                            |
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Pages           | `show_page`                                                                                                        |

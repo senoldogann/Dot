@@ -36,6 +36,7 @@ from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
     NO_PICKS,
+    WORK_ORDER_MOVES,
     WORKING_STATUSES,
     AgentLook,
     AgentRecord,
@@ -69,6 +70,9 @@ from dotagent.store.models import (
     MemoryScore,
     MemoryUseHow,
     MergedSource,
+    ObjectiveNote,
+    ObjectiveRecord,
+    ObjectiveStatus,
     PushSubscription,
     QueuedMessage,
     ReactionName,
@@ -99,6 +103,8 @@ from dotagent.store.models import (
     UnattendedRun,
     VaultRecord,
     WorkingRun,
+    WorkOrderRecord,
+    WorkOrderStatus,
 )
 from dotagent.store.stats import (
     RETRIED_CHATS,
@@ -160,6 +166,19 @@ CREATE TABLE IF NOT EXISTS todos (
 );
 CREATE INDEX IF NOT EXISTS todos_status ON todos(status, created_at);
 CREATE INDEX IF NOT EXISTS todos_title_key ON todos(title_key, updated_at);
+CREATE TABLE IF NOT EXISTS work_orders (
+    id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, title TEXT NOT NULL, brief TEXT NOT NULL, acceptance TEXT NOT NULL,
+    objective_id TEXT, status TEXT NOT NULL, attempts INTEGER NOT NULL, run_ids TEXT NOT NULL, run_id TEXT,
+    thread_id TEXT, lead_run_id TEXT, due_at REAL, tainted INTEGER NOT NULL, note TEXT NOT NULL,
+    created_at REAL NOT NULL, updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS work_orders_status ON work_orders(status, created_at);
+CREATE INDEX IF NOT EXISTS work_orders_objective ON work_orders(objective_id);
+CREATE TABLE IF NOT EXISTS objectives (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, why TEXT NOT NULL, measure TEXT NOT NULL, status TEXT NOT NULL,
+    notes TEXT NOT NULL, tainted INTEGER NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS objectives_status ON objectives(status, created_at);
 CREATE TABLE IF NOT EXISTS drafts (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL, channel TEXT NOT NULL, recipients TEXT NOT NULL, cc TEXT NOT NULL,
     subject TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, decided_at REAL,
@@ -883,6 +902,46 @@ def _todo(row: aiosqlite.Row) -> TodoRecord:
         attempts=row["attempts"],
         run_id=row["run_id"],
         note=row["note"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+_RUN_IDS: TypeAdapter[tuple[str, ...]] = TypeAdapter(tuple[str, ...])
+_OBJECTIVE_NOTES: TypeAdapter[tuple[ObjectiveNote, ...]] = TypeAdapter(tuple[ObjectiveNote, ...])
+
+
+def _work_order(row: aiosqlite.Row) -> WorkOrderRecord:
+    return WorkOrderRecord(
+        id=row["id"],
+        agent_id=row["agent_id"],
+        title=row["title"],
+        brief=row["brief"],
+        acceptance=row["acceptance"],
+        objective_id=row["objective_id"],
+        status=row["status"],
+        attempts=row["attempts"],
+        run_ids=_RUN_IDS.validate_json(row["run_ids"]),
+        run_id=row["run_id"],
+        thread_id=row["thread_id"],
+        lead_run_id=row["lead_run_id"],
+        due_at=row["due_at"],
+        tainted=bool(row["tainted"]),
+        note=row["note"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def _objective(row: aiosqlite.Row) -> ObjectiveRecord:
+    return ObjectiveRecord(
+        id=row["id"],
+        title=row["title"],
+        why=row["why"],
+        measure=row["measure"],
+        status=row["status"],
+        notes=_OBJECTIVE_NOTES.validate_json(row["notes"]),
+        tainted=bool(row["tainted"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -3899,6 +3958,194 @@ class Store:
         if cursor.rowcount == 0:
             raise NotFoundError("no such thing on Dot's list", {"todo_id": todo_id})
         return await self.get_todo(todo_id)
+
+    # ----- work orders (item 907) -----------------------------------------------------------
+
+    @_writing
+    async def add_work_order(
+        self,
+        agent_id: str,
+        title: str,
+        brief: str,
+        acceptance: str,
+        objective_id: str | None,
+        due_at: float | None,
+        run_id: str | None,
+        thread_id: str | None,
+        tainted: bool,
+    ) -> WorkOrderRecord:
+        """Record a piece of work handed to an agent: ``assigned``, with no attempt yet. ``run_id`` and ``thread_id``
+        are the run and the chat of the lead that handed it out."""
+        now: float = time.time()
+        record: WorkOrderRecord = WorkOrderRecord(
+            id=new_id("wo"),
+            agent_id=agent_id,
+            title=title,
+            brief=brief,
+            acceptance=acceptance,
+            objective_id=objective_id,
+            status="assigned",
+            attempts=0,
+            run_ids=(),
+            run_id=run_id,
+            thread_id=thread_id,
+            lead_run_id=run_id,
+            due_at=due_at,
+            tainted=tainted,
+            note="",
+            created_at=now,
+            updated_at=now,
+        )
+        await self._db.execute(
+            "INSERT INTO work_orders(id, agent_id, title, brief, acceptance, objective_id, status, attempts, run_ids,"
+            " run_id, thread_id, lead_run_id, due_at, tainted, note, created_at, updated_at)"
+            " VALUES(?, ?, ?, ?, ?, ?, 'assigned', 0, '[]', ?, ?, ?, ?, ?, '', ?, ?)",
+            (
+                record.id,
+                agent_id,
+                title,
+                brief,
+                acceptance,
+                objective_id,
+                run_id,
+                thread_id,
+                run_id,
+                due_at,
+                int(tainted),
+                now,
+                now,
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    async def get_work_order(self, order_id: str) -> WorkOrderRecord:
+        row = await self._one("SELECT * FROM work_orders WHERE id = ?", (order_id,))
+        if row is None:
+            raise NotFoundError("no such work order", {"order_id": order_id})
+        return _work_order(row)
+
+    async def list_work_orders(self, statuses: Sequence[WorkOrderStatus] | None, limit: int) -> list[WorkOrderRecord]:
+        """The work orders in ``statuses`` (every one for ``None``), the newest change first, ``limit`` at most."""
+        marks: str = ", ".join("?" for _ in statuses or ())
+        where: str = "" if statuses is None else f" WHERE status IN ({marks})"
+        rows = await self._all(
+            f"SELECT * FROM work_orders{where} ORDER BY updated_at DESC, rowid DESC LIMIT ?",
+            (*(statuses or ()), limit),
+        )
+        return [_work_order(row) for row in rows]
+
+    @_writing
+    async def mark_work_order_tainted(self, order_id: str) -> None:
+        """Mark a work order as holding content third parties can author, whatever its status (item 907): a mark is
+        never lost to a move made meanwhile, and never cleared."""
+        await self._db.execute("UPDATE work_orders SET tainted = 1 WHERE id = ?", (order_id,))
+        await self._db.commit()
+
+    @_writing
+    async def move_work_order(
+        self,
+        order_id: str,
+        status: WorkOrderStatus,
+        expected: Sequence[WorkOrderStatus],
+        *,
+        note: str | None = None,
+        new_run: str | None = None,
+        last_run: str | None = None,
+        agent_id: str | None = None,
+        lead_run_id: str | None = None,
+        tainted: bool = False,
+    ) -> WorkOrderRecord | None:
+        """Move a work order to ``status`` when it stands in one of ``expected`` (and, with ``last_run``, when that is
+        the run of its newest attempt), else change nothing and return ``None``: the end of an attempt that comes late,
+        or two verdicts at once, find the order moved already. A move ``WORK_ORDER_MOVES`` does not allow is an error;
+        one to the status the order has changes only the rest.
+        ``new_run`` starts an attempt (its run is recorded, the attempts counted); ``agent_id`` gives the order to
+        another agent; ``tainted`` can only mark an order, never clear it; ``note`` replaces the last note."""
+        current: WorkOrderRecord = await self.get_work_order(order_id)
+        if current.status not in expected or (last_run is not None and current.run_ids[-1:] != (last_run,)):
+            return None
+        if status != current.status and status not in WORK_ORDER_MOVES[current.status]:
+            raise InvalidValueError(
+                "a work order does not move like that", {"order_id": order_id, "from": current.status, "to": status}
+            )
+        run_ids: tuple[str, ...] = current.run_ids if new_run is None else (*current.run_ids, new_run)
+        await self._db.execute(
+            "UPDATE work_orders SET status = ?, attempts = ?, run_ids = ?, agent_id = ?, lead_run_id = ?, tainted = ?,"
+            " note = ?, updated_at = ? WHERE id = ?",
+            (
+                status,
+                len(run_ids),
+                dumps_compact(list(run_ids)),
+                current.agent_id if agent_id is None else agent_id,
+                current.lead_run_id if lead_run_id is None else lead_run_id,
+                int(current.tainted or tainted),
+                current.note if note is None else note,
+                time.time(),
+                order_id,
+            ),
+        )
+        await self._db.commit()
+        return await self.get_work_order(order_id)
+
+    # ----- objectives (item 908) ------------------------------------------------------------
+
+    @_writing
+    async def add_objective(self, title: str, why: str, measure: str, tainted: bool) -> ObjectiveRecord:
+        """Put an objective on the list, active, with no progress yet."""
+        now: float = time.time()
+        record: ObjectiveRecord = ObjectiveRecord(
+            id=new_id("obj"),
+            title=title,
+            why=why,
+            measure=measure,
+            status="active",
+            notes=(),
+            tainted=tainted,
+            created_at=now,
+            updated_at=now,
+        )
+        await self._db.execute(
+            "INSERT INTO objectives(id, title, why, measure, status, notes, tainted, created_at, updated_at)"
+            " VALUES(?, ?, ?, ?, 'active', '[]', ?, ?, ?)",
+            (record.id, title, why, measure, int(tainted), now, now),
+        )
+        await self._db.commit()
+        return record
+
+    async def get_objective(self, objective_id: str) -> ObjectiveRecord:
+        row = await self._one("SELECT * FROM objectives WHERE id = ?", (objective_id,))
+        if row is None:
+            raise NotFoundError("no such objective", {"objective_id": objective_id})
+        return _objective(row)
+
+    async def list_objectives(self, statuses: Sequence[ObjectiveStatus], limit: int) -> list[ObjectiveRecord]:
+        """The objectives in ``statuses``, the oldest first, ``limit`` at most."""
+        marks: str = ", ".join("?" for _ in statuses)
+        rows = await self._all(
+            f"SELECT * FROM objectives WHERE status IN ({marks}) ORDER BY created_at, rowid LIMIT ?",
+            (*statuses, limit),
+        )
+        return [_objective(row) for row in rows]
+
+    @_writing
+    async def update_objective(
+        self, objective_id: str, status: ObjectiveStatus | None, note: ObjectiveNote | None
+    ) -> ObjectiveRecord:
+        """Change where an objective stands, and add a dated line of progress: the notes only grow."""
+        current: ObjectiveRecord = await self.get_objective(objective_id)
+        notes: tuple[ObjectiveNote, ...] = current.notes if note is None else (*current.notes, note)
+        await self._db.execute(
+            "UPDATE objectives SET status = ?, notes = ?, updated_at = ? WHERE id = ?",
+            (
+                current.status if status is None else status,
+                _OBJECTIVE_NOTES.dump_json(notes).decode(),
+                time.time(),
+                objective_id,
+            ),
+        )
+        await self._db.commit()
+        return await self.get_objective(objective_id)
 
     async def get_draft(self, draft_id: str) -> DraftRecord:
         row = await self._one("SELECT * FROM drafts WHERE id = ?", (draft_id,))
