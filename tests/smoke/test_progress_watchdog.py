@@ -11,7 +11,7 @@ import pytest
 import pytest_asyncio
 
 from dotagent.agent.manager import RunManager
-from dotagent.agent.review import PROGRESS_TOOL
+from dotagent.agent.review import CHECKPOINT_TOOL, PROGRESS_TOOL
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
@@ -74,12 +74,15 @@ async def login_env() -> dict[str, str]:
     return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
 
 
-def _config(escalation: bool) -> AppConfig:
-    """The configuration of an eval run, with the scripted model as the review model too."""
+def _config(escalation: bool, checkpoint_steps: int = 0) -> AppConfig:
+    """The configuration of an eval run, with the scripted model as the review model too, and checkpoints every
+    ``checkpoint_steps`` acting steps (item 909; none by default here, so the other tests' scripts stay as they are)."""
     config: AppConfig = eval_config(load_default_config())
     return config.model_copy(
         update={
-            "agent": config.agent.model_copy(update={"stall_escalation": escalation}),
+            "agent": config.agent.model_copy(
+                update={"stall_escalation": escalation, "checkpoint_steps": checkpoint_steps}
+            ),
             "models": config.models.model_copy(update={"review": SCRIPTED_MODEL}),
         }
     )
@@ -223,3 +226,53 @@ async def test_without_escalation_a_run_that_repeats_itself_is_nudged_twice_and_
     assert classify_ending(played.record.status, played.record.result) == "stalled"
     assert all("read_file" in _offered(step) for step in played.steps)
     assert played.consults == ()
+
+
+def _verdict(on_track: bool, steps: Sequence[str] = ()) -> ScriptedTurn:
+    why: str = (
+        "It drafts summary.md and reads the notes, as the goal asks."
+        if on_track
+        else ("It keeps rewriting summary.md with drafts that drop what notes.txt says.")
+    )
+    return _turn(
+        ScriptedCall(
+            tool=CHECKPOINT_TOOL, arguments={"on_track": on_track, "diagnosis": why, "next_steps": list(steps)}
+        )
+    )
+
+
+async def test_a_checkpoint_of_a_long_run_gives_the_steps_back_when_it_drifts_and_nothing_when_it_is_on_track(
+    login_env: dict[str, str],
+) -> None:
+    """Item 909: a run that changes its steps shows no pattern; every few acting steps the review model is asked
+    whether it is on track. Off track, the run is given its steps back and the ladder climbs; on track, nothing."""
+    drafts: list[ScriptedTurn] = [_turn(_write("summary.md", f"draft {number}\n")) for number in range(6)]
+    back: str = "Write summary.md from what notes.txt says: the report ships on Friday."
+    turns: list[ScriptedTurn] = [*drafts[:3], _verdict(False, [back]), *drafts[3:], _verdict(True), DONE]
+    played: Played = await _play(_config(False, checkpoint_steps=3), login_env, turns)
+    assert played.record.status == "done", played.record.result
+    assert len(played.consults) == 2 and all(_offered(ask) == {CHECKPOINT_TOOL} for ask in played.consults)
+    assert "draft 2" in _said(played.consults[0])
+    # The owner's words stand apart from the digest, where a line that says it is the user's may come of a page.
+    assert "<<OWNER'S WORDS" in _said(played.consults[0]) and GOAL in _said(played.consults[0])
+    assert [(stall["action"], stall["reason"]) for stall in played.stalls] == [("nudge", "drift")]
+    assert played.stalls[0]["next_steps"] == [back]
+    # The step after the checkpoint carries the judge's steps back; the one after the second, on track, nothing new.
+    assert f"1. {back}" in _said(played.steps[3])
+    assert _said(played.steps[6]).count(f"1. {back}") == 1
+
+
+async def test_a_run_judged_off_track_at_every_checkpoint_is_stopped_with_what_it_tried(
+    login_env: dict[str, str],
+) -> None:
+    drafts: list[ScriptedTurn] = [_turn(_write("summary.md", f"draft {number}\n")) for number in range(9)]
+    off: ScriptedTurn = _verdict(False, ["Read notes.txt and write its one line into summary.md."])
+    turns: list[ScriptedTurn] = [*drafts[:2], off, *drafts[2:4], off, *drafts[4:6], off, *drafts[6:], DONE]
+    played: Played = await _play(_config(False, checkpoint_steps=2), login_env, turns)
+    assert [stall["action"] for stall in played.stalls] == ["nudge", "nudge", "stop"]
+    assert played.record.status == "failed"
+    assert classify_ending(played.record.status, played.record.result) == "stalled"
+    assert "review model judged that the steps are not getting closer" in played.record.result
+    # The stop says the judge's last diagnosis, in the result and on the timeline.
+    assert "drop what notes.txt says" in played.record.result
+    assert played.stalls[-1]["diagnosis"].startswith("It keeps rewriting summary.md")

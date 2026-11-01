@@ -28,7 +28,8 @@ from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
 
-type Pattern = Literal["repeat", "cycle", "failures", "revisiting"]
+# ``drift`` is no pattern of the steps: the checkpoint judge of a long run said it is not getting closer (item 909).
+type Pattern = Literal["repeat", "cycle", "failures", "revisiting", "drift"]
 type Rung = Literal["nudge", "replan", "consult", "ask", "stop"]
 
 # A cycle is looked for at these lengths, and counts when it has gone round twice.
@@ -144,6 +145,9 @@ class WatchState(FrozenModel):
     seen: frozenset[str]
     level: int
     quiet: int
+    # The checkpoints in a row the run was judged off track at (item 909): no quiet step lowers it, as checkpoints are
+    # far apart; one passed sets it back to none.
+    drifts: int = 0
 
 
 class Detection(FrozenModel):
@@ -161,7 +165,7 @@ class Alert(FrozenModel):
 
 
 def new_watch() -> WatchState:
-    return WatchState(window=(), seen=frozenset(), level=0, quiet=0)
+    return WatchState(window=(), seen=frozenset(), level=0, quiet=0, drifts=0)
 
 
 def limits_for(config: AgentConfig) -> Limits:
@@ -323,17 +327,49 @@ def advance(
         quiet: int = state.quiet + 1
         decays: bool = state.level > 0 and quiet >= limits.decay_steps
         return WatchState(
-            window=window, seen=seen, level=state.level - 1 if decays else state.level, quiet=0 if decays else quiet
+            window=window,
+            seen=seen,
+            level=state.level - 1 if decays else state.level,
+            quiet=0 if decays else quiet,
+            drifts=state.drifts,
         ), None
     level: int = min(state.level + 1, len(ladder))
     alert: Alert = Alert(level=level, rung=ladder[level - 1], pattern=detection.pattern, detail=detection.detail)
-    return WatchState(window=(), seen=seen, level=level, quiet=0), alert
+    return WatchState(window=(), seen=seen, level=level, quiet=0, drifts=state.drifts), alert
+
+
+def checkpoint_due(acted: int, every: int) -> bool:
+    """Whether the run's ``acted``-th acting step is a checkpoint (item 909): every ``every`` of them, none when
+    ``every`` is 0. A pattern of the steps answers what it sees at once; a run that changes its steps without getting
+    closer, or works on what the goal does not ask for, shows no pattern, and the checkpoint asks the review model."""
+    return every > 0 and acted > 0 and acted % every == 0
+
+
+DRIFT_DETAIL: str = (
+    "At a checkpoint of this long run, the review model judged that the steps are not getting closer to the goal."
+)
+
+
+def drift_alert(state: WatchState, ladder: tuple[Rung, ...]) -> tuple[WatchState, Alert]:
+    """The alert of a checkpoint the run did not pass (item 909): one rung up the ladder, as a pattern's alert climbs,
+    and never lower than the checkpoints in a row it did not pass, which the quiet steps between two checkpoints do not
+    lower (the pre-push review: forty steps apart, the twelve quiet steps that bring a rung down had set the ladder back
+    at every checkpoint, and a run judged off track again and again was never stopped)."""
+    drifts: int = state.drifts + 1
+    level: int = min(max(state.level + 1, drifts), len(ladder))
+    alert: Alert = Alert(level=level, rung=ladder[level - 1], pattern="drift", detail=DRIFT_DETAIL)
+    return WatchState(window=(), seen=state.seen, level=level, quiet=0, drifts=drifts), alert
+
+
+def checkpoint_passed(state: WatchState) -> WatchState:
+    """A checkpoint the run passed (item 909): the count of those in a row it did not pass starts again."""
+    return state.model_copy(update={"drifts": 0})
 
 
 def clear_window(state: WatchState) -> WatchState:
     """A fresh start of the work (the goal check sent the run back to it): the steps before it do not count towards the
     next alert, but the rung reached stays."""
-    return WatchState(window=(), seen=state.seen, level=state.level, quiet=state.quiet)
+    return WatchState(window=(), seen=state.seen, level=state.level, quiet=state.quiet, drifts=state.drifts)
 
 
 def restriction_for(rung: Rung, can_ask: bool) -> frozenset[str] | None:

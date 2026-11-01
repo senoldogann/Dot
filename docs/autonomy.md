@@ -279,9 +279,23 @@ ladder instead: a nudge; a re-plan, in which the next step may only plan or fini
 to you (not in yolo, scheduled, delegated or eval runs, where nobody would answer); and the stop. Twelve steps without
 an alert bring the ladder one rung down again, so a long run is not stopped for hiccups that are hours apart. Every
 alert shows in the timeline with what was seen and what was done. The ladder is off by default until evals show that it
-helps; without it, a run that keeps changing its steps without getting anywhere goes on using the model until you stop
-it. Give such a run a goal that can be checked, and keep an eye on the token count of a long one (`--verbose`, or the
-facts under More on the side panel's Task tab).
+helps.
+
+**Checkpoints of a long run** (item 909). A run that keeps changing its steps without getting closer, or that works on
+something its goal does not ask for, shows none of the patterns above. So every `checkpoint_steps` acting steps (`[agent]`,
+40; 0 never) the review model (`[models] review`) is shown the goal, your words to the run since (apart: a line of a
+page that says it is yours extends nothing), the plan and a digest of the steps, and says whether
+the run is still on track: on track, or when it cannot tell, nothing happens (a wrong alarm costs a run that was going
+well); off track, it says why and gives one to three steps back to the goal, which the run is given as a note, and the
+watchdog climbs a rung of its ladder as for a pattern, so a run judged off track again and again is stopped with what it
+tried. The timeline shows the check as a progress alert (`drift`) with the diagnosis and the steps. A checkpoint the
+review model cannot answer is skipped and logged (`checkpoint_failed`): a run is never stopped for a judge that failed.
+A run that ever read content others can author is marked again when the judge's note (or the consult rung's) comes,
+as the judge read what the run read, even after your steer cleared the mark.
+This is the Watchdog of DeepSeek Harness's Super-agent design (2026-11-01), which judges whether each worker makes
+substantive progress or drifts from its goal: in the owner's Dot no progress alert had fired in four days, while runs
+of 130 to 230 tool calls ran on, one for an hour until it was stopped by hand. Give a run a goal that can be checked,
+and keep an eye on the token count of a long one (`--verbose`, or the facts under More on the side panel's Task tab).
 
 **Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off, or a run of
 `dotx run` whose terminal was closed (or that got SIGTERM) or whose command died, can go on where it stopped: Continue
