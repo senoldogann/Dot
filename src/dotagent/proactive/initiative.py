@@ -542,10 +542,22 @@ class Initiative:
         """Count a try of ``todo`` that ``ended`` without doing it: to do again, or let go and told once it was tried
         ``[initiative] attempts`` times."""
         store: Store = self._runtime.store
+        config: InitiativeConfig = self._runtime.config.initiative
         tried: int = todo.attempts + 1
+        waiting: bool = await store.count_left_in_chat(ended.thread_id) > 0
+        # A try that spent more than [initiative] retry_under_tokens and did not do it is not made again the same way
+        # (item 913): on the owner's Mac three tries of one application spent 31.6 million tokens on a puzzle its form
+        # asked for, each one finding what the one before had.
+        spent: int = ended.input_tokens + ended.output_tokens
+        if not waiting and config.retry_under_tokens > 0 and spent > config.retry_under_tokens:
+            millions: str = f"{spent / 1_000_000:.1f}"
+            await self._let_go(
+                todo, tried, ended.id, one_line(f"Spent {millions}M tokens without doing it: {note}", _NOTE_CHARS)
+            )
+            return
         # One that left the owner what only they decide (item 868) stays to do, its try counted, while it waits for
         # their answer; it is let go once it is not waiting and has no try left (:meth:`_next`).
-        if tried < self._runtime.config.initiative.attempts or await store.count_left_in_chat(ended.thread_id) > 0:
+        if tried < config.attempts or waiting:
             await store.set_todo(todo.id, "open", tried, ended.id, note)
             return
         await self._let_go(todo, tried, ended.id, note)
@@ -555,7 +567,7 @@ class Initiative:
         await self._runtime.store.set_todo(todo.id, "dropped", tried, run_id, note)
         await tell_owner(
             self._runtime.bus,
-            f"Dot let go of a thing after {tried} tries",
+            f"Dot let go of a thing after {tried} {'try' if tried == 1 else 'tries'}",
             one_line(f"{todo.title}: {note}", _TELL_CHARS),
             f"#/runs/{run_id}" if run_id is not None else _LIST_ROUTE,
         )

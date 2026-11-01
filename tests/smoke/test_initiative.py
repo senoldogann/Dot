@@ -67,6 +67,7 @@ def _config(runs_per_day: int = 0, peak: tuple[int, ...] = (), grouped: bool = F
     if grouped:
         # Its tools in groups, as a run of the owner's 173 tools has them, so that what is on from its start shows.
         config = config.model_copy(update={"agent": config.agent.model_copy(update={"tool_surface": "grouped"})})
+    # No bound of tokens on a try but in the test of it (item 913).
     initiative = config.initiative.model_copy(
         update={
             "idle_minutes": 10.0,
@@ -74,6 +75,7 @@ def _config(runs_per_day: int = 0, peak: tuple[int, ...] = (), grouped: bool = F
             "attempts": 2,
             "runs_per_day": runs_per_day,
             "peak_hours_utc": peak,
+            "retry_under_tokens": 0,
             **more,
         }
     )
@@ -1148,3 +1150,23 @@ async def test_the_look_judges_on_its_own_model_and_sees_what_came_of_what_was_d
         assert (await runtime.store.get_run(did.id)).model == runtime.config.models.main
         [groups] = await runtime.store.events_of_kind(did.id, "tool_groups", 1)
         assert "todos" in groups.data["on"], groups.data
+
+
+async def test_a_try_that_spent_past_its_bound_lets_the_thing_go_at_once(login_env: dict[str, str]) -> None:
+    """Item 913: a failed try that spent more than [initiative] retry_under_tokens is not made again the same way."""
+    async with _dot(login_env, [_finish("The form wants a puzzle solved.", False)], retry_under_tokens=500) as (
+        runtime,
+        manager,
+    ):
+        todo: TodoRecord | str = await add_todo(runtime.store, "Send the application", "Asked", "owner", None, False)
+        assert isinstance(todo, TodoRecord)
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        async with runtime.bus.subscribe(None) as subscription:
+            await initiative.tick(10_000.0)
+            await _settled(initiative)
+            told: list[EventRecord] = await _told(subscription)
+        dropped: TodoRecord = await runtime.store.get_todo(todo.id)
+        assert (dropped.status, dropped.attempts) == ("dropped", 1)
+        assert dropped.note.startswith("Spent 0.0M tokens without doing it: The form wants a puzzle solved."), dropped
+        assert [event.data["title"] for event in told] == ["Dot let go of a thing after 1 try"]

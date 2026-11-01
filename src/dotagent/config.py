@@ -805,6 +805,9 @@ class InitiativeConfig(FrozenModel):
     peak_hours_utc: tuple[int, ...] = ()
     # The model of the run that looks for work (item 910): the judgement of what is worth doing; "" is [models] main.
     look_model: str = ""
+    # A try that spent more tokens than this and did not do its thing lets it go, rather than trying it the same way
+    # again (item 913); 0: no such bound.
+    retry_under_tokens: int = Field(default=0, ge=0)
 
     @field_validator("look_model")
     @classmethod

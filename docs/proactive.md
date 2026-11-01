@@ -249,30 +249,33 @@ In `yolo` your own chats ask you before a payment, a message or mail sent for yo
 schedule's run in one of your chats the review model judges a message or a post, and a payment is handed to you; a
 schedule's own chat asks nothing of the kind.
 
-A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or
-let go. Done, it is marked so with the first line of the run's answer and you are told ("Dot did on its own", the push,
-the desktop, iMessage when it is on). A run that failed leaves it to do, up to `attempts` (3) runs; then it is let go
-and you are told. A run that finds you said not to do the work (a rule of yours it remembers or read in a chat) does
-none of it and lets the thing go itself, with `todo_drop` and your words as the reason; it is not tried again, and you
-are told once ("Dot let go of a thing you said not to do", item 878: on 2026-10-31 a look listed a chapter of a
-thesis its owner had said never to touch, and three runs each refused it before it was let go). A thing let go while
-its run worked, by that run or by you, stays let go however the run ends. A run you stopped lets it go at once; one the daemon's stop or the emergency stop ended (the stop of
-every run, or the STOP file the run saw as it worked, item 790) leaves it to do; one the daemon was doing when it shut
-down is to do again when it starts, and one it was doing when it stopped
-without shutting down (a crash) counts that try, so a thing that brings Dot down is let go after `attempts` tries. A
-thing tried as often as `attempts` allows, after the limit was lowered, is let go, and you are told. A thing whose run the owner resumed
-is left to that resume while it works, and done once it ended done; another message in its chat is no sign it was done.
-A thing whose chat holds a question or a step left for you, unanswered, or a run at work, is not started again in
-another chat (item 868), the urgent ones too; its tries are not used up while a question waits. A run of its chat that
-goes on from its last one takes it over: a resume, the run your answer to its question started, or the one your answer
-to a step it kept started (each carries the goal of the run it goes on from; a message you write is a goal of its
-own). Its end is the thing's, as one of its own runs' is: done, the thing is done and you are told; failed, that is
-a try; stopped by you, the thing is let go. A question you skip, or a step whose time ran out, ends the wait, and the
-try that left it stays counted: a thing whose last try it was is let go then, and you are told.
+A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or let go.
+Done, it is marked so with the first line of the run's answer and you are told ("Dot did on its own", the push, the
+desktop, iMessage when it is on). A run that failed leaves it to do, up to `attempts` (3) runs; then it is let go and
+you are told. A run that finds you said not to do the work (a rule of yours it remembers or read in a chat) does none of
+it and lets the thing go itself, with `todo_drop` and your words as the reason; it is not tried again, and you are told
+once. ("Dot let go of a thing you said not to do", item 878: on 2026-10-31 a look listed a chapter of a thesis its owner
+had said never to touch, and three runs each refused it before it was let go). A failed try that spent more than
+`retry_under_tokens` (5 million, every model call of the run counted) lets the thing go at once and you are told, rather
+than a second try the same way (item 913: three tries of one application spent 31.6 million tokens on a puzzle its form
+asked for); a try that left you a question stays to do. A thing let go while its run worked, by that run or by you,
+stays let go however the run ends. A run you stopped lets it go at once; one the daemon's stop or the emergency stop
+ended (the stop of every run, or the STOP file the run saw as it worked, item 790) leaves it to do; one the daemon was
+doing when it shut down is to do again when it starts, and one it was doing when it stopped without shutting down (a
+crash) counts that try, so a thing that brings Dot down is let go after `attempts` tries. A thing tried as often as
+`attempts` allows, after the limit was lowered, is let go, and you are told. A thing whose run the owner resumed is left
+to that resume while it works, and done once it ended done; another message in its chat is no sign it was done. A thing
+whose chat holds a question or a step left for you, unanswered, or a run at work, is not started again in another chat
+(item 868), the urgent ones too; its tries are not used up while a question waits. A run of its chat that goes on from
+its last one takes it over: a resume, the run your answer to its question started, or the one your answer to a step it
+kept started (each carries the goal of the run it goes on from; a message you write is a goal of its own). Its end is
+the thing's, as one of its own runs' is: done, the thing is done and you are told; failed, that is a try; stopped by
+you, the thing is let go. A question you skip, or a step whose time ran out, ends the wait, and the try that left it
+stays counted: a thing whose last try it was is let go then, and you are told.
 
 The settings are in `[initiative]` of `defaults.toml`: `idle_minutes`, `gap_minutes`, `look_every_hours`, `attempts`,
 `runs_per_day`, `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do), `peak_hours_utc`,
-and `look_model`; the switch and the time of the last look are kept in the
+`look_model` and `retry_under_tokens`; the switch and the time of the last look are kept in the
 database.
 
 ### Objectives

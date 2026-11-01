@@ -1078,6 +1078,10 @@ peak_hours_utc = []
 # stronger model here costs little, as the look is a small share of what Dot's own work spends (8% on the owner's Mac,
 # 2026-10-29 to 11-01), and the runs that do the work stay on [models] main.
 look_model = ""
+# A try that spent more tokens than this (every model call of the run) and did not do its thing lets it go, and you are
+# told, rather than trying it again the same way (item 913: three tries of one application spent 31.6 million). 0: no
+# such bound.
+retry_under_tokens = 5000000
 
 [skills]
 # Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML
