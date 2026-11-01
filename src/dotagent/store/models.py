@@ -895,6 +895,17 @@ class HarnessPruned(FrozenModel):
     experiences: int
 
 
+class HarnessTask(FrozenModel):
+    """A task the improvement loop wrote from the owner's run ``from_run`` and code admitted (item 904): ``task`` is the
+    eval task as JSON (:class:`dotagent.evals.types.EvalTask`), ``habit`` the line it tests."""
+
+    id: str
+    from_run: str
+    habit: str
+    task: str
+    created_at: float
+
+
 class HarnessExperience(FrozenModel):
     """An experience the loop kept (item 391): the shape of situation it applies to (``cue``), the lesson, the
     evidence it rests on, how sure the writer was, the step and version it came from, and whether the run it was

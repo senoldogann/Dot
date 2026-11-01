@@ -298,9 +298,47 @@ hand with `dotx harness step`. Its provenance (version ← probe ← run, experi
 is a graph the loop keeps, so that what Dot changed about itself, when, and on what evidence, can always be read (the
 command line and the API read it; drawing it on the page is left for later).
 
+### Tasks made of your own runs
+
+The pool is passed by a capable model under any text: from 2026-10-29 to 11-01 the probes passed 32 attempts of 34,
+and the candidate of each night, written to answer the run that went worst (a page on a local port it could not open,
+an agent that failed and was left), came out the same as the base on tasks that had nothing to do with that run. So the
+step also makes the run it reads into a task of its own (item 904, `harness/tasks.py`, `harness/own.py`), as the
+evaluation guides advise: start from real failures.
+
+- **The task writer** (`write_harness_task`, on the proposer's model) reads the run as the proposer does and writes one
+  small task of files that tests the habit the run lacked: a goal, at most six files of 4,000 characters, checks of the
+  files and of the answer (no pattern, no command), whether it can be done (or the right end is an honest report of why
+  not), a reference solution of file tools ending with `finish`, and the habit in a line. Its facts are made up; it reads
+  no page and runs no command. When the run's trouble cannot be made into such a task, it answers none.
+- **Code admits it, and no model does.** Every path stays inside the workspace: a seed's, a check's and a reference
+  call's own `path` and `glob`, and no text of the task (its goal, files, checks, the arguments of its reference, its
+  habit) names a home folder (`~`), a variable (`$HOME`), an absolute path or a climb (`../`), which the file tools would
+  expand or take as they are. The reference calls only `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`,
+  `search_files` and `finish`, and every text is asked what a habit is (no secret, link, e-mail address, path in a home
+  folder, account name, imitation of the prompt or character that does not print); a task that fails is asked again
+  with why, as any role's answer. Then three plays through the scripted
+  model, in throw-away homes and at no model's cost, prove it fair: its reference passes it, and both a run that does
+  nothing and says it is done and one that does nothing and gives up fail it. A task that fails a play is not kept, and
+  the night's record says which play (`no task: a run that does nothing and claims it is done passes it`).
+- **A run that read content third parties can author is made into no task**, and the writer is not asked: what it read
+  could shape a task that a model then plays with a run's rights. A run is asked about once: a task refused or found
+  unfair is not drafted and played again on a later night.
+- **A task of the loop is played under the balanced preset at least**, whatever yours is: a write or a command outside
+  the workspace asks, and an attempt declines what it asks. A model wrote the task, so what it steers a run to do is kept
+  to the scratch workspace; a task of the catalog, which a developer wrote, plays as your preset says.
+- **Where it is played.** The task made tonight is scored on first, by the base and every candidate, so a candidate that
+  answers the run is judged where the run went wrong. The tasks kept (the newest 24) join the pool, so the base tries one
+  it does not know yet, and one it fails sometimes has headroom and is scored on, as a task of the catalog is. A night
+  with too few tasks with headroom to judge a candidate still makes the run that went worst into a task (without taking
+  the run: the next night that proposes still learns from it) and tries it, so that a pool passed in full never leaves the
+  loop with nothing to learn on.
+- **What you see.** The night's row on the page says `Own test:` and the task it kept (`own-1a2b3c4d tests: Count what the
+  file holds before writing the number`) or why it kept none. The step's record holds it as `task`.
+
 ## The roles
 
-Four roles are built for the step, and three of them play it today: the step chooses between candidates by their
+Five roles are built for the step, and four of them play it today (the task writer is above): the step chooses between candidates by their
 passes, so it does not call the selector yet, and `[harness] selector` has no effect until it does. Each role is a model
 asked one question that it answers with one tool call, as the review model answers Dot's other questions; the proposer,
 the composer and the experience writer may write that call's JSON as their whole answer instead, in a code fence or not,

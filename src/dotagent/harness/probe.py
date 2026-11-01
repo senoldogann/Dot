@@ -87,6 +87,17 @@ class ProbeAsk(FrozenModel):
     scripted: bool
     max_minutes: float
     max_tokens: int
+    # The tasks of ``tasks`` the loop wrote (item 904), whole: the process that plays them has no store to read them
+    # from. A task named here is played as given, a task of the catalog by its id.
+    own: tuple[EvalTask, ...] = ()
+
+
+def tasks_of(ask: ProbeAsk) -> tuple[EvalTask, ...]:
+    """The tasks ``ask`` names, in its order: those the loop wrote as given, the others from the catalog."""
+    given: dict[str, EvalTask] = {task.id: task for task in ask.own}
+    named: list[str] = [task_id for task_id in ask.tasks if task_id not in given]
+    catalog: dict[str, EvalTask] = {task.id: task for task in select_tasks(named)} if named else {}
+    return tuple(given[task_id] if task_id in given else catalog[task_id] for task_id in ask.tasks)
 
 
 class ProbeReport(FrozenModel):
@@ -142,7 +153,7 @@ async def probe(
     """Play ``ask`` in this process, one attempt after another, and stop before the attempt that would pass its budget,
     taking the next attempt to cost what the earlier ones did (:func:`over_budget`). ``config`` is an eval
     configuration (:func:`dotagent.evals.runner.eval_config`)."""
-    tasks: tuple[EvalTask, ...] = select_tasks(list(ask.tasks))
+    tasks: tuple[EvalTask, ...] = tasks_of(ask)
     started: float = time.monotonic()
     cards: list[Scorecard] = []
     tokens: int = 0

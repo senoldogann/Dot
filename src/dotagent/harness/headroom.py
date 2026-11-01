@@ -73,9 +73,11 @@ def records_of(attempts: Sequence[Attempt], window: int) -> dict[str, TaskRecord
     }
 
 
-def plan_scoring(config: HarnessConfig, records: dict[str, TaskRecord]) -> ScoringPlan:
-    """The tasks a step plays under the version in use whose ``records`` these are (:func:`records_of`)."""
-    pool: tuple[str, ...] = pool_of(config)
+def plan_scoring(config: HarnessConfig, records: dict[str, TaskRecord], own: Sequence[str] = ()) -> ScoringPlan:
+    """The tasks a step plays under the version in use whose ``records`` these are (:func:`records_of`), from the pool
+    and the tasks the loop wrote from the owner's runs (``own``, item 904), which a capable model does not pass under
+    any text as it does the pool's."""
+    pool: tuple[str, ...] = tuple(dict.fromkeys((*pool_of(config), *own)))
     known: list[TaskRecord] = [records[task] for task in pool if task in records]
     with_headroom: list[TaskRecord] = sorted(
         (record for record in known if record.passes < record.attempts),

@@ -33,6 +33,7 @@ from dotagent.evals.types import EvalTask, FileSeed, SkillSeed
 from dotagent.events import Subscription
 from dotagent.harness.components import NO_HARNESS, GivenText
 from dotagent.harness.service import install
+from dotagent.harness.tasks import OWN_PREFIX
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatProvider
@@ -189,6 +190,17 @@ def site_config(config: AppConfig) -> AppConfig:
     """The configuration of an attempt at a task with a site of its own: the web tools may reach the loopback address
     the site is served on."""
     return config.model_copy(update={"web": config.web.model_copy(update={"allow_private_hosts": True})})
+
+
+def held_to_workspace(config: AppConfig, task: EvalTask) -> AppConfig:
+    """The configuration of an attempt at a task the improvement loop wrote (item 904, an id of
+    :data:`dotagent.harness.tasks.OWN_PREFIX`): its run under the balanced preset at least, which asks before a write or
+    a command outside the workspace, and an attempt declines what it asks. A model wrote the task from the owner's run,
+    so what it steers a run to do is kept to the scratch workspace, as a task of the catalog, which a developer wrote,
+    need not be (the security review). A task of the catalog is played as the owner's preset says."""
+    if not task.id.startswith(OWN_PREFIX) or config.policy.preset != "aggressive":
+        return config
+    return config.model_copy(update={"policy": config.policy.model_copy(update={"preset": "balanced"})})
 
 
 def with_servers(config: AppConfig, task: EvalTask) -> AppConfig:
@@ -375,7 +387,8 @@ async def _attempt(
         stand_in: ChatProvider | None = ScriptedProvider(_SCRIPTED_PROVIDER, placed.reference) if scripted else None
         await asyncio.to_thread(seed_skills, skills_dir(), task.skills)
         runtime: Runtime = await open_runtime(
-            with_servers(site_config(config) if task.site else config, task), {**login_env, **_ATTEMPT_ENV}
+            with_servers(held_to_workspace(site_config(config) if task.site else config, task), task),
+            {**login_env, **_ATTEMPT_ENV},
         )
         try:
             outcome: TaskOutcome = await _run_in(runtime, placed, model, stand_in, attempt, harness)

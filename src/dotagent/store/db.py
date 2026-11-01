@@ -62,6 +62,7 @@ from dotagent.store.models import (
     HarnessState,
     HarnessStep,
     HarnessStepState,
+    HarnessTask,
     HarnessVersion,
     MemoryOrder,
     MemoryRecord,
@@ -290,6 +291,9 @@ CREATE TABLE IF NOT EXISTS harness_probes (
 );
 CREATE INDEX IF NOT EXISTS harness_probes_step ON harness_probes(step_id);
 CREATE INDEX IF NOT EXISTS harness_probes_version ON harness_probes(version_id);
+CREATE TABLE IF NOT EXISTS harness_tasks (
+    id TEXT PRIMARY KEY, from_run TEXT NOT NULL, habit TEXT NOT NULL, task TEXT NOT NULL, created_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS harness_experiences (
     id TEXT PRIMARY KEY, step_id TEXT NOT NULL, version_id TEXT, cue TEXT NOT NULL, lesson TEXT NOT NULL,
     evidence TEXT NOT NULL, confidence TEXT NOT NULL, created_at REAL NOT NULL
@@ -1783,6 +1787,45 @@ class Store:
             [(step_id, version_id, label, *card, created_at) for card in cards],
         )
         await self._db.commit()
+
+    @_writing
+    async def add_harness_task(self, task: HarnessTask, keep: int) -> list[str]:
+        """Keep a task the loop wrote (item 904), and of all of them the newest ``keep`` alone: the ids of those let go
+        come back. The attempts played on one stay, under its id, with the steps that played them."""
+        await self._db.execute(
+            "INSERT INTO harness_tasks(id, from_run, habit, task, created_at) VALUES(?, ?, ?, ?, ?)",
+            (task.id, task.from_run, task.habit, task.task, task.created_at),
+        )
+        rows = await self._all(
+            "SELECT id FROM harness_tasks ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?", (keep,)
+        )
+        gone: list[str] = [str(row["id"]) for row in rows]
+        await self._db.executemany("DELETE FROM harness_tasks WHERE id = ?", [(task_id,) for task_id in gone])
+        await self._db.commit()
+        return gone
+
+    async def harness_tasks(self) -> list[HarnessTask]:
+        """The tasks the loop wrote and keeps (item 904), newest first."""
+        rows = await self._all("SELECT * FROM harness_tasks ORDER BY created_at DESC, id DESC", ())
+        return [
+            HarnessTask(
+                id=row["id"],
+                from_run=row["from_run"],
+                habit=row["habit"],
+                task=row["task"],
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+
+    async def harness_task_of_run(self, run_id: str) -> HarnessTask | None:
+        """The task the loop wrote from ``run_id``, if it keeps one."""
+        row = await self._one("SELECT * FROM harness_tasks WHERE from_run = ? ORDER BY created_at DESC", (run_id,))
+        if row is None:
+            return None
+        return HarnessTask(
+            id=row["id"], from_run=row["from_run"], habit=row["habit"], task=row["task"], created_at=row["created_at"]
+        )
 
     async def harness_probes_of(self, step_id: str) -> list[HarnessProbe]:
         rows = await self._all("SELECT * FROM harness_probes WHERE step_id = ? ORDER BY id", (step_id,))

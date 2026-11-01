@@ -224,6 +224,8 @@ function stepRow(step) {
           ]),
         ),
         said === "" ? null : el("div", { class: "harness-said" }, said),
+        // The test the night made of the owner's run (item 904): the one it kept, or why it kept none.
+        typeof facts.task === "string" ? el("div", { class: "harness-said muted" }, `Own test: ${facts.task}`) : null,
       ),
     ),
   );

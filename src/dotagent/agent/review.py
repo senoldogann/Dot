@@ -48,6 +48,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.harness.components import component_problem, description_problem, names_a_task, normalized
+from dotagent.harness.tasks import TaskDraft, draft_problem
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref, unavailable_reason
 from dotagent.llm.types import (
@@ -64,6 +65,7 @@ from dotagent.llm.types import (
 from dotagent.policy.drafting import DraftedRule, RuleDraft, rule_from_draft
 from dotagent.policy.types import ActionInfo
 from dotagent.secrets import known_secrets
+from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.schema import tool_parameters_schema
 
 log = get_logger(__name__)
@@ -84,6 +86,7 @@ REVISE_TOOL: str = "revise_skill"
 # The roles of the harness (item 390, docs/harness.md).
 PROPOSE_TOOL: str = "propose_harness"
 COMPOSE_TOOL: str = "compose_harness"
+TASK_TOOL: str = "write_harness_task"
 SELECT_TOOL: str = "select_answer"
 EXPERIENCE_TOOL: str = "write_experience"
 # The pairs of notes one question of the outdated judge shows at most (item 306).
@@ -908,6 +911,19 @@ _PROPOSER_SCOPE: dict[str, str] = {
         "about a tool or a site. Never invent an authority or a source."
     ),
 }
+_TASK_WRITER_SYSTEM: str = (
+    f"You write a test for the harness. {_HARNESS_SHARED}\n\nYou read what one run did that went badly and write one "
+    "small, self-contained task of files that tests the habit the run lacked: a run with that habit passes it, a run "
+    "without it fails. It is not the run's goal again: its facts are made up, its few files hold all it needs, and it "
+    "reads no page, sends nothing and runs no command. Its checks judge the end, the files and the answer. A run that "
+    "does nothing and claims it is done fails them, and so does one that gives up: for a task that cannot be done, the "
+    "right end is an honest report that says why, so a check asks the answer for the reason. The reference is a "
+    "solution: turns of calls of read_file, write_file, edit_file, list_dir, find_files or search_files, with the "
+    f"arguments those tools take, the last turn calling {FINISH_TOOL} alone with answer (the report) and success "
+    "(whether the task was done). Code plays the reference and the two idle answers before the task is kept. When the "
+    "run's trouble cannot be made into such a task (it was about a page, a person, money or the weather), answer with "
+    f"task null. Answer by calling {TASK_TOOL} exactly once."
+)
 _COMPOSER_SYSTEM: str = (
     f"You compose one version of the harness. {_HARNESS_SHARED}\n\nYou read the base texts, the candidates "
     "written from the same run, the moments behind each and, when a candidate was probed, what its probe showed "
@@ -967,6 +983,22 @@ class ProposalRequest(FrozenModel):
     experience: tuple[str, ...]
     scope: ProposalScope
     bounds: HarnessBounds
+
+
+class TaskRequest(FrozenModel):
+    """What the task writer is shown (item 904): the run as the proposer sees it."""
+
+    goal: str
+    digest: str
+    signals: tuple[str, ...]
+    answer: str
+    reached_goal: bool
+
+
+class HarnessTaskAnswer(FrozenModel):
+    task: TaskDraft | None = Field(
+        description="The task that tests the habit the run lacked, or null when its trouble cannot be made into one."
+    )
 
 
 def _blank_text(value: object) -> bool:
@@ -1191,6 +1223,9 @@ _RULE_SPEC: ToolSpec = ToolSpec(
 )
 _PROPOSE_SPEC: ToolSpec = ToolSpec(
     name=PROPOSE_TOOL, description="Give your candidate, or keep.", parameters=tool_parameters_schema(HarnessProposal)
+)
+_TASK_SPEC: ToolSpec = ToolSpec(
+    name=TASK_TOOL, description="Give the task, or null.", parameters=tool_parameters_schema(HarnessTaskAnswer)
 )
 _COMPOSE_SPEC: ToolSpec = ToolSpec(
     name=COMPOSE_TOOL,
@@ -2411,6 +2446,58 @@ def harness_proposer_for(
         return await _decide_checked(question, proposal_check(request, held))
 
     return propose
+
+
+def _task_prompt(request: TaskRequest, nonce: str) -> str:
+    return "\n\n".join(
+        (
+            _fenced("GOAL", nonce, request.goal),
+            _fenced("DIGEST", nonce, request.digest),
+            _fenced("WHAT WENT WRONG ON THE WAY", nonce, _listed(request.signals)),
+            _fenced("ANSWER", nonce, request.answer),
+            f"The run reached its goal: {'yes' if request.reached_goal else 'no'}.",
+        )
+    )
+
+
+def task_check(held: Sequence[str]) -> Callable[[HarnessTaskAnswer], HarnessTaskAnswer]:
+    """The check of a task the writer gives (item 904): none, or one :func:`dotagent.harness.tasks.draft_problem` finds
+    nothing wrong with (the paths inside the workspace, the reference of file tools ending with finish, every text one
+    the gate for learned texts lets through, none of the secrets ``held``). Whether it is fair is played after."""
+
+    def check(answer: HarnessTaskAnswer) -> HarnessTaskAnswer:
+        if answer.task is not None:
+            problem: str | None = draft_problem(answer.task, held)
+            if problem is not None:
+                raise ProviderProtocolError(f"the task cannot be kept: {problem}", {"task": problem})
+        return answer
+
+    return check
+
+
+def harness_task_writer_for(
+    router: ModelRouter, model: str, timeout_s: float, session_key: str, run_id: str | None
+) -> Callable[[TaskRequest], Awaitable[HarnessTaskAnswer]]:
+    """The task writer of the harness (item 904), asking ``model`` about the run ``run_id``: a task of files that
+    tests the habit the run lacked, or none."""
+
+    async def write(request: TaskRequest) -> HarnessTaskAnswer:
+        nonce: str = secrets.token_hex(6)
+        question: _Question[HarnessTaskAnswer] = _Question(
+            router=router,
+            review_model=model,
+            timeout_s=timeout_s,
+            session_key=session_key,
+            origin=CallOrigin(run_id=run_id, purpose="harness_task"),
+            system=_TASK_WRITER_SYSTEM,
+            prompt=_task_prompt(request, nonce),
+            tool=_TASK_SPEC,
+            verdict_type=HarnessTaskAnswer,
+        )
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
+        return await _decide_checked(question, task_check(held))
+
+    return write
 
 
 def harness_composer_for(

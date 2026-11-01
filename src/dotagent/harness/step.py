@@ -30,7 +30,7 @@ from dotagent.core.errors import DotError, InvalidValueError, ProviderProtocolEr
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.evals.runner import SCRIPTED_MODEL
-from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.evals.types import EvalTask, ScriptedCall, ScriptedTurn
 from dotagent.harness.components import COMPONENTS, NO_HARNESS, GivenText, HarnessText
 from dotagent.harness.contrast import (
     CONFIRM_FACTOR,
@@ -42,6 +42,7 @@ from dotagent.harness.contrast import (
     contrast_text,
 )
 from dotagent.harness.headroom import Attempt, ScoringPlan, plan_scoring, records_of
+from dotagent.harness.own import own_tasks, write_task
 from dotagent.harness.probe import (
     BASE,
     CONFIRM_BASE,
@@ -225,8 +226,10 @@ async def _carry_out(
     scoring: ScoringPlan,
     prober: Prober,
     now: float,
+    task_run: str | None = None,
 ) -> _Outcome:
-    """The step ``step`` under ``base``, the version in use when it began, which ``scoring`` was planned for."""
+    """The step ``step`` under ``base``, the version in use when it began, which ``scoring`` was planned for; on a
+    step that only tries the pool, ``task_run`` is the run a task is written from (item 904), which it does not take."""
     store: Store = runtime.store
     config: HarnessConfig = runtime.config.harness
     # The values Dot holds, which a probe's own home cannot know: a stored text is played, or shown to a role, only as
@@ -236,6 +239,8 @@ async def _carry_out(
     held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     base_text: GivenText = NO_HARNESS if base is None else given_text(base, held)
     errors: list[str] = []
+    # The tasks the loop wrote from the owner's runs (item 904), which a probe is given whole.
+    own: dict[str, EvalTask] = await own_tasks(store)
     # Probe: the base first, then each candidate within what is left of the budget; a probe with nothing left plays
     # nothing, and its candidate comes out unclear.
     started: float = time.monotonic()
@@ -257,6 +262,7 @@ async def _carry_out(
             scripted=plan.scripted,
             max_minutes=max(0.0, plan.minutes - (time.monotonic() - started) / 60.0),
             max_tokens=max(0, plan.tokens - spent),
+            own=tuple(own[task] for task in tasks if task in own),
         )
         report: ProbeReport = nothing_played(ask) if over_budget(ask, 0, 0.0, 0) is not None else await prober(ask)
         spent += report.tokens
@@ -272,7 +278,22 @@ async def _carry_out(
     # Until enough tasks have headroom (item 719), the base alone tries a few tasks of the pool it knows least and
     # nothing is proposed.
     if not scoring.ready:
-        return await _calibrate(scoring, config, lambda tasks: played(BASE, base, tasks), errors)
+        calibrated: ScoringPlan = scoring
+        task_note: str | None = None
+        if task_run is not None:
+            try:
+                written, task_note = await write_task(runtime, task_run, prober)
+            except DotError as exc:
+                log.warning("harness_task_failed", step=step.id, error=exc.message)
+                errors.append(f"the task writer failed: {exc.message}")
+                written, task_note = None, "no task: the writer failed"
+            if written is not None:
+                own[written.id] = written
+                calibrated = scoring.model_copy(update={"calibrated": (written.id, *scoring.calibrated)})
+        outcome: _Outcome = await _calibrate(calibrated, config, lambda tasks: played(BASE, base, tasks), errors)
+        if task_note is None:
+            return outcome
+        return outcome.model_copy(update={"facts": {**outcome.facts, "task_run": task_run, "task": task_note}})
     from_run: str | None = step.from_run
     if from_run is None:
         return _Outcome(
@@ -280,6 +301,20 @@ async def _carry_out(
             facts={"reason": "no run of the owner's ended since the last step that took one, a week back at most"},
             error=None,
         )
+    # The run as a task (item 904): a candidate written from the run is scored where the run went wrong, which the
+    # tasks of the pool, passed under any text, cannot show. A scripted check writes none (its roles answer from a
+    # script that holds no task); a writer that fails leaves the step to go on, failed in the end, as a proposer does.
+    learned: EvalTask | None = None
+    learned_note: str = "no task: a scripted check writes none"
+    if not plan.scripted:
+        try:
+            learned, learned_note = await write_task(runtime, from_run, prober)
+        except DotError as exc:
+            log.warning("harness_task_failed", step=step.id, error=exc.message)
+            errors.append(f"the task writer failed: {exc.message}")
+            learned_note = "no task: the writer failed"
+    if learned is not None:
+        own[learned.id] = learned
     # Propose. A proposer whose answer is no proposal in one scope (the review module asked it twice already) leaves the
     # other scopes to be proposed and played (item 718): on 2026-10-24 one such answer lost the night. The step is
     # recorded failed all the same, with the error, and adopts nothing.
@@ -295,7 +330,11 @@ async def _carry_out(
             candidates.append(candidate)
     if not candidates:
         reason: str = "the proposer failed" if errors else "the proposer kept the harness"
-        return _Outcome(state="keep", facts={"from_run": from_run, "reason": reason}, error="; ".join(errors) or None)
+        return _Outcome(
+            state="keep",
+            facts={"from_run": from_run, "reason": reason, "task": learned_note},
+            error="; ".join(errors) or None,
+        )
     case: LessonCase = await case_of(runtime, from_run)
 
     async def write_experience(probed: HarnessVersion | None) -> None:
@@ -305,7 +344,8 @@ async def _carry_out(
             log.warning("harness_experience_failed", step=step.id, error=exc.message)
             errors.append(f"the experience writer failed: {exc.message}")
 
-    scored: tuple[str, ...] = scoring.scored
+    # The task written tonight is scored on first: it is where the run the candidates answer went wrong.
+    scored: tuple[str, ...] = scoring.scored if learned is None else (learned.id, *scoring.scored)
     base_report: ProbeReport = await played(BASE, base, scored)
     contrasts: list[Contrast] = []
     by_label: dict[str, HarnessVersion] = {}
@@ -332,6 +372,7 @@ async def _carry_out(
             "tainted": case.tainted,
             "errors": list(errors),
             "scored_on": list(scored),
+            "task": learned_note,
         }
 
     # Select; when two candidates both did better, the composer merges them and the merge is probed in its turn.
@@ -463,7 +504,7 @@ async def scoring_of(store: Store, config: HarnessConfig, base: HarnessVersion |
         Attempt(task_id=probe.task_id, passed=probe.passed, at=probe.created_at)
         for probe in await store.started_attempts_of(None if base is None else base.id)
     ]
-    return plan_scoring(config, records_of(attempts, config.headroom_window))
+    return plan_scoring(config, records_of(attempts, config.headroom_window), tuple(await own_tasks(store)))
 
 
 async def _calibrate(
@@ -718,8 +759,17 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
     # A step that only tries the pool learns from no run and takes none, not even one named by hand, which its decision
     # says: the run that went worst is left to the first step that proposes (item 719, pre-push review rounds 1 to 3).
     left_for_later: str | None = None
+    # The run a task is written from (item 904): the one the step learns from, or, on a step that only tries the pool,
+    # the one that went worst, which the step does not take: a pool every task of which is passed would leave the loop
+    # nothing to propose on for good, and the tasks written from the owner's runs are what gives it some.
+    task_run: str | None = None
     if not scoring.ready:
         left_for_later, from_run = from_run, None
+        if not plan.scripted:
+            worst: RunRecord | None = (
+                await pick_run(store, await _since_last_step(store, now)) if left_for_later is None else None
+            )
+            task_run = left_for_later if worst is None else worst.id
     elif from_run is None:
         since: float = await _since_last_step(store, now)
         picked: RunRecord | None = await pick_run(store, since)
@@ -727,7 +777,7 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
     step: HarnessStep = await store.create_harness_step(now, from_run, None if base is None else base.id)
     log.info("harness_step_started", step=step.id, from_run=from_run, tasks=len(plan.tasks), repeats=plan.repeats)
     try:
-        outcome: _Outcome = await _carry_out(runtime, step, plan, base, scoring, prober, now)
+        outcome: _Outcome = await _carry_out(runtime, step, plan, base, scoring, prober, now, task_run)
     except DotError as exc:
         await store.finish_harness_step(step.id, time.time(), "failed", "{}", exc.message)
         raise
