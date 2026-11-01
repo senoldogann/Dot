@@ -437,7 +437,9 @@ scheduled run of the owner's sent 50,000 to 61,000 tokens before any work on 202
 7,000, the tools 14,400), and a change that needs more raises it there, saying why.
 
 **Where the tokens went** (item 881): after the medians, `dotx stats` names the five goals of its window that spent the
-most tokens, the chats of one title together (a goal started again in a new chat keeps its title), each with its share
+most tokens, the chats of one title together (a goal started again in a new chat keeps its title; only chats you
+opened whose title is three words or more, so two chats titled "selam", or the chats of a schedule, a watcher or Dot's
+own initiative, stand each alone: item 895), each with its share
 of all of them, its tokens, its chats, its runs and how many failed. One started again in two chats or more (not
 counting the chats a schedule opened at its firings) whose runs failed twice or more is marked "started again and
 failing: look whether it gets anywhere": on the owner's Mac a hiring CTF whose flag was never found took 64 million of

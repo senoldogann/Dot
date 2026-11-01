@@ -1231,12 +1231,19 @@ class TokenSpend(FrozenModel):
 RETRIED_CHATS: int = 2
 RETRIED_FAILURES: int = 2
 
+# The chats a title joins into one goal (the pre-push review of item 881): the owner's own, whose title is a goal of
+# three words or more. Two chats both titled "selam", or two watcher chats about mails of one subject, are not one goal
+# started again; the chats of a schedule, a watcher, Dot's own initiative and its notices each stand alone.
+_OWN_TITLE: str = (
+    "COALESCE(t.source, '') NOT IN ('schedule', 'watcher', 'initiative', 'notice')"
+    " AND LENGTH(TRIM(t.title)) - LENGTH(REPLACE(TRIM(t.title), ' ', '')) >= 2"
+)
 _SPEND_GROUPS: str = (
     "SELECT MAX(r.thread_id), COALESCE(t.title, ''), COUNT(DISTINCT r.thread_id), COUNT(*),"
     " SUM(r.status = 'failed') AS failed, SUM(r.input_tokens + r.output_tokens) AS spent, MAX(r.created_at),"
     " COUNT(DISTINCT CASE WHEN COALESCE(t.source, '') != 'schedule' THEN r.thread_id END) AS opened FROM runs r"
     " LEFT JOIN threads t ON t.id = r.thread_id WHERE r.created_at >= ?"
-    " GROUP BY COALESCE(NULLIF(t.title, ''), r.thread_id)"
+    f" GROUP BY CASE WHEN {_OWN_TITLE} THEN t.title ELSE r.thread_id END"
 )
 SPEND_SQL: str = f"{_SPEND_GROUPS} ORDER BY spent DESC LIMIT ?"
 # The goals that are :attr:`ChatSpend.retried`, however few tokens they spent (the review of item 883).

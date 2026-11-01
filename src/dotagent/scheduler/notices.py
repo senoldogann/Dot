@@ -14,10 +14,15 @@ BY_HAND_LEVEL: NotifyLevel = "always"
 
 async def said_nothing_new(store: Store, run_id: str) -> bool:
     """Whether the finish call that ended ``run_id`` said it found nothing new for the owner (item 880): the newest one
-    that went through, not one refused before the run went on (the review of item 880)."""
+    that went through, not one refused before the run went on (the review of item 880), and never in a run that read
+    content third parties can author."""
     finished: EventRecord | None = await store.last_ok_call_of(run_id, FINISH_TOOL)
     args: object = None if finished is None else finished.data.get("args")
-    return isinstance(args, dict) and args.get("nothing_new") is True
+    if not (isinstance(args, dict) and args.get("nothing_new") is True):
+        return False
+    # Said by a run that read a mail or a page, it may be what that mail told it to say, so that its end, and what came
+    # with it, is not told: such a run is told as any other (the pre-push review of item 880).
+    return not await store.run_ever_tainted(run_id)
 
 
 def notify_level(own: NotifyLevel | None, configured: NotifyLevel) -> NotifyLevel:

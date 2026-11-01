@@ -2317,6 +2317,18 @@ class Store:
         await self._db.commit()
         return cursor.rowcount
 
+    async def run_ever_tainted(self, run_id: str) -> bool:
+        """Whether the run ``run_id`` ever read content third parties can author: one of its events says it was tainted
+        (a step's result, its start), or ``dotx prune`` recorded that it ended so (item 556). The owner's later words
+        clear its taint, not what it read (the follow-up of item 880)."""
+        row = await self._one(
+            "SELECT 1 FROM events WHERE run_id = ? AND kind IN ('tool_result', 'run_queued')"
+            " AND json_extract(data, '$.tainted') = 1"
+            " UNION ALL SELECT 1 FROM run_taints WHERE run_id = ? LIMIT 1",
+            (run_id, run_id),
+        )
+        return row is not None
+
     async def chat_ever_tainted(self, thread_id: str) -> bool:
         """Whether a run of the chat ``thread_id`` ever read content third parties can author: an event of one of its
         runs says it was tainted (a step's result, its start), or ``dotx prune`` recorded that one ended so (item 556).
