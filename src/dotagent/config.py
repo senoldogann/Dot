@@ -316,6 +316,8 @@ class AgentConfig(FrozenModel):
     stall_escalation: bool
     failure_streak: int = Field(ge=1)
     revisit_window: int = Field(ge=2)
+    # Every this many acting steps of a run, the review model judges whether it is still on track (item 909); 0: never.
+    checkpoint_steps: int = Field(ge=0)
     finish_nudges: int = Field(ge=0)
     questions: QuestionMode
     parallel_tools: int = Field(ge=1)

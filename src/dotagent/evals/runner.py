@@ -61,12 +61,13 @@ _ATTEMPT_ENV: dict[str, str] = {"PYTHONDONTWRITEBYTECODE": "1"}
 
 def eval_config(config: AppConfig) -> AppConfig:
     """The configuration an eval run uses: the given one, without what must not take part in a measurement (the MCP
-    servers of the user and those that come with Dot (item 583), whose tools would reach the web, the skills and
-    plugins of the user, the Mac desktop, the embeddings of the memory, the lessons and the playbooks, which would carry
-    what one attempt learnt into the next, the user's helper and standby models, which would answer for the model under
-    measure, and the user's limits of a run: a task's own time and token limits cut its runs); the browser is Dot's own
-    Chrome, whatever the owner's mode, so that a measurement never touches the owner's (item 579: a campaign follows
-    the mode), and headless, since nobody watches an attempt."""
+    servers of the user and those that come with Dot (item 583), whose tools would reach the web, the skills and plugins
+    of the user, the Mac desktop, the embeddings of the memory, the lessons and the playbooks, which would carry what
+    one attempt learnt into the next, the user's helper and standby models, which would answer for the model under
+    measure, the user's limits of a run (a task's own time and token limits cut its runs) and the checkpoints of a long
+    run, whose judge is the review model (item 909); the browser is Dot's own Chrome, whatever the owner's mode, so that
+    a measurement never touches the owner's (item 579: a campaign follows the mode), and headless, since nobody watches
+    an attempt."""
     return config.model_copy(
         update={
             "browser": config.browser.model_copy(update={"headless": True, "mode": "own"}),
@@ -77,6 +78,9 @@ def eval_config(config: AppConfig) -> AppConfig:
                     "playbooks": False,
                     "run_max_minutes": 0.0,
                     "run_max_tokens": 0,
+                    # The checkpoints of a long run (item 909) ask the review model, which a measurement of the model
+                    # under test leaves out, as it does the helper models.
+                    "checkpoint_steps": 0,
                 }
             ),
             "mcp": [],

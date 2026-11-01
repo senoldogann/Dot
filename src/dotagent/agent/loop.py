@@ -99,8 +99,11 @@ from dotagent.agent.progress import (
     advance,
     ask_note,
     can_ask_user,
+    checkpoint_due,
+    checkpoint_passed,
     clear_window,
     consult_note,
+    drift_alert,
     image_hash,
     ladder_for,
     limits_for,
@@ -129,12 +132,16 @@ from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lap
 from dotagent.agent.restating import restates
 from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
+    CheckpointJudge,
+    CheckpointRequest,
+    CheckpointVerdict,
     GoalChecker,
     GoalRequest,
     GoalVerdict,
     ProgressAdvice,
     ProgressConsultant,
     ProgressRequest,
+    checkpoint_judge_for,
     goal_checker_for,
     goal_digest,
     progress_consultant_for,
@@ -1600,10 +1607,48 @@ async def _consult(
         return RunOutcome(status="failed", result=stop_result(reason, ledger, plan), needs="")
     diagnosis: str = shorten_reason(advice.diagnosis)
     next_steps: list[str] = [shorten_reason(step) for step in advice.next_steps]
+    # The review model read what the run read: its advice after a steer that cleared the mark carries that content
+    # again, so the run is marked again (the security review of item 909).
+    if agent.gate.ever_tainted:
+        agent.gate.taint()
     await agent.runtime.bus.emit(
         run.id, "stall", _stall_data(alert, {"diagnosis": diagnosis, "next_steps": list(next_steps)}), True
     )
     return StallAnswer(note=consult_note(alert, diagnosis, next_steps), allowed=None)
+
+
+@dataclass(frozen=True)
+class _Drift:
+    """What the checkpoint judge said of a run off track: why, and the steps back to the goal."""
+
+    diagnosis: str
+    next_steps: tuple[str, ...]
+
+
+async def _checkpoint(
+    agent: AgentRun, judge: CheckpointJudge, history: Sequence[Message], goal: Message
+) -> _Drift | bool:
+    """Ask the review model at a checkpoint whether the run is on track (item 909): what it said of a run off track,
+    True for one on track, False when the model could not answer, which changes nothing: a checkpoint is a second look,
+    and a run is never stopped, misled or let off for a judge that failed."""
+    request: CheckpointRequest = CheckpointRequest(
+        goal=agent.run.goal,
+        owner_words=agent.gate.instructions,
+        plan=plan_lines(await _current_plan(agent)) or _NO_PLAN,
+        digest=goal_digest(render_transcript(_since_goal(history, goal))),
+    )
+    try:
+        verdict: CheckpointVerdict = await judge(request)
+    except ProviderError as error:
+        log.warning("checkpoint_failed", run_id=agent.run.id, error=error.message, context=error.context)
+        return False
+    log.info("checkpoint", run_id=agent.run.id, on_track=verdict.on_track)
+    if verdict.on_track:
+        return True
+    return _Drift(
+        diagnosis=shorten_reason(verdict.diagnosis),
+        next_steps=tuple(shorten_reason(step) for step in verdict.next_steps),
+    )
 
 
 async def _answer_alert(
@@ -2413,6 +2458,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         run.id,
     )
     watch: WatchState = new_watch()
+    # The run's acting steps, for its checkpoints (item 909), and the judge asked at each.
+    acted: int = 0
+    judge: CheckpointJudge = checkpoint_judge_for(
+        runtime.router, runtime.roles.review(), config.model_call_timeout_s, f"{run.thread_id}:progress", run.id
+    )
     # Since when (monotonic seconds) the owner holds the run with a ✋ (item 586), None while they do not.
     held_since: float | None = None
     # The tools of the next step when a progress alert or the run's limit restricts them; None offers the tools of the
@@ -2858,7 +2908,48 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             else:
                 alert: Alert | None
                 watch, alert = advance(watch, _calls_seen(outcomes), limits, ladder)
-                if alert is not None:
+                acted += 1
+                drift: _Drift | None = None
+                if alert is None and checkpoint_due(acted, config.checkpoint_steps):
+                    judged: _Drift | bool = await _checkpoint(agent, judge, history, goal)
+                    if isinstance(judged, _Drift):
+                        drift = judged
+                        watch, alert = drift_alert(watch, ladder)
+                    elif judged:
+                        watch = checkpoint_passed(watch)
+                # A run judged off track is given the judge's steps back; at the stop rung it ends as a pattern's stop
+                # does, with what it tried and the judge's last diagnosis.
+                if alert is not None and drift is not None:
+                    # The judge read what the run read: a note of it after a steer that cleared the mark carries that
+                    # content again, so the run is marked again (the security review of item 909).
+                    if agent.gate.ever_tainted:
+                        agent.gate.taint()
+                    await runtime.bus.emit(
+                        run.id,
+                        "stall",
+                        _stall_data(alert, {"diagnosis": drift.diagnosis, "next_steps": list(drift.next_steps)}),
+                        True,
+                    )
+                    if alert.rung == "stop":
+                        stopped: str = stop_result(
+                            f"{alert.detail} {drift.diagnosis}", ledger, plan_lines(await _current_plan(agent))
+                        )
+                        return _run_end(
+                            agent, history, goal, RunOutcome(status="failed", result=stopped, needs=""), facts
+                        )
+                    # A re-plan's or a question's rung keeps the next step's tools to planning or asking, as for a
+                    # pattern's alert (the security review), and says so after the judge's steps.
+                    limited: str = (
+                        replan_note(alert, can_ask)
+                        if alert.rung == "replan"
+                        else ask_note(alert)
+                        if alert.rung == "ask"
+                        else ""
+                    )
+                    advice: str = consult_note(alert, drift.diagnosis, drift.next_steps)
+                    history.append(await _stored_note(agent, f"{advice}\n\n{limited}" if limited else advice))
+                    allowed = restriction_for(alert.rung, can_ask)
+                elif alert is not None:
                     answer: StallAnswer | RunOutcome = await _answer_alert(
                         agent, consultant, alert, can_ask, history, goal, ledger
                     )

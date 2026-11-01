@@ -285,6 +285,12 @@ stall_escalation = false
 stall_limit = 4
 failure_streak = 6
 revisit_window = 8
+# Every checkpoint_steps acting steps of a run, the review model ([models] review) is asked whether the run is still on
+# track (item 909, after DeepSeek Harness's Super-agent Watchdog, which judges whether each worker makes substantive
+# progress or drifts): a run that changes its steps without getting closer shows no pattern above. One judged off
+# track is given the model's steps back to the goal and climbs a rung of the ladder, so one judged off track again and
+# again is stopped. Doubt counts as on track. 0 asks never.
+checkpoint_steps = 40
 # A reply without a tool call is nudged towards finish; the finish_nudges + 1st such reply in a row ends a task run with
 # that reply as its result (a step with tool calls starts the count again). A reply the model service cut short (its
 # output limit, or another abnormal end it gave) is never a result, in any mode: it is nudged too, and the

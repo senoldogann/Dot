@@ -274,3 +274,62 @@ def test_the_steer_names_the_tool_and_the_target_without_its_secrets() -> None:
     assert "browser_act" in note and "abcdef0123456789" not in note
     desktop: str = single_action_steer(SingleAction(tool="desktop_act", target="Safari"))
     assert "this application (Safari)" in desktop and "desktop_act" in desktop
+
+
+def test_a_checkpoint_comes_every_so_many_acting_steps_and_never_at_zero() -> None:
+    """Item 909."""
+    from dotagent.agent.progress import checkpoint_due
+
+    assert [acted for acted in range(0, 13) if checkpoint_due(acted, 4)] == [4, 8, 12]
+    assert not any(checkpoint_due(acted, 0) for acted in range(0, 50))
+
+
+def test_a_run_judged_off_track_climbs_the_ladder_as_a_pattern_does() -> None:
+    from dotagent.agent.progress import drift_alert, ladder_for, new_watch
+
+    ladder = ladder_for(False, False)
+    state = new_watch()
+    rungs: list[str] = []
+    for _ in range(3):
+        state, alert = drift_alert(state, ladder)
+        assert alert.pattern == "drift" and state.window == ()
+        rungs.append(alert.rung)
+    assert rungs == ["nudge", "nudge", "stop"]
+
+
+def test_off_track_checkpoints_far_apart_still_reach_the_stop() -> None:
+    """The pre-push review of item 909: forty quiet steps between two checkpoints lower the ladder, but not the count of
+    the checkpoints in a row a run did not pass; one it passes starts that count again."""
+    from dotagent.agent.progress import (
+        CallSeen,
+        advance,
+        checkpoint_passed,
+        drift_alert,
+        ladder_for,
+        limits_for,
+        new_watch,
+    )
+    from dotagent.config import load_default_config
+
+    limits = limits_for(load_default_config().agent)
+    ladder = ladder_for(False, False)
+
+    def quiet(state: WatchState, count: int) -> WatchState:
+        for number in range(count):
+            call = CallSeen(
+                name="write_file", arguments=f"draft {number}", result=f"wrote {number}", failed=False, images=()
+            )
+            state, alert = advance(state, [call], limits, ladder)
+            assert alert is None
+        return state
+
+    state = new_watch()
+    rungs: list[str] = []
+    for _ in range(3):
+        state = quiet(state, 39)
+        state, alert = drift_alert(state, ladder)
+        rungs.append(alert.rung)
+    assert rungs == ["nudge", "nudge", "stop"]
+    passed = checkpoint_passed(quiet(new_watch(), 39))
+    again, alert = drift_alert(quiet(passed, 39), ladder)
+    assert alert.rung == "nudge" and again.drifts == 1
