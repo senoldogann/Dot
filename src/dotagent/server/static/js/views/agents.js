@@ -9,6 +9,7 @@
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
 import { isTrader, TRADING_DESK } from "../agentpanel.js";
 import { api } from "../api.js";
+import { BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
@@ -1016,7 +1017,7 @@ function mountList(root, ctx) {
     officeToggle.setAttribute("aria-expanded", String(on));
     if (on && office === null) {
       office = mountOffice(officeHolder, {
-        composerFor: (record, onStarted) => officeComposer(record, ctx, onStarted),
+        composerFor: (record, onStarted, follow, onSteered) => officeComposer(record, ctx, onStarted, follow, onSteered),
         openAgent: (id) => ctx.navigate(`/agents/${id}`),
       });
     } else if (!on && office !== null) {
@@ -1079,17 +1080,17 @@ const OFFICE_KEY = "dot.agents.office";
  * The box of the office's panel that messages `record` (Dot, or an agent): the composer of the agent's page, whose
  * run starts without leaving the office; `onStarted(run)` is told of it, so its figure goes to work at once.
  */
-function officeComposer(record, ctx, onStarted) {
+function officeComposer(record, ctx, onStarted, follow, onSteered) {
   const stay = {
     ...ctx,
-    navigate: (path) => {
-      const id = String(path).split("/").pop() ?? "";
-      onStarted({ id, status: "queued", goal: "", thread_id: "", agent_id: record.id === DOT_ID ? null : record.id, parent_run_id: null });
-      toast("ok", `${record.name} is on it.`);
-    },
+    // The run the message started, with its chat, so that the next message goes on in it at once (the review).
+    started: (run) => onStarted(run),
+    navigate: () => {},
+    steered: (runId, text) => onSteered(runId, text, false),
+    queued: (runId, text) => onSteered(runId, text, true),
   };
   const owner = record.id === DOT_ID ? {} : { agent_id: record.id };
-  return startComposer({ name: record.name, bounds: record, owner, ctx: stay });
+  return startComposer({ name: record.name, bounds: record, owner, ctx: stay, follow });
 }
 
 // ------------------------------------------------------------------------------------------------- the page
@@ -1155,7 +1156,19 @@ function agentComposer(record, ctx) {
  * choices start (`agentKept`), `owner` what the message says of whose chat it is, `{ agent_id }` or `{ team_id }`, and
  * `ctx` the page's context, which opens the run the message started. Returns `element`, `focus()` and `dispose()`.
  */
-export function startComposer({ name, bounds, owner, ctx }) {
+/**
+ * What the box that starts an agent's run is given of its page: where a started run is opened, and, in the office,
+ * what is told of a run started, a message steered to the run at work, or one queued for it.
+ * @typedef {{ navigate: (path: string) => void, started?: (run: any) => void, steered?: (runId: string, text: string) => void,
+ *   queued?: (runId: string, text: string) => void, [key: string]: any }} ComposerContext
+ */
+
+/**
+ * The box that starts an agent's run. `follow`, when given, says where the next message goes (the office, item 898):
+ * the run at work it is sent to (`working`), or the chat it goes on in (`threadId`), else a new chat.
+ * @param {{ name: string, bounds: object, owner: object, ctx: ComposerContext, follow?: () => { threadId: string | null, working: string | null } }} options
+ */
+export function startComposer({ name, bounds, owner, ctx, follow }) {
   const frame = composerFrame({
     label: `Message ${name}`,
     boxLabel: "Message",
@@ -1203,8 +1216,48 @@ export function startComposer({ name, bounds, owner, ctx }) {
     }
     starting = true;
     frame.sendButton.disabled = true;
+    const where = follow?.() ?? { threadId: null, working: null };
     try {
       await attempt(async () => {
+        if (where.working !== null && where.threadId !== null && settingValue(BUSY_SEND) !== "steer") {
+          // The agent works and Settings › General › Messages says to queue (item 230, the default): the message waits in
+          // its chat's queue for the work under way to end, as one sent in the chat does (the review of item 898).
+          await choices.ready();
+          const chosen = choices.value();
+          const body = {
+            text,
+            mode: chosen.mode,
+            model: chosen.model,
+            effort: chosen.effort,
+            speed: chosen.speed,
+            once: chosen.once,
+            approvals: chosen.approvals,
+            goal_mode: chosen.goal_mode,
+            attachments: attachments.ids(),
+            ...owner,
+            ...frame.picks.body(),
+          };
+          await api.post(`/threads/${encodeURIComponent(where.threadId)}/queue`, { ...body, key: keys.of("queue", where.threadId, body) });
+          keys.sent();
+          choices.sent();
+          frame.picks.sent();
+          frame.clear();
+          ctx.queued?.(where.working, text);
+          return;
+        }
+        if (where.working !== null) {
+          // The agent works and the owner chose Steer: the message reaches that run, as one sent in its chat does. A
+          // steer joins the run under way, which keeps what it has (item 259): picks wait for a new task, and say so.
+          if (frame.picks.count() > 0) {
+            toast("ok", "Sent to the task under way, which keeps what it has. Plugins, skills and Plan first wait for a message that starts a new task.");
+          }
+          const steer = { text, attachments: attachments.ids() };
+          await api.post(`/runs/${encodeURIComponent(where.working)}/steer`, { ...steer, key: keys.of("steer", where.working, steer) });
+          keys.sent();
+          frame.clear();
+          ctx.steered?.(where.working, text);
+          return;
+        }
         // A kept reasoning level is checked against the model's own, so the models are known first.
         await choices.ready();
         const chosen = choices.value();
@@ -1218,7 +1271,7 @@ export function startComposer({ name, bounds, owner, ctx }) {
           approvals: chosen.approvals,
           goal_mode: chosen.goal_mode,
           standing: false,
-          thread_id: null,
+          thread_id: where.threadId,
           attachments: attachments.ids(),
           ...owner,
           ...frame.picks.body(),
@@ -1228,6 +1281,7 @@ export function startComposer({ name, bounds, owner, ctx }) {
         choices.sent();
         frame.picks.sent();
         frame.clear();
+        ctx.started?.(created);
         ctx.navigate(`/runs/${created.id}`);
       });
     } finally {

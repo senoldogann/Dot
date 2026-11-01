@@ -6,7 +6,7 @@
 
 import { DOT_ID, actorFace, lookOf } from "../actors.js";
 import { api } from "../api.js";
-import { el } from "../dom.js";
+import { clip, el } from "../dom.js";
 import { icon } from "../icons.js";
 import { toast, toastError } from "../ui.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack } from "../state.js";
@@ -45,8 +45,9 @@ const POSE_WORDS = { sleep: "Napping", drink: "Coffee", rest: "On the sofa", loo
  */
 
 /**
- * Mount the office in `holder`. `composerFor(record, onStarted)` gives the box that messages an agent (views/agents.js),
- * which calls `onStarted(run)` instead of opening the run. Returns `dispose()`.
+ * Mount the office in `holder`. `composerFor(record, onStarted, follow, onSteered)` gives the box that messages an
+ * agent (views/agents.js), which calls `onStarted(run)` instead of opening the run, and `onSteered(runId, text)` for a
+ * message to its run at work. Returns `dispose()`.
  */
 export function mountOffice(holder, { composerFor, openAgent }) {
   const frame = el("div", { class: "office-frame", role: "region", "aria-label": "The office: your agents at work" });
@@ -102,7 +103,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     const fill = new THREE.DirectionalLight("#dfe8ff", 0.35);
     scene.add(hemisphere, sun, sun.target, fill);
 
-    /** @type {Map<string, { summary: Summary, figure: ReturnType<typeof makeFigure>, agent: ReturnType<typeof makeAgent>, tag: HTMLElement, word: HTMLElement, bubble: HTMLElement, visitWord: string }>} */
+    /** @type {Map<string, { summary: Summary, figure: ReturnType<typeof makeFigure>, agent: ReturnType<typeof makeAgent>, tag: HTMLElement, word: HTMLElement, bubble: HTMLElement, visitWord: string, size: { w: number, h: number } | null, lift: number }>} */
     const actors = new Map();
     /** @type {ReturnType<typeof buildRoom> | null} */
     let room = null;
@@ -163,6 +164,8 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     }
 
     function resize() {
+      // The tags' sizes change with the frame's width (a phone's smaller type): read again.
+      for (const actor of actors.values()) actor.size = null;
       const width = frame.clientWidth;
       const height = frame.clientHeight;
       renderer.setSize(width, height, false);
@@ -229,7 +232,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
           word,
         );
         tags.append(tag);
-        actors.set(summary.record.id, { summary, figure, agent, tag, word, bubble, visitWord: "" });
+        actors.set(summary.record.id, { summary, figure, agent, tag, word, bubble, visitWord: "", size: null, lift: 0 });
       });
       goal.target.set(0, 0.9, 0);
       placeCamera();
@@ -399,7 +402,11 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     // The one in the panel keeps its full tag on a phone, where a free agent's is its name alone (item 894); set when it
     // is chosen, as a still room (reduced motion) draws no frame for it.
     function markChosen() {
-      for (const actor of actors.values()) actor.tag.toggleAttribute("data-chosen", actor.summary.record.id === selected);
+      for (const actor of actors.values()) {
+        actor.tag.toggleAttribute("data-chosen", actor.summary.record.id === selected);
+        // A chosen tag is the full one on a phone: its size is read again.
+        actor.size = null;
+      }
     }
 
     function select(id) {
@@ -449,6 +456,94 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       );
     }
 
+    // The chat in the panel (item 898, the owner's word of 2026-11-01: "every message made a new chat; we should start
+    // a conversation there and go on in it"): the agent's newest chat, its turns as the owner's words and the answers,
+    // and the box sends on in it, to the run at work while there is one. "New chat" starts the next message afresh.
+    const AUTOMATIC = new Set(["schedule", "watcher", "initiative", "notice"]);
+    const TURNS_SHOWN = 6;
+    /** @type {Map<string, { key: string, turns: { id: string, goal: string, result: string, status: string }[] }>} */
+    const chats = new Map();
+    const readingChats = new Set();
+    const freshChat = new Set();
+    // What the owner sent a run at work from here, shown at once, until the run has read it (its steer event, which
+    // comes when the run takes it before its next step).
+    /** @type {Map<string, string[]>} */
+    const pending = new Map();
+    /** Whether a message to the agent goes on in the chat of `latest`: one of the owner's, not a helper's or a schedule's. */
+    function continues(latest) {
+      return latest !== null && latest !== undefined && latest.parent_run_id === null && latest.thread_id !== "" && !AUTOMATIC.has(latest.source ?? "");
+    }
+    function followOf(id) {
+      return () => {
+        const latest = actors.get(id)?.summary.latest ?? null;
+        if (freshChat.has(id) || !continues(latest)) return { threadId: null, working: null };
+        // Waiting for the owner (blocked) is at work too: the message reaches that run, as in its chat (the review).
+        const working = latest.status === "running" || latest.status === "queued" || latest.status === "blocked";
+        return { threadId: latest.thread_id, working: working ? latest.id : null };
+      };
+    }
+    async function readChat(threadId, key) {
+      if (readingChats.has(threadId)) return;
+      readingChats.add(threadId);
+      try {
+        const runs = await api.get(`/runs?thread_id=${encodeURIComponent(threadId)}&limit=20`);
+        if (disposed) return;
+        const turns = runs
+          .filter((run) => run.parent_run_id === null)
+          .slice(0, TURNS_SHOWN)
+          .reverse()
+          .map((run) => ({ id: run.id, goal: run.goal, result: run.result ?? "", status: run.status }));
+        chats.set(threadId, { key, turns });
+        panelSoon();
+      } catch (error) {
+        console.warn("the office could not read the chat", threadId, error);
+      } finally {
+        readingChats.delete(threadId);
+      }
+    }
+    function chatView(id, latest) {
+      if (freshChat.has(id)) {
+        return el("div", { class: "office-chat" }, el("p", { class: "office-chat-note" }, "Your next message starts a new chat."));
+      }
+      if (!continues(latest)) return el("div", { class: "office-chat", hidden: true });
+      const key = `${latest.id}|${latest.status}`;
+      const kept = chats.get(latest.thread_id);
+      if (kept === undefined || kept.key !== key) readChat(latest.thread_id, key);
+      const turns = kept?.turns ?? [];
+      // The run at work's own: what the owner sent it as it worked, read from its events, and what waits for it.
+      const said = feeds.feed(latest.id)?.said ?? [];
+      // What waits is let go once the run has read it, or has ended (a queued one is a turn of its own then).
+      const atWork = latest.status === "running" || latest.status === "queued" || latest.status === "blocked";
+      const waiting = atWork ? (pending.get(latest.id) ?? []).filter((text) => !said.includes(text)) : [];
+      if (waiting.length === 0) pending.delete(latest.id);
+      else pending.set(latest.id, waiting);
+      const sent = (turn) => (turn.id === latest.id ? [...said, ...waiting] : []);
+      const view = el(
+        "div",
+        { class: "office-chat", role: "log", "aria-label": "The chat" },
+        ...turns.flatMap((turn) => [
+          el("div", { class: "office-turn office-turn-you" }, clip(turn.goal, 600)),
+          ...sent(turn).map((text) => el("div", { class: "office-turn office-turn-you" }, clip(text, 600))),
+          // The answer of a turn that ended; the one at work shows its steps and words live below.
+          turn.status === "running" || turn.status === "queued" || turn.result === ""
+            ? null
+            : el("div", { class: "office-turn office-turn-agent" }, clip(turn.result, 1200)),
+        ]),
+      );
+      // Kept where the owner scrolled it while the run works and the panel is painted again; to the foot when it was
+      // there or a turn came (the review).
+      // Only this agent's own chat as it was: another's scroll is no guide (the review).
+      const before = panelSlot.dataset.agent === id ? panelSlot.querySelector(".office-chat") : null;
+      const shown = view.querySelectorAll(".office-turn").length;
+      const atFoot = before === null || before.scrollHeight - before.scrollTop - before.clientHeight < 8;
+      const grew = before === null || shown > before.querySelectorAll(".office-turn").length;
+      const keptTop = before?.scrollTop ?? 0;
+      requestAnimationFrame(() => {
+        view.scrollTop = atFoot || grew ? view.scrollHeight : keptTop;
+      });
+      return view;
+    }
+
     function paintPanel() {
       const actor = selected === null ? undefined : actors.get(selected);
       if (actor === undefined) {
@@ -463,25 +558,53 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         mode === "free" ? "Free right now." : `${MODE_WORDS[mode]}: ${latest?.goal ?? ""}`,
       );
       const live = feedView(latest === null ? undefined : feeds.feed(latest.id), mode);
+      const chat = chatView(record.id, latest);
       const links = el(
         "div",
         { class: "office-panel-links" },
         latest !== null ? el("a", { class: "btn ghost sm", href: `#/runs/${latest.id}` }, "Open its chat") : null,
+        continues(latest) && !freshChat.has(record.id)
+          ? el(
+              "button",
+              {
+                class: "btn ghost sm",
+                type: "button",
+                onclick: () => {
+                  freshChat.add(record.id);
+                  paintPanel();
+                },
+              },
+              "New chat",
+            )
+          : null,
         record.id !== DOT_ID ? el("button", { class: "btn ghost sm", type: "button", onclick: () => openAgent(record.id) }, "Its page") : null,
       );
       if (panel !== null && panel.dispose !== undefined && panelSlot.dataset.agent === record.id) {
         // The same agent: only what it does changes, the box keeps what was typed.
         panelSlot.querySelector(".office-panel-doing")?.replaceWith(doing);
+        panelSlot.querySelector(".office-chat")?.replaceWith(chat);
         panelSlot.querySelector(".office-panel-live")?.replaceWith(live);
         panelSlot.querySelector(".office-panel-links")?.replaceWith(links);
         panelSlot.querySelector(".office-offers")?.replaceWith(offersView(record.id));
         return;
       }
       panel?.dispose?.();
-      const box = composerFor(record, (run) => {
-        actor.summary = { ...actor.summary, latest: run };
-        readSoon();
-      });
+      const box = composerFor(
+        record,
+        (run) => {
+          actor.summary = { ...actor.summary, latest: run };
+          freshChat.delete(record.id);
+          toast("ok", `${record.name} is on it.`);
+          readSoon();
+          panelSoon();
+        },
+        followOf(record.id),
+        (runId, text, queued) => {
+          pending.set(runId, [...(pending.get(runId) ?? []), text]);
+          toast("ok", queued ? `Queued: it goes to ${record.name} once the work under way ends.` : `Sent to ${record.name}'s work under way.`);
+          panelSoon();
+        },
+      );
       panel = box;
       panelSlot.dataset.agent = record.id;
       panelSlot.replaceChildren(
@@ -496,6 +619,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
             el("button", { class: "btn icon ghost", type: "button", title: "Close", "aria-label": "Close", onclick: closePanel }, icon("x")),
           ),
           doing,
+          chat,
           live,
           offersView(record.id),
           links,
@@ -619,9 +743,13 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         const word = visiting !== "" ? visiting : mode !== "free" ? MODE_WORDS[mode] : (POSE_WORDS[actor.agent.pose] ?? "");
         if (actor.bubble.textContent !== doing) {
           actor.bubble.textContent = doing;
+          actor.size = null;
           actor.bubble.hidden = doing === "";
         }
-        if (actor.word.textContent !== word) actor.word.textContent = word;
+        if (actor.word.textContent !== word) {
+          actor.word.textContent = word;
+          actor.size = null;
+        }
         const about = mode === "free" ? actor.summary.record.name : `${actor.summary.record.name}: ${actor.summary.latest?.goal ?? ""}`;
         if (actor.tag.title !== about) actor.tag.title = about;
         actor.tag.dataset.mode = mode;
@@ -636,8 +764,29 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       placeCamera();
     }
 
-    // The tags over the heads, the nearer first; one that would cover another is lifted above it.
-    function placeTags() {
+    // The tags over the heads, the nearer first; one that would cover another is lifted above it. The lift glides there
+    // rather than jumps, the place is not rounded to whole pixels, and a tag's size is read again only when its words
+    // change (the owner's word of 2026-11-01: the names moved jerkily over the heads; reading every tag's size at every
+    // frame made the page lay out sixty times a second).
+    function sizeOf(actor) {
+      if (actor.size === null) {
+        const bubble = actor.bubble.hidden ? 0 : actor.bubble.offsetHeight + 4;
+        actor.size = {
+          w: Math.max(actor.tag.offsetWidth || 90, actor.bubble.hidden ? 0 : actor.bubble.offsetWidth),
+          h: (actor.tag.offsetHeight || 22) + bubble,
+        };
+      }
+      return actor.size;
+    }
+    // One tag's size read again at each frame, in turn: a size read before the page's type settled (a phone's smaller
+    // tags, a font that loaded late) is right again within a few frames, at one read a frame.
+    let remeasured = 0;
+    function placeTags(dt) {
+      const all = [...actors.values()];
+      if (all.length > 0) {
+        remeasured = (remeasured + 1) % all.length;
+        all[remeasured].size = null;
+      }
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
       const placed = [];
@@ -648,9 +797,8 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         })
         .sort((one, other) => one.depth - other.depth);
       for (const item of order) {
-        const tagWidth = Math.max(item.actor.tag.offsetWidth || 90, item.actor.bubble.hidden ? 0 : item.actor.bubble.offsetWidth);
         // A bubble over the tag is part of what must not cover another.
-        const tagHeight = (item.actor.tag.offsetHeight || 22) + (item.actor.bubble.hidden ? 0 : item.actor.bubble.offsetHeight + 4);
+        const { w: tagWidth, h: tagHeight } = sizeOf(item.actor);
         let y = item.y;
         // Each placed tag takes the band [y - h, y] above its anchor: one that would overlap another is lifted over it.
         for (let tries = 0; tries < 8; tries += 1) {
@@ -661,7 +809,11 @@ export function mountOffice(holder, { composerFor, openAgent }) {
           y = clash.y - clash.h - 3;
         }
         placed.push({ x: item.x, y, w: tagWidth, h: tagHeight });
-        item.actor.tag.style.transform = `translate(${Math.round(item.x)}px, ${Math.round(y)}px) translate(-50%, -100%)`;
+        // The lift above its anchor glides toward where the tag must stand, a sixth of a second or so.
+        const lift = item.y - y;
+        item.actor.lift = dt <= 0 ? lift : item.actor.lift + (lift - item.actor.lift) * Math.min(1, dt * 10);
+        const shownY = item.y - item.actor.lift;
+        item.actor.tag.style.transform = `translate3d(${item.x.toFixed(1)}px, ${shownY.toFixed(1)}px, 0) translate(-50%, -100%)`;
         item.actor.tag.hidden = item.depth > 1;
       }
     }
@@ -698,7 +850,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         const began = performance.now();
         renderer.render(scene, camera);
         measure(performance.now() - began);
-        placeTags();
+        placeTags(moving ? dt : 0);
         if (moving) {
           loop();
         }

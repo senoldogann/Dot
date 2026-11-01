@@ -45,8 +45,14 @@ Dot's window is the one in front, at 30 frames a second while nobody walks and t
 the Mac or the phone cannot keep up (item 889: the still room is baked into one mesh per material and its sun shadows
 drawn once, a few hundred draw calls where it was 1,420), one frame each time something changes when motion is reduced,
 and a browser without WebGL 2 is told so and shows the rest of the page. The room grows with the number of agents (two
-desks a pod). three.js 0.187.0 (MIT, `static/vendor/three/`, its licence beside it) draws it and is loaded only when the
-office opens.
+desks a pod, three pods across), and is 20 by 15 metres at least (item 898). Its panel is a chat (item 898): the agent's
+newest chat of yours shows its last turns, your words at the right and its answers at the left, and what you write goes
+on in that chat rather than starting a new chat each time: while the agent works, or waits for you, it waits in that
+chat's queue, or reaches the run at once with **Steer** chosen under Settings › General › Messages, as a message in its
+chat does; **New chat** starts the next message afresh. A schedule's, a watcher's or Dot's own chat is not gone on in.
+The names over the heads glide when one must stand above another, and their sizes are read when their words change, not
+at every frame (item 898: they moved jerkily). three.js 0.187.0 (MIT, `static/vendor/three/`, its licence beside it)
+draws it and is loaded only when the office opens.
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
 model, a reasoning level, approvals, the actions it may use (its tools); each left out takes the configured one, and **All actions**,
