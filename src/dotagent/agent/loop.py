@@ -284,6 +284,7 @@ from dotagent.tools.groups import (
     BROWSER_GROUP,
     CORE_GROUP,
     GROUPS_EVENT,
+    TODOS_GROUP,
     group_of,
     groups_event,
     groups_of,
@@ -2334,9 +2335,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         await runtime.store.load_messages(run.thread_id, config.keep_recent_screenshots)
     )
     # The tool groups that are on; they only grow. A grouped run starts with core, the groups its thread used and the
-    # servers the owner picked for its message (item 318).
+    # servers the owner picked for its message (item 318); a run of Dot's own initiative with its list too, so that a
+    # thing the owner said not to do is let go at once (item 912: such a run asked the owner instead, three times).
+    own: tuple[str, ...] = (TODOS_GROUP,) if run.source == INITIATIVE_SOURCE else ()
     on: frozenset[str] = (
-        frozenset({CORE_GROUP, *used_groups(history), *picked_groups(opening.picks)}) & frozenset(groups)
+        frozenset({CORE_GROUP, *used_groups(history), *picked_groups(opening.picks), *own}) & frozenset(groups)
         if grouped
         else frozenset(groups)
     )

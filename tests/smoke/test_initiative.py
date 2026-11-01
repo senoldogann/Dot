@@ -1068,3 +1068,83 @@ async def test_a_thing_the_owner_said_not_to_do_is_let_go_by_its_run_at_once_and
         manager.ended_tainted = read_a_page  # type: ignore[method-assign]
         listed: str = "\n".join(await _listed(runtime.store, await initiative._clean_runs()))
         assert "why not quoted" in listed and "never to touch" not in listed
+
+
+def _call(tool: str, **arguments: object) -> ScriptedTurn:
+    return ScriptedTurn(text="", calls=(ScriptedCall(tool=tool, arguments=arguments),))
+
+
+async def _results(runtime: Runtime, run_id: str, tool: str) -> list[tuple[bool, str]]:
+    return [
+        (bool(event.data.get("ok")), str(event.data.get("text", "")))
+        for event in await runtime.store.list_events(run_id, 0, 500)
+        if event.kind == "tool_result" and event.data.get("tool") == tool
+    ]
+
+
+_LOOK_MODEL: str = f"{_PROVIDER}:scripted-look"
+
+
+async def test_the_look_judges_on_its_own_model_and_sees_what_came_of_what_was_done(login_env: dict[str, str]) -> None:
+    """Items 910 and 911: the look starts on [initiative] look_model, reads each thing done with its day and what came
+    of it, and a thing like one done lately goes on the list only with what is new since; the thing itself is done on
+    the configured model, with the list's tools on from its start (item 912)."""
+    turns: list[ScriptedTurn] = [
+        _call("todo_add", title="Rewrite the CV summary so it leads with results", why="No answers to 19 applications"),
+        _call(
+            "todo_add",
+            title="Rewrite the CV summary so it leads with results",
+            why="No answers to 19 applications",
+            again_because="The Finnish copy was left out of the rewrite",
+        ),
+        _call("todo_add", title="Tidy the downloads folder by year", why="It is full"),
+        _finish("Put two things on the list."),
+        _finish("The Finnish summary is rewritten in cv/fi.html."),
+    ]
+    async with _dot(login_env, turns, grouped=True, look_model=_LOOK_MODEL) as (runtime, manager):
+        rewritten = await add_todo(runtime.store, "Rewrite the CV summary with results", "Asked", "run", None, False)
+        assert isinstance(rewritten, TodoRecord)
+        thread = await runtime.store.create_thread("Rewrite the CV", "ui")
+        old: RunRecord = await runtime.store.create_run(
+            thread.id,
+            "Rewrite the CV",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            INITIATIVE_SOURCE,
+            "medium",
+            "standard",
+            None,
+            "yolo",
+            False,
+            None,
+            None,
+            None,
+        )
+        await runtime.store.finish_run(old.id, "done", "The summary is rewritten in cv/en.html.")
+        await runtime.store.set_todo(rewritten.id, "done", 1, old.id, "The summary is rewritten in cv/en.html.")
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(10_000.0)
+        [look] = [run for run in await runtime.store.list_runs(10, None) if run.id != old.id]
+        await _settled(initiative)
+        looked: RunRecord = await runtime.store.get_run(look.id)
+        assert (looked.model, looked.status) == (_LOOK_MODEL, "done")
+        listed: list[str] = await _listed(runtime.store, frozenset({old.id}))
+        said: str = next(line for line in listed if "Rewrite the CV summary with results" in line)
+        assert said.startswith("- done on ") and "what came of it: " in said and "cv/en.html" in said, said
+        added: list[tuple[bool, str]] = await _results(runtime, look.id, "todo_add")
+        assert not added[0][0] and "Not put on the list: it is like" in added[0][1], added
+        assert "What came of it: The summary is rewritten in cv/en.html." in added[0][1]
+        assert added[1][0] and added[2][0], added
+        again: TodoRecord = next(
+            todo for todo in await runtime.store.list_todos(("open",), 10) if todo.title.startswith("Rewrite the CV")
+        )
+        assert again.why.endswith("Again because: The Finnish copy was left out of the rewrite")
+        # The thing is done on the configured model, with the list's tools on from its first step.
+        await initiative.tick(10_100.0)
+        did: RunRecord = next(run for run in await runtime.store.list_runs(10, None) if run.id not in (look.id, old.id))
+        await _settled(initiative)
+        assert (await runtime.store.get_run(did.id)).model == runtime.config.models.main
+        [groups] = await runtime.store.events_of_kind(did.id, "tool_groups", 1)
+        assert "todos" in groups.data["on"], groups.data

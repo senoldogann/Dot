@@ -215,15 +215,19 @@ ones a person started (a watcher's, whose title carries a mail's subject, and Do
 the list that came from such content is counted, not quoted; the runs whose words the record does quote give it their
 taint, as the brief's do.
 
-**How it does a thing.** The run is a task in `[initiative] approvals`, `yolo` by default whatever your own mode is
-(item 756: in `ask`, a run of its own asked to put a thing on its own list and waited on nobody), nobody watches it (a
-question it has is left for you, as a schedule's is), and its goal is Dot's words, "On my own initiative: …": the review
-model takes none of it as your instruction, in that run or in a later one of its chat, a resume too (`auto` asks you
-what reaches others), and a thing that a run put on the list after reading content third parties can author (a mail, a
-page) is done by a run that starts untrusted, so that in `yolo` too the review model refuses a message, a post, a
-payment or an upload that no word of yours calls for (item 525). A run that read nothing of the kind (a thing from your
-own chats) is checked by nobody in `yolo`, and a payment it decides on goes out as it decides, which is what `yolo`
-means (item 443); `[initiative] approvals` set to `auto` or `ask` has such a run ask you first.
+**How it does a thing.** The run first checks, on the thing itself (the file, the page, the mail), that the work is
+still to do, as the note it came from may be out of date, and once it is done it brings that note or plan up to date, in
+the copy the others are made from (item 912). Its list's tools are on from its first step, so that a thing you said not
+to do is let go at once rather than asked about. The run is a task in `[initiative] approvals`, `yolo` by default
+whatever your own mode is (item 756: in `ask`, a run of its own asked to put a thing on its own list and waited on
+nobody), nobody watches it (a question it has is left for you, as a schedule's is), and its goal is Dot's words, "On my
+own initiative: …": the review model takes none of it as your instruction, in that run or in a later one of its chat, a
+resume too (`auto` asks you what reaches others), and a thing that a run put on the list after reading content third
+parties can author (a mail, a page) is done by a run that starts untrusted, so that in `yolo` too the review model
+refuses a message, a post, a payment or an upload that no word of yours calls for (item 525). A run that read nothing of
+the kind (a thing from your own chats) is checked by nobody in `yolo`, and a payment it decides on goes out as it
+decides, which is what `yolo` means (item 443); `[initiative] approvals` set to `auto` or `ask` has such a run ask you
+first.
 
 But in a chat Dot opened on its own initiative, three steps wait for you in every mode, `yolo` and `auto` too (item
 850, your word of 2026-10-30):

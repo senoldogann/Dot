@@ -80,18 +80,22 @@ nobody watches it. It is a thing on your own list.
 The work: {title}
 Why it helps them: {why}
 
-Do it as far as it goes without them. What only they can decide, leave as a question (ask_user) and go on with the \
-rest. A thing that says no work you can do (empty, or a word with no task in it): say so in a sentence and end. Work \
-the owner said not to do (a rule of theirs you remember or read in a chat): do none of it, let the thing go with \
-todo_drop (tool group todos), their words as the reason, and end. Dot keeps the list: as this run ends it marks the \
-thing done, or to try again when the run fails; never change the list otherwise, nor Dot's database, yourself (item \
-821). End with one or two sentences: what you did, and where the result is."""
+First check that the work is still to do, on the thing itself (the file, the page, the mail, the repository): the \
+note it came from may be out of date (item 912). Done already: say where, change nothing, and end. Then do it as far \
+as it goes without them. What only they can decide, leave as a question (ask_user) and go on with the rest. A thing \
+that says no work you can do (empty, or a word with no task in it): say so in a sentence and end. Work the owner said \
+not to do (a rule of theirs you remember or read in a chat): do none of it and ask nothing, let the thing go with \
+todo_drop, their words as the reason, and end. When it is done, bring the note or plan its why names up to date (a \
+line that says it is done, and where), so that it no longer reads as open; of a thing kept in several copies, change \
+the one the others are made from. Dot keeps the list: as this run ends it marks the thing done, or to try again when \
+the run fails; never change the list otherwise, nor Dot's database, yourself (item 821). End with one or two \
+sentences: what you did, and where the result is."""
 _LOOK_GOAL: str = "On my own initiative: look for work that helps the owner"
 _LOOK_OPENING: str = """You look for work to do for the owner on your own initiative (item 715). Read what you \
 remember of them (memory_search: their projects, their wishes, what they asked to be done later, and what they said \
 never to do or not to touch), the record below, \
 the chats they had lately, and their mail and calendar when an account is connected. Then put at most three things on \
-your list with todo_add (in the tool group todos: turn it on with use_tools when it is off): each a concrete piece \
+your list with todo_add (its tools are on from your first step, item 912): each a concrete piece \
 of work you can do alone, which they would thank you for, which moves one of their objectives below forward when \
 there is one (say which in its why, and leave out what a work order below already covers), which is not on the \
 list yet and was not done (what came of each thing done is below: the same work in other words is done too; a note \
