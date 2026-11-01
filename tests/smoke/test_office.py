@@ -265,7 +265,8 @@ async def test_one_stream_carries_several_runs_events_in_their_order(login_env: 
 
 async def test_a_free_agent_offers_help_and_the_owner_lets_it_help(login_env: dict[str, str]) -> None:
     """Item 896: a free agent the fast model matched with a run at work walks over to offer, both panels say so, and
-    "Let it help" asks the daemon to tell the run at work, as Dot's note, of the helper (never the model's part)."""
+    "Let it help" asks the daemon to start the helper's run (item 902; test_help_for_real.py plays it whole), sending
+    the helper and the run alone, never the model's part."""
     steered: list[dict[str, object]] = []
 
     async def offers(route: Route) -> None:
@@ -285,7 +286,9 @@ async def test_a_free_agent_offers_help_and_the_owner_lets_it_help(login_env: di
 
     async def let_help(route: Route) -> None:
         steered.append(json.loads(route.request.post_data or "{}"))
-        await route.fulfill(status=202, body="null", headers={"content-type": "application/json"})
+        # The helper's run, as the daemon starts it (item 902).
+        helper_run = {"id": "run_h", "status": "queued", "goal": "Help", "thread_id": "th", "parent_run_id": None}
+        await route.fulfill(status=201, body=json.dumps(helper_run), headers={"content-type": "application/json"})
 
     async with _daemon(login_env) as address, async_playwright() as playwright:
         # The daemon's own answer: with no run at work, nobody is asked and nothing is offered (no model is called).
@@ -323,7 +326,7 @@ async def test_a_free_agent_offers_help_and_the_owner_lets_it_help(login_env: di
             await expect(offer).to_contain_text("Copy Editor")
             await expect(offer).to_contain_text("tighten the brief's wording")
             await offer.get_by_role("button", name="Let it help").click()
-            await expect(offer.get_by_role("button", name="Told")).to_be_disabled()
+            await expect(offer.get_by_role("button", name="Helping")).to_be_disabled()
             assert len(steered) == 1 and steered[0]["run_id"] == "run_x" and set(steered[0]) == {"helper_id", "run_id"}
             assert errors == [], errors
         finally:

@@ -133,15 +133,35 @@ class LetHelpRequest(FrozenModel):
     run_id: str = Field(min_length=1, max_length=64)
 
 
+def help_goal(to_name: str, run_id: str) -> str:
+    """The goal of the helper's run when the owner lets it help (item 902: the note alone of item 896 asked the run at
+    work to hand a part over, and a run near its end went on without): the owner's click, in fixed words, names only
+    the one it helps; where that one stands it reads itself, fenced when that chat read outside content
+    (``read_agent_chat``)."""
+    name: str = one_line(to_name, 60)
+    return (
+        f"Help {name} with its work under way. First read where it stands with read_agent_chat (agent: {name!r}, "
+        f"run: {run_id!r}). "
+        f"Then do the part of that work your role fits, and end with what you found or made in a few lines: your "
+        f"answer is passed on to {name}."
+    )
+
+
 def help_note(helper: AgentRecord) -> str:
-    """What the run at work is told when the owner lets ``helper`` help: its name and role, the owner's own records,
-    and how to hand it a part. It is Dot's note, not the owner's words (the pre-push review): it clears no mark of
+    """What the run at work is told when the owner lets ``helper`` help: that it is on it, its role, and that its answer
+    comes as a note. It is Dot's note, not the owner's words (the pre-push review of item 896): it clears no mark of
     content others can write and gives the reviewer no instruction, as a note about a reaction does (item 586)."""
     role: str = one_line(helper.role, 200) or "no role given"
     return (
-        f"[Note from Dot: the owner lets {one_line(helper.name, 60)} help. It is free now (its role: {role}). If a "
-        "part of your work fits its role, hand that part to it with message_agent; if none does, go on as you were.]"
+        f"[Note from Dot: the owner has {one_line(helper.name, 60)} help you (its role: {role}). It reads where you "
+        "stand and does the part its role fits; its answer reaches you as a note when it ends. Go on with the rest.]"
     )
+
+
+def help_answer_note(answered: str) -> str:
+    """The note that passes the helper's answer (``answered``, as ``message_agent`` gives a reply: fenced when the
+    helper read outside content) on to the run at work."""
+    return f"[Note from Dot: the help the owner asked for has ended. Its answer:]\n{answered}"
 
 
 def offers_tool() -> ToolSpec:

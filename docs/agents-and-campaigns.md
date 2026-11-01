@@ -25,36 +25,43 @@ there) the room is square and seen more from above, so that its floor fills the 
 alone, small, and those that work or wait for you, and the one whose panel is open, keep the full tag; the panel takes
 the frame's foot, and the button that brings the room back steps aside while it is open.
 
-**Help offers** (item 896, your ask of 2026-11-01: the agents outside the work should offer to help the agents at
-work, when it makes sense). While the office is open, each run at work, Dot's or an agent's (six at most, the newest
-first), is matched once with the agents free now (not at work, not waiting for you, not paused): the fast model is shown
-its goal, in a fence since it may hold what a page or a mail wrote, and each free agent's name and role, and names at
-most two whose role fits a real part of that work, each with that part in a few words, or none. Such a helper walks over
-to the one at work, its tag saying "Offers to help …", and both panels list the offer with **Let it help**: the run at
-work is told, in a note of Dot's that the daemon writes from the helper's record, that the helper is free and what its
-role is, and to hand it a part with `message_agent` if one fits. The note is not your message: like a note about a
-reaction it clears no mark of content others can write and gives the reviewer no instruction, and the part the model
-wrote is shown to you, never sent to the run. Nothing starts a
-helper's run but that run's message. A run is asked about once; a model that cannot answer offers nothing. By meaning
-alone (bge-m3) a Turkish goal and the English roles of the templates scored 0.44 to 0.57 for every role alike, which
-is why a model matches them. `GET /api/agents/offers` gives the offers (`helper_id`, `helper_name`, `helper_role`,
-`to_id`, `to_name`, `run_id`, `part`); `POST /api/agents/offers/help` with `helper_id` and `run_id` tells the run (202;
-404 for an agent or a run that is not, 409 for a run that is not at work). **Hide** folds it away, which this browser
-keeps; the teams and the agents' cards stay under it. It draws only while it is on the screen, the page is shown and
-Dot's window is the one in front, at 30 frames a second while nobody walks and the camera rests, with fewer pixels when
-the Mac or the phone cannot keep up (item 889: the still room is baked into one mesh per material and its sun shadows
-drawn once, a few hundred draw calls where it was 1,420), one frame each time something changes when motion is reduced,
-and a browser without WebGL 2 is told so and shows the rest of the page. The room grows with the number of agents (two
-desks a pod, three pods across), and is 20 by 15 metres at least (item 898). Its panel is a chat (item 898): the agent's
-newest chat of yours shows its last turns, your words at the right and its answers at the left, and what you write goes
-on in that chat rather than starting a new chat each time: while the agent works, or waits for you, it waits in that
-chat's queue, or reaches the run at once with **Steer** chosen under Settings › General › Messages, as a message in its
-chat does; **New chat** starts the next message afresh. A schedule's, a watcher's or Dot's own chat is not gone on in:
-with no chat of yours, the panel is an empty chat, ready for your first message. A free agent's panel is its chat alone;
-its steps and words show while it works or waits (item 901). The button at the top corner shows the office full screen,
-over the whole window, and takes it back, as Escape does (item 901). The names over the heads glide when one must stand
-above another, and their sizes are read when their words change, not at every frame (item 898: they moved jerkily).
-three.js 0.187.0 (MIT, `static/vendor/three/`, its licence beside it) draws it and is loaded only when the office opens.
+**Help offers** (item 896, your ask of 2026-11-01: the agents outside the work should offer to help the agents at work,
+when it makes sense). While the office is open, each run at work, Dot's or an agent's (six at most, the newest first),
+is matched once with the agents free now (not at work, not waiting for you, not paused): the fast model is shown its
+goal, in a fence since it may hold what a page or a mail wrote, and each free agent's name and role, and names at most
+two whose role fits a real part of that work, each with that part in a few words, or none. Such a helper walks over to
+the one at work, its tag saying "Offers to help …", and both panels list the offer with **Let it help**: the helper's
+run starts as a helper of the run at work, as `message_agent` starts one, so that it asks you what that run would ask
+(an initiative's message, post or release, in every mode) and starts as untrusted as it is (item 902; item 896 only told
+the run at work it could hand a part over, and a run near its end went on without): its goal, in fixed words, names the
+one it helps and its run at work, and has it read where that run stands with `read_agent_chat` (that run's chat, not the
+newest, fenced when it read outside content), do the part its role fits and end with what it found or made. The run at
+work is told so in a note of Dot's, and the helper's answer reaches it as another note when the helper ends, while it
+still works (fenced when the helper read outside content, and the run at work then counts as having read it, as with
+`message_agent`). Only a free agent helps (409 for one at work, waiting or paused). Stopping the run at work, or its
+end, stops its helper. The notes are not your messages: like a note about a reaction they clear no mark of content
+others can write and give the reviewer no instruction, and the part the model wrote is shown to you, never sent to a
+run. The room shows the helper at work at once, and the button says **Helping**. A run is asked about once; a model that
+cannot answer offers nothing. By meaning alone (bge-m3) a Turkish goal and the English roles of the templates scored
+0.44 to 0.57 for every role alike, which is why a model matches them. `GET /api/agents/offers` gives the offers
+(`helper_id`, `helper_name`, `helper_role`, `to_id`, `to_name`, `run_id`, `part`); `POST /api/agents/offers/help` with
+`helper_id` and `run_id` starts the helper's run and returns it (201; 404 for an agent or a run that is not, 409 for a
+run that is not at work). **Hide** folds it away, which this browser keeps; the teams and the agents' cards stay under
+it. It draws only while it is on the screen, the page is shown and Dot's window is the one in front, at 30 frames a
+second while nobody walks and the camera rests, with fewer pixels when the Mac or the phone cannot keep up (item 889:
+the still room is baked into one mesh per material and its sun shadows drawn once, a few hundred draw calls where it was
+1,420), one frame each time something changes when motion is reduced, and a browser without WebGL 2 is told so and shows
+the rest of the page. The room grows with the number of agents (two desks a pod, three pods across), and is 20 by 15
+metres at least (item 898). Its panel is a chat (item 898): the agent's newest chat of yours shows its last turns, your
+words at the right and its answers at the left, and what you write goes on in that chat rather than starting a new chat
+each time: while the agent works, or waits for you, it waits in that chat's queue, or reaches the run at once with
+**Steer** chosen under Settings › General › Messages, as a message in its chat does; **New chat** starts the next
+message afresh. A schedule's, a watcher's or Dot's own chat is not gone on in: with no chat of yours, the panel is an
+empty chat, ready for your first message. A free agent's panel is its chat alone; its steps and words show while it
+works or waits (item 901). The button at the top corner shows the office full screen, over the whole window, and takes
+it back, as Escape does (item 901). The names over the heads glide when one must stand above another, and their sizes
+are read when their words change, not at every frame (item 898: they moved jerkily). three.js 0.187.0 (MIT,
+`static/vendor/three/`, its licence beside it) draws it and is loaded only when the office opens.
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
 model, a reasoning level, approvals, the actions it may use (its tools); each left out takes the configured one, and **All actions**,
@@ -270,7 +277,7 @@ Memory page marks a lesson with its agent's name. A note a run saves with `memor
 tools its role names, has the group **office** (turned on with `use_tools` as any group): `agents_now` lists Dot and
 every agent with its role, its teams and what it does now (working on which goal, waiting for you, or free), so a run
 knows whom a name or a team means; `read_agent_chat` reads the newest messages (20 by default, 40 at most) of an agent's
-newest chat, or Dot's, with what its run does now: what you asked, what it said, the tools it called and the start of
+newest chat, or Dot's, or with `run` the chat of one of its runs (item 902), with what its run does now: what you asked, what it said, the tools it called and the start of
 what they gave. So "go and help the agent of the Engineer team" is a run that finds the Engineer, reads where it stands
 and sends it what it needs with `message_agent`. Both only read. The secrets Dot holds are masked in what they quote,
 and what a chat's runs read from pages or mails comes fenced and marks the reading run untrusted, as that chat was (item

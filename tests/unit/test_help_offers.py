@@ -15,6 +15,8 @@ from dotagent.agent.offers import (
     HelpOffer,
     OfferBook,
     at_work_and_free,
+    help_answer_note,
+    help_goal,
     help_note,
     picked,
     question,
@@ -90,9 +92,18 @@ def test_the_runs_at_work_and_the_free_agents_are_told_apart() -> None:
 def test_the_note_names_the_helper_and_its_role_as_dots_words() -> None:
     """The pre-push review: the note is Dot's, written from the helper's record, never the part the model wrote."""
     note: str = help_note(_RESEARCH)
-    assert note.startswith("[Note from Dot: the owner lets Research Desk help.")
-    assert "its role: Researches a question across sources" in note and "message_agent" in note
+    assert note.startswith("[Note from Dot: the owner has Research Desk help you")
+    assert "its role: Researches a question across sources" in note and "its answer reaches you" in note
     assert "no role given" in help_note(_agent("agt_x", "Blank", ""))
+    assert help_answer_note("Found it.").endswith("Its answer:]\nFound it.")
+
+
+def test_the_helpers_goal_is_fixed_words_that_name_the_one_it_helps() -> None:
+    """Item 902: the helper reads where the other stands itself (``read_agent_chat`` fences what a page wrote); its
+    goal, the owner's click, quotes nothing of the other's goal."""
+    goal: str = help_goal("Sales Outbound", "run_s")
+    assert goal.startswith("Help Sales Outbound with its work under way.")
+    assert "read_agent_chat (agent: 'Sales Outbound', run: 'run_s')" in goal and "passed on to Sales Outbound" in goal
 
 
 def test_the_goal_goes_in_a_fence_that_it_cannot_close() -> None:
@@ -174,37 +185,48 @@ def test_a_model_that_cannot_answer_offers_nothing(reply: ModelReply | BaseExcep
     assert offers == []
 
 
-class _Store:
-    async def get_agent(self, agent_id: str) -> AgentRecord:
-        return _RESEARCH
+class _Gate:
+    """What ``RunGate.take`` touches of a gate, recorded."""
 
-    async def get_run(self, run_id: str) -> RunRecord:
-        return _run(run_id, "running", 1.0)
-
-
-class _Manager:
     def __init__(self) -> None:
-        self.told: list[tuple[str, str, object]] = []
+        self.done: list[str] = []
 
-    def tell(self, run_id: str, text: str, reaction: object) -> None:
-        self.told.append((run_id, text, reaction))
+    def heard_from_owner(self) -> None:
+        self.done.append("heard")
 
-    def steer(self, *_args: object) -> None:
-        raise AssertionError("Let it help is Dot's note, never the owner's steer")
+    def clear_taint(self) -> None:
+        self.done.append("clear")
+
+    def taint(self) -> None:
+        self.done.append("taint")
+
+    def add_instruction(self, text: str) -> None:
+        self.done.append(f"said:{text}")
 
 
-def test_let_it_help_is_dots_note_which_clears_no_mark() -> None:
-    """The pre-push review: a steer is the owner's words and clears the run's mark of content others can write; the
-    note of Let it help goes as a note about a reaction does (``tell``: no vouching, no instruction)."""
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
+def test_a_message_s_marks_are_taken_in_one_place_for_every_loop() -> None:
+    """Item 902, the pre-push review: OpenCode's loop missed the mark of a note that carries what a page wrote. Both
+    loops take a message through ``RunGate.take``: the owner's words clear the mark and instruct, Dot's note that
+    carries outside content sets it, and a note of Dot's alone does neither."""
+    from dotagent.agent.attachments import UserInput
+    from dotagent.agent.gate import RunGate
 
-    from dotagent.server.routes_agents import agents_router
+    def took(sent: UserInput) -> list[str]:
+        gate = _Gate()
+        RunGate.take(cast(Any, gate), sent)
+        return gate.done
 
-    manager = _Manager()
-    context = SimpleNamespace(runtime=SimpleNamespace(store=_Store()), manager=manager)
-    app = FastAPI()
-    app.include_router(agents_router(cast(Any, context)))
-    answer = TestClient(app).post("/api/agents/offers/help", json={"helper_id": "agt_r", "run_id": "run_s"})
-    assert answer.status_code == 202, answer.text
-    assert manager.told == [("run_s", help_note(_RESEARCH), "note")]
+    owners = UserInput(text="Go on.", files=(), question_id=None, vouches=True, said="Go on.")
+    assert took(owners) == ["heard", "clear", "said:Go on."]
+    outside = UserInput(text="[Note…]", files=(), question_id=None, vouches=False, said="", taints=True)
+    assert took(outside) == ["heard", "taint"]
+    note = UserInput(text="[Note…]", files=(), question_id=None, vouches=False, said="")
+    assert took(note) == ["heard"]
+    # Both loops use it.
+    from pathlib import Path
+
+    import dotagent
+
+    root = Path(dotagent.__file__).parent
+    assert "gate.take(sent)" in (root / "agent" / "loop.py").read_text(encoding="utf-8")
+    assert "gate.take(sent)" in (root / "opencode" / "run.py").read_text(encoding="utf-8")

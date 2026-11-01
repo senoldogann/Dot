@@ -768,11 +768,8 @@ class _Follow:
         note: Message = await message_with_attachments(
             runtime, self.agent.run.thread_id, run_id, sent.text, sent.files, self.vision
         )
-        self.agent.gate.heard_from_owner()
-        if sent.vouches:
-            self.agent.gate.clear_taint()
-        if sent.said != "":
-            self.agent.gate.add_instruction(sent.said)
+        # As Dot's own loop takes it (item 902): one place for what a message does to the run's trust.
+        self.agent.gate.take(sent)
         await runtime.store.append_messages(self.agent.run.thread_id, [note])
         self.added += 1
         await self.emit("steer", steer_event(sent, self.agent.gate.tainted), True)

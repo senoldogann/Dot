@@ -98,6 +98,7 @@ class AgentsNowArgs(ToolArgs):
 class ReadAgentChatArgs(ToolArgs):
     agent: str = Field(min_length=1, description='Its name, or "Dot".')
     messages: int = Field(default=20, ge=1, le=_MOST_MESSAGES, description="How many newest messages.")
+    run: str | None = Field(default=None, description="One of its runs, to read that run's chat, not its newest.")
 
 
 async def _waiting_runs(store: Store) -> set[str]:
@@ -170,6 +171,7 @@ def _read_agent_chat_tool() -> RegisteredTool:
         wanted: str = args.agent.strip()
         newest: RunRecord | None
         name: str
+        owner: str | None = None
         if wanted.casefold() == DOT_NAME.casefold():
             newest, name = await store.latest_dot_run(), DOT_NAME
         else:
@@ -182,11 +184,18 @@ def _read_agent_chat_tool() -> RegisteredTool:
                     "no agent has that name",
                     {"agent": wanted, "agents": ", ".join([DOT_NAME, *(found.name for found in agents)])},
                 )
-            newest, name = (await store.latest_agent_runs()).get(agent.id), agent.name
+            newest, name, owner = (await store.latest_agent_runs()).get(agent.id), agent.name, agent.id
+        if args.run is not None and args.run.strip() != "":
+            # A run of its own named (item 902: the helper the owner sends reads the work it helps, not the newest
+            # chat, which may be another of the same agent's).
+            named: RunRecord = await store.get_run(args.run.strip())
+            if named.agent_id != owner:
+                raise ToolInputError("that run is not one of this agent's", {"agent": name, "run": named.id})
+            newest = named
         if newest is None:
             return ok(f"{name} has no chat yet: it has not worked.")
         if newest.thread_id == ctx.thread_id:
-            return ok(f"{name}'s newest chat is this one: what it says is above.")
+            return ok(f"{name}'s chat asked for is this one: what it says is above.")
         runs: list[RunRecord] = await store.list_runs(_RUNS_READ, newest.thread_id)
         tainted: bool = any([await run_tainted(store, run.id) for run in runs])
         messages: list[Message] = await store.load_messages(newest.thread_id, 0)
@@ -206,7 +215,7 @@ def _read_agent_chat_tool() -> RegisteredTool:
 
     return make_tool(
         name=READ_AGENT_CHAT_TOOL,
-        description="Read an agent's newest chat and what it does now, before you help it.",
+        description="Read an agent's newest chat, or one run's, and what it does now, before you help it.",
         args_model=ReadAgentChatArgs,
         modes=ALL_MODES,
         parallel_safe=True,

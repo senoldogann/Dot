@@ -4,6 +4,7 @@ approval modes answers the policy's questions without the user."""
 import asyncio
 import time
 from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING
 
 from dotagent.agent.approvals import TIMEOUT_DECIDER, ApprovalBroker, ApprovalOutcome, Kept
 from dotagent.agent.authorization import Answerer, Authorization, step_decision
@@ -44,6 +45,10 @@ from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Deci
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, EventRecord, RuleRecord, RunMode
+
+if TYPE_CHECKING:
+    # For a type alone: attachments reads the runtime, which reads this module.
+    from dotagent.agent.attachments import UserInput
 
 log = get_logger(__name__)
 
@@ -273,6 +278,19 @@ class RunGate:
         the user is there again (:meth:`heard_from_owner`)."""
         self._instructions = (*self._instructions, text)
         self.heard_from_owner()
+
+    def take(self, sent: "UserInput") -> None:
+        """What a message that reached the run while it works does to its trust, in one place for every loop that reads
+        its inbox (Dot's own and OpenCode's; the pre-push review of item 902: OpenCode's had missed a mark): the owner
+        is there; their own words clear the mark of content others can write; a note of Dot's that carries such content
+        sets it; and what the owner said is an instruction the reviewer reads."""
+        self.heard_from_owner()
+        if sent.vouches:
+            self.clear_taint()
+        if sent.taints:
+            self.taint()
+        if sent.said != "":
+            self.add_instruction(sent.said)
 
     def heard_from_owner(self) -> None:
         """The owner did something in the run (wrote to it, answered it, did a step it kept for them): a hand-off is put
