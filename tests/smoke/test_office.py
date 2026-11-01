@@ -6,7 +6,7 @@ import asyncio
 import json
 import re
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
 import httpx
@@ -86,7 +86,14 @@ async def _working(route: Route) -> None:
     response = await route.fetch()
     agents = await response.json()
     mine = next(summary for summary in agents if summary["record"]["id"] != "dot")
-    mine["latest"] = {"id": "run_x", "status": "running", "goal": "Read the week's sources", "thread_id": "t"}
+    mine["latest"] = {
+        "id": "run_x",
+        "status": "running",
+        "goal": "Read the week's sources",
+        "thread_id": "t",
+        "parent_run_id": None,
+        "source": "ui",
+    }
     await route.fulfill(status=200, body=json.dumps(agents), headers={"content-type": "application/json"})
 
 
@@ -318,6 +325,171 @@ async def test_a_free_agent_offers_help_and_the_owner_lets_it_help(login_env: di
             await offer.get_by_role("button", name="Let it help").click()
             await expect(offer.get_by_role("button", name="Told")).to_be_disabled()
             assert len(steered) == 1 and steered[0]["run_id"] == "run_x" and set(steered[0]) == {"helper_id", "run_id"}
+            assert errors == [], errors
+        finally:
+            await browser.close()
+
+
+async def _until(done: Callable[[], bool]) -> None:
+    """Wait, five seconds at most, until `done` holds."""
+    for _ in range(100):
+        if done():
+            return
+        await asyncio.sleep(0.05)
+    raise AssertionError("it did not happen in time")
+
+
+async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: dict[str, str]) -> None:
+    """Item 898, the owner's word of 2026-11-01: every message from the office made a new chat. The panel shows the
+    agent's chat; a message goes to the run at work, else on in that chat; "New chat" starts the next one afresh."""
+    steered: list[dict[str, object]] = []
+    started: list[dict[str, object]] = []
+    queued: list[dict[str, object]] = []
+    waiting: bool = False
+
+    async def agents(route: Route) -> None:
+        response = await route.fetch()
+        listed = await response.json()
+        mine = [summary for summary in listed if summary["record"]["id"] != "dot"]
+        mine[0]["latest"] = {
+            "id": "run_x",
+            "status": "running",
+            "goal": "Read the week's sources",
+            "thread_id": "t",
+            "parent_run_id": None,
+            "source": "ui",
+        }
+        mine[1]["latest"] = {
+            "id": "run_y",
+            "status": "blocked" if waiting else "done",
+            "goal": "Tighten the brief",
+            "thread_id": "t2",
+            "parent_run_id": None,
+            "source": "ui",
+            "result": "Done: two lines shorter.",
+        }
+        await route.fulfill(status=200, body=json.dumps(listed), headers={"content-type": "application/json"})
+
+    async def turns(route: Route) -> None:
+        url: str = route.request.url
+        runs = (
+            [
+                {
+                    "id": "run_x",
+                    "goal": "Read the week's sources",
+                    "result": "",
+                    "status": "running",
+                    "parent_run_id": None,
+                },
+                {"id": "run_w", "goal": "Hello", "result": "Hi there", "status": "done", "parent_run_id": None},
+            ]
+            if "thread_id=t&" in url or url.endswith("thread_id=t")
+            else [
+                {
+                    "id": "run_y",
+                    "goal": "Tighten the brief",
+                    "result": "Done: two lines shorter.",
+                    "status": "done",
+                    "parent_run_id": None,
+                }
+            ]
+        )
+        await route.fulfill(status=200, body=json.dumps(runs), headers={"content-type": "application/json"})
+
+    async def quiet(route: Route) -> None:
+        """No stored events of the waiting run, and nothing new on the stream while the test looks."""
+        events: bool = "/events" in route.request.url
+        await route.fulfill(
+            status=200,
+            body="[]" if events else ":\n\n",
+            headers={"content-type": "application/json" if events else "text/event-stream"},
+        )
+
+    async def queue(route: Route) -> None:
+        if route.request.method != "POST":
+            await route.fulfill(status=200, body="[]", headers={"content-type": "application/json"})
+            return
+        queued.append({**json.loads(route.request.post_data or "{}"), "thread": route.request.url.split("/")[-2]})
+        await route.fulfill(status=201, body="[]", headers={"content-type": "application/json"})
+
+    async def steer(route: Route) -> None:
+        steered.append({**json.loads(route.request.post_data or "{}"), "run": route.request.url.split("/")[-2]})
+        await route.fulfill(status=202, body=json.dumps({"id": "run_x"}), headers={"content-type": "application/json"})
+
+    async def start(route: Route) -> None:
+        if route.request.method != "POST":
+            await route.continue_()
+            return
+        started.append(json.loads(route.request.post_data or "{}"))
+        run = {"id": f"run_n{len(started)}", "status": "queued", "goal": "", "thread_id": "t2", "agent_id": None}
+        await route.fulfill(status=201, body=json.dumps(run), headers={"content-type": "application/json"})
+
+    async with _daemon(login_env) as address, async_playwright() as playwright:
+        browser = await playwright.chromium.launch(args=_ARGS)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
+            errors: list[str] = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            await page.route("**/api/agents", agents)
+            await page.route("**/api/runs?thread_id=*", turns)
+            await page.route("**/api/runs/run_x/events**", _history)
+            await page.route("**/api/runs/run_y/events**", quiet)
+            await page.route("**/api/runs/streams**", quiet)
+            await page.route("**/api/runs/*/steer", steer)
+            await page.route("**/api/threads/*/queue", queue)
+            await page.route("**/api/runs", start)
+            await _agents_page(page, address)
+            office = page.get_by_role("region", name="The office: your agents at work")
+            await expect(office.locator("canvas.office-canvas")).to_have_count(1, timeout=20_000)
+            # The working one: its chat, and a message to it waits in that chat's queue, as Settings › General says by
+            # default (item 230), not a new chat.
+            await office.locator('.office-tag[data-mode="working"]').click()
+            panel = office.locator(".office-panel")
+            await expect(panel.locator(".office-turn-you")).to_have_text(["Hello", "Read the week's sources"])
+            await expect(panel.locator(".office-turn-agent")).to_have_text(["Hi there"])
+            await panel.get_by_role("textbox", name="Message").fill("After this, the news.")
+            await panel.get_by_role("button", name="Start").click()
+            await _until(lambda: len(queued) == 1)
+            assert queued[0]["thread"] == "t" and queued[0]["text"] == "After this, the news." and steered == []
+            # With Steer chosen, the message reaches the run at work.
+            await page.evaluate("localStorage.setItem('dot.busySend', 'steer')")
+            await panel.get_by_role("textbox", name="Message").fill("And the news?")
+            await panel.get_by_role("button", name="Start").click()
+            await _until(lambda: len(steered) == 1)
+            assert steered[0]["text"] == "And the news?" and started == []
+            # What was sent stands in the chat at once, as the owner's words (the review of item 898).
+            await expect(panel.locator(".office-turn-you")).to_have_text(
+                ["Hello", "Read the week's sources", "After this, the news.", "And the news?"]
+            )
+            await panel.get_by_role("button", name="Close").click()
+            # A free one whose last chat was the owner's: the message goes on in that chat.
+            await office.locator(".office-tag", has_text="Copy Editor").click()
+            panel = office.locator(".office-panel")
+            await expect(panel.locator(".office-turn-agent")).to_have_text(["Done: two lines shorter."])
+            await panel.get_by_role("textbox", name="Message").fill("Now the summary.")
+            await panel.get_by_role("button", name="Start").click()
+            await _until(lambda: len(started) == 1)
+            assert started[0]["thread_id"] == "t2" and started[0]["goal"] == "Now the summary."
+            # "New chat": the next message starts afresh.
+            await panel.get_by_role("button", name="New chat").click()
+            await expect(panel.locator(".office-chat-note")).to_have_text("Your next message starts a new chat.")
+            await panel.get_by_role("textbox", name="Message").fill("Something else.")
+            await panel.get_by_role("button", name="Start").click()
+            await _until(lambda: len(started) == 2)
+            assert started[1]["thread_id"] is None
+            await panel.get_by_role("button", name="Close").click()
+            # One that waits for the owner (blocked) is at work too: the message reaches that run (the review).
+            waiting = True
+            await page.goto(f"{address}/#/settings")
+            await page.goto(f"{address}/#/agents")
+            office = page.get_by_role("region", name="The office: your agents at work")
+            await expect(office.locator(".office-tag", has_text="Copy Editor")).to_have_count(1, timeout=20_000)
+            await office.locator(".office-tag", has_text="Copy Editor").click()
+            panel = office.locator(".office-panel")
+            await panel.get_by_role("textbox", name="Message").fill("Yes, go on.")
+            await panel.get_by_role("button", name="Start").click()
+            await _until(lambda: len(steered) == 2)
+            assert steered[1]["run"] == "run_y" and len(started) == 2
             assert errors == [], errors
         finally:
             await browser.close()

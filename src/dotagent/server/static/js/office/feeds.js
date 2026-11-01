@@ -19,13 +19,13 @@ const QUIET = new Set(["finish", "update_plan", "use_tools", "react", "set_statu
 
 /**
  * @typedef {{ runId: string, steps: { words: string, ok: boolean | null, ts: number }[], text: string, ended: string | null,
- *   doing: string, at: number, lastId: number }} Feed
+ *   doing: string, at: number, lastId: number, said: string[] }} Feed
  */
 
 /** A new, empty feed of `runId`. */
 function newFeed(runId) {
   /** @type {Feed} */
-  const feed = { runId, steps: [], text: "", ended: null, doing: "", at: 0, lastId: 0 };
+  const feed = { runId, steps: [], text: "", ended: null, doing: "", at: 0, lastId: 0, said: [] };
   return feed;
 }
 
@@ -73,6 +73,14 @@ export function readEvent(feed, kind, data, ts) {
     case "assistant":
       if (typeof data.text === "string" && data.text.trim() !== "") {
         feed.text = data.text.slice(-TEXT_KEPT);
+      }
+      return null;
+    case "steer":
+      // What the owner sent the run while it worked (item 898), for the office's chat; Dot's own notes (a reaction's,
+      // a help offer's) vouch for nothing and are not the owner's words.
+      if (data.vouches !== false && typeof data.text === "string" && data.text.trim() !== "") {
+        feed.said.push(data.text);
+        if (feed.said.length > STEPS_KEPT) feed.said.shift();
       }
       return null;
     case "run_finished":

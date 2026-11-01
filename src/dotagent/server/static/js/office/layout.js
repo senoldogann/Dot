@@ -23,6 +23,11 @@ const DESK_D = 0.75;
 // The room left free of furniture along the walls and between the parts of the room.
 const AISLE = 1.4;
 const POD_GAP = 1.6;
+// The pods across the work floor, and the least size of the room (the owner's word of 2026-11-01: "a bigger, wider
+// office"): three across and 20 by 15 metres at least, so that the lounge, the bar and the meeting table stand apart.
+const POD_COLUMNS = 3;
+const LEAST_WIDTH = 20;
+const LEAST_DEPTH = 15;
 
 /** The number of pods that hold `desks` desks: two desks a pod, two pods at least. */
 export function podsFor(desks) {
@@ -38,11 +43,11 @@ export function podsFor(desks) {
  */
 export function planFor(desks) {
   const pods = podsFor(desks);
-  const rows = Math.ceil(pods / 2);
-  const workWidth = 2 * (DESK_W + POD_GAP);
+  const rows = Math.ceil(pods / POD_COLUMNS);
+  const workWidth = POD_COLUMNS * (DESK_W + POD_GAP);
   const workDepth = rows * (2 * DESK_D + 2.4);
-  const width = Math.max(14, workWidth + 7.5);
-  const depth = Math.max(11, workDepth + 5.2);
+  const width = Math.max(LEAST_WIDTH, workWidth + 9);
+  const depth = Math.max(LEAST_DEPTH, workDepth + 6.5);
   const left = -width / 2;
   const back = -depth / 2;
   /** @type {Piece[]} */
@@ -59,8 +64,8 @@ export function planFor(desks) {
   const workLeft = width / 2 - AISLE - workWidth;
   let made = 0;
   for (let pod = 0; pod < pods; pod += 1) {
-    const column = pod % 2;
-    const row = Math.floor(pod / 2);
+    const column = pod % POD_COLUMNS;
+    const row = Math.floor(pod / POD_COLUMNS);
     const cx = workLeft + column * (DESK_W + POD_GAP) + DESK_W / 2 + 0.3;
     const cz = back + 3.2 + row * (2 * DESK_D + 2.4) + DESK_D;
     for (const side of [-1, 1]) {
