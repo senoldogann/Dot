@@ -29,7 +29,7 @@ from dotagent.agent.rewind import (
     take_back,
 )
 from dotagent.browser.remote_input import InputBatch, InputResult
-from dotagent.core.errors import InvalidValueError, RunConflict
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import workspace_dir
 from dotagent.llm.router import parse_model_ref
@@ -425,6 +425,8 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         """Write a recap of the run when one is due, or with ``force``; one being written is waited for."""
         return await write_recap(ctx.runtime, run_id, request.force)
 
+    making_loops: asyncio.Lock = asyncio.Lock()
+
     async def make_loop(run_id: str, every: str, text: str) -> ScheduleRecord:
         """Make the chat of the run ask ``text`` again on the rhythm ``every`` (item 281): one of the chat's schedules,
         whose runs go on in it as its follow-ups do and start as they do (item 291). The same loop asked for again is
@@ -438,13 +440,16 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             owner.mode if choices is None else resolved_mode(choices.mode, text),
             chat_options(owner, choices),
         )
-        # The same loop asked for again (a page that sends it once more after a failure) is the one there is.
-        for kept in await store.list_schedules():
-            if (kept.thread_id, kept.enabled, kept.cron, kept.goal) == (owner.thread_id, True, plan.cron, plan.goal):
-                return kept
-        return await create_schedule(
-            store, ctx.runtime.config.scheduler, ctx.runtime.schedule_zone, plan, time.time(), owner.thread_id
-        )
+        # The same loop asked for again (a page that sends it once more after a failure) is the one there is; two asks
+        # at once (two tabs) look and make in turn, so the second finds the first's (the review of 2026-11-01).
+        wanted: tuple[str, bool, str | None, str] = (owner.thread_id, True, plan.cron, plan.goal)
+        async with making_loops:
+            for kept in await store.list_schedules():
+                if (kept.thread_id, kept.enabled, kept.cron, kept.goal) == wanted:
+                    return kept
+            return await create_schedule(
+                store, ctx.runtime.config.scheduler, ctx.runtime.schedule_zone, plan, time.time(), owner.thread_id
+            )
 
     @router.post("/runs/{run_id}/loop", status_code=201)
     async def start_loop(run_id: str, request: LoopRequest) -> ScheduleRecord:
@@ -615,7 +620,9 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         saved: HeldSecret = await asyncio.to_thread(save_secret, run.thread_id, name, label, request.value)
         try:
             answered: ApprovalRecord = await ctx.runtime.approvals.resolve(approval_id, True, UI_SOURCE, "")
-        except RunConflict:
+        except Exception:
+            # Whatever kept the card from being answered (another answer, a run deleted meanwhile), the secret is not
+            # left held for the chat (the review of 2026-11-01).
             await asyncio.to_thread(forget_secret, saved, run.thread_id, request.value)
             raise
         log.info("secret_held", approval_id=approval_id, run_id=record.run_id, name=name)

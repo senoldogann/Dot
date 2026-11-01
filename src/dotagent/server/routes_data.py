@@ -479,6 +479,9 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 agent_id=agent_id,
                 # The form has no field for them: a taught task's skill stays with its schedule (item 666).
                 skills=kept.skills,
+                # Nor for where its goal came from: one a run made after reading a page stays so (the review of
+                # 2026-11-01); a schedule the owner makes anew is theirs.
+                from_outside=kept.from_outside,
             ),
         )
         # Left out, on or off stays as it is now, not as a form saw it when it opened (item 723).

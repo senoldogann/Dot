@@ -251,11 +251,20 @@ async def _tell(
             text += f" · its run did not start: {error.message}"
     elif watcher.action == "run":
         text += " · no run: this watcher's limit for the hour is used"
+    key: str = chosen.item.key
     if started is not None:
         text += " · a run was started"
+        # Written down as soon as its run started, the run counted against the hour's limit: a line or a tell that
+        # fails after must not have the next look start a second run for the same item (the review of 2026-11-01).
+        await update_state(
+            runtime.store,
+            watcher.id,
+            lambda state: state.model_copy(
+                update={"seen": _kept_keys(state.seen, [key]), "ran": (*_recent(state.ran, now), now)}
+            ),
+        )
     route: str | None = await _keep_line(runtime, manager, watcher, text)
     await tell_owner(runtime.bus, watcher.name, text, "#/schedules" if route is None else route)
-    key: str = chosen.item.key
     await update_state(
         runtime.store,
         watcher.id,
@@ -263,7 +272,8 @@ async def _tell(
             update={
                 "seen": _kept_keys(state.seen, [key]),
                 "told": (*_recent(state.told, now), now),
-                "ran": (*_recent(state.ran, now), *([now] if started is not None else [])),
+                # Counted when it started, above.
+                "ran": _recent(state.ran, now),
             }
         ),
     )

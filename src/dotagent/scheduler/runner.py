@@ -479,6 +479,8 @@ class Scheduler:
         at the next tick, and the other schedules and the daemon go on (item 116)."""
         try:
             current: ScheduleRecord | None = await self._still_due(record.id, now)
+            if current is not None and await self._waits_after_failure(current, now):
+                return
             if current is not None:
                 await self._fire(current, now)
         except DotError as exc:
@@ -491,6 +493,14 @@ class Scheduler:
             crashed: str = f"failed to fire: {type(exc).__name__}"
             await self._runtime.store.set_schedule_status(record.id, crashed)
             await record_firing_failure(self._runtime.store, record.id, now, crashed)
+
+    async def _waits_after_failure(self, record: ScheduleRecord, now: float) -> bool:
+        """Whether a schedule whose firings of this time failed waits before it is tried again (:func:`retry_after`): a
+        recurring one as a one-time one does, rather than at every tick (the review of 2026-11-01: a zone that could
+        not be read failed every 15 seconds for an hour)."""
+        failure: FiringFailure | None = await firing_failure(self._runtime.store, record.id)
+        due: float | None = record.next_run_at
+        return failure is not None and due is not None and failure.last_failure_at >= due and now < retry_after(failure)
 
     async def _still_due(self, schedule_id: str, now: float) -> ScheduleRecord | None:
         """The schedule as the store has it now, when it is still switched on and due at ``now``; ``None`` when it was
@@ -557,7 +567,12 @@ class Scheduler:
         if late and not one_time:
             log.warning("schedule_skipped_overdue", schedule_id=record.id, overdue_s=round(overdue_s))
             # The daemon was off or the Mac slept past the grace: the clock cannot tell which (item 553).
-            overdue: str = f"skipped: {round(overdue_s / 60)} minutes overdue (Dot was off or the Mac slept)"
+            failed_before: FiringFailure | None = await firing_failure(store, record.id)
+            overdue: str = (
+                f"skipped: it could not fire for {round(overdue_s / 60)} minutes: {failed_before.last_error}"
+                if failed_before is not None and failed_before.last_failure_at >= record.next_run_at
+                else f"skipped: {round(overdue_s / 60)} minutes overdue (Dot was off or the Mac slept)"
+            )
             await store.record_schedule_skip(record.id, following, overdue)
             await self._tell_missed(record, overdue)
             return
@@ -613,12 +628,19 @@ class Scheduler:
         written (its next time, its chat) before the run starts, so a crash can lose a firing but never repeat one."""
         store: Store = self._runtime.store
         one_time: bool = record.cron is None
+        # As the store had it when it was found due: what the claim below compares (the brief rewrites its goal).
+        found: ScheduleRecord = record
         same_chat, digest = await self._history(record, zone)
         record, digest, title = await self._briefed(
             record, digest, now, zone, thread_title(f"{record.name} · {format_local(now, zone)}")
         )
         thread_id, made = await self._firing_chat(record, same_chat, title)
-        await store.record_schedule_fire(record.id, now, following, thread_id, "starting")
+        if not await store.claim_schedule_fire(record.id, due, found, now, following, thread_id):
+            # Changed, switched off or deleted while the firing was being prepared: the owner's change stands.
+            log.info("schedule_fire_dropped", schedule_id=record.id)
+            if made:
+                await self._drop_chat(record.id, thread_id)
+            return
         if late:
             log.warning("schedule_fired_late", schedule_id=record.id, overdue_s=round(overdue_s))
         told: str = late_goal(record.goal, due, now, zone) if late else record.goal
@@ -817,6 +839,7 @@ class Scheduler:
                 options.goal_mode,
                 carried,
                 options.skills,
+                options.from_outside,
             )
         agent: AgentRecord = await self._runtime.store.get_agent(options.agent_id)
         return await self._manager.start_firing_for_agent(
@@ -832,6 +855,7 @@ class Scheduler:
             options.goal_mode,
             carried,
             options.skills,
+            options.from_outside,
         )
 
     def _level(self, record: ScheduleRecord) -> NotifyLevel:

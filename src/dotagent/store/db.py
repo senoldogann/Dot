@@ -1066,6 +1066,7 @@ def _schedule(row: aiosqlite.Row) -> ScheduleRecord:
             notify=row["notify"],
             agent_id=row["agent_id"],
             skills=_skills_of(row["skills"]),
+            from_outside=bool(row["from_outside"]),
         ),
         runs_failed_in_row=row["runs_failed_in_row"],
     )
@@ -1092,12 +1093,14 @@ type _OptionValues = tuple[
     str | None,
     str | None,
     str | None,
+    int,
 ]
 
 
 def _option_values(options: ScheduleOptions) -> _OptionValues:
     """The schedule columns that hold ``options``, in the order model, effort, approvals, goal_mode, timezone,
-    history_runs, same_chat, speed, stop_after_failures, notify, agent_id, skills (a JSON list, or NULL for none)."""
+    history_runs, same_chat, speed, stop_after_failures, notify, agent_id, skills (a JSON list, or NULL for none),
+    from_outside."""
     goal_mode: int | None = None if options.goal_mode is None else int(options.goal_mode)
     same_chat: int | None = None if options.same_chat is None else int(options.same_chat)
     return (
@@ -1113,6 +1116,7 @@ def _option_values(options: ScheduleOptions) -> _OptionValues:
         options.notify,
         options.agent_id,
         dumps_compact(list(options.skills)) if options.skills else None,
+        int(options.from_outside),
     )
 
 
@@ -1185,6 +1189,8 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("notify", "TEXT"),
     ("agent_id", "TEXT"),
     ("skills", "TEXT"),
+    # Made by a run that had read outside content (the review of 2026-11-01): its firings start tainted.
+    ("from_outside", "INTEGER NOT NULL DEFAULT 0"),
 )
 
 
@@ -1271,7 +1277,9 @@ async def _add_columns(
 async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     """Give a database created by an older version the columns added since, and the indexes on them, in one
     transaction: a process that dies part way leaves the database as it was, and the next start does it all."""
-    await connection.execute("BEGIN")
+    # Immediate: the daemon and a `dotx` command opening an old database at once take turns, rather than the second
+    # failing on a snapshot the first changed (the review of 2026-11-01).
+    await connection.execute("BEGIN IMMEDIATE")
     added_to_runs: tuple[str, ...] = await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
@@ -2132,7 +2140,12 @@ class Store:
         )
         delegated: tuple[str, ...] = tuple(str(row["thread_id"]) for row in hosts)
         candidates: set[str] = await self._screenshots_of(doomed, named, delegated)
-        await self._db.execute(f"{doomed} DELETE FROM events WHERE run_id IN (SELECT id FROM doomed)", named)
+        # Every event but the owner's save of a lesson, which keeps that lesson theirs, never merged nor proposed to be
+        # forgotten, after its chat is gone, as the prune keeps it (the review of 2026-11-01).
+        await self._db.execute(
+            f"{doomed} DELETE FROM events WHERE run_id IN (SELECT id FROM doomed) AND NOT ({_OWNER_SAVED_LESSON})",
+            named,
+        )
         await self._db.execute(f"{doomed} DELETE FROM approvals WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM shown_pages WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM drafts WHERE run_id IN (SELECT id FROM doomed)", named)
@@ -3389,7 +3402,8 @@ class Store:
             f" OR json_extract(data, '$.channel') IN ({channel_marks})))",
             (run_id, *kinds, *channels),
         )
-        return row is not None and bool(row[0])
+        # A run whose events the prune deleted counts as it ended (item 556; the review of 2026-11-01).
+        return (row is not None and bool(row[0])) or await self.pruned_run_tainted(run_id)
 
     async def outside_reads(self, run_id: str, kinds: Sequence[str], channels: Sequence[str]) -> tuple[str, ...]:
         """What made a run one that read content third parties can author (:meth:`read_outside`), each once and sorted:
@@ -3408,6 +3422,8 @@ class Store:
         for kind, channel in rows:
             named: set[str] = ({kind} if kind in kinds else set()) | ({channel} if channel in channels else set())
             found |= named or {"tainted"}
+        if not found and await self.pruned_run_tainted(run_id):
+            found.add("tainted")
         return tuple(sorted(found))
 
     async def model_profile(self, model: str, runs: int) -> ModelProfile:
@@ -5100,8 +5116,10 @@ class Store:
             others: aiosqlite.Row | None = await self._one("SELECT dim FROM memory_vectors LIMIT 1", ())
             # (None of the others' size to go by: the trash's vectors are dropped with theirs when the model changes.)
             if row["vec"] is not None and (others is None or int(others["dim"]) == int(row["dim"])):
+                # Over any vector left under its id (an embedding that ended after the note was forgotten, which an
+                # older Dot let through), which made the restore fail.
                 await self._db.execute(
-                    "INSERT INTO memory_vectors(id, dim, vec) VALUES(?, ?, ?)",
+                    "INSERT OR REPLACE INTO memory_vectors(id, dim, vec) VALUES(?, ?, ?)",
                     (record.id, int(row["dim"]), bytes(row["vec"])),
                 )
             await self._db.execute("DELETE FROM memory_trash WHERE id = ?", (memory_id,))
@@ -5291,11 +5309,15 @@ class Store:
         return [_memory(row) for row in rows]
 
     @_writing
-    async def set_memory_vector(self, memory_id: str, vector: Sequence[float]) -> None:
+    async def set_memory_vector(self, memory_id: str, vector: Sequence[float], content: str) -> None:
+        """Keep the vector of the note ``memory_id`` embedded from ``content``, only while the note is there with those
+        words (the review of 2026-11-01): one forgotten or rewritten while it was embedded gets no stale vector, nor
+        an orphan one that a restore of the note would then collide with."""
         await self._db.execute(
-            "INSERT INTO memory_vectors(id, dim, vec) VALUES(?, ?, ?)"
+            "INSERT INTO memory_vectors(id, dim, vec) SELECT ?, ?, ?"
+            " WHERE EXISTS (SELECT 1 FROM memories WHERE id = ? AND content = ?)"
             " ON CONFLICT(id) DO UPDATE SET dim = excluded.dim, vec = excluded.vec",
-            (memory_id, len(vector), pack_vector(vector)),
+            (memory_id, len(vector), pack_vector(vector), memory_id, content),
         )
         await self._db.commit()
 
@@ -5336,8 +5358,8 @@ class Store:
         await self._db.execute(
             "INSERT INTO schedules(id, name, cron, run_at, goal, mode, enabled, created_at, last_run_at, next_run_at,"
             " thread_id, last_status, model, effort, approvals, goal_mode, timezone, history_runs, same_chat, speed,"
-            " stop_after_failures, notify, agent_id, skills)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " stop_after_failures, notify, agent_id, skills, from_outside)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 name,
@@ -5377,7 +5399,8 @@ class Store:
         await self._db.execute(
             "UPDATE schedules SET name = ?, cron = ?, run_at = ?, goal = ?, mode = ?, model = ?, effort = ?,"
             " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?,"
-            " stop_after_failures = ?, notify = ?, agent_id = ?, skills = ?, enabled = ?, next_run_at = ?,"
+            " stop_after_failures = ?, notify = ?, agent_id = ?, skills = ?, from_outside = ?, enabled = ?,"
+            " next_run_at = ?,"
             " runs_failed_in_row = 0,"
             " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
             " WHERE id = ?",
@@ -5414,6 +5437,30 @@ class Store:
             (fired_at, next_run_at, thread_id, status, next_run_at, schedule_id),
         )
         await self._db.commit()
+
+    @_writing
+    async def claim_schedule_fire(
+        self,
+        schedule_id: str,
+        due: float | None,
+        record: ScheduleRecord,
+        fired_at: float,
+        next_run_at: float | None,
+        thread_id: str,
+    ) -> bool:
+        """Write a firing of ``schedule_id`` as :meth:`record_schedule_fire` does, only while the schedule is still on
+        and still due at ``due``: an edit, a switch-off or a delete made while the firing was being prepared is kept,
+        and nothing starts (the review of 2026-11-01), as is one whose goal or times changed while its time stayed (a
+        one-time schedule edited at its own time). Whether the firing was written."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE schedules SET last_run_at = ?, next_run_at = ?, thread_id = ?, last_status = 'starting',"
+            " enabled = CASE WHEN ? IS NULL THEN 0 ELSE enabled END WHERE id = ? AND enabled = 1 AND next_run_at IS ?"
+            # The goal and the times it was read with: a one-time schedule edited at its own time keeps it.
+            " AND goal = ? AND cron IS ? AND run_at IS ?",
+            (fired_at, next_run_at, thread_id, next_run_at, schedule_id, due, record.goal, record.cron, record.run_at),
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
 
     async def opened_by(self, thread_id: str) -> str | None:
         """The source the chat ``thread_id`` was made with, which nothing changes, a rewind neither: ``initiative`` for
@@ -5815,8 +5862,8 @@ class Store:
     async def delete_agent(self, agent_id: str) -> None:
         """Forget the agent; its runs and its lessons stay, as Dot's (their ``agent_id`` is cleared). Its schedules
         (item 462) are switched off with :data:`AGENT_DELETED_STATUS` and named for no agent, in the same write: one
-        never goes on firing as Dot, with every tool, nor fails at every tick for an agent that is gone. The teams that
-        had the agent (item 610) keep the agents they have left."""
+        never goes on firing as Dot, with every tool, nor fails at every tick for an agent that is gone. Its queued
+        messages go with it. The teams that had the agent (item 610) keep the agents they have left."""
         await self.get_agent(agent_id)
         await self._db.execute("UPDATE runs SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
         await self._db.execute("UPDATE memories SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
@@ -5824,6 +5871,9 @@ class Store:
             "UPDATE schedules SET enabled = 0, next_run_at = NULL, agent_id = NULL, last_status = ? WHERE agent_id = ?",
             (AGENT_DELETED_STATUS, agent_id),
         )
+        # A message queued for it would start as Dot, with every tool, or fail the queue at its turn (the review of
+        # 2026-11-01): it goes with the agent.
+        await self._db.execute("DELETE FROM queued_messages WHERE agent_id = ?", (agent_id,))
         for team in await self.list_teams():
             if agent_id in team.agents:
                 left: str = dumps_compact([member for member in team.agents if member != agent_id])

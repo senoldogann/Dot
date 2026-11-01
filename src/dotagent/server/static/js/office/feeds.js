@@ -119,6 +119,19 @@ export function runFeeds(onChange) {
   /** @type {Map<string, Promise<void>>} */
   const loading = new Map();
 
+  // A run's stored events, page after page until a page comes back short (the review of 2026-11-01: a long run's
+  // first 2000 alone left its panel with its first steps and no end).
+  async function readHistory(runId) {
+    let after = 0;
+    for (;;) {
+      const page = await api.get(`/runs/${encodeURIComponent(runId)}/events?after=${after}&limit=${HISTORY_PAGE}`);
+      if (disposed) return;
+      for (const record of page) take({ ...record, ts: 0 });
+      if (page.length < HISTORY_PAGE) return;
+      after = page[page.length - 1].id;
+    }
+  }
+
   function take(record) {
     if (record === undefined || record === null) return;
     const feed = feeds.get(record.run_id);
@@ -179,11 +192,7 @@ export function runFeeds(onChange) {
         feeds.set(runId, newFeed(runId));
         loading.set(
           runId,
-          api
-            .get(`/runs/${encodeURIComponent(runId)}/events?after=0&limit=${HISTORY_PAGE}`)
-            .then((page) => {
-              for (const record of page) take({ ...record, ts: 0 });
-            })
+          readHistory(runId)
             .catch((error) => console.warn("the office could not read a run's steps", runId, error))
             .finally(() => loading.delete(runId)),
         );

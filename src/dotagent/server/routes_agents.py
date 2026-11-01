@@ -267,6 +267,9 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         ctx.manager.tell(request.run_id, help_note(helper), "note")
 
     async def created(request: AgentRequest) -> AgentRecord:
+        # A new agent never takes the lead's name (the review of 2026-11-01); one named so before is still changed.
+        if request.name.strip().casefold() == DOT_AGENT.name.casefold():
+            raise InvalidValueError("Dot is the lead's name; choose another for the agent", {"name": request.name})
         return await saved(_checked(request, known()))
 
     async def saved(checked: AgentRequest) -> AgentRecord:

@@ -132,7 +132,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   days, which searches skip (the list and the page still show it; take the tag off to wake it), and
   `keep-separate` on the notes whose merge you took back, which no night merges again (take it off to let them). A
   run that saves or rewrites a note cannot give it `rest` or `keep-separate`, however spelled, and keeps the ones
-  the note has (item 796).
+  the note has (item 796). A run that saves the words of your own note or of a pinned one again, with a time to hold,
+  leaves that note's time as it is: it never rests by a run's say (item 899). A note that holds only for a while is not
+  merged by hand either, as the night leaves it out (item 899): merged, it would hold for good.
 - The night merges notes that say the same in other words (item 584). Besides the fold of two lessons that say the
   same the same way round, which asks no model, the reflection shows the review model the notes of Dot's that are
   awake and not pinned, not yours and not a journal, whose embeddings are at least `merge_similarity` (0.80) close
@@ -343,7 +345,11 @@ what moved; a schedule switched off is not started so, and the end of such a run
   off: its last 3 tasks failed") and tells you once (item 458): **Switch off after** in its form (3, 5, 10, 20, never),
   else `[scheduler] stop_after_failures` (0, never, by default). Its row says how many failed in a row. A run done sets
   the row to 0, a run cancelled (stopped by you, the emergency stop or the daemon) counts neither way, a run started
-  by hand counts as one at its time, and a firing that started no run counts not at all. A one-time schedule is never
+  by hand counts as one at its time, and a firing that started no run counts not at all. A recurring schedule that
+  cannot fire at all (its time zone or its record cannot be read) is tried again a minute later, then twice as long
+  each time, an hour at most, as a one-time one is, its status saying why (item 899). A firing is written only while
+  its schedule is still on and still due at that time: a change, a switch-off or a delete made while it was being
+  prepared stands, and nothing starts (item 899). A one-time schedule is never
   switched off by it. Switching a schedule on again, or changing it, starts its row afresh.
 - A one-time schedule that fired has no run left: its row says **ran once**, in grey beside how its run ended, and has
   no switch to press (item 723); it read "switched off", as one you had switched off, and switching it on was refused.

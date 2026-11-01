@@ -171,7 +171,7 @@ async def backfill(index: MemoryIndex) -> int:
             return embedded
         vectors: list[Vector] = await embedder.embed([record.content for record in pending])
         for record, vector in zip(pending, vectors, strict=True):
-            await index.store.set_memory_vector(record.id, vector)
+            await index.store.set_memory_vector(record.id, vector, record.content)
         embedded += len(pending)
 
 
@@ -245,6 +245,10 @@ async def _saved_again(
         standing: list[MemoryRecord] = await store.get_memories([existing.merged_into])
         existing = standing[0] if standing else existing
     merged: tuple[str, ...] = _merged_tags(existing.tags, tags)
+    # The owner's note or a pinned one keeps its time: a run that saves its words again with a few days' validity does
+    # not make a note that never rests run out (the review of 2026-11-01).
+    if existing.pinned_at is not None or existing.source_run is None:
+        expires_at = existing.expires_at
     if REST_TAG in existing.tags or existing.expires_at != expires_at:
         awake: tuple[str, ...] = tuple(tag for tag in merged if tag != REST_TAG)
         woken: MemoryRecord = await store.wake_memory(existing.id, awake, time.time(), expires_at)

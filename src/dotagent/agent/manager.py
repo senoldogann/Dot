@@ -270,6 +270,12 @@ def _answer_text(question: ApprovalRecord, answer: str) -> str:
     return f"Answer to your question “{question.summary}”: {answer}"
 
 
+def _answer_said(answer: str) -> str:
+    """What of an answer to a run's question the review model takes as the owner's instruction: their own words alone.
+    The question is the run's, which a page it read may have written (the review of 2026-11-01)."""
+    return f"(Answer to a question of the run) {answer}"
+
+
 def goes_on_from(run: RunRecord, earlier: RunRecord) -> bool:
     """Whether ``run`` goes on with the task of ``earlier`` in its chat (item 868): a resume of it, the run the answer
     to a question it left started (:meth:`RunManager._carry_on`), or the one the owner's answer to a step it kept
@@ -818,6 +824,7 @@ class RunManager:
         goal_mode: bool | None,
         carried: tuple[str, ...],
         skills: tuple[str, ...] = (),
+        from_outside: bool = False,
     ) -> RunRecord:
         """Queue the run of a schedule's firing in the chat ``thread_id`` (item 257). ``goal`` is the schedule's, the
         owner's words, which the run keeps, its reviewer takes as the owner's instruction and its chat shows;
@@ -825,9 +832,22 @@ class RunManager:
         schedule's earlier runs (``scheduler/history.py``). ``carried`` are the earlier runs whose words the run reads,
         in the digest or in its chat: it starts tainted when one of them ended so. Goal mode is asked by the goal
         alone; fast mode only of a model that has it (item 291). ``skills`` are the schedule's (item 666): the run
-        starts with them as with a message's picks of skills. The rest is as for :meth:`start`."""
+        starts with them as with a message's picks of skills. ``from_outside``: the schedule was made by a run that read
+        content third parties can author, so the run starts tainted. The rest is as for :meth:`start`."""
         return await self._launch_firing(
-            goal, opening, mode, model, thread_id, effort, speed, approvals, goal_mode, carried, None, skills
+            goal,
+            opening,
+            mode,
+            model,
+            thread_id,
+            effort,
+            speed,
+            approvals,
+            goal_mode,
+            carried,
+            None,
+            skills,
+            from_outside,
         )
 
     async def start_firing_for_agent(
@@ -844,6 +864,7 @@ class RunManager:
         goal_mode: bool | None,
         carried: tuple[str, ...],
         skills: tuple[str, ...] = (),
+        from_outside: bool = False,
     ) -> RunRecord:
         """Queue the run of the firing of a schedule of ``agent`` (item 462), as :meth:`start_firing` queues one of
         Dot's, within the agent's bounds (:func:`agent_bounds`): the schedule's own model, reasoning level and
@@ -863,6 +884,7 @@ class RunManager:
             carried,
             agent.id,
             skills,
+            from_outside,
         )
 
     async def _launch_firing(
@@ -879,6 +901,7 @@ class RunManager:
         carried: tuple[str, ...],
         agent_id: str | None,
         skills: tuple[str, ...],
+        from_outside: bool = False,
     ) -> RunRecord:
         """The run of a schedule's firing, of Dot (``agent_id`` None) or of one of the owner's agents, with the skills
         of the schedule picked for it."""
@@ -898,7 +921,9 @@ class RunManager:
             speed,
             approvals,
             goal_mode_asked(goal, mode, goal_mode),
-            RunOpening(text=opening, files=(), resumed=None, once=None, carried=carried, picks=picks),
+            RunOpening(
+                text=opening, files=(), resumed=None, once=None, carried=carried, picks=picks, tainted=from_outside
+            ),
             None,
             agent_id,
         )
@@ -2152,7 +2177,7 @@ class RunManager:
         if active is not None:
             try:
                 active.inbox.put_nowait(
-                    UserInput(text=text, files=(), question_id=question.id, vouches=vouches, said=text)
+                    UserInput(text=text, files=(), question_id=question.id, vouches=vouches, said=_answer_said(answer))
                 )
             except asyncio.QueueShutDown:
                 await active.finished.wait()
@@ -2167,7 +2192,10 @@ class RunManager:
                 "a run of another process is working on this thread; answer the question once it has ended",
                 {"approval_id": question.id, "thread_id": asked.thread_id, "run_id": newest.id},
             )
-        goal: str = f"{asked.goal}\n\n{text}"
+        # The goal, which the review model takes as the owner's words, holds their answer alone; the question, which
+        # the run wrote, is in what the model reads first (the review of 2026-11-01).
+        goal: str = f"{asked.goal}\n\n{_answer_said(answer)}"
+        opening: str = f"{asked.goal}\n\n{text}"
         run, _ = await self._launch(
             goal,
             asked.mode,
@@ -2182,7 +2210,7 @@ class RunManager:
             # One that vouches for nothing starts tainted when the run that asked, or the chat's last run, ended so,
             # as the run a kept step's answer starts does (item 482).
             RunOpening(
-                text=goal,
+                text=opening,
                 files=(),
                 resumed=None,
                 once=asked.once,
@@ -2202,10 +2230,20 @@ class RunManager:
         which brings the next one forward."""
         session: RunHandle | None = self._handles.get(question.run_id)
         if approve and session is not None:
+            # A session is answered as any run that left a question (item 508, :meth:`_carry_on`): the owner's answer to
+            # one they watch clears no mark of content others can write, and only their words are an instruction (the
+            # review of 2026-11-01: it vouched always).
+            asked: RunRecord = await self._runtime.store.get_run(question.run_id)
             try:
                 answer: str = _answer_text(question, note)
                 session.inbox.put_nowait(
-                    UserInput(text=answer, files=(), question_id=question.id, vouches=True, said=answer)
+                    UserInput(
+                        text=answer,
+                        files=(),
+                        question_id=question.id,
+                        vouches=not can_ask_user(asked.source, asked.parent_run_id, asked.approvals),
+                        said=_answer_said(note),
+                    )
                 )
             except asyncio.QueueShutDown:
                 # It is recording its end and reads nothing more.
@@ -2826,9 +2864,8 @@ class RunManager:
         store: Store = self._runtime.store
         campaign: CampaignRecord = await store.get_campaign(campaign_id)
         asked: list[ApprovalRecord] = await store.campaign_questions(campaign.id, ASK_USER_TOOL, BRIEF_QUESTIONS)
-        answers: list[str] = [
-            _answer_text(question, question.note) for question in asked if question.status == "approved"
-        ]
+        # Their answers alone: the questions are the sessions' words (the review of 2026-11-01).
+        answers: list[str] = [_answer_said(question.note) for question in asked if question.status == "approved"]
         return (*await self._instructions_for((goal,), campaign.thread_id, None, None), *answers)
 
     async def _firing_effort(self, ref: ModelRef, effort: Effort) -> Effort | None:

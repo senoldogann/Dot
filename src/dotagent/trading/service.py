@@ -21,7 +21,7 @@ from typing import Literal, Protocol
 from zoneinfo import ZoneInfo
 
 from dotagent.config import ANY_PRODUCT, TradingConfig
-from dotagent.core.errors import ToolExecutionError
+from dotagent.core.errors import DotError, ToolExecutionError
 from dotagent.core.logs import get_logger
 from dotagent.store.db import Store
 from dotagent.store.models import TradingExitRecord, TradingOrderRecord
@@ -572,7 +572,13 @@ class Trading:
             quote: Quote | None = quotes.get(exit_.product)
             if quote is None or _reached(exit_, quote) is None:
                 continue
-            end: ExitEnd | None = await self._close(exit_.id, quote)
+            try:
+                end: ExitEnd | None = await self._close(exit_.id, quote)
+            except DotError as error:
+                # One exit's store or account failing does not lose what the others came to: a stop that sold before it
+                # is still told (the review of 2026-11-01); this one is looked at again next time.
+                _log.warning("trading_exit_not_closed", exit_id=exit_.id, error=error.message)
+                continue
             if end is not None:
                 ends.append(end)
         return self._told_once_held(ends)

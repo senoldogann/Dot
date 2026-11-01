@@ -384,8 +384,10 @@ class Initiative:
                 "task",
                 todo.tainted,
             )
-        except DotError:
-            # Its last run stays named (the review of item 790): an owner's resume of it is found by that id.
+        except BaseException:
+            # Its last run stays named (the review of item 790): an owner's resume of it is found by that id. Whatever
+            # kept the run from starting (a store, a bug, the daemon stopping), the thing is open again, not left
+            # "doing" with no run until the next start of the daemon (the review of 2026-11-01).
             await store.set_todo(todo.id, "open", todo.attempts, todo.run_id, todo.note)
             raise
         await store.set_todo(todo.id, "doing", todo.attempts, run.id, todo.note)

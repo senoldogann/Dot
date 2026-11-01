@@ -299,9 +299,21 @@ async def open_hub(configs: Sequence[McpServerConfig], login_env: Mapping[str, s
     """Start every enabled server at once. One that cannot start is left out with the reason, and the others serve
     their tools, so Dot starts without the tools of a broken server. A cancellation stops every server again."""
     enabled: list[McpServerConfig] = [config for config in configs if config.enabled]
-    outcomes: list[_Connected | BaseException] = list(
-        await asyncio.gather(*(_connect_kept(config, login_env) for config in enabled), return_exceptions=True)
-    )
+    tasks: list[asyncio.Task[_Connected]] = [
+        asyncio.create_task(_connect_kept(config, login_env)) for config in enabled
+    ]
+    try:
+        outcomes: list[_Connected | BaseException] = list(await asyncio.gather(*tasks, return_exceptions=True))
+    except BaseException:
+        # Cancelled while they start (the daemon stopping): the servers that had connected are stopped too, as the
+        # others are by the cancellation (the review of 2026-11-01).
+        for task in tasks:
+            task.cancel()
+        finished: list[_Connected] = [
+            task.result() for task in tasks if task.done() and not task.cancelled() and task.exception() is None
+        ]
+        await asyncio.gather(*(done.connection.close() for done in finished), return_exceptions=True)
+        raise
     connected: dict[str, _Connected] = {
         config.name: outcome
         for config, outcome in zip(enabled, outcomes, strict=True)

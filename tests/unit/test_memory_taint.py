@@ -51,6 +51,18 @@ def _context(index: MemoryIndex, tainted: bool) -> SimpleNamespace:
         run_id="run_1",
         agent_id=None,
         tainted=lambda: tainted,
+        ever_tainted=lambda: tainted,
+    )
+
+
+def _context_cleared(index: MemoryIndex) -> SimpleNamespace:
+    """A run that read outside content, whose mark the owner's later message cleared."""
+    return SimpleNamespace(
+        runtime=SimpleNamespace(memory=index),
+        run_id="run_1",
+        agent_id=None,
+        tainted=lambda: False,
+        ever_tainted=lambda: True,
     )
 
 
@@ -184,3 +196,14 @@ async def test_a_runs_core_note_is_handed_when_it_fits_and_to_every_run_once_the
     assert owners.id in handed and pinned.id in handed
     assert asks.id not in handed, "a run's core note no one pinned was handed to a run it does not fit"
     assert asks.id in {note.id for note in about_it.records}
+
+
+async def test_a_note_saved_after_the_owner_cleared_the_runs_mark_keeps_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review of 2026-11-01: the owner's "go on" clears the run's mark, not the page's words a note may quote; a
+    note is marked by whether the run ever read such content, as a skill is (item 893)."""
+    async with _index(tmp_path, monkeypatch) as index:
+        await _call("memory_save", _context_cleared(index), {"content": NOTE, "tags": []})
+        notes: dict[str, bool] = {note.content: note.tainted for note in await index.store.list_memories(10, 0)}
+    assert notes == {NOTE: True}

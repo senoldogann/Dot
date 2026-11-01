@@ -558,20 +558,29 @@ last, ended, whose goal holds none of Dot's words and whose quote of the message
 [Reactions](runs.md#reactions-on-dots-messages)). A 📌 makes a note marked as read from outside content when the run read
 some. A message you send to the run clears the mark; your answer to a question of a run you watch does not, whether the
 run waited for it or went on (item 508), as it answers what the run asked rather than sending it on its way: the run it
-reaches stays marked, and the run it starts once that run has ended starts as untrusted as that run ended. A delegated
+reaches stays marked, and the run it starts once that run has ended starts as untrusted as that run ended; so does
+your answer to a question of a campaign's session (item 899). Of any answer the review model takes your words alone
+as your instruction, not the question the run wrote, which a page it read may have written (item 899). A delegated
 run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off, and the run that
 tells a chat that its command in the background ended as the chat's last run ended: that message is Dot's, not yours,
 and so is the note that tells a run at work of such an end, which clears nothing. The run a watcher starts for a mail,
 an event or a notification (item 571, see [Dot comes to you](proactive.md#watchers)) starts untrusted whatever it goes
 on from, since what a stranger wrote set it off: its goal is your own words and the item stands in its first message, in
-a fence. The run a move of the market starts (item 772) starts unmarked, as its schedule's firing does: what its first
+a fence. So does every firing of a schedule a run made after it had read outside content (`schedule_create`, item
+899): its goal may hold those words; a change of yours in its form keeps the mark, and a schedule you make is yours. The run a move of the market starts (item 772) starts unmarked, as its schedule's firing does: what its first
 message adds is product ids Dot checked against the form of an id and numbers it read from Coinbase's list, no one's
-words. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`):
+words. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`),
+as does one it saved after your message cleared its mark, since your words clear the run's mark, not the page's
+words a note may quote (item 899; a thing for later, `todo_add`, the same):
 it is never among the notes a run starts with, is handed while it works or as a site's lessons (item 384), a
 `memory_search` that returns one marks the run that read it, so its next save asks again, and Settings › Memory and
 `dotx memory list` say of such a note that it was saved while reading outside content. A learned skill whose steps may
 come from outside content (its record says so, or is older than the mark) marks the run that reads it with the `skill`
-tool, and a run that starts with one picked in the composer starts marked (item 585).
+tool, and a run that starts with one picked in the composer starts marked (item 585). A link in an answer whose words
+name an address it does not go to ("https://accounts.example.com" leading to another site) shows the host it goes to
+beside its words (item 899), so an answer a page steered cannot show one site and open another. A call of an MCP
+server that failed without its answer (the server died, the session was lost) gives the model what came with the
+failure, the server's message and the tail of what its process wrote, fenced as its answers are (item 899).
 
 **What a server says of itself** (item 659). When a run's tools come in groups, the line of an MCP server's group in its
 instructions says what the server is for, so that the model can tell which group to turn on ([MCP

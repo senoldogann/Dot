@@ -74,10 +74,18 @@ export function onStreamBack(listener) {
   return () => backListeners.delete(listener);
 }
 
+// The newest read: an older one that answers after it shows nothing (the review of 2026-11-01: a card answered between
+// two reads stood as waiting again until the next tick).
+let reads = 0;
+
 /** Read the status and the approvals that wait; each is shown as soon as it is read, so that one that fails does not
  * keep the other (the emergency stop's banner, the count of what waits) as it was (item 559). Throws what failed. */
 export async function refresh() {
+  const ticket = ++reads;
   const [status, approvals] = await Promise.allSettled([api.get("/status"), api.get("/approvals?status=pending&limit=100")]);
+  if (ticket !== reads) {
+    return;
+  }
   if (status.status === "fulfilled") {
     snapshot.status = status.value;
     snapshot.outdated = status.value.pages !== OWN_PAGES;

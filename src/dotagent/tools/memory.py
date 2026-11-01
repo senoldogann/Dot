@@ -170,8 +170,10 @@ def _save_tool() -> RegisteredTool:
         # A note a run saves is Dot's, for every run; only lessons are an agent's own (item 94). A run that had read
         # content third parties can author saves a tainted note: yolo removes the approval, not the origin.
         expires_at: float | None = expiry_of(args.valid_days, time.time())
+        # Read at any time in the run, not as it stands: the owner's "go on" clears the run's taint, not the page's
+        # words it may quote (the review of 2026-11-01, as skill_save does).
         saved: SavedMemory = await save_memory(
-            ctx.runtime.memory, args.content, _own_tags(args.tags), ctx.run_id, None, expires_at, ctx.tainted()
+            ctx.runtime.memory, args.content, _own_tags(args.tags), ctx.run_id, None, expires_at, ctx.ever_tainted()
         )
         return ok(render_saved(saved))
 
@@ -287,7 +289,7 @@ def _update_tool() -> RegisteredTool:
             args.content,
             _own_tags(args.tags, (await ctx.runtime.memory.store.get_memory(args.memory_id)).tags),
             ctx.run_id,
-            ctx.tainted(),
+            ctx.ever_tainted(),
         )
         return ok(f"Updated: {render_note(updated)}")
 
