@@ -48,18 +48,22 @@ from dotagent.server.views import (
     TeamUse,
     TeamView,
     TemplateUse,
+    WorkOrderView,
 )
 from dotagent.store.db import Store
 from dotagent.store.models import (
     DOT_AGENT,
     DOT_AGENT_ID,
+    OPEN_WORK_ORDERS,
     AgentLook,
     AgentRecord,
     AgentToolUse,
     MemoryRecord,
+    ObjectiveRecord,
     RunMode,
     RunRecord,
     TeamRecord,
+    WorkOrderRecord,
 )
 from dotagent.tools.base import ToolResult
 from dotagent.tools.context import DelegateOutcome
@@ -69,6 +73,8 @@ log = get_logger(__name__)
 
 # How many of its newest runs an agent's page shows.
 _PAGE_RUNS: int = 50
+# How many work orders and objectives the Agents page lists (items 907, 908).
+_WORK_ORDERS_LISTED: int = 60
 # How many of the newest messages an agent sent or received its page shows.
 _PAGE_MESSAGES: int = 50
 # How many of its newest ended runs an agent's page reads for the tools it used (item 874), and how many must have
@@ -252,6 +258,35 @@ def agents_router(ctx: ServerContext) -> APIRouter:
                 latest_title=titles.get(latest[agent.id].thread_id) if agent.id in latest else None,
             )
             for agent in await store.list_agents()
+        ]
+
+    @router.get("/work-orders")
+    async def list_work_orders() -> list[WorkOrderView]:
+        """The work orders the lead handed out (item 907): the open ones first, then the newest that were accepted or
+        cancelled, each with its agent's name and the objective it serves."""
+        orders: list[WorkOrderRecord] = await store.list_work_orders(None, _WORK_ORDERS_LISTED)
+        names: dict[str, str] = {agent.id: agent.name for agent in await store.list_agents()}
+        titles: dict[str, str] = {
+            objective.id: objective.title
+            for objective in await store.list_objectives(("active", "done", "dropped"), _WORK_ORDERS_LISTED)
+        }
+        ranked: list[WorkOrderRecord] = sorted(orders, key=lambda order: order.status not in OPEN_WORK_ORDERS)
+        return [
+            WorkOrderView(
+                order=order,
+                agent_name=names.get(order.agent_id, ""),
+                objective_title=None if order.objective_id is None else titles.get(order.objective_id),
+            )
+            for order in ranked
+        ]
+
+    @router.get("/objectives")
+    async def list_objectives() -> list[ObjectiveRecord]:
+        """The owner's objectives Dot keeps (item 908): the active ones, then those done or let go, each with its
+        dated lines of progress."""
+        return [
+            *await store.list_objectives(("active",), _WORK_ORDERS_LISTED),
+            *reversed(await store.list_objectives(("done", "dropped"), _WORK_ORDERS_LISTED)),
         ]
 
     book: OfferBook = OfferBook()

@@ -58,11 +58,17 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 200 for `skill_save` (item 893, after a guide to Grok's bots the owner sent: "tell your bots to create
 # skills for itself as you give it instructions"): a run writes down how the owner told it to do a kind of work, in a
 # group of its own (24,110 measured with item 890; tools 16,684).
-BUDGET_TOKENS: int = 24_200
+# Raised by 1,200 for the work orders and the objectives (items 907, 908, the owner's ask of 2026-11-01: Dot runs its
+# agents as a CEO runs staff): `assign_work`, `work_orders` and `review_work` (the lead hands work out without waiting
+# and judges what comes back), `objective_add`, `objective_update` and `objectives` (what the owner wants moved
+# forward), each described in a line, and the lead's paragraph on managing (25,356 measured; system 7,591, tools
+# 17,739).
+BUDGET_TOKENS: int = 25_400
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
-SYSTEM_BUDGET_TOKENS: int = 7_400
+# Raised by 200 for the lead's paragraph on work orders (item 907).
+SYSTEM_BUDGET_TOKENS: int = 7_600
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
@@ -70,7 +76,8 @@ SYSTEM_BUDGET_TOKENS: int = 7_400
 # (item 887) above, and by 100 for items 880 and 875 above.
 # Raised by 200 for the office's two tools (item 890) above.
 # Raised by 200 for `skill_save` (item 893) above.
-TOOLS_BUDGET_TOKENS: int = 16_800
+# Raised by 1,000 for the six tools of items 907 and 908 above.
+TOOLS_BUDGET_TOKENS: int = 17_800
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

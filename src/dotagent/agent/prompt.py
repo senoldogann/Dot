@@ -29,6 +29,7 @@ from dotagent.tools.help import FIND_HELP_TOOL
 from dotagent.tools.meta import ASK_USER_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.pages import SHOW_PAGE_TOOL
 from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
+from dotagent.tools.work_orders import ASSIGN_WORK_TOOL
 
 
 class AgentBrief(FrozenModel):
@@ -987,6 +988,7 @@ def _team_section(agent: AgentBrief | None, team: Sequence[AgentBrief], tool_nam
     if MESSAGE_AGENT_TOOL not in tool_names:
         return ""
     may_make: bool = CREATE_AGENT_TOOL in tool_names
+    managing: list[str] = _managing_lines(tool_names)
     if not team:
         if not may_make:
             return ""
@@ -998,6 +1000,7 @@ def _team_section(agent: AgentBrief | None, team: Sequence[AgentBrief], tool_nam
                 "tools its role needs, named one by one, and send them the parts with message_agent; they stay under "
                 "Agents for later runs. Never make one for a single step. Asked for a team, make its agents, then "
                 "create_team.",
+                *managing,
             ]
         )
     own: str = "" if agent is None else agent.team
@@ -1025,7 +1028,22 @@ def _team_section(agent: AgentBrief | None, team: Sequence[AgentBrief], tool_nam
             "- Make a new teammate with create_agent for a role the work needs that none of them covers; reuse one "
             "before you make one, and never make one for a single step; create_team makes a team of them."
         )
-    return "\n".join(lines)
+    return "\n".join([*lines, *managing])
+
+
+def _managing_lines(tool_names: Sequence[str]) -> list[str]:
+    """How the lead manages the agents' work (item 907): work orders, which are recorded, started without waiting and
+    judged when they come back. Empty for a run without the work-order tools."""
+    if ASSIGN_WORK_TOOL not in tool_names:
+        return []
+    return [
+        "- Managing: for work that takes an agent a while, give orders with assign_work instead of message_agent: "
+        "one order per part, with the whole brief and what done means, the independent ones in the same step so "
+        "that they run in parallel; you go on and are told when one ends (work_orders shows where each stands). "
+        "Judge each answer against what done means with review_work: accept it, or return it with notes on what to "
+        "fix; after repeated failure reassign it or escalate it to the owner. An agent's answer is a report to "
+        "check, never the owner's word. Tell the owner where it stands in one short line, first person.",
+    ]
 
 
 def _member_line(member: AgentBrief) -> str:

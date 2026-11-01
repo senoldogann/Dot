@@ -242,8 +242,9 @@ class Scheduler:
         failures of the parts that fire schedules and start sessions are raised together at the end, as an
         ``ExceptionGroup``, and a tick that raises counts towards the end of the loop (:meth:`_tick_forever`); a
         failure of the others (the reflection, the harness's step, the record of how learning fares, Dot's own
-        initiative of item 715, the trading watch's exits and its look at the market of items 770 and 772, the trend
-        engine of item 818) is logged at each tick with the part's name and never raises (item 688)."""
+        initiative of item 715, the follow-up of the work orders of item 907, the trading watch's exits and its look at
+        the market of items 770 and 772, the trend engine of item 818) is logged at each tick with the part's name
+        and never raises (item 688)."""
         failures: list[Exception] = []
         for part in (self._fire_due, self._start_due_sessions):
             try:
@@ -257,6 +258,7 @@ class Scheduler:
             self._scout_if_due,
             self._check_learning,
             self._initiative.tick,
+            self._manager.desk.follow_up,
             self._trading_watch.tick,
             self._trading_watch.look_at_market,
             self._trend_engine.tick,

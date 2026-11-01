@@ -13,6 +13,7 @@ from dotagent.store.models import RunMode, RunRecord
 from dotagent.web.refused import RefusedHosts
 
 if TYPE_CHECKING:
+    from dotagent.agent.orders import WorkDesk
     from dotagent.agent.verify import RunFacts
     from dotagent.runtime import Runtime
 
@@ -58,6 +59,11 @@ class Spawner(Protocol):
     def answers_reach_runs(self) -> bool:
         """Whether the user's answer to a question a run left reaches the run while it works (item 508): true in the
         daemon, false in a ``dotx`` command, whose runs no other process steers."""
+        ...
+
+    @property
+    def desk(self) -> "WorkDesk":
+        """The work orders this process hands out and follows (item 907)."""
         ...
 
     async def delegate(

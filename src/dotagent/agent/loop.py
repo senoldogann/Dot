@@ -298,11 +298,13 @@ from dotagent.tools.meta import (
     FinishArgs,
     UseToolsArgs,
 )
+from dotagent.tools.objectives import OBJECTIVE_TOOLS
 from dotagent.tools.office import AGENTS_NOW_TOOL, READ_AGENT_CHAT_TOOL
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import skill_instructions
 from dotagent.tools.team import CREATE_AGENT_TOOL, CREATE_TEAM_TOOL, MESSAGE_AGENT_TOOL
+from dotagent.tools.work_orders import ASSIGN_WORK_TOOL, WORK_ORDER_TOOLS
 from dotagent.vault.onepassword import kept_token
 
 log = get_logger(__name__)
@@ -331,6 +333,9 @@ _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
         MESSAGE_AGENT_TOOL,
         CREATE_AGENT_TOOL,
         CREATE_TEAM_TOOL,
+        # The lead hands work out and keeps the objectives (items 907, 908); a run it handed a part to does neither.
+        *WORK_ORDER_TOOLS,
+        *OBJECTIVE_TOOLS,
     }
 )
 # The sources of runs no message of the owner's started (item 664). "background" is agent/manager.py's
@@ -1091,7 +1096,8 @@ def step_parallelism(calls: Sequence[ToolCall], group: int, configured: int) -> 
     """How many of a step's calls run at once: a group chat's many (``group``, :func:`parallel_calls`) only for a reply
     whose calls all send agents their parts, so that a lead's reads and searches keep the owner's ``[agent]
     parallel_tools`` (the pre-push review of item 831: a small Mac's limit was the lead's eight web reads)."""
-    return group if calls and all(call.name == MESSAGE_AGENT_TOOL for call in calls) else configured
+    sends: bool = bool(calls) and all(call.name in (MESSAGE_AGENT_TOOL, ASSIGN_WORK_TOOL) for call in calls)
+    return group if sends else configured
 
 
 def _team_brief(record: TeamRecord | None, agents: Sequence[AgentRecord], run: RunRecord) -> TeamBrief | None:
@@ -2124,7 +2130,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # Without a teammate the message tool goes, unless the run may make one (item 99): then it stays, so a teammate
     # made mid-run can be messaged at once.
     if not team and all(spec.name != CREATE_AGENT_TOOL for spec in specs):
-        specs = tuple(spec for spec in specs if spec.name != MESSAGE_AGENT_TOOL)
+        specs = tuple(spec for spec in specs if spec.name not in {MESSAGE_AGENT_TOOL, *WORK_ORDER_TOOLS})
+    # The objectives are Dot's own (item 908): a run of an agent keeps none.
+    if run.agent_id is not None:
+        specs = tuple(spec for spec in specs if spec.name not in OBJECTIVE_TOOLS)
     # The agents the run knows of (item 99): the ones at its start; a newcomer is noted at the next step.
     known_agents: set[str] = {member.id for member in team} | ({run.agent_id} if run.agent_id is not None else set())
     may_message: bool = any(spec.name == MESSAGE_AGENT_TOOL for spec in specs)

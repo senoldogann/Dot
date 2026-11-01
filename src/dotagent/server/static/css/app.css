@@ -10197,6 +10197,32 @@ button.attach-chip:hover {
   font-size: var(--text-sm);
 }
 
+/* The work orders of the Agents page (items 907, 908): the active objectives, then the orders, in one card. */
+.work-sub {
+  margin: 0;
+  padding: var(--pad-row);
+  border-top: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+}
+
+.work-sub:first-child {
+  border-top: 0;
+}
+
+.work-sub + .list-row {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.work-heads {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .template-card > .btn {
   margin-top: auto;
   align-self: flex-start;

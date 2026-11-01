@@ -30,6 +30,7 @@ import { messageRow } from "./team.js";
 import { getSnapshot, loadModels, onChange, onLifecycle, onStreamBack } from "../state.js";
 import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
+import { workOrdersPart } from "../workorders.js";
 
 const DOT_ID = "dot";
 // The template of the trading desk's agent (item 847, agent/templates.py).
@@ -1032,6 +1033,8 @@ function mountList(root, ctx) {
     officeHolder,
   );
   showOffice(readPref(OFFICE_KEY) !== "off");
+  // What Dot handed out to the agents and the objectives it keeps (items 907, 908), read only.
+  const work = workOrdersPart();
   root.append(
     pageHead(
       "Agents",
@@ -1040,6 +1043,7 @@ function mountList(root, ctx) {
     ),
     editorSlot,
     officePart,
+    work.element,
     yourTeams,
     yours,
     templates,
@@ -1048,11 +1052,13 @@ function mountList(root, ctx) {
     if (event.kind === "run_started" || event.kind === "run_finished") {
       attempt(reload);
       attempt(reloadTeams);
+      attempt(work.reload);
     }
   });
   const stopBack = onStreamBack(() => {
     attempt(reload);
     attempt(reloadTeams);
+    attempt(work.reload);
   });
   // The list is read again when a run starts or ends; in between, the cards' ages keep up with the clock (item 633).
   const ages = setInterval(() => {
@@ -1063,6 +1069,7 @@ function mountList(root, ctx) {
   attempt(reload);
   attempt(reloadTeams);
   attempt(loadTemplates);
+  attempt(work.reload);
   return () => {
     disposed = true;
     clearInterval(ages);
@@ -1070,6 +1077,7 @@ function mountList(root, ctx) {
     stopBack();
     closeEditor();
     office?.dispose();
+    work.dispose();
   };
 }
 

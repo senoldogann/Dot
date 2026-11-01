@@ -55,6 +55,11 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "teach.py:draft_taught_skill": (True,),
     # An agent a run makes, its words masked before they are stored (the review of 2026-11-01).
     "tools/team.py:_create_agent_tool.run": (True,),
+    # The words of a work order and of an objective, masked before they are stored (items 907, 908).
+    "tools/work_orders.py:_assign_tool.run": (True,),
+    "tools/work_orders.py:_review_tool.run": (True,),
+    "tools/objectives.py:_add_tool.run": (True,),
+    "tools/objectives.py:_update_tool.run": (True,),
     # The part a help offer says a free agent could take, masked before the office shows it (item 896).
     "server/routes_agents.py:agents_router.help_offers": (True,),
     # A skill the owner said in a chat (item 893), masked before it is written.

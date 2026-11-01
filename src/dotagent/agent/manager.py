@@ -56,6 +56,7 @@ from dotagent.agent.lessons import (
 )
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.mode_words import resolved_mode
+from dotagent.agent.orders import WorkDesk
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
 from dotagent.agent.parking import allowed_text, handed_back_text, parking_for
 from dotagent.agent.picks import picked_groups, picks_problems
@@ -474,6 +475,8 @@ class RunManager:
         # Whether the daemon's next start resumes on its own the runs it cut off: ``[agent] resume``, or what the owner
         # chose since (:meth:`set_resume_mode`).
         self._resume_mode: ResumeMode = runtime.config.agent.resume
+        # The work orders the lead hands out (item 907): their attempts are runs of this manager, followed to their end.
+        self.desk: WorkDesk = WorkDesk(runtime, self)
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
@@ -665,6 +668,18 @@ class RunManager:
 
     def active_run_ids(self) -> list[str]:
         return list(self._handles)
+
+    def live_run_in(self, thread_id: str) -> str | None:
+        """The run at work in the chat ``thread_id`` in this process, ``None`` when none is (item 907: the lead's chat
+        is told what its work orders came to by whichever run of it is at work)."""
+        return next(
+            (
+                handle.run_id
+                for handle in self._handles.values()
+                if handle.thread_id == thread_id and handle.parent_run_id is None
+            ),
+            None,
+        )
 
     def main_model(self) -> str:
         """The model a run that names none starts on (:meth:`set_main_model`)."""
@@ -1318,6 +1333,7 @@ class RunManager:
         agent_id: str | None,
         opening: str | None = None,
         on_start: Callable[[str], None] | None = None,
+        tainted: bool = False,
     ) -> DelegateOutcome:
         """Run ``goal`` as a run of its own on ``model``, or on the parent's model as it is stored now when that is
         ``None`` (after a switch to a standby model, the standby), and wait until it ends.
@@ -1332,7 +1348,8 @@ class RunManager:
         agent's own model and effort bound it where the agent names them, the parent's where it does not, and it
         answers the policy's questions the stricter way of the agent's and the parent's (item 135). A delegated run
         whose end the store could not record is a ``StoreError``, not an outcome: what the store holds of it is how it
-        was while it worked.
+        was while it worked. ``tainted`` starts it untrusted whatever its parent is: its goal quotes words that came of
+        content third parties can author (item 907: a work order's brief and the answer sent back).
         """
         parent: RunRecord = await self._runtime.store.get_run(parent_run_id)
         agent: AgentRecord | None = None if agent_id is None else await self._runtime.store.get_agent(agent_id)
@@ -1367,6 +1384,7 @@ class RunManager:
                 once=None,
                 carried=(),
                 picks=NO_PICKS,
+                tainted=tainted,
             ),
             None,
             helper_of,
@@ -1995,6 +2013,8 @@ class RunManager:
         for handle in handles:
             self.cancel(handle.run_id)
         await asyncio.gather(*(handle.finished.wait() for handle in handles))
+        # The attempts of work orders, which the stop ended, are written down before the store closes (item 907).
+        await self.desk.close()
         if self._asks is not None:
             self._asks.cancel()
         learning: list[asyncio.Task[None]] = [*self._learning.values(), *self._distilling.values()]
@@ -3029,6 +3049,9 @@ class RunManager:
         (:meth:`store_left_ends`), and the run stays as the store has it until then."""
         try:
             await _to_its_end(self._record_end(run, status, result, needs, error, inbox, restated))
+            # The orders a Stop ends are ended under the same shield: a second stop meanwhile cuts nothing short (the
+            # pre-push review of item 907).
+            await _to_its_end(self._stop_orders_with(run, status, result))
             return True
         except Exception:
             log.exception("run_end_not_recorded", run_id=run.id, status=status)
@@ -3041,6 +3064,17 @@ class RunManager:
             self._emergency.discard(run.id)
             self._cutting.discard(run.id)
             finished.set()
+
+    async def _stop_orders_with(self, run: RunRecord, status: RunStatus, result: str) -> None:
+        """The work orders of a chat whose run was stopped stop with it (item 907, :meth:`WorkDesk.lead_ended`): a run
+        another run delegated has no chat of orders of its own. What goes wrong there is logged, and the end of the run
+        stands."""
+        if run.parent_run_id is not None or status != "cancelled":
+            return
+        try:
+            await self.desk.lead_ended(run, classify_ending(status, result))
+        except Exception:
+            log.exception("work_orders_not_stopped", run_id=run.id, thread_id=run.thread_id)
 
     async def _record_end(
         self,
