@@ -6,12 +6,14 @@
 
 import { DOT_ID, actorFace, lookOf } from "../actors.js";
 import { api } from "../api.js";
-import { clip, el } from "../dom.js";
+import { el } from "../dom.js";
 import { icon } from "../icons.js";
+import { prose } from "../prose.js";
 import { toast, toastError } from "../ui.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack } from "../state.js";
 import { decide, heading, makeAgent, modeOf, step, visit } from "./brain.js";
 import { runFeeds } from "./feeds.js";
+import { tailOf } from "./tail.js";
 import { makeFigure } from "./figure.js";
 import { planFor } from "./layout.js";
 import { gridFor } from "./nav.js";
@@ -446,6 +448,8 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     }
 
     function select(id) {
+      // The nodes kept of another agent's chat are let go: one chat is in the panel at a time.
+      if (id !== selected) forgetChat();
       selected = id;
       markChosen();
       followWork();
@@ -458,6 +462,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     }
 
     function closePanel() {
+      forgetChat();
       selected = null;
       markChosen();
       panel?.dispose?.();
@@ -469,27 +474,32 @@ export function mountOffice(holder, { composerFor, openAgent }) {
 
     // The live work of the agent in the panel (item 889): its steps as they come, the newest last, and the answer as it
     // is written; a free agent's last run, as it ended.
+    // What the run at work does now, as the last of its chat (item 905): its newest steps as the chat's activity rows,
+    // and the words it writes rendered as an answer is. Made again only when a step or a word changed.
+    /** @type {{ key: string, node: HTMLElement } | null} */
+    let liveKept = null;
     function feedView(feed, mode) {
-      if (feed === undefined || (feed.steps.length === 0 && feed.text === "")) {
-        return el("div", { class: "office-panel-live", hidden: true });
-      }
-      const steps = feed.steps
-        .slice(-8)
-        .map((one) =>
-          el(
-            "li",
-            { class: "office-step", dataset: { state: one.ok === null ? "running" : one.ok ? "ok" : "failed" } },
-            el("span", { class: "office-step-mark", "aria-hidden": "true" }),
-            el("span", { class: "office-step-words" }, one.words),
-          ),
-        );
+      if (feed === undefined || (feed.steps.length === 0 && feed.text === "")) return null;
+      const recent = feed.steps.slice(-6);
       const text = feed.text.trim();
-      return el(
-        "section",
-        { class: "office-panel-live", "aria-label": mode === "free" ? "What it did last" : "What it does now", "aria-live": "polite" },
-        steps.length > 0 ? el("ol", { class: "office-steps" }, ...steps) : null,
-        text !== "" ? el("p", { class: "office-live-text" }, text.length > 420 ? `…${text.slice(-420)}` : text) : null,
+      const key = JSON.stringify([mode, recent.map((one) => [one.words, one.ok]), text]);
+      if (liveKept !== null && liveKept.key === key) return liveKept.node;
+      const steps = recent.map((one) =>
+        el(
+          "li",
+          { class: "office-step", dataset: { state: one.ok === null ? "running" : one.ok ? "ok" : "failed" } },
+          el("span", { class: "office-step-mark", "aria-hidden": "true" }),
+          el("span", { class: "office-step-words" }, one.words),
+        ),
       );
+      const node = el(
+        "section",
+        { class: "office-panel-live", "aria-label": mode === "free" ? "What it did last" : "What it does now" },
+        steps.length > 0 ? el("ol", { class: "office-steps" }, ...steps) : null,
+        text !== "" ? el("div", { class: "office-live-text" }, prose(tailOf(text))) : null,
+      );
+      liveKept = { key, node };
+      return node;
     }
 
     // The chat in the panel (item 898, the owner's word of 2026-11-01: "every message made a new chat; we should start
@@ -537,51 +547,107 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         readingChats.delete(threadId);
       }
     }
-    function chatView(id, latest) {
+    // A turn of the chat, written as the chat page writes it (item 905, the owner's word of 2026-11-01: "make it flow
+    // like the normal chat"): the Markdown of the owner's words and of the answer rendered, never shown as marks. A
+    // node is made once for its words and kept, so that a repaint while the agent works moves nothing that was there.
+    /** @type {Map<string, { text: string, node: HTMLElement }>} */
+    const turnNodes = new Map();
+    function turnNode(key, who, text) {
+      const kept = turnNodes.get(key);
+      if (kept !== undefined && kept.text === text) return kept.node;
+      const node = el("div", { class: `office-turn office-turn-${who}`, dataset: { turn: key } }, prose(text));
+      turnNodes.set(key, { text, node });
+      return node;
+    }
+    function forgetChat() {
+      turnNodes.clear();
+      liveKept = null;
+    }
+    function noteNode(words) {
+      const key = `note:${words}`;
+      const kept = turnNodes.get(key);
+      if (kept !== undefined) return kept.node;
+      const node = el("p", { class: "office-chat-note" }, words);
+      turnNodes.set(key, { text: words, node });
+      return node;
+    }
+    /** The chat of the agent `id`: its turns, then what its run at work does now (`live`), in one log that scrolls. A
+     * run that is no chat of the owner's (a schedule's, a watcher's, Dot's own, a helper's) shows a note and its live
+     * part all the same. The log that is in the panel is changed where it differs and given back, so that its scroll,
+     * its selection and the nodes already drawn stay; a new one is made for another agent or another chat. */
+    function chatView(id, latest, live) {
+      let thread = "";
+      /** @type {(HTMLElement | null)[]} */
+      let nodes;
       if (freshChat.has(id)) {
-        return el("div", { class: "office-chat" }, el("p", { class: "office-chat-note" }, "Your next message starts a new chat."));
-      }
-      // No chat of the owner's with it yet (or its newest is a schedule's or a helper's): an empty chat, ready for the
-      // first message (item 901), not the last run's steps.
-      if (!continues(latest)) {
-        return el("div", { class: "office-chat" }, el("p", { class: "office-chat-note" }, "No chat yet. Write to start one."));
-      }
-      const key = `${latest.id}|${latest.status}`;
-      const kept = chats.get(latest.thread_id);
-      if (kept === undefined || kept.key !== key) readChat(latest.thread_id, key);
-      const turns = kept?.turns ?? [];
-      // The run at work's own: what the owner sent it as it worked, read from its events, and what waits for it.
-      const said = feeds.feed(latest.id)?.said ?? [];
-      // What waits is let go once the run has read it, or has ended (a queued one is a turn of its own then).
-      const atWork = latest.status === "running" || latest.status === "queued" || latest.status === "blocked";
-      const waiting = atWork ? (pending.get(latest.id) ?? []).filter((text) => !said.includes(text)) : [];
-      if (waiting.length === 0) pending.delete(latest.id);
-      else pending.set(latest.id, waiting);
-      const sent = (turn) => (turn.id === latest.id ? [...said, ...waiting] : []);
-      const view = el(
-        "div",
-        { class: "office-chat", role: "log", "aria-label": "The chat" },
-        ...turns.flatMap((turn) => [
-          el("div", { class: "office-turn office-turn-you" }, clip(turn.goal, 600)),
-          ...sent(turn).map((text) => el("div", { class: "office-turn office-turn-you" }, clip(text, 600))),
-          // The answer of a turn that ended; the one at work shows its steps and words live below.
+        nodes = [noteNode("Your next message starts a new chat.")];
+      } else if (!continues(latest)) {
+        // No chat of the owner's with it yet, or its newest is a schedule's or a helper's: an empty chat, ready for the
+        // first message (item 901), with what that run does now under it.
+        nodes = [noteNode("No chat yet. Write to start one.")];
+      } else {
+        thread = latest.thread_id;
+        const key = `${latest.id}|${latest.status}`;
+        const kept = chats.get(latest.thread_id);
+        if (kept === undefined || kept.key !== key) readChat(latest.thread_id, key);
+        const turns = kept?.turns ?? [];
+        // The run at work's own: what the owner sent it as it worked, read from its events, and what waits for it.
+        const said = feeds.feed(latest.id)?.said ?? [];
+        // What waits is let go once the run has read it, or has ended (a queued one is a turn of its own then).
+        const atWork = latest.status === "running" || latest.status === "queued" || latest.status === "blocked";
+        const waiting = atWork ? (pending.get(latest.id) ?? []).filter((text) => !said.includes(text)) : [];
+        if (waiting.length === 0) pending.delete(latest.id);
+        else pending.set(latest.id, waiting);
+        const sent = (turn) => (turn.id === latest.id ? [...said, ...waiting] : []);
+        nodes = turns.flatMap((turn) => [
+          turnNode(`${turn.id}:you`, "you", turn.goal),
+          ...sent(turn).map((text, index) => turnNode(`${turn.id}:sent:${index}`, "you", text)),
+          // The answer of a turn that ended; the one at work shows its steps and words live after it.
           turn.status === "running" || turn.status === "queued" || turn.result === ""
             ? null
-            : el("div", { class: "office-turn office-turn-agent" }, clip(turn.result, 1200)),
-        ]),
-      );
-      // Kept where the owner scrolled it while the run works and the panel is painted again; to the foot when it was
-      // there or a turn came (the review).
-      // Only this agent's own chat as it was: another's scroll is no guide (the review).
-      const before = panelSlot.dataset.agent === id ? panelSlot.querySelector(".office-chat") : null;
-      const shown = view.querySelectorAll(".office-turn").length;
-      const atFoot = before === null || before.scrollHeight - before.scrollTop - before.clientHeight < 8;
-      const grew = before === null || shown > before.querySelectorAll(".office-turn").length;
-      const keptTop = before?.scrollTop ?? 0;
-      requestAnimationFrame(() => {
-        view.scrollTop = atFoot || grew ? view.scrollHeight : keptTop;
-      });
-      return view;
+            : turnNode(`${turn.id}:answer`, "agent", turn.result),
+        ]);
+        // The newest turn before the chat is read back: the owner's own words at once, not an empty log.
+        if (turns.length === 0) nodes.push(turnNode(`${latest.id}:you`, "you", latest.goal));
+      }
+      const shown = /** @type {HTMLElement[]} */ (nodes.filter((node) => node !== null));
+      // The nodes of turns no longer shown are let go (the pre-push review).
+      const used = new Set(shown);
+      for (const [key, kept] of turnNodes) if (!used.has(kept.node)) turnNodes.delete(key);
+      const before = panelSlot.dataset.agent === id ? /** @type {HTMLElement | null} */ (panelSlot.querySelector(".office-chat")) : null;
+      const log = /** @type {HTMLElement | null} */ (before?.querySelector(".office-chat-log") ?? null);
+      if (before === null || log === null || before.dataset.thread !== thread) {
+        // The turns are a log, read out as one comes; what the run does now stands after it, outside it, so that its
+        // steps are not read out each time they change (the pre-push review).
+        const view = el(
+          "div",
+          { class: "office-chat", dataset: { thread } },
+          el("div", { class: "office-chat-log", role: "log", "aria-label": "The chat" }, ...shown),
+          live ?? el("section", { class: "office-panel-live", hidden: true }),
+        );
+        requestAnimationFrame(() => {
+          view.scrollTop = view.scrollHeight;
+        });
+        return view;
+      }
+      // Kept where the owner scrolled it; to the foot when it was there (the review of item 898). Only what differs
+      // from the first turn that changed on is taken out and put in, and the live part is put in its place alone.
+      const atFoot = before.scrollHeight - before.scrollTop - before.clientHeight < 24;
+      const now = [...log.children];
+      let same = 0;
+      while (same < now.length && same < shown.length && now[same] === shown[same]) same += 1;
+      const added = shown.slice(same);
+      if (same !== now.length || added.length > 0) {
+        for (const gone of now.slice(same)) gone.remove();
+        log.append(...added);
+      }
+      const liveNow = before.querySelector(":scope > .office-panel-live");
+      const liveNext = live ?? el("section", { class: "office-panel-live", hidden: true });
+      if (liveNow !== liveNext && !(live === null && liveNow?.hasAttribute("hidden"))) liveNow?.replaceWith(liveNext);
+      // What the owner just sent is shown, wherever the chat was scrolled (the pre-push review).
+      const mine = added.some((node) => node.classList.contains("office-turn-you"));
+      if (atFoot || mine) before.scrollTop = before.scrollHeight;
+      return before;
     }
 
     function paintPanel() {
@@ -592,15 +658,18 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       }
       const { record, latest } = actor.summary;
       const mode = modeOf(latest, waitingRuns());
+      // What it does, in a word: the goal of a chat of the owner's is its first message below, not said again (item
+      // 905); a run that is no such chat (a schedule's, Dot's own, a helper's), or one a new chat leaves out, says it.
+      const inChat = continues(latest) && !freshChat.has(record.id);
       const doing = el(
         "p",
-        { class: "office-panel-doing" },
-        mode === "free" ? "Free right now." : `${MODE_WORDS[mode]}: ${latest?.goal ?? ""}`,
+        { class: "office-panel-doing", dataset: { mode }, title: mode === "free" ? "" : (latest?.goal ?? "") },
+        mode === "free" ? "Free right now" : inChat ? MODE_WORDS[mode] : `${MODE_WORDS[mode]}: ${latest?.goal ?? ""}`,
       );
-      // Its steps and words live while it works or waits; a free agent's panel is its chat alone (item 901, the owner's
-      // word: "the chat screens should be clean"), not the steps and the long answer of its last run.
-      const live = mode === "free" ? el("div", { class: "office-panel-live", hidden: true }) : feedView(latest === null ? undefined : feeds.feed(latest.id), mode);
-      const chat = chatView(record.id, latest);
+      // Its steps and words live while it works or waits, at the foot of its chat, whoever started the run; a free
+      // agent's panel is its chat alone (item 901, the owner's word: "the chat screens should be clean").
+      const live = mode === "free" || latest === null ? null : feedView(feeds.feed(latest.id), mode);
+      const chat = chatView(record.id, latest, live);
       const links = el(
         "div",
         { class: "office-panel-links" },
@@ -624,8 +693,8 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       if (panel !== null && panel.dispose !== undefined && panelSlot.dataset.agent === record.id) {
         // The same agent: only what it does changes, the box keeps what was typed.
         panelSlot.querySelector(".office-panel-doing")?.replaceWith(doing);
-        panelSlot.querySelector(".office-chat")?.replaceWith(chat);
-        panelSlot.querySelector(".office-panel-live")?.replaceWith(live);
+        const shown = panelSlot.querySelector(".office-chat");
+        if (shown !== chat) shown?.replaceWith(chat);
         panelSlot.querySelector(".office-panel-links")?.replaceWith(links);
         panelSlot.querySelector(".office-offers")?.replaceWith(offersView(record.id));
         return;
@@ -662,7 +731,6 @@ export function mountOffice(holder, { composerFor, openAgent }) {
           ),
           doing,
           chat,
-          live,
           offersView(record.id),
           links,
           box.element,
