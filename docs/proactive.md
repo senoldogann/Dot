@@ -205,7 +205,7 @@ research run may. The look runs on `look_model` when it is set ("" is `[models] 
 worth doing, and is a small share of what this work spends (8% on the owner's Mac, 2026-10-29 to 11-01), so a stronger
 model there costs little; the things are done on `[models] main`. Each thing done is listed to it with its day and what
 came of it (the first line of its run's answer, quoted only when that run read nothing third parties can author, item
-911). A thing a run puts on the list that is like one done or let go
+911), and it reads the last count of this work (below). A thing a run puts on the list that is like one done or let go
 in the last 14 days, by meaning with the embedder of the memory (a cosine of 0.73 or more between the titles) or by
 words without it (0.6 of the shorter title's words), is refused with what that one was and what came of it: the run
 puts it on the list only with `again_because`, what is new since, which the thing's why keeps (on 2026-10-30 to 11-01
@@ -273,9 +273,16 @@ the thing's, as one of its own runs' is: done, the thing is done and you are tol
 you, the thing is let go. A question you skip, or a step whose time ran out, ends the wait, and the try that left it
 stays counted: a thing whose last try it was is let go then, and you are told.
 
+**What it came to.** Every `review_every_days` (7; 0 never), once a thing was done or let go since, Dot puts on its list
+"Count what my own work since … came to" and does it as a thing (item 914). Its run is given what was done and let go
+since the last count and what that cost (the runs, the failed ones, the tokens), looks where an answer would be for what
+was sent or put live (the mail, the page, the account), and writes `own-work-review.md` in the workspace: each thing and
+what came of it, the counts, and what is worth more of its time and what to stop. It sends nothing; you are told as of
+any thing done, and the next look reads the file.
+
 The settings are in `[initiative]` of `defaults.toml`: `idle_minutes`, `gap_minutes`, `look_every_hours`, `attempts`,
 `runs_per_day`, `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do), `peak_hours_utc`,
-`look_model` and `retry_under_tokens`; the switch and the time of the last look are kept in the
+`look_model`, `retry_under_tokens` and `review_every_days`; the switch and the time of the last look are kept in the
 database.
 
 ### Objectives

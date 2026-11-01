@@ -808,6 +808,8 @@ class InitiativeConfig(FrozenModel):
     # A try that spent more tokens than this and did not do its thing lets it go, rather than trying it the same way
     # again (item 913); 0: no such bound.
     retry_under_tokens: int = Field(default=0, ge=0)
+    # How many days apart a run counts what Dot's own work came to (item 914); 0: never.
+    review_every_days: float = Field(default=0.0, ge=0, le=60, allow_inf_nan=False)
 
     @field_validator("look_model")
     @classmethod

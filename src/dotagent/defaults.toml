@@ -1082,6 +1082,10 @@ look_model = ""
 # told, rather than trying it again the same way (item 913: three tries of one application spent 31.6 million). 0: no
 # such bound.
 retry_under_tokens = 5000000
+# Every so many days a run of its own counts what its work came to (item 914): what it did, what it spent, and what
+# came back (an answer to a mail it sent, a page live, an application answered), told to you and read by the next look.
+# 0: never.
+review_every_days = 7.0
 
 [skills]
 # Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML

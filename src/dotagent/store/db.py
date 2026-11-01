@@ -3914,6 +3914,18 @@ class Store:
         row = await self._one("SELECT COUNT(*) AS made FROM runs WHERE source = ? AND created_at >= ?", (source, since))
         return 0 if row is None else int(row["made"])
 
+    async def spent_by_source(self, source: str, since: float) -> tuple[int, int, int]:
+        """The runs of ``source`` made since ``since``: how many, how many of them failed, and the tokens of every model
+        call they made (item 914)."""
+        row = await self._one(
+            "SELECT COUNT(*) AS made, SUM(status = 'failed') AS failed,"
+            " COALESCE(SUM(input_tokens + output_tokens), 0) AS spent FROM runs WHERE source = ? AND created_at >= ?",
+            (source, since),
+        )
+        if row is None:
+            return 0, 0, 0
+        return int(row["made"]), int(row["failed"] or 0), int(row["spent"])
+
     async def same_todo(self, title_key: str, since: float) -> TodoRecord | None:
         """The thing of the list with ``title_key`` that is to do or being done, or that was done or let go since
         ``since``: a thing is not listed twice, however long the list grew (the code review of item 715)."""

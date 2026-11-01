@@ -67,7 +67,7 @@ def _config(runs_per_day: int = 0, peak: tuple[int, ...] = (), grouped: bool = F
     if grouped:
         # Its tools in groups, as a run of the owner's 173 tools has them, so that what is on from its start shows.
         config = config.model_copy(update={"agent": config.agent.model_copy(update={"tool_surface": "grouped"})})
-    # No bound of tokens on a try but in the test of it (item 913).
+    # No count of the week's work but in the tests of it (item 914), nor a bound of tokens on a try (item 913).
     initiative = config.initiative.model_copy(
         update={
             "idle_minutes": 10.0,
@@ -75,6 +75,7 @@ def _config(runs_per_day: int = 0, peak: tuple[int, ...] = (), grouped: bool = F
             "attempts": 2,
             "runs_per_day": runs_per_day,
             "peak_hours_utc": peak,
+            "review_every_days": 0.0,
             "retry_under_tokens": 0,
             **more,
         }
@@ -1170,3 +1171,41 @@ async def test_a_try_that_spent_past_its_bound_lets_the_thing_go_at_once(login_e
         assert (dropped.status, dropped.attempts) == ("dropped", 1)
         assert dropped.note.startswith("Spent 0.0M tokens without doing it: The form wants a puzzle solved."), dropped
         assert [event.data["title"] for event in told] == ["Dot let go of a thing after 1 try"]
+
+
+async def test_every_so_many_days_it_counts_what_its_own_work_came_to(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 914: once a run of its own was made, the count is put on the list and done as a thing, its opening the
+    record of what was done and spent; it is not put on the list again until review_every_days went by."""
+    turns: list[ScriptedTurn] = [_finish("Sorted."), _finish("Two things done, nothing came back yet.")]
+    async with _dot(login_env, turns, review_every_days=7.0) as (runtime, manager):
+        await add_todo(runtime.store, "Sort the receipts by month", "They asked for it", "owner", None, False)
+        await set_initiative(runtime.store, True)
+        openings: dict[str, str] = {}
+        start_own = manager.start_own
+
+        async def kept(
+            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+        ) -> RunRecord:
+            run: RunRecord = await start_own(goal, opening, mode, thread_id, tainted, model)
+            openings[run.id] = opening
+            return run
+
+        monkeypatch.setattr(manager, "start_own", kept)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        now: float = time.time()
+        await initiative.tick(now)
+        await _settled(initiative)
+        # Nothing was done before the first tick: nothing to count then. Now a thing was.
+        await initiative.tick(now + 60)
+        [review] = [todo for todo in await runtime.store.list_todos(("doing",), 10)]
+        assert review.source == "review" and review.title.startswith("Count what my own work since "), review
+        counting: RunRecord = await runtime.store.get_run(review.run_id or "")
+        await _settled(initiative)
+        text: str = openings[counting.id]
+        assert "own-work-review.md" in text and "1 runs of your own, 0 of them failed" in text, text
+        assert "Sort the receipts by month" in text and "what came of it: " in text and "Sorted." in text, text
+        assert (await runtime.store.get_todo(review.id)).status == "done"
+        await initiative.tick(now + 120)
+        assert not [todo for todo in await runtime.store.list_todos(("open", "doing"), 10) if todo.source == "review"]
