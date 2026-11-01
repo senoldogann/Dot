@@ -139,6 +139,12 @@ def test_an_agent_is_found_by_its_name_whatever_the_case_or_by_its_id() -> None:
     assert find_agent([SCOUT], "scout ") == SCOUT
     assert find_agent([SCOUT], "agt_1") == SCOUT
     assert find_agent([SCOUT], "Pilot") is None
+    # A page's escapes are no part of a name (item 901): "Community &amp; Launch", as a model wrote it, is "Community &
+    # Launch", either way round.
+    escaped: AgentRecord = SCOUT.model_copy(update={"id": "agt_2", "name": "Community &amp; Launch"})
+    assert find_agent([escaped], "Community & Launch") == escaped
+    plain: AgentRecord = SCOUT.model_copy(update={"id": "agt_3", "name": "Community & Launch"})
+    assert find_agent([plain], "community &amp; launch") == plain
 
 
 def _run(status: str, result: str) -> RunRecord:

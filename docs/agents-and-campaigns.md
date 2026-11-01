@@ -49,10 +49,12 @@ desks a pod, three pods across), and is 20 by 15 metres at least (item 898). Its
 newest chat of yours shows its last turns, your words at the right and its answers at the left, and what you write goes
 on in that chat rather than starting a new chat each time: while the agent works, or waits for you, it waits in that
 chat's queue, or reaches the run at once with **Steer** chosen under Settings › General › Messages, as a message in its
-chat does; **New chat** starts the next message afresh. A schedule's, a watcher's or Dot's own chat is not gone on in.
-The names over the heads glide when one must stand above another, and their sizes are read when their words change, not
-at every frame (item 898: they moved jerkily). three.js 0.187.0 (MIT, `static/vendor/three/`, its licence beside it)
-draws it and is loaded only when the office opens.
+chat does; **New chat** starts the next message afresh. A schedule's, a watcher's or Dot's own chat is not gone on in:
+with no chat of yours, the panel is an empty chat, ready for your first message. A free agent's panel is its chat alone;
+its steps and words show while it works or waits (item 901). The button at the top corner shows the office full screen,
+over the whole window, and takes it back, as Escape does (item 901). The names over the heads glide when one must stand
+above another, and their sizes are read when their words change, not at every frame (item 898: they moved jerkily).
+three.js 0.187.0 (MIT, `static/vendor/three/`, its licence beside it) draws it and is loaded only when the office opens.
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
 model, a reasoning level, approvals, the actions it may use (its tools); each left out takes the configured one, and **All actions**,
