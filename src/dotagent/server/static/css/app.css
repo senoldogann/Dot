@@ -11409,7 +11409,8 @@ dialog.teach {
 }
 .office-panel-doing[data-mode="working"]::before {
   background: var(--office-working);
-  animation: office-doing 1.4s ease-in-out infinite;
+  animation: office-doing var(--motion-pulse) ease-in-out infinite;
+  animation-play-state: var(--endless);
 }
 .office-panel-doing[data-mode="waiting"]::before {
   background: var(--office-waiting);
@@ -11457,8 +11458,8 @@ dialog.teach {
 }
 .office-turn .prose,
 .office-live-text .prose {
-  font-size: inherit;
-  line-height: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
 }
 .office-turn .prose > :first-child,
 .office-live-text .prose > :first-child {
