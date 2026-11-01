@@ -8,6 +8,7 @@ agent a run makes can do no more than the run (item 307): only tools the run has
 run that only reads (research) makes none."""
 
 import asyncio
+import html
 import re
 import secrets
 from collections.abc import Sequence
@@ -143,9 +144,12 @@ async def _group_of(ctx: ToolContext, own: RunRecord) -> TeamRecord | None:
 
 
 def find_agent(agents: list[AgentRecord], name: str) -> AgentRecord | None:
-    """The agent whose name or id is ``name``, the name read without regard to case; ``None`` when there is none."""
-    wanted: str = name.strip().casefold()
-    return next((agent for agent in agents if agent.id == name.strip() or agent.name.casefold() == wanted), None)
+    """The agent whose name or id is ``name``, the name read without regard to case nor to a page's escapes ("&amp;" is
+    "&", item 901); ``None`` when there is none."""
+    wanted: str = html.unescape(name).strip().casefold()
+    return next(
+        (agent for agent in agents if agent.id == name.strip() or html.unescape(agent.name).casefold() == wanted), None
+    )
 
 
 def _fence(text: str, nonce: str, run_id: str) -> str:
@@ -282,7 +286,7 @@ def _create_agent_tool() -> RegisteredTool:
         # and its instructions, not its name and role alone (the review of 2026-11-01).
         refuses: str = "; ".join(line.strip() for line in args.refuses if line.strip())
         parts: list[str] = [
-            f"Make the agent {args.name.strip()}: {args.role.strip()}",
+            f"Make the agent {html.unescape(args.name).strip()}: {html.unescape(args.role).strip()}",
             f"tools: {', '.join(args.tools) or 'none named'}",
             *([f"model: {args.model.strip()}"] if args.model.strip() else []),
             *([f"never: {refuses}"] if refuses else []),
@@ -299,7 +303,10 @@ def _create_agent_tool() -> RegisteredTool:
         )
 
     async def run(args: CreateAgentArgs, ctx: ToolContext) -> ToolResult:
-        name: str = args.name.strip()
+        # A model may write its words for a page ("Community &amp; Launch"): the agent's name and role are plain text,
+        # shown as they are (item 901).
+        name: str = html.unescape(args.name).strip()
+        role: str = html.unescape(args.role).strip()
         if name.casefold() == DOT_AGENT.name.casefold():
             # Dot is the lead: an agent of its name would answer for it in a group chat and could not be read by
             # read_agent_chat (the review of 2026-11-01).
@@ -330,7 +337,7 @@ def _create_agent_tool() -> RegisteredTool:
         held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         made: AgentRecord = await ctx.runtime.store.create_agent(
             redact_known(name, held),
-            redact_known(args.role.strip(), held),
+            redact_known(role, held),
             redact_known(args.instructions.strip(), held),
             model,
             None,
@@ -386,7 +393,8 @@ def _create_team_tool() -> RegisteredTool:
             tool=CREATE_TEAM_TOOL,
             kind="meta",
             risk="low",
-            summary=f"Make the team {args.name.strip()} of {', '.join(name.strip() for name in args.agents)}",
+            summary=f"Make the team {html.unescape(args.name).strip()} of "
+            f"{', '.join(html.unescape(name).strip() for name in args.agents)}",
             target="",
             # A team lasts beyond the run, as an agent does.
             flags=("persistence",),
@@ -394,7 +402,7 @@ def _create_team_tool() -> RegisteredTool:
 
     async def run(args: CreateTeamArgs, ctx: ToolContext) -> ToolResult:
         """A team of agents the owner has (item 864): their own, and those a run made, which are theirs too."""
-        name: str = args.name.strip()
+        name: str = html.unescape(args.name).strip()
         if ctx.run_tools is None:
             # A delegated run and one that answers a message make no team, as they make no agent.
             raise ToolExecutionError("this run cannot make teams", {"run_id": ctx.run_id})

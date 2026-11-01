@@ -11321,12 +11321,34 @@ dialog.teach {
 .office-tag-word:empty {
   display: none;
 }
-.office-reset {
+.office-reset,
+.office-big {
   position: absolute;
   right: var(--space-2);
   bottom: var(--space-2);
   background: var(--office-glass);
   color: var(--office-ink);
+}
+.office-big {
+  top: var(--space-2);
+  bottom: auto;
+}
+/* Full screen (item 901): over the whole window, the page under it, the panel taller and its chat with it. Over the
+   sidebar (30) and under what its own panel opens over it, a menu (50) and the toasts (60), so that a send that failed
+   still says so (the pre-push review). */
+.office-frame.office-full {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  height: auto;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+.office-full .office-panel-slot {
+  width: min(440px, calc(100% - 2 * var(--space-2)));
+}
+.office-full .office-chat {
+  max-height: 55vh;
 }
 .office-panel-slot {
   position: absolute;
@@ -11491,6 +11513,10 @@ dialog.teach {
   /* The panel takes the frame's foot, where the reset button stood over its message box. */
   .office-holder:has(.office-panel) .office-reset {
     display: none;
+  }
+  /* Full screen keeps the phone's panel across the foot. */
+  .office-full .office-panel-slot {
+    width: auto;
   }
   /* A tag takes a finger (32 px at least), as every control of a phone does. */
   .office-tag {

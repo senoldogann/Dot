@@ -493,3 +493,54 @@ async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: di
             assert errors == [], errors
         finally:
             await browser.close()
+
+
+async def test_a_free_agents_panel_is_its_chat_and_the_office_goes_full_screen(login_env: dict[str, str]) -> None:
+    """Item 901, the owner's word of 2026-11-01: a free agent's panel showed its last run's steps and long answer, and
+    the office stood in a small square with the whole window free. A free agent with no chat of the owner's shows an
+    empty chat; the office goes full screen and back, Escape too."""
+    async with _daemon(login_env) as address, async_playwright() as playwright:
+        browser = await playwright.chromium.launch(args=_ARGS)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
+            errors: list[str] = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            await _agents_page(page, address)
+            office = page.get_by_role("region", name="The office: your agents at work")
+            await expect(office.locator("canvas.office-canvas")).to_have_count(1, timeout=20_000)
+            await office.locator(".office-tag", has_text="Copy Editor").click()
+            panel = office.locator(".office-panel")
+            await expect(panel.locator(".office-chat-note")).to_have_text("No chat yet. Write to start one.")
+            await expect(panel.locator(".office-step")).to_have_count(0)
+            # Full screen: the window's size, and back with the button or Escape.
+            full = office.get_by_role("button", name="Full screen")
+            await full.click()
+            box = await office.bounding_box()
+            assert box is not None and box["width"] == 1280 and box["height"] == 860, box
+            # What its panel opens stands over it: the composer's menu (the pre-push review).
+            await panel.locator(".plus-button").first.click()
+            await expect(page.locator(".menu").first).to_be_visible()
+            menu_z: str = await page.locator(".menu").first.evaluate("(node) => getComputedStyle(node).zIndex")
+            office_z: str = await office.evaluate("(node) => getComputedStyle(node).zIndex")
+            assert int(menu_z) > int(office_z), (menu_z, office_z)
+            await page.keyboard.press("Escape")
+            await office.get_by_role("button", name="Leave full screen").click()
+            box = await office.bounding_box()
+            assert box is not None and box["width"] < 1280, box
+            await full.click()
+            # An Escape that closes a dialog (a file, a question) closes the dialog alone (the pre-push review).
+            opening: str = (
+                "() => { const d = document.createElement('dialog'); d.id = 't-dialog';"
+                " document.body.append(d); d.showModal(); }"
+            )
+            await page.evaluate(opening)
+            await page.keyboard.press("Escape")
+            await expect(page.locator("#t-dialog")).not_to_have_attribute("open", "")
+            await expect(office.get_by_role("button", name="Leave full screen")).to_have_attribute(
+                "aria-pressed", "true"
+            )
+            await page.keyboard.press("Escape")
+            await expect(office.get_by_role("button", name="Full screen")).to_have_attribute("aria-pressed", "false")
+            assert errors == [], errors
+        finally:
+            await browser.close()

@@ -54,6 +54,24 @@ export function mountOffice(holder, { composerFor, openAgent }) {
   const tags = el("div", { class: "office-tags" });
   const panelSlot = el("div", { class: "office-panel-slot" });
   const reset = el("button", { class: "btn icon office-reset", type: "button", title: "Back to the whole room", "aria-label": "Back to the whole room" }, icon("refresh"));
+  // The office at the size of the window (item 901, the owner's word of 2026-11-01: "with this much room, why a small
+  // square? it could be full size when we want"): over the page, Escape or the button again brings it back.
+  const big = el("button", { class: "btn icon office-big", type: "button", title: "Full screen", "aria-label": "Full screen", "aria-pressed": "false" }, icon("maximize"));
+  function setBig(on) {
+    frame.classList.toggle("office-full", on);
+    big.setAttribute("aria-pressed", String(on));
+    big.title = on ? "Leave full screen" : "Full screen";
+    big.setAttribute("aria-label", big.title);
+    big.replaceChildren(icon(on ? "minimize" : "maximize"));
+  }
+  big.addEventListener("click", () => setBig(!frame.classList.contains("office-full")));
+  // One Escape does one thing: one a menu or the box took for itself, or one that closes a dialog (a file, a question,
+  // which the browser closes without saying so), leaves full screen as it is (the pre-push review).
+  const leaveBig = (event) => {
+    if (event.key !== "Escape" || event.defaultPrevented || !frame.classList.contains("office-full")) return;
+    if (document.querySelector("dialog[open]") !== null) return;
+    setBig(false);
+  };
   frame.append(tags, panelSlot, reset);
   holder.replaceChildren(frame);
   let disposed = false;
@@ -63,6 +81,9 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     frame.append(el("p", { class: "office-note" }, "This browser draws no 3D, so the office cannot be shown here."));
     return { dispose() {} };
   }
+  // Only where the room is drawn: a browser that draws none has nothing to show full screen.
+  frame.append(big);
+  document.addEventListener("keydown", leaveBig);
   loadThree()
     .then(() => {
       if (!disposed) {
@@ -71,6 +92,10 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     })
     .catch((error) => {
       console.warn("the office could not be drawn", error);
+      // Nothing to show full screen: the note stands at its own size.
+      setBig(false);
+      big.remove();
+      document.removeEventListener("keydown", leaveBig);
       frame.classList.add("office-off");
       frame.append(el("p", { class: "office-note" }, "The office could not be drawn here."));
     });
@@ -505,7 +530,11 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       if (freshChat.has(id)) {
         return el("div", { class: "office-chat" }, el("p", { class: "office-chat-note" }, "Your next message starts a new chat."));
       }
-      if (!continues(latest)) return el("div", { class: "office-chat", hidden: true });
+      // No chat of the owner's with it yet (or its newest is a schedule's or a helper's): an empty chat, ready for the
+      // first message (item 901), not the last run's steps.
+      if (!continues(latest)) {
+        return el("div", { class: "office-chat" }, el("p", { class: "office-chat-note" }, "No chat yet. Write to start one."));
+      }
       const key = `${latest.id}|${latest.status}`;
       const kept = chats.get(latest.thread_id);
       if (kept === undefined || kept.key !== key) readChat(latest.thread_id, key);
@@ -557,7 +586,9 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         { class: "office-panel-doing" },
         mode === "free" ? "Free right now." : `${MODE_WORDS[mode]}: ${latest?.goal ?? ""}`,
       );
-      const live = feedView(latest === null ? undefined : feeds.feed(latest.id), mode);
+      // Its steps and words live while it works or waits; a free agent's panel is its chat alone (item 901, the owner's
+      // word: "the chat screens should be clean"), not the steps and the long answer of its last run.
+      const live = mode === "free" ? el("div", { class: "office-panel-live", hidden: true }) : feedView(latest === null ? undefined : feeds.feed(latest.id), mode);
       const chat = chatView(record.id, latest);
       const links = el(
         "div",
@@ -765,7 +796,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     }
 
     // The tags over the heads, the nearer first; one that would cover another is lifted above it. The lift glides there
-    // rather than jumps, the place is not rounded to whole pixels, and a tag's size is read again only when its words
+    // rather than jumps, and a tag's size is read again only when its words
     // change (the owner's word of 2026-11-01: the names moved jerkily over the heads; reading every tag's size at every
     // frame made the page lay out sixty times a second).
     function sizeOf(actor) {
@@ -813,7 +844,9 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         const lift = item.y - y;
         item.actor.lift = dt <= 0 ? lift : item.actor.lift + (lift - item.actor.lift) * Math.min(1, dt * 10);
         const shownY = item.y - item.actor.lift;
-        item.actor.tag.style.transform = `translate3d(${item.x.toFixed(1)}px, ${shownY.toFixed(1)}px, 0) translate(-50%, -100%)`;
+        // Whole pixels: a tag placed between two lost a part of a pixel of its height on a phone, under a finger's
+        // 32 (test_phone_type); the glide keeps it from jumping.
+        item.actor.tag.style.transform = `translate3d(${Math.round(item.x)}px, ${Math.round(shownY)}px, 0) translate(-50%, -100%)`;
         item.actor.tag.hidden = item.depth > 1;
       }
     }
@@ -963,6 +996,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
   return {
     dispose() {
       disposed = true;
+      document.removeEventListener("keydown", leaveBig);
       stop();
     },
   };
