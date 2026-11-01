@@ -53,6 +53,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/playbooks.py:_write_reply": (True,),
     "agent/skill_proposals.py:propose_merges": (True,),
     "teach.py:draft_taught_skill": (True,),
+    # The part a help offer says a free agent could take, masked before the office shows it (item 896).
+    "server/routes_agents.py:agents_router.help_offers": (True,),
     # A skill the owner said in a chat (item 893), masked before it is written.
     "tools/skill_save.py:_skill_save_tool.run": (True,),
     # ----- Refusing, blocking or choosing: nothing a run can watch tells it a value (``filled=False``). -----

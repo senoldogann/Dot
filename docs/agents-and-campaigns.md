@@ -23,7 +23,23 @@ message you send waits behind none. A call it reads from before it opened moves 
 or two fingers zoom, the button at the corner brings the whole room back. On a phone (item 894, the owner's look at it
 there) the room is square and seen more from above, so that its floor fills the frame; a free agent's tag is its name
 alone, small, and those that work or wait for you, and the one whose panel is open, keep the full tag; the panel takes
-the frame's foot, and the button that brings the room back steps aside while it is open. **Hide** folds it away, which this browser
+the frame's foot, and the button that brings the room back steps aside while it is open.
+
+**Help offers** (item 896, your ask of 2026-11-01: the agents outside the work should offer to help the agents at
+work, when it makes sense). While the office is open, each run at work, Dot's or an agent's (six at most, the newest
+first), is matched once with the agents free now (not at work, not waiting for you, not paused): the fast model is shown
+its goal, in a fence since it may hold what a page or a mail wrote, and each free agent's name and role, and names at
+most two whose role fits a real part of that work, each with that part in a few words, or none. Such a helper walks over
+to the one at work, its tag saying "Offers to help …", and both panels list the offer with **Let it help**: the run at
+work is told, in a note of Dot's that the daemon writes from the helper's record, that the helper is free and what its
+role is, and to hand it a part with `message_agent` if one fits. The note is not your message: like a note about a
+reaction it clears no mark of content others can write and gives the reviewer no instruction, and the part the model
+wrote is shown to you, never sent to the run. Nothing starts a
+helper's run but that run's message. A run is asked about once; a model that cannot answer offers nothing. By meaning
+alone (bge-m3) a Turkish goal and the English roles of the templates scored 0.44 to 0.57 for every role alike, which
+is why a model matches them. `GET /api/agents/offers` gives the offers (`helper_id`, `helper_name`, `helper_role`,
+`to_id`, `to_name`, `run_id`, `part`); `POST /api/agents/offers/help` with `helper_id` and `run_id` tells the run (202;
+404 for an agent or a run that is not, 409 for a run that is not at work). **Hide** folds it away, which this browser
 keeps; the teams and the agents' cards stay under it. It draws only while it is on the screen, the page is shown and
 Dot's window is the one in front, at 30 frames a second while nobody walks and the camera rests, with fewer pixels when
 the Mac or the phone cannot keep up (item 889: the still room is baked into one mesh per material and its sun shadows

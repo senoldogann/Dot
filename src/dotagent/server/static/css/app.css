@@ -11374,6 +11374,41 @@ dialog.teach {
   line-height: var(--leading-sm);
   margin: 0;
 }
+/* Help offers in a panel (item 896): each free agent that could help, the part it could take, and the button that lets
+   it help. */
+.office-offers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.office-offers[hidden] {
+  display: none;
+}
+.office-offers-head {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.office-offer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.office-offer-words {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.office-offer-name {
+  font-size: var(--text-sm);
+}
+.office-offer-part {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .office-panel-links {
   display: flex;
   flex-wrap: wrap;

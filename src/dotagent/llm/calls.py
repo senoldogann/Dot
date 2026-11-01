@@ -44,6 +44,8 @@ type CallPurpose = Literal[
     "watch",
     # The review of a plugin the scout found for the gallery (item 710).
     "scout",
+    # Which free agents could help an agent at work (item 896), asked while the office is open.
+    "offer",
 ]
 
 CALL_EVENT: str = "model_call"
