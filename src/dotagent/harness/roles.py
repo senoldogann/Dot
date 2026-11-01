@@ -1,9 +1,10 @@
 """The roles of the improvement loop (item 390, docs/harness.md), each a question to a model that answers with one
-tool call (:mod:`dotagent.agent.review`): the proposer, which writes a candidate from what a run did; the composer,
-which makes one version of the candidates and what their probes showed; the selector, which picks among anonymous
-answers; and the experience writer, which records what each edit did. ``[harness]`` names a model for each, or leaves
-it to the review model."""
+tool call (:mod:`dotagent.agent.review`): the proposer, which writes a candidate from what a run did; the task writer,
+which makes that run a task of files (item 904); the composer, which makes one version of the candidates and what their
+probes showed; the selector, which picks among anonymous answers; and the experience writer, which records what each
+edit did. ``[harness]`` names a model for each, or leaves it to the review model; the task writer is the proposer's."""
 
+from collections.abc import Awaitable, Callable
 from typing import Literal
 
 from dotagent.agent.review import (
@@ -11,10 +12,13 @@ from dotagent.agent.review import (
     HarnessComposer,
     HarnessProposer,
     HarnessSelector,
+    HarnessTaskAnswer,
+    TaskRequest,
     experience_writer_for,
     harness_composer_for,
     harness_proposer_for,
     harness_selector_for,
+    harness_task_writer_for,
 )
 from dotagent.config import HarnessConfig
 from dotagent.llm.roles import ModelRoles
@@ -38,6 +42,20 @@ def role_model(config: HarnessConfig, roles: ModelRoles, role: RoleName) -> str:
 def proposer_of(runtime: Runtime, session_key: str, run_id: str | None) -> HarnessProposer:
     """The proposer, asked on the thread ``session_key`` names, about the run ``run_id`` (``None`` outside any run)."""
     return harness_proposer_for(
+        runtime.router,
+        role_model(runtime.config.harness, runtime.roles, "proposer"),
+        runtime.config.agent.model_call_timeout_s,
+        session_key,
+        run_id,
+    )
+
+
+def task_writer_of(
+    runtime: Runtime, session_key: str, run_id: str
+) -> Callable[[TaskRequest], Awaitable[HarnessTaskAnswer]]:
+    """The task writer (item 904), on the proposer's model: it reads the run the proposer reads, and a weak model
+    writes a task that the plays refuse, at the cost of nothing but the call."""
+    return harness_task_writer_for(
         runtime.router,
         role_model(runtime.config.harness, runtime.roles, "proposer"),
         runtime.config.agent.model_call_timeout_s,

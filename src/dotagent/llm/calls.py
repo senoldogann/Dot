@@ -36,6 +36,7 @@ type CallPurpose = Literal[
     # The roles of the harness (item 390, docs/harness.md): the proposer, the composer, the blind selector and the
     # experience writer.
     "harness_propose",
+    "harness_task",
     "harness_compose",
     "harness_select",
     "harness_experience",

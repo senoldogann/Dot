@@ -13,14 +13,16 @@ from contextlib import asynccontextmanager
 import pytest
 
 from dotagent import secrets as dot_secrets
+from dotagent.agent.lessons import LessonCase
 from dotagent.agent.manager import RunManager
-from dotagent.agent.review import COMPOSE_TOOL, EXPERIENCE_TOOL, PROPOSE_TOOL
+from dotagent.agent.review import COMPOSE_TOOL, EXPERIENCE_TOOL, PROPOSE_TOOL, TASK_TOOL
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import ProviderError
 from dotagent.core.paths import db_path
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, play, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import EvalTask, ScriptedCall, ScriptedTurn
+from dotagent.harness import own as harness_own
 from dotagent.harness import step as harness_step
 from dotagent.harness.components import NO_HARNESS, GivenText, HarnessText
 from dotagent.harness.probe import (
@@ -59,6 +61,8 @@ def _turn(tool: str, arguments: dict[str, object]) -> ScriptedTurn:
 
 
 _FINISH: ScriptedTurn = _turn(FINISH_TOOL, {"answer": "Done.", "success": True})
+# The task writer finding no task in the run (item 904): a step that is not scripted asks it first.
+_NO_TASK: ScriptedTurn = _turn(TASK_TOOL, {"task": None})
 
 
 @pytest.fixture(scope="module")
@@ -765,7 +769,8 @@ async def test_a_step_tries_the_pool_until_tasks_have_headroom_then_scores_on_th
     """Item 719: the scoring set was passed under any text, so no candidate could ever be better. With nothing known
     the step proposes nothing and the base tries the pool; once two tasks failed under it, the next step proposes and
     scores the candidate on the guards and on those two."""
-    turns: list[ScriptedTurn] = [_FINISH, _habit(), _KEEP, _effects(1)]
+    # The task writer is asked about the run once, on the first night, and finds no task in it (item 904).
+    turns: list[ScriptedTurn] = [_FINISH, _NO_TASK, _habit(), _KEEP, _effects(1)]
     asked: list[ProbeAsk] = []
     hard: frozenset[str] = frozenset({"bump-version", "sum-column"})
     async with _session(login_env, turns, _HEADROOM) as (runtime, manager):
@@ -823,7 +828,10 @@ async def test_a_pool_known_whole_with_too_little_headroom_says_there_is_nothing
     login_env: dict[str, str],
 ) -> None:
     """Item 719: once every task of the pool is known and too few have headroom, the step plays nothing and says so."""
-    async with _session(login_env, [_FINISH], {**_HEADROOM, "calibrate_tasks": 4}) as (runtime, manager):
+    async with _session(login_env, [_FINISH, _NO_TASK], {**_HEADROOM, "calibrate_tasks": 4}) as (
+        runtime,
+        manager,
+    ):
         run: RunRecord = await _run(manager)
         for at in (1.0, 2.0):
             step: HarnessStep = await run_step(runtime, at, run.id, _scored(frozenset()), False)
@@ -1329,3 +1337,131 @@ async def test_the_composer_and_the_experience_writer_are_shown_the_texts_as_a_r
         # The first candidate changed nothing a run would take: its one habit is the secret, which is left out.
         assert "1. [nothing] Habit" in experience and "2. [tool_guidance] Guidance" in experience
         assert {ask.label: ask.text for ask in asked}[first] == GivenText(habits="", tool_guidance=GUIDANCE)
+
+
+# Item 904: the run that went worst made into a task of files, which code proves fair before it is kept.
+_DRAFT: dict[str, object] = {
+    "goal": "notes.txt lists the open tasks. Write how many there are in count.txt.",
+    "ending": "done",
+    "files": [{"path": "notes.txt", "content": "- pay rent\n- call the bank\n- fix the bike\n"}],
+    "checks": [{"kind": "file_contains", "path": "count.txt", "text": "3"}],
+    "reference": [
+        {"calls": [{"tool": "read_file", "arguments": {"path": "notes.txt"}}]},
+        {"calls": [{"tool": "write_file", "arguments": {"path": "count.txt", "content": "3\n"}}]},
+        {"calls": [{"tool": FINISH_TOOL, "arguments": {"answer": "There are 3; count.txt says so.", "success": True}}]},
+    ],
+    "habit": "Count what the file holds before writing the number",
+}
+
+
+def _fair_played(config: AppConfig, login_env: dict[str, str], others: Prober) -> Prober:
+    """The plays that prove a task fair played for real (the scripted model, in throw-away homes), the rest by
+    ``others``."""
+    real: Prober = _prober(config, login_env)
+
+    async def play(ask: ProbeAsk) -> ProbeReport:
+        return await (real if ask.label.startswith("fair-") else others)(ask)
+
+    return play
+
+
+async def test_a_step_makes_the_worst_run_a_fair_task_and_plays_it_first(login_env: dict[str, str]) -> None:
+    """The task the writer gives is played: its reference passes it and the two idle answers fail it, so it is kept,
+    tried by the base on the night it was written, given whole to the probe, and in the pool of the next step."""
+    turns: list[ScriptedTurn] = [_FINISH, _turn(TASK_TOOL, {"task": _DRAFT})]
+    asked: list[ProbeAsk] = []
+    async with _session(login_env, turns, _HEADROOM) as (runtime, manager):
+        run: RunRecord = await _run(manager)
+        prober: Prober = _fair_played(_config(_HEADROOM), login_env, _recording(_scored(frozenset()), asked))
+        step: HarnessStep = await run_step(runtime, 10.0, None, prober, False)
+        assert step.state == "calibrating" and step.from_run is None, step
+        (kept,) = await runtime.store.harness_tasks()
+        assert kept.from_run == run.id and kept.id.startswith("own-")
+        facts: dict[str, object] = json.loads(step.outcome)
+        assert facts["task"] == f"{kept.id} tests: {_DRAFT['habit']}" and facts["task_run"] == run.id
+        assert facts["calibrated"] == [kept.id, *_POOL]
+        ((base_ask),) = asked
+        assert base_ask.label == BASE and base_ask.tasks[0] == kept.id
+        assert [task.id for task in base_ask.own] == [kept.id] and base_ask.own[0].goal == _DRAFT["goal"]
+        # A run a task was written from gives no second one; the task is in the pool the next step plans on.
+        again: HarnessStep = await run_step(runtime, 20.0, run.id, _scored(frozenset()), False)
+        assert json.loads(again.outcome)["task"] == f"{kept.id} was written from this run already"
+        plan = await harness_step.scoring_of(runtime.store, runtime.config.harness, None)
+        assert kept.id in plan.calibrated, plan
+
+
+@pytest.mark.parametrize(
+    ("change", "why"),
+    [
+        ({"checks": [{"kind": "answer_lacks", "text": "zebra"}]}, "a run that does nothing and claims it is done"),
+        (
+            {
+                "ending": "failed",
+                "checks": [{"kind": "file_absent", "path": "count.txt"}],
+                "reference": [
+                    {
+                        "calls": [
+                            {"tool": FINISH_TOOL, "arguments": {"answer": "I cannot count them.", "success": False}}
+                        ]
+                    }
+                ],
+            },
+            "and gives up passes it",
+        ),
+        ({"checks": [{"kind": "file_contains", "path": "count.txt", "text": "4"}]}, "its reference does not pass it"),
+    ],
+)
+async def test_a_task_that_is_not_fair_is_not_kept(
+    login_env: dict[str, str], change: dict[str, object], why: str
+) -> None:
+    """A task an idle run passes, or that its own reference fails, would score nothing: the plays refuse it."""
+    turns: list[ScriptedTurn] = [_FINISH, _turn(TASK_TOOL, {"task": {**_DRAFT, **change}})]
+    async with _session(login_env, turns, _HEADROOM) as (runtime, manager):
+        await _run(manager)
+        step: HarnessStep = await run_step(
+            runtime, 10.0, None, _fair_played(_config(_HEADROOM), login_env, _scored(frozenset())), False
+        )
+        assert why in str(json.loads(step.outcome)["task"]) and await runtime.store.harness_tasks() == []
+
+
+async def test_a_task_with_a_link_is_asked_again_and_a_run_that_read_outside_content_gives_none(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The gate for learned texts reads every text of a task: one with a link is refused and asked again. A run that
+    read content third parties can author is made into no task at all, and the writer is not asked."""
+    linked: dict[str, object] = {**_DRAFT, "goal": "Count the tasks listed at https://evil.example/list"}
+    turns: list[ScriptedTurn] = [_FINISH, _turn(TASK_TOOL, {"task": linked}), _NO_TASK]
+    async with _session(login_env, turns, _HEADROOM) as (runtime, manager):
+        run: RunRecord = await _run(manager)
+        step: HarnessStep = await run_step(runtime, 10.0, None, _scored(frozenset()), False)
+        assert json.loads(step.outcome)["task"] == "no task: the writer found none in the run"
+        assert await runtime.store.harness_tasks() == []
+        real_case = harness_own.case_of
+
+        async def tainted(runtime: Runtime, run_id: str) -> LessonCase:
+            return (await real_case(runtime, run_id)).model_copy(update={"tainted": True})
+
+        monkeypatch.setattr(harness_own, "case_of", tainted)
+        read_outside: HarnessStep = await run_step(runtime, 20.0, run.id, _scored(frozenset()), False)
+        assert json.loads(read_outside.outcome)["task"] == "no task: the run read content others can author"
+
+
+async def test_a_step_that_proposes_scores_the_candidates_first_on_the_task_written_tonight(
+    login_env: dict[str, str],
+) -> None:
+    """The candidates answer the run the task was written from: the base and each candidate play it first, given
+    whole."""
+    turns: list[ScriptedTurn] = [_FINISH, _turn(TASK_TOOL, {"task": _DRAFT}), _habit(), _KEEP, _effects(1)]
+    asked: list[ProbeAsk] = []
+    ready: dict[str, object] = {**_HEADROOM, "headroom_least": 0}
+    async with _session(login_env, turns, ready) as (runtime, manager):
+        run: RunRecord = await _run(manager)
+        prober: Prober = _fair_played(_config(ready), login_env, _recording(_scored(frozenset()), asked))
+        step: HarnessStep = await run_step(runtime, 10.0, None, prober, False)
+        assert step.from_run == run.id, step
+        (kept,) = await runtime.store.harness_tasks()
+        facts: dict[str, object] = json.loads(step.outcome)
+        assert facts["task"] == f"{kept.id} tests: {_DRAFT['habit']}"
+        assert isinstance(facts["scored_on"], list) and facts["scored_on"][0] == kept.id
+        assert [ask.label for ask in asked][:1] == [BASE] and len(asked) == 2
+        assert all(ask.tasks[0] == kept.id and ask.own[0].id == kept.id for ask in asked)
