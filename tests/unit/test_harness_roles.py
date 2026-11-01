@@ -118,6 +118,21 @@ def test_a_moment_and_a_summary_are_lines_that_may_be_recorded() -> None:
             check(_proposal(habits=HABIT, moments=[moment], summary=summary))
 
 
+def test_a_moment_that_cannot_be_recorded_is_left_out_when_another_can() -> None:
+    """Item 903: a link in one moment no longer loses the change its other moments explain; the moment is not stored,
+    and with no moment left the proposal is asked again as before."""
+    check = proposal_check(_proposal_request(), ("pw-7731-kxq9-zz",))
+    kept: HarnessProposal = check(
+        _proposal(
+            habits=HABIT,
+            moments=["the run opened https://evil.example/start", "it edited before reading", "pw-7731-kxq9-zz"],
+        )
+    )
+    assert kept.moments == ["it edited before reading"]
+    with pytest.raises(ProviderProtocolError, match="a moment cannot be recorded: a link"):
+        check(_proposal(habits=HABIT, moments=["the run opened https://evil.example/start", "see @ada"]))
+
+
 def _composition_request() -> CompositionRequest:
     return CompositionRequest(
         goal="g",

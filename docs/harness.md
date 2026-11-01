@@ -85,7 +85,10 @@ write, whether it holds an address to go to or an account name; a site named bar
 page`) is know-how and stays. The moments of a run a proposal answers to, the decisions of a composition and the summary
 of a version, which a model writes about a change and which you and the roles after it read, are asked as a lesson of
 such a run is, and the summary and the texts in the notes of a version are asked again whoever made it (the proposer
-and the composer are asked at their answer, and asked again when it is not good). Dot's lines of the owner section are
+and the composer are asked at their answer, and asked again when it is not good). A moment that cannot be recorded is
+left out when another of the same proposal can be, and the proposal stands on those (item 903: on 2026-11-01 a proposer
+wrote a link in a moment three times and the night lost a change its other moments explained); only a proposal none of
+whose moments can be is asked again. Dot's lines of the owner section are
 asked everything, the mark included; a line that fails is dropped and logged (`owner_line_refused`), the rest of the
 night goes on, and your own lines are never checked. A night in which every line the writer gives is refused leaves the
 lines of the nights before as they were and says so in the log (`owner_lines_all_refused`): it does not empty the

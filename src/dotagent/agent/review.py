@@ -2272,10 +2272,15 @@ def proposal_check(request: ProposalRequest, held: Sequence[str]) -> Callable[[H
             raise ProviderProtocolError("no text changes, so keep must be true", {})
         if not proposal.moments:
             raise ProviderProtocolError("a change names the moment of the run it answers to", {})
-        for moment in proposal.moments:
-            _described("a moment", moment, held)
+        # A moment that cannot be recorded (a link, an account name, item 587) is left out when another can be: a
+        # moment only says why, no run reads it, and the change stands on the ones kept. Only when none can is the
+        # proposal asked again (item 903: on 2026-11-01 DeepSeek V4.1 Flash wrote a link in a moment three times, and
+        # the night's step lost a change that its other moments explained).
+        recordable: list[str] = [moment for moment in proposal.moments if description_problem(moment, held) is None]
+        if not recordable:
+            _described("a moment", proposal.moments[0], held)
         _described("the summary", proposal.summary, held)
-        return proposal.model_copy(update={"habits": habits, "tool_guidance": guidance})
+        return proposal.model_copy(update={"habits": habits, "tool_guidance": guidance, "moments": recordable})
 
     return check
 
