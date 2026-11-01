@@ -25,7 +25,10 @@ Settings › Models chooses `fast`, `review` and `vision` under the default mode
 can do its work: those that call tools for `fast` and `review`, those that see for `vision`. A choice holds from the
 next call of that work on, with no restart (a run under way keeps the review model it started with for its goal check,
 its second opinion and its approvals), and the config file keeps it with the rest of the file as it was; a model that
-cannot do the work is refused, and nothing changes (`POST /api/models/roles`).
+cannot do the work is refused, and nothing changes (`POST /api/models/roles`). Under them, **Own work model** chooses
+the model that decides what Dot does on its own initiative (`[initiative] look_model`, items 910 and 916), from the
+models that call tools, or **Default model** for `[models] main`; it holds from the next look on
+(`PUT /api/initiative/look-model`, [Dot comes to you](proactive.md)).
 
 Under them, **Fallbacks** (item 478, the standby models; drawn as a numbered list since item 563) lists the models a run
 moves to when its own model cannot answer (below), in their order: **Add a fallback model** puts one of the models that

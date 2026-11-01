@@ -4720,6 +4720,13 @@
   margin: var(--space-2) var(--space-4) 0;
 }
 
+/* The lines under the lead (items 826 and 916): the model that decides and the dearer hours, set in as the lead is. */
+.initiative-judge,
+.initiative-peak {
+  margin: 0;
+  padding: var(--space-2) var(--space-4) 0;
+}
+
 /* ---------- Settings › Trading, a trading desk (item 777): the account's worth over its day and the limits' meters, the
    positions, holdings and orders as tables of figures that line up (tabular numbers, right-aligned), a phone's table
    turned into labelled lines, the watch's lines with their tone, and under them the settings: a choice of three over

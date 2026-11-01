@@ -18,6 +18,7 @@ What holds:
 import asyncio
 import contextlib
 import math
+import re
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -82,13 +83,16 @@ _FIRST_LOOK_S: float = 7 * _DAY_S
 # Monday is 0: the weekdays are those before Saturday (item 826).
 _SATURDAY: int = 5
 
+# The note of a costly try (item 916): what :meth:`Initiative._tried` writes when a try spent past [initiative]
+# retry_under_tokens and did not do its thing.
+_COSTLY_NOTE: re.Pattern[str] = re.compile(r"Spent \d+(?:\.\d)?M tokens without doing it: ")
 _DO_GOAL: str = "On my own initiative: {title}"
 _DO_OPENING: str = """You work on your own initiative for the owner (item 715): nobody asked for this in this chat and \
 nobody watches it. It is a thing on your own list.
 
 The work: {title}
 Why it helps them: {why}
-
+{before}
 First check that the work is still to do, on the thing itself (the file, the page, the mail, the repository): the \
 note it came from may be out of date (item 912). Done already: say where, change nothing, and end. Then do it as far \
 as it goes without them. What only they can decide, leave as a question (ask_user) and go on with the rest. A thing \
@@ -436,7 +440,9 @@ class Initiative:
             opening: str = (
                 await self._review_opening(todo)
                 if todo.source == REVIEW_SOURCE
-                else _DO_OPENING.format(title=todo.title, why=todo.why or "(not said)")
+                else _DO_OPENING.format(
+                    title=todo.title, why=todo.why or "(not said)", before=await self._before_line(todo)
+                )
             )
             run: RunRecord = await self._start(
                 todo.title, _DO_GOAL.format(title=todo.title), opening, "task", todo.tainted
@@ -450,6 +456,32 @@ class Initiative:
         await store.set_todo(todo.id, "doing", todo.attempts, run.id, todo.note)
         log.info("initiative_started", todo_id=todo.id, run_id=run.id, tainted=todo.tainted)
         self._follow(run.id, todo.id)
+
+    async def _before_line(self, todo: TodoRecord) -> str:
+        """What the opening of a try says of the try before it (item 916), "" for a first try: how that one ended, so
+        that this one goes on from what it found rather than doing it again, as the tries of 2026-10-29 to 11-01 did.
+        What it said is read from that run itself, never from the thing's note, which a try the daemon's stop cut off
+        leaves as an earlier run wrote it (the pre-push review of item 916), and quoted only of a run that never read
+        content others wrote (item 911's rule); of one that did, or one no longer kept, only that it did not do it."""
+        if todo.attempts == 0 or todo.run_id is None:
+            return ""
+        store: Store = self._runtime.store
+        said: str = ""
+        before: RunRecord | None
+        try:
+            before = await store.get_run(todo.run_id)
+        except NotFoundError:
+            before = None
+        if before is not None:
+            spent: str = f"{(before.input_tokens + before.output_tokens) / 1_000_000:.1f}"
+            ended: str = one_line(_first_line(before.result), _NOTE_CHARS)
+            clean: bool = not todo.tainted and not await store.run_ever_tainted(before.id)
+            said = f" It spent {spent}M tokens" + (f" and ended: {ended}" if clean and ended != "" else ".")
+        return (
+            f"\nA try before this one did not do it ({todo.attempts} so far).{said} Go on from what it found, not "
+            "from the start, and do not do again what it did. When the same wall stops you, leave what only the owner "
+            "can do as a question, or let the thing go with todo_drop and why in a sentence.\n"
+        )
 
     async def _review_if_due(self, now: float) -> None:
         """Put the count of what Dot's own work came to on the list (item 914) once ``[initiative] review_every_days``
@@ -533,7 +565,7 @@ class Initiative:
         tainted: bool = await self._carries_taint(carried)
         # The look judges what is worth doing, on a model of its own when one is set (item 910); its things are done on
         # the configured one.
-        model: str | None = self._runtime.config.initiative.look_model or None
+        model: str | None = self._runtime.roles.look() or None
         run: RunRecord = await self._start(
             LOOK_TITLE,
             _LOOK_GOAL,
@@ -605,7 +637,10 @@ class Initiative:
         """What the end of ``ended`` makes of its thing: done, to do again, or let go."""
         store: Store = self._runtime.store
         todo: TodoRecord = await store.get_todo(todo_id)
-        note: str = one_line(_first_line(ended.result), _NOTE_CHARS)
+        said: str = one_line(_first_line(ended.result), _NOTE_CHARS)
+        # Only :meth:`_tried` writes the note of a costly try: an answer that reads as one is marked as the run's words,
+        # so that it cannot pass for a costly try and let the thing go at the next (the pre-push review of item 916).
+        note: str = said if _COSTLY_NOTE.match(said) is None else f"It said: {said}"
         url: str = f"#/runs/{ended.id}"
         # Let go while its run worked (item 878): by that run, as the owner said not to do it, or by the owner on the
         # Schedules page. It stays let go, however the run ended, and is not tried again.
@@ -641,15 +676,19 @@ class Initiative:
         config: InitiativeConfig = self._runtime.config.initiative
         tried: int = todo.attempts + 1
         waiting: bool = await store.count_left_in_chat(ended.thread_id) > 0
-        # A try that spent more than [initiative] retry_under_tokens and did not do it is not made again the same way
-        # (item 913): on the owner's Mac three tries of one application spent 31.6 million tokens on a puzzle its form
-        # asked for, each one finding what the one before had.
+        # A costly try, one that spent more than [initiative] retry_under_tokens and did not do it (item 913): on the
+        # owner's Mac three tries of one application spent 31.6 million tokens on a puzzle its form asked for, each one
+        # finding what the one before had. Big work is not cut by it (item 916, the owner's word of 2026-11-02): a run
+        # that does its thing is never stopped for what it spends (13 of 55 done on the owner's Mac spent more than 5
+        # million, one 14.3), and a first costly try is tried again with what it found (:meth:`_before_line`); a
+        # second costly try in a row lets the thing go. A try the daemon's stop or the emergency stop cut off keeps the
+        # note as it was (:meth:`_settle`), so it does not break the row: it was not let finish.
         spent: int = ended.input_tokens + ended.output_tokens
-        if not waiting and config.retry_under_tokens > 0 and spent > config.retry_under_tokens:
-            millions: str = f"{spent / 1_000_000:.1f}"
-            await self._let_go(
-                todo, tried, ended.id, one_line(f"Spent {millions}M tokens without doing it: {note}", _NOTE_CHARS)
-            )
+        costly: bool = config.retry_under_tokens > 0 and spent > config.retry_under_tokens
+        if costly:
+            note = one_line(f"Spent {spent / 1_000_000:.1f}M tokens without doing it: {note}", _NOTE_CHARS)
+        if costly and not waiting and _COSTLY_NOTE.match(todo.note) is not None:
+            await self._let_go(todo, tried, ended.id, one_line(f"A second costly try. {note}", _NOTE_CHARS))
             return
         # One that left the owner what only they decide (item 868) stays to do, its try counted, while it waits for
         # their answer; it is let go once it is not waiting and has no try left (:meth:`_next`).

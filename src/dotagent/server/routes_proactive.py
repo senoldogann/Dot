@@ -6,7 +6,13 @@ import time
 
 from fastapi import APIRouter
 
+from dotagent.config_edit import set_look_model
+from dotagent.core.errors import ConfigError
+from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel
+from dotagent.llm.opencode import OPENCODE_PROVIDER
+from dotagent.llm.router import ModelRef, parse_model_ref
+from dotagent.llm.types import ModelInfo
 from dotagent.oauth.providers import ProviderId
 from dotagent.oauth.tokens import Account
 from dotagent.proactive.brief import BriefRequest, BriefView, brief_view, set_brief
@@ -15,6 +21,7 @@ from dotagent.proactive.initiative import idle_seconds
 from dotagent.proactive.todos import (
     InitiativeRequest,
     InitiativeView,
+    LookModelRequest,
     TodoRequest,
     initiative_view,
     let_go,
@@ -70,10 +77,18 @@ def proactive_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
 
     def moded(view: InitiativeView) -> InitiativeView:
-        """``view`` with the approval mode Dot's own runs start in (item 756) and the hours they wait (item 826), for
-        the card to say."""
+        """``view`` with the approval mode Dot's own runs start in (item 756), the hours they wait (item 826), the
+        model that looks for work and the tokens of a costly try (item 916), for the card and Settings › Models to
+        say."""
         config = ctx.runtime.config.initiative
-        return view.model_copy(update={"approvals": config.approvals, "peak_hours_utc": config.peak_hours_utc})
+        return view.model_copy(
+            update={
+                "approvals": config.approvals,
+                "peak_hours_utc": config.peak_hours_utc,
+                "look_model": ctx.runtime.roles.look(),
+                "costly_tokens": config.retry_under_tokens,
+            }
+        )
 
     @router.get("/initiative")
     async def get_initiative() -> InitiativeView:
@@ -88,6 +103,31 @@ def proactive_router(ctx: ServerContext) -> APIRouter:
     async def put_initiative(request: InitiativeRequest) -> InitiativeView:
         """Switch Dot's own initiative on or off; a run of it under way goes on until its end or a stop."""
         return moded(await set_initiative(ctx.runtime.store, request.enabled))
+
+    @router.put("/initiative/look-model")
+    async def put_look_model(request: LookModelRequest) -> InitiativeView:
+        """Have ``model`` look for work on Dot's own initiative from the next look on, or the default model for ""
+        (item 916): the config file keeps it as ``[initiative] look_model``. A model its provider does not offer, one
+        that cannot use actions (the look is a run that reads and writes its list) and one of Zen's free models, which
+        answer only as OpenCode's own agent, are refused, as is a config file that cannot be changed; nothing changes
+        then. A look under way keeps its model."""
+        chosen: str = ""
+        if request.model != "":
+            ref: ModelRef = parse_model_ref(request.model)
+            chosen = ref.label
+            if ref.provider == OPENCODE_PROVIDER:
+                raise ConfigError(
+                    "Zen's free models answer only as OpenCode's own agent, so none can look for work; pick another",
+                    {"model": request.model},
+                )
+            info: ModelInfo = await ctx.runtime.router.model_info(ref)
+            if not info.tools:
+                raise ConfigError(
+                    "the model that looks for work must be one that can use actions", {"model": ref.label}
+                )
+        await asyncio.to_thread(set_look_model, config_path(), chosen)
+        ctx.runtime.roles.choose_look(chosen)
+        return moded(await initiative_view(ctx.runtime.store))
 
     @router.post("/initiative/todos", status_code=201)
     async def post_todo(request: TodoRequest) -> InitiativeView:

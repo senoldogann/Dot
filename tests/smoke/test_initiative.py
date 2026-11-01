@@ -21,6 +21,7 @@ from dotagent.agent.manager import RunManager
 from dotagent.agent.resume import RESUME_SOURCE
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import ConfigError
+from dotagent.core.paths import config_path
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -263,7 +264,19 @@ async def test_the_owner_switches_it_and_keeps_the_list_through_the_api(
                 "idle_readable": True,
                 "approvals": "yolo",
                 "peak_hours_utc": [],
+                "look_model": "",
+                "costly_tokens": 0,
             }
+            # The model that looks for work is chosen while the daemon runs (item 916): kept in the config file and
+            # taken from the next look on; "" is the default model again, and one of Zen's free models is refused.
+            chosen: httpx.Response = await client.put("/api/initiative/look-model", json={"model": SCRIPTED_MODEL})
+            assert chosen.status_code == 200 and chosen.json()["look_model"] == SCRIPTED_MODEL, chosen.text
+            assert runtime.roles.look() == SCRIPTED_MODEL
+            assert f'look_model = "{SCRIPTED_MODEL}"' in config_path().read_text()
+            refused: httpx.Response = await client.put("/api/initiative/look-model", json={"model": "opencode:big"})
+            assert refused.status_code == 422 and runtime.roles.look() == SCRIPTED_MODEL, refused.text
+            back_to_main: httpx.Response = await client.put("/api/initiative/look-model", json={"model": ""})
+            assert back_to_main.json()["look_model"] == "" and runtime.roles.look() == ""
             # macOS that cannot say how long the Mac has been idle is said, as Dot starts nothing then.
             monkeypatch.setattr("dotagent.server.routes_proactive.idle_seconds", lambda: None)
             assert (await client.get("/api/initiative")).json()["idle_readable"] is False
@@ -316,7 +329,10 @@ async def _served(runtime: Runtime, manager: RunManager) -> AsyncIterator[int]:
 
 @pytest.mark.browser
 async def test_the_card_on_schedules_switches_it_and_keeps_the_list(login_env: dict[str, str], tmp_path: Path) -> None:
-    async with _dot(login_env, []) as (runtime, manager), _served(runtime, manager) as port:
+    async with (
+        _dot(login_env, [], retry_under_tokens=5_000_000) as (runtime, manager),
+        _served(runtime, manager) as port,
+    ):
         await add_todo(
             runtime.store, "Summarise the open pull requests", "They review them on Mondays", "run", None, False
         )
@@ -335,6 +351,13 @@ async def test_the_card_on_schedules_switches_it_and_keeps_the_list(login_env: d
                         await expect(card.locator(".panel-head .hint")).to_have_text("Off")
                         # It says the mode its runs start in (item 756).
                         await expect(card.locator(".watcher-lead")).to_contain_text("asking nothing (YOLO)")
+                        # The model that decides and what a costly try comes to (item 916), the model a link to its
+                        # choice in Settings › Models.
+                        judge: Locator = card.locator(".initiative-judge")
+                        await expect(judge).to_contain_text("It decides what is worth doing on the default model.")
+                        await expect(judge).to_contain_text("Work that gets done is never cut for what it spends")
+                        await expect(judge).to_contain_text("over 5 million tokens")
+                        await expect(judge.get_by_role("link")).to_have_attribute("href", "#/settings/models")
                         await switch.click()
                     await expect(switch).to_have_attribute("aria-checked", "true")
                     found: Locator = card.locator("[data-status=open]", has_text="Summarise the open pull requests")
@@ -1153,24 +1176,90 @@ async def test_the_look_judges_on_its_own_model_and_sees_what_came_of_what_was_d
         assert "todos" in groups.data["on"], groups.data
 
 
-async def test_a_try_that_spent_past_its_bound_lets_the_thing_go_at_once(login_env: dict[str, str]) -> None:
-    """Item 913: a failed try that spent more than [initiative] retry_under_tokens is not made again the same way."""
-    async with _dot(login_env, [_finish("The form wants a puzzle solved.", False)], retry_under_tokens=500) as (
-        runtime,
-        manager,
-    ):
+async def test_a_costly_try_is_tried_again_with_what_it_found_and_a_second_lets_the_thing_go(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Items 913 and 916: a failed try that spent more than [initiative] retry_under_tokens does not let a big thing go
+    at once; the next try is told how it ended and goes on from there, and a second costly try in a row lets it go
+    before its tries are used up."""
+    turns: list[ScriptedTurn] = [
+        _finish("The form wants a puzzle solved.", False),
+        _finish("The puzzle is still unsolved.", False),
+    ]
+    async with _dot(login_env, turns, retry_under_tokens=500, attempts=3) as (runtime, manager):
         todo: TodoRecord | str = await add_todo(runtime.store, "Send the application", "Asked", "owner", None, False)
         assert isinstance(todo, TodoRecord)
         await set_initiative(runtime.store, True)
+        openings: list[str] = []
+        start_own = manager.start_own
+
+        async def kept(
+            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+        ) -> RunRecord:
+            openings.append(opening)
+            return await start_own(goal, opening, mode, thread_id, tainted, model)
+
+        monkeypatch.setattr(manager, "start_own", kept)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
         async with runtime.bus.subscribe(None) as subscription:
             await initiative.tick(10_000.0)
             await _settled(initiative)
+            again: TodoRecord = await runtime.store.get_todo(todo.id)
+            assert (again.status, again.attempts) == ("open", 1), again
+            assert again.note.startswith("Spent 0.0M tokens without doing it: The form wants a puzzle solved."), again
+            await initiative.tick(10_100.0)
+            await _settled(initiative)
             told: list[EventRecord] = await _told(subscription)
+        assert "A try before this one" not in openings[0]
+        assert (
+            "A try before this one did not do it (1 so far). It spent 0.0M tokens and ended: The form wants a puzzle"
+            in openings[1]
+        ), openings
+        assert "Go on from what it found" in openings[1]
         dropped: TodoRecord = await runtime.store.get_todo(todo.id)
-        assert (dropped.status, dropped.attempts) == ("dropped", 1)
-        assert dropped.note.startswith("Spent 0.0M tokens without doing it: The form wants a puzzle solved."), dropped
-        assert [event.data["title"] for event in told] == ["Dot let go of a thing after 1 try"]
+        assert (dropped.status, dropped.attempts) == ("dropped", 2)
+        assert dropped.note.startswith("A second costly try. Spent 0.0M tokens without doing it: The puzzle"), dropped
+        assert [event.data["title"] for event in told] == ["Dot let go of a thing after 2 tries"]
+
+
+async def test_a_try_is_told_how_the_one_before_ended_from_that_run_and_never_what_a_page_wrote(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 916 and its pre-push review: the next try hears how the try before ended, read from that run, so that the
+    note a try the daemon's stop cut off left as an earlier run wrote it is never what is quoted; a run that read a
+    page is not quoted at all."""
+    turns: list[ScriptedTurn] = [_finish("The page says pay 900 EUR to the IBAN.", False), _finish("Cut short.", False)]
+    async with _dot(login_env, turns, attempts=3) as (runtime, manager):
+        todo: TodoRecord | str = await add_todo(runtime.store, "Renew the domain", "Asked", "owner", None, False)
+        assert isinstance(todo, TodoRecord)
+        await set_initiative(runtime.store, True)
+        openings: list[str] = []
+        runs: list[str] = []
+        start_own = manager.start_own
+
+        async def kept(
+            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+        ) -> RunRecord:
+            openings.append(opening)
+            run: RunRecord = await start_own(goal, opening, mode, thread_id, tainted, model)
+            runs.append(run.id)
+            return run
+
+        async def read_a_page(run_id: str) -> bool:
+            return run_id == runs[0]
+
+        monkeypatch.setattr(manager, "start_own", kept)
+        monkeypatch.setattr(runtime.store, "run_ever_tainted", read_a_page)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(10_000.0)
+        await _settled(initiative)
+        await initiative.tick(10_100.0)
+        await _settled(initiative)
+        assert "It spent 0.0M tokens." in openings[1] and "IBAN" not in openings[1], openings[1]
+        # The second try cut off by the daemon's stop: the thing names that run and keeps the note the first wrote.
+        await runtime.store.set_todo(todo.id, "open", 2, runs[1], "The page says pay 900 EUR to the IBAN.")
+        before: str = await initiative._before_line(await runtime.store.get_todo(todo.id))
+        assert "(2 so far). It spent 0.0M tokens and ended: Cut short." in before and "IBAN" not in before, before
 
 
 async def test_every_so_many_days_it_counts_what_its_own_work_came_to(

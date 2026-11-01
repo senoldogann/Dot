@@ -233,10 +233,21 @@ async def test_settings_choose_the_models_of_dots_own_work_and_the_next_call_goe
                     )
                     written = load_config(path).models
                     assert (written.fast, written.review, written.vision) == (_OPUS, _HAIKU, _HAIKU)
+                    # The model that looks for work on Dot's own initiative (item 916): the default one until chosen,
+                    # then the next look's, kept as [initiative] look_model.
+                    own: Locator = page.get_by_role("combobox", name="Own work model")
+                    await expect(own).to_have_value("")
+                    await expect(own.locator("option").first).to_have_text("Default model")
+                    await own.select_option(_OPUS)
+                    await expect(page.get_by_text(f"Dot's own work is chosen on {_OPUS.split(':')[1]}")).to_be_visible()
+                    await expect(own).to_have_value(_OPUS)
+                    assert runtime.roles.look() == _OPUS
+                    assert load_config(path).initiative.look_model == _OPUS
                 else:
                     await expect(fast).to_have_value(_OPUS)
                     await expect(review).to_have_value(_HAIKU)
                     await expect(vision).to_have_value(_HAIKU)
+                    await expect(page.get_by_role("combobox", name="Own work model")).to_have_value(_OPUS)
                 card: Locator = page.locator(".models-role").first
                 assert not (
                     await page.locator(".models-role").evaluate_all(

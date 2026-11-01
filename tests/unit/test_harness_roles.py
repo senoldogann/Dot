@@ -54,7 +54,7 @@ def _proposal(**fields: object) -> HarnessProposal:
 
 def test_each_role_plays_on_the_review_model_unless_the_configuration_names_one() -> None:
     config = load_default_config()
-    roles: ModelRoles = ModelRoles(config.models)
+    roles: ModelRoles = ModelRoles(config.models, "")
     assert {role: role_model(config.harness, roles, role) for role in ROLE_NAMES} == {
         role: config.models.review for role in ROLE_NAMES
     }

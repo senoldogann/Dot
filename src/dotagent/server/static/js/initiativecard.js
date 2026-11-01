@@ -4,7 +4,7 @@
 // taken off, one that was let go put back.
 
 import { api } from "./api.js";
-import { clip, el } from "./dom.js";
+import { clip, el, modelName } from "./dom.js";
 import { icon } from "./icons.js";
 import { inlineError } from "./panels.js";
 import { attempt, toast } from "./ui.js";
@@ -92,6 +92,10 @@ export function mountInitiative() {
   );
   // The weekday hours its runs wait in (item 826), told in the Mac's own time.
   const peak = el("p", { class: "hint initiative-peak", hidden: true });
+  // The model that decides what to do and what a costly try comes to (item 916).
+  const lookName = el("a", { href: "#/settings/models", title: "Choose it in Settings › Models › Own work model" }, "the default model");
+  const costly = el("span");
+  const judge = el("p", { class: "hint initiative-judge" }, "It decides what is worth doing on ", lookName, ". ", costly);
   const idleNote = el("div", { class: "note warn initiative-idle", hidden: true, role: "status" }, icon("alert"), el("span", null, "macOS does not say how long the Mac has been idle, so Dot starts nothing on its own. The daemon's log has why."));
   const holder = el("div", { class: "initiative-list" }, el("div", { class: "hint" }, "Reading the list…"));
   const input = el("input", { class: "input", type: "text", maxlength: String(TITLE_CHARS), placeholder: "Something Dot can do for you on its own", "aria-label": "A thing for Dot's list" });
@@ -102,6 +106,7 @@ export function mountInitiative() {
     { class: "memory-panel notes-panel watcher-panel initiative-panel", dataset: { initiative: "" } },
     el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "On its own"), count, el("span", { class: "spacer" }), toggle),
     lead,
+    judge,
     peak,
     idleNote,
     holder,
@@ -118,6 +123,11 @@ export function mountInitiative() {
     if (hours.length === 2) {
       peak.textContent = `On weekdays (by UTC) it starts nothing from ${localHour(hours[0])} to ${localHour(hours[1])} your time, the provider's dearer hours, but a thing you marked [URGENT].`;
     }
+    lookName.textContent = view.look_model === "" ? "the default model" : modelName(view.look_model);
+    costly.textContent =
+      view.costly_tokens > 0
+        ? `Work that gets done is never cut for what it spends; a try that spends over ${(view.costly_tokens / 1_000_000).toLocaleString()} million tokens without doing it is tried once more from what it found, and a second such try in a row lets the thing go.`
+        : "";
     toggle.title = view.enabled ? "Dot works on its own while the Mac is idle: switch it off" : "Switch on: Dot works on its own while the Mac is idle";
     toggle.disabled = busy;
     add.disabled = busy;

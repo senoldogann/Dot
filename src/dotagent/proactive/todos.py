@@ -235,10 +235,22 @@ class InitiativeView(FrozenModel):
     # The weekday hours in UTC in which none of its runs starts but an urgent thing (``[initiative] peak_hours_utc``,
     # item 826), which the card says; empty for none.
     peak_hours_utc: tuple[int, ...] = ()
+    # The model that looks for work (``[initiative] look_model``, item 916), "" for the default one, which Settings ›
+    # Models shows and chooses.
+    look_model: str = ""
+    # The tokens past which a try that did not do its thing counts as a costly one (``[initiative]
+    # retry_under_tokens``, item 916): the card says what two of them in a row come to. 0: no such bound.
+    costly_tokens: int = 0
 
 
 class InitiativeRequest(FrozenModel):
     enabled: bool
+
+
+class LookModelRequest(FrozenModel):
+    """The model that looks for work on Dot's own initiative (item 916): "" for the default model."""
+
+    model: str
 
 
 class TodoRequest(FrozenModel):

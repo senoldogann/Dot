@@ -1207,10 +1207,11 @@ const ROLE_SETTINGS = [
  * A model that Settings › Models chooses: the default one (item 199), the one a run that names none starts on, a new
  * chat's among them, or one of Dot's own work (item 232). It offers the models that `fits` (the default one, as the
  * composer does, and the fast and review models call tools; the vision model sees), and the one chosen now, listed or
- * not; `choose(ref)` makes the choice. `paint(providers, chosen)` fills it again; the select stays, and so does the
+ * not; `none` names the choice of "" (the default model, for the model that looks for work, item 916), null for none;
+ * `choose(ref)` makes the choice. `paint(providers, chosen)` fills it again; the select stays, and so does the
  * focus on it.
  */
-function modelSetting({ label, hint, className, fits, choose }) {
+function modelSetting({ label, hint, className, fits, none, choose }) {
   let shown = "";
   const select = el("select", { class: "select sm mono", "aria-label": label });
   // The provider of the model chosen stands in the select's box, before its chevron, as the design draws it.
@@ -1242,7 +1243,9 @@ function modelSetting({ label, hint, className, fits, choose }) {
     const listed = groups.some((group) => group.models.some((model) => model.ref === chosen));
     // The native replaceChildren writes a null as text: the option of a model not listed is left out instead.
     const unlisted = listed || chosen === "" ? [] : [el("option", { value: chosen }, `${modelName(chosen)} (not listed now)`)];
+    const empty = none === null ? [] : [el("option", { value: "" }, none)];
     select.replaceChildren(
+      ...empty,
       ...unlisted,
       ...groups.map((group) =>
         el("optgroup", { label: providerLabel(group.provider) }, group.models.map((model) => el("option", { value: model.ref }, modelName(model.ref)))),
@@ -1387,6 +1390,7 @@ function buildModels(isDisposed, asked, head) {
     hint: "New chats start on it, and so does any task that names no model. A chat keeps the model it has; Default in its message box follows this one.",
     className: "models-default",
     fits: (model) => model.tools,
+    none: null,
     choose: async (ref) => {
       await api.post("/models/main", { model: ref });
       toast("ok", `New chats start on ${modelName(ref)}.`);
@@ -1399,12 +1403,30 @@ function buildModels(isDisposed, asked, head) {
       hint: setting.hint,
       className: "models-role",
       fits: setting.fits,
+      none: null,
       choose: async (ref) => {
         await api.post("/models/roles", { role: setting.role, model: ref });
         toast("ok", `The ${setting.label.toLowerCase()} is ${modelName(ref)} from its next call.`);
       },
     }),
   }));
+  // The model that looks for work on Dot's own initiative (item 916): kept as [initiative] look_model, "" for the
+  // default model, and read from the daemon's view of its initiative rather than its status: null until it is read, and
+  // the row stays hidden then, so that a view that cannot be read hides the row alone, not the page.
+  let lookModel = null;
+  const lookFailed = el("div", { class: "set-row models-look-failed", hidden: true });
+  const look = modelSetting({
+    label: "Own work model",
+    hint: "Decides what is worth doing when Dot works on its own while the Mac is idle (Schedules › On its own). The work itself runs on the default model.",
+    className: "models-role",
+    fits: (model) => model.tools,
+    none: "Default model",
+    choose: async (ref) => {
+      const view = await api.put("/initiative/look-model", { model: ref });
+      paintLook(view.look_model);
+      toast("ok", ref === "" ? "Dot's own work is chosen on the default model from its next look." : `Dot's own work is chosen on ${modelName(ref)} from its next look.`);
+    },
+  });
   const standby = standbySetting({
     choose: async (refs) => {
       const answered = await api.put("/models/standby", { models: refs });
@@ -1418,7 +1440,7 @@ function buildModels(isDisposed, asked, head) {
   const element = el(
     "div",
     { class: "set-sections" },
-    setSection({ title: "Roles", body: setCard(main.element, ...roles.map(({ control }) => control.element)) }),
+    setSection({ title: "Roles", body: setCard(main.element, ...roles.map(({ control }) => control.element), look.element, lookFailed) }),
     standby.element,
     setSection({ title: "Every model, by service", body: setCard(el("div", { class: "set-row models-search" }, el("span", { class: "models-search-box" }, icon("search"), search)), list, noMatch) }),
   );
@@ -1461,6 +1483,9 @@ function buildModels(isDisposed, asked, head) {
     main.paint(providers, mainModel);
     for (const { role, control } of roles) {
       control.paint(providers, status === null ? "" : status.models[role]);
+    }
+    if (lookModel !== null) {
+      look.paint(providers, lookModel);
     }
     standby.paint(providers, standbyModels);
     list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider), remember)));
@@ -1528,13 +1553,49 @@ function buildModels(isDisposed, asked, head) {
     }
   }
 
+  /** Draw the row of the model that looks for work alone, with `model` chosen, once the list is here: drawing the page
+   * again would take the focus off the model an address asked for. */
+  function paintLook(model) {
+    lookModel = model;
+    if (providers !== null) {
+      look.paint(providers, lookModel);
+    }
+  }
+
+  /** The model that looks for work, read on its own: a failure stands in its place with a way to read it again, and
+   * leaves the rest of the page as it is. */
+  async function loadLook() {
+    lookFailed.hidden = true;
+    try {
+      const view = await api.get("/initiative");
+      if (typeof view.look_model !== "string") {
+        throw new Error("the daemon's answer names no model that looks for work");
+      }
+      if (!isDisposed()) {
+        paintLook(view.look_model);
+      }
+    } catch (error) {
+      if (!isDisposed()) {
+        console.error("the model that looks for work could not be read", error);
+        lookFailed.replaceChildren(inlineError(error, () => attempt(loadLook)));
+        lookFailed.hidden = false;
+      }
+    }
+  }
+
   async function load() {
+    // The list read again is drawn once it is here: a paint before it (the model that looks for work, read beside it)
+    // draws nothing from the list before it (the pre-push review of item 916).
+    providers = null;
+    lookModel = null;
+    attempt(loadLook);
     forgetModels();
     painted = null;
     main.hide();
     for (const { control } of roles) {
       control.hide();
     }
+    look.hide();
     standby.hide();
     list.replaceChildren(inlineLoading());
     head.setMeta();

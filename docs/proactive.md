@@ -201,7 +201,8 @@ with a research run, which reads what it remembers of you, the record the mornin
 runs
 that failed since the last look, the campaigns at work), the titles of your newest chats and the list (a thing let go with why, so that it is not listed again in
 other words; why is quoted only when the run that wrote it read nothing third parties can author, else it says so), and puts at most three things on it: none you said not to do, which it searches its memory for first. That run is a research run: it writes nothing but its list, its notes and Dot's memory, as any
-research run may. The look runs on `look_model` when it is set ("" is `[models] main`, item 910): it judges what is
+research run may. The look runs on `look_model` when it is set ("" is `[models] main`, item 910; Settings › Models
+chooses it as the Own work model while the daemon runs, and the card names it, item 916): it judges what is
 worth doing, and is a small share of what this work spends (8% on the owner's Mac, 2026-10-29 to 11-01), so a stronger
 model there costs little; the things are done on `[models] main`. Each thing done is listed to it with its day and what
 came of it (the first line of its run's answer, quoted only when that run read nothing third parties can author, item
@@ -255,10 +256,15 @@ desktop, iMessage when it is on). A run that failed leaves it to do, up to `atte
 you are told. A run that finds you said not to do the work (a rule of yours it remembers or read in a chat) does none of
 it and lets the thing go itself, with `todo_drop` and your words as the reason; it is not tried again, and you are told
 once. ("Dot let go of a thing you said not to do", item 878: on 2026-10-31 a look listed a chapter of a thesis its owner
-had said never to touch, and three runs each refused it before it was let go). A failed try that spent more than
-`retry_under_tokens` (5 million, every model call of the run counted) lets the thing go at once and you are told, rather
-than a second try the same way (item 913: three tries of one application spent 31.6 million tokens on a puzzle its form
-asked for); a try that left you a question stays to do. A thing let go while its run worked, by that run or by you,
+had said never to touch, and three runs each refused it before it was let go). A try that gets its thing done is never
+stopped for what it spends (13 of 55 done on the owner's Mac spent more than 5 million tokens, one 14.3). A failed try
+that spent more than `retry_under_tokens` (5 million, every model call of the run counted) is a costly one: its note
+says what it spent, and a second costly try in a row lets the thing go and you are told, before its `attempts` are used
+up (items 913 and 916: three tries of one application spent 31.6 million tokens on a puzzle its form asked for, each
+finding what the one before had); a try the daemon's stop or the emergency stop cut off neither counts as costly nor
+breaks the row, as it was not let finish; a try that left you a question stays to do. Each try after the first is told how the
+one before ended (quoted only when that run read nothing third parties can author) and goes on from what it found
+rather than doing it again. A thing let go while its run worked, by that run or by you,
 stays let go however the run ends. A run you stopped lets it go at once; one the daemon's stop or the emergency stop
 ended (the stop of every run, or the STOP file the run saw as it worked, item 790) leaves it to do; one the daemon was
 doing when it shut down is to do again when it starts, and one it was doing when it stopped without shutting down (a
@@ -337,8 +343,11 @@ it.
 | `PATCH /api/watchers/{id}` | change the whole of its choices, as for a new one; what it handled is kept unless its kind or its account changed, and one switched on again looks at once (404 for none) |
 | `DELETE /api/watchers/{id}` | delete it; answers what was deleted; the chats of the runs it started stay (404 for none) |
 | `POST /api/watchers/{id}/try` | Check now: one look at once, whatever its time: `{"outcome": {"first", "found", "told", "summary", "error"}, "watcher": …}`; a look that fails answers 200 with the failure in `outcome.error`, and `found` and `told` say how far it came (404 for none; 409 for a watcher switched off, while `[watchers] enabled` is false and while the emergency stop is engaged) |
-| `GET /api/initiative` | Dot's own initiative (item 715): `enabled`, `looked_at` (its last look for work), `idle_readable` (whether macOS says how long the Mac has been idle; without it nothing starts, and the card says so), `approvals` (the mode its runs start in, `[initiative] approvals`, which the card says: item 756) and `todos`, what is being done and to do, then what was done or let go in the last two weeks, each with `id`, `title`, `why`, `source` (`owner` or `run`), `status`, `attempts`, `run_id`, `note` and `updated_at` |
+| `GET /api/initiative` | Dot's own initiative (item 715): `enabled`, `looked_at` (its last look for work), `idle_readable` (whether macOS says how long the Mac has been idle; without it nothing starts, and the card says so), `approvals` (the mode its runs start in, `[initiative] approvals`, which the card says: item 756), `peak_hours_utc`
+(item 826), `look_model` (the model that looks for work, "" for the default one) and `costly_tokens`
+(`[initiative] retry_under_tokens`, item 916), and `todos`, what is being done and to do, then what was done or let go in the last two weeks, each with `id`, `title`, `why`, `source` (`owner` or `run`), `status`, `attempts`, `run_id`, `note` and `updated_at` |
 | `PUT /api/initiative` | switch it: `{"enabled": true}`; a run of it under way goes on until its end or a stop |
+| `PUT /api/initiative/look-model` | the model that looks for work, from the next look on (item 916): `{"model": "provider:model"}`, `""` for the default model; kept as `[initiative] look_model`; 422 for one that cannot use actions, one of Zen's free models or of no known provider |
 | `POST /api/initiative/todos` | put a thing of yours on the list, 201: `{"title", "why"}`; 422 when it is on it, or was done or let go in the last 30 days |
 | `GET /api/objectives` | Dot's objectives (item 908): the active ones, then those done or dropped, each with `id`, `title`, `why`, `measure`, `status`, `notes` (`at`, `text`, `tainted`), `tainted` and the times |
 | `GET /api/work-orders` | the work orders (item 907, [Work orders](agents-and-campaigns.md#work-orders)): the open ones first, each as `order` (its record), `agent_name` and `objective_title` |

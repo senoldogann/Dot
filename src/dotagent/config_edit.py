@@ -7,7 +7,8 @@ daemon answers to and whether it keeps the Mac awake, ``[server] reach`` and ``k
 notes are found by meaning, ``[memory] embed_enabled`` (item 558), whether a messaging app of the owner reaches Dot,
 ``[channels] imessage`` (item 572) and ``progress`` (item 618), what a reaction on Dot's message does once its run
 has ended, ``[reactions]`` (item 586), or whether an MCP server that comes with Dot is started, a switch of
-``[builtin_mcp]`` (item 583), so the comments and the other settings stay as written."""
+``[builtin_mcp]`` (item 583), or the model that looks for work on Dot's own initiative, ``[initiative] look_model``
+(item 916), so the comments and the other settings stay as written."""
 
 import os
 import re
@@ -42,6 +43,7 @@ type ConfigTable = Literal[
     "browser",
     "builtin_mcp",
     "channels",
+    "initiative",
     "judge",
     "memory",
     "models",
@@ -69,6 +71,7 @@ type BrowserSetting = Literal[
     "zoom",
 ]
 type BuiltinMcpSetting = Literal["web_research"]
+type InitiativeSetting = Literal["look_model"]
 type JudgeSetting = Literal["provider"]
 type MemorySetting = Literal["embed_enabled"]
 type ModelsSetting = Literal["main", "fast", "review", "vision", "standby"]
@@ -96,6 +99,7 @@ type SettingKey = (
     | BrowserSetting
     | BuiltinMcpSetting
     | ChannelsSetting
+    | InitiativeSetting
     | JudgeSetting
     | MemorySetting
     | ModelsSetting
@@ -354,6 +358,12 @@ def set_embeddings(path: Path, on: bool) -> None:
     """Write ``[memory] embed_enabled``, whether the notes are found by meaning as well as by their words (item 558),
     into the config file at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "memory", "embed_enabled", on)
+
+
+def set_look_model(path: Path, model: str) -> None:
+    """Write ``[initiative] look_model``, the model of the run that looks for work on Dot's own initiative ("" for the
+    default model, items 910 and 916), into the config file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "initiative", "look_model", model)
 
 
 def set_resume(path: Path, mode: ResumeMode) -> None:

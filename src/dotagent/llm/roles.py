@@ -2,7 +2,8 @@
 pages for the facts asked of them, the review model, which checks runs and draws their lessons, and the vision model,
 which reads images for a model that cannot; and the standby models a run moves to when its own model cannot answer
 (item 478). ``[models]`` names them, and Settings › Models chooses them while the daemon runs, which the config file
-keeps too."""
+keeps too; so does it the model that looks for work on Dot's own initiative (``[initiative] look_model``, items 910 and
+916), "" for the default model."""
 
 from collections.abc import Sequence
 from typing import Literal
@@ -19,13 +20,14 @@ class ModelRoles:
     """The models of Dot's own work, as the config file named them when the runtime was built or as the owner chose them
     since (:meth:`choose`). One per runtime, read as each call is made, so that a choice holds from the next call on."""
 
-    def __init__(self, models: ModelsConfig) -> None:
+    def __init__(self, models: ModelsConfig, look: str) -> None:
         self._models: dict[ModelRole, ModelReference] = {
             "fast": models.fast,
             "review": models.review,
             "vision": models.vision,
         }
         self._standby: tuple[ModelReference, ...] = tuple(models.standby)
+        self._look: str = look
 
     def fast(self) -> ModelReference:
         return self._models["fast"]
@@ -39,6 +41,17 @@ class ModelRoles:
     def standby(self) -> tuple[ModelReference, ...]:
         """The models a run moves to, in their order, when its own model cannot answer (``[models] standby``)."""
         return self._standby
+
+    def look(self) -> str:
+        """The model of the run that looks for work on Dot's own initiative (``[initiative] look_model``); "" is the
+        default model."""
+        return self._look
+
+    def choose_look(self, model: str) -> None:
+        """Have ``model`` ("" for the default one) look for work from the next look on (item 916); one under way keeps
+        its own."""
+        self._look = model
+        log.info("look_model_set", model=model)
 
     def after_review(self, own: Sequence[ModelReference] = ()) -> tuple[ModelReference, ...]:
         """The models a question of Dot's own learning goes to, in turn, when the review model declines it or cannot
