@@ -1285,6 +1285,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       drawRecord(fresh);
       paintCost();
     } catch (error) {
+      // A run deleted since it was kept (its chat deleted on another page or on the phone) is not drawn as it stood:
+      // the page is opened again, and says Task not found.
+      if (error.status === 404 && !signal.aborted) {
+        keptRuns.delete(runId);
+        reload();
+        return;
+      }
       readFailed("The task", error);
     }
   }
