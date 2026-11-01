@@ -58,9 +58,9 @@ _BROKEN_FAST: str = "broken"
 # call and Dot kept a list of its own (items 714 and 715), 30 000 for recon (item 776), whose schema of 985 characters
 # adds about 330 tokens to the fixed part, 31 000 for `todo_drop` (item 821), which took it 62 tokens over, 32 000 for
 # `nothing_new` on `finish` and `refuses` on `create_agent` (items 880 and 875) and the shell's pointer to wait_until
-# and its group's line (item 887), 33 000 for the office's `agents_now` and `read_agent_chat` (item 890); the window is
-# rounded up so that the summary still has room.
-_SMALL_WINDOW: int = 33_000
+# and its group's line (item 887), 33 000 for the office's `agents_now` and `read_agent_chat` (item 890), 35 000 for the
+# work orders and the objectives (items 907 and 908); the window is rounded up so that the summary still has room.
+_SMALL_WINDOW: int = 35_000
 # Every section the continuity check asks for, and no identifier the run's history does not hold.
 _SUMMARY: str = (
     "GOAL: find why the backup failed.\nDONE: read the log page by page.\nSTATE: no failure found so far.\n"
@@ -343,12 +343,13 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     # up compacting at every step once the instructions grew by a few words (item 404). It was 32 000 until three tools
     # joined the fixed part (items 714 and 715), 33 600 until three more did (items 740 and 746), and 35 200 until the
     # security scan and the Deep-OS skill did (item 781), 37 000 until `ask_secret` joined the core tools (item
-    # 857), and 38 000 until the shell's description pointed to wait_until and its group was listed (item 887).
+    # 857), 38 000 until the shell's description pointed to wait_until and its group was listed (item 887), and 39 000
+    # until the work orders and the objectives joined (items 907 and 908).
     turns: list[ScriptedTurn] = _reading(40)
-    small: Played = await _play(_config({}, 6), login_env, 39_000, turns)
+    small: Played = await _play(_config({}, 6), login_env, 41_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(39_000, None, 29_250, 29_250, 3656, True),)
+    assert small.scaffolds == (_scaffold(41_000, None, 30_750, 30_750, 3844, True),)
     assert roomy.scaffolds == (_scaffold(None, None, 96_000, 81_600, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
@@ -359,7 +360,7 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for page in [*small_pages, *roomy_pages]:
         assert "chars omitted" not in page
         assert page.endswith("to continue]")
-    assert max(len(page) for page in small_pages) <= 3550 < min(len(page) for page in roomy_pages)
+    assert max(len(page) for page in small_pages) <= 3740 < min(len(page) for page in roomy_pages)
 
     # The small budget is kept by compacting with summaries of the fast model; the large one is never reached.
     assert len(small.compactions) > 1
@@ -371,8 +372,8 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for compaction in small.compactions:
         before, after = compaction["tokens_before"], compaction["tokens_after"]
         assert isinstance(before, int) and isinstance(after, int), compaction
-        assert after < before and after <= 29_250, compaction
-    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 29_250
+        assert after < before and after <= 30_750, compaction
+    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 30_750
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
     # history again at the very next step.
     gaps: list[int] = [
