@@ -100,7 +100,8 @@ async def _served(home: Path) -> AsyncIterator[tuple[RunManager, str, int]]:
     """A daemon whose scripted model says a message, runs a command, keeps a note and answers: its run manager, its
     address and its port."""
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[memory]\nembed_enabled = false\n',
+        encoding="utf-8",
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, list(_TURNS)))

@@ -67,7 +67,8 @@ _SIZES: tuple[tuple[str, int, int], ...] = (("desk", 1280, 860), ("phone", 390, 
 _SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
 # The steps before the answer, each a line of text and a shell call (the commands vary, so no step repeats enough to
 # be called a loop), so the conversation is taller than a window and the way down (the jump arrow) has something to
-# point at. Lessons are off: the scripted model has no reply left for drawing them.
+# point at: as many as the conversation on one grid (item 884), whose finished steps fold, needs. Lessons are off:
+# the scripted model has no reply left for drawing them.
 _STEPS: tuple[tuple[str, str], ...] = (
     (
         "Listing the workspace first, to see what is there before counting anything; the names and the sizes come "
@@ -113,6 +114,11 @@ _STEPS: tuple[tuple[str, str], ...] = (
         "du -sh .",
     ),
     ("Reading the listing a last time, with every name in view, so nothing is left out of the count.", "ls -la"),
+    ("Counting the entries by a second way, one name a line, so the two counts can be held side by side.", "ls -1"),
+    ("Reading the kinds of the files, since a folder among them would not count as a file of the folder.", "ls -F"),
+    ("Looking at the sizes in a form a person reads, so the answer says them as the owner would.", "ls -lh"),
+    ("Checking that the folder has not moved under the run, before the answer names it.", "pwd -P"),
+    ("Reading the dates once more, oldest first, so the newest is the last name and no other.", "ls -ltr"),
     ("Writing the answer up with the count, the newest file and what was read on the way to it.", "ls -lt"),
 )
 _PLAYBOOK: str = (

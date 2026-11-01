@@ -410,7 +410,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           "div",
           { class: "approval-actions" },
           note,
-          remember === null ? null : el("label", { class: "approval-remember", title: "Steps of this kind (the same tool and place) go without asking in this chat" }, remember, "Don't ask again in this chat"),
+          remember === null ? null : el("label", { class: "approval-remember", title: "Steps of this kind (the same action, in the same place) go without asking in this chat" }, remember, "Don't ask again in this chat"),
           el("button", { class: "btn", type: "button", onclick: () => submit(false) }, no),
           el("button", { class: "btn primary", type: "button", onclick: () => submit(true) }, yes),
         ),

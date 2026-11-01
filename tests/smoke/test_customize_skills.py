@@ -24,6 +24,7 @@ from dotagent.config import AppConfig, load_default_config
 from dotagent.core.paths import playbooks_dir
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.server.links import ui_url
+from dotagent.skills.catalog import builtin_skill_names
 from dotagent.store.models import NO_PICKS, RunRecord
 from dotagent.tools.shell import read_login_env
 
@@ -198,7 +199,9 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         await search.fill("")
                         # System: the skills that come with Dot, and the plugin's with its name.
                         await page.get_by_role("button", name=re.compile(r"^System \d+$")).click()
-                        await expect(_section(page, "builtin").locator(".skill-card")).to_have_count(3)
+                        await expect(_section(page, "builtin").locator(".skill-card")).to_have_count(
+                            len(builtin_skill_names())
+                        )
                         await expect(_card(page, _PLUGIN_SKILL)).to_contain_text(_PLUGIN)
                         await expect(_card(page, _SHARED)).to_have_count(0)
                         await page.screenshot(path=str(tmp_path / "skills-system-1280-light.png"), full_page=True)

@@ -7100,16 +7100,18 @@ summary:has(> .chev)::-webkit-details-marker {
   font-size: var(--text-sm);
 }
 
-/* Under a block (code, a table, a picture) or with no copy button to stand for the space under the line, the foot
-   keeps clear of what is above it. */
-.answer > .prose:has(> :is(pre, table, .table-scroll, .prose-code, .prose-table, figure, img, hr):last-child) + .answer-foot,
-.answer-foot:not(:has(.btn)) {
-  margin-top: var(--space-2);
-}
-
-/* Under a bubble the foot keeps a breath from it (item 832): the bubble's fill ends where its words do. */
+/* Under the answer's words the foot keeps a breath from them (item 832). */
 .answer > .prose + .answer-foot {
   margin-top: var(--space-1);
+}
+
+/* Under a block (code, a table, a picture) or with no copy button to stand for the space under the line, the foot
+   keeps clear of what is above it: after the breath, and as strong, so that it is not lost under it (the nightly
+   browser tests of 2026-11-01 found a foot with no button 4 px under the line). */
+.answer > .prose:has(> :is(pre, table, .table-scroll, .prose-code, .prose-table, figure, img, hr):last-child) + .answer-foot,
+.answer > .prose + .answer-foot:not(:has(.btn)),
+.answer-foot:not(:has(.btn)) {
+  margin-top: var(--space-2);
 }
 
 /* Where a pointer can hover, the foot of an answer that ended well and of your message waits for it, as a messaging

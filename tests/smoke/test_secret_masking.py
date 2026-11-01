@@ -236,7 +236,7 @@ async def test_a_card_expiry_dropdown_hides_its_choice_refuses_the_step_and_is_c
     assert _masked(_pixel(image, where["month"])) and _masked(_pixel(image, where["year"]))
     assert not _masked(_pixel(image, where["country"]))
 
-    async def allow(field: SecretField) -> None:
+    async def allow(field: SecretField, text: str | None) -> None:
         return None
 
     open_view: PageView = await browser.open_url("expiry-yolo", f"{site}/expiry", False)

@@ -162,9 +162,10 @@ async def test_a_run_that_reaches_a_site_is_handed_what_was_learned_there(runtim
         await manager.shutdown()
     assert ended.status == "done", ended.result
     assert len(model.requests) == 2
-    assert (
-        listed.name in model.requests[0].messages[0].content and local.name not in model.requests[0].messages[0].content
-    )
+    # The shop's skill is listed with what it does; the local page's is only named with those not listed (item 659).
+    instructions: str = model.requests[0].messages[0].content
+    assert listed.name in instructions and listed.draft.description in instructions, instructions
+    assert local.draft.description not in instructions, instructions
     notes: list[str] = [
         message.content
         for message in model.requests[1].messages

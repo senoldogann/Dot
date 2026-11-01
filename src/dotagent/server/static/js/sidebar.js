@@ -22,7 +22,7 @@ import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
 import { loopRhythm, nextFiring } from "./rhythm.js";
 import { markContent } from "./marks.js";
-import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
+import { closeMenu, closeMenuFrom, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
 import { buildSettingsNav } from "./settingsnav.js";
@@ -811,8 +811,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const active = document.activeElement;
     const focused = active === null ? undefined : [...rowNodes].find(([, node]) => node.contains(active) || moreOf(node) === active);
     const onMore = focused !== undefined && moreOf(focused[1]) === active;
-    // A chat's menu acts on the rows it was opened from, which go now.
-    closeMenu();
+    // A chat's menu acts on the rows it was opened from, which go now (those of the list, of the channels' sections and
+    // of Working and Waiting, painted below); a menu of another part of the page stays.
+    closeMenuFrom(list, channelsNav, activityNav);
     rowNodes.clear();
     // The runs at work show those they delegated that have ended too (item 198). Until the chats come, what works waits
     // for them, so that a chat at work does not show first as its run's row; if they cannot come, the rows show.
