@@ -10,9 +10,11 @@ import { describeArguments, toolWords } from "../tools.js";
 
 // The most runs followed at once: the office shows that many working agents' steps live.
 const MOST_FOLLOWED = 8;
-// The steps a feed keeps, the newest last, and how much of the answer being written.
+// The steps a feed keeps, the newest last, and how much of the answer being written: all of an answer as long as most
+// are, so that what the panel shows of it is cut between its blocks (office/tail.js), not here at any character (the
+// pre-push review of item 905). Eight feeds of 64,000 characters at most.
 const STEPS_KEPT = 14;
-const TEXT_KEPT = 1600;
+const TEXT_KEPT = 64_000;
 const STEP_CHARS = 90;
 // The tools that are the run's own business, not a step to show (finishing, the plan, the groups).
 const QUIET = new Set(["finish", "update_plan", "use_tools", "react", "set_status"]);

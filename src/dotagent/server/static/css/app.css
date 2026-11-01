@@ -11244,13 +11244,12 @@ dialog.teach {
 .office-bubble[hidden] {
   display: none;
 }
+/* What the run at work does now, at the foot of its chat (item 905): its steps as quiet activity rows, then its words. */
 .office-panel-live {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
+  color: var(--muted);
 }
 .office-panel-live[hidden] {
   display: none;
@@ -11293,11 +11292,7 @@ dialog.teach {
   background: var(--bad);
 }
 .office-live-text {
-  margin: 0;
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
   color: var(--text);
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .office-tag-dot {
@@ -11347,9 +11342,6 @@ dialog.teach {
 .office-full .office-panel-slot {
   width: min(440px, calc(100% - 2 * var(--space-2)));
 }
-.office-full .office-chat {
-  max-height: 55vh;
-}
 .office-panel-slot {
   position: absolute;
   left: var(--space-2);
@@ -11367,7 +11359,10 @@ dialog.teach {
   flex-direction: column;
   gap: var(--space-2);
   max-height: 100%;
-  overflow: auto;
+  min-height: 0;
+  /* The chat scrolls; the panel too, as a last resort, when what stays (the head, offers, a box of many lines, a phone's
+     keyboard) is taller than it: the box is never cut off out of reach (the pre-push review of item 905). */
+  overflow-y: auto;
   padding: var(--space-3);
   border-radius: var(--radius);
   background: var(--surface);
@@ -11398,41 +11393,93 @@ dialog.teach {
   line-height: var(--leading-sm);
   margin: 0;
 }
+/* What it does in a word, with its state's dot (item 905): the goal is the first message of the chat. */
+.office-panel-doing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+.office-panel-doing::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--office-free);
+}
+.office-panel-doing[data-mode="working"]::before {
+  background: var(--office-working);
+  animation: office-doing var(--motion-pulse) ease-in-out infinite;
+  animation-play-state: var(--endless);
+}
+.office-panel-doing[data-mode="waiting"]::before {
+  background: var(--office-waiting);
+}
+@keyframes office-doing {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .office-panel-doing[data-mode="working"]::before {
+    animation: none;
+  }
+}
+.office-panel-head,
+.office-panel-links {
+  flex: none;
+}
 /* Help offers in a panel (item 896): each free agent that could help, the part it could take, and the button that lets
    it help. */
-/* The chat in a panel (item 898): the owner's words at the right, the agent's answers at the left, the newest at the
-   foot, in a well that scrolls. */
+/* The chat in a panel (item 898): the owner's words at the right, the agent's answers as the chat page writes them,
+   the newest at the foot. It takes the height the panel has, and is the one part of it that scrolls (item 905). */
 .office-chat {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  max-height: 240px;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: min(140px, 30vh);
   overflow-y: auto;
   overscroll-behavior: contain;
+  padding-right: var(--space-1);
 }
 .office-chat[hidden] {
   display: none;
 }
-.office-chat:empty {
-  display: none;
+.office-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .office-turn {
-  max-width: 88%;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.office-turn .prose,
+.office-live-text .prose {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+.office-turn .prose > :first-child,
+.office-live-text .prose > :first-child {
+  margin-top: 0;
+}
+.office-turn .prose > :last-child,
+.office-live-text .prose > :last-child {
+  margin-bottom: 0;
 }
 .office-turn-you {
   align-self: flex-end;
+  max-width: 88%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
   background: var(--msg-me);
   color: var(--on-msg-me);
 }
+/* The answer as the chat page shows one: no bubble, the panel's width. */
 .office-turn-agent {
-  align-self: flex-start;
-  background: var(--msg-agent);
+  align-self: stretch;
   color: var(--text);
 }
 .office-chat-note {
@@ -11444,6 +11491,11 @@ dialog.teach {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  /* Many offers scroll in their own part rather than squeeze the chat away (item 905). */
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 35%;
+  overflow-y: auto;
 }
 .office-offers[hidden] {
   display: none;

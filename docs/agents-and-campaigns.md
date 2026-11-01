@@ -58,7 +58,16 @@ each time: while the agent works, or waits for you, it waits in that chat's queu
 **Steer** chosen under Settings › General › Messages, as a message in its chat does; **New chat** starts the next
 message afresh. A schedule's, a watcher's or Dot's own chat is not gone on in: with no chat of yours, the panel is an
 empty chat, ready for your first message. A free agent's panel is its chat alone; its steps and words show while it
-works or waits (item 901). The button at the top corner shows the office full screen, over the whole window, and takes
+works or waits (item 901), at the foot of the chat, whoever started the run (a schedule, a watcher, Dot's own
+initiative, a helper's part, or a run a **New chat** leaves out). The chat is written as the chat page writes it (item
+905): your words in a bubble, the answers across the panel with their Markdown rendered (headings, bold, lists, code),
+never as marks, and whole; the words a run at work is writing show their newest whole blocks, 1,600 characters or so
+(as the chat page's reader finds them, so never inside a code block or a list; a code block still being written shows
+its opening line and its newest lines). Over the chat, what the agent does is a word (Working, Waits for you)
+when its run is the chat below, whose first message is the goal; for any other run, the word and the goal. The chat takes the height of the panel and is the one part of it that scrolls, and a new step or word is added
+to what is drawn rather than drawing the whole chat again, so it stays where you scrolled it, or follows the foot when
+you were there or when you send. Many help offers scroll in their own part, and the panel scrolls as a last resort, so
+the box is never out of reach. The button at the top corner shows the office full screen, over the whole window, and takes
 it back, as Escape does (item 901). The names over the heads glide when one must stand above another, and their sizes
 are read when their words change, not at every frame (item 898: they moved jerkily). three.js 0.187.0 (MIT,
 `static/vendor/three/`, its licence beside it) draws it and is loaded only when the office opens.

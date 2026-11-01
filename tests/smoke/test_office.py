@@ -384,7 +384,7 @@ async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: di
                     "status": "running",
                     "parent_run_id": None,
                 },
-                {"id": "run_w", "goal": "Hello", "result": "Hi there", "status": "done", "parent_run_id": None},
+                {"id": "run_w", "goal": "Hello", "result": "**Hi** there", "status": "done", "parent_run_id": None},
             ]
             if "thread_id=t&" in url or url.endswith("thread_id=t")
             else [
@@ -450,6 +450,12 @@ async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: di
             panel = office.locator(".office-panel")
             await expect(panel.locator(".office-turn-you")).to_have_text(["Hello", "Read the week's sources"])
             await expect(panel.locator(".office-turn-agent")).to_have_text(["Hi there"])
+            # Written as the chat page writes it (item 905): the Markdown rendered, never its marks; what it does in a
+            # word, the goal being the chat's own first message.
+            await expect(panel.locator(".office-turn-agent strong")).to_have_text("Hi")
+            await expect(panel.locator(".office-panel-doing")).to_have_text("Working")
+            # The log is kept as the panel is painted again: what was drawn stays, and new words are added to it.
+            await panel.locator(".office-chat").evaluate("(chat) => { chat.dataset.kept = 'yes'; }")
             await panel.get_by_role("textbox", name="Message").fill("After this, the news.")
             await panel.get_by_role("button", name="Start").click()
             await _until(lambda: len(queued) == 1)
@@ -464,6 +470,7 @@ async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: di
             await expect(panel.locator(".office-turn-you")).to_have_text(
                 ["Hello", "Read the week's sources", "After this, the news.", "And the news?"]
             )
+            await expect(panel.locator('.office-chat[data-kept="yes"]')).to_have_count(1)
             await panel.get_by_role("button", name="Close").click()
             # A free one whose last chat was the owner's: the message goes on in that chat.
             await office.locator(".office-tag", has_text="Copy Editor").click()
