@@ -147,7 +147,9 @@ def _create_tool() -> RegisteredTool:
     def classify(args: CreateArgs, ctx: ToolContext) -> ActionInfo:
         when: str = describe_timing(tool_timing(args.cron, args.at, ctx), ctx.runtime.schedule_zone)
         mode: str = "this chat's mode" if args.mode is None else args.mode
-        return _action("schedule_create", f'Schedule "{args.name}" ({when}, {mode}): {args.goal}', "medium")
+        # The whole goal on the card: every firing runs all of it, not what fits the card (the review of 2026-11-01).
+        summary: str = f'Schedule "{args.name}" ({when}, {mode}): {" ".join(args.goal.split())}'
+        return _action("schedule_create", "", "medium").model_copy(update={"summary": summary})
 
     async def run(args: CreateArgs, ctx: ToolContext) -> ToolResult:
         zone: ZoneInfo = ctx.runtime.schedule_zone
@@ -163,7 +165,9 @@ def _create_tool() -> RegisteredTool:
             cron=args.cron,
             at=args.at,
             mode=schedule_mode(args.mode, owner.mode if choices is None else choices.mode),
-            options=chat_options(owner, choices),
+            # A run that read a page or a mail may be making its words a schedule: each firing then starts tainted
+            # (the review of 2026-11-01), so what reaches other people or lasts asks first.
+            options=chat_options(owner, choices).model_copy(update={"from_outside": ctx.ever_tainted()}),
         )
         record: ScheduleRecord = await create_schedule(
             store, ctx.runtime.config.scheduler, zone, request, time.time(), owner.thread_id

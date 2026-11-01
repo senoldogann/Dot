@@ -174,7 +174,9 @@ struct Daemon {
 /// The page the window shows (`watch`): the UI, or the down page at the address that says why (`down_url`), or, on a
 /// Mac that has no Dot, the installer's own window (`installer`).
 enum Shown {
-    Ui,
+    /// The UI at the address it was opened at (`ui_url`): a daemon that comes back at another port or with another
+    /// token is opened anew (the review of 2026-11-01), not left on a page that cannot reach it.
+    Ui(String),
     Down(String),
     Installer,
 }
@@ -656,13 +658,17 @@ fn watch(app: AppHandle, shown: Shown) {
                 (Shown::Installer, Some(daemon)) if counted && !installing(&app) => {
                     close_installer(&app);
                     open_ui(&app, &daemon);
-                    Shown::Ui
+                    Shown::Ui(ui_url(&daemon))
                 }
                 (Shown::Installer, _) => Shown::Installer,
-                (Shown::Ui, _) if !leaves_ui(misses) => Shown::Ui,
+                (Shown::Ui(old), Some(daemon)) if counted && ui_url(&daemon) != old => {
+                    open_ui(&app, &daemon);
+                    Shown::Ui(ui_url(&daemon))
+                }
+                (Shown::Ui(old), _) if !leaves_ui(misses) => Shown::Ui(old),
                 (Shown::Down(_), Some(daemon)) if counted => {
                     open_ui(&app, &daemon);
-                    Shown::Ui
+                    Shown::Ui(ui_url(&daemon))
                 }
                 (shown, _) => {
                     let page = down_url(&seen);
@@ -947,7 +953,7 @@ pub fn run() {
                             &handle,
                             WebviewUrl::External(url::Url::parse(&ui_url(&daemon))?),
                         )?;
-                        Shown::Ui
+                        Shown::Ui(ui_url(&daemon))
                     }
                     _ => {
                         let page = down_url(&seen);

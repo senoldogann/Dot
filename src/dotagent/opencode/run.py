@@ -891,6 +891,7 @@ async def _tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> Tool
         facts=lambda: facts,
         spawner=None,
         tainted=lambda: agent.gate.tainted,
+        ever_tainted=lambda: agent.gate.ever_tainted,
     )
 
 

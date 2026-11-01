@@ -7,6 +7,7 @@ way the Agents page does, for a role the work needs again or in parallel; the re
 agent a run makes can do no more than the run (item 307): only tools the run has, a helper model or the run's own, and a
 run that only reads (research) makes none."""
 
+import asyncio
 import re
 import secrets
 from collections.abc import Sequence
@@ -14,11 +15,21 @@ from collections.abc import Sequence
 from pydantic import Field
 
 from dotagent.core.errors import ToolExecutionError, ToolInputError
-from dotagent.core.text import truncate_tail, unclosing
+from dotagent.core.text import redact_known, truncate_tail, unclosing
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import Message
 from dotagent.policy.types import ActionInfo
-from dotagent.store.models import REFUSES_CHARS, AgentRecord, EventRecord, RunMode, RunRecord, TeamRecord, ThreadRecord
+from dotagent.secrets import known_secrets
+from dotagent.store.models import (
+    DOT_AGENT,
+    REFUSES_CHARS,
+    AgentRecord,
+    EventRecord,
+    RunMode,
+    RunRecord,
+    TeamRecord,
+    ThreadRecord,
+)
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -267,11 +278,21 @@ def render_made(agent: AgentRecord) -> str:
 
 def _create_agent_tool() -> RegisteredTool:
     def classify(args: CreateAgentArgs, ctx: ToolContext) -> ActionInfo:
+        # The card says all that the agent will carry into every later run: its tools, its model, what it never does
+        # and its instructions, not its name and role alone (the review of 2026-11-01).
+        refuses: str = "; ".join(line.strip() for line in args.refuses if line.strip())
+        parts: list[str] = [
+            f"Make the agent {args.name.strip()}: {args.role.strip()}",
+            f"tools: {', '.join(args.tools) or 'none named'}",
+            *([f"model: {args.model.strip()}"] if args.model.strip() else []),
+            *([f"never: {refuses}"] if refuses else []),
+            f"instructions: {' '.join(args.instructions.split()) or 'none'}",
+        ]
         return ActionInfo(
             tool=CREATE_AGENT_TOOL,
             kind="meta",
             risk="low",
-            summary=f"Make the agent {args.name.strip()}: {args.role.strip()}",
+            summary=". ".join(parts),
             target="",
             # A teammate shapes every later run, the way a saved note does.
             flags=("persistence",),
@@ -279,6 +300,10 @@ def _create_agent_tool() -> RegisteredTool:
 
     async def run(args: CreateAgentArgs, ctx: ToolContext) -> ToolResult:
         name: str = args.name.strip()
+        if name.casefold() == DOT_AGENT.name.casefold():
+            # Dot is the lead: an agent of its name would answer for it in a group chat and could not be read by
+            # read_agent_chat (the review of 2026-11-01).
+            raise ToolInputError("Dot is the lead's name; choose another for the agent", {"agent": name})
         if ctx.run_tools is None:
             raise ToolExecutionError("this run cannot make agents", {"run_id": ctx.run_id})
         own: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
@@ -301,17 +326,19 @@ def _create_agent_tool() -> RegisteredTool:
                 "an agent has that name already; message it, or choose another name",
                 {"agent": taken.name, "role": taken.role},
             )
+        # What it carries into every later run, with the secrets Dot holds masked (the review of 2026-11-01).
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         made: AgentRecord = await ctx.runtime.store.create_agent(
-            name,
-            args.role.strip(),
-            args.instructions.strip(),
+            redact_known(name, held),
+            redact_known(args.role.strip(), held),
+            redact_known(args.instructions.strip(), held),
             model,
             None,
             None,
             tools,
             ctx.run_id,
             None,
-            "\n".join(line.strip() for line in args.refuses if line.strip())[:REFUSES_CHARS],
+            redact_known("\n".join(line.strip() for line in args.refuses if line.strip()), held)[:REFUSES_CHARS],
         )
         return ok(render_made(made))
 

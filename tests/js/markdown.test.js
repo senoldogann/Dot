@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { openFence, parseBlocks, parseInline, plainText, readsAsMarkdown, sourceLines } from "../../src/dotagent/server/static/js/markdown.js";
+import { linkWords, openFence, parseBlocks, parseInline, plainText, readsAsMarkdown, sourceLines } from "../../src/dotagent/server/static/js/markdown.js";
 
 test("inline text keeps code, emphasis and links apart", () => {
   const parts = parseInline("Run `make` for **all** of [the docs](https://example.com/docs).");
@@ -400,3 +400,19 @@ test("a preview's words have their markdown taken off", () => {
   assert.equal(plainText("snake_case_name and __init__.py"), "snake_case_name and init.py");
 });
 
+
+test("a link whose words name another address says where it goes", () => {
+  // The review of 2026-11-01: an answer a page steered showed one site and opened another.
+  const [link] = parseInline("[https://accounts.example.com/signin](https://evil.example/login)").filter((part) => part.type === "link");
+  assert.equal(link.value, "https://accounts.example.com/signin (evil.example)");
+  assert.equal(link.href, "https://evil.example/login");
+  // Words that are no address, or the same host, stay as written.
+  assert.equal(linkWords("the docs", "https://example.com/docs"), "the docs");
+  assert.equal(linkWords("example.com/docs", "https://www.example.com/docs"), "example.com/docs");
+  assert.equal(linkWords("Version 1.2", "https://example.com"), "Version 1.2");
+  // A host in another script that only looks the same, one inside a sentence or in bold, and a file's name.
+  assert.equal(linkWords("b\u0430nk.example", "https://bank.example/x"), "b\u0430nk.example (bank.example)");
+  assert.equal(linkWords("Log in at bank.example", "https://evil.example"), "Log in at bank.example (evil.example)");
+  assert.equal(linkWords("**bank.example**", "https://evil.example"), "**bank.example** (evil.example)");
+  assert.equal(linkWords("report.pdf", "https://drive.google.com/file"), "report.pdf");
+});

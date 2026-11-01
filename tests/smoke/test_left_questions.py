@@ -167,9 +167,11 @@ async def test_a_run_nobody_answers_leaves_its_question_and_the_answer_starts_a_
         assert (decided.status, decided.note) == ("approved", ANSWER)
         newest: RunRecord = (await runtime.store.list_runs(1, asked.thread_id))[0]
         assert newest.id != asked.id
-        # The new run carries the task of the run that asked on, with the answer under it.
+        # The new run carries the task of the run that asked on, with the answer under it: in its goal, which the review
+        # model takes as the owner's words, the answer alone, not the question the run wrote (the review of
+        # 2026-11-01); the question is in what its model reads first.
         assert (newest.goal, newest.mode, newest.model, newest.approvals, newest.source) == (
-            f"{GOAL}\n\n{CARRIED}",
+            f"{GOAL}\n\n(Answer to a question of the run) {ANSWER}",
             "task",
             SCRIPTED_MODEL,
             approvals,

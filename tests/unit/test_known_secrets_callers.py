@@ -53,6 +53,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/playbooks.py:_write_reply": (True,),
     "agent/skill_proposals.py:propose_merges": (True,),
     "teach.py:draft_taught_skill": (True,),
+    # An agent a run makes, its words masked before they are stored (the review of 2026-11-01).
+    "tools/team.py:_create_agent_tool.run": (True,),
     # The part a help offer says a free agent could take, masked before the office shows it (item 896).
     "server/routes_agents.py:agents_router.help_offers": (True,),
     # A skill the owner said in a chat (item 893), masked before it is written.

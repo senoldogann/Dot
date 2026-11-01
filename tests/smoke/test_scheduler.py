@@ -439,6 +439,7 @@ class _OwnerSwitchesTheOtherOff(RunManager):
         goal_mode: bool | None,
         carried: tuple[str, ...],
         skills: tuple[str, ...] = (),
+        from_outside: bool = False,
     ) -> RunRecord:
         self.started.append(goal)
         for other, schedule_id in self._schedule_of.items():
@@ -494,6 +495,7 @@ class _StartsAndEnds(RunManager):
     def __init__(self, runtime: Runtime) -> None:
         super().__init__(runtime)
         self.goals: list[str] = []
+        self.from_outside: list[bool] = []
         self.ends: asyncio.Event = asyncio.Event()
 
     async def start_firing(
@@ -509,8 +511,10 @@ class _StartsAndEnds(RunManager):
         goal_mode: bool | None,
         carried: tuple[str, ...],
         skills: tuple[str, ...] = (),
+        from_outside: bool = False,
     ) -> RunRecord:
         self.goals.append(goal)
+        self.from_outside.append(from_outside)
         return await self._runtime.store.create_run(
             thread_id,
             goal,
@@ -555,6 +559,7 @@ class _Starts(_StartsAndEnds):
         goal_mode: bool | None,
         carried: tuple[str, ...],
         skills: tuple[str, ...] = (),
+        from_outside: bool = False,
     ) -> RunRecord:
         self.started.append(opening)
         return await super().start_firing(
@@ -611,6 +616,7 @@ class _FailsThenStarts(_StartsAndEnds):
         goal_mode: bool | None,
         carried: tuple[str, ...],
         skills: tuple[str, ...] = (),
+        from_outside: bool = False,
     ) -> RunRecord:
         if self.failures:
             raise self.failures.pop(0)
@@ -1259,3 +1265,24 @@ async def test_a_recurring_firing_whose_chat_is_busy_is_skipped_not_failed(runti
     assert after.last_status == "skipped: a run is already active on this thread"
     assert after.enabled and after.next_run_at is not None and after.next_run_at > due
     assert await firing_failure(runtime.store, record.id) is None
+
+
+async def test_a_schedule_a_run_made_after_reading_outside_content_fires_tainted(runtime: Runtime) -> None:
+    """The review of 2026-11-01: a schedule a tainted run made fired clean for good. Its mark is kept in the store,
+    through an edit of the owner's, and its firing starts tainted."""
+    marked: ScheduleRecord = await _schedule(
+        runtime,
+        _cron("Copied", "*/5 * * * *").model_copy(
+            update={"options": UNSET_OPTIONS.model_copy(update={"from_outside": True})}
+        ),
+    )
+    assert (await runtime.store.get_schedule(marked.id)).options.from_outside
+    manager: _StartsAndEnds = _StartsAndEnds(runtime)
+    scheduler: Scheduler = Scheduler(runtime, manager)
+    try:
+        await scheduler.tick(_planned(marked) + 5)
+        manager.ends.set()
+        await _until_over(runtime, marked.id)
+    finally:
+        await scheduler.drain()
+    assert manager.from_outside == [True]

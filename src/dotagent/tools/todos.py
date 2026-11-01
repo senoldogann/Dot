@@ -60,7 +60,7 @@ def _todo_tool() -> RegisteredTool:
 
     async def run(args: TodoArgs, ctx: ToolContext) -> ToolResult:
         added: TodoRecord | str = await add_todo(
-            ctx.runtime.store, args.title, args.why, "run", ctx.run_id, ctx.tainted()
+            ctx.runtime.store, args.title, args.why, "run", ctx.run_id, ctx.ever_tainted()
         )
         if isinstance(added, str):
             return fail(added)

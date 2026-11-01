@@ -77,7 +77,10 @@ the home's Today strip wear the face too. A schedule can run as one of your agen
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting an agent leaves its chats, its lessons and its
 learned skills to Dot, and switches its schedules off ("switched off: its agent was deleted"), as Dot's with no agent
 named, so that none goes on firing with every tool; one you switch on again runs as Dot, or as the agent you then pick
-in its form. The dialog says how many of them it switches off: the ones on. The bar of an agent's page names the agent
+in its form. The dialog says how many of them it switches off: the ones on. A message you queued for it goes with it
+(item 899): it would start as Dot. No agent takes Dot's name, made by you or by a run, nor is a run's agent made with
+a secret Dot holds in its words: they are masked (item 899), and the card that asks you whether to make one shows its
+tools, its model, what it never does and its instructions, not its name and role alone. The bar of an agent's page names the agent
 as the page's heading, as the tab does ("Scout · Agents · Dot"), and Edit opens the editor at the top of the page, not
 where the greeting stood. **Pause** in the bar (item 465; `POST /api/agents/<id>/pause`, and `/resume`) keeps the
 agent's schedules from starting anything by themselves until **Resume**: the list and the page say "Paused", and its

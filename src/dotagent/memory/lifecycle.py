@@ -214,6 +214,10 @@ async def merge_notes(index: MemoryIndex, source_ids: Sequence[str], keep_id: st
                 "a note the owner saved or pinned, a standing note and a journal are not merged",
                 {"memory_id": note.id},
             )
+        if note.expires_at is not None:
+            # A note that holds for a while would hold for good as part of a merged one (the review of 2026-11-01),
+            # as the nightly merge keeps such notes out too.
+            raise InvalidValueError("a note that holds only for a while is not merged", {"memory_id": note.id})
     return await index.store.merge_memories(source_ids, keep_id, REST_TAG, now)
 
 

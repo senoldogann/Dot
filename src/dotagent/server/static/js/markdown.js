@@ -154,6 +154,36 @@ function emphasisParts(text) {
 // A link, or a picture written as one (`![words](address)`): the picture is not drawn (nothing is fetched for a
 // message), its words are the link (`linkMatches`).
 
+// Words that name an address of their own ("https://bank.example/login", "Log in at bank.example", a host in another
+// script that only looks the same) and a link that goes to another host: the host it goes to is said beside them (the
+// review of 2026-11-01: a page that steered an answer could have it show one site and open another). Hosts are compared
+// as the browser reads them (punycode), and a file's name ("report.pdf") is no address.
+const NAMED_HOSTS = /(?:https?:\/\/)?((?:[\p{L}\p{N}-]+\.)+[\p{L}]{2,})/gu;
+const FILE_ENDINGS = new Set(["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "md", "png", "jpg", "jpeg", "gif", "zip", "json", "html", "htm", "py", "js", "ts"]);
+
+/** The host of `address`, as the browser reads it, lower case and without a leading "www.", or "". */
+function hostOf(address) {
+  try {
+    return new URL(address).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+/** The words of a link as they are shown: as written, or with the host it goes to beside an address it does not go to. */
+export function linkWords(words, href) {
+  const target = hostOf(href);
+  if (target === "") return words;
+  for (const match of words.matchAll(NAMED_HOSTS)) {
+    const named = match[1];
+    const ending = named.slice(named.lastIndexOf(".") + 1).toLowerCase();
+    if (FILE_ENDINGS.has(ending)) continue;
+    const shown = hostOf(`https://${named}`);
+    if (shown !== "" && shown !== target) return `${words} (${target})`;
+  }
+  return words;
+}
+
 function markdownLinkParts(text) {
   const parts = [];
   let last = 0;
@@ -162,7 +192,7 @@ function markdownLinkParts(text) {
       parts.push(...emphasisParts(text.slice(last, match.index)));
     }
     if (SAFE_URL.test(match.href)) {
-      parts.push({ type: "link", value: match.words, href: match.href });
+      parts.push({ type: "link", value: linkWords(match.words, match.href), href: match.href });
     } else {
       parts.push({ type: "text", value: match.text });
     }

@@ -669,6 +669,9 @@ class ScheduleOptions(FrozenModel):
     # The skills its runs start with, as a message's picks of skills do (item 666): a task the owner taught Dot and
     # asked it to repeat. None for every schedule before.
     skills: tuple[str, ...] = ()
+    # Made by a run that had read content third parties can author (the review of 2026-11-01): its goal may hold their
+    # words, so every firing starts tainted, as a watcher's run does. False for every schedule before and the owner's.
+    from_outside: bool = False
 
 
 class ScheduleRecord(FrozenModel):

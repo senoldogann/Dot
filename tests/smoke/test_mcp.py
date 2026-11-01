@@ -436,8 +436,9 @@ async def test_a_server_that_died_is_started_again_by_the_next_call(runtime: Run
     old_pid: int = int(_answer(first, "process_id"))
     os.kill(old_pid, signal.SIGKILL)
 
-    with pytest.raises(McpError, match="closed the connection while running wipe"):
-        await _call(runtime, "mcp__fixture__wipe", {"target": "the logs"})
+    # What came with the failure is the server's side: fenced, the result untrusted (the review of 2026-11-01).
+    died, _ = await _call(runtime, "mcp__fixture__wipe", {"target": "the logs"})
+    assert died.is_error and died.untrusted and "closed the connection while running wipe" in died.text
 
     again, _ = await _call(runtime, "mcp__fixture__add", {"a": 1, "b": 1})
     assert _answer(again, "add") == "2"

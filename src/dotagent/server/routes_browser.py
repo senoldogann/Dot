@@ -132,16 +132,18 @@ def browser_router(ctx: ServerContext) -> APIRouter:
     @router.post("/browser/raise")
     async def set_raise(request: BrowserRaiseRequest) -> BrowserView:
         """Whether Chrome is brought to the front while a run works (item 97); takes effect at once and is kept."""
-        session.set_raise_window(request.raise_window)
+        # Kept first, then taken: a config that cannot be written changes nothing (the review of 2026-11-01).
         await asyncio.to_thread(set_browser_setting, config_path(), "raise_window", request.raise_window)
+        session.set_raise_window(request.raise_window)
         return await state()
 
     @router.post("/browser/remote-input")
     async def set_remote_input(request: BrowserRemoteInputRequest) -> BrowserView:
         """Whether the owner may use a held run's page from the screen that shows it (item 470); takes effect at once
         and is kept."""
-        ctx.runtime.browsers.set_remote_input(request.remote_input)
+        # Kept first: a write that fails must not leave a phone able to drive a held page (the review of 2026-11-01).
         await asyncio.to_thread(set_browser_setting, config_path(), "remote_input", request.remote_input)
+        ctx.runtime.browsers.set_remote_input(request.remote_input)
         return await state()
 
     @router.post("/browser/debug-port")
@@ -159,8 +161,8 @@ def browser_router(ctx: ServerContext) -> APIRouter:
     @router.post("/browser/enabled")
     async def set_enabled(request: BrowserEnabledRequest) -> BrowserView:
         """Whether runs are offered the browser tools (item 354), for the runs that start from now on; kept."""
-        ctx.runtime.browsers.set_enabled(request.enabled)
         await asyncio.to_thread(set_browser_setting, config_path(), "enabled", request.enabled)
+        ctx.runtime.browsers.set_enabled(request.enabled)
         return await state()
 
     @router.post("/browser/look")
