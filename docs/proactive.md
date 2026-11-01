@@ -203,7 +203,13 @@ that failed since the last look, the campaigns at work), the titles of your newe
 other words; why is quoted only when the run that wrote it read nothing third parties can author, else it says so), and puts at most three things on it: none you said not to do, which it searches its memory for first. That run is a research run: it writes nothing but its list, its notes and Dot's memory, as any
 research run may. The look runs on `look_model` when it is set ("" is `[models] main`, item 910): it judges what is
 worth doing, and is a small share of what this work spends (8% on the owner's Mac, 2026-10-29 to 11-01), so a stronger
-model there costs little; the things are done on `[models] main`. Its record quotes no words a
+model there costs little; the things are done on `[models] main`. Each thing done is listed to it with its day and what
+came of it (the first line of its run's answer, quoted only when that run read nothing third parties can author, item
+911). A thing a run puts on the list that is like one done or let go
+in the last 14 days, by meaning with the embedder of the memory (a cosine of 0.73 or more between the titles) or by
+words without it (0.6 of the shorter title's words), is refused with what that one was and what came of it: the run
+puts it on the list only with `again_because`, what is new since, which the thing's why keeps (on 2026-10-30 to 11-01
+the look listed the CV's summary four times in other words, and each run rewrote it again). Its record quotes no words a
 third party wrote unless it starts untrusted: the chats it names are the
 ones a person started (a watcher's, whose title carries a mail's subject, and Dot's own are left out), and a thing on
 the list that came from such content is counted, not quoted; the runs whose words the record does quote give it their

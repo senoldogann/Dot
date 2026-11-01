@@ -94,7 +94,8 @@ the chats they had lately, and their mail and calendar when an account is connec
 your list with todo_add (in the tool group todos: turn it on with use_tools when it is off): each a concrete piece \
 of work you can do alone, which they would thank you for, which moves one of their objectives below forward when \
 there is one (say which in its why, and leave out what a work order below already covers), which is not on the \
-list yet and was not done, which they \
+list yet and was not done (what came of each thing done is below: the same work in other words is done too; a note \
+or plan that says a thing is open may be out of date, so check the thing itself first, item 911), which they \
 did not say not to do, and which is not what was let go below for that reason. Put nothing \
 on it when nothing is worth it; one you put on it by mistake, take back with todo_drop (item 821). Change nothing \
 else. End with one sentence: what you put on the list, or that you found nothing.
@@ -141,7 +142,8 @@ async def _listed(store: Store, clean: frozenset[str] = frozenset()) -> list[str
         if todo.status in ("done", "dropped")
     ]
     lines: list[str] = [
-        f"- {_STATE_WORDS[todo.status]}: {quoted(todo.title, _QUOTE_CHARS)}{_why_let_go(todo, clean)}"
+        f"- {_STATE_WORDS[todo.status]}{_when_ended(todo)}: {quoted(todo.title, _QUOTE_CHARS)}"
+        f"{_why_let_go(todo, clean)}{_what_came(todo, clean)}"
         for todo in [*kept, *lately]
         if not todo.tainted
     ]
@@ -149,6 +151,26 @@ async def _listed(store: Store, clean: frozenset[str] = frozenset()) -> list[str
     if unquoted:
         lines.append(f"- and {unquoted} more that came from content third parties wrote, not quoted here")
     return ["Your list:", *(lines or ["- nothing yet"])]
+
+
+def _day(at: float) -> str:
+    return datetime.fromtimestamp(at).strftime("%d.%m")
+
+
+def _when_ended(todo: TodoRecord) -> str:
+    """The day a thing was done or let go, after its state (item 911)."""
+    if todo.status not in ("done", "dropped"):
+        return ""
+    return f" on {_day(todo.updated_at)}"
+
+
+def _what_came(todo: TodoRecord, clean: frozenset[str]) -> str:
+    """What came of a thing done, after its title (item 911): its run's first line, where the result is, so that the
+    look does not put the same work on the list again in other words as if it were still open. Quoted only when that
+    run is ``clean``, as why a thing was let go is."""
+    if todo.status != "done" or not todo.note or todo.run_id is None or todo.run_id not in clean:
+        return ""
+    return f", what came of it: {quoted(todo.note, _QUOTE_CHARS)}"
 
 
 def _why_let_go(todo: TodoRecord, clean: frozenset[str]) -> str:
@@ -440,12 +462,13 @@ class Initiative:
             raise
 
     async def _clean_runs(self) -> frozenset[str]:
-        """The last runs of the things let go lately that ended having read nothing third parties can author: their
-        words of why may be quoted to the look (the code review of item 878)."""
+        """The last runs of the things done or let go lately that ended having read nothing third parties can author:
+        their words of why, or of what came of the thing, may be quoted to the look (the code review of item 878, item
+        911)."""
         let_go: list[TodoRecord] = [
             todo
             for todo in await self._runtime.store.recent_todos(time.time() - 30 * _DAY_S, _LISTED)
-            if todo.status == "dropped" and todo.run_id is not None
+            if todo.status in ("done", "dropped") and todo.run_id is not None
         ]
         clean: set[str] = set()
         for todo in let_go:
