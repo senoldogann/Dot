@@ -5,7 +5,8 @@ import { api, query } from "./api.js";
 import { el, plural, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
-import { answerMessage, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+import { answerMessage, besideLine,
+  scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
@@ -233,6 +234,10 @@ function drawFlow(past, flow, asked, events, reactions) {
       // A schedule the turn made (item 665) is a line of the conversation where it came, as on the run's own page.
       batch = null;
       blocks.push({ schedule: event.data });
+    } else if (event.kind === "started_beside") {
+      // A request of its own the owner sent as it worked, started in a chat of its own (item 915): a line here.
+      batch = null;
+      blocks.push({ beside: event.data });
     } else if (event.kind === "dot_reaction") {
       reaction = event.data.reaction;
       reactedTo = [...blocks].reverse().find((block) => block.steer !== undefined) ?? null;
@@ -273,6 +278,8 @@ function drawFlow(past, flow, asked, events, reactions) {
       ? pageCard(block.page.id, block.page.title)
       : block.schedule !== undefined
       ? scheduleLine(block.schedule)
+      : block.beside !== undefined
+      ? besideLine(block.beside)
       : block.steer !== undefined
       ? steerMessage(block, block === reactedTo ? reaction : null)
       : block.kept !== undefined

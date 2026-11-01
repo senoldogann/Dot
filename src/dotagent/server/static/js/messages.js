@@ -82,6 +82,18 @@ export function scheduleLine(made) {
   );
 }
 
+/** The line a message sent while the chat worked leaves in it when it was a request of its own and started at once
+ * in a chat of its own (item 915): what it asked, and the way to that chat. `started` is the `started_beside` event's
+ * data. */
+export function besideLine(started) {
+  return el(
+    "a",
+    { class: "note schedule-line beside-line", href: `#/runs/${encodeURIComponent(started.run_id)}` },
+    icon("branch"),
+    el("span", null, el("span", { class: "schedule-made" }, "Started in a chat of its own"), " ", el("strong", null, started.text)),
+  );
+}
+
 // What each reaction of Dot's on a message of yours says, for its tooltip and a screen reader (item 664).
 const DOT_REACTION_WORDS = { "👍": "understood", "👀": "looking into it" };
 

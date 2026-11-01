@@ -500,6 +500,10 @@ class QueueView(FrozenModel):
 
     held: bool
     messages: list[QueuedMessageView]
+    # The run a message just sent started at once in a chat of its own, as a request of its own (item 915), and its
+    # chat; none when the message was queued.
+    beside_run_id: str | None = None
+    beside_thread_id: str | None = None
 
 
 class AttachmentUpload(FrozenModel):

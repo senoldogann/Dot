@@ -21,6 +21,7 @@ from dotagent.agent.attachments import (
     load_attachments,
     steer_event,
 )
+from dotagent.agent.busy import is_separate
 from dotagent.agent.campaign import (
     BRIEF_ENTRIES,
     BRIEF_QUESTIONS,
@@ -115,6 +116,7 @@ from dotagent.memory.service import REFLECTION_SOURCE, SavedMemory
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
+from dotagent.proactive.text import one_line
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
@@ -164,6 +166,11 @@ from dotagent.tools.registry import tools_for_mode
 from dotagent.tools.team import TEAM_SOURCE
 
 log = get_logger(__name__)
+# A request of its own sent to a chat at work (item 915): the event of the line that leads to its chat, how long the
+# fast model has to say so (the owner's send waits for it, so a little only), and how much of the message the line says.
+STARTED_BESIDE_EVENT: str = "started_beside"
+_BESIDE_JUDGE_S: float = 12.0
+_BESIDE_LINE_CHARS: int = 160
 
 # The live event that tells the pages a chat's queue changed (item 148); it carries the chat's id.
 QUEUE_CHANGED_EVENT: str = "queue_changed"
@@ -1541,6 +1548,61 @@ class RunManager:
                 self.tell(holder.run_id, RELEASE_NOTE, "release")
         await self._drain(thread_id, newest[0].id)
         return message
+
+    async def start_beside(
+        self,
+        thread_id: str,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+    ) -> RunRecord | None:
+        """Start ``text``, sent to the chat ``thread_id`` while its run works, at once in a chat of its own when the
+        fast model says it is a request of its own (item 915, :func:`dotagent.agent.busy.is_separate`); ``None``
+        when it is not, when it cannot be told, or when nothing works in the chat, so that the caller queues it as
+        before. Only a chat of Dot's own with the owner: an agent's, a campaign's, a delegated run's or one held by
+        a ✋ queue as before. The run at work gets a ``started_beside`` event, the line of its chat that leads to the
+        new one."""
+        if not self._runtime.config.agent.busy_parallel:
+            return None
+        holder: RunHandle | None = self._active_on(thread_id)
+        if holder is None or holder.inbox.holding:
+            return None
+        at_work: RunRecord = await self._runtime.store.get_run(holder.run_id)
+        if at_work.parent_run_id is not None or at_work.campaign_id is not None or at_work.agent_id is not None:
+            return None
+        # A chat with a team (item 610) works as the team: a request sent there is the team's, so it waits in the
+        # chat's queue rather than start in a chat of Dot's alone (the pre-push review).
+        if (await self._runtime.store.get_thread(thread_id)).team_id is not None:
+            return None
+        separate: bool = await is_separate(
+            self._runtime.router,
+            self._runtime.roles.fast(),
+            _BESIDE_JUDGE_S,
+            f"{thread_id}:busy",
+            at_work.goal,
+            text,
+        )
+        # The run at work may have ended while the fast model answered: the chat is free then, and the queue starts the
+        # message there at once, as it would have (the pre-push review).
+        if not separate or self._active_on(thread_id) is not holder:
+            return None
+        run: RunRecord = await self.start(
+            text, mode, model, None, source, None, effort, speed, None, approvals, goal_mode, files
+        )
+        await self._runtime.bus.emit(
+            holder.run_id,
+            STARTED_BESIDE_EVENT,
+            {"run_id": run.id, "thread_id": run.thread_id, "text": one_line(text, _BESIDE_LINE_CHARS)},
+            True,
+        )
+        log.info("started_beside", thread_id=thread_id, run_id=run.id, beside=holder.run_id)
+        return run
 
     async def edit_queued(self, message_id: str, text: str) -> str:
         """Change the text of a queued message; returns its chat. One starting as the chat's next run is refused."""

@@ -43,6 +43,8 @@ type CallPurpose = Literal[
     # A watcher's question of the fast model, whether one new mail or notification is one the owner wants to hear of
     # (item 571).
     "watch",
+    # Whether a message sent to a chat at work is a request of its own (item 915).
+    "busy",
     # The review of a plugin the scout found for the gallery (item 710).
     "scout",
     # Which free agents could help an agent at work (item 896), asked while the office is open.

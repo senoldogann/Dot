@@ -382,7 +382,30 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     element,
     add: async (body) => {
       const mine = ++reads;
-      showNewest(mine, await api.post(`/threads/${threadId}/queue`, body));
+      // While the run works the fast model is asked whether the message stands on its own (item 915), which takes a
+      // few seconds: the queue says the message is on its way meanwhile (the pre-push review).
+      const sending = el("div", { class: "queue-sending small muted", role: "status" }, "Sending…");
+      const hidden = element.hidden;
+      element.hidden = false;
+      element.append(sending);
+      let view;
+      try {
+        view = await api.post(`/threads/${threadId}/queue`, body);
+      } finally {
+        sending.remove();
+        element.hidden = hidden;
+      }
+      showNewest(mine, view);
+      // A request of its own started at once in a chat of its own (item 915): said, with the way to it.
+      if (typeof view.beside_run_id === "string") {
+        const runId = view.beside_run_id;
+        toast("ok", "A request of its own: started at once in a chat of its own.", {
+          label: "Open",
+          run: () => {
+            location.hash = `#/runs/${runId}`;
+          },
+        });
+      }
     },
     steerFirst: () => (messages.length > 0 && active ? steer(messages[0]) : Promise.resolve()),
     setActive: (on) => {
