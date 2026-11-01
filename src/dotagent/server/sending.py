@@ -22,7 +22,8 @@ async def send_once(store: Store, kind: SendingKind, key: str | None, send: Call
     """Do ``send`` for the message of ``key`` once and return what it came to: the id of the run it started or steered,
     or of the queued message it became, which ``send`` returns. The same key again returns what the first sending came
     to without doing it, and is refused (409) while that sending is under way; a sending that fails lets the key go.
-    The keys of each ``kind`` of sending are apart, so a run's id is never taken for a queued message's. Without a key
+    The keys of each ``kind`` of sending are apart; a ``queue`` sending comes to a queued message's id, or to a run's
+    when the message started at once in a chat of its own (item 915), which the ids' prefixes tell apart. Without a key
     (the API used directly) ``send`` is done every time."""
     if key is None:
         return await send()

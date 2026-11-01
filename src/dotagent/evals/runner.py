@@ -81,6 +81,9 @@ def eval_config(config: AppConfig) -> AppConfig:
                     # The checkpoints of a long run (item 909) ask the review model, which a measurement of the model
                     # under test leaves out, as it does the helper models.
                     "checkpoint_steps": 0,
+                    # A message sent while a run works asks the fast model whether it stands on its own (item 915):
+                    # an attempt sends none, and a test of the queue means the queue.
+                    "busy_parallel": False,
                 }
             ),
             "mcp": [],

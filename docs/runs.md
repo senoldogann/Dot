@@ -264,6 +264,17 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   answer stands, wherever it was given. It takes no steering from the pages: a message sent there waits in the chat's
   queue. A chat has one run at work at a time, whichever process drives it: a second is refused (409), and the run a
   `dotx` command left at work when it died is closed first.
+- A message you send a chat of Dot's while its run works is first asked of the fast model (`[models] fast`, item 915):
+  is it a request of its own (another task, question or topic), or part of the work under way (a correction, an
+  addition, a detail, an answer, a change of plan, a stop or a thanks)? One of its own starts at once in a chat of its
+  own, with the choices it was sent with, and the chat at work shows a line, *Started in a chat of its own*, that leads
+  to it, as the toast that says so does; the request never waits for the work under way. The question holds your two
+  messages and nothing the run read. When it is part of the work, when it cannot be told, when the fast model fails or
+  does not answer in 12 seconds, and for a message to an agent's chat, a team's (it works as the team), a campaign's,
+  one held by a ✋, one for a single
+  message's level or one with picks, it waits as below. `[agent] busy_parallel = false` queues every message. This is
+  the router of DeepSeek Harness's Super-agent design (2026-11-01): with one session that does the work itself, a new
+  request waits; in its measure, a model left to decide whether to hand work out did so in none of five runs.
 - A message sent to a chat while its run works waits in the chat's queue: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a

@@ -17,7 +17,7 @@ import { helperCard } from "./helpercard.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
-import { answerMessage, scheduleLine, userMessage } from "./messages.js";
+import { answerMessage, besideLine, scheduleLine, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
@@ -1408,6 +1408,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // A schedule the run made (item 665): a line of the conversation that leads to it.
     schedule_made(scope, record) {
       place(scope, scheduleLine(record.data), record.ts);
+    },
+
+    // A request of its own sent as the run worked, started in a chat of its own (item 915): a line that leads to it.
+    started_beside(scope, record) {
+      place(scope, besideLine(record.data), record.ts);
     },
 
     // Dot's reaction on your latest message (item 664): it stands on that message, which the page finds.

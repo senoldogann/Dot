@@ -318,6 +318,8 @@ class AgentConfig(FrozenModel):
     revisit_window: int = Field(ge=2)
     # Every this many acting steps of a run, the review model judges whether it is still on track (item 909); 0: never.
     checkpoint_steps: int = Field(ge=0)
+    # A message the owner sends a chat at work, a request of its own, starts at once in a chat of its own (item 915).
+    busy_parallel: bool
     finish_nudges: int = Field(ge=0)
     questions: QuestionMode
     parallel_tools: int = Field(ge=1)

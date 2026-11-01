@@ -291,6 +291,11 @@ revisit_window = 8
 # track is given the model's steps back to the goal and climbs a rung of the ladder, so one judged off track again and
 # again is stopped. Doubt counts as on track. 0 asks never.
 checkpoint_steps = 40
+# A message you send a chat while its run works is asked of the fast model ([models] fast): a request of its own (another
+# task, question or topic) starts at once in a chat of its own, and the chat at work shows a line that leads to it; one
+# that is part of the work under way, or that cannot be told, waits in the chat's queue as before (item 915, after
+# DeepSeek Harness's Super-agent design: a new request never waits for the work under way). false: every message waits.
+busy_parallel = true
 # A reply without a tool call is nudged towards finish; the finish_nudges + 1st such reply in a row ends a task run with
 # that reply as its result (a step with tool calls starts the count again). A reply the model service cut short (its
 # output limit, or another abnormal end it gave) is never a result, in any mode: it is nudged too, and the

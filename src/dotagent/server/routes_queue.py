@@ -4,6 +4,7 @@ a stop, a failure or a crash of the daemon held goes on when the owner resumes i
 then is."""
 
 import asyncio
+from contextlib import suppress
 
 from fastapi import APIRouter
 
@@ -25,9 +26,14 @@ from dotagent.server.views import (
     picks_of,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import QueuedMessage
+from dotagent.store.models import QueuedMessage, RunRecord
 
 log = get_logger(__name__)
+
+
+def _picked(request: QueueMessageRequest) -> bool:
+    """Whether the message carries picks of the composer (plugins, skills, accounts, plan first)."""
+    return bool(request.plugins or request.skills or request.accounts or request.plan_first)
 
 
 def queue_router(ctx: ServerContext) -> APIRouter:
@@ -72,6 +78,24 @@ def queue_router(ctx: ServerContext) -> APIRouter:
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
 
         async def queue() -> str:
+            # A request of its own, sent while the chat's run works, starts at once in a chat of its own (item 915):
+            # not one for an agent, for one message's level, or with picks, which the queue carries to its run.
+            if request.agent_id is None and request.once is None and not _picked(request):
+                beside: RunRecord | None = await ctx.manager.start_beside(
+                    thread_id,
+                    request.text,
+                    files,
+                    resolved_mode(request.mode, request.text),
+                    request.model,
+                    request.effort,
+                    request.speed,
+                    request.approvals,
+                    request.goal_mode,
+                    UI_SOURCE,
+                )
+                if beside is not None:
+                    started.append(beside)
+                    return beside.id
             message: QueuedMessage = await ctx.manager.queue(
                 thread_id,
                 request.text,
@@ -90,8 +114,17 @@ def queue_router(ctx: ServerContext) -> APIRouter:
             )
             return message.id
 
-        await send_once(store, "queue", request.key, queue)
-        return await view(thread_id)
+        started: list[RunRecord] = []
+        target: str = await send_once(store, "queue", request.key, queue)
+        shown: QueueView = await view(thread_id)
+        # The same message sent again with its key (an answer that was lost) says the chat it started the first time,
+        # so that the page learns of it then too (the pre-push review): the target of such a sending is a run's id.
+        if not started and target.startswith("run_"):
+            with suppress(NotFoundError):
+                started.append(await store.get_run(target))
+        if started:
+            return shown.model_copy(update={"beside_run_id": started[0].id, "beside_thread_id": started[0].thread_id})
+        return shown
 
     @router.patch("/queue/{message_id}")
     async def edit_queued(message_id: str, request: QueueEditRequest) -> QueueView:
