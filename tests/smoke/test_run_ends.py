@@ -218,7 +218,7 @@ async def test_a_delegated_run_whose_end_was_not_kept_is_an_error_for_the_run_th
             None,
             None,
         )
-        await runtime.store.finish_run(parent.id, "done", "Delegated.")
+        # The parent stays at work (item 941: a helper of a run that has ended does not start).
         await asyncio.to_thread(_refuse_ends, db_path())
         manager: RunManager = RunManager(runtime)
         try:

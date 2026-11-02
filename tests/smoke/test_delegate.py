@@ -169,6 +169,19 @@ async def test_a_delegated_run_cannot_delegate_again(runtime: Runtime, manager: 
     assert manager.active_run_ids() == []
 
 
+async def test_a_run_that_has_ended_delegates_nothing(runtime: Runtime, manager: RunManager) -> None:
+    """Item 941 (the review of 2026-11-02): a helper takes its parent's taint and guards from the parent's gate; one
+    whose parent ended before it was registered (an offer of help raced with the end) would take none, so none
+    starts."""
+    parent: RunRecord = await _stored_run(runtime, "task", None, "test")
+    await runtime.store.finish_run(parent.id, "done", "Done.")
+    with pytest.raises(RunConflict) as refused:
+        await manager.delegate(parent.id, "anything", "task", None, None)
+    assert "has ended" in refused.value.message
+    assert manager.active_run_ids() == []
+    assert await _children_of(runtime, parent.id) == []
+
+
 async def test_a_research_run_only_delegates_research(runtime: Runtime, manager: RunManager) -> None:
     parent: RunRecord = await _stored_run(runtime, "research", None, "test")
     with pytest.raises(RunConflict) as refused:

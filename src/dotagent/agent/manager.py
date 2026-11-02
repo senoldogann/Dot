@@ -2791,6 +2791,16 @@ class RunManager:
         runtime: Runtime = self._runtime
         asked_level: Effort = level if opening.once is None else ONE_MESSAGE_LEVELS[opening.once]
         parent: RunHandle | None = None if parent_run_id is None else self._handles.get(parent_run_id)
+        if parent_run_id is not None and parent is None:
+            # A helper takes its parent's taint, guards and where it keeps its steps from the parent's gate: one whose
+            # parent has ended meanwhile would start with none of them (item 941), so it does not start.
+            parent_record: RunRecord = await runtime.store.get_run(parent_run_id)
+            # One whose end the store refused is ended too, though stored as at work (``_left_ends``, the review).
+            if parent_record.status not in WORKING_STATUSES or parent_run_id in self._left_ends:
+                raise RunConflict(
+                    "the run that delegated it has ended",
+                    {"parent_run_id": parent_run_id, "status": parent_record.status},
+                )
         # A goal that is not the owner's words is no instruction (:data:`_NOT_THE_OWNERS_WORDS`).
         own: tuple[str, ...] = () if source in _NOT_THE_OWNERS_WORDS else (goal,)
         instructions: tuple[str, ...] = (

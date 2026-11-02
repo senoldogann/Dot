@@ -52,7 +52,12 @@ async def test_a_runs_end_keeps_its_current_tab_and_a_helpers_end_closes_all(mon
                 )  # fmt: skip
                 async with asyncio.timeout(_RUN_WAIT_S):
                     parent = await manager.wait(parent.id)
-                    helped: DelegateOutcome = await manager.delegate(parent.id, "Read a page", "task", None, None)
+                    # A run of the same chat at work delegates (item 941: one that has ended delegates nothing).
+                    asker: RunRecord = await runtime.store.create_run(
+                        parent.thread_id, "Look again", "task", SCRIPTED_MODEL, None, EVAL_SOURCE, "medium",
+                        "standard", None, "ask", False, None, None, None,
+                    )  # fmt: skip
+                    helped: DelegateOutcome = await manager.delegate(asker.id, "Read a page", "task", None, None)
             finally:
                 await manager.shutdown()
         finally:

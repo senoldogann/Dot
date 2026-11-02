@@ -822,7 +822,8 @@ helper model that `model` names when that one can answer (see [Helpers and stand
 Several calls in one turn run side by side (up to `parallel_tools`; a group chat's lead sends its agents their parts all
 at once, as many as the team has, up to eight, when its reply's calls all send parts, item 831), which is how a plan's
 independent steps run at the same time; `step` names the plan step the part is, and the report closes it (see the plan
-above). A delegated run cannot delegate again (the depth is one), ask you a question (its approvals still come to you)
+above). A delegated run cannot delegate again (the depth is one), nor start once the run that delegated it has ended
+(item 941: it would take none of that run's taint and guards), ask you a question (its approvals still come to you)
 or consult a helper, does not take one of the `max_concurrent_runs` slots, starts as untrusted as its parent, and ends
 when the parent is cancelled. The parent's result names the model the delegated run ended on. The model cannot choose
 the delegated run's mode: a research run's helper does research and only reads, and any other run's helper, a chat's
