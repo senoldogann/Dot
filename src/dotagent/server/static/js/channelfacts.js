@@ -16,7 +16,7 @@
  *   cursor_reset: { from_row: number, to_row: number, at: number } | null,
  *   warning: string | null,
  * }} Seen
- * @typedef {{ on: boolean, handles: string[], seen: Seen, links: string | null }} ImessageView
+ * @typedef {{ on: boolean, handles: string[], seen: Seen, links: string | null, links_off: boolean }} ImessageView
  */
 
 const UNITS = ["B", "KB", "MB", "GB", "TB"];

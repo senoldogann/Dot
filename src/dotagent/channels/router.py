@@ -10,11 +10,12 @@ nothing, and the owner is told so. ``/stop``, or a message of the plain stop wor
 whatever the emergency stop, and a channel's pairing is not the router's, so the owner can still be reached.
 
 Outbound, the answer of each run of the chat is sent when the run ends, masked of the secrets Dot holds, as plain text
-and cut to the channel's size with a link to the chat for the rest; the pictures it names go after it, each as a message
-of its own (item 617). A run that waits for the owner (an approval, a question) sends one line with what it asks and the
-link. Approvals and questions are never answered on a channel: the account of a channel, if taken, must not be able to
-approve. The links are made from ``[server] reach``, the name a phone reaches Dot by; with none there is no address a
-phone can open, and no link is sent (item 611).
+and cut to the channel's size with a line that says where the rest is; the pictures it names go after it, each as a
+message of its own (item 617). A run that waits for the owner (an approval, a question) sends one line with what it
+asks. Approvals and questions are never answered on a channel: the account of a channel, if taken, must not be able to
+approve. A message links to its page in Dot only when ``[channels] links`` is on (item 934; off by default), at
+``[server] reach``, the name a phone reaches Dot by; with none there is no address a phone can open, and no link is sent
+(item 611). Without a link, the line says the rest, or the answer, is in Dot on the Mac.
 
 A run that a message on a channel started and that works longer than 15 seconds sends a few messages of progress too
 (item 618, ``[channels] progress``): what it did since the last one, from the calls of its tools and its newest thought,

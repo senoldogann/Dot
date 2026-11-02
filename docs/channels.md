@@ -286,9 +286,9 @@ took (every three seconds while the channel is on):
   program that runs Dot needs Full Disk Access for them, as for the database).
 - **Last command**: the last row Dot took as a command, and when; it survives a restart. **Last error**: the last thing
   that went wrong, with its time and the secrets Dot holds masked; it stays after the problem is gone.
-- **Links in messages** (item 611): the name the links in Dot's messages open at, or, when `[server] reach` names none,
-  that Dot sends no link and why (`links` in `GET /api/channels`). The log says it once as the daemon starts
-  (`channel_links_not_sent`).
+- **Links in messages** (items 611 and 934): the name the links in Dot's messages open at, or that Dot sends no link
+  and why: `[channels] links` is off (`links_off`), or `[server] reach` names no address (`links` in `GET
+  /api/channels`). The log says which once as the daemon starts (`channel_links_not_sent`, its `why`).
 
 **The warning.** When the log has changed and nothing Dot can read has changed with it, for more than two minutes, the
 tab says: *Messages has written since Dot last saw a new message; Dot may not be seeing the newest. Quit and reopen
