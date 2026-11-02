@@ -54,7 +54,8 @@ def _prompt(style: PromptStyle, approvals: ApprovalMode) -> str:
             Path("/tmp/work"),
             [],
             0,
-            [],
+            # A run with the shell, as Dot's own are: one without is told so in a section of its own (item 936).
+            ["shell"],
             [],
             0,
             None,
