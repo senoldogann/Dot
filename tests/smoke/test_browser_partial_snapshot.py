@@ -5,6 +5,7 @@ does on Slack or LinkedIn, and the part is read for real: the script that names 
 work afterwards.
 """
 
+import time
 from collections.abc import AsyncIterator
 
 import pytest
@@ -61,3 +62,23 @@ async def test_a_page_whose_whole_snapshot_times_out_gives_a_part_with_refs_that
     assert await page.locator(f"aria-ref={ref}").count() == 1
     # A page the snapshot can read is read whole, with no note.
     assert (await capture_page(page, 60_000, True)).partial == ""
+
+
+_HEAVY_ITEMS: int = 60_000
+_HEAVY_PAGE: str = (
+    "<!doctype html><title>Heavier</title><main><ul>"
+    + "".join(f"<li><a href='#h{n}'>Row {n}</a></li>" for n in range(_HEAVY_ITEMS))
+    + "</ul></main>"
+)
+
+
+async def test_a_whole_snapshot_that_really_times_out_still_gives_a_part(page: Page) -> None:
+    """The whole snapshot that timed out runs on in the page (item 923); the part waits for it rather than failing."""
+    await page.set_content(_HEAVY_PAGE)
+    started: float = time.monotonic()
+    await page.aria_snapshot(mode="ai", boxes=True, timeout=120_000)
+    whole_ms: int = round((time.monotonic() - started) * 1000)
+    # A third of the time the whole takes: it times out for real, and the page stays busy up to twice as long again.
+    read = await capture_page(page, whole_ms // 3, True)
+    assert read.partial.startswith("Partial view: the page was too heavy to read whole")
+    assert "Row" in render_lines(read.lines)
