@@ -102,7 +102,7 @@ FILES_WAIT_S: float = 15.0
 # file with no words is.
 OWN_PICTURE_NAME_S: float = 3600.0
 _FILES_LOOK_S: float = 1.0
-# The longest message Dot sends, the marker with it: a longer answer is cut, with the link to the chat in Dot.
+# The longest message Dot sends, the marker with it: a longer answer is cut, with a line that says where the rest is.
 OUT_CHARS: int = 2000
 POLL_S: float = 3.0
 BY_A_RUN: str = ENGLISH.by_a_run

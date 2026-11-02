@@ -55,7 +55,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory, replies: Replies) ->
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\nlessons = "off"\n'
-        "playbooks = false\n\n[memory]\nembed_enabled = false\n",
+        "playbooks = false\n\n[memory]\nembed_enabled = false\n\n[channels]\nlinks = true\n",
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
@@ -227,6 +227,7 @@ async def test_the_page_shows_a_channel_that_is_off_with_no_one_paired(world: Wo
         },
         # No name for a phone to reach the Mac by: no link is sent (item 611).
         "links": None,
+        "links_off": False,
     }
 
 
@@ -282,7 +283,7 @@ async def test_a_message_the_owner_sends_to_themselves_starts_a_run_and_its_answ
     switched: JsonObject = _view(await world.post("/api/channels/imessage/switch", {"on": True}))
     assert switched["on"] is True
     written: object = tomllib.loads(config_path().read_text(encoding="utf-8")).get("channels")
-    assert written == {"imessage": True}
+    assert written == {"imessage": True, "links": True}
     # What reaches the Mac in other conversations, or from other people, is never a command.
     world.messages.message(world.messages.chat("+358409999999"), "to a friend", at=time.time())
     world.messages.message(world.messages.chat("chat555", style=43), "to a group", at=time.time())
@@ -313,7 +314,7 @@ async def test_switched_off_the_channel_reads_nothing_and_switched_on_again_it_s
     own: int = world.messages.chat(PHONE)
     off: JsonObject = _view(await world.post("/api/channels/imessage/switch", {"on": False}))
     assert off["on"] is False
-    assert tomllib.loads(config_path().read_text(encoding="utf-8"))["channels"] == {"imessage": False}
+    assert tomllib.loads(config_path().read_text(encoding="utf-8"))["channels"] == {"imessage": False, "links": True}
     world.messages.message(own, "sent while it is off", at=time.time())
     await asyncio.sleep(0.4)
     assert len(await world.runs()) == 1
@@ -723,7 +724,7 @@ async def _reading(
         runtime,
         config=runtime.config.model_copy(
             update={
-                "channels": ChannelsConfig(imessage=True, progress="steps"),
+                "channels": ChannelsConfig(imessage=True, progress="steps", links=True),
                 "server": runtime.config.server.model_copy(update={"reach": [] if reach is None else reach}),
             }
         ),

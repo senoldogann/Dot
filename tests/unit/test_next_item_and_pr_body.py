@@ -126,11 +126,11 @@ def test_the_title_is_the_headings_with_its_first_letter_in_lower_case() -> None
     assert pr_body.title("### 12. UI of the chat\n") == "Item 12: UI of the chat"
 
 
-def test_the_body_is_the_entry_without_its_heading_and_its_log_and_ends_with_the_attribution() -> None:
+def test_the_body_is_the_entry_without_its_heading_and_its_log_and_no_line_of_the_tool() -> None:
     text: str = pr_body.body(_ENTRY)
     assert text.startswith("**Status: done (2026-10-22).** Why.")
     assert "Checked by a test." in text and "Log:" not in text and "item 540 on" not in text
-    assert text.endswith("🤖 Generated with [Claude Code](https://claude.com/claude-code)\n")
+    assert text.endswith("Checked by a test.\n") and "Claude" not in text
 
 
 def test_an_entry_without_its_heading_is_refused() -> None:
@@ -158,11 +158,11 @@ def test_a_batch_has_all_its_numbers_and_headings_in_its_title() -> None:
     assert pr_body.batch_title([_ENTRY, _SECOND, third]).endswith("; UI of the chat")
 
 
-def test_a_batch_has_a_section_for_each_item_and_one_attribution() -> None:
+def test_a_batch_has_a_section_for_each_item_and_no_line_of_the_tool() -> None:
     text: str = pr_body.batch_body([_ENTRY, _SECOND])
     assert text.index("## Item 540: a change takes fewer pushes and reruns") < text.index(
         "## Item 541: pull requests carry batches"
     )
     assert "Checked by a test." in text and "Log:" not in text and "a log line" not in text
-    assert text.count("Generated with [Claude Code]") == 1 and text.endswith("\n")
+    assert "Claude" not in text and text.endswith("\n")
     assert pr_body.batch_body([_ENTRY]) == pr_body.body(_ENTRY)

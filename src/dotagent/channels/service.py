@@ -155,11 +155,14 @@ class Channels:
             language=self._language,
         )
         self._channels: dict[ChannelId, Channel] = {"imessage": self._imessage}
+        # The address the router links its messages to: none while [channels] links is off (item 934, the owner's word),
+        # or while [server] reach names no address a phone can open (item 611).
+        self._sent_links: str | None = self._links if runtime.config.channels.links else None
         self._router: ChannelRouter = ChannelRouter(
             runtime,
             manager,
             self._channels,
-            self._links,
+            self._sent_links,
             self.is_on,
             asks_apart_s,
             pictures,
@@ -202,7 +205,9 @@ class Channels:
         await self._language.load()
         await self._imessage.load()
         await self._router.load()
-        if self._links is None:
+        if not self._runtime.config.channels.links:
+            log.info("channel_links_not_sent", why="[channels] links is off")
+        elif self._links is None:
             log.info("channel_links_not_sent", why="[server] reach names no address a phone can open")
         feed: Subscription = await self._stack.enter_async_context(self._runtime.bus.subscribe_kinds(WATCHED_KINDS))
         self._watcher = asyncio.create_task(_kept_up("watch", partial(self._router.watch, feed)), name="channels-watch")
@@ -283,7 +288,8 @@ class Channels:
             chat_run_id=await self._router.chat_run_id("imessage"),
             program=await asyncio.to_thread(self._macos.program),
             seen=await self._seen(),
-            links=self._links,
+            links=self._sent_links,
+            links_off=not self._runtime.config.channels.links,
         )
 
     async def _seen(self) -> Seen:

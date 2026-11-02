@@ -22,8 +22,8 @@ class ImessageView(FrozenModel):
     the newest run of its chat (``chat_run_id``, which the page links to), the name of the program macOS holds
     responsible for Dot (``program``), which is what to switch on in Privacy & Security, what the channel sees of
     Messages' database (``seen``, item 595): the newest row, the cursor, the two files, the last command and error, and
-    the address the links of its messages open at (``links``, item 611), ``None`` when ``[server] reach`` names none and
-    no link is sent."""
+    the address the links of its messages open at (``links``, item 611), ``None`` when no link is sent: ``[channels]
+    links`` is off (``links_off``, item 934) or ``[server] reach`` names no address."""
 
     on: bool
     handles: tuple[str, ...]
@@ -36,6 +36,7 @@ class ImessageView(FrozenModel):
     program: str | None
     seen: Seen
     links: str | None
+    links_off: bool
 
 
 class ChannelsView(FrozenModel):

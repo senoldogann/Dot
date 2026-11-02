@@ -141,10 +141,12 @@ test("a cursor that was moved down to the newest row is a fact beside the one it
 });
 
 test("the links in Dot's messages are a fact: the name they open at, or why there are none", () => {
-  assert.deepEqual(linkFact("https://mac.example.ts.net/"), ["Links in messages", "open at https://mac.example.ts.net/"]);
-  const [label, none] = linkFact(null);
+  assert.deepEqual(linkFact("https://mac.example.ts.net/", false), ["Links in messages", "open at https://mac.example.ts.net/"]);
+  const [label, none] = linkFact(null, false);
   assert.equal(label, "Links in messages");
   assert.match(none, /^none: /);
   assert.match(none, /\[server\] reach/);
   assert.match(none, /open Dot on your Mac/);
+  // Item 934: switched off by [channels] links, whatever the address.
+  assert.match(linkFact("https://mac.example.ts.net/", true)[1], /\[channels\] links is off/);
 });
