@@ -568,11 +568,11 @@ def _files_print(paths: Sequence[Path]) -> str:
 async def checkout_print(repo: Path, env: Mapping[str, str]) -> str:
     """A print of the owner's checkout at ``repo`` that changes when what Dot would pull and restart with does (the
     sixth and ninth reviews of item 921): the commit it stands on, the contents of every change to a tracked file
-    (``git diff HEAD``), the contents of every file git does not track and does not ignore, its git config (but the
-    sections of branches other than main, :func:`config_print`) and its hooks (each read through its link: the review
-    hook lives in the checkout). Files git ignores (``.venv``) are not in
-    it, which docs/repair.md says. A session runs with the owner's rights, so it could write there outside its own
-    checkout; Dot compares the print before and after it, and before it merges."""
+    (``git diff HEAD``), the contents of every file git does not track and does not ignore, its git config as git
+    reads it (but the entries of branches other than main, :func:`config_print`) and its hooks (each read through its
+    link: the review hook lives in the checkout). Files git ignores (``.venv``) are not in it, which docs/repair.md
+    says. A session runs with the owner's rights, so it could write there outside its own checkout; Dot compares the
+    print before and after it, and before it merges."""
     head: str = await command(("git", "-C", str(repo), "rev-parse", "HEAD"), repo, env)
     changed: str = await command(("git", "-C", str(repo), "diff", "HEAD", "--binary"), repo, env)
     untracked: str = await command(
