@@ -82,6 +82,8 @@ _WHY_CHARS: int = 400
 NO_PR_COMMIT: str = "a commit with no pull request"
 # What the night's note says when main and the owner's checkout could not be read after a session.
 UNCHECKED: str = "main and your checkout could not be checked"
+# No look starts with less than this left of the night.
+LOOK_LEAST_S: float = 60.0
 # What a look says of a pull request merged before it came to it.
 MERGED_BEFORE: str = "it was merged already"
 # How a look's notes begin, so that the page tells a look from a session.
@@ -110,9 +112,10 @@ class SessionTrace(FrozenModel):
 
 class LookOutcome(FrozenModel):
     """How a second look ended: merged (and whether the owner's checkout was pulled), found merged already, held for
-    the owner with why, or found closed, with the session it ran when it ran one."""
+    the owner with why, found closed, or left to the next night (its time ran out), with the session it ran when it ran
+    one."""
 
-    end: Literal["merged", "merged_unpulled", "merged_before", "held", "closed"]
+    end: Literal["merged", "merged_unpulled", "merged_before", "held", "closed", "later"]
     why: str
     outcome: ClaudeOutcome | None
 
@@ -276,13 +279,13 @@ async def second_look(
     session_id: str | None,
     main_before: str | None,
     moved: str,
-    timeout_s: float,
+    time_left: Callable[[], float],
     wait_checks: ChecksWait,
     sleep: Sleep,
 ) -> LookOutcome:
     """The second look of the pull request at ``pr_url``, opened by the session ``session_id`` of ``repo`` (see the
     module); ``moved`` is what the night saw move. ``wait_checks(number)`` waits for its checks, ``sleep`` between
-    reads of its head."""
+    reads of its head; ``time_left()`` is how long its session may take, read once the waits are over."""
     number: int | None = pr_number(pr_url)
     if number is None:
         return LookOutcome(end="held", why="no pull request to look at", outcome=None)
@@ -346,6 +349,11 @@ async def second_look(
     if not all_passed(checks):
         return LookOutcome(end="held", why="its checks did not all pass on main as it stands", outcome=None)
     diff: str = await pr_diff(repo, number, env)
+    # Its time is what is left once the waits are over, so that it never runs past the night's end (the review); a
+    # night with too little left leaves it to the next, as a session's does.
+    timeout_s: float = time_left()
+    if timeout_s < LOOK_LEAST_S:
+        return LookOutcome(end="later", why="the night's time ran out before the look", outcome=None)
     look: Path = repo / ".claude" / "worktrees" / f"look-{secrets.token_hex(4)}"
     scratch: Path = Path(tempfile.mkdtemp(prefix="dot-look-"))
     try:

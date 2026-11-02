@@ -178,7 +178,7 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   while its head is the one looked at, your checkout is pulled when it is on `main`, and Dot restarts once idle. Its
   session is kept like any (its note begins `Second look:`); one that held it ends as yours (*Waits for you*, with its
   reason) and is not looked at again. A pull request found merged already counts its problem fixed, and the night
-  goes on.
+  goes on. A look whose waits left the night less than a minute is not made, and the next night looks again.
 
   What it does not read: a command by more than its words (what a script the session wrote did when run is read as a
   file of its change, not as what happened on the Mac), and the transcript is a file the session itself could have

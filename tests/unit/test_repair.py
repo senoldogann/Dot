@@ -63,7 +63,7 @@ from dotagent.repair.problems import (
     with_problem,
     with_sightings,
 )
-from dotagent.repair.second import read_transcript, outside, trace_of, transcript_path, verdict_of
+from dotagent.repair.second import outside, read_transcript, trace_of, transcript_path, verdict_of
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord
 

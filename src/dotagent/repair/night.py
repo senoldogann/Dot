@@ -100,7 +100,7 @@ from dotagent.repair.problems import (
     with_problem,
     with_sightings,
 )
-from dotagent.repair.second import LOOK_NOTE, MERGED_BEFORE, NO_PR_COMMIT, UNCHECKED, LookOutcome, second_look
+from dotagent.repair.second import LOOK_NOTE, NO_PR_COMMIT, UNCHECKED, LookOutcome, second_look
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
@@ -757,6 +757,13 @@ _LOOK_ENDS: dict[str, SessionEnd] = {
 }
 
 
+class _Looked(FrozenModel):
+    """A second look as the night keeps it: the session it is, and whether it found the pull request merged already."""
+
+    session: RepairSession
+    merged_before: bool
+
+
 async def _look(
     runtime: Runtime,
     night: Night,
@@ -766,8 +773,9 @@ async def _look(
     deadline: float,
     clock: Clock,
     sleep: Sleep,
-) -> RepairSession:
-    """The second look of ``last``'s pull request (:mod:`dotagent.repair.second`), as a session of ``problem``'s."""
+) -> _Looked | None:
+    """The second look of ``last``'s pull request (:mod:`dotagent.repair.second`), as a session of ``problem``'s;
+    ``None`` for one the night's time left to the next night, which keeps nothing, so that the next looks again."""
     config = runtime.config.repair
     started: float = clock()
     minutes: int = max(1, min(config.checks_minutes, int((deadline - clock()) // 60)))
@@ -786,7 +794,7 @@ async def _look(
             last.session_id,
             last.main_before,
             last.note,
-            min(config.session_minutes * 60.0, deadline - clock()),
+            lambda: min(config.session_minutes * 60.0, deadline - clock()),
             wait_checks,
             sleep,
         )
@@ -796,9 +804,15 @@ async def _look(
     spent: _Spent = _Spent(rounds=0, input_tokens=0, output_tokens=0, cost_usd=0.0, session_id=None, window=None)
     if looked.outcome is not None:
         spent = _spent(spent, looked.outcome)
+    if looked.end == "later":
+        log.info("repair_look_left_for_later", problem_id=problem.id, pr=last.pr_url)
+        return None
     end: SessionEnd = _LOOK_ENDS[looked.end]
     note: str = f"{LOOK_NOTE}{looked.why}"
-    return _session(problem, account, started, clock(), spent, end, last.pr_url, note, last.main_before)
+    session: RepairSession = _session(
+        problem, account, started, clock(), spent, end, last.pr_url, note, last.main_before
+    )
+    return _Looked(session=session, merged_before=looked.end == "merged_before")
 
 
 async def repair_night(runtime: Runtime, restart: Restart, clock: Clock, sleep: Sleep) -> tuple[RepairSession, ...]:
@@ -840,12 +854,15 @@ async def repair_night(runtime: Runtime, restart: Restart, clock: Clock, sleep: 
         account: ClaudeAccount | None = await asyncio.to_thread(read_account, claude_state(night.env))
         if account is None or not await _has_room(store, night, account, config.claude, config.leave_room, clock()):
             return False
-        session: RepairSession = await _look(runtime, night, problem, last, account, deadline, clock, sleep)
+        looked: _Looked | None = await _look(runtime, night, problem, last, account, deadline, clock, sleep)
+        if looked is None:
+            return False
+        session: RepairSession = looked.session
         await keep(problem, session)
         if session.end == "merged":
             await restart()
         # A merge of the look's own ends the night, as a session's does; one found merged already does not.
-        return session.end in ("merged", "merged_unpulled") and not session.note.endswith(MERGED_BEFORE)
+        return session.end in ("merged", "merged_unpulled") and not looked.merged_before
 
     # The pull requests a session left because something moved around it are looked at again first (item 933).
     for waiting, last in looks_due(book, kept):

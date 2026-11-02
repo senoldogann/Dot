@@ -25,6 +25,7 @@ from dotagent.evals.runner import eval_config, eval_environment, scratch_home
 from dotagent.events import Subscription
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.repair import night as night_module
+from dotagent.repair import second as second_module
 from dotagent.repair.night import FIXED_TITLE, NEEDS_YOU_TITLE, SESSIONS_KEY, RepairSession, read_sessions, repair_night
 from dotagent.repair.problems import BOOK_KEY, EMPTY_BOOK, Book, Sighting, read_book, with_sightings
 from dotagent.runtime import Runtime, close_runtime, open_runtime
@@ -656,3 +657,43 @@ async def test_with_merge_ask_a_pull_request_stopped_because_something_moved_get
         assert [session.end for session in sessions] == ["main_moved"]
         assert not (stand_ins / "looks.jsonl").exists() and not (stand_ins / "merges").exists()
         assert restarts == []
+
+
+async def test_a_look_the_nights_time_cannot_hold_is_left_to_the_next_night(
+    login_env: dict[str, str], stand_ins: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The sixth pre-push review of item 933: a look whose waits left too little of the night is not made and keeps
+    nothing, so the next night looks again, as a session cut short is tried again."""
+    async with _night(login_env, stand_ins, "busy", "on_pass") as (runtime, restarts):
+        with monkeypatch.context() as patch:
+            patch.setattr(second_module, "LOOK_LEAST_S", night_module.NIGHT_LIMIT_S + 1)
+            first, _ = await _play(runtime, restarts)
+        assert [session.end for session in first] == ["main_moved"]
+        assert not (stand_ins / "looks.jsonl").exists() and not (stand_ins / "merges").exists()
+        second, _ = await _play(runtime, restarts)
+        assert [session.end for session in second] == ["merged"] and restarts == ["restart"]
+
+
+async def test_a_pull_request_found_merged_already_counts_fixed_and_the_night_goes_on(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """The sixth pre-push review of item 933: no restart is asked, and the night takes its next problem."""
+    async with _night(login_env, stand_ins, "busy", "on_pass") as (runtime, restarts):
+        (stand_ins / "look").write_text("NO VERDICT", encoding="utf-8")
+        first, _ = await _play(runtime, restarts)
+        await runtime.store.kv_set(SESSIONS_KEY, night_module.SessionLog(sessions=first[:1]).model_dump_json())
+        # The owner merged it meanwhile; another problem waits in the book.
+        (stand_ins / "merges").write_text("pr merge 7 --squash\n", encoding="utf-8")
+        book: Book = read_book(await runtime.store.kv_get(BOOK_KEY))
+        other: list[Sighting] = [
+            Sighting(kind="daemon", words="memory_failed: no such note", evidence=f"m {n}", at=30.0 + n)
+            for n in range(3)
+        ]
+        await runtime.store.kv_set(BOOK_KEY, with_sightings(book, other, 40.0).model_dump_json())
+        second, _ = await _play(runtime, restarts)
+        assert second[0].end == "merged_unpulled" and second[0].note == "Second look: it was merged already"
+        # The look asked for no restart: only a merge of the next session's does.
+        assert len(second) > 1 and second[1].problem_id != second[0].problem_id
+        assert restarts == ["restart" for session in second if session.end == "merged"]
+        statuses: dict[str, str] = {p.id: p.status for p in read_book(await runtime.store.kv_get(BOOK_KEY)).problems}
+        assert statuses[second[0].problem_id] == "fixed"
