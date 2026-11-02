@@ -319,3 +319,7 @@ class VoiceError(DotError):
     """This Mac could not write a recording down (item 626). The message is for the owner, in plain words, and says what
     to do; ``context["code"]`` is what a page tells it by: ``unavailable`` (this Mac cannot write recordings down),
     ``unsupported-language``, ``no-audio``, ``timeout`` or ``failed``."""
+
+
+class RepairError(DotError):
+    """The repair of Dot's own problems (item 919) could not go on: Claude Code, git or GitHub's CLI failed."""
