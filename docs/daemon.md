@@ -1200,9 +1200,11 @@ dotx service uninstall   # stop the daemon and remove the job
   dotagent.restart_when_idle`, which reads the database read-only every 5 seconds until no run is queued, running or
   blocked (the run that asked included, so it has to end first, and a run that waits for an answer works too). Once no
   run works it asks the daemon, at `GET /api/status` with the API token, about **the night's learning under way**
-  (item 815): the reflection, the harness's step and the plugin scout's night (the scheduler's, or a Look now) are no
-  runs, and each records nothing until its end, so a restart would cut it off and lose the night (the reflection at
-  03:30 and a step of up to `[harness] step_minutes`). `night_work` there names those under way, and the job waits for
+  (item 815): the reflection, the harness's step, the plugin scout's night (the scheduler's, or a Look now) and the
+  repair night ([Self-repair](repair.md), item 921) are no runs, and each records nothing until its end, so a restart
+  would cut it off and lose the night (the reflection at 03:30 and a step of up to `[harness] step_minutes`). A repair
+  night's work is bounded by two hours (a push already under way may add half an hour), so that it ends within the
+  three hours the job waits for the night's work. `night_work` there names those under way, and the job waits for
   them as for the runs. A daemon from before item 815 names none; one that does not listen counts as none, and so does
   one whose answer is refused, cannot be read or does not come within 5 seconds (each logged as
   `restart_when_idle_night_unknown`, as a token that cannot be read is): what is cut off then is a night of learning,

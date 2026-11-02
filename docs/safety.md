@@ -22,6 +22,12 @@ run needs, sent where the configuration points:
   OpenRouter passes each call on to the lab whose model it is. OpenCode Zen's free models (`opencode:`) get the whole
   conversation of a run that runs on one, through OpenCode's own agent, and the providers of some of them may use what
   they get to improve their models (see [Models and providers](models.md#models-and-providers)).
+- **To Anthropic and GitHub: the repair night's work, once `[repair] repo` is set ([Self-repair](repair.md), items
+  919-921).** Each session of Claude Code, on your own plan, sends Anthropic the problem it is handed (its words and
+  lines of evidence from Dot's record, tool errors that may quote a page or a mail, errors of Dot's log, masked of the
+  secrets Dot holds) and what it reads of Dot's repository and runs in it. Dot pushes the session's branch to the
+  repository's GitHub with your sign-in, through the review hook (which sends the change to Anthropic too), opens its
+  pull request and merges it by `[repair] merge`.
 - **To the embedding model: each note and each search of the memory.** It is Ollama's `bge-m3` on this Mac by default;
   with `[memory] embed_provider = "openai"` the texts go to OpenAI (see [Memory](memory-and-schedules.md#memory)).
 - **To the search engines: the query.** The `[web] search_backend` ladder asks the owner's SearXNG instance when `[web]
@@ -1288,7 +1294,8 @@ event and approval.
   emergency stop as soon as it exists; the reflection and the harness's step neither start nor go on (one under way is
   cancelled, as at the daemon's stop, and the harness's probe ends with the commands it started, item 683); nor does the
   nightly look for plugins (one under way ends at its next plugin and stores nothing, and Look now answers 409, items
-  711 and 712)
+  711 and 712), nor the repair night (one under way is cancelled with its session of Claude Code and what it started,
+  and its problem is left as it was; [Self-repair](repair.md), item 921)
 - while the `STOP` file exists, no watcher looks (a stop engaged while one looks keeps the next from looking and the
   one at work from starting a run, item 683), and **a message on a channel** (iMessage, [Channels](channels.md),
   item 611) starts no run and is not queued either: a message queued starts its run when the one at work ends, stop or

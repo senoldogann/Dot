@@ -1122,6 +1122,31 @@ builtin = true
 # is one plugin itself; ~ expands). Plugins are read when Dot starts, skills at the start of every run.
 dirs = []
 
+[repair]
+# Dot repairs its own problems (docs/repair.md, items 919-921). Dot keeps a book of what its record shows going wrong
+# again and again (a tool that fails the same way in several runs, the progress watchdog's alerts, a failed step of the
+# improvement loop, an error of its log). Each night at time (HH:MM in [scheduler] timezone, or "off") it hands the
+# first problem seen least_seen times or more to Claude Code (the claude command, signed in on this Mac with your own
+# plan: never an API key) in a checkout of its own of repo, the git checkout of Dot's code ("" is off). The session
+# fixes it with a test and commits; Dot pushes its branch through the review hook and opens the pull request. A change
+# to what REVIEW.md lists under "Always needs a human", or to the gate's own sources and Dot's dependencies, waits for
+# you. Dot then waits checks_minutes for the checks: with merge = "on_pass" a pull request whose every check passed is
+# merged and pulled into repo, and Dot restarts once idle; with "ask" it waits for you. A failed check goes back to the
+# same session, rounds times at most. The session runs with your rights: what Dot checks before it merges is main on
+# GitHub and your checkout of Dot (docs/repair.md says what it does not check). sessions_per_day bounds the sessions
+# a day; none starts while the plan's window is used past leave_room (0.8: a fifth is left for you), and one session
+# ends after session_minutes.
+repo = ""
+time = "05:30"
+claude = "claude"
+sessions_per_day = 10
+rounds = 3
+least_seen = 2
+leave_room = 0.8
+session_minutes = 90
+checks_minutes = 45
+merge = "ask"
+
 [scout]
 # The plugin scout (docs/extending.md): each night, at time (HH:MM in [scheduler] timezone, or "off"), it looks for plugins
 # worth proposing on Customize › Plugins (Anthropic's marketplaces, the makers' own repositories, GitHub's topics for

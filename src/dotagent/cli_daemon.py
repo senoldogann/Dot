@@ -424,7 +424,7 @@ async def cmd_service_restart_when_idle(command: ServiceRestartCommand) -> int:
     sys.stdout.write(
         f"Loaded a restart that waits (the launchd job {RESTART_LABEL}: {plist}).\n"
         f"The daemon is restarted once no run works, the run that asked included, and none of the night's learning "
-        f"(the reflection, the harness's step, the plugin scout) is under way; the job looks every "
+        f"(the reflection, the harness's step, the plugin scout, the repair night) is under way; the job looks every "
         f"{RESTART_POLL_S:g} seconds, gives up after {_duration(RESTART_WAIT_LIMIT_S)} of runs at work or "
         f"{_duration(RESTART_NIGHT_LIMIT_S)} of the night's learning without restarting, and unloads itself either "
         "way. 'dotx service status' says whether one waits.\n"

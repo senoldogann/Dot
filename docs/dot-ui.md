@@ -25,6 +25,7 @@ home page is `runs.js`, and one run is `run.js`.
 | Connectors | `connectors.js` | The services Dot works with and where to connect them. |
 | Memory | `memory.js` | Notes, semantic and word search, and the lessons handed to runs. |
 | Harness | `harness.js` | Self-improvement around the model: the harness and what it changes. |
+| Self-repair | `repair.js` | The problems Dot found in its own record and the Claude Code sessions that fixed them. |
 | Providers | `keys.js` | The model providers and the judge's service. |
 | Channels | `channels.js` | The owner's messaging apps as ways to reach Dot. |
 | Phone | `phone.js` | Dot on a phone through Tailscale, a step at a time. |
