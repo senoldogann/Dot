@@ -63,7 +63,11 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # and judges what comes back), `objective_add`, `objective_update` and `objectives` (what the owner wants moved
 # forward), each described in a line, and the lead's paragraph on managing (25,356 measured; system 7,591, tools
 # 17,739).
-BUDGET_TOKENS: int = 25_400
+# Raised by 350 for the gaps the owner took from the DeepSeek Harness super-agent article (2026-11-02): `recall`, which
+# reads back by its id a record a compaction note names (item 924), `pass_reply`, which hands a reply to a mail to the
+# chat that sent it (item 926), and the `brief` of a plan's step, which runs the independent steps at once as helpers
+# (item 927), each described in a line (25,713 measured; system 7,591, tools 18,097).
+BUDGET_TOKENS: int = 25_750
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -77,7 +81,8 @@ SYSTEM_BUDGET_TOKENS: int = 7_600
 # Raised by 200 for the office's two tools (item 890) above.
 # Raised by 200 for `skill_save` (item 893) above.
 # Raised by 1,000 for the six tools of items 907 and 908 above.
-TOOLS_BUDGET_TOKENS: int = 17_800
+# Raised by 350 for `recall`, `pass_reply` and a plan step's `brief` (items 924, 926 and 927) above.
+TOOLS_BUDGET_TOKENS: int = 18_150
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

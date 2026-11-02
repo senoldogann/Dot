@@ -97,11 +97,20 @@ happened. The evidence stands under the step in the web UI, in every note that c
 step that must wait for others names them (`depends_on`, step numbers; a cycle or a number outside the plan is refused),
 the plan reads `(after 1, 2)` and the web UI shows the same, and the result of every plan change says which steps are
 ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that are ready together
-are independent, so the run can hand each to `delegate` in one turn, naming the step; the delegated run's report then
+are independent, so the run can hand each to `delegate` in one turn, naming the step (not one with a `brief`, which
+went to its helper already, below: delegated too, its work would be done twice); the delegated run's report then
 closes the step (done with the report's start as evidence, or failed) without a mark of the run's own; a step the plan
 does not have (a slip, or a delegate before the plan) does not stop the delegation: the run goes, the result's first
 line says the step was not in the plan, and nothing is marked. A `delegate` call waits up to four hours for its
-run's report. A run that calls `finish` with steps still open is asked once to close them; the conversation draws no line
+run's report. **Fan-out** (item 927) does it by the plan rather than by the model: a step of `update_plan` may carry a
+`brief`, an instruction a run that cannot see the conversation can follow, and when two or more pending steps with one
+wait for nothing open, they run at once as helpers of the run, at most `[agent] fan_out` (3; 0 or 1: none), as
+`delegate` runs them (the run's model and bounds, research for a research run), while the plan shows them in progress;
+each comes back marked done or failed with its report as the evidence, and the reports are in the plan's result, fenced
+and marking the run untrusted when a helper read content third parties can author. A single ready step is the run's own,
+and a helper's own plan fans out nothing, nor does the plan of an agent whose role leaves `delegate` out. The DeepSeek Harness super-agent article measured that a model left to decide
+hands no work to helpers (5 tries of 5), and on the owner's Mac 4 runs of 127 were helpers; more helpers at once spend
+more tokens for less time. A run that calls `finish` with steps still open is asked once to close them; the conversation draws no line
 for it (item 852), the plan's marks show the steps. A plan can also hold the run's targets (`targets` of `update_plan`,
 at most 600 characters): for a goal that names an outcome, what the run will reach and how its own tools measure it.
 They stay until new targets
