@@ -34,7 +34,7 @@ from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
-type Mode = Literal["pr", "no_fix", "limited", "rogue", "rename", "tamper", "busy", "tracked"]
+type Mode = Literal["pr", "no_fix", "limited", "rogue", "rename", "tamper", "busy", "tracked", "pulled", "rewound"]
 
 _REVIEW: str = "# Review\n\n## Always needs a human\n\n- `src/dotagent/policy/`\n- `src/dotagent/agent/review.py`\n"
 _GIT_ENV: dict[str, str] = {
@@ -109,6 +109,22 @@ elif mode == "rogue":
     # Past what its environment was meant to keep it from: straight to main (a local origin needs no sign-in).
     subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], check=True)
     answer = "Fixed.\\nREADY: fixed"
+elif mode == "rewound":
+    # A command of its own takes the owner's checkout back to an older commit of main: a fix of main's undone there.
+    subprocess.run(["git", "-C", "../../..", "reset", "-q", "--hard", "HEAD~1"], check=True)
+    Path("fix.txt").write_text("fixed\\n")
+    wrote("fix.txt")
+    subprocess.run(["git", "add", "fix.txt"], check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
+    answer = "Fixed it.\\nREADY: fixed"
+elif mode == "pulled":
+    # The owner deploys meanwhile: their checkout pulls main along, to a commit of main's (item 940).
+    subprocess.run(["git", "-C", "../../..", "pull", "--ff-only", "-q", "origin", "main"], check=True)
+    Path("fix.txt").write_text("fixed\\n")
+    wrote("fix.txt")
+    subprocess.run(["git", "add", "fix.txt"], check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
+    answer = "Fixed it.\\nREADY: fixed"
 elif mode == "tracked":
     # Another agent's `git push -u` meanwhile: a section of its branch in the owner's git config, which a pull of main
     # never reads (item 935).
@@ -723,3 +739,40 @@ async def test_another_branchs_section_written_in_the_owners_git_config_does_not
     async with _night(login_env, stand_ins, "tracked", "on_pass") as (runtime, restarts):
         sessions, _ = await _play(runtime, restarts)
         assert [session.end for session in sessions] == ["merged"] and restarts == ["restart"]
+
+
+async def test_the_owners_pull_along_main_during_a_session_does_not_stop_it(
+    login_env: dict[str, str], stand_ins: Path, tmp_path: Path
+) -> None:
+    """Item 940: on the owner's Mac a deploy during a night (a pull of main into their checkout) stopped its session as
+    a change of the checkout. A commit of main on GitHub is no change of Dot's to fear; the fix is merged."""
+    origin: Path = stand_ins.parent / "origin.git"
+    other: Path = tmp_path / "other"
+    _git(tmp_path, "clone", "-q", str(origin), str(other))
+    (other / "merged-before.txt").write_text("a pull request of the day\n", encoding="utf-8")
+    _git(other, "add", "merged-before.txt")
+    _git(other, "commit", "-q", "-m", "Item 0: merged earlier")
+    _git(other, "push", "-q", "origin", "HEAD:main")
+    async with _night(login_env, stand_ins, "pulled", "on_pass") as (runtime, restarts):
+        sessions, _ = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["merged"], [session.note for session in sessions]
+
+
+async def test_a_session_that_takes_the_owners_checkout_back_along_main_is_stopped(
+    login_env: dict[str, str], stand_ins: Path, tmp_path: Path
+) -> None:
+    """The pre-push review of item 940: only forward along main is a pull of the owner's; a checkout taken back to an
+    older commit of main (a fix undone in what Dot restarts with) stops the night, and nothing is merged."""
+    origin: Path = stand_ins.parent / "origin.git"
+    other: Path = tmp_path / "other"
+    _git(tmp_path, "clone", "-q", str(origin), str(other))
+    (other / "guard-fix.txt").write_text("a fix of main's\n", encoding="utf-8")
+    _git(other, "add", "guard-fix.txt")
+    _git(other, "commit", "-q", "-m", "Item 0: a fix")
+    _git(other, "push", "-q", "origin", "HEAD:main")
+    _git(stand_ins.parent / "Dot", "pull", "-q", "--ff-only", "origin", "main")
+    async with _night(login_env, stand_ins, "rewound", "on_pass") as (runtime, restarts):
+        sessions, _ = await _play(runtime, restarts)
+        assert sessions[0].end == "main_moved", [session.note for session in sessions]
+        assert "went to a commit that is not main's ahead of where it stood" in sessions[0].note
+        assert not (stand_ins / "merges").exists() and restarts == []

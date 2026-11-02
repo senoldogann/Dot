@@ -17,7 +17,8 @@ that fails is said once), with **Stop**, which
 asks first and ends the night as the emergency stop does: the session ends with what it started and its problem stays
 as it was. Then an overview (on or off and when, what it works on now, the problems fixed, waiting for you and open, the
 account), what waits for you with its pull request and why, the nights by date (each session's problem, how it ended and
-why in a line that opens whole), the problems next in line (the most seen first, a few and the rest a click away), the
+why in a line that opens whole; one whose problem was settled since reads *Fixed later* or *Let go*, item 940), the
+problems next in line (the most seen first, a few and the rest a click away), the
 closed ones folded, and, folded at the foot to its model and effort, how Claude Code works (a section never folded
 while its choice cannot be read, as the nights wait on it); a problem's placeholders
 read as words (item 932). It starts a night by hand (**Run now**): `GET /api/repair` gives them (`live`, what the night
@@ -155,7 +156,9 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
 - **Main moved.** GitHub refuses a push straight to `main` of a commit whose checks have not passed (its protection
   requires `gate`, `browser (pages)` and `browser (phone)`, up to date, for admins too: read on 2026-11-02), so the one
   way into `main` is a pull request whose checks passed. When a session begins, Dot reads where `main` stands on
-  GitHub and takes a print of your checkout of Dot: its commit, the contents of every change to a tracked file and of
+  GitHub and takes a print of your checkout of Dot: its commit, which may only go forward along main (to a commit of
+  main on GitHub that comes after it: a pull of yours, a deploy, item 940; back, or off main, counts as changed), the
+  contents of every change to a tracked file and of
   every file git does not track, its git config as git reads it (but the entries of branches other than `main`, which
   `git push -u` of another agent's work writes: item 935) and its hooks read through their links. Files git ignores
   (`.venv`) are not in it. It reads both again before it merges, and after every session it merged nothing for, one that
@@ -174,6 +177,7 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
     minutes whether it is behind `main`;
   - a commit `main` holds since the session began belongs to no merged pull request (read from GitHub, commit by
     commit, never from the night's note, which names what it saw first);
+  - your checkout of Dot did not go only forward along main since the session began (item 940);
   - Claude Code's transcript of the session (`~/.claude/projects/<its checkout>/<session>.jsonl`) is gone, or names
     a file the session edited or wrote outside its checkout;
   - the session handed work to a helper agent (`Agent`, `Task`: their tools go to a transcript of their own, which is

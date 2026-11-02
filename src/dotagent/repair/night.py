@@ -64,6 +64,7 @@ from dotagent.repair.claude import (
 from dotagent.repair.github import (
     Check,
     all_passed,
+    along_main,
     branch_commits,
     branch_files,
     branch_items,
@@ -222,6 +223,8 @@ class RepairSession(FrozenModel):
     # Where main stood on GitHub when the session began (item 933), which its second look reads from; ``None`` for a
     # session kept before, or one that ended before it was read.
     main_before: str | None = None
+    # The commit the owner's checkout stood on when the session began (item 940), which its second look reads from.
+    head_before: str | None = None
 
 
 class SessionLog(FrozenModel):
@@ -475,6 +478,7 @@ def _session(
     pr_url: str,
     note: str,
     main_before: str | None,
+    head_before: str | None,
 ) -> RepairSession:
     return RepairSession(
         problem_id=problem.id,
@@ -491,6 +495,7 @@ def _session(
         note=note[-_TAIL_CHARS:],
         window=spent.window,
         main_before=main_before,
+        head_before=head_before,
     )
 
 
@@ -577,8 +582,9 @@ async def _work(
     ends: list[SessionEnd] = []
     merged_branch: list[str] = []
 
-    # Where main stood when the session began, once read.
+    # Where main stood when the session began, once read, and the commit the owner's checkout stood on (item 940).
     main_at: list[str] = []
+    head_before: list[str] = []
     # The newest steps of the session's rounds, for the page while it works (item 939).
     steps: list[RepairStep] = []
     # The live state of the session's newest round, which says what it waits on between rounds.
@@ -593,7 +599,18 @@ async def _work(
 
     def ended(end: SessionEnd, note: str) -> RepairSession:
         ends.append(end)
-        return _session(problem, account, started, clock(), spent, end, url, note, main_at[0] if main_at else None)
+        return _session(
+            problem,
+            account,
+            started,
+            clock(),
+            spent,
+            end,
+            url,
+            note,
+            main_at[0] if main_at else None,
+            head_before[0] if head_before else None,
+        )
 
     async def ask(prompt: str) -> ClaudeOutcome:
         """A round of the session, cut to what is left of the night."""
@@ -643,6 +660,11 @@ async def _work(
             its git config, its hooks), or main on GitHub; ``None`` when nothing did."""
             if print_before and await checkout_print(night.repo, night.env) != print_before:
                 return "your checkout of Dot (its files, git config or hooks) changed outside the session's own"
+            # Its commit may only have gone forward along main, a pull of the owner's (item 940).
+            if head_before and not await along_main(
+                night.repo, head_before[0], await head_of(night.repo, night.env), night.env
+            ):
+                return "your checkout of Dot went to a commit that is not main's ahead of where it stood"
             if await main_on_github(night.repo, night.env) == main_before:
                 return None
             merged: tuple[str, ...] = await merged_since(night.repo, since, night.env)
@@ -659,6 +681,7 @@ async def _work(
         await make_checkout(night.repo, folder, branch, night.env)
         start = await head_of(folder, night.env)
         print_before = await checkout_print(night.repo, night.env)
+        head_before.append(await head_of(night.repo, night.env))
         item: int = await next_item(night.repo, sys.executable, night.env)
 
         async def rounds() -> RepairSession:
@@ -898,6 +921,7 @@ async def _look(
             last.pr_url,
             last.session_id,
             last.main_before,
+            last.head_before,
             last.note,
             lambda: min(config.session_minutes * 60.0, deadline - clock()),
             wait_checks,
@@ -918,7 +942,7 @@ async def _look(
     end: SessionEnd = _LOOK_ENDS[looked.end]
     note: str = f"{LOOK_NOTE}{looked.why}"
     session: RepairSession = _session(
-        problem, account, started, clock(), spent, end, last.pr_url, note, last.main_before
+        problem, account, started, clock(), spent, end, last.pr_url, note, last.main_before, last.head_before
     )
     return _Looked(session=session, merged_before=looked.end == "merged_before")
 

@@ -418,11 +418,11 @@ async def checkout_clean(repo: Path, env: Mapping[str, str]) -> bool:
     changed: str = await command(("git", "-C", str(repo), "status", "--porcelain", "--untracked-files=no"), repo, env)
     if changed.strip():
         return False
-    try:
-        await command(("git", "-C", str(repo), "merge-base", "--is-ancestor", "HEAD", "origin/main"), repo, env)
-    except RepairError:
-        return False
-    return True
+    # Main as GitHub holds it, fetched: the checkout's own origin/main is a ref a session could move (item 940).
+    main: str = await main_on_github(repo, env)
+    await command(("git", "-C", str(repo), "fetch", "--quiet", "origin", "main"), repo, env)
+    head: str = (await command(("git", "-C", str(repo), "rev-parse", "HEAD"), repo, env)).strip()
+    return await is_ancestor(repo, head, main, env)
 
 
 async def update_branch(repo: Path, number: int, env: Mapping[str, str]) -> None:
@@ -565,15 +565,40 @@ def _files_print(paths: Sequence[Path]) -> str:
     return digest.hexdigest()
 
 
+async def is_ancestor(repo: Path, older: str, newer: str, env: Mapping[str, str]) -> bool:
+    """Whether the commit ``older`` is ``newer`` or comes before it in ``repo`` (``git merge-base --is-ancestor``). Its
+    answer no is the command's exit 1; any other failure (an object missing, a ref locked) is raised, never read as no
+    (the pre-push review of item 940)."""
+    try:
+        await command(("git", "-C", str(repo), "merge-base", "--is-ancestor", older, newer), repo, env)
+    except RepairError as error:
+        if error.context.get("code") == 1:
+            return False
+        raise
+    return True
+
+
+async def along_main(repo: Path, before: str, after: str, env: Mapping[str, str]) -> bool:
+    """Whether the owner's checkout went from the commit ``before`` to ``after`` along main (item 940): forward from
+    where it stood, to a commit of main on GitHub (read from GitHub and fetched, never from the checkout's own refs,
+    which a session could move). A pull of theirs along main is that, a deploy during a night; going back to an older
+    commit, or to one main does not hold, is not."""
+    if after == before:
+        return True
+    main: str = await main_on_github(repo, env)
+    await command(("git", "-C", str(repo), "fetch", "--quiet", "origin", "main"), repo, env)
+    return await is_ancestor(repo, before, after, env) and await is_ancestor(repo, after, main, env)
+
+
 async def checkout_print(repo: Path, env: Mapping[str, str]) -> str:
     """A print of the owner's checkout at ``repo`` that changes when what Dot would pull and restart with does (the
-    sixth and ninth reviews of item 921): the commit it stands on, the contents of every change to a tracked file
+    sixth and ninth reviews of item 921): the contents of every change to a tracked file
     (``git diff HEAD``), the contents of every file git does not track and does not ignore, its git config as git
     reads it (but the entries of branches other than main, :func:`config_print`) and its hooks (each read through its
     link: the review hook lives in the checkout). Files git ignores (``.venv``) are not in it, which docs/repair.md
     says. A session runs with the owner's rights, so it could write there outside its own checkout; Dot compares the
-    print before and after it, and before it merges."""
-    head: str = await command(("git", "-C", str(repo), "rev-parse", "HEAD"), repo, env)
+    print before and after it, and before it merges. The commit it stands on is read apart from it (item 940,
+    :func:`along_main`): one it went forward to along main is no change of the session's."""
     changed: str = await command(("git", "-C", str(repo), "diff", "HEAD", "--binary"), repo, env)
     untracked: str = await command(
         ("git", "-C", str(repo), "ls-files", "--others", "--exclude-standard", "-z"), repo, env
@@ -590,7 +615,7 @@ async def checkout_print(repo: Path, env: Mapping[str, str]) -> str:
     listed: str = await command(
         ("git", "config", "--file", str(folder / "config"), "--includes", "--list", "-z"), repo, env
     )
-    return hashlib.sha256(f"{head}\n{changed}\n{config_print(listed)}\n{files}".encode()).hexdigest()
+    return hashlib.sha256(f"{changed}\n{config_print(listed)}\n{files}".encode()).hexdigest()
 
 
 async def pull_main(repo: Path, env: Mapping[str, str]) -> bool:

@@ -170,7 +170,11 @@ async def test_on_it_shows_the_problems_their_fixes_and_the_sessions(
         window=None,
     )
     await runtime.store.kv_set(BOOK_KEY, book.model_dump_json())
-    await runtime.store.kv_set(SESSIONS_KEY, SessionLog(sessions=(session,)).model_dump_json())
+    # An earlier session of the same problem, stopped as main moved: the problem is fixed since (item 940).
+    stopped = session.model_copy(
+        update={"started_at": now - 7200, "ended_at": now - 7000, "end": "main_moved", "note": "During the session…"}
+    )
+    await runtime.store.kv_set(SESSIONS_KEY, SessionLog(sessions=(stopped, session)).model_dump_json())
     repair = runtime.config.repair.model_copy(update={"repo": "/Users/owner/Desktop/Dot", "merge": "on_pass"})
     on: Runtime = dataclasses.replace(runtime, config=runtime.config.model_copy(update={"repair": repair}))
     async with _serving(on, None) as address:
@@ -189,7 +193,10 @@ async def test_on_it_shows_the_problems_their_fixes_and_the_sessions(
             nights = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Nights"))
             await expect(nights.get_by_text("Merged", exact=True)).to_be_visible()
             await expect(nights).to_contain_text("2 rounds · 129k tokens · owner@example.invalid")
-            await expect(nights).to_contain_text("1 session")
+            await expect(nights).to_contain_text("2 sessions")
+            # Settled since, it waits on nobody: no warning is drawn of it.
+            await expect(nights.get_by_text("Fixed later", exact=True)).to_be_visible()
+            await expect(nights.get_by_text("Main moved: look")).to_have_count(0)
             line = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Next in line"))
             await expect(line.locator(".set-row")).to_have_count(5)
             await line.get_by_role("button", name="Show all 7").click()

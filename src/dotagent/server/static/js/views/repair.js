@@ -278,19 +278,34 @@ function problemRow(problem) {
 }
 
 /** The row of a session: its problem, how it ended, why in a line, what it used, and its pull request. */
-function sessionRow(session, titles) {
+/**
+ * How a session's end reads now (item 940): as it ended, but for one whose problem was settled since by another session
+ * or by the owner, which reads "Fixed later" (fixed) or "Let go" (not Dot's), never a warning that waits on nobody.
+ */
+function endBadge(session, status) {
+  const settled = session.end === "merged" || session.end === "merged_unpulled" || session.end === "declined";
+  if (!settled && status === "fixed") {
+    return badge("Fixed later", "good");
+  }
+  if (!settled && status === "declined") {
+    return badge("Let go", undefined);
+  }
+  return badge(ENDS[session.end] ?? session.end, END_TONE[session.end]);
+}
+
+function sessionRow(session, titles, statuses) {
   const used = `${session.rounds} round${session.rounds === 1 ? "" : "s"} · ${Math.round((session.input_tokens + session.output_tokens) / 1000)}k tokens · ${session.account}`;
   const title = titles.get(session.problem_id) ?? session.problem_id;
   return setRow({
     title: el("span", { class: "repair-title", title }, readable(title)),
     lead: used,
-    control: el("span", { class: "repair-status" }, badge(ENDS[session.end] ?? session.end, END_TONE[session.end]), prLink(session.pr_url)),
+    control: el("span", { class: "repair-status" }, endBadge(session, statuses.get(session.problem_id)), prLink(session.pr_url)),
     body: note(session.note),
   });
 }
 
 /** The sessions by night, the newest night first, each night named by its date. */
-function nights(sessions, titles) {
+function nights(sessions, titles, statuses) {
   const byNight = new Map();
   for (const session of sessions) {
     const day = new Date(session.started_at * 1000).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
@@ -304,7 +319,7 @@ function nights(sessions, titles) {
       "div",
       { class: "stack repair-night" },
       el("div", { class: "repair-night-head" }, el("span", null, day), el("span", { class: "hint" }, `${list.length} session${list.length === 1 ? "" : "s"}`)),
-      setCard(...list.map((session) => sessionRow(session, titles))),
+      setCard(...list.map((session) => sessionRow(session, titles, statuses))),
     ),
   );
 }
@@ -431,6 +446,7 @@ export function mount(root, ctx) {
 
   function paint() {
     const titles = new Map(view.problems.map((problem) => [problem.id, problem.title]));
+    const statuses = new Map(view.problems.map((problem) => [problem.id, problem.status]));
     const waiting = view.problems.filter((problem) => problem.status === "waiting");
     const open = view.problems.filter((problem) => problem.status === "open" || problem.status === "working").sort((a, b) => b.count - a.count || b.last_at - a.last_at);
     const closed = view.problems.filter((problem) => problem.status === "fixed" || problem.status === "declined");
@@ -444,7 +460,7 @@ export function mount(root, ctx) {
         setSection({
           title: "Nights",
           lead: "Each session: the problem, how it ended and why.",
-          body: view.sessions.length === 0 ? emptyPanel("clock", "No night yet", "") : el("div", { class: "stack" }, ...nights(view.sessions, titles)),
+          body: view.sessions.length === 0 ? emptyPanel("clock", "No night yet", "") : el("div", { class: "stack" }, ...nights(view.sessions, titles, statuses)),
         }),
         setSection({ title: "Next in line", lead: "What Dot's record shows going wrong again and again, the most seen first.", body: nextUp(open) }),
         closed.length === 0 ? null : setSection({ title: "Closed", body: el("details", { class: "repair-closed" }, el("summary", null, `${closed.length} fixed or not Dot's`), setCard(...closed.map(problemRow))) }),

@@ -36,6 +36,7 @@ from dotagent.repair.github import (
     checks_of,
     config_print,
     human_paths,
+    is_ancestor,
     needs_the_owner,
     pr_number,
     settled,
@@ -632,3 +633,38 @@ async def test_the_live_state_keeps_the_newest_steps_masked(tmp_path: Path) -> N
         assert read_live("not json") is None and read_live(None) is None
     finally:
         await store.close()
+
+
+def _two_commits(repo: Path, env: dict[str, str]) -> tuple[str, str]:
+    """A repository at ``repo`` of two commits: the older and the newer."""
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ("git", "-C", str(repo), *args), check=True, capture_output=True, text=True, env=env
+        ).stdout
+
+    repo.mkdir()
+    git("init", "-q")
+    for name in ("one", "two"):
+        (repo / name).write_text(name, encoding="utf-8")
+        git("add", name)
+        git("commit", "-q", "-m", name)
+    return git("rev-parse", "HEAD~1").strip(), git("rev-parse", "HEAD").strip()
+
+
+async def test_is_ancestor_says_no_by_gits_exit_1_and_raises_any_other_failure(tmp_path: Path) -> None:
+    """The pre-push review of item 940: a commit missing, or a ref locked, is a failure to say, never read as no."""
+    env: dict[str, str] = {
+        "PATH": "/usr/bin:/bin:/opt/homebrew/bin",
+        "HOME": str(tmp_path),
+        "GIT_AUTHOR_NAME": "T",
+        "GIT_AUTHOR_EMAIL": "t@example.invalid",
+        "GIT_COMMITTER_NAME": "T",
+        "GIT_COMMITTER_EMAIL": "t@example.invalid",
+    }
+    repo: Path = tmp_path / "repo"
+    older, newer = await asyncio.to_thread(_two_commits, repo, env)
+    assert await is_ancestor(repo, older, newer, env)
+    assert not await is_ancestor(repo, newer, older, env)
+    with pytest.raises(RepairError):
+        await is_ancestor(repo, "0" * 40, newer, env)

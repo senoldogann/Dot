@@ -48,8 +48,10 @@ from dotagent.repair.github import (
     Check,
     PrHead,
     all_passed,
+    along_main,
     checkout_at,
     checkout_clean,
+    command,
     commits_without_pr,
     drop_checkout,
     drop_remote_branch,
@@ -278,6 +280,7 @@ async def second_look(
     pr_url: str,
     session_id: str | None,
     main_before: str | None,
+    head_before: str | None,
     moved: str,
     time_left: Callable[[], float],
     wait_checks: ChecksWait,
@@ -302,6 +305,17 @@ async def second_look(
         return LookOutcome(end="held", why=f"after the session {UNCHECKED}", outcome=None)
     if main_before is None:
         return LookOutcome(end="held", why="where main stood when the session began is not known", outcome=None)
+    # The owner's checkout may only have gone forward along main since the session began, a pull of theirs (item 940):
+    # one taken back or off main is the owner's to look at, whatever the pull request is.
+    if head_before is None:
+        return LookOutcome(
+            end="held", why="where your checkout stood when the session began is not known", outcome=None
+        )
+    head_now: str = (await command(("git", "-C", str(repo), "rev-parse", "HEAD"), repo, env)).strip()
+    if not await along_main(repo, head_before, head_now, env):
+        return LookOutcome(
+            end="held", why="your checkout of Dot was taken back or off main during the session", outcome=None
+        )
     listed: tuple[str, ...] = human_paths(await review_on_main(repo, env)) or ("*",)
     touched: tuple[str, ...] = needs_the_owner(await pr_files(repo, number, env), (*protected, *listed))
     if touched:
