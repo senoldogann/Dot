@@ -417,6 +417,9 @@ async def _again_after_navigation[T](page: Page, what: str, call: Callable[[], A
 # The part of a page a snapshot falls back to when the whole is too heavy for it (item 743): the biggest element around
 # the middle of the window that holds at most this many elements, found by sampling the window on a grid.
 _PARTIAL_BUDGET: int = 3000
+# How many times the snapshot's own time the naming of the part may wait for the page to finish the whole snapshot that
+# timed out (item 923): a page whose whole takes up to about three times that time still gives a part.
+_PARTIAL_WAIT_TIMES: int = 2
 _PARTIAL_ROOT_SCRIPT: str = """(budget) => {
   const count = (node) => node.getElementsByTagName('*').length;
   const chunks = new Map();
@@ -456,8 +459,11 @@ async def _partial_snapshot(page: Page, timeout_ms: int) -> tuple[str, str] | No
     sentence that says it is a part; ``None`` when no part smaller than the page can be named or it cannot be read
     either. Taking it replaces the ref table as a whole snapshot does, so its refs are the ones that work."""
     try:
-        # The page that was too slow for the whole may be too busy for this too: it gets the same time, no more.
-        async with asyncio.timeout(timeout_ms / 1000):
+        # The whole snapshot that timed out is not stopped in the page: it runs on to its end and anything asked of the
+        # page waits behind it (item 923, measured with Chrome: a snapshot of 4.4 s given 1 s kept the page busy for
+        # 1.4 s more). The naming of the part waits for that end too, so it gets :data:`_PARTIAL_WAIT_TIMES` times the
+        # time of the whole; the part itself gets the same time as the whole, no more.
+        async with asyncio.timeout(_PARTIAL_WAIT_TIMES * timeout_ms / 1000):
             root: object = await page.evaluate(_PARTIAL_ROOT_SCRIPT, _PARTIAL_BUDGET)
         if not isinstance(root, dict) or not isinstance(root.get("selector"), str):
             return None
