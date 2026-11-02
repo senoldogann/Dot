@@ -157,6 +157,8 @@ const STEP_VERBS = { read: "Read", edit: "Edited", write: "Wrote", run: "Ran", s
 // The newest steps the card shows before "All steps", and how often the page reads the night while one is at work.
 const NOW_STEPS = 4;
 const POLL_MS = 4000;
+// What a session waits on between its rounds, in the card's head.
+const PHASE_WORDS = { review: "Waiting for the review", checks: "Waiting for the checks" };
 // While no night works, the night is read once in this many of those.
 const IDLE_TICKS = 8;
 
@@ -192,7 +194,7 @@ function nowCard(live, allSteps, onAll, onStop) {
       "div",
       { class: "repair-now-head" },
       el("span", { class: "repair-live", "aria-hidden": "true" }),
-      el("b", null, live.kind === "look" ? "Looking again" : "Working"),
+      el("b", null, PHASE_WORDS[live.phase] ?? (live.kind === "look" ? "Looking again" : "Working")),
       el("span", { class: "hint" }, " · ", el("span", { class: "repair-elapsed", dataset: { since: String(live.started_at) } }, elapsed(live.started_at, Date.now() / 1000)), ` · round ${live.round}`),
       el("span", { class: "grow" }),
       el("button", { class: "btn sm danger", type: "button", onclick: onStop }, icon("stop"), "Stop"),
@@ -201,7 +203,7 @@ function nowCard(live, allSteps, onAll, onStop) {
     el("div", { class: "hint" }, `${model}${effort} · ${live.account}`),
     steps.length === 0
       ? el("p", { class: "hint repair-now-wait" }, "Starting…")
-      : el("ol", { class: "repair-steps", "aria-label": "Its newest steps" }, steps.map((step, index) => stepLine(step, index === steps.length - 1))),
+      : el("ol", { class: "repair-steps", "aria-label": "Its newest steps" }, steps.map((step, index) => stepLine(step, live.phase === "working" && index === steps.length - 1))),
     live.steps.length > NOW_STEPS
       ? el(
           "button",

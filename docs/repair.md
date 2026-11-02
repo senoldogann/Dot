@@ -8,7 +8,8 @@ code itself.
 
 It is off until `[repair] repo` names the git checkout of Dot's code (`~/Desktop/Dot` on the owner's Mac). Settings ›
 Rules and memory › Self-repair leads, while a night works, with what it works on now (item 939): a session or a second
-look, how long (its time going on by the second) and which round, the problem, the model, effort and account, and its
+look, how long (its time going on by the second) and which round, or what it waits on between rounds (the review hook,
+the checks), the problem, the model, effort and account, and its
 newest four steps (what Claude Code read, edited, wrote, searched or ran, a command by the description Claude Code gave
 it, all of its newest forty a click away; masked of the secrets Dot holds before they are cut), read again every four
 seconds while the page is in sight (every half minute while none works, so that one the schedule starts shows; a read

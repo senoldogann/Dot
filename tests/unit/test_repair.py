@@ -616,7 +616,7 @@ async def test_the_live_state_keeps_the_newest_steps_masked(tmp_path: Path) -> N
     try:
         live = LiveSession(
             problem_id="prb_1", title="x", kind="session", started_at=1.0, round=1, account="a@b.dev",
-            model="opus", effort="high", steps=(),
+            model="opus", effort="high", steps=(), phase="working",
         )  # fmt: skip
         steps: list[RepairStep] = []
         sink = live_sink(store, live, steps, ("hunter2-secret",))

@@ -294,7 +294,7 @@ async def test_a_night_at_work_shows_its_problem_steps_and_time_and_stops(
     )
     live = LiveSession(
         problem_id="prb_1", title="browser_open: waited <n> s for <quoted>", kind="session", started_at=now - 125,
-        round=2, account="owner@example.invalid", model="opus", effort="high", steps=steps,
+        round=2, account="owner@example.invalid", model="opus", effort="high", steps=steps, phase="working",
     )  # fmt: skip
     await runtime.store.kv_set(LIVE_KEY, live.model_dump_json())
     night = _NightAtWork()
@@ -317,6 +317,10 @@ async def test_a_night_at_work_shows_its_problem_steps_and_time_and_stops(
             await expect(card.locator(".repair-step.current")).to_contain_text("Wrote roadmap/9.md", timeout=10_000)
             assert await page.evaluate(FITS)
             await page.screenshot(path=tmp_path / "repair-at-work-390.png", full_page=True)
+            # Between rounds it says what it waits on, and no step is the current one (the pre-push review).
+            await runtime.store.kv_set(LIVE_KEY, more.model_copy(update={"phase": "checks"}).model_dump_json())
+            await expect(card).to_contain_text("Waiting for the checks", timeout=10_000)
+            await expect(card.locator(".repair-step.current")).to_have_count(0)
             await card.get_by_role("button", name="Stop").click()
             await page.get_by_role("dialog").get_by_role("button", name="Stop").click()
             await expect(page.get_by_text("The night is stopped.")).to_be_visible()

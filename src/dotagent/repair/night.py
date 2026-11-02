@@ -255,6 +255,8 @@ class LiveSession(FrozenModel):
     model: str
     effort: str
     steps: tuple[RepairStep, ...]
+    # What it waits on, when Claude Code is not at work (the pre-push review): the review hook's push, the checks.
+    phase: Literal["working", "review", "checks"]
 
 
 def live_sink(store: Store, live: LiveSession, steps: list[RepairStep], known: Sequence[str]) -> StepSink:
@@ -579,6 +581,15 @@ async def _work(
     main_at: list[str] = []
     # The newest steps of the session's rounds, for the page while it works (item 939).
     steps: list[RepairStep] = []
+    # The live state of the session's newest round, which says what it waits on between rounds.
+    shown: list[LiveSession] = []
+
+    async def waiting(phase: Literal["review", "checks"]) -> None:
+        """Say on the page that the session waits on ``phase`` (its newest steps kept)."""
+        if shown:
+            await runtime.store.kv_set(
+                LIVE_KEY, shown[0].model_copy(update={"phase": phase, "steps": tuple(steps)}).model_dump_json()
+            )
 
     def ended(end: SessionEnd, note: str) -> RepairSession:
         ends.append(end)
@@ -601,7 +612,10 @@ async def _work(
             model=night.worker.model,
             effort=night.worker.effort,
             steps=tuple(steps),
+            phase="working",
         )
+        shown.clear()
+        shown.append(live)
         await runtime.store.kv_set(LIVE_KEY, live.model_dump_json())
         outcome: ClaudeOutcome = await run_claude(
             argv, folder, env, timeout_s, live_sink(runtime.store, live, steps, known)
@@ -673,6 +687,7 @@ async def _work(
                     if clock() >= deadline:
                         raise _NightOver("the night's time is spent before a push", {})
                     # Pushed from the owner's checkout, never the session's, through the hook's own review.
+                    await waiting("review")
                     review: str | None = await push_branch(night.repo, head, branch, night.env)
                     if review is not None:
                         if spent.rounds >= config.rounds:
@@ -698,6 +713,7 @@ async def _work(
                 if clock() >= deadline:
                     raise _NightOver("the night's time is spent before the checks", {})
                 minutes: int = max(1, min(config.checks_minutes, int((deadline - clock()) // 60)))
+                await waiting("checks")
                 checks: tuple[Check, ...] = await _wait_checks(night.repo, number, night.env, minutes, clock, sleep)
                 if all_passed(checks):
                     if config.merge == "ask":
@@ -863,6 +879,7 @@ async def _look(
         model=night.worker.model,
         effort=night.worker.effort,
         steps=(),
+        phase="checks",
     )
     await runtime.store.kv_set(LIVE_KEY, live.model_dump_json())
     try:
@@ -879,7 +896,8 @@ async def _look(
             lambda: min(config.session_minutes * 60.0, deadline - clock()),
             wait_checks,
             sleep,
-            live_sink(runtime.store, live, [], known),
+            # Its steps are its own session's, at work once they come.
+            live_sink(runtime.store, live.model_copy(update={"phase": "working"}), [], known),
         )
     except RepairError as error:
         log.warning("repair_look_failed", problem_id=problem.id, error=error.message, context=error.context)
