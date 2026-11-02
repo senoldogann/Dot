@@ -313,7 +313,7 @@ async def test_a_terminals_line_is_never_done_on_a_yes_given_to_its_card(room: R
 
 
 async def test_a_question_that_waits_for_the_owner_holds_no_other_run_on_its_site(room: Room) -> None:
-    """The pre-push review of item 922: a question waits as long as the owner takes now, and it was asked under its
+    """The pre-push review of item 922: a question may wait up to `approval_timeout_s`, and it was asked under its
     site's pace lock, so every other run's step on that site waited with it. It is asked outside the lock."""
     shared: SiteLocks = SiteLocks()
     asking: RunGate = _gate(room, "ask", owners_word=False, locks=shared)

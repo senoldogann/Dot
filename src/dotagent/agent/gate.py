@@ -377,7 +377,7 @@ class RunGate:
         if paced is None:
             return await self._decide(info, weighed)
         # The pace is read before the step is decided, so that the owner is not asked about a step the pace refuses,
-        # and decided outside the site's lock (item 922): a question waits as long as the owner takes, and the other
+        # and decided outside the site's lock (item 922): a question may wait up to `approval_timeout_s`, and the other
         # runs' steps on the site must not wait for it. Under the lock the pace is read again, the step spaced and
         # counted, one at a time: a pace the other runs filled meanwhile refuses it, the owner's yes notwithstanding.
         # A paced step is one of a page, which a kept send's yes never lets through (:func:`kept_send_digest`), so no

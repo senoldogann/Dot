@@ -319,8 +319,9 @@ log = get_logger(__name__)
 # What a run is told when it starts while the owner's free mode is on (item 922): its steps wait for nobody, and a field
 # of a secret is typed as in yolo; the sandbox stays as its own mode has it.
 _FREE_MODE_LINE: str = (
-    "\n\nThe owner's free mode is on: no step of yours waits for their answer, a payment, a message or a post "
-    "included; each is recorded with why it would have asked. Do what was asked, and take no way around a refusal."
+    "\n\nThe owner's free mode is on, as it stands when this run started: no step of yours waits for their answer, "
+    "a payment, a message or a post included; each is recorded with why it would have asked. Do what was asked, and "
+    "take no way around a refusal."
 )
 # The event of a run's start that found its notes or skills by their words alone (item 256).
 EMBEDDING_FAILED: str = "embedding_failed"
