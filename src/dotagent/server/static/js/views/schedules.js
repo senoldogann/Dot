@@ -9,6 +9,7 @@
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
 import { mountBrief } from "../briefcard.js";
+import { mountCheckin } from "../checkincard.js";
 import { mountInitiative } from "../initiativecard.js";
 import { mountWatchers } from "../watcherspanel.js";
 import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
@@ -708,6 +709,7 @@ export function mount(root, ctx) {
   const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Schedules are paused, so nothing starts until Dot starts again."));
   // The brief's card reads again whenever the list does: a switch in the list, a run's end, a failure that switched it off.
   const brief = mountBrief(ctx, () => reload());
+  const checkin = mountCheckin(() => reload());
   // The watchers (item 571), under the brief: what Dot tells you of when it happens.
   const watchers = mountWatchers();
   // Dot's own initiative (item 715), under the watchers: what Dot does for you on its own while the Mac is idle.
@@ -790,6 +792,7 @@ export function mount(root, ctx) {
       views = fresh;
       paint();
       attempt(brief.reload);
+      attempt(checkin.reload);
       attempt(initiative.reload);
     } catch (error) {
       if (disposed || mine !== ticket) {
@@ -883,6 +886,7 @@ export function mount(root, ctx) {
       holder,
     ),
     brief.element,
+    checkin.element,
     watchers.element,
     initiative.element,
     zoneList(),
@@ -898,6 +902,7 @@ export function mount(root, ctx) {
     disposed = true;
     stopCut();
     brief.dispose();
+    checkin.dispose();
     watchers.dispose();
     initiative.dispose();
     stopLifecycle();

@@ -33,6 +33,7 @@ from dotagent.plugins import scout_service
 from dotagent.plugins.scout import ScoutStopped
 from dotagent.plugins.scout_types import ScoutState
 from dotagent.proactive.brief import BriefFiring, is_brief, prepare, tell_brief
+from dotagent.proactive.checkin import is_checkin, prepare_checkin, tell_checkin
 from dotagent.proactive.initiative import Initiative
 from dotagent.repair.github import command
 from dotagent.repair.night import NIGHT_KEY, repair_night
@@ -885,6 +886,9 @@ class Scheduler:
         ``digest`` and the ``title`` it was given."""
         briefing: BriefFiring | None = await prepare(self._runtime, record, now, zone)
         if briefing is None:
+            # The evening check-in (item 930) fires as the brief does, with a record of the day.
+            briefing = await prepare_checkin(self._runtime, record, now, zone)
+        if briefing is None:
             return record, digest, title
         return briefing.record, briefing.context, briefing.title
 
@@ -1033,6 +1037,9 @@ class Scheduler:
         if finished.status == "done" and await is_brief(self._runtime.store, schedule_id):
             # The brief is told in its own words, its first line, and opens in its chat (item 570).
             await tell_brief(self._runtime.bus, finished)
+            return
+        if finished.status == "done" and await is_checkin(self._runtime.store, schedule_id):
+            await tell_checkin(self._runtime.bus, finished)
             return
         told: ScheduleRunEnded = ScheduleRunEnded(
             schedule_id=schedule_id, run_id=finished.id, status=finished.status, result=finished.result

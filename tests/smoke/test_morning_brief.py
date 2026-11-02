@@ -1038,3 +1038,76 @@ async def test_the_brief_names_a_goal_started_again_and_failing_and_takes_its_ru
     assert f'- "Solve the hiring CTF": 2 chats, 2 runs, 2 failed, {share} of the week\'s tokens' in context
     assert newest.id in firing.context.run_ids
     assert '"Check the client mail": 2 chats' not in context
+
+
+async def test_the_evening_check_in_tells_the_day_done_and_the_next_step_in_its_own_chat(
+    runtime: Runtime, manager: RunManager, scheduler: Scheduler, client: httpx.AsyncClient, told: Told
+) -> None:
+    """Item 930, the brief's twin: its card makes a read-only schedule of its own; its firing reads what got done since
+    the morning, in a fence, before a goal of its own; it ends told in its own words, in a chat of its own."""
+    for record in await runtime.store.list_schedules():
+        await runtime.store.delete_schedule(record.id)
+    # A run of the owner's day that ended done, whose goal the check-in names.
+    WRITER.succeed = True
+    WRITER.answer = "Fixed the invoice export."
+    done: RunRecord = await manager.start(
+        "Fix the invoice export", "task", OPUS, None, "ui", None, None, "standard", None, "yolo", False, ()
+    )
+    await _until_over(manager, scheduler, done.id)
+    answer: httpx.Response = await client.put("/api/checkin", json={"enabled": True, "time": "18:00", "days": "every"})
+    assert answer.status_code == 200, answer.text
+    view: JsonObject = answer.json()
+    assert view["enabled"] is True and view["time"] == "18:00" and isinstance(view["schedule_id"], str)
+    record: ScheduleRecord = await runtime.store.get_schedule(str(view["schedule_id"]))
+    assert (record.mode, record.cron, record.name) == ("research", "0 18 * * *", "Evening check-in")
+    assert not await is_brief(runtime.store, record.id)
+    WRITER.answer = "Tomorrow: send the invoice export to the accountant first.\nDone today: the invoice export."
+    assert record.next_run_at is not None
+    await scheduler.tick(record.next_run_at + 1)
+    run: RunRecord = await _until_over(manager, scheduler, scheduler._in_flight[record.id])
+    assert (run.mode, run.status) == ("research", "done") and run.goal.startswith("Write my evening check-in for ")
+    opening: str = WRITER.first_message()
+    assert "evening check-in" in opening and "Done today" in opening and '"Fix the invoice export"' in opening
+    assert opening.index("<dot_state>") < opening.index("Write my evening check-in for ")
+    thread = await runtime.store.get_thread(run.thread_id)
+    assert thread.title == "Evening check-in"
+    assert [data["title"] for data in told.owner] == ["Your evening check-in"]
+    assert told.owner[0]["text"] == "Tomorrow: send the invoice export to the accountant first."
+    # Switched off, its schedule is.
+    off: httpx.Response = await client.put("/api/checkin", json={"enabled": False, "time": "18:00", "days": "every"})
+    assert off.json()["enabled"] is False
+
+
+async def test_the_evening_check_in_card_switches_it_on_at_its_time_on_a_desktop_and_a_phone(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 930: the card is one line under the brief's, its time and its switch; switching it on makes its schedule."""
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, height in ((1280, 900), (390, 844)):
+                await _no_schedules(runtime)
+                await client.put("/api/checkin", json={"enabled": False, "time": "18:00", "days": "every"})
+                phone: bool = width < 720
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height}, is_mobile=phone, has_touch=phone
+                )
+                await page.goto(ui_url("127.0.0.1", port, TOKEN))
+                await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+                card: Locator = page.locator("[data-checkin]")
+                await expect(card.get_by_role("heading", name="Evening check-in")).to_be_visible()
+                switch: Locator = card.get_by_role("switch", name="Evening check-in on")
+                await expect(switch).to_have_attribute("aria-checked", "false")
+                await card.get_by_label("Check-in at").fill("19:30")
+                await switch.click()
+                await expect(switch).to_have_attribute("aria-checked", "true")
+                await expect(card.locator(".brief-summary")).to_contain_text("Every day at 19:30")
+                view: JsonObject = (await client.get("/api/checkin")).json()
+                assert view["enabled"] is True and view["time"] == "19:30"
+                assert await card.evaluate("(node) => node.getBoundingClientRect().right <= window.innerWidth + 1")
+                await page.screenshot(path=tmp_path / f"checkin-{width}.png")
+                await page.close()
+        finally:
+            await browser.close()
