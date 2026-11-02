@@ -2764,6 +2764,12 @@
     min-height: 0;
     padding-block: 0;
   }
+
+  /* A folded note's words are what a finger opens it by (item 937): a note of one line is a line of 26 px, under the
+     32 px a tap takes (item 401). */
+  .note-head {
+    min-height: 32px;
+  }
 }
 
 .note-when {
