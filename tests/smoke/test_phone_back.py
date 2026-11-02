@@ -35,7 +35,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import RunRecord
+from dotagent.store.models import RunRecord, ThreadRecord
 
 # How long the sidebar may take to slide in on a busy runner (item 540).
 _SLIDES_IN_MS: int = 15_000
@@ -262,14 +262,21 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     phone: Page = await phone_context.new_page()
                     await phone.goto(ui_url("127.0.0.1", port, TOKEN))
                     await _phone_walk(phone, address, ended)
-                    # A delegated run's page goes Back to the run that started it (item 401).
+                    # A delegated run's page goes Back to the run that started it (item 401): one at work in the
+                    # chat of its own (item 941: a run that has ended delegates nothing), so that the walk below still
+                    # finds the first chat with no run at work.
+                    planning: ThreadRecord = await runtime.store.create_thread("Plan the trip", "ui")
+                    asker: RunRecord = await runtime.store.create_run(
+                        planning.id, "Plan the trip", "chat", SCRIPTED_MODEL, None, "ui", "medium", "standard",
+                        None, "yolo", False, None, None, None,
+                    )  # fmt: skip
                     child: RunRecord = await manager.start(
                         "Check the fares",
                         "chat",
                         SCRIPTED_MODEL,
-                        ended.thread_id,
+                        planning.id,
                         "ui",
-                        ended.id,
+                        asker.id,
                         None,
                         "standard",
                         None,
@@ -282,7 +289,7 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     await phone.goto(f"{address}/#/runs/{child.id}")
                     await expect(phone.locator(".stagebar-left button")).to_have_attribute("aria-label", "Back")
                     await phone.locator(".stagebar-left button").click()
-                    await expect(phone).to_have_url(f"{address}/#/runs/{ended.id}")
+                    await expect(phone).to_have_url(f"{address}/#/runs/{asker.id}")
                     await phone.goto(f"{address}/#/runs/{ended.id}")
                     await phone.screenshot(path=str(tmp_path / "back-phone.png"))
                     follow_up: Page = await phone_context.new_page()
