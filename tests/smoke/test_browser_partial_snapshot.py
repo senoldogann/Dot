@@ -78,7 +78,8 @@ async def test_a_whole_snapshot_that_really_times_out_still_gives_a_part(page: P
     started: float = time.monotonic()
     await page.aria_snapshot(mode="ai", boxes=True, timeout=120_000)
     whole_ms: int = round((time.monotonic() - started) * 1000)
-    # A third of the time the whole takes: it times out for real, and the page stays busy up to twice as long again.
-    read = await capture_page(page, whole_ms // 3, True)
+    # Half the time the whole takes: it times out for real, and the page stays busy as long again, inside the twice its
+    # time the part waits (a third was the bound itself, which a slow runner missed: #756's CI, 2026-11-02).
+    read = await capture_page(page, whole_ms // 2, True)
     assert read.partial.startswith("Partial view: the page was too heavy to read whole")
     assert "Row" in render_lines(read.lines)
