@@ -24,7 +24,6 @@ const SEARCH_LIMIT = 30;
 const SEARCH_MOST = 50;
 const SEARCH_DELAY_MS = 250;
 const STRONG_MATCH = 0.75;
-const PREVIEW_CHARS = 420;
 const QUOTE_CHARS = 160;
 
 // What the notes can be narrowed to, by what each carries: its tags and whether the run that saved it had read outside
@@ -64,23 +63,6 @@ function parseTags(text) {
 /** `text` as text nodes, with what stands between backticks in code type: nodes to put in an element, never markup. */
 export function codeText(text) {
   return text.split(/`([^`\n]+)`/).map((part, index) => (index % 2 === 1 ? el("code", { class: "mono" }, part) : part));
-}
-
-/** The words of a note; a long note shows its beginning, with a button to read the rest. */
-function noteText(text) {
-  const preview = `${text.slice(0, PREVIEW_CHARS)}…`;
-  if (text.length <= PREVIEW_CHARS) {
-    return el("div", { class: "note-text" }, codeText(text));
-  }
-  let expanded = false;
-  const body = el("div", { class: "note-text" }, codeText(preview));
-  const toggle = el("button", { class: "note-fold", type: "button" }, "Show more");
-  toggle.addEventListener("click", () => {
-    expanded = !expanded;
-    body.replaceChildren(...codeText(expanded ? text : preview));
-    toggle.textContent = expanded ? "Show less" : "Show more";
-  });
-  return el("div", null, body, toggle);
 }
 
 /** How the runs a note was handed to ended: "Handed to 5 runs, 4 done"; nothing until a run was handed it. */
@@ -155,11 +137,21 @@ function mergedBadge(record) {
       );
 }
 
+// The tags a folded note shows; the rest are counted (item 937).
+const FOLDED_TAGS = 2;
+
+/** The tags of a folded note: the first few, and how many more (item 937). */
+function foldedTags(tags, most) {
+  const shown = tags.slice(0, most).map((tag) => el("span", { class: "chip" }, tag));
+  return tags.length > most ? [...shown, el("span", { class: "chip note-more-tags", title: tags.slice(most).join(", ") }, `+${tags.length - most}`)] : shown;
+}
+
 /**
  * One note with its tags, its age, who wrote it and its "…" to pin, correct or forget it (and to take back the merge that
  * made it). `similarity` is null unless the row is a search hit; `rested` is since when the note rests, when it does by a
- * date; `actions` is `{ forget(record), edit(record), pin(record), unmerge(record) }`, `edit` opening the dialog that
- * corrects the note (item 615).
+ * date; `actions` is `{ forget(record), edit(record), pin(record), unmerge(record), fold }`, `edit` opening the dialog that
+ * corrects the note (item 615), `fold` `{ isOpen(id), toggle(id) }` (item 937): a note is folded to its first two lines,
+ * a few tags and its age until it is opened.
  */
 function memoryRow({ record, similarity, score, rested }, actions) {
   const row = el("div", { class: "note-row", dataset: { memory: record.id } });
@@ -179,46 +171,99 @@ function memoryRow({ record, similarity, score, rested }, actions) {
     similarity === null
       ? null
       : el("span", { class: `badge ${similarity >= STRONG_MATCH ? "b-ok" : "b-muted"}` }, `${Math.round(similarity * 100)}% match`);
+  /** The badges of a note, folded or open: its match, its pin, a run's wish that it go everywhere, its merge and its taint. */
+  const badges = () => [
+    match,
+    pinned ? el("span", { class: "badge b-muted", title: "A pinned note never rests." }, icon("pin"), "Pinned") : null,
+    // A run's core note goes to every run only once the owner pins it; till then it goes where it fits (item 613).
+    !pinned && record.source_run !== null && record.tags.includes("core")
+      ? el(
+          "span",
+          {
+            class: "badge b-muted note-asks",
+            title: "A task asked that this note go to every task. Pin it and it does; until then it goes to the tasks it fits.",
+          },
+          "Always, once pinned",
+        )
+      : null,
+    mergedBadge(record),
+    record.tainted
+      ? el("span", { class: "badge b-warn", title: "The task that saved it had read content other people can write." }, icon("alert"), "From outside content")
+      : null,
+  ];
+  /** The button that opens or folds the note, its words saying which. */
+  function toggle(open) {
+    return el(
+      "button",
+      {
+        class: "note-toggle",
+        type: "button",
+        "aria-expanded": String(open),
+        "aria-label": open ? "Fold the note" : "Open the note",
+        onclick: () => {
+          actions.fold.toggle(record.id);
+          paintRow();
+        },
+      },
+      icon("chevron"),
+    );
+  }
+  function showFolded() {
+    row.classList.add("note-folded");
+    row.replaceChildren(
+      el(
+        "div",
+        { class: "note-main" },
+        el(
+          "button",
+          {
+            class: "note-head",
+            type: "button",
+            onclick: () => {
+              actions.fold.toggle(record.id);
+              paintRow();
+            },
+          },
+          el("span", { class: "note-text note-clamp" }, codeText(record.content)),
+        ),
+        el(
+          "div",
+          { class: "note-meta" },
+          foldedTags(record.tags, FOLDED_TAGS),
+          badges(),
+          el("span", { class: "note-age", title: dateTimeFull(record.created_at) }, ago(record.created_at)),
+        ),
+      ),
+      el("div", { class: "note-actions" }, toggle(false), more),
+    );
+  }
+  function paintRow() {
+    if (actions.fold.isOpen(record.id)) {
+      showNote();
+    } else {
+      showFolded();
+    }
+  }
   function showNote() {
+    row.classList.remove("note-folded");
     const [whose, used] = usedLine(record);
     row.replaceChildren(
       el(
         "div",
         { class: "note-main" },
-        noteText(record.content),
+        el("div", { class: "note-text" }, codeText(record.content)),
         el(
           "div",
           { class: "note-meta" },
           record.tags.map((tag) => el("span", { class: "chip" }, tag)),
-          match,
-          pinned ? el("span", { class: "badge b-muted", title: "A pinned note never rests." }, icon("pin"), "Pinned") : null,
-          // A run's core note goes to every run only once the owner pins it; till then it goes where it fits (item 613).
-          !pinned && record.source_run !== null && record.tags.includes("core")
-            ? el(
-                "span",
-                {
-                  class: "badge b-muted note-asks",
-                  title: "A task asked that this note go to every task. Pin it and it does; until then it goes to the tasks it fits.",
-                },
-                "Always, once pinned",
-              )
-            : null,
-          mergedBadge(record),
-          record.tainted
-            ? el(
-                "span",
-                { class: "badge b-warn", title: "The task that saved it had read content other people can write." },
-                icon("alert"),
-                "From outside content",
-              )
-            : null,
+          badges(),
           el("span", { class: "note-when" }, ...joined([whose, savedLine(record), restedLine(rested), ...lifespan(record), used, scoreLine(score)])),
         ),
       ),
-      el("div", { class: "note-actions" }, more),
+      el("div", { class: "note-actions" }, toggle(true), more),
     );
   }
-  showNote();
+  paintRow();
   return row;
 }
 
@@ -606,12 +651,32 @@ export function mount(root, ctx) {
     });
   }
 
+  // Which notes are open (item 937): folded until opened, all of them while "Open all" holds, but those folded since.
+  let allOpen = false;
+  const flipped = new Set();
+  const expandAll = el("button", { class: "btn ghost sm note-expand", type: "button", "aria-pressed": "false" }, "Open all");
   const rowActions = {
     forget: (record) => attempt(() => forgetNote(record)),
     edit: (record) => openEdit(record),
     pin: (record) => attempt(() => pinNote(record)),
     unmerge: (record) => attempt(() => unmergeNote(record)),
+    fold: {
+      isOpen: (id) => allOpen !== flipped.has(id),
+      toggle: (id) => {
+        if (!flipped.delete(id)) {
+          flipped.add(id);
+        }
+      },
+    },
   };
+  expandAll.addEventListener("click", () => {
+    allOpen = !allOpen;
+    flipped.clear();
+    expandAll.textContent = allOpen ? "Fold all" : "Open all";
+    expandAll.setAttribute("aria-pressed", String(allOpen));
+    rowsShown = new Map();
+    paint();
+  });
 
   // True while a note is being saved: Enter does not look at the disabled button, so a second press is refused here,
   // or one note would be kept twice.
@@ -788,7 +853,7 @@ export function mount(root, ctx) {
   const notesSection = setSection({
     title: ["Notes", count],
     actions: el("div", { class: "note-tools" }, narrowing.element, el("label", { class: "note-search" }, icon("search"), search)),
-    body: el("div", { class: "set-card note-card" }, orderBox.element, holder, foot),
+    body: el("div", { class: "set-card note-card" }, el("div", { class: "note-bar" }, expandAll, orderBox.element), holder, foot),
   });
   notesSection.classList.add("notes-section");
   const ownerSection = setSection({

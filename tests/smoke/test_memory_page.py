@@ -5,6 +5,7 @@ shown, and a search narrows within a choice; an empty memory, and a choice with 
 model is used: the notes are kept and found by their words."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -144,6 +145,8 @@ async def test_a_note_is_kept_with_its_tags_from_the_card_at_the_head(
         row: Locator = page.locator("[data-memory]")
         await expect(row).to_have_count(1)
         await expect(row.locator(".chip")).to_have_text(["work", "mac"])
+        # A note is folded to its first lines (item 937): its whole record shows once it is opened.
+        await page.get_by_role("button", name="Open all").click()
         await expect(row.locator(".note-when")).to_have_text("Saved just now by you · not used yet")
         await expect(row.locator(".badge")).to_have_count(0)
         # The same words again, with the key of the card, stay one note.
@@ -397,3 +400,38 @@ async def test_a_runs_core_note_no_one_pinned_says_it_stands_once_pinned(
         await expect(page.locator(".note-asks")).to_have_count(1)
     finally:
         await page.close()
+
+
+async def test_a_note_is_folded_to_its_first_lines_and_opens_alone_or_with_all(
+    browser: Browser, address: str, runtime: Runtime
+) -> None:
+    """Item 937: on the owner's Mac 301 notes made the page eleven screens long on a phone. A note shows its first two
+    lines, two of its tags and how many more, its badges and its age; a press opens it whole with who saved it and how
+    it was used, and Open all opens every note until a press folds one again."""
+    long: str = "The zyxwv invoices live in ~/Documents/Invoices. " * 12
+    note = await runtime.store.add_memory(long, ("zyxwv", "invoices", "work", "money"), None, None, None, False)
+    page: Page = await _open(browser, address, 390)
+    try:
+        await page.get_by_role("searchbox", name="Search notes").fill("zyxwv")
+        row: Locator = page.locator(f'[data-memory="{note.id}"]')
+        await expect(row).to_have_class(re.compile(r"\bnote-folded\b"))
+        await expect(row.locator(".chip")).to_have_text(["zyxwv", "invoices", "+2"])
+        await expect(row.locator(".note-when")).to_have_count(0)
+        # Two lines of the words, not all of them.
+        height: float = await row.locator(".note-clamp").evaluate("(node) => node.getBoundingClientRect().height")
+        line: float = await row.locator(".note-clamp").evaluate(
+            "(node) => parseFloat(getComputedStyle(node).lineHeight)"
+        )
+        assert height <= 2 * line + 1
+        await row.get_by_role("button", name="Open the note").click()
+        await expect(row).not_to_have_class(re.compile(r"\bnote-folded\b"))
+        await expect(row.locator(".chip")).to_have_count(4)
+        await expect(row.locator(".note-when")).to_contain_text("Saved")
+        await row.get_by_role("button", name="Fold the note").click()
+        await expect(row).to_have_class(re.compile(r"\bnote-folded\b"))
+        await page.get_by_role("button", name="Open all").click()
+        await expect(row.locator(".note-when")).to_contain_text("by you")
+        await expect(page.get_by_role("button", name="Fold all")).to_have_attribute("aria-pressed", "true")
+    finally:
+        await page.close()
+        await runtime.store.delete_memory(note.id)

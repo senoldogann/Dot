@@ -263,6 +263,8 @@ async def test_a_note_is_pinned_and_a_merged_note_says_what_it_was_made_of_and_i
         await expect(row).to_have_count(1)
         await expect(row.locator(".badge", has_text="Merged from 2 notes")).to_be_visible()
         await expect(row.locator(".badge", has_text="From outside content")).to_be_visible()
+        # A note is folded to its first lines (item 937): its whole record shows once it is opened.
+        await page.get_by_role("button", name="Open all").click()
         await expect(page.locator(f"[data-memory='{one.id}']")).to_contain_text("Merged into another note")
         await expect(page.locator(f"[data-memory='{one.id}']")).to_contain_text("Resting since")
 
@@ -308,6 +310,8 @@ async def test_the_notes_are_listed_by_use_and_a_search_lists_them_by_match(
     try:
         order: Locator = page.get_by_role("combobox", name="Sort the notes by")
         await expect(order).to_have_value("changed")
+        # A note is folded to its first lines (item 937): its whole record shows once it is opened.
+        await page.get_by_role("button", name="Open all").click()
         # Each note says how often and when it was used.
         await expect(page.locator(f"[data-memory='{busy.id}'] .note-when")).to_contain_text("used 5 times, last")
         await expect(page.locator(f"[data-memory='{never.id}'] .note-when")).to_contain_text("not used yet")
