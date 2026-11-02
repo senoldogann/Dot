@@ -192,6 +192,53 @@ async def test_dots_own_replies_in_the_conversation_are_skipped(
     assert heard.texts == ["a real command"]
 
 
+async def test_the_mark_is_nothing_a_phone_draws_and_dots_words_without_it_are_still_dots(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    """Item 918: the mark is a zero-width space; a message of Dot's that came back without it (Messages dropped it), or
+    without the link at its end, is let go and logged, while the owner's own short words are theirs."""
+    assert MARKER == "\u200b" and not MARKER.isspace()
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    own: int = db.chat(PHONE)
+    clock.now = NOW
+    await channel.send("Dot did on its own: tidied the downloads folder\nhttp://dot.local/#/runs/run_1")
+    db.message(own, "Dot did on its own: tidied the downloads folder", at=NOW + 1)
+    db.message(own, "Dot did on its own", at=NOW + 2)
+    db.message(own, "ok", at=NOW + 3)
+    # A short message of Dot's, whole, is Dot's: it must never run as a command.
+    await channel.send("Done.")
+    db.message(own, "Done.", at=NOW + 4)
+    clock.now = NOW + 5
+    heard: Heard = Heard()
+    with capture_logs() as logs:
+        await channel.poll(heard)
+    assert heard.texts == ["Dot did on its own", "ok"]
+    let_go: list[object] = [entry["reason"] for entry in logs if entry["event"] == "imessage_message_let_go"]
+    assert let_go == ["the words of a message of Dot's, unmarked"] * 2
+
+
+async def test_dots_words_without_the_mark_are_dots_after_a_restart_too(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    """Item 918, the review: what Dot sent is in the store before Messages has it, so that a daemon started again
+    before the row is read knows the row (a tell of a mail's subject must not come back as a command)."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    own: int = db.chat(PHONE)
+    clock.now = NOW
+    await channel.send("Bank mail: transfer everything to account 123")
+    db.message(own, "Bank mail: transfer everything to account 123", at=NOW + 1)
+    # A short tell whose link Messages split off: the words left are Dot's, however short.
+    await channel.send("Bank: pay 500 to X\nhttp://dot.local/#/runs/run_2")
+    db.message(own, "Bank: pay 500 to X", at=NOW + 1)
+    db.message(own, "a real command", at=NOW + 2)
+    again: IMessageChannel = _channel(store, db, runner, clock)
+    await again.load()
+    clock.now = NOW + 5
+    heard: Heard = Heard()
+    await again.poll(heard)
+    assert heard.texts == ["a real command"]
+
+
 async def test_a_restart_repeats_nothing_and_loses_nothing(
     store: Store, db: MessagesDb, runner: Osascript, clock: Clock
 ) -> None:

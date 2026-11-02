@@ -19,7 +19,7 @@ from playwright.async_api import Browser, BrowserContext, Locator, Page, async_p
 
 from dotagent.agent.manager import RunManager
 from dotagent.channels import service as channels_service
-from dotagent.channels.imessage import STATE_KEY, ImessageState
+from dotagent.channels.imessage import MARKER, STATE_KEY, ImessageState
 from dotagent.channels.seen import WAL_UNSEEN, wal_path
 from dotagent.channels.service import Channels
 from dotagent.config import load_config
@@ -199,7 +199,7 @@ async def test_the_tab_stands_beside_phone_and_says_where_imessage_stands(browse
         await expect(_row(page, "Full Disk Access").locator(".badge")).to_have_text("granted")
         await expect(_row(page, "Automation for Messages").locator(".badge")).to_have_text("allowed")
         await expect(
-            card.get_by_text("Lets Dot send Dot's answers through Messages, each starting with ◆.")
+            card.get_by_text("Lets Dot send Dot's answers through Messages, each starting with an invisible mark.")
         ).to_be_visible()
         # What the channel sees of Messages' database (item 595), before it has looked, with Check now.
         seen: Locator = _row(page, "What Dot sees in Messages")
@@ -245,7 +245,7 @@ async def test_a_number_is_paired_with_the_code_typed_back_and_the_switch_turns_
     await card.get_by_role("button", name="Send a code").click()
     await expect(card.get_by_text(f"A code went to {PHONE}.")).to_be_visible()
     handle, text = served.osascript.sent[-1]
-    assert handle == PHONE and text.startswith("◆ ")
+    assert handle == PHONE and text.startswith(MARKER)
     code: str = _code_sent(served)
     entry: Locator = card.get_by_label("The code you read on your iPhone")
     await entry.fill("000000" if code != "000000" else "111111")
@@ -282,7 +282,9 @@ async def test_the_switch_of_progress_messages_says_what_a_run_tells_and_is_kept
         progress: Locator = card.get_by_role("switch", name="Progress messages")
         await expect(progress).to_have_attribute("aria-checked", "true")
         await expect(
-            card.get_by_text("While a task you started from iMessage works, Dot sends a few lines of what it is doing")
+            card.get_by_text(
+                "While a task you started from iMessage works, Dot sends a few short lines of what it is doing"
+            )
         ).to_be_visible()
         await expect(card.get_by_text("Off, or for a task that ends sooner, only the answer comes.")).to_be_visible()
         await _fits(page, f"{width} with the switch of progress")
@@ -380,7 +382,7 @@ async def test_check_now_looks_at_once_and_says_the_row_it_took_as_a_command(
         await expect(_fact(page, "Last command")).to_contain_text(f"row {wanted}, taken")
         await expect(_fact(page, "Newest message")).to_contain_text(f"row {wanted}, dated")
         await expect(_fact(page, "Read up to")).to_have_text(f"row {wanted}")
-        await _until(lambda: served.osascript.sent[-1][1].startswith("◆ No run is at work"))
+        await _until(lambda: served.osascript.sent[-1][1].startswith(f"{MARKER}No run is at work"))
         # A press that finds nothing new says what it saw.
         await seen.get_by_role("button", name="Check now").click()
         await _said(page, f"Dot looked: the newest message is row {wanted}")

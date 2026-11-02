@@ -187,7 +187,7 @@ async def test_a_failing_thing_is_tried_again_then_let_go_and_the_owner_told(log
             told: list[EventRecord] = await _told(subscription)
         dropped: TodoRecord = await runtime.store.get_todo(todo.id)
         assert (dropped.status, dropped.attempts, dropped.note) == ("dropped", 2, "The folder is still gone.")
-        assert [event.data["title"] for event in told] == ["Dot let go of a thing after 2 tries"]
+        assert [event.data["title"] for event in told] == ["Dot let go of a thing"]
 
 
 async def test_a_thing_a_tainted_run_put_on_the_list_is_done_by_a_tainted_run(login_env: dict[str, str]) -> None:
@@ -703,7 +703,7 @@ async def test_a_thing_whose_question_the_owner_skipped_is_tried_again_or_let_go
             assert told == ["Dot did on its own"]
         else:
             assert (again.status, again.attempts, again.run_id) == ("dropped", 2, asked.id)
-            assert told == ["Dot let go of a thing after 2 tries"]
+            assert told == ["Dot let go of a thing"]
             assert [run.id for run in await runtime.store.list_runs(10, None)] == [asked.id]
 
 
@@ -787,7 +787,7 @@ async def test_the_end_of_a_run_that_went_on_from_the_things_is_the_things(
             told: list[str] = [event.data["title"] for event in await _told(subscription)]
         # Let go at its last try, the owner is told; tried again, the new run ended done and they are told of that.
         expected: dict[tuple[str, int], list[str]] = {
-            ("dropped", 2): ["Dot let go of a thing after 2 tries"],
+            ("dropped", 2): ["Dot let go of a thing"],
             ("doing", 1): ["Dot did on its own"],
             ("done", 1): ["Dot did on its own"],
         }
@@ -1219,7 +1219,7 @@ async def test_a_costly_try_is_tried_again_with_what_it_found_and_a_second_lets_
         dropped: TodoRecord = await runtime.store.get_todo(todo.id)
         assert (dropped.status, dropped.attempts) == ("dropped", 2)
         assert dropped.note.startswith("A second costly try. Spent 0.0M tokens without doing it: The puzzle"), dropped
-        assert [event.data["title"] for event in told] == ["Dot let go of a thing after 2 tries"]
+        assert [event.data["title"] for event in told] == ["Dot let go of a thing"]
 
 
 async def test_a_try_is_told_how_the_one_before_ended_from_that_run_and_never_what_a_page_wrote(

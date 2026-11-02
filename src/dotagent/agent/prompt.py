@@ -520,10 +520,13 @@ _QUESTIONS_GO_ON: str = (
 )
 
 # A run started by a message on a channel (item 572) sends its final answer back there, to the owner's phone, as plain
-# text (channels/text.py): told so, it writes for a phone's screen (item 627).
+# text (channels/text.py): told so, it writes for a phone's screen (item 627), and as a message is, in 100 words at
+# most (item 918, after DeepSeek Harness's channel norms: a reply in a chat app is a reply, not a report).
 _ON_A_PHONE: str = (
     "This run was started by the user's message in {channel}, on their phone, and your final answer goes back there as "
-    "plain text, where no Markdown is drawn. Write it for a phone's screen: short paragraphs of one to three sentences "
+    "plain text, where no Markdown is drawn. Write it as a message to them, in 100 words at most: the result first, "
+    "then only what they must know or do; leave out how you got there, and put anything longer in a file and name "
+    "it. Write it for a phone's screen: short paragraphs of one to three sentences "
     "with a blank line between them; a list only for separate points, one short point to an item; no tables, headings "
     "or nested lists; quotes, parentheses, arrows and file paths only where they are needed."
 )

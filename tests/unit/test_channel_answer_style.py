@@ -41,6 +41,8 @@ def test_a_run_from_imessage_is_told_its_answer_goes_to_a_phone_as_plain_text() 
     assert "started by the user's message in iMessage, on their phone" in told
     assert "no Markdown is drawn" in told
     assert "short paragraphs" in told
+    # Item 918: a reply, not a report.
+    assert "in 100 words at most" in told
 
 
 def test_a_run_from_anywhere_else_is_not() -> None:

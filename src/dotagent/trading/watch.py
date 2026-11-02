@@ -37,24 +37,28 @@ _SETTINGS_ROUTE: str = "#/settings/trading"
 type Wake = Callable[[str, float, str], Awaitable[object]]
 
 
+# The titles of what an exit came to: one title each, which a channel says in the owner's language (item 918); the
+# product is in the line.
+HELD_TITLE: str = "An exit cannot sell yet"
+TARGET_TITLE: str = "A target was reached and sold"
+STOP_TITLE: str = "A stop was reached and sold"
+REFUSED_TITLE: str = "An exit did not sell"
+
+
 def end_words(end: ExitEnd, quote: str) -> tuple[str, str]:
     """The title and the line the owner is told of what an exit came to."""
     exit_ = end.exit
     base: str = exit_.product.split("-")[0]
     if end.held:
-        return (
-            f"Exit of {exit_.product} cannot sell yet",
-            f"It should sell now, but {end.held}. Dot tries again at each look.",
-        )
+        return (HELD_TITLE, f"{exit_.product}: it should sell now, but {end.held}. Dot tries again at each look.")
     account: str = "paper" if exit_.mode == "paper" else "your Coinbase account"
     if end.order is not None:
-        word: str = "Stop" if exit_.status == "stopped" else "Target"
         return (
-            f"{word} reached: {exit_.product} sold",
-            f"Sold {end.order.size:.8g} {base} at {end.order.price:.8g} {quote} ({end.order.notional:.2f} {quote}) on "
-            f"{account}.",
+            STOP_TITLE if exit_.status == "stopped" else TARGET_TITLE,
+            f"{exit_.product}: sold {end.order.size:.8g} {base} at {end.order.price:.8g} {quote} "
+            f"({end.order.notional:.2f} {quote}) on {account}.",
         )
-    return (f"Exit of {exit_.product} did not sell", exit_.note or "Its sell was refused.")
+    return (REFUSED_TITLE, f"{exit_.product}: {exit_.note or 'its sell was refused.'}")
 
 
 class TradingWatch:

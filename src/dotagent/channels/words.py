@@ -173,6 +173,8 @@ class Words:
     on_your_mac: str
     not_here: str
     told_more: str
+    # The titles Dot gives what it tells on its own (item 918), by their English: a title not here is said as it is.
+    titles: Mapping[str, str]
     not_sent: str
     # The cut of an answer (item 611).
     rest_in_dot: str
@@ -183,8 +185,8 @@ class Words:
     reasons: Mapping[str, str]
     # Progress (item 618).
     working_for: str
-    earlier_step: str
-    earlier_steps: str
+    # The line of a run's newest thought (item 918), set apart from the steps by a word.
+    thought: str
     seconds: str
     minutes: str
     hours: str
@@ -208,6 +210,10 @@ class Words:
         """A step of progress: the phrase ``key`` names (one of :data:`STEP_KEYS`), with ``detail`` (a host, a file's
         name, a query) where its template takes one."""
         return self.steps[key].format(detail=detail)
+
+    def title(self, english: str) -> str:
+        """The title of a tell in this language: ``english`` is the title Dot gave it."""
+        return self.titles.get(english, english)
 
     def reason(self, why: str) -> str:
         """Why a picture was left out, in this language: ``why`` is the English reason the finder gives."""
@@ -310,6 +316,7 @@ ENGLISH: Words = Words(
     on_your_mac="{where} on your Mac, not here.",
     not_here="{where}, not here: {link}",
     told_more="{title}: and {count} more",
+    titles={},
     not_sent="Dot could not send {names}. The log has why.",
     rest_in_dot="\n\n… The rest of the answer is in Dot: ",
     rest_on_mac="\n\n… The rest of the answer is in Dot on your Mac.",
@@ -317,8 +324,7 @@ ENGLISH: Words = Words(
     more="{count} more",
     reasons={},
     working_for="Working for {elapsed}:",
-    earlier_step="… {count} earlier step",
-    earlier_steps="… {count} earlier steps",
+    thought="Thought: {thought}",
     seconds="s",
     minutes="min",
     hours="h",
@@ -416,6 +422,17 @@ TURKISH: Words = Words(
     on_your_mac="{where}, Mac'inde; burada değil.",
     not_here="{where}, burada değil: {link}",
     told_more="{title}: ve {count} tane daha",
+    titles={
+        "Dot did on its own": "Kendi başıma yaptım",
+        "Dot let go of a thing you said not to do": "Yapma dediğin işi bıraktım",
+        "Dot let go of a thing": "Bir işi bıraktım",
+        "A work order needs you": "Bir iş emri seni bekliyor",
+        "Your morning brief": "Sabah özetin",
+        "An exit cannot sell yet": "Bir çıkış henüz satamıyor",
+        "A target was reached and sold": "Hedefe ulaşıldı, satıldı",
+        "A stop was reached and sold": "Zarar durdura ulaşıldı, satıldı",
+        "An exit did not sell": "Bir çıkış satamadı",
+    },
     not_sent="{names} gönderilemedi. Nedeni günlükte yazıyor.",
     rest_in_dot="\n\n… Cevabın devamı Dot'ta: ",
     rest_on_mac="\n\n… Cevabın devamı Mac'indeki Dot'ta.",
@@ -430,8 +447,7 @@ TURKISH: Words = Words(
         "it is gone": "artık yok",
     },
     working_for="Çalışıyorum ({elapsed}):",
-    earlier_step="… önceki {count} adım",
-    earlier_steps="… önceki {count} adım",
+    thought="Düşünce: {thought}",
     seconds="sn",
     minutes="dk",
     hours="sa",

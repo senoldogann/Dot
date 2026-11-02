@@ -1,12 +1,12 @@
 """What a run started from a channel shows on it while it works (item 618): the words of a step in the page's own
-terms, the first sentence of a thought, and the limits (nothing before 15 s, one every 30 s, six at most) with the time
-given by the test, never by the clock."""
+terms, the first sentence of a thought, and the limits (nothing before 15 s, one every 60 s, four at most, three steps
+to a message: item 918 made them plain for a phone) with the time given by the test, never by the clock."""
 
 import pytest
 
 from dotagent.channels.progress import (
     APART_S,
-    COMMAND_CHARS,
+    DETAIL_CHARS,
     FIRST_AFTER_S,
     MAX_LINES,
     MAX_MESSAGES,
@@ -20,23 +20,19 @@ from dotagent.channels.progress import (
 
 
 def test_the_limits_are_the_ones_the_owner_was_promised() -> None:
-    assert (FIRST_AFTER_S, APART_S, MAX_MESSAGES, COMMAND_CHARS, THOUGHT_CHARS) == (15.0, 30.0, 6, 60, 160)
+    limits = (FIRST_AFTER_S, APART_S, MAX_MESSAGES, MAX_LINES, DETAIL_CHARS, THOUGHT_CHARS)
+    assert limits == (15.0, 60.0, 4, 3, 60, 160)
 
 
 @pytest.mark.parametrize(
     ("tool", "args", "expected"),
     [
-        ("shell", {"command": "ls -la ~/Desktop"}, "$ ls -la ~/Desktop"),
-        (
-            "shell",
-            {"command": "python - <<'EOF'\nprint(1)\n  print(2)\nEOF"},
-            "$ python - <<'EOF' print(1) print(2) EOF",
-        ),
-        ("shell", {"command": "x" * 100}, "$ " + "x" * 59 + "…"),
+        ("shell", {"command": "ls -la ~/Desktop"}, "ran a command"),
+        ("shell", {"command": "python - <<'EOF'\nprint(1)\n  print(2)\nEOF"}, "ran a command"),
         ("shell", {"command": ""}, "ran a command"),
         ("shell", {"command": ["not", "text"]}, "ran a command"),
-        ("terminal_open", {"command": "python3 -i"}, "$ python3 -i"),
-        ("terminal_send", {"session": "t1", "text": "print(1)\n"}, "$ print(1)"),
+        ("terminal_open", {"command": "python3 -i"}, "ran a command"),
+        ("terminal_send", {"session": "t1", "text": "print(1)\n"}, "ran a command"),
         ("read_file", {"path": "/Users/me/Documents/notes.txt"}, "read notes.txt"),
         ("write_file", {"path": "report.md", "content": "a secret body"}, "wrote report.md"),
         ("edit_file", {"path": "/tmp/a/b/main.py", "old": "x", "new": "y"}, "edited main.py"),
@@ -172,20 +168,20 @@ def test_a_run_that_does_its_first_thing_late_sends_at_once_and_says_how_long_it
     assert progress.message(42.0) == "Working for 42 s:\nused the desktop"
 
 
-def test_the_next_message_is_due_thirty_seconds_after_the_last_and_only_when_there_is_something_new() -> None:
+def test_the_next_message_is_due_a_minute_after_the_last_and_only_when_there_is_something_new() -> None:
     progress: Progress = Progress(started=0.0)
     progress.step("$ one")
     assert progress.message(15.0) == "Working for 15 s:\n$ one"
     assert progress.due_at() is None and progress.message(500.0) is None
     progress.step("$ two")
-    assert progress.due_at() == 45.0
-    assert progress.message(44.0) is None
-    assert progress.message(50.0) == "Working for 50 s:\n$ two"
+    assert progress.due_at() == 75.0
+    assert progress.message(74.0) is None
+    assert progress.message(80.0) == "Working for 1 min 20 s:\n$ two"
     progress.step("$ three")
-    assert progress.due_at() == 80.0
+    assert progress.due_at() == 140.0
 
 
-def test_a_run_sends_six_messages_at_most_and_then_nothing_whatever_it_does() -> None:
+def test_a_run_sends_four_messages_at_most_and_then_nothing_whatever_it_does() -> None:
     progress: Progress = Progress(started=0.0)
     times: list[float] = []
     now: float = 0.0
@@ -198,8 +194,8 @@ def test_a_run_sends_six_messages_at_most_and_then_nothing_whatever_it_does() ->
         sent: str | None = progress.message(now)
         assert sent is not None
         times.append(now)
-    assert progress.sent == MAX_MESSAGES == len(times) == 6
-    assert times == [15.0, 45.0, 75.0, 105.0, 135.0, 165.0]
+    assert progress.sent == MAX_MESSAGES == len(times) == 4
+    assert times == [15.0, 75.0, 135.0, 195.0]
     progress.step("$ one more")
     assert progress.due_at() is None and progress.message(10_000.0) is None
 
@@ -208,37 +204,27 @@ def test_a_message_tells_only_what_came_after_the_one_before() -> None:
     progress: Progress = Progress(started=0.0)
     progress.step("$ first")
     progress.thought("I will start.")
-    assert progress.message(15.0) == "Working for 15 s:\n$ first\n💭 I will start."
+    assert progress.message(15.0) == "Working for 15 s:\n$ first\nThought: I will start."
     progress.step("$ second")
-    assert progress.message(60.0) == "Working for 1 min:\n$ second"
+    assert progress.message(75.0) == "Working for 1 min 15 s:\n$ second"
 
 
 def test_the_same_thing_again_straight_after_is_counted_not_repeated() -> None:
     progress: Progress = Progress(started=0.0)
-    for words in ("used the desktop", "used the desktop", "used the desktop", "$ ls", "used the desktop"):
+    for words in ("used the desktop", "used the desktop", "used the desktop", "ran a command", "used the desktop"):
         progress.step(words)
-    assert progress.message(20.0) == "Working for 20 s:\nused the desktop ×3\n$ ls\nused the desktop"
+    assert progress.message(20.0) == "Working for 20 s:\nused the desktop ×3\nran a command\nused the desktop"
 
 
-def test_a_message_holds_the_newest_lines_and_counts_the_earlier_steps() -> None:
-    progress: Progress = Progress(started=0.0)
-    for number in range(MAX_LINES + 5):
-        progress.step(f"$ step {number}")
-    lines: list[str] = (progress.message(20.0) or "").splitlines()
-    assert lines[0] == "Working for 20 s:" and lines[1] == "… 5 earlier steps"
-    assert lines[2:] == [f"$ step {number}" for number in range(5, MAX_LINES + 5)]
-    progress.step("$ a")
-    progress.step("$ b")
-    progress.step("$ b")
-    assert (progress.message(60.0) or "").splitlines() == ["Working for 1 min:", "$ a", "$ b ×2"]
-
-
-def test_the_steps_kept_for_one_message_are_bounded_and_the_ones_let_go_are_counted() -> None:
+def test_a_message_holds_the_newest_steps_alone() -> None:
     progress: Progress = Progress(started=0.0)
     for number in range(1000):
-        progress.step(f"$ step {number}")
-    lines: list[str] = (progress.message(20.0) or "").splitlines()
-    assert lines[1] == "… 992 earlier steps" and lines[-1] == "$ step 999" and len(lines) == MAX_LINES + 2
+        progress.step(f"step {number}")
+    assert (progress.message(20.0) or "").splitlines() == ["Working for 20 s:", "step 997", "step 998", "step 999"]
+    progress.step("a")
+    progress.step("b")
+    progress.step("b")
+    assert (progress.message(80.0) or "").splitlines() == ["Working for 1 min 20 s:", "a", "b ×2"]
 
 
 def test_a_thought_is_the_last_line_the_newest_one_and_is_not_told_twice() -> None:
@@ -247,13 +233,13 @@ def test_a_thought_is_the_last_line_the_newest_one_and_is_not_told_twice() -> No
     progress.step("$ ls")
     progress.thought("The newest thought.")
     progress.thought("")
-    assert progress.message(20.0) == "Working for 20 s:\n$ ls\n💭 The newest thought."
+    assert progress.message(20.0) == "Working for 20 s:\n$ ls\nThought: The newest thought."
     # Nothing new: the same thought alone is no reason to speak.
     progress.thought("The newest thought.")
     assert progress.due_at() is None
     progress.thought("A thought and nothing else.")
-    assert progress.due_at() == 50.0
-    assert progress.message(50.0) == "Working for 50 s:\n💭 A thought and nothing else."
+    assert progress.due_at() == 80.0
+    assert progress.message(80.0) == "Working for 1 min 20 s:\nThought: A thought and nothing else."
 
 
 def test_the_limits_can_be_given_other_values() -> None:

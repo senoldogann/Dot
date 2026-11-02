@@ -9,7 +9,7 @@ needs no token or secret of its own. Only the conversations with the handles the
 chats (never a group), rows that Messages marks as sent by the owner over iMessage (never SMS, which is not tied to an
 Apple ID) or received from the handle the chat is named for, and not the reactions to a message. The database is opened
 read-only (Full Disk Access for the program that runs Dot), and Dot's own replies, which land in the same chat as the
-owner's, each start with :data:`MARKER` and are skipped.
+owner's, each start with :data:`MARKER`, a zero-width space, and are skipped.
 
 A row received is judged as a row sent is. A run of Dot sends through this Mac's Messages as the Mac's account, which
 writes rows ``is_from_me = 1``; but that Messages never keeps a received copy of what a run sends to the owner's own
@@ -69,8 +69,32 @@ from dotagent.store.db import Store
 log = get_logger(__name__)
 
 # What starts each of Dot's own messages in the conversation: its rows are the owner's by their flag, and this is what
-# tells them apart.
-MARKER: str = "◆ "
+# tells them apart. It is a zero-width space (item 918), which a phone draws as nothing and its keyboard does not type:
+# the owner read the diamond it was before as clutter at the head of every message.
+MARKER: str = "\u200b"
+# The mark Dot's messages started with before item 918: a row of then that is read again (a cursor brought down to a
+# rebuilt database) is Dot's own still.
+OLD_MARKER: str = "◆"
+# A row that is the start of a message Dot sent a moment before is Dot's own when it is at least this long (item 918).
+_SAME_WORDS_LEAST: int = 20
+# The key of the kv table that holds what Dot sent lately (item 918), so that a row of Dot's words read after a restart
+# is known as Dot's as well as one read before it.
+SENT_KEY: str = "imessage.sent"
+
+
+class SentWords(FrozenModel):
+    """A message Dot handed to Messages: when, and its words without the mark."""
+
+    at: float
+    text: str
+
+
+class SentLog(FrozenModel):
+    """The messages Dot sent lately, the oldest first, as the kv table keeps them."""
+
+    sent: tuple[SentWords, ...]
+
+
 # How long a file a message brought, which Messages is still bringing down from iCloud, is waited for, and how often it
 # is looked at meanwhile (item 806).
 FILES_WAIT_S: float = 15.0
@@ -265,6 +289,25 @@ def link_form(words: str | None) -> str | None:
         return None
     bare: str = _SCHEME.sub("", found, count=1).rstrip("/").casefold()
     return bare if _BARE_HOST.fullmatch(bare) is not None else None
+
+
+def marked(text: str) -> bool:
+    """Whether ``text`` starts with the mark of Dot's own messages, the one of now or the one of before item 918."""
+    head: str = text.lstrip()
+    return head.startswith(MARKER) or head.startswith(OLD_MARKER)
+
+
+def same_words(row_text: str, sent: str) -> bool:
+    """Whether a row's words are the words of a message Dot sent, its white space aside: the whole of them, or the
+    whole but its last word, however short (Messages may show the link or the host at the end of a message as a row of
+    its own, and a tell ends with its link), or a start of them of at least :data:`_SAME_WORDS_LEAST` characters. A
+    short message of Dot's must never run as a command, so the owner's ``Done.`` typed in the minute after Dot said it
+    is let go with it."""
+    said: str = " ".join(row_text.split())
+    whole: str = " ".join(sent.split())
+    if said in (whole, whole.rsplit(" ", 1)[0]):
+        return True
+    return len(said) >= _SAME_WORDS_LEAST and whole.startswith(said)
 
 
 def _dated_near(row: Row, at: float, after_s: float) -> bool:
@@ -569,6 +612,8 @@ class IMessageChannel:
         # What the channel sees of the database (item 595), and the one look or poll at a time that adds to it.
         self._watch: Watch = Watch()
         self._polling: asyncio.Lock = asyncio.Lock()
+        # One send at a time writes what Dot sent in the store, so that an older list never takes a newer one's place.
+        self._keeping: asyncio.Lock = asyncio.Lock()
         self.problem: str | None = None
         self.needs: Needs | None = None
 
@@ -579,6 +624,9 @@ class IMessageChannel:
         self._state = ImessageState() if kept is None else ImessageState.model_validate_json(kept)
         command: str | None = await self._store.kv_get(COMMAND_KEY)
         self._watch.command = None if command is None else SeenCommand.model_validate_json(command)
+        sent: str | None = await self._store.kv_get(SENT_KEY)
+        if sent is not None:
+            self._sent.extend((words.at, words.text) for words in SentLog.model_validate_json(sent).sent)
         if self._staging is not None:
             await asyncio.to_thread(self._staging.sweep_old, self._clock())
 
@@ -715,7 +763,7 @@ class IMessageChannel:
         same chat, by the same author (words this Mac sent and a link that came from the iPhone are two messages), and
         soon after."""
         said: str | None = words.text
-        if said is None or said == "" or said.lstrip().startswith(MARKER.strip()):
+        if said is None or said == "" or marked(said):
             return False
         if words.balloon is not None or only_a_link(said) is not None or is_stop(said):
             return False
@@ -748,6 +796,15 @@ class IMessageChannel:
             form in _SCHEME.sub("", said.casefold()) and _dated_near(row, at, OWN_PREVIEW_S) for at, said in self._sent
         )
 
+    def _dots_own_words(self, row: Row) -> bool:
+        """Whether ``row`` is words of a message Dot sent from just before the row's date to :data:`OWN_LINK_S` after,
+        with no mark (:func:`same_words`). The mark is how Dot's messages are told; this holds should a Messages ever
+        drop a zero-width space from what it keeps (item 918)."""
+        said: str | None = row.text
+        if not said:
+            return False
+        return any(same_words(said, sent) and _dated_near(row, at, OWN_LINK_S) for at, sent in self._sent)
+
     def _dots_own_picture(self, row: Row) -> bool:
         """Whether ``row`` is a picture Dot sent (item 617). A picture is a message of its own with no words and no
         marker, flagged as the owner's like any row, so Dot's is told from a picture the owner sent by when it was
@@ -778,7 +835,12 @@ class IMessageChannel:
             # A link preview whose link cannot be read has nothing to run, and is no attachment to tell the owner of.
             log.info("imessage_message_let_go", rowid=row.rowid, reason="a link preview with no link")
             return
-        if row.text is not None and row.text.lstrip().startswith(MARKER.strip()):
+        if row.text is not None and marked(row.text):
+            return
+        if self._dots_own_words(row):
+            # The mark was lost on the way (Messages kept no zero-width space): the row is still Dot's, and the log
+            # says so, since every message of Dot's read later, after a restart, would then be a command.
+            log.warning("imessage_message_let_go", rowid=row.rowid, reason="the words of a message of Dot's, unmarked")
             return
         if self._dots_own_picture(row):
             log.info("imessage_message_let_go", rowid=row.rowid, reason="a picture of Dot's own")
@@ -981,8 +1043,17 @@ class IMessageChannel:
 
     async def _send_to(self, handle: str, text: str) -> None:
         """Hand ``text``, after the marker, to Messages' iMessage service for ``handle``. The message is kept in mind
-        for a while, for the links in it that Messages may show as rows of their own (:meth:`_dots_own_link`)."""
-        self._sent.append((self._clock(), text))
+        for a while, for the links in it that Messages may show as rows of their own (:meth:`_dots_own_link`) and for
+        its words should they come back without the mark (:meth:`_dots_own_words`); it is written in the store before
+        Messages has it, so that a daemon started again in between knows it too (item 918)."""
+        async with self._keeping:
+            self._sent.append((self._clock(), text))
+            kept: SentLog = SentLog(sent=tuple(SentWords(at=at, text=said) for at, said in self._sent))
+            await self._store.kv_set(SENT_KEY, kept.model_dump_json())
+        await self._hand(handle, text)
+
+    async def _hand(self, handle: str, text: str) -> None:
+        """Hand ``text``, after the marker, to Messages' iMessage service for ``handle``."""
         try:
             await self._script("AppleScript", SCRIPTS["message"], (f"{MARKER}{text}", handle), (), self._timeout_s)
         except DesktopError as error:
@@ -1021,10 +1092,9 @@ class IMessageChannel:
         if now - self._code_sent_at < CODE_APART_S:
             raise ChannelError("a code was sent a moment ago: wait for it, or try again in half a minute", {})
         code: OneTimeCode = new_code(now)
-        await self._send_to(
-            handle,
-            self._words().fill(self._words().pairing_code, code=shown_code(code)),
-        )
+        # The code is handed to Messages and kept nowhere else: the conversation is not read before it is paired, from
+        # its newest row then on, so its row is never a command.
+        await self._hand(handle, self._words().fill(self._words().pairing_code, code=shown_code(code)))
         self._pending = _Pending(handle, code)
         self._code_sent_at = now
         log.info("imessage_code_sent")

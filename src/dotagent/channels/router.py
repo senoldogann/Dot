@@ -18,7 +18,7 @@ phone can open, and no link is sent (item 611).
 
 A run that a message on a channel started and that works longer than 15 seconds sends a few messages of progress too
 (item 618, ``[channels] progress``): what it did since the last one, from the calls of its tools and its newest thought,
-at most one every 30 seconds and six in all, never what a tool answered.
+at most one a minute and four in all (item 918), a command as *ran a command*, never what a tool answered.
 
 What Dot tells the owner on its own (the morning brief and the watchers, ``owner_told`` of ``notify/owner.py``, item
 582) goes out on each channel that is on and paired as one line: the title, the text and the link to the page it opens.
@@ -647,12 +647,14 @@ class ChannelRouter:
         """The one line of the tells held for a channel: the tell itself when it is the only one, else how many there
         are under the title they share ("Dot" when they differ). The link opens the page of the newest: the route of a
         tell is one of Dot's own pages (:func:`~dotagent.notify.owner.told`), at the address the router's links open
-        at; with no such address (item 611) the line has none."""
+        at; with no such address (item 611) the line has none. A title Dot gives its tells is said in the owner's
+        language (item 918); a watcher's name is the owner's own and stays as they wrote it."""
         pointer: str = "" if self._base is None else f"\n{self._base}{held.newest.url}"
-        if held.count == 1:
-            return f"{held.newest.title}: {held.newest.text}{pointer}"
         words: Words = self._words()
-        return f"{words.fill(words.told_more, title=held.title or _FOLDED_TITLE, count=held.count)}{pointer}"
+        if held.count == 1:
+            return f"{words.title(held.newest.title)}: {held.newest.text}{pointer}"
+        title: str = _FOLDED_TITLE if held.title is None else words.title(held.title)
+        return f"{words.fill(words.told_more, title=title, count=held.count)}{pointer}"
 
     def _reachable(self, channel_id: ChannelId) -> bool:
         """Whether the owner can be told on ``channel_id``: it is switched on and knows who to answer."""

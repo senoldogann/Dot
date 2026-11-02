@@ -71,6 +71,8 @@ WAITING_FOR_REVIEW_S: float = 86_400.0
 _NONCE_BYTES: int = 8
 _NO_ANSWER: str = "(it replied nothing)"
 _ORDERS_PAGE: str = "#/agents"
+# The title the owner is told a work order needs them under (a channel says it in their language, item 918).
+NEEDS_YOU_TITLE: str = "A work order needs you"
 # What an order may be in when the lead moves it on: waiting for the lead, or sent back and not started again.
 _FOR_THE_LEAD: tuple[WorkOrderStatus, ...] = ("in_review", "returned")
 
@@ -429,7 +431,7 @@ class WorkDesk:
         self._stop_attempt(order)
         title: str = one_line(order.title, _LINE_CHARS)
         text: str = f"{title}: waits for you." if moved.tainted else f"{title}: {moved.note}"
-        await tell_owner(self._runtime.bus, "A work order needs you", text, _ORDERS_PAGE)
+        await tell_owner(self._runtime.bus, NEEDS_YOU_TITLE, text, _ORDERS_PAGE)
         log.info("work_order_escalated", order_id=order.id, attempts=order.attempts)
         return f"Work order {order.id} is escalated: the owner is told, and it waits for them."
 

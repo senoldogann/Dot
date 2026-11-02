@@ -1195,7 +1195,7 @@ async def test_a_run_that_works_longer_than_fifteen_seconds_tells_what_it_did_an
     await _does(runtime, run, "desktop_screenshot")
     await _until(lambda: len(wired.channel.sent) == before + 1, "the first message of progress")
     assert wired.channel.sent[before] == (
-        "Working for 16 s:\n$ ls -la ~/Desktop\nread a page: example.com\nused the desktop\n💭 There are three files."
+        "Working for 16 s:\nran a command\nread a page: example.com\nused the desktop\nThought: There are three files."
     )
     # Never what a tool answered, and a page only by its host.
     assert "TOP SECRET" not in wired.channel.sent[before] and "token" not in wired.channel.sent[before]
@@ -1203,10 +1203,10 @@ async def test_a_run_that_works_longer_than_fifteen_seconds_tells_what_it_did_an
     await _does(runtime, run, "shell", command="echo hello")
     await _quiet_for_a_moment()
     assert len(wired.channel.sent) == before + 1
-    clock.now = 1047.0
+    clock.now = 1077.0
     await _does(runtime, run, "write_file", path="/Users/me/notes/summary.md", content="a body that is not told")
     await _until(lambda: len(wired.channel.sent) == before + 2, "the second message of progress")
-    assert wired.channel.sent[before + 1] == "Working for 47 s:\n$ echo hello\nwrote summary.md"
+    assert wired.channel.sent[before + 1] == "Working for 1 min 17 s:\nran a command\nwrote summary.md"
     await _let_go(wired, replies)
     # The answer is the last, with the progress before it and none after it.
     assert wired.channel.sent[before + 2 :] == ["All done."]
@@ -1232,7 +1232,7 @@ async def test_a_run_that_ends_before_fifteen_seconds_sends_only_its_answer(
     assert wired.channel.sent[before:] == ["All done."]
 
 
-async def test_a_message_every_thirty_seconds_at_most_and_six_in_all(
+async def test_a_message_every_minute_at_most_and_four_in_all(
     working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
 ) -> None:
     wired, clock = working
@@ -1240,38 +1240,42 @@ async def test_a_message_every_thirty_seconds_at_most_and_six_in_all(
     run: RunRecord = await _began(wired, clock, replies, 3000.0, "a very long one")
     told: list[str] = []
     for number in range(10):
-        clock.now = 3016.0 + 31.0 * number
-        await _does(runtime, run, "shell", command=f"step {number}")
-        if number < 6:
+        clock.now = 3016.0 + 61.0 * number
+        await _does(runtime, run, "web_search", query=f"step {number}")
+        if number < 4:
             await _until(lambda: len(wired.channel.sent) == before + len(told) + 1, f"message {number + 1}")
             told.append(wired.channel.sent[-1])
         else:
             await _quiet_for_a_moment()
-    assert len(wired.channel.sent) == before + 6
-    assert [message.splitlines()[1:] for message in told] == [[f"$ step {number}"] for number in range(6)]
-    # Another step inside the thirty seconds of a message waits for the time to pass and is told with the next.
+    assert len(wired.channel.sent) == before + 4
+    assert [message.splitlines()[1:] for message in told] == [
+        [f"searched the web: step {number}"] for number in range(4)
+    ]
+    # Another step inside the minute of a message waits for the time to pass and is told with the next.
     await _let_go(wired, replies)
-    assert wired.channel.sent[before + 6 :] == ["All done."]
+    assert wired.channel.sent[before + 4 :] == ["All done."]
 
 
-async def test_a_step_inside_the_thirty_seconds_waits_and_goes_with_the_next_message(
+async def test_a_step_inside_the_minute_waits_and_goes_with_the_next_message(
     working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
 ) -> None:
     wired, clock = working
     before: int = len(wired.channel.sent)
     run: RunRecord = await _began(wired, clock, replies, 4000.0, "steps that wait")
     clock.now = 4016.0
-    await _does(runtime, run, "shell", command="first")
+    await _does(runtime, run, "web_search", query="first")
     await _until(lambda: len(wired.channel.sent) == before + 1, "the first message")
-    for moment, command in ((4020.0, "second"), (4030.0, "third"), (4040.0, "third")):
+    for moment, query in ((4020.0, "second"), (4040.0, "third"), (4060.0, "third")):
         clock.now = moment
-        await _does(runtime, run, "shell", command=command)
+        await _does(runtime, run, "web_search", query=query)
     await _quiet_for_a_moment()
     assert len(wired.channel.sent) == before + 1
-    clock.now = 4046.0
-    await _does(runtime, run, "shell", command="fourth")
+    clock.now = 4076.0
+    await _does(runtime, run, "web_search", query="fourth")
     await _until(lambda: len(wired.channel.sent) == before + 2, "the second message")
-    assert wired.channel.sent[-1] == "Working for 46 s:\n$ second\n$ third ×2\n$ fourth"
+    assert wired.channel.sent[-1] == (
+        "Working for 1 min 16 s:\nsearched the web: second\nsearched the web: third ×2\nsearched the web: fourth"
+    )
     await _let_go(wired, replies)
 
 
@@ -1284,18 +1288,18 @@ async def test_a_message_of_progress_is_masked_of_the_secrets_dot_holds(
     before: int = len(wired.channel.sent)
     run: RunRecord = await _began(wired, clock, replies, 5000.0, "a run with a secret in it")
     clock.now = 5016.0
-    await _does(runtime, run, "shell", command=f"curl -H 'X-Pass: {secret}' https://x.example")
+    await _does(runtime, run, "web_search", query=f"login X-Pass: {secret} example")
     await _thinks(runtime, run, f"The password {secret} is in the header.")
     await _until(lambda: len(wired.channel.sent) == before + 1, "the message of progress")
     told: str = wired.channel.sent[-1]
-    assert secret not in told and told.splitlines()[1] == "$ curl -H 'X-Pass: ***' https://x.example"
+    assert secret not in told and told.splitlines()[1] == "searched the web: login X-Pass: *** example"
     await _let_go(wired, replies)
 
 
-async def test_a_secret_the_cut_of_a_command_would_split_is_masked_before_it_is_cut(
+async def test_a_secret_the_cut_of_a_query_would_split_is_masked_before_it_is_cut(
     working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
 ) -> None:
-    """The first 60 characters of a command are told: a secret that stands across the 60th would be cut into a half no
+    """The first 60 characters of a query are told: a secret that stands across the 60th would be cut into a half no
     mask knows, if the cut came first."""
     secret: str = "correct-horse-battery-staple-4"
     write_env_value(env_file_path(), "SOME_FOURTH_SERVICE_PASSWORD_FILE", secret)
@@ -1303,12 +1307,12 @@ async def test_a_secret_the_cut_of_a_command_would_split_is_masked_before_it_is_
     before: int = len(wired.channel.sent)
     run: RunRecord = await _began(wired, clock, replies, 5500.0, "a run with a secret across the cut")
     clock.now = 5516.0
-    await _does(runtime, run, "shell", command=f"{'x' * 45} {secret} and more words after it")
+    await _does(runtime, run, "web_search", query=f"{'x' * 45} {secret} and more words after it")
     await _thinks(runtime, run, f"{'y' * 120} {secret[:12]}")
     await _until(lambda: len(wired.channel.sent) == before + 1, "the message of progress")
     told: str = wired.channel.sent[-1]
     assert secret not in told and "correct-horse" not in told and "staple" not in told
-    assert told.splitlines()[1].startswith("$ " + "x" * 45 + " *** and ")
+    assert told.splitlines()[1].startswith("searched the web: " + "x" * 45 + " *** and ")
     await _let_go(wired, replies)
 
 
@@ -1417,7 +1421,7 @@ async def test_nothing_is_told_to_a_channel_nobody_is_paired_on_and_nothing_is_k
     await _does(runtime, run, "shell", command="when somebody does")
     await _until(lambda: len(wired.channel.sent) == before + 1, "the message of progress")
     # What the run did while nobody could be told is not told afterwards.
-    assert wired.channel.sent[-1] == "Working for 50 s:\n$ when somebody does"
+    assert wired.channel.sent[-1] == "Working for 50 s:\nran a command"
     await _let_go(wired, replies)
 
 

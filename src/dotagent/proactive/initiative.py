@@ -55,6 +55,11 @@ LOOK_TITLE: str = "Looking for work to do for you"
 _DAY_S: float = 86_400.0
 _NOTE_CHARS: int = 300
 _TELL_CHARS: int = 140
+# The titles of what the owner is told of a thing (a channel says them in the owner's language, item 918): done, let go
+# as they said not to do it, let go after its tries (how many is on its page).
+DID_TITLE: str = "Dot did on its own"
+LET_GO_SAID_TITLE: str = "Dot let go of a thing you said not to do"
+LET_GO_TITLE: str = "Dot let go of a thing"
 _LISTED: int = 30
 # The most things a count of what Dot's own work came to reads (item 914).
 _REVIEWED: int = 100
@@ -648,14 +653,14 @@ class Initiative:
             if todo.note.startswith(LET_GO_BY_ITS_RUN):
                 await tell_owner(
                     self._runtime.bus,
-                    "Dot let go of a thing you said not to do",
+                    LET_GO_SAID_TITLE,
                     one_line(f"{todo.title}: {todo.note.removeprefix(LET_GO_BY_ITS_RUN)}", _TELL_CHARS),
                     url,
                 )
             return
         if ended.status == "done":
             await store.set_todo(todo.id, "done", todo.attempts + 1, ended.id, note)
-            await tell_owner(self._runtime.bus, "Dot did on its own", one_line(todo.title, _TELL_CHARS), url)
+            await tell_owner(self._runtime.bus, DID_TITLE, one_line(todo.title, _TELL_CHARS), url)
             return
         # The emergency stop ends a run in two words: the stop of every run, and the STOP file a run saw as it worked
         # ("Emergency stop: …"); either leaves the thing to do, as the docs say (item 790).
@@ -702,7 +707,7 @@ class Initiative:
         await self._runtime.store.set_todo(todo.id, "dropped", tried, run_id, note)
         await tell_owner(
             self._runtime.bus,
-            f"Dot let go of a thing after {tried} {'try' if tried == 1 else 'tries'}",
+            LET_GO_TITLE,
             one_line(f"{todo.title}: {note}", _TELL_CHARS),
             f"#/runs/{run_id}" if run_id is not None else _LIST_ROUTE,
         )

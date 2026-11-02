@@ -1,7 +1,7 @@
 """The iMessage channel end to end (item 572), on a real runtime, run manager and server with a scripted model, a
 ``chat.db`` the test writes and a runner that stands for ``osascript``: the owner pairs a number with a code typed back,
 switches the channel on, and a message they send to themselves starts a run in the "iMessage" chat whose answer comes
-back to them marked ◆, while no other conversation is ever read as a command."""
+back to them marked, while no other conversation is ever read as a command."""
 
 import asyncio
 import contextlib
@@ -663,7 +663,7 @@ async def test_a_message_from_the_iphones_other_apple_id_starts_a_run_and_its_an
 async def test_the_link_at_the_end_of_an_answer_is_not_read_back_as_a_command_when_messages_splits_it_off(
     runtime: Runtime, manager: RunManager, messages: MessagesDb, replies: Replies
 ) -> None:
-    """Messages may keep the link at the end of a message as a row of its own, a link preview, which carries no ◆ and
+    """Messages may keep the link at the end of a message as a row of its own, a link preview, which carries no mark and
     is flagged as the owner's. An answer that ends with a source would else start a run on it, and that run's answer
     another."""
     replies.clear()
@@ -994,7 +994,7 @@ async def test_a_run_that_works_longer_than_a_moment_tells_what_it_does_while_it
         lines: list[str] = told.removeprefix(MARKER).splitlines()
         assert handle == PHONE and told.startswith(MARKER)
         assert lines[0].startswith("Working for ") and lines[0].endswith(" s:")
-        assert lines[1:] == ["$ echo hello from the run", "looked in a folder", "💭 I should greet first."]
+        assert lines[1:] == ["ran a command", "looked in a folder", "Thought: I should greet first."]
         assert waited >= 0.4
         await asyncio.sleep(0.8)
         assert len(osascript.sent) == 1

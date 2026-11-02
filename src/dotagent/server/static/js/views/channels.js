@@ -220,7 +220,7 @@ export function mount(root, ctx) {
       }),
       setRow({
         title: "Automation for Messages",
-        lead: `Lets ${program} send Dot's answers through Messages, each starting with ◆.`,
+        lead: `Lets ${program} send Dot's answers through Messages, each starting with an invisible mark.`,
         control: automationControl,
       }),
     ];
@@ -259,7 +259,7 @@ export function mount(root, ctx) {
     // What a run started from the channel tells while it works (item 618): `[channels] progress`, live.
     const progress = switchRowSetting({
       label: "Progress messages",
-      hint: "While a task you started from iMessage works, Dot sends a few lines of what it is doing: the commands it runs, the actions it takes and its newest thought. The first after 15 seconds, then at most one every 30 seconds and six in all. Off, or for a task that ends sooner, only the answer comes.",
+      hint: "While a task you started from iMessage works, Dot sends a few short lines of what it is doing: the newest things it did and its newest thought, never a command's text. The first after 15 seconds, then at most one a minute and four in all. Off, or for a task that ends sooner, only the answer comes.",
       read: () => progressOn,
       write: async (on) => {
         await post("/channels/progress", { on }, on ? "Dot tells you what a task is doing as it works." : "Dot sends only the answers.");
@@ -285,7 +285,7 @@ export function mount(root, ctx) {
     return [
       setSection({
         title: "iMessage",
-        lead: "Message yourself from your iPhone, or write to this Mac's Apple ID from your own. Each answer of Dot comes back in the same conversation, marked ◆.",
+        lead: "Message yourself from your iPhone, or write to this Mac's Apple ID from your own. Each answer of Dot comes back in the same conversation.",
         actions: chat,
         body: card,
       }),

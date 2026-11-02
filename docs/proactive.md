@@ -319,11 +319,13 @@ shows it as a desktop notification where those are on, and the channel router of
 sends it into your conversation with yourself while iMessage is on and a number is paired; any way to reach you added
 later listens for the same event. It is not stored: what is kept is the run it opens.
 
-**On iMessage** a tell is one message, marked `◆ `, of the title, a colon, the text and the link to the page it opens
+**On iMessage** a tell is one message, marked with a zero-width space, of the title (a title Dot gives in your
+language, item 918), a colon, the text and the link to the page it opens
 (`#/runs/<id>` or `#/schedules`, at the address of the links of the channel, the name `[server] reach` gives and never
 one that carries the access token; with no such name there is no link, item 611):
 *Your morning brief: Nothing needs you today. https://…/#/runs/…*. It is masked of the secrets Dot holds and sent as
-plain text, and it is never read back as a command, since every message of Dot's in that conversation starts with `◆`
+plain text, and it is never read back as a command, since every message of Dot's in that conversation starts with the
+mark
 (and the link that Messages may split off its end is Dot's own too, see
 [Channels](channels.md#what-dot-reads-and-what-it-does-not)). A channel gets at most one such message in twenty
 seconds (`ASKS_APART_S`, the pace of its other lines): a watcher that tells several things in a row is told as its

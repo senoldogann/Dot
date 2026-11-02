@@ -35,7 +35,8 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   schedules, campaigns and watchers, and a run that was being started as the file appeared ends as an emergency stop.
   `/stop` and its words still stop the run at work, pairing and its code still work, and what Dot tells you about a
   run that ended (the stop's own end among it) still comes.
-- When a run of that chat ends, its answer is sent back in the same conversation, **marked with `◆ `** at its start.
+- When a run of that chat ends, its answer is sent back in the same conversation, **marked with a zero-width space** at
+  its start, which your phone draws as nothing (item 918; it was a `◆ ` before).
   The answer is masked of the secrets Dot holds, sent as plain text and cut to about 2,000 characters, with a link to
   the chat in Dot for the rest. A messaging app draws no Markdown, so the answer reads clean (item 617): a list item
   has a bullet (`• `, a nested one `  ◦ `, a task its box; a numbered item stays as it is), a heading stands on a line
@@ -56,8 +57,10 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   right above it; a list of short items (things to buy) stays one block. A heading with words after it ends with a
   colon, as a title typed in a message does (*Summary:*), unless it ends in a mark of its own (*What changed?*). A run
   of spaces between two words is one space. And the run that answers is told, in its prompt, that its answer goes to
-  your phone as plain text: short paragraphs with a blank line between them, a list only for separate points, no tables,
-  headings or nested lists, and quotes, parentheses and file paths only where they are needed.
+  your phone as plain text, as a message to you in 100 words at most (item 918): the result first, then only what you
+  must know or do, and anything longer in a file it names; short paragraphs with a blank line between them, a list only
+  for separate points, no tables, headings or nested lists, and quotes, parentheses and file paths only where they are
+  needed.
 - **The pictures an answer names go with it** (item 617). A Markdown image (`![words](path)`) or a path to an image
   file in the answer's words is looked at on disk, and a picture that may go is sent after the text, each as a message
   of its own with no words, through Messages as the text is. It may go when it is a regular file in Dot's workspace or
@@ -88,20 +91,20 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   away from yours.)
 - **A run that works longer than fifteen seconds tells what it does** (item 618, `[channels] progress`). iMessage
   cannot edit a message it sent, so "live" is a few messages and not a stream: a run started from the channel sends one
-  message after 15 seconds of work, then at most one every 30 seconds, and six in all; a run that ends sooner sends only
-  its answer, and none comes after the answer. A message tells what happened since the one before, in plain lines, the
-  newest last: the commands the run ran (`$ ` and the first 60 characters of each), the tools it used in the words the
-  page uses for them (*used the desktop*, *read a page: example.com*, *wrote notes.txt*, *searched the web: …*), and
-  the first sentence of its newest thought (`💭 `, at most 160 characters) when the model thinks. The same thing again
-  and again is counted (*used the desktop ×3*), and a message holds eight lines at most, with a line that counts the
-  earlier steps. A message reads so:
+  message after 15 seconds of work, then at most one a minute, and four in all; a run that ends sooner sends only its
+  answer, and none comes after the answer. A message tells what happened since the one before, in plain lines, the
+  newest last: the three newest things the run did, in the words the page uses for them (*ran a command*, *used the
+  desktop*, *read a page: example.com*, *wrote notes.txt*, *searched the web: …*), and the first sentence of its newest
+  thought (*Thought: …*, at most 160 characters) when the model thinks. A command is told as *ran a command*, never
+  its text, and the same thing again and again is counted (*used the desktop ×3*) (item 918 made it plain). A message
+  reads so:
 
   ```
-  ◆ Working for 45 s:
-  $ ls ~/Desktop
+  Working for 45 s:
   read a page: example.com
   used the desktop ×3
-  💭 The page lists three files.
+  ran a command
+  Thought: The page lists three files.
   ```
 
   Only what was done is told, never what came of it: no output of a tool is read, a page is told by its host alone
@@ -132,7 +135,8 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   in Dot on your Mac*, a wait says *Answer it in Dot on your Mac, not here*, a line of tells is the tell and nothing
   after it, and the tab says why once, in its facts (*Links in messages*, below). Settings › Phone sets the name.
 - What Dot tells you on its own comes the same way (item 582): the first line of the morning brief and each tell of a
-  watcher ([Dot comes to you](proactive.md)), as one message, **marked with `◆ `**, that holds the title, a colon, the
+  watcher ([Dot comes to you](proactive.md)), as one message, **marked** as an answer is, that holds the title (one
+  Dot gives, such as *Dot did on its own*, in your language, item 918; a watcher's name as you wrote it), a colon, the
   text and the link to the page the tell opens (the brief's run, the chat Watchers or Schedules; with no `[server]
   reach` there is no link, item 611): *Your morning brief: Nothing needs you today. https://…/#/runs/…*. It goes
   to the conversation you wrote in last, masked of the secrets Dot holds and as plain text, while iMessage is on and a
@@ -141,8 +145,8 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   one such message every twenty seconds: the first tell of a burst goes at once, and what comes after it inside the
   twenty seconds is told as one message when they are over, *Bank mail: and 3 more* with the link to the newest (a
   single one that waited goes as itself, and tells under different titles are counted under the name *Dot*). Dot's own
-  message starts with `◆`, so it is never read back as a command, whoever wrote the words in it, and neither is the
-  link that Messages may split off its end (see Links, below).
+  message starts with the mark, so it is never read back as a command, whoever wrote the words in it, and neither is
+  the link that Messages may split off its end (see Links, below).
 
 **Approvals are not answered on a channel.** You answer them in Dot's web UI or the phone app. A channel's account, if
 someone took it, must not be able to approve anything: it can only send Dot a message, and a message is judged by the
@@ -187,8 +191,14 @@ row is a command only when all of these hold:
   you (`is_from_me = 1`: your conversation with yourself, and what this Mac sends in the chat) or it was **received from
   the handle the chat is named for** (`is_from_me = 0`, and the sender of the message is that handle, compared in lower
   case and as a number or address is written): your iPhone's Apple ID writing to this Mac's (item 595);
-- it does not start with `◆`: Dot's own messages land in the same conversation as yours, and each starts so;
-- it is not a picture Dot sent (item 617): a picture is a message of its own with a file, no words and no `◆`, which
+- it does not start with the mark, a zero-width space (or the `◆` of before item 918): Dot's own messages land in the
+  same conversation as yours, and each starts so. Should a message of Dot's come back without the mark (a Messages that
+  dropped it), its words are Dot's still when they are those of a message Dot sent from five seconds before to a minute
+  after, whole however short, or all but their last word (the link or host at its end that Messages split off), or a
+  start of them of twenty characters or more (so your own *Done.* typed in the minute after Dot said it is let go too);
+  Dot keeps what it sent in its store, so that this holds across a restart, and the log says so
+  (`imessage_message_let_go`, *the words of a message of Dot's, unmarked*);
+- it is not a picture Dot sent (item 617): a picture is a message of its own with a file, no words and no mark, which
   Messages flags as yours like any row, so Dot tells it from a picture of yours by its time and what it is: a row that
   holds a file and no words, dated from five seconds before Dot handed a picture to Messages to a minute after, is
   Dot's own and is never read as a message (a picture of yours with no words in that minute is let go with it: send
@@ -197,7 +207,7 @@ row is a command only when all of these hold:
 - it is words: a sticker, an app's message, a payment, or any rich content Messages gives a bundle of its own, is never
   a command (a link preview is read as the link it holds);
 - it is not only a link that Dot wrote: Messages may split the link at the end of one of Dot's messages into a row of
-  its own, which has no `◆` (see Links, below);
+  its own, which has no mark (see Links, below);
 - a run of Dot may not have written it, and Messages does not send it later than it was written (see below), whether
   it is flagged as sent or as received;
 - it is not the second row of one message that Messages keeps as two (item 595): a sent row and a received row in the
@@ -348,7 +358,7 @@ Dot's answers, and what it tells you on its own (the brief's first line, a watch
 may be in it, as they are in the push to your phone), go to Apple's iMessage servers and on to your own devices, as any
 iMessage does, and so do the pictures an answer names (item 617): files of Dot's workspace or your home folder, at most
 four of at most 20 MB, never from a hidden folder, from `~/Library` outside Dot's own folder or from a place the policy
-keeps from a run. The messages of progress (item 618) carry the first 60 characters of the commands a run ran, the
+keeps from a run. The messages of progress (item 618) carry that a run ran a command (never its text, item 918), the
 names of the files it read or wrote, the host of the pages it read and the first sentence of a thought, the same way.
 A picture is a file of yours that leaves the Mac, to your own devices: an answer that names one is
 the model's choice, and a run that read a page may be led to name a picture of yours that the page asked for, so the

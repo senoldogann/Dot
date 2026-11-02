@@ -66,9 +66,9 @@ run needs, sent where the configuration points:
   place `[policy] protected_paths` and `sealed_paths` keep from a run; each is sent from a copy Dot makes in
   `~/Pictures/Dot` and removes an hour later (it removes only the folders it made there, each marked with a file of
   its own, and nothing else in that folder). So are the few messages of progress a run started from there sends while
-  it works (item 618, `[channels] progress`, on by default): the first 60 characters of the commands it ran, the names
-  of files it read or wrote, the host of pages it read, a tool's name and the first sentence of its newest thought,
-  masked of the secrets Dot holds, never what a tool answered. What you send there is read from Messages' database on
+  it works (item 618, `[channels] progress`, on by default): that it ran a command (never the command's text, item
+  918), the names of files it read or wrote, the host of pages it read, a tool's name and the first sentence of its
+  newest thought, masked of the secrets Dot holds, never what a tool answered. What you send there is read from Messages' database on
   this Mac (see [Channels](channels.md), item 572).
 - **To the browser's makers, if you use the microphone in a browser that recognizes speech itself: your voice, from
   your browser or Dot.app (Apple's); and, when the Mac has no voice of the language, the text read aloud.** The
@@ -1201,9 +1201,14 @@ over iMessage, in a one-to-one conversation named for a number or an address you
 your iPhone has another Apple ID than this Mac (item 595), a row received over iMessage from that very number or
 address, in the conversation named for it. A message from anyone else, in a group, by text message or as a reaction is
 never read as a command; Dot's own messages (its answers, and what it tells you on its own, item 582, whose words may be
-a third party's: a mail's subject) land in the same conversation and each starts with `◆`, which is how they are told
-from yours. Nobody without your Apple ID can write such a row from outside this Mac (nor one received from your paired
-number, which needs the Apple ID of that number: Apple authenticates the sender), but a run of Dot can write one flagged
+a third party's: a mail's subject) land in the same conversation and each starts with a zero-width space (a `◆` before
+item 918), which is how they are told from yours. Messages keeping that mark in its database was not seen on this Mac
+when the change was made, so a row that came back without it is Dot's still when it is the words of a message Dot sent
+from five seconds before to a minute after, whole or all but their last word however short, or a start of them of twenty
+characters or more: Dot writes what it sends in its store before Messages has it, so that a restart in between changes
+nothing, and the log says each such row (`imessage_message_let_go`). Nobody without your Apple ID can write such a row
+from outside this Mac (nor one received from your paired number, which needs the Apple ID of that number: Apple
+authenticates the sender), but a run of Dot can write one flagged
 as sent from inside it: a message it sends through AppleScript, through keystrokes in Messages or through a tool of an
 MCP server lands in that conversation flagged as yours, and Messages' database cannot tell it from yours. The guard asks
 before such a send, but in `auto` the review model answers, not you, and in `yolo` nobody does, so a run that read
@@ -1214,7 +1219,7 @@ until it ends, about 33 minutes at the most) is told and not run, and so is a me
 written (Send Later of macOS 15), and a draft to a number or address you paired is refused. What this does not catch is
 a send the guard cannot see, which raises no flag: a script of a page, a program the run wrote and then runs, a
 Shortcut, a job a step left behind. A picture Dot sends with an answer (item 617) is a row of that conversation too,
-flagged as yours, with a file, no words and no `◆`: Dot tells it from a picture of yours by its time (from five
+flagged as yours, with a file, no words and no mark: Dot tells it from a picture of yours by its time (from five
 seconds before Dot handed it to Messages to a minute after) and kind, or, for an hour, by the name of the file it sent
 (item 806), and never reads it as a message. `/stop` is run
 in any case, and so are the plain words `stop`, `dur` and
@@ -1239,7 +1244,7 @@ data; a message of files and no words runs too. A voice message, a video or a st
 run is told part of the message was not read, and the answer starts by saying so to you. A row that is not
 words (a sticker, an app's message, a payment: rich content, which Messages marks with a bundle of its own) is never
 run, and neither is a row that is only a link that Dot wrote, one into its own pages or one in a message it sent a
-minute before: Messages may split the link at the end of a message of Dot's into a row of its own, which has no `◆` and
+minute before: Messages may split the link at the end of a message of Dot's into a row of its own, which has no mark and
 is flagged as yours, and it would else start a run whose answer might end with a link as well. A link of yours that
 Messages splits off your words, less than 3 seconds after them, is joined to them as one command.
 

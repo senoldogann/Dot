@@ -3,11 +3,12 @@
 iMessage cannot edit a message it sent, so "live" is a few messages and not a stream. A run that works longer than
 :data:`FIRST_AFTER_S` sends one message of progress, then at most one every :data:`APART_S`, and :data:`MAX_MESSAGES` in
 all; a run that ends sooner sends only its answer. A message tells what happened since the one before, in plain lines,
-the newest last: the commands the run ran (``$ `` and the first :data:`COMMAND_CHARS` characters of each), the tools it
-used in the words the page uses for them (*used the desktop*, *read a page: example.com*, *wrote notes.txt*), and the
-first sentence of its newest thought (``💭 ``, at most :data:`THOUGHT_CHARS` characters) when the model thinks. It
-tells what was done, never what came of it: no tool's output is read here, only the call and its arguments, which the
-loop has masked of the secrets Dot holds before they are an event.
+the newest last: the :data:`MAX_LINES` newest things the run did, in the words the page uses for them (*ran a command*,
+*used the desktop*, *read a page: example.com*, *wrote notes.txt*), and the first sentence of its newest thought
+(*Thought: …*, at most :data:`THOUGHT_CHARS` characters) when the model thinks. Item 918 made it plain for a phone: a
+command is *ran a command*, never its text, a word and no emoji marks a thought, and the steps before the newest few
+are not counted. It tells what was done, never what came of it: no tool's output is read here, only the call and its
+arguments, which the loop has masked of the secrets Dot holds before they are an event.
 
 This module has the words and the bookkeeping; the router follows the events and sends the messages."""
 
@@ -22,19 +23,14 @@ from dotagent.core.text import plain_line
 # A run that works longer than this sends its first message of progress; a later one is sent at least this long after
 # the one before it, and a run sends this many at most.
 FIRST_AFTER_S: float = 15.0
-APART_S: float = 30.0
-MAX_MESSAGES: int = 6
-# What one message holds: this many lines at most (the earlier steps are counted in a line of their own), a command cut
-# to this many characters, a thought's first sentence to this many, a name to this many.
-MAX_LINES: int = 8
-COMMAND_CHARS: int = 60
+APART_S: float = 60.0
+MAX_MESSAGES: int = 4
+# What one message holds: this many steps at most, the newest; a query or a goal cut to this many characters, a
+# thought's first sentence to this many, a name to this many.
+MAX_LINES: int = 3
+DETAIL_CHARS: int = 60
 THOUGHT_CHARS: int = 160
 _NAME_CHARS: int = 60
-# The steps kept for the next message, at most: a run that does hundreds of things between two messages keeps the
-# newest.
-_STEPS_KEPT: int = 200
-COMMAND_MARK: str = "$ "
-THOUGHT_MARK: str = "💭 "
 _SENTENCE_END: str = ".!?…"
 # The tools whose steps say nothing a phone needs: the end of the run is its answer, a question has its own line, a
 # reaction stands on the owner's message (item 664), and the plan, the groups of tools, the help and the reading of a
@@ -105,12 +101,6 @@ def _text(args: Mapping[str, object], key: str) -> str:
     return value if isinstance(value, str) else ""
 
 
-def _command(raw: str, words: Words) -> str:
-    """A command the run ran, ``$ `` and its first characters; a call that gave none ran a command."""
-    shown: str = _clip(raw, COMMAND_CHARS)
-    return f"{COMMAND_MARK}{shown}" if shown else words.step("ran_command")
-
-
 def _file(key: str, args: Mapping[str, object], words: Words) -> str:
     """A step on a file, named by the file's name (``key``), or on a file (``key`` and ``_a_file``) when it has none."""
     path: str = _text(args, "path").strip()
@@ -161,24 +151,22 @@ def tool_words(tool: str) -> str:
 
 def step_words(tool: str, args: Mapping[str, object], words: Words = ENGLISH) -> str | None:
     """What the call of ``tool`` with ``args`` is told as, in one line of the owner's language (``words``, item 805), or
-    ``None`` for a step a phone does not need to hear of. A command is ``$ `` and its first characters; a file read,
+    ``None`` for a step a phone does not need to hear of. A command is *ran a command*, never its text; a file read,
     written or edited is named by its file name; a page by its host alone; the browser and the desktop as the page
     counts them; any other tool by what it does."""
     if tool in _SKIPPED:
         return None
-    if tool in ("shell", "terminal_open"):
-        return _command(_text(args, "command"), words)
-    if tool == "terminal_send":
-        return _command(_text(args, "text"), words)
+    if tool in ("shell", "terminal_open", "terminal_send"):
+        return words.step("ran_command")
     if tool in _FILE_STEPS:
         return _file(_FILE_STEPS[tool], args, words)
     if tool == "web_search":
-        query: str = _clip(_text(args, "query"), COMMAND_CHARS)
+        query: str = _clip(_text(args, "query"), DETAIL_CHARS)
         return words.step("searched_web_for", query) if query else words.step("searched_web")
     if tool in _PAGE_STEPS:
         return _page(_PAGE_STEPS[tool], args, words)
     if tool == "delegate":
-        goal: str = _clip(_text(args, "goal"), COMMAND_CHARS)
+        goal: str = _clip(_text(args, "goal"), DETAIL_CHARS)
         return words.step("handed_work_for", goal) if goal else words.step("handed_work")
     if tool == "skill":
         name: str = _clip(_text(args, "name"), _NAME_CHARS)
@@ -233,7 +221,6 @@ class Progress:
     sent: int = 0
     last_sent: float | None = None
     _steps: list[_Step] = field(default_factory=list)
-    _dropped: int = 0
     _thought: str | None = None
     _told_thought: str | None = None
 
@@ -243,8 +230,8 @@ class Progress:
             self._steps[-1].times += 1
             return
         self._steps.append(_Step(words))
-        if len(self._steps) > _STEPS_KEPT:
-            self._dropped += self._steps.pop(0).times
+        if len(self._steps) > MAX_LINES:
+            self._steps.pop(0)
 
     def thought(self, sentence: str) -> None:
         """The newest thought of the run, its first sentence; a thought with no words changes nothing."""
@@ -268,7 +255,6 @@ class Progress:
         """What the run did is not to be told (nobody can be): the steps and the thought are let go, and no message is
         counted."""
         self._steps = []
-        self._dropped = 0
         self._told_thought = self._thought
 
     def message(self, now: float) -> str | None:
@@ -278,17 +264,13 @@ class Progress:
         if due is None or now < due:
             return None
         shown: list[_Step] = self._steps[-MAX_LINES:]
-        earlier: int = self._dropped + sum(step.times for step in self._steps[: len(self._steps) - len(shown)])
         words: Words = self.words
         lines: list[str] = [words.fill(words.working_for, elapsed=words.elapsed(now - self.started))]
-        if earlier:
-            lines.append(words.fill(words.earlier_step if earlier == 1 else words.earlier_steps, count=earlier))
         lines.extend(f"{step.words} ×{step.times}" if step.times > 1 else step.words for step in shown)
         if self._thought is not None and self._new_thought():
-            lines.append(f"{THOUGHT_MARK}{self._thought}")
+            lines.append(words.fill(words.thought, thought=self._thought))
             self._told_thought = self._thought
         self._steps = []
-        self._dropped = 0
         self.sent += 1
         self.last_sent = now
         return "\n".join(lines)

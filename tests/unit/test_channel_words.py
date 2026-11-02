@@ -5,6 +5,7 @@ from dataclasses import fields
 
 import pytest
 
+from dotagent.agent.orders import NEEDS_YOU_TITLE
 from dotagent.channels.intake import Intake, Tell
 from dotagent.channels.pictures import TOO_BIG, TOO_MANY, Found, Left
 from dotagent.channels.progress import Progress, step_words
@@ -19,7 +20,10 @@ from dotagent.channels.words import (
     SpokenLanguage,
     language_of,
 )
+from dotagent.proactive.brief import TELL_TITLE
+from dotagent.proactive.initiative import DID_TITLE, LET_GO_SAID_TITLE, LET_GO_TITLE
 from dotagent.store.models import EventRecord
+from dotagent.trading.watch import HELD_TITLE, REFUSED_TITLE, STOP_TITLE, TARGET_TITLE
 
 
 class _Kept:
@@ -113,8 +117,7 @@ def test_progress_speaks_turkish() -> None:
         progress.step(said)
     message: str | None = progress.message(125.0)
     assert message == (
-        "Çalışıyorum (2 dk 5 sn):\nnotes.txt dosyasını okudum\nbir sayfa okudum: www.example.com\n"
-        "masaüstünü kullandım\n$ ls ~/Desktop"
+        "Çalışıyorum (2 dk 5 sn):\nbir sayfa okudum: www.example.com\nmasaüstünü kullandım\nbir komut çalıştırdım"
     )
 
 
@@ -147,3 +150,13 @@ def test_the_cut_and_the_left_out_line_speak_turkish() -> None:
     assert (
         found.note(TURKISH) == "Gönderilmeyenler: big.png (20 MB'tan büyük), 1 tane daha (bir mesajda en çok 4 tane)."
     )
+
+
+def test_the_titles_dot_gives_its_tells_have_their_turkish() -> None:
+    """Item 918: a tell on iMessage is titled in the owner's language; a watcher's name is theirs and stays."""
+    given: set[str] = {DID_TITLE, LET_GO_SAID_TITLE, LET_GO_TITLE, NEEDS_YOU_TITLE, TELL_TITLE}
+    given |= {HELD_TITLE, TARGET_TITLE, STOP_TITLE, REFUSED_TITLE}
+    for title in given:
+        assert TURKISH.title(title) != title and ENGLISH.title(title) == title
+    assert set(TURKISH.titles) == given
+    assert TURKISH.title("Rent reminder") == "Rent reminder"

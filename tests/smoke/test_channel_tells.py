@@ -1,7 +1,7 @@
 """What Dot tells the owner on its own reaches iMessage too (item 582), on a real runtime and run manager with a
 scripted model, a ``chat.db`` the test writes and a runner that stands for ``osascript``. The morning brief's and the
 watchers' tell (``tell_owner``, the event ``owner_told``) goes into the owner's conversation with themselves as one line
-marked ◆, with the link to the page it opens, once, and only while the channel is on and paired; a burst of tells is one
+marked, with the link to the page it opens, once, and only while the channel is on and paired; a burst of tells is one
 line and one more after the channel's window; a secret Dot holds is masked; and the row Messages keeps of such a line
 is never read back as a command."""
 
@@ -114,7 +114,7 @@ class World:
         await tell_owner(self.runtime.bus, title, text, route)
 
     def line(self, title: str, text: str, route: str = "#/runs/run_1") -> str:
-        """What reaches Messages for such a tell: marked ◆, the title, a colon, the text, then the link (none without
+        """What reaches Messages for such a tell: marked, the title, a colon, the text, then the link (none without
         a name to reach the Mac by)."""
         link: str = "" if self.base is None else f"\n{self.base}{route}"
         return f"{MARKER}{title}: {text}{link}"
@@ -231,7 +231,7 @@ async def test_a_tell_reaches_a_paired_imessage_once_marked_and_is_never_read_ba
 
 async def test_the_link_messages_splits_off_a_tell_is_never_read_as_a_command(world: World, replies: Replies) -> None:
     """Messages may keep the link at the end of a message as a row of its own, a link preview, flagged as the owner's
-    and with no ◆: as a link preview or as plain words, it is Dot's own and is not run."""
+    and with no mark: as a link preview or as plain words, it is Dot's own and is not run."""
     replies.clear()
     await _reading(world)
     await world.tell("Bank mail", "Mail 1 from the bank", "#/runs/run_1")

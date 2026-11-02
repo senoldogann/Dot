@@ -991,7 +991,7 @@ async def test_the_watch_tells_a_held_exit_once_it_has_lasted_five_minutes(
     finally:
         _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
     (message,) = told
-    assert message["title"] == "Exit of BTC-EUR cannot sell yet"
+    assert message["title"] == "An exit cannot sell yet" and str(message["text"]).startswith("BTC-EUR: ")
     assert "Coinbase does not take orders of BTC-EUR now" in str(message["text"])
     # Released, then held again for as long: told again.
     trading.market.rules = real_rules  # type: ignore[method-assign]
@@ -1042,7 +1042,8 @@ async def test_the_watch_tells_the_owner_what_an_exit_came_to(store: Store, cloc
     finally:
         _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
     (message,) = told
-    assert message["title"] == "Stop reached: BTC-EUR sold" and "on paper" in str(message["text"])
+    assert message["title"] == "A stop was reached and sold" and str(message["text"]).startswith("BTC-EUR: ")
+    assert "on paper" in str(message["text"])
 
 
 # ----- the whole market (item 771) -------------------------------------------------------------------------------
