@@ -303,8 +303,9 @@ command line and the API read it; drawing it on the page is left for later).
 The pool is passed by a capable model under any text: from 2026-10-29 to 11-01 the probes passed 32 attempts of 34,
 and the candidate of each night, written to answer the run that went worst (a page on a local port it could not open,
 an agent that failed and was left), came out the same as the base on tasks that had nothing to do with that run. So the
-step also makes the run it reads into a task of its own (item 904, `harness/tasks.py`, `harness/own.py`), as the
-evaluation guides advise: start from real failures.
+step also makes a run of yours into a task of its own (item 904, `harness/tasks.py`, `harness/own.py`), as the
+evaluation guides advise: start from real failures. The run is the worst of those that read only what is Dot's and
+yours (item 931, below), most often not the one the candidates answer.
 
 - **The task writer** (`write_harness_task`, on the proposer's model) reads the run as the proposer does and writes one
   small task of files that tests the habit the run lacked: a goal, at most six files of 4,000 characters, checks of the
@@ -321,18 +322,30 @@ evaluation guides advise: start from real failures.
   model, in throw-away homes and at no model's cost, prove it fair: its reference passes it, and both a run that does
   nothing and says it is done and one that does nothing and gives up fail it. A task that fails a play is not kept, and
   the night's record says which play (`no task: a run that does nothing and claims it is done passes it`).
-- **A run that read content third parties can author is made into no task**, and the writer is not asked: what it read
-  could shape a task that a model then plays with a run's rights. A run is asked about once: a task refused or found
-  unfair is not drafted and played again on a later night.
+- **The task is written from the worst run that read only what is Dot's and the owner's** (item 931), not from the run
+  the step learns from: of the runs a step weighs, the one that went worst among those that read no content third
+  parties can author and that gave no task yet. A run that read such content is made into no task, and the writer is
+  not asked about it: what it read could shape a task that a model then plays with a run's rights. On the owner's Mac
+  80 of 97 runs of a week had read a page or a mail, the run the step learns from always among them, so the step had
+  never written a task. A run is asked about once: a task refused or found unfair is not drafted and played again on a
+  later night.
+- **A night with nothing to tell a better text from luck proposes and plays nothing** (item 931): no task was written
+  tonight, none the loop wrote has headroom, and no task of the pool is *hard* (failed in more than a quarter of its
+  attempts: one failed once in six is as often a slip of the model's). On the owner's Mac every task scored on passed
+  2/2 under the base and both candidates, two nights running, at 1.6 and 2.5 million tokens a night. The step is
+  recorded `keep`, and its decision says why.
+- **A role's malformed answer after the probes is a warning, not the night's failure** (item 931): the experience
+  writer's answer that is no verdict (on 2026-11-02 its entry came as a sentence, twice) leaves the step as the probes
+  decided it, with the warning in its record (`warnings`).
 - **A task of the loop is played under the balanced preset at least**, whatever yours is: a write or a command outside
   the workspace asks, and an attempt declines what it asks. A model wrote the task, so what it steers a run to do is kept
   to the scratch workspace; a task of the catalog, which a developer wrote, plays as your preset says.
-- **Where it is played.** The task made tonight is scored on first, by the base and every candidate, so a candidate that
-  answers the run is judged where the run went wrong. The tasks kept (the newest 24) join the pool, so the base tries one
-  it does not know yet, and one it fails sometimes has headroom and is scored on, as a task of the catalog is. A night
-  with too few tasks with headroom to judge a candidate still makes the run that went worst into a task (without taking
-  the run: the next night that proposes still learns from it) and tries it, so that a pool passed in full never leaves the
-  loop with nothing to learn on.
+- **Where it is played.** The task made tonight is scored on first, by the base and every candidate, so a candidate is
+  judged where a run of yours went wrong. The tasks kept (the newest 24) join the pool, so the base tries one it does
+  not know yet, and one it fails sometimes has headroom and is scored on, as a task of the catalog is. A night with too
+  few tasks with headroom to judge a candidate still makes the worst run that read only what is Dot's and yours into a
+  task and tries it, without taking the run the next night that proposes learns from, so that a pool passed in full
+  never leaves the loop with nothing to learn on.
 - **What you see.** The night's row on the page says `Own test:` and the task it kept (`own-1a2b3c4d tests: Count what the
   file holds before writing the number`) or why it kept none. The step's record holds it as `task`.
 
@@ -409,8 +422,10 @@ harness step` prints it), and counts in how learning fares with the reflection. 
 its own when it did better (above) with `step_repeats` of at least 2 and was confirmed on new attempts (`step_repeats` ×
 2 attempts of each task, for the base and for the survivor, under the labels `confirm-base` and `confirm-<id>`; the
 survivor's notes, the step's record and its decision hold the confirmation), and never from a run that had read content
-third parties can author; `"owner"`, the default, leaves it to you. A role that fails after the probes (the composer,
-the experience writer) leaves the step `failed` with the error, the survivor probed all the same and adopted by nobody,
+third parties can author; `"owner"`, the default, leaves it to you. A role that fails after the probes (the composer)
+leaves the step `failed` with the error, the survivor probed all the same and adopted by nobody; the experience
+writer's failure is a warning instead (item 931), which leaves the step as the probes decided it but adopts nothing
+on its own either,
 and so does a proposer whose answer is no proposal in one scope, asked twice: the other scopes are still proposed and
 played (item 718),
 whatever `adopt` says (the decision says it was left to you), and how learning fares counts the failure; a scripted

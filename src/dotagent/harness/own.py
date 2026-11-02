@@ -63,6 +63,13 @@ def fairness(task: EvalTask, report: ProbeReport) -> str | None:
     return None
 
 
+async def task_taken(store: Store, run_id: str) -> bool:
+    """Whether a task was written, or tried, from the run ``run_id`` already: it is asked once."""
+    return (
+        await store.harness_task_of_run(run_id) is not None or await store.kv_get(f"{_TRIED_KEY}{run_id}") is not None
+    )
+
+
 async def write_task(runtime: Runtime, run_id: str, prober: Prober) -> tuple[EvalTask | None, str]:
     """Make the run ``run_id`` a task and keep it when it is fair: the task, or ``None`` and why not, in the words of
     the step's record. A run that read content third parties can author gives no task (what it read could shape a task
