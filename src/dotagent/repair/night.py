@@ -584,8 +584,8 @@ async def _work(
     # The live state of the session's newest round, which says what it waits on between rounds.
     shown: list[LiveSession] = []
 
-    async def waiting(phase: Literal["review", "checks"]) -> None:
-        """Say on the page that the session waits on ``phase`` (its newest steps kept)."""
+    async def waiting(phase: Literal["working", "review", "checks"]) -> None:
+        """Say on the page what the session does now: waits on ``phase``, or works again (its newest steps kept)."""
         if shown:
             await runtime.store.kv_set(
                 LIVE_KEY, shown[0].model_copy(update={"phase": phase, "steps": tuple(steps)}).model_dump_json()
@@ -715,6 +715,7 @@ async def _work(
                 minutes: int = max(1, min(config.checks_minutes, int((deadline - clock()) // 60)))
                 await waiting("checks")
                 checks: tuple[Check, ...] = await _wait_checks(night.repo, number, night.env, minutes, clock, sleep)
+                await waiting("working")
                 if all_passed(checks):
                     if config.merge == "ask":
                         return ended("ready", "Every check passed; it waits for your merge.")
@@ -866,7 +867,12 @@ async def _look(
     minutes: int = max(1, min(config.checks_minutes, int((deadline - clock()) // 60)))
 
     async def wait_checks(number: int) -> tuple[Check, ...]:
-        return await _wait_checks(night.repo, number, night.env, minutes, clock, sleep)
+        """The checks of the pull request once they settle, the page saying the look waits on them meanwhile."""
+        await runtime.store.kv_set(LIVE_KEY, live.model_copy(update={"phase": "checks"}).model_dump_json())
+        try:
+            return await _wait_checks(night.repo, number, night.env, minutes, clock, sleep)
+        finally:
+            await runtime.store.kv_set(LIVE_KEY, live.model_dump_json())
 
     known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     live: LiveSession = LiveSession(
@@ -879,7 +885,7 @@ async def _look(
         model=night.worker.model,
         effort=night.worker.effort,
         steps=(),
-        phase="checks",
+        phase="working",
     )
     await runtime.store.kv_set(LIVE_KEY, live.model_dump_json())
     try:
@@ -896,8 +902,7 @@ async def _look(
             lambda: min(config.session_minutes * 60.0, deadline - clock()),
             wait_checks,
             sleep,
-            # Its steps are its own session's, at work once they come.
-            live_sink(runtime.store, live.model_copy(update={"phase": "working"}), [], known),
+            live_sink(runtime.store, live, [], known),
         )
     except RepairError as error:
         log.warning("repair_look_failed", problem_id=problem.id, error=error.message, context=error.context)
