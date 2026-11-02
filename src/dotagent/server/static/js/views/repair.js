@@ -277,7 +277,6 @@ function problemRow(problem) {
   });
 }
 
-/** The row of a session: its problem, how it ended, why in a line, what it used, and its pull request. */
 /**
  * How a session's end reads now (item 940): as it ended, but for one whose problem was settled since by another session
  * or by the owner, which reads "Fixed later" (fixed) or "Let go" (not Dot's), never a warning that waits on nobody.
@@ -293,6 +292,7 @@ function endBadge(session, status) {
   return badge(ENDS[session.end] ?? session.end, END_TONE[session.end]);
 }
 
+/** The row of a session: its problem, how it ended (as it reads now), why in a line, what it used, and its pull request. */
 function sessionRow(session, titles, statuses) {
   const used = `${session.rounds} round${session.rounds === 1 ? "" : "s"} · ${Math.round((session.input_tokens + session.output_tokens) / 1000)}k tokens · ${session.account}`;
   const title = titles.get(session.problem_id) ?? session.problem_id;

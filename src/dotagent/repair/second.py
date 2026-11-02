@@ -51,10 +51,10 @@ from dotagent.repair.github import (
     along_main,
     checkout_at,
     checkout_clean,
-    command,
     commits_without_pr,
     drop_checkout,
     drop_remote_branch,
+    head_of,
     human_paths,
     merge_pr,
     needs_the_owner,
@@ -311,7 +311,7 @@ async def second_look(
         return LookOutcome(
             end="held", why="where your checkout stood when the session began is not known", outcome=None
         )
-    head_now: str = (await command(("git", "-C", str(repo), "rev-parse", "HEAD"), repo, env)).strip()
+    head_now: str = await head_of(repo, env)
     if not await along_main(repo, head_before, head_now, env):
         return LookOutcome(
             end="held", why="your checkout of Dot was taken back or off main during the session", outcome=None

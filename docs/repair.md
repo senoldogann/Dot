@@ -157,8 +157,9 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   requires `gate`, `browser (pages)` and `browser (phone)`, up to date, for admins too: read on 2026-11-02), so the one
   way into `main` is a pull request whose checks passed. When a session begins, Dot reads where `main` stands on
   GitHub and takes a print of your checkout of Dot: its commit, which may only go forward along main (to a commit of
-  main on GitHub that comes after it: a pull of yours, a deploy, item 940; back, or off main, counts as changed), the
-  contents of every change to a tracked file and of
+  main on GitHub that comes after it: a pull of yours, a deploy, item 940; back, or off main, counts as changed; a pull
+  that changes the review hook itself, read through its link, still counts as changed, as the hook decides what is
+  pushed), the contents of every change to a tracked file and of
   every file git does not track, its git config as git reads it (but the entries of branches other than `main`, which
   `git push -u` of another agent's work writes: item 935) and its hooks read through their links. Files git ignores
   (`.venv`) are not in it. It reads both again before it merges, and after every session it merged nothing for, one that
