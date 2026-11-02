@@ -556,6 +556,13 @@ _DEVTOOLS: str = (
     "them."
 )
 _SCRIPT_TOOLS: frozenset[str] = frozenset({"shell", "terminal_send"})
+# The tools that run a command; a run with neither (an agent the owner gave none) is told so (item 936).
+_COMMAND_TOOLS: frozenset[str] = frozenset({"shell", "terminal_open"})
+_NO_COMMANDS_SECTION: str = """# No commands in this run
+- Your tool list has no shell and no terminal, so no command runs in this run: not curl, a script, git nor any other \
+program. Where these instructions name the shell or a command, do that work with the tools your list does name \
+(web_fetch or the browser for a page and its HTTP status, the file tools for a file), or say that it needs a command \
+you do not have. Never call a tool your list does not name."""
 
 _MCP_TOOL_PREFIX: str = "mcp__"
 
@@ -818,6 +825,12 @@ def _groups_section(tool_names: Sequence[str], purposes: Mapping[str, McpPurpose
     return "\n".join([_GROUPS_SECTION, *claims, *group_lines(tool_names, purposes)])
 
 
+def _no_commands_section(tool_names: Sequence[str]) -> str:
+    """What a run whose tools run no command is told (item 936): the ways of working above name the shell first, and a
+    run without one called it all the same. Empty for a run with the shell or a terminal."""
+    return "" if not _COMMAND_TOOLS.isdisjoint(tool_names) else _NO_COMMANDS_SECTION
+
+
 def _pages_section(tool_names: Sequence[str]) -> str:
     return _PAGES_SECTION if SHOW_PAGE_TOOL in tool_names else ""
 
@@ -973,6 +986,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _lead_section(inputs.lead, inputs.tool_names),
         _agent_section(inputs.agent),
         f"{work}\n{_ending(inputs.mode, inputs.campaign_session)}",
+        _no_commands_section(inputs.tool_names),
         _ALWAYS_A_WAY,
         _habits_section(inputs.habits),
         f"{rest}\n- {_SECRETS_TYPED if inputs.approvals == 'yolo' else _SECRETS_REFUSED}\n{closing}",
