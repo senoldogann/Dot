@@ -146,8 +146,9 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   requires `gate`, `browser (pages)` and `browser (phone)`, up to date, for admins too: read on 2026-11-02), so the one
   way into `main` is a pull request whose checks passed. When a session begins, Dot reads where `main` stands on
   GitHub and takes a print of your checkout of Dot: its commit, the contents of every change to a tracked file and of
-  every file git does not track, its git config and its hooks read through their links. Files git ignores (`.venv`)
-  are not in it. It reads both again before it merges, and after every session it merged nothing for, one that
+  every file git does not track, its git config as git reads it (but the entries of branches other than `main`, which
+  `git push -u` of another agent's work writes: item 935) and its hooks read through their links. Files git ignores
+  (`.venv`) are not in it. It reads both again before it merges, and after every session it merged nothing for, one that
   failed too; what cannot be read counts as changed. When either changed by no doing of Dot's, the night stops at
   once: nothing of that session is merged, pulled or restarted but by its second look (below, with `merge =
   "on_pass"`), and you are told what changed (*A fix of Dot's own needs you*: "During the session main moved: #…", or
@@ -178,7 +179,8 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   while its head is the one looked at, your checkout is pulled when it is on `main`, and Dot restarts once idle. Its
   session is kept like any (its note begins `Second look:`); one that held it ends as yours (*Waits for you*, with its
   reason) and is not looked at again. A pull request found merged already counts its problem fixed, and the night
-  goes on. A look whose waits left the night less than a minute is not made, and the next night looks again.
+  goes on; a merged or closed one is settled before anything else is read (item 935). A look whose waits left the
+  night less than a minute is not made, and the next night looks again.
 
   What it does not read: a command by more than its words (what a script the session wrote did when run is read as a
   file of its change, not as what happened on the Mac), and the transcript is a file the session itself could have

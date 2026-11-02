@@ -34,7 +34,7 @@ from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
-type Mode = Literal["pr", "no_fix", "limited", "rogue", "rename", "tamper", "busy"]
+type Mode = Literal["pr", "no_fix", "limited", "rogue", "rename", "tamper", "busy", "tracked"]
 
 _REVIEW: str = "# Review\n\n## Always needs a human\n\n- `src/dotagent/policy/`\n- `src/dotagent/agent/review.py`\n"
 _GIT_ENV: dict[str, str] = {
@@ -106,6 +106,15 @@ elif mode == "rogue":
     # Past what its environment was meant to keep it from: straight to main (a local origin needs no sign-in).
     subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], check=True)
     answer = "Fixed.\\nREADY: fixed"
+elif mode == "tracked":
+    # Another agent's `git push -u` meanwhile: a section of its branch in the owner's git config, which a pull of main
+    # never reads (item 935).
+    subprocess.run(["git", "-C", "../../..", "config", "branch.another-agent.remote", "origin"], check=True)
+    Path("fix.txt").write_text("fixed\\n")
+    wrote("fix.txt")
+    subprocess.run(["git", "add", "fix.txt"], check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
+    answer = "Fixed it.\\nREADY: fixed"
 elif mode in ("pr", "busy"):
     again = "--resume" in sys.argv
     name = "fix-again.txt" if again else "fix.txt"
@@ -681,7 +690,9 @@ async def test_a_pull_request_found_merged_already_counts_fixed_and_the_night_go
     async with _night(login_env, stand_ins, "busy", "on_pass") as (runtime, restarts):
         (stand_ins / "look").write_text("NO VERDICT", encoding="utf-8")
         first, _ = await _play(runtime, restarts)
-        await runtime.store.kv_set(SESSIONS_KEY, night_module.SessionLog(sessions=first[:1]).model_dump_json())
+        # A session kept before item 933, with no record of where main stood (item 935: #752's).
+        unknown = first[0].model_copy(update={"main_before": None})
+        await runtime.store.kv_set(SESSIONS_KEY, night_module.SessionLog(sessions=(unknown,)).model_dump_json())
         # The owner merged it meanwhile; another problem waits in the book.
         (stand_ins / "merges").write_text("pr merge 7 --squash\n", encoding="utf-8")
         book: Book = read_book(await runtime.store.kv_get(BOOK_KEY))
@@ -697,3 +708,13 @@ async def test_a_pull_request_found_merged_already_counts_fixed_and_the_night_go
         assert restarts == ["restart" for session in second if session.end == "merged"]
         statuses: dict[str, str] = {p.id: p.status for p in read_book(await runtime.store.kv_get(BOOK_KEY)).problems}
         assert statuses[second[0].problem_id] == "fixed"
+
+
+async def test_another_branchs_section_written_in_the_owners_git_config_does_not_stop_the_night(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 935: on the owner's Mac a `git push -u` of another session's branch stopped a night's session as a change of
+    their checkout; such a section is left out of the print, and the fix is merged."""
+    async with _night(login_env, stand_ins, "tracked", "on_pass") as (runtime, restarts):
+        sessions, _ = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["merged"] and restarts == ["restart"]

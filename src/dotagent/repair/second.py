@@ -289,15 +289,17 @@ async def second_look(
     number: int | None = pr_number(pr_url)
     if number is None:
         return LookOutcome(end="held", why="no pull request to look at", outcome=None)
-    if UNCHECKED in moved:
-        return LookOutcome(end="held", why=f"after the session {UNCHECKED}", outcome=None)
-    if main_before is None:
-        return LookOutcome(end="held", why="where main stood when the session began is not known", outcome=None)
+    # Where it stands first: one merged or closed meanwhile is settled whatever else is known (item 935: #752, merged by
+    # hand, was held for the start of main its session kept no record of).
     head: PrHead = await pr_head(repo, number, env)
     if head.state == "MERGED":
         return LookOutcome(end="merged_before", why=MERGED_BEFORE, outcome=None)
     if head.state != "OPEN":
         return LookOutcome(end="closed", why=f"the pull request is {head.state.lower()}", outcome=None)
+    if UNCHECKED in moved:
+        return LookOutcome(end="held", why=f"after the session {UNCHECKED}", outcome=None)
+    if main_before is None:
+        return LookOutcome(end="held", why="where main stood when the session began is not known", outcome=None)
     listed: tuple[str, ...] = human_paths(await review_on_main(repo, env)) or ("*",)
     touched: tuple[str, ...] = needs_the_owner(await pr_files(repo, number, env), (*protected, *listed))
     if touched:

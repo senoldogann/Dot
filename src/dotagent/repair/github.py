@@ -531,6 +531,28 @@ async def has_commits(folder: Path, start: str, env: Mapping[str, str]) -> bool:
     return bool((await command(("git", "-C", str(folder), "rev-list", f"{start}..HEAD"), folder, env)).strip())
 
 
+def config_print(listed: str) -> str:
+    """The owner's git config as the print reads it (item 935), from what ``git config --list -z`` gives (each entry its
+    key, a line break and its value, ended by a NUL): every entry but those of a branch other than ``main``
+    (``branch.<name>.<key>``). Those are what ``git push -u`` and ``git branch`` write for any branch, another agent's
+    working in the owner's checkout among them, and on the owner's Mac they stopped every night's session as a change of
+    the checkout; a pull of main reads none of them. ``main``'s entries (its remote, what it merges) and every other
+    stay, as they decide what Dot pulls and runs. Git reads the file, so what it would act on is what the print holds
+    (the pre-push review: a parser of Dot's own read two headers on a line, and quotes escaped in a header, otherwise
+    than git)."""
+    kept: list[str] = []
+    for entry in listed.split("\0"):
+        if not entry:
+            continue
+        key: str = entry.split("\n", 1)[0]
+        if key.startswith("branch.") and key.count(".") >= 2:
+            name: str = key[len("branch.") : key.rindex(".")]
+            if name != "main":
+                continue
+        kept.append(entry)
+    return "\0".join(kept)
+
+
 def _files_print(paths: Sequence[Path]) -> str:
     """A digest of the contents of ``paths`` (a link read through to what it points at; a path with no file as such)."""
     digest = hashlib.sha256()
@@ -546,8 +568,9 @@ def _files_print(paths: Sequence[Path]) -> str:
 async def checkout_print(repo: Path, env: Mapping[str, str]) -> str:
     """A print of the owner's checkout at ``repo`` that changes when what Dot would pull and restart with does (the
     sixth and ninth reviews of item 921): the commit it stands on, the contents of every change to a tracked file
-    (``git diff HEAD``), the contents of every file git does not track and does not ignore, its git config and its
-    hooks (each read through its link: the review hook lives in the checkout). Files git ignores (``.venv``) are not in
+    (``git diff HEAD``), the contents of every file git does not track and does not ignore, its git config (but the
+    sections of branches other than main, :func:`config_print`) and its hooks (each read through its link: the review
+    hook lives in the checkout). Files git ignores (``.venv``) are not in
     it, which docs/repair.md says. A session runs with the owner's rights, so it could write there outside its own
     checkout; Dot compares the print before and after it, and before it merges."""
     head: str = await command(("git", "-C", str(repo), "rev-parse", "HEAD"), repo, env)
@@ -562,8 +585,12 @@ async def checkout_print(repo: Path, env: Mapping[str, str]) -> str:
     # settings are one git ignores, read by the review hook's reviewer.
     loose: list[Path] = [repo / name for name in untracked.split("\0") if name and not name.startswith(_WORKTREES)]
     settings: Path = repo / ".claude" / "settings.local.json"
-    files: str = await asyncio.to_thread(_files_print, [folder / "config", *hooks, *loose, settings])
-    return hashlib.sha256(f"{head}\n{changed}\n{files}".encode()).hexdigest()
+    files: str = await asyncio.to_thread(_files_print, [*hooks, *loose, settings])
+    # Read by git itself, its includes followed; a file git cannot read fails the print, which counts as changed.
+    listed: str = await command(
+        ("git", "config", "--file", str(folder / "config"), "--includes", "--list", "-z"), repo, env
+    )
+    return hashlib.sha256(f"{head}\n{changed}\n{config_print(listed)}\n{files}".encode()).hexdigest()
 
 
 async def pull_main(repo: Path, env: Mapping[str, str]) -> bool:

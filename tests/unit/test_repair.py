@@ -5,6 +5,7 @@ printed on the owner's Mac (2026-11-02), shortened."""
 
 import asyncio
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,7 @@ from dotagent.repair.github import (
     Check,
     all_passed,
     checks_of,
+    config_print,
     human_paths,
     needs_the_owner,
     pr_number,
@@ -529,3 +531,35 @@ async def test_a_transcript_that_cannot_be_read_is_a_repair_error_its_look_holds
     with pytest.raises(RepairError, match="transcript cannot be read"):
         await read_transcript(tmp_path)
     assert await read_transcript(tmp_path / "gone.jsonl") is None
+
+
+def test_the_print_of_the_owners_git_config_leaves_out_the_branches_but_main(tmp_path: Path) -> None:
+    """Item 935: `git push -u` of another agent's branch wrote such a section during a night and stopped its session;
+    main's section decides what a pull takes, and stays, as does every other entry. Git reads the file, so two headers
+    on one line and quotes escaped in a header are read as git acts on them (the pre-push review)."""
+    config: Path = tmp_path / "config"
+
+    def printed(text: str) -> str:
+        config.write_text(text, encoding="utf-8")
+        listed = subprocess.run(
+            ("git", "config", "--file", str(config), "--includes", "--list", "-z"),
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        return config_print(listed)
+
+    base = (
+        "[core]\n\thooksPath = .git/hooks\n"
+        '[branch "channel-links"]\n\tremote = origin\n\tmerge = refs/heads/channel-links\n'
+        '[branch "main"]\n\tremote = origin\n\tmerge = refs/heads/main\n'
+        '[remote "origin"]\n\turl = https://github.com/senoldogann/Dot.git\n'
+    )
+    kept = printed(base)
+    assert "channel-links" not in kept and "branch.main.merge" in kept and "core.hookspath" in kept
+    assert printed(base + '[branch "another"]\n\tremote = elsewhere\n') == kept
+    assert printed(base.replace('[branch "main"]\n\tremote = origin', '[branch "main"]\n\tremote = evil')) != kept
+    # Two headers on a line: git reads the key as core's.
+    assert printed(base + '[branch "x"] [core]\n\tfsmonitor = /tmp/payload\n') != kept
+    # A quote escaped in a subsection: the key after it is url's.
+    assert printed(base + '[url "https://h/x\\"y"]\n\tinsteadOf = https://github.com/\n') != kept
