@@ -207,6 +207,56 @@ function protections() {
   );
 }
 
+/**
+ * The owner's free mode (item 922), switched here while the daemon runs; the config file keeps it. On, no task asks
+ * anything, in any chat and any mode; off, each asks as its mode says.
+ */
+function buildFreeMode(isDisposed) {
+  let view = null;
+  const setting = switchRowSetting({
+    label: "Free mode: Dot asks you nothing",
+    hint: [
+      "On, no task asks you anything, in any chat and any mode: Dot pays, sends mail and messages for you, posts and puts projects live by itself, and records why it would have asked. Off, each chat asks as its mode says: YOLO only before a payment, a message or mail and a post, and Dot's own work keeps its mails and posts as drafts until you say yes.",
+      el(
+        "span",
+        { class: "rule-fine" },
+        "It holds from the next step of every task, with no restart. A refusal still stands (research stays read-only, trading keeps its limits). It is switched on from the Mac, not a phone. Kept in the config file as ",
+        el("code", { class: "mono" }, "[policy] free"),
+        ".",
+      ),
+    ],
+    read: () => view?.free === true,
+    write: async (on) => {
+      view = await api.put("/policy/free", { free: on });
+      toast("ok", on ? "Free mode is on: from the next step, no task asks you anything." : "Free mode is off: each chat asks as its mode says.");
+    },
+    onToggled: () => {
+      if (!isDisposed()) {
+        setting.paint();
+      }
+    },
+  });
+  setting.toggle.disabled = true;
+
+  async function load() {
+    try {
+      const found = await api.get("/policy/free");
+      if (isDisposed()) {
+        return;
+      }
+      view = found;
+      setting.toggle.disabled = false;
+      setting.paint();
+    } catch (error) {
+      if (!isDisposed()) {
+        readFailed("Free mode", error);
+      }
+    }
+  }
+
+  return { element: setting.element, load };
+}
+
 /** The macOS sandbox of a run's commands (item 262), switched here while the daemon runs; the config file keeps it. */
 function buildSandbox(isDisposed) {
   let view = null;
@@ -386,6 +436,7 @@ export function mount(root, ctx) {
 
   const adder = buildAdder({ onAdded: reload, isDisposed: () => disposed });
   const sandbox = buildSandbox(() => disposed);
+  const freeMode = buildFreeMode(() => disposed);
   const advanced = el(
     "details",
     { class: "set-card rule-advanced" },
@@ -412,6 +463,11 @@ export function mount(root, ctx) {
       "div",
       { class: "set-sections" },
       setSection({
+        title: "How Dot asks",
+        lead: "One switch for every chat: free, or asking as each chat's mode says.",
+        body: el("section", { class: "set-card rule-free", "aria-label": "How Dot asks" }, freeMode.element),
+      }),
+      setSection({
         title: "Add a rule",
         lead: "Say it in your own words. Dot turns it into a rule and shows it to you before anything changes.",
         body: adder.element,
@@ -435,6 +491,7 @@ export function mount(root, ctx) {
   const stopBack = onStreamBack(reload);
   attempt(reload);
   attempt(sandbox.load);
+  attempt(freeMode.load);
   return () => {
     disposed = true;
     stopLifecycle();

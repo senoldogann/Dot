@@ -21,6 +21,7 @@ from dotagent.channels.words import (
     language_of,
 )
 from dotagent.proactive.brief import TELL_TITLE
+from dotagent.proactive.checkin import TELL_TITLE as CHECKIN_TITLE
 from dotagent.proactive.initiative import DID_TITLE, LET_GO_SAID_TITLE, LET_GO_TITLE
 from dotagent.repair.night import FIXED_TITLE, READY_TITLE
 from dotagent.repair.night import NEEDS_YOU_TITLE as REPAIR_NEEDS_YOU
@@ -158,6 +159,7 @@ def test_the_titles_dot_gives_its_tells_have_their_turkish() -> None:
     """Item 918: a tell on iMessage is titled in the owner's language; a watcher's name is theirs and stays."""
     given: set[str] = {DID_TITLE, LET_GO_SAID_TITLE, LET_GO_TITLE, NEEDS_YOU_TITLE, TELL_TITLE}
     given |= {HELD_TITLE, TARGET_TITLE, STOP_TITLE, REFUSED_TITLE, FIXED_TITLE, READY_TITLE, REPAIR_NEEDS_YOU}
+    given |= {CHECKIN_TITLE}
     for title in given:
         assert TURKISH.title(title) != title and ENGLISH.title(title) == title
     assert set(TURKISH.titles) == given

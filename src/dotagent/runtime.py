@@ -565,11 +565,13 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             order=tuple(config.web.search_order),
         )
         router.on_retire(partial(_refresh_search_key, config, search_keys))
+        approvals: ApprovalBroker = ApprovalBroker(store, bus, config.policy.approval_timeout_s)
+        approvals.switch_free(config.policy.free)
         runtime: Runtime = Runtime(
             config=config,
             store=store,
             bus=bus,
-            approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
+            approvals=approvals,
             site_locks=SiteLocks(),
             awake=KeepAwake(),
             assistant=Assistant(config.assistant, await asyncio.to_thread(mac_first_name)),

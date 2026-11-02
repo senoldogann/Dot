@@ -518,8 +518,9 @@ def _secret_field_check(ctx: ToolContext) -> SecretFieldCheck:
     """What a batch does at a field that takes a secret. A yolo run asks nothing (item 443): the gate waives each field
     with its reason in the step's record. In every other mode text the user wrote in this run may go in — a password or
     a one-time code they gave, which is theirs to hand over — while text a page or a tool's output carries is refused
-    (item 797); a yes to the batch never covers a card number or a password (item 429)."""
-    if ctx.approvals != "yolo":
+    (item 797); a yes to the batch never covers a card number or a password (item 429). The owner's free mode is yolo
+    here too (item 922)."""
+    if ctx.approvals != "yolo" and not ctx.runtime.approvals.free:
 
         async def given(field: SecretField, text: str | None) -> None:
             if text and text in ctx.user_text():

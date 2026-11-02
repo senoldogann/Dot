@@ -162,7 +162,8 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
         session: TerminalSession = ctx.runtime.terminals.get(ctx.thread_id, args.session)
         lines, rest = typed_lines(session.pending_line, args.text)
         if session.awaiting_secret:
-            if ctx.approvals != "yolo":
+            # The owner's free mode is yolo here too (item 922).
+            if ctx.approvals != "yolo" and not ctx.runtime.approvals.free:
                 _refuse_secret(session)
             # A yolo run types the password (item 443), and the step is named by the session alone: what was typed would
             # otherwise stand in the summary that the events and the record of the step carry. One line, and only one:

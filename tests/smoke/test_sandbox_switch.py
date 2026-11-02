@@ -248,3 +248,40 @@ async def test_the_rules_page_shows_the_switch_and_moves_it(login_env: dict[str,
                     await page.close()
             finally:
                 await browser.close()
+
+
+FREE: str = "Free mode: Dot asks you nothing"
+
+
+async def test_free_mode_is_switched_on_the_rules_page_and_kept(login_env: dict[str, str], tmp_path: Path) -> None:
+    """Item 922: the owner's one switch for every chat. The API says it is off, the Rules page shows it first and moves
+    it, wide and on a phone, the gates of the runs read it at once, and the config file keeps ``[policy] free``."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env, True) as (runtime, address), async_playwright() as playwright:
+            async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
+                assert (await http.get("/api/policy/free")).json() == {"free": False}
+            host, port = "127.0.0.1", int(address.rpartition(":")[2])
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                for width, scheme in (_SHOTS[0], _SHOTS[3]):
+                    page: Page = await browser.new_page(
+                        viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+                    )
+                    await page.goto(ui_url(host, port, TOKEN))
+                    await page.goto(f"{address}/#/settings/rules")
+                    await expect(page.locator(".set-section-title").first).to_have_text("How Dot asks")
+                    switch: Locator = page.get_by_role("switch", name=FREE)
+                    await expect(switch).to_be_enabled()
+                    await expect(switch).to_have_attribute("aria-checked", "false")
+                    await switch.click()
+                    await expect(switch).to_have_attribute("aria-checked", "true")
+                    assert runtime.approvals.free is True
+                    assert "free = true" in (home / "config.toml").read_text(encoding="utf-8")
+                    await page.screenshot(path=tmp_path / f"free-mode-{width}-{scheme}.png")
+                    await switch.click()
+                    await expect(switch).to_have_attribute("aria-checked", "false")
+                    assert runtime.approvals.free is False
+                    assert "free = false" in (home / "config.toml").read_text(encoding="utf-8")
+                    await page.close()
+            finally:
+                await browser.close()

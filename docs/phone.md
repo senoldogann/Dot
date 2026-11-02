@@ -189,7 +189,8 @@ sign-in code, nor see or remove the paired phones, nor switch the iMessage chann
 (403), so a phone that is taken cannot open another way in, nor close yours. Nor can it widen for good what runs do
 without asking, which would outlast its removal (item 678, 403): add a connected app (a server Dot starts runs its
 command at each start of the daemon), or one another agent of the Mac set up, switch Dot's safe box for commands or its
-extra checker (the typed judge) off, add or switch on a rule that lets steps through (allow, pre-approved), delete or
+extra checker (the typed judge) off, switch free mode on (item 922), add or switch on a rule that lets steps through
+(allow, pre-approved), delete or
 switch off a rule that asks, or move any rule; what narrows (a rule that asks, the safe box on) it still does. What is
 shown or connected on the Mac alone (the eye of the vault, 1Password, a sign-in of Google or Microsoft, the microphone's
 pane of System Settings) answers the installation's token alone, never a phone's key, whatever address a phone's request

@@ -92,6 +92,9 @@ def eval_config(config: AppConfig) -> AppConfig:
             "plugins": PluginsConfig(dirs=[]),
             "desktop": config.desktop.model_copy(update={"enabled": False, "keep_awake": False}),
             "memory": config.memory.model_copy(update={"embed_enabled": False}),
+            # The owner's free mode is never an eval's (the pre-push review of item 922): an attempt asks as its task
+            # says, and a task the model wrote is held to the workspace by its questions (item 904).
+            "policy": config.policy.model_copy(update={"free": False}),
         }
     )
 

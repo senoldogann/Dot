@@ -16,6 +16,7 @@ from dotagent.llm.types import ModelInfo
 from dotagent.oauth.providers import ProviderId
 from dotagent.oauth.tokens import Account
 from dotagent.proactive.brief import BriefRequest, BriefView, brief_view, set_brief
+from dotagent.proactive.checkin import CheckinRequest, CheckinView, checkin_view, set_checkin
 from dotagent.proactive.github import GITHUB_TOKEN_NAME
 from dotagent.proactive.initiative import idle_seconds
 from dotagent.proactive.todos import (
@@ -157,6 +158,17 @@ def proactive_router(ctx: ServerContext) -> APIRouter:
         shows in ``GET /api/schedules`` as the brief; 422 for what the scheduler refuses (too many schedules on) and
         for lines that are too long or too many."""
         return await set_brief(ctx.runtime, request, time.time())
+
+    @router.get("/checkin")
+    async def get_checkin() -> CheckinView:
+        """The evening check-in as its card shows it (item 930)."""
+        return await checkin_view(ctx.runtime)
+
+    @router.put("/checkin")
+    async def put_checkin(request: CheckinRequest) -> CheckinView:
+        """Set the evening check-in: on, its time (``HH:MM``) and its days. Switched on it is a schedule of the
+        scheduler (``research``, read-only; its notice is always); 422 for what the scheduler refuses."""
+        return await set_checkin(ctx.runtime, request, time.time())
 
     @router.get("/watchers")
     async def list_all_watchers() -> list[WatcherView]:

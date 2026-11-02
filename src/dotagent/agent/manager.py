@@ -59,7 +59,16 @@ from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, 
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.orders import WorkDesk
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
-from dotagent.agent.parking import allowed_text, handed_back_text, parking_for
+from dotagent.agent.parking import (
+    EXACT_KEY,
+    Parking,
+    allowed_send_text,
+    allowed_text,
+    handed_back_text,
+    is_kept_send,
+    parking_for,
+    send_parking,
+)
 from dotagent.agent.picks import picked_groups, picks_problems
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import (
@@ -2136,13 +2145,20 @@ class RunManager:
         if not approve:
             return await self._runtime.approvals.resolve(record.id, False, source, note)
         if record.severity == "handoff":
-            await self._carry_kept(record, source, handed_back_text(record.id, note), note)
+            await self._carry_kept(record, source, handed_back_text(record.id, note), note, None)
+            return await self._runtime.approvals.resolve(record.id, True, source, note)
+        if is_kept_send(record.args):
+            # A send of a chat of Dot's own initiative (item 922): no yes is stored for any run of the chat to find. The
+            # run it reaches may do the step exactly as its card showed it, once; any other asks the owner again.
+            exact: bool = record.args.get(EXACT_KEY) is True
+            told: str = allowed_send_text(record.id, record.summary, note, exact)
+            await self._carry_kept(record, source, told, note, record.digest if exact else None)
             return await self._runtime.approvals.resolve(record.id, True, source, note)
         hours: float = self._runtime.config.policy.permit_hours
         granted: ApprovalRecord = await self._runtime.approvals.grant(record, source, note, now + hours * 3600.0)
         delivered: bool = False
         try:
-            await self._carry_kept(record, source, allowed_text(record.id, note), note)
+            await self._carry_kept(record, source, allowed_text(record.id, note), note, None)
             delivered = True
         finally:
             if not delivered:
@@ -2151,13 +2167,16 @@ class RunManager:
         await self._runtime.approvals.announce(granted)
         return granted
 
-    async def _carry_kept(self, record: ApprovalRecord, source: str, text: str, note: str) -> None:
+    async def _carry_kept(
+        self, record: ApprovalRecord, source: str, text: str, note: str, send_once: str | None
+    ) -> None:
         """Tell the step's chat what the owner answered to a step kept for them (items 482, 483), in Dot's words
         ``text``: the run working there reads them as the next thing it is told, and otherwise a new run goes on from
         the goal of the run that kept it, starting tainted when that run ended tainted; a session of a campaign that
         ended is followed by the campaign's next session instead, whose brief carries the answer (item 484). The words
         are Dot's: they clear no taint, and only the ``note`` the owner wrote is their instruction, which is all the new
-        run's goal adds to the goal it goes on from."""
+        run's goal adds to the goal it goes on from. ``send_once`` is the fingerprint of a kept send the owner said yes
+        to, which the run their answer reaches may do once (item 922)."""
         # A step a delegated run kept is answered to the run at the top, which delegated it (item 485).
         asked: RunRecord = await self._root_of(record.run_id)
         said: str = note.strip()
@@ -2170,11 +2189,17 @@ class RunManager:
             else self._handles.get(asked.id) or await self._session_at_work(record.scope_campaign_id)
         )
         if active is not None:
+            if is_kept_send(record.args):
+                # The owner is there now: a send this run cannot do on their yes asks them rather than keeps another
+                # card (the pre-push review of item 922).
+                active.gate.owner_answers_sends()
+            if send_once is not None:
+                active.gate.allow_send_once(send_once)
             try:
                 active.inbox.put_nowait(UserInput(text=text, files=(), question_id=record.id, vouches=False, said=said))
             except asyncio.QueueShutDown:
                 await active.finished.wait()
-                await self._carry_kept(record, source, text, note)
+                await self._carry_kept(record, source, text, note, send_once)
                 return
             log.info("kept_step_handed_back", approval_id=record.id, run_id=active.run_id, delivered="steer")
             return
@@ -2214,6 +2239,9 @@ class RunManager:
             None,
             asked.agent_id,
         )
+        if send_once is not None:
+            # Before its first step, which the run's start awaits nothing of yet.
+            self._handles[run.id].gate.allow_send_once(send_once)
         log.info("kept_step_handed_back", approval_id=record.id, run_id=run.id, delivered="run")
 
     async def _root_of(self, run_id: str) -> RunRecord:
@@ -2869,20 +2897,22 @@ class RunManager:
             kept_mode: ApprovalMode = "ask" if owners_word and approval_mode == "yolo" else approval_mode
             if parent_run_id is not None:
                 gate.keep_for(None if parent is None or kept_mode == "yolo" else parent.gate.parking)
+                # A helper keeps its sends where the run that delegated it does (item 922).
+                gate.keep_sends_for(None if parent is None else parent.gate.send_parking)
             else:
                 conversation_id: str = (
                     thread_id if campaign_id is None else (await runtime.store.get_campaign(campaign_id)).thread_id
                 )
-                gate.keep_for(
-                    parking_for(
-                        runtime.config.policy,
-                        kept_mode,
-                        source == EVAL_SOURCE,
-                        conversation_id,
-                        campaign_id,
-                        await runtime.store.schedule_of_thread(thread_id),
-                    )
+                schedule_id: str | None = await runtime.store.schedule_of_thread(thread_id)
+                parking: Parking | None = parking_for(
+                    runtime.config.policy, kept_mode, source == EVAL_SOURCE, conversation_id, campaign_id, schedule_id
                 )
+                gate.keep_for(parking)
+                # A run keeps its sends for the owner's yes, whatever [policy] unanswered says (item 922): at once in
+                # a chat of Dot's own initiative that nobody watches, else once nobody answered in time; and the run
+                # their yes starts there takes it.
+                if source != EVAL_SOURCE:
+                    gate.keep_sends_for(send_parking(conversation_id, campaign_id, schedule_id))
             cancel: asyncio.Event = asyncio.Event()
             inbox: RunInbox = RunInbox()
             finished: asyncio.Event = asyncio.Event()

@@ -525,6 +525,14 @@ def test_an_eval_run_works_in_dots_own_chrome_whatever_the_owners_browser_mode()
     assert (measured.browser.mode, measured.browser.headless) == ("own", True)
 
 
+def test_the_owners_free_mode_is_never_an_evals() -> None:
+    """The pre-push review of item 922: an attempt asks as its task says, and a task the model wrote is held to the
+    workspace by its questions (item 904), whatever the owner's free mode."""
+    default: AppConfig = load_default_config()
+    owner: AppConfig = default.model_copy(update={"policy": default.policy.model_copy(update={"free": True})})
+    assert eval_config(owner).policy.free is False
+
+
 def test_an_eval_run_needs_the_key_of_the_review_model_when_an_attempt_checks_the_end_of_its_run() -> None:
     config: AppConfig = eval_config(load_default_config())
     measured: str = "openai:gpt-5.5"

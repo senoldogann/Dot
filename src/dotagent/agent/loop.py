@@ -316,6 +316,13 @@ from dotagent.tools.work_orders import ASSIGN_WORK_TOOL, WORK_ORDER_TOOLS
 from dotagent.vault.onepassword import kept_token
 
 log = get_logger(__name__)
+# What a run is told when it starts while the owner's free mode is on (item 922): its steps wait for nobody, and a field
+# of a secret is typed as in yolo; the sandbox stays as its own mode has it.
+_FREE_MODE_LINE: str = (
+    "\n\nThe owner's free mode is on, as it stands when this run started: no step of yours waits for their answer, "
+    "a payment, a message or a post included; each is recorded with why it would have asked. Do what was asked, and "
+    "take no way around a refusal."
+)
 # The event of a run's start that found its notes or skills by their words alone (item 256).
 EMBEDDING_FAILED: str = "embedding_failed"
 
@@ -2326,6 +2333,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 group_purposes=purposes,
             )
         )
+        # The owner's free mode (item 922), as it stands when the run starts: the gate reads it at every step.
+        + (_FREE_MODE_LINE if runtime.approvals.free else "")
     )
     await runtime.bus.emit(run.id, "scaffold", scaffold_event(scaffold, config), True)
     # Every tool of the run counts, also the ones of groups that are off: a group the run turns on later must fit too.
