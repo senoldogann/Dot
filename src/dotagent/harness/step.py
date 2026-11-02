@@ -42,7 +42,7 @@ from dotagent.harness.contrast import (
     contrast_text,
 )
 from dotagent.harness.headroom import Attempt, ScoringPlan, plan_scoring, records_of
-from dotagent.harness.own import own_tasks, write_task
+from dotagent.harness.own import own_tasks, task_taken, write_task
 from dotagent.harness.probe import (
     BASE,
     CONFIRM_BASE,
@@ -68,6 +68,7 @@ from dotagent.harness.service import (
 )
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.types import split_model_ref
+from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
@@ -141,6 +142,8 @@ async def _why_not_adopted(store: Store, version_id: str, held: Sequence[str]) -
     return "left to you: what is in use changed while the step ran"
 
 
+# What a step says when no run is left to write a task from (item 931).
+NO_CLEAN_RUN: str = "no task: no run left that read only what is Dot's and the owner's and gave no task yet"
 # How many of the newest runs a step may learn from are weighed for the one that went worst (item 720).
 RUNS_WEIGHED: int = 30
 # How badly a run ended, worst highest: one that failed, then one that was stopped or held, then the rest.
@@ -159,6 +162,30 @@ async def pick_run(store: Store, since: float) -> RunRecord | None:
     errors: dict[str, int] = await store.tool_errors_of([run.id for run in runs])
     return max(
         runs,
+        key=lambda run: (_ENDED_BADLY.get(run.status, 0), errors.get(run.id, 0), run.finished_at or 0.0),
+        default=None,
+    )
+
+
+async def pick_clean_run(store: Store, since: float) -> RunRecord | None:
+    """The run a task is written from (item 931): of the runs :func:`pick_run` weighs, the one that went worst among
+    those that read no content third parties can author and that no task was written or tried from yet. The run the
+    step learns from is the worst of all, and on the owner's Mac it had always read a page or a mail (80 of 97 runs of a
+    week did), so a task was never written (item 904 writes none from such a run: what it read could shape the task a
+    model then plays with a run's rights). ``None`` when there is none."""
+    runs: list[RunRecord] = sorted(
+        (run for run in await store.runs_finished_since(since) if learns_from(run)),
+        key=lambda run: run.finished_at or 0.0,
+    )[-RUNS_WEIGHED:]
+    clean: list[RunRecord] = [
+        run
+        for run in runs
+        if not await store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS))
+        and not await task_taken(store, run.id)
+    ]
+    errors: dict[str, int] = await store.tool_errors_of([run.id for run in clean])
+    return max(
+        clean,
         key=lambda run: (_ENDED_BADLY.get(run.status, 0), errors.get(run.id, 0), run.finished_at or 0.0),
         default=None,
     )
@@ -190,8 +217,10 @@ def _changed(base: HarnessText, candidate: HarnessText) -> tuple[str, ...]:
 
 
 class _Outcome(FrozenModel):
-    """What a step came to: its state, its facts, and the error of a role that failed after the probes (the composer,
-    the experience writer), which leaves the step ``failed`` with the survivor probed all the same."""
+    """What a step came to: its state, its facts, and the error of a role that failed after the probes (the composer),
+    which leaves the step ``failed`` with the survivor probed all the same. The experience writer's failure is a
+    warning of the facts instead (item 931), which leaves the step as the probes decided it but adopts nothing on its
+    own."""
 
     state: HarnessStepState
     facts: dict[str, JsonValue]
@@ -228,8 +257,8 @@ async def _carry_out(
     now: float,
     task_run: str | None = None,
 ) -> _Outcome:
-    """The step ``step`` under ``base``, the version in use when it began, which ``scoring`` was planned for; on a
-    step that only tries the pool, ``task_run`` is the run a task is written from (item 904), which it does not take."""
+    """The step ``step`` under ``base``, the version in use when it began, which ``scoring`` was planned for;
+    ``task_run`` is the run a task is written from (items 904 and 931), the worst clean one, which it does not take."""
     store: Store = runtime.store
     config: HarnessConfig = runtime.config.harness
     # The values Dot holds, which a probe's own home cannot know: a stored text is played, or shown to a role, only as
@@ -239,6 +268,8 @@ async def _carry_out(
     held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     base_text: GivenText = NO_HARNESS if base is None else given_text(base, held)
     errors: list[str] = []
+    # What went wrong without changing the step's decision (item 931): shown with it, never as its failure.
+    warnings: list[str] = []
     # The tasks the loop wrote from the owner's runs (item 904), which a probe is given whole.
     own: dict[str, EvalTask] = await own_tasks(store)
     # Probe: the base first, then each candidate within what is left of the budget; a probe with nothing left plays
@@ -279,7 +310,7 @@ async def _carry_out(
     # nothing is proposed.
     if not scoring.ready:
         calibrated: ScoringPlan = scoring
-        task_note: str | None = None
+        task_note: str | None = None if plan.scripted else NO_CLEAN_RUN
         if task_run is not None:
             try:
                 written, task_note = await write_task(runtime, task_run, prober)
@@ -301,20 +332,43 @@ async def _carry_out(
             facts={"reason": "no run of the owner's ended since the last step that took one, a week back at most"},
             error=None,
         )
-    # The run as a task (item 904): a candidate written from the run is scored where the run went wrong, which the
-    # tasks of the pool, passed under any text, cannot show. A scripted check writes none (its roles answer from a
-    # script that holds no task); a writer that fails leaves the step to go on, failed in the end, as a proposer does.
+    # A run as a task (item 904): a candidate is scored where an owner's run went wrong, which the tasks of the pool,
+    # passed under any text, cannot show. The run is the worst that read only what is Dot's and the owner's (item
+    # 931), not always the one the candidates answer. A scripted check writes none (its roles answer from a script that
+    # holds no task); a writer that fails leaves the step to go on, failed in the end, as a proposer does.
     learned: EvalTask | None = None
     learned_note: str = "no task: a scripted check writes none"
-    if not plan.scripted:
+    if not plan.scripted and task_run is None:
+        learned_note = NO_CLEAN_RUN
+    elif not plan.scripted and task_run is not None:
         try:
-            learned, learned_note = await write_task(runtime, from_run, prober)
+            learned, learned_note = await write_task(runtime, task_run, prober)
         except DotError as exc:
             log.warning("harness_task_failed", step=step.id, error=exc.message)
             errors.append(f"the task writer failed: {exc.message}")
             learned_note = "no task: the writer failed"
     if learned is not None:
         own[learned.id] = learned
+    # Nothing tells a better text from luck (item 931): no task was written tonight, none the loop wrote has headroom,
+    # and every task of the pool with headroom passes in more than three quarters of its attempts. The step proposes and
+    # plays nothing then, and takes no run: it is marked ``no_signal``, which :func:`_since_last_step` passes over, so
+    # that the run that went worst is still there for the next step that proposes. A task writer that failed tonight
+    # still fails the step, so that the night never reads clean (the review).
+    if not plan.scripted and learned is None and not scoring.hard and not any(task in own for task in scoring.headroom):
+        left: str = "" if from_run is None else f"; {from_run} is left for a step that proposes"
+        return _Outcome(
+            state="keep",
+            facts={
+                "from_run": from_run,
+                "no_signal": True,
+                "task": learned_note,
+                "decision": (
+                    "nothing was proposed: no task tells a better text from luck (every task with headroom passes in "
+                    f"more than three quarters of its attempts, and none was written from a run){left}"
+                ),
+            },
+            error="; ".join(errors) or None,
+        )
     # Propose. A proposer whose answer is no proposal in one scope (the review module asked it twice already) leaves the
     # other scopes to be proposed and played (item 718): on 2026-10-24 one such answer lost the night. The step is
     # recorded failed all the same, with the error, and adopts nothing.
@@ -341,10 +395,13 @@ async def _carry_out(
         try:
             await _write_experience(runtime, step, from_run, base_text, candidates, contrasts, probed, held)
         except DotError as exc:
+            # The record of the night, not its decision (item 931): a writer whose answer was malformed leaves the
+            # step as the probes decided it, with a warning, rather than failed (on 2026-11-02 it made a night that
+            # had kept the base read as failed).
             log.warning("harness_experience_failed", step=step.id, error=exc.message)
-            errors.append(f"the experience writer failed: {exc.message}")
+            warnings.append(f"the experience writer failed: {exc.message}")
 
-    # The task written tonight is scored on first: it is where the run the candidates answer went wrong.
+    # The task written tonight is scored on first: it is where an owner's run went wrong.
     scored: tuple[str, ...] = scoring.scored if learned is None else (learned.id, *scoring.scored)
     base_report: ProbeReport = await played(BASE, base, scored)
     contrasts: list[Contrast] = []
@@ -371,6 +428,7 @@ async def _carry_out(
             "tokens": spent,
             "tainted": case.tainted,
             "errors": list(errors),
+            "warnings": list(warnings),
             "scored_on": list(scored),
             "task": learned_note,
         }
@@ -461,7 +519,10 @@ async def _carry_out(
         return found
 
     # The owner already decided about the survivor while the step ran: nothing is left to adopt or to leave to them.
-    if not decided and adopts_on_its_own(config.adopt, survivor, plan.repeats, case.tainted, failed=bool(errors)):
+    # A warning (the experience writer's failure) adopts nothing on its own either, as a failure does (item 588).
+    if not decided and adopts_on_its_own(
+        config.adopt, survivor, plan.repeats, case.tainted, failed=bool(errors) or bool(warnings)
+    ):
         sure: Contrast | None = None
         try:
             sure = await confirm()
@@ -489,6 +550,8 @@ async def _carry_out(
             decision = f"{decision}; left to you: the run had read content others can author"
         elif errors:
             decision = f"{decision}; left to you: the step failed after the probes"
+        elif warnings:
+            decision = f"{decision}; left to you: {warnings[0]}"
     facts: dict[str, JsonValue] = {**facts_now(), "decision": decision, "probed": probed.id}
     if confirmation is not None:
         facts["confirmation"] = confirmation
@@ -710,11 +773,13 @@ async def _since_last_step(store: Store, now: float) -> float:
     """When the newest step that learned from a run began, and never further back than :data:`_LOOKBACK_S` from
     ``now``: a scripted check (`--scripted`) is recorded like any step but does not move the window the next step
     learns from, nor does a step that took no run (item 719: one that only tried the pool, whatever it came to, or
-    found none to learn from), so that the run that went worst meanwhile is still there for the next step that
+    found none to learn from), nor one that proposed nothing for want of a task to tell a better text by (item 931,
+    ``no_signal``), so that the run that went worst meanwhile is still there for the next step that
     proposes. One rule bounds it: a week, whether the last step that took a run was longer ago or there was none."""
     oldest: float = now - _LOOKBACK_S
     for earlier in await store.harness_steps_with_run(oldest, _RECENT_STEPS):
-        if step_facts(earlier).get("scripted") is not True:
+        facts: dict[str, JsonValue] = step_facts(earlier)
+        if facts.get("scripted") is not True and facts.get("no_signal") is not True:
             return earlier.started_at
     return oldest
 
@@ -747,7 +812,7 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
     # have headroom. A store that cannot be read for it still leaves the step recorded, as failed.
     try:
         scoring: ScoringPlan = (
-            ScoringPlan(scored=plan.tasks, calibrated=(), headroom=(), untried=0, ready=True)
+            ScoringPlan(scored=plan.tasks, calibrated=(), headroom=(), untried=0, ready=True, hard=plan.tasks)
             if plan.scripted
             else await scoring_of(store, runtime.config.harness, base)
         )
@@ -759,17 +824,15 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
     # A step that only tries the pool learns from no run and takes none, not even one named by hand, which its decision
     # says: the run that went worst is left to the first step that proposes (item 719, pre-push review rounds 1 to 3).
     left_for_later: str | None = None
-    # The run a task is written from (item 904): the one the step learns from, or, on a step that only tries the pool,
-    # the one that went worst, which the step does not take: a pool every task of which is passed would leave the loop
-    # nothing to propose on for good, and the tasks written from the owner's runs are what gives it some.
+    # The run a task is written from (items 904 and 931), on any step: the worst run that read nothing third parties
+    # can author, which the step does not take. A pool every task of which is passed would leave the loop nothing to
+    # propose on for good, and the tasks written from the owner's runs are what gives it some.
     task_run: str | None = None
+    if not plan.scripted:
+        clean: RunRecord | None = await pick_clean_run(store, await _since_last_step(store, now))
+        task_run = None if clean is None else clean.id
     if not scoring.ready:
         left_for_later, from_run = from_run, None
-        if not plan.scripted:
-            worst: RunRecord | None = (
-                await pick_run(store, await _since_last_step(store, now)) if left_for_later is None else None
-            )
-            task_run = left_for_later if worst is None else worst.id
     elif from_run is None:
         since: float = await _since_last_step(store, now)
         picked: RunRecord | None = await pick_run(store, since)

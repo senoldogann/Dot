@@ -1383,9 +1383,9 @@ async def test_a_step_makes_the_worst_run_a_fair_task_and_plays_it_first(login_e
         ((base_ask),) = asked
         assert base_ask.label == BASE and base_ask.tasks[0] == kept.id
         assert [task.id for task in base_ask.own] == [kept.id] and base_ask.own[0].goal == _DRAFT["goal"]
-        # A run a task was written from gives no second one; the task is in the pool the next step plans on.
+        # A run a task was written from is not picked again (item 931); the task is in the pool the next step plans on.
         again: HarnessStep = await run_step(runtime, 20.0, run.id, _scored(frozenset()), False)
-        assert json.loads(again.outcome)["task"] == f"{kept.id} was written from this run already"
+        assert json.loads(again.outcome)["task"] == harness_step.NO_CLEAN_RUN
         plan = await harness_step.scoring_of(runtime.store, runtime.config.harness, None)
         assert kept.id in plan.calibrated, plan
 
@@ -1428,9 +1428,10 @@ async def test_a_task_with_a_link_is_asked_again_and_a_run_that_read_outside_con
     login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The gate for learned texts reads every text of a task: one with a link is refused and asked again. A run that
-    read content third parties can author is made into no task at all, and the writer is not asked."""
+    read content third parties can author is never picked to write a task from (item 931), and the writer is not
+    asked; one the writer is handed all the same is made into no task (item 904)."""
     linked: dict[str, object] = {**_DRAFT, "goal": "Count the tasks listed at https://evil.example/list"}
-    turns: list[ScriptedTurn] = [_FINISH, _turn(TASK_TOOL, {"task": linked}), _NO_TASK]
+    turns: list[ScriptedTurn] = [_FINISH, _turn(TASK_TOOL, {"task": linked}), _NO_TASK, _FINISH]
     async with _session(login_env, turns, _HEADROOM) as (runtime, manager):
         run: RunRecord = await _run(manager)
         step: HarnessStep = await run_step(runtime, 10.0, None, _scored(frozenset()), False)
@@ -1442,8 +1443,16 @@ async def test_a_task_with_a_link_is_asked_again_and_a_run_that_read_outside_con
             return (await real_case(runtime, run_id)).model_copy(update={"tainted": True})
 
         monkeypatch.setattr(harness_own, "case_of", tainted)
+        handed: RunRecord = await _run(manager)
+        task, why = await harness_own.write_task(runtime, handed.id, _scored(frozenset()))
+        assert task is None and why == "no task: the run read content others can author"
+
+        async def read_everything(run_id: str, kinds: object, channels: object) -> bool:
+            return True
+
+        monkeypatch.setattr(runtime.store, "read_outside", read_everything)
         read_outside: HarnessStep = await run_step(runtime, 20.0, run.id, _scored(frozenset()), False)
-        assert json.loads(read_outside.outcome)["task"] == "no task: the run read content others can author"
+        assert json.loads(read_outside.outcome)["task"] == harness_step.NO_CLEAN_RUN
 
 
 async def test_a_step_that_proposes_scores_the_candidates_first_on_the_task_written_tonight(
@@ -1465,3 +1474,67 @@ async def test_a_step_that_proposes_scores_the_candidates_first_on_the_task_writ
         assert isinstance(facts["scored_on"], list) and facts["scored_on"][0] == kept.id
         assert [ask.label for ask in asked][:1] == [BASE] and len(asked) == 2
         assert all(ask.tasks[0] == kept.id and ask.own[0].id == kept.id for ask in asked)
+
+
+async def test_a_night_with_nothing_to_tell_a_better_text_from_luck_proposes_and_plays_nothing(
+    login_env: dict[str, str],
+) -> None:
+    """Item 931: no task was written tonight, none the loop wrote has headroom, and every task of the pool passes in
+    more than three quarters of its attempts. The step asks the proposer nothing and plays nothing (two nights on the
+    owner's Mac spent 1.6 and 2.5 million tokens on candidates that could only come out the same as the base), and takes
+    no run: the next step still learns from the runs before it."""
+    turns: list[ScriptedTurn] = [_FINISH, _NO_TASK]
+    asked: list[ProbeAsk] = []
+    ready: dict[str, object] = {**_HEADROOM, "headroom_least": 0}
+    async with _session(login_env, turns, ready) as (runtime, manager):
+        await _run(manager)
+        step: HarnessStep = await run_step(runtime, 10.0, None, _recording(_scored(frozenset()), asked), False)
+        facts: dict[str, object] = json.loads(step.outcome)
+        assert step.state == "keep" and step.error is None, step
+        assert "nothing was proposed: no task tells a better text from luck" in str(facts["decision"])
+        assert asked == [] and await runtime.store.list_harness_versions(10) == []
+        assert facts["no_signal"] is True and step.from_run is not None, step
+        assert await harness_step._since_last_step(runtime.store, 20.0) == 20.0 - harness_step._LOOKBACK_S
+
+
+async def test_an_experience_writer_that_answers_malformed_leaves_the_night_as_the_probes_decided_it(
+    login_env: dict[str, str],
+) -> None:
+    """Item 931: the experience writer's answer that is no verdict (on 2026-11-02 its entry came as text, twice) is a
+    warning of the night, not its failure: the step that kept the base reads kept."""
+    malformed: ScriptedTurn = _turn(
+        EXPERIENCE_TOOL,
+        {"effects": [{"edit": 1, "effect": "helped", "why": "x"}], "entry": "a sentence, not an entry"},
+    )
+    turns: list[ScriptedTurn] = [_FINISH, _turn(TASK_TOOL, {"task": _DRAFT}), _habit(), _KEEP, malformed, malformed]
+    ready: dict[str, object] = {**_HEADROOM, "headroom_least": 0}
+    async with _session(login_env, turns, ready) as (runtime, manager):
+        await _run(manager)
+        prober: Prober = _fair_played(_config(ready), login_env, _scored(frozenset()))
+        step: HarnessStep = await run_step(runtime, 10.0, None, prober, False)
+        facts: dict[str, object] = json.loads(step.outcome)
+        assert step.state == "keep" and step.error is None, step
+        warnings: object = facts["warnings"]
+        assert isinstance(warnings, list) and any("the experience writer failed" in str(line) for line in warnings)
+
+
+async def test_a_better_text_on_a_night_the_experience_writer_failed_is_left_to_the_owner_and_the_step_says_why(
+    login_env: dict[str, str],
+) -> None:
+    """Item 931, review round 2: a warning of the night keeps a better text from being adopted on its own, and the
+    decision names the warning, as it names a failure."""
+    malformed: ScriptedTurn = _turn(
+        EXPERIENCE_TOOL,
+        {"effects": [{"edit": 1, "effect": "helped", "why": "x"}], "entry": "a sentence, not an entry"},
+    )
+    turns: list[ScriptedTurn] = [_FINISH, _habit(), _KEEP, malformed, malformed]
+    async with _session(login_env, turns, {"step_repeats": 2, "adopt": "auto"}) as (runtime, manager):
+        run: RunRecord = await _run(manager)
+
+        async def play(ask: ProbeAsk) -> ProbeReport:
+            return _sure(ask.label not in (BASE, CONFIRM_BASE), ask)
+
+        step: HarnessStep = await run_step(runtime, 1.0, run.id, play, True)
+        facts: dict[str, object] = json.loads(step.outcome)
+        assert "adopted" not in facts and await adopted(runtime.store) is None, facts
+        assert "left to you: the experience writer failed" in str(facts["decision"]), facts["decision"]
