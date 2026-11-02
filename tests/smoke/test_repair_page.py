@@ -112,12 +112,10 @@ async def test_off_it_says_how_to_turn_it_on(browser: Browser, runtime: Runtime)
     async with _serving(runtime) as address:
         page: Page = await _open(browser, address, 1280)
         try:
-            await expect(
-                page.get_by_text("Set [repair] repo to the checkout of Dot's code to turn it on.")
-            ).to_be_visible()
+            await expect(page.get_by_text("Set [repair] repo to turn it on")).to_be_visible()
             await expect(page.get_by_role("button", name="Run now")).to_have_count(0)
             await expect(page.get_by_text("owner@example.invalid · Org")).to_be_visible()
-            await expect(page.get_by_text("No problems")).to_be_visible()
+            await expect(page.get_by_text("Nothing in line")).to_be_visible()
         finally:
             await page.close()
 
@@ -126,22 +124,31 @@ async def test_off_it_says_how_to_turn_it_on(browser: Browser, runtime: Runtime)
 async def test_on_it_shows_the_problems_their_fixes_and_the_sessions(
     browser: Browser, runtime: Runtime, width: int, tmp_path: Path
 ) -> None:
+    """Item 932: an overview leads; what waits for the owner, the nights by date and the problems next in line follow,
+    a few of them and the rest a click away, the closed ones folded, a problem's placeholders read as words."""
+    now: float = time.time()
     seen: list[Sighting] = [
-        Sighting(kind="daemon", words="schedule_start_failed: no such effort", evidence="a", at=time.time() - 60),
-        Sighting(kind="daemon", words="schedule_start_failed: no such effort", evidence="b", at=time.time() - 30),
-        Sighting(
-            kind="tool_error", words="browser_open: taking the page snapshot failed", evidence="c", at=time.time()
+        Sighting(kind="daemon", words="schedule_start_failed: no such effort", evidence="a", at=now - 60),
+        Sighting(kind="daemon", words="schedule_start_failed: no such effort", evidence="b", at=now - 30),
+        Sighting(kind="tool_error", words="browser_open: waited 15 s for 'Allow'", evidence="w", at=now - 20),
+        *(
+            Sighting(kind="tool_error", words=f"{name}: broke", evidence=name, at=now - number)
+            for number, name in enumerate(("alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf"), 1)
         ),
     ]
-    book = with_sightings(EMPTY_BOOK, seen, time.time())
+    book = with_sightings(EMPTY_BOOK, seen, now)
     fixed = next(problem for problem in book.problems if problem.kind == "daemon")
+    waited = next(problem for problem in book.problems if problem.title.startswith("browser_open"))
     book = with_problem(book, fixed.model_copy(update={"status": "fixed", "pr_url": PR}))
+    book = with_problem(
+        book, waited.model_copy(update={"status": "waiting", "pr_url": PR, "note": "It changes REVIEW.md"})
+    )
     session = RepairSession(
         problem_id=fixed.id,
         account="owner@example.invalid",
         session_id="s-1",
-        started_at=time.time() - 3600,
-        ended_at=time.time() - 3000,
+        started_at=now - 3600,
+        ended_at=now - 3000,
         rounds=2,
         input_tokens=120_000,
         output_tokens=9_000,
@@ -158,17 +165,26 @@ async def test_on_it_shows_the_problems_their_fixes_and_the_sessions(
     async with _serving(on) as address:
         page: Page = await _open(browser, address, width)
         try:
-            await expect(page.get_by_text("On: 05:30 each night, merged once every check passes")).to_be_visible()
+            overview = page.get_by_role("group", name="Overview")
+            await expect(overview).to_contain_text("On, 05:30")
+            await expect(overview).to_contain_text("Merged once every check passes")
+            await expect(overview.locator(".stat-tile")).to_have_count(4)
             await expect(page.get_by_role("button", name="Run now")).to_be_enabled()
-            problems = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Problems"))
-            await expect(problems.locator(".set-row")).to_have_count(2)
-            await expect(problems.get_by_text("Fixed", exact=True)).to_be_visible()
-            await expect(problems.get_by_text("Open", exact=True)).to_be_visible()
-            await expect(problems.get_by_role("link", name="Pull request")).to_have_attribute("href", PR)
-            sessions = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Sessions"))
-            await expect(sessions.get_by_text("Merged", exact=True)).to_be_visible()
-            await expect(sessions).to_contain_text("2 rounds · 129k tokens · owner@example.invalid")
-            await expect(sessions).to_contain_text("schedule_start_failed: no such effort")
+            waiting = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Waits for you"))
+            await expect(waiting.locator(".set-row")).to_have_count(1)
+            # The book's placeholders read as words.
+            await expect(waiting).to_contain_text("browser_open: waited … s for “…”")
+            await expect(waiting.get_by_role("link", name="Pull request")).to_have_attribute("href", PR)
+            nights = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Nights"))
+            await expect(nights.get_by_text("Merged", exact=True)).to_be_visible()
+            await expect(nights).to_contain_text("2 rounds · 129k tokens · owner@example.invalid")
+            await expect(nights).to_contain_text("1 session")
+            line = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Next in line"))
+            await expect(line.locator(".set-row")).to_have_count(5)
+            await line.get_by_role("button", name="Show all 7").click()
+            await expect(line.locator(".set-row")).to_have_count(7)
+            closed = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Closed"))
+            await expect(closed.get_by_text("1 fixed or not Dot's")).to_be_visible()
             assert await page.evaluate(FITS)
             await page.screenshot(path=tmp_path / f"repair-{width}.png", full_page=True)
         finally:

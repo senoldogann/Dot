@@ -5423,8 +5423,9 @@
   }
 }
 
-/* Settings › Self-repair (items 919-921): a problem's or a session's status beside the link of its pull request; a fix
-   merged is good, one that waits for the owner is a warning. */
+/* Settings › Self-repair (items 919-921, its look item 932): a row's status beside the link of its pull request; a
+   fix merged is good, one that waits for the owner a warning. A problem's words keep to two lines (whole on a hover),
+   a note to one that opens whole. */
 .repair-status {
   display: inline-flex;
   align-items: center;
@@ -5432,9 +5433,53 @@
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-.badge.repair-fixed {
+.badge.repair-good {
   color: var(--ok);
 }
-.badge.repair-waiting {
+.badge.repair-warn {
   color: var(--warn);
+}
+.repair-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.repair-note {
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.repair-note > summary {
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  list-style: none;
+}
+.repair-note > summary::-webkit-details-marker {
+  display: none;
+}
+.repair-note[open] > summary {
+  display: none;
+}
+.repair-note > p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.repair-night-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-weight: var(--weight-title);
+}
+.repair-more {
+  align-self: flex-start;
+}
+.repair-closed > summary {
+  cursor: pointer;
+  color: var(--muted);
+  margin-bottom: var(--space-2);
 }

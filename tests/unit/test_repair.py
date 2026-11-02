@@ -45,6 +45,7 @@ from dotagent.repair.problems import (
     EMPTY_BOOK,
     Sighting,
     fingerprint,
+    is_defect,
     log_sightings,
     next_problem,
     normalized,
@@ -370,3 +371,8 @@ def test_a_usage_report_of_another_shape_lists_no_window() -> None:
         usage_of([json.dumps({"usage_report": {"rate_limits": {"limits": [{"kind": "session", "percent": True}]}}})])
         == ()
     )
+
+
+def test_a_host_name_that_does_not_resolve_is_no_defect_of_dots() -> None:
+    """Item 932: the first repair night found four guessed hosts NXDOMAIN, which the book counted as a defect."""
+    assert not is_defect("the host name could not be resolved")
