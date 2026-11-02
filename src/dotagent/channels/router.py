@@ -42,7 +42,7 @@ from dotagent.channels.inbox import Incoming
 from dotagent.channels.intake import FILES_ONLY_NOTE, UNREAD_NOTE
 from dotagent.channels.pictures import Found, Pictures
 from dotagent.channels.progress import APART_S, FIRST_AFTER_S, Progress, first_sentence, step_words
-from dotagent.channels.text import as_plain_text, cut_with_link, one_line
+from dotagent.channels.text import as_plain_text, cut_answer, cut_with_link, one_line
 from dotagent.channels.types import TITLES, Channel, ChannelId, is_stop
 from dotagent.channels.words import ENGLISH, SpokenLanguage, Words
 from dotagent.core.errors import DotError, NotFoundError, RunConflict
@@ -160,6 +160,8 @@ class ChannelRouter:
         language: SpokenLanguage | None = None,
     ) -> None:
         self._store: Store = runtime.store
+        # The most words of an answer that go (item 928; 0: no cap).
+        self._answer_words: int = runtime.config.channels.answer_words
         # Where the files the owner sends are kept, as uploads (item 806).
         self._workspace: Path = runtime.workspace
         # The language of the lines the router writes itself (item 805); with none they are in English.
@@ -692,7 +694,7 @@ class ChannelRouter:
         note: str = redact_known(found.note(said), known)
         words: str = as_plain_text(found.text)
         room: int = channel.limit - ((len(note) + _NOTE_APART) if note else 0)
-        body: str = cut_with_link(words, room, self.link(run_id), said) if words else ""
+        body: str = cut_answer(words, self._answer_words, room, self.link(run_id), said) if words else ""
         message: str = "\n\n".join(part for part in (body, note) if part)
         if message:
             await self._deliver(channel_id, message, known)

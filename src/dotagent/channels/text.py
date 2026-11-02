@@ -424,6 +424,45 @@ def cut_with_link(text: str, limit: int, link: str | None, words: Words = ENGLIS
     return f"{head.rstrip()}{tail}"
 
 
+# A word of an answer, as the cap on a channel's answer counts them (item 928), and the end of a sentence in it.
+_WORD: re.Pattern[str] = re.compile(r"\S+")
+# Not the dot of a short form ("e.g."), nor that of a numbered item, a number alone at the start of its line ("2."),
+# where an answer cut ends on an empty item (the fourth pre-push review); a sentence that ends on a number ("Total 42.")
+# does end there (the fifth).
+_SENTENCE_END: re.Pattern[str] = re.compile(r"(?<!\b[a-z])[.!?…](?=\s|$)")
+_ITEM_NUMBER: re.Pattern[str] = re.compile(r"(?:^|\n)[ \t]*\d+\.$")
+
+
+def first_words(text: str, count: int) -> str | None:
+    """The start of ``text`` up to its ``count``-th word (item 928), ended at the last end of a sentence in its last
+    third when there is one, so that a cut answer ends on a whole sentence; None when ``text`` has no more words than
+    ``count``. The spacing and the lines of what is kept are as they were."""
+    found: list[re.Match[str]] = list(_WORD.finditer(text))
+    if len(found) <= count:
+        return None
+    head: str = text[: found[count - 1].end()]
+    floor: int = found[max(0, (count * 2) // 3 - 1)].end()
+    ends: list[int] = [
+        end.end()
+        for end in _SENTENCE_END.finditer(head)
+        if end.end() >= floor and _ITEM_NUMBER.search(head, 0, end.end()) is None
+    ]
+    return head[: ends[-1]] if ends else head
+
+
+def cut_answer(text: str, most_words: int, limit: int, link: str | None, words: Words) -> str:
+    """``text`` as a channel sends a run's answer (item 928): at most ``most_words`` words (0: no cap), the rest named
+    by the line that says where it is, as :func:`cut_with_link` says it, and within ``limit`` characters in any case.
+    The cap is the code's, not only the model's instruction: the DeepSeek Harness super-agent article holds an IM reply
+    to 100 words at most as the norm of a chat app, and a model told so still writes past it."""
+    head: str | None = first_words(text, most_words) if most_words > 0 else None
+    if head is None:
+        return cut_with_link(text, limit, link, words)
+    tail: str = words.rest_on_mac if link is None else f"{words.rest_in_dot}{link}"
+    cut: str = f"{head.rstrip()}{tail}"
+    return cut if len(cut) <= limit else cut_with_link(text, limit, link, words)
+
+
 def one_line(text: str, chars: int) -> str:
     """``text`` as one line of at most ``chars`` characters, its marks left out and its end marked when it was cut."""
     flat: str = plain_line(text, len(text))

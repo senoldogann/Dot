@@ -848,6 +848,10 @@ progress = "steps"
 # progress, how a run ended, what was left out. "auto" (the default) speaks the language of your last message there,
 # English or Turkish; "en" or "tr" holds one. An answer is in the language the model wrote it in.
 language = "auto"
+# answer_words: the most words of a run's answer that go there (item 928), cut at the end of a sentence when one is
+# close, then a line with the link to the rest in Dot; a run started from a channel is told to write in 100 words.
+# 0 sends the whole answer (within the 2,000 characters a message holds).
+answer_words = 100
 
 [reactions]
 # Reactions on Dot's messages (item 586, docs/runs.md): a button under each message of Dot's opens a palette: 👍 good,

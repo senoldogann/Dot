@@ -555,6 +555,8 @@ class ChannelsConfig(FrozenModel):
     imessage: bool
     progress: ProgressMode
     language: Literal["auto", "en", "tr"] = "auto"
+    # The most words of a run's answer a channel sends (item 928), the rest a link away; 0 sends it whole.
+    answer_words: int = Field(default=100, ge=0, le=2000)
 
 
 # What a reaction does once the run it is about has ended (item 586): ``follow_up`` starts a run in the same chat, as
