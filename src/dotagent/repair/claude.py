@@ -19,9 +19,10 @@ line that reads commands by their first words, not every spelling of them."""
 import asyncio
 import contextlib
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, StrictFloat, StrictInt, ValidationError
 
@@ -53,6 +54,9 @@ DENIED_TOOLS: tuple[str, ...] = (
     "Bash(gh auth:*)",
     "Bash(git credential:*)",
     "Bash(git credential-osxkeychain:*)",
+    # A helper agent's tools go to a transcript of its own, which the second look does not read (item 933).
+    "Agent",
+    "Task",
 )
 # The names of the environment a session never gets: each makes ``claude`` bill an API or a cloud instead of the plan.
 _BILLING_NAMES: frozenset[str] = frozenset(
@@ -96,6 +100,35 @@ _STDERR_KEPT: int = 4000
 _KEPT_TYPES: frozenset[str] = frozenset({"system", "rate_limit_event", "result"})
 
 
+# The models a session may be given, by Claude Code's own names for the newest of each family; ``default`` is the one
+# Claude Code picks for the account itself.
+type ClaudeModel = Literal["default", "fable", "opus", "sonnet", "haiku"]
+# How hard a session thinks (``--effort``); ``default`` is Claude Code's own.
+type ClaudeEffort = Literal["default", "low", "medium", "high", "xhigh", "max"]
+
+
+class WorkerChoice(FrozenModel):
+    """How Claude Code works for Dot (item 933), as the owner chose it on Settings › Self-repair: its model, how hard it
+    thinks and whether it answers in fast mode. Fast mode is billed to a plan as extra usage: an account without extra
+    usage runs at the standard speed, which the session's stream says (:attr:`ClaudeOutcome.fast_mode`)."""
+
+    model: ClaudeModel
+    effort: ClaudeEffort
+    fast: bool
+
+
+# Until the owner chooses: Claude Code's own model and effort, at the standard speed.
+DEFAULT_WORKER: WorkerChoice = WorkerChoice(model="default", effort="default", fast=False)
+# The settings every session runs with, besides fast mode (item 933): no line of Claude's in a commit or a pull request
+# (the owner's ask: Claude Code's own default adds a ``Co-Authored-By`` trailer and a footer), the object form Claude
+# Code 2.1 documents (``attribution: false`` makes older versions skip the whole settings).
+_ATTRIBUTION: dict[str, str | bool] = {"commit": "", "pr": "", "sessionUrl": False}
+# The MCP servers a session gets: those Dot gives it, never the owner's own (``--strict-mcp-config``). Without it a
+# session took every server of the owner's Claude Code (measured 2026-11-02: their Chrome DevTools server, Claude Docs
+# and the claude.ai connectors, Gmail and Drive among them, waiting only for a sign-in).
+NO_MCP: str = '{"mcpServers":{}}'
+
+
 class ClaudeAccount(FrozenModel):
     """The account ``claude`` is signed in with: its address and its organisation (``oauthAccount`` of its state)."""
 
@@ -128,6 +161,10 @@ class ClaudeOutcome(FrozenModel):
     limit: LimitWindow | None
     exit_code: int | None
     timed_out: bool
+    # Whether the session answered in fast mode (``on``, ``off``, ``cooldown``) and, off, why
+    # (``extra_usage_disabled``), as its stream said; ``None`` when it said nothing of it.
+    fast_mode: str | None
+    fast_mode_off_why: str | None
 
 
 def account_of(state_text: str) -> ClaudeAccount | None:
@@ -176,14 +213,33 @@ def worker_env(env: Mapping[str, str], scratch: Path) -> dict[str, str]:
     return kept
 
 
-def claude_argv(binary: str, prompt: str, resume: str | None) -> tuple[str, ...]:
-    """The command of one session: ``prompt`` to a new session, or to the one ``resume`` names."""
+def worker_settings(worker: WorkerChoice) -> str:
+    """The ``--settings`` of a session that works as ``worker`` says: fast mode or not, and no attribution."""
+    return json.dumps({"fastMode": worker.fast, "attribution": _ATTRIBUTION}, separators=(",", ":"))
+
+
+def worker_flags(worker: WorkerChoice) -> tuple[str, ...]:
+    """The flags of the model and the effort ``worker`` chose, none for Claude Code's own."""
+    model: tuple[str, ...] = () if worker.model == "default" else ("--model", worker.model)
+    effort: tuple[str, ...] = () if worker.effort == "default" else ("--effort", worker.effort)
+    return (*model, *effort)
+
+
+def claude_argv(binary: str, prompt: str, resume: str | None, worker: WorkerChoice, mcp_config: str) -> tuple[str, ...]:
+    """The command of one session: ``prompt`` to a new session, or to the one ``resume`` names, working as ``worker``
+    says, with the MCP servers of ``mcp_config`` (JSON) and no other."""
     again: tuple[str, ...] = () if resume is None else ("--resume", resume)
     return (
         binary,
         "-p",
         prompt,
         *again,
+        *worker_flags(worker),
+        "--settings",
+        worker_settings(worker),
+        "--strict-mcp-config",
+        "--mcp-config",
+        mcp_config,
         "--output-format",
         "stream-json",
         "--verbose",
@@ -193,6 +249,34 @@ def claude_argv(binary: str, prompt: str, resume: str | None) -> tuple[str, ...]
         "none",
         "--disallowedTools",
         *DENIED_TOOLS,
+    )
+
+
+# The tools of a second look (item 933): it reads the checkout and the change, and can change nothing.
+LOOK_TOOLS: tuple[str, ...] = ("Read", "Grep", "Glob")
+
+
+def look_argv(binary: str, prompt: str, worker: WorkerChoice) -> tuple[str, ...]:
+    """The command of a second look: ``prompt`` to a new session that may only read (:data:`LOOK_TOOLS`), with no MCP
+    server and nothing kept to resume, working as ``worker`` says."""
+    return (
+        binary,
+        "-p",
+        prompt,
+        *worker_flags(worker),
+        "--settings",
+        worker_settings(worker),
+        "--strict-mcp-config",
+        "--mcp-config",
+        NO_MCP,
+        "--tools",
+        *LOOK_TOOLS,
+        "--no-session-persistence",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--permission-prompts",
+        "none",
     )
 
 
@@ -227,6 +311,8 @@ def outcome_of(lines: Iterable[str], exit_code: int | None, timed_out: bool, std
     session_id: str | None = None
     limit: LimitWindow | None = None
     result: dict[str, object] | None = None
+    fast: str | None = None
+    fast_off: str | None = None
     for line in lines:
         try:
             item: object = json.loads(line)
@@ -238,6 +324,11 @@ def outcome_of(lines: Iterable[str], exit_code: int | None, timed_out: bool, std
         named: object = item.get("session_id")
         if isinstance(named, str) and named:
             session_id = named
+        state: object = item.get("fast_mode_state")
+        if isinstance(state, str) and state:
+            fast = state
+            why_off: object = item.get("fast_mode_disabled_reason")
+            fast_off = why_off if isinstance(why_off, str) and why_off else None
         if kind == "rate_limit_event":
             limit = _limit_of(item.get("rate_limit_info")) or limit
         elif kind == "result":
@@ -256,6 +347,8 @@ def outcome_of(lines: Iterable[str], exit_code: int | None, timed_out: bool, std
             limit=limit,
             exit_code=exit_code,
             timed_out=timed_out,
+            fast_mode=fast,
+            fast_mode_off_why=fast_off,
         )
     usage: object = result.get("usage")
     tokens: dict[str, object] = usage if isinstance(usage, dict) else {}
@@ -277,6 +370,8 @@ def outcome_of(lines: Iterable[str], exit_code: int | None, timed_out: bool, std
         limit=limit,
         exit_code=exit_code,
         timed_out=timed_out,
+        fast_mode=fast,
+        fast_mode_off_why=fast_off,
     )
 
 
@@ -305,12 +400,11 @@ async def _read_tail(stream: asyncio.StreamReader) -> str:
     return data.decode("utf-8", errors="replace")[-_STDERR_KEPT:]
 
 
-async def run_claude(
-    binary: str, cwd: Path, prompt: str, resume: str | None, env: Mapping[str, str], timeout_s: float
-) -> ClaudeOutcome:
-    """Run one session of ``binary`` in ``cwd`` with ``env``, at most ``timeout_s`` (then it is ended, with everything
-    it started). Raises :class:`RepairError` when the program cannot be started."""
-    argv: tuple[str, ...] = claude_argv(binary, prompt, resume)
+async def run_claude(argv: Sequence[str], cwd: Path, env: Mapping[str, str], timeout_s: float) -> ClaudeOutcome:
+    """Run one session, the command ``argv`` (:func:`claude_argv`, :func:`look_argv`), in ``cwd`` with ``env``, at most
+    ``timeout_s`` (then it is ended, with everything it started). Raises :class:`RepairError` when the program cannot
+    be started."""
+    binary: str = argv[0]
     try:
         process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
             *argv,
@@ -363,6 +457,8 @@ async def run_claude(
         cost_usd=round(outcome.cost_usd, 4),
         timed_out=timed_out,
         exit_code=process.returncode,
+        fast_mode=outcome.fast_mode,
+        fast_mode_off_why=outcome.fast_mode_off_why,
     )
     return outcome
 
@@ -387,7 +483,7 @@ USAGE_ARGS: tuple[str, ...] = (
     "--no-session-persistence",
     "--strict-mcp-config",
     "--mcp-config",
-    '{"mcpServers":{}}',
+    NO_MCP,
 )
 USAGE_TIMEOUT_S: float = 60.0
 

@@ -18,7 +18,7 @@ from playwright.async_api import Browser, Page, async_playwright, expect
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
-from dotagent.repair.night import SESSIONS_KEY, RepairSession, SessionLog
+from dotagent.repair.night import FAST_KEY, SESSIONS_KEY, WORKER_KEY, FastSeen, RepairSession, SessionLog
 from dotagent.repair.problems import BOOK_KEY, EMPTY_BOOK, Sighting, with_problem, with_sightings
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -189,3 +189,50 @@ async def test_on_it_shows_the_problems_their_fixes_and_the_sessions(
             await page.screenshot(path=tmp_path / f"repair-{width}.png", full_page=True)
         finally:
             await page.close()
+
+
+async def test_the_claude_code_card_keeps_the_model_effort_and_fast_mode_chosen(
+    browser: Browser, runtime: Runtime, tmp_path: Path
+) -> None:
+    """Item 933: each control saves at once, the page reads it back, and the fast mode line says what the last session
+    that asked for it got."""
+    seen = FastSeen(state="off", why="extra_usage_disabled", at=time.time() - 60)
+    await runtime.store.kv_set(FAST_KEY, seen.model_dump_json())
+    async with _serving(runtime) as address:
+        page: Page = await _open(browser, address, 390)
+        try:
+            card = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Claude Code"))
+            await expect(card.get_by_label("Model")).to_have_value("default")
+            await card.get_by_label("Model").select_option("opus")
+            await expect(page.get_by_text("Saved: the next night works so.")).to_be_visible()
+            await card.get_by_label("Effort").select_option("xhigh")
+            await card.get_by_role("switch", name="Fast mode").click()
+            await expect(card.get_by_role("switch", name="Fast mode")).to_have_attribute("aria-checked", "true")
+            await expect(card).to_contain_text("the account has no extra usage, which fast mode is billed to")
+            kept = await runtime.store.kv_get(WORKER_KEY)
+            assert kept is not None and json.loads(kept) == {"model": "opus", "effort": "xhigh", "fast": True}
+            await page.reload()
+            await expect(card.get_by_label("Effort")).to_have_value("xhigh")
+            assert await page.evaluate(FITS)
+            await card.screenshot(path=tmp_path / "claude-code-card-390.png")
+        finally:
+            await page.close()
+            await runtime.store.kv_delete(WORKER_KEY)
+            await runtime.store.kv_delete(FAST_KEY)
+
+
+async def test_a_choice_that_cannot_be_read_is_said_and_chosen_again(browser: Browser, runtime: Runtime) -> None:
+    """The fourth pre-push review of item 933: the nights stop on it, but the page opens and takes a new one."""
+    await runtime.store.kv_set(WORKER_KEY, '{"model": "retired"}')
+    async with _serving(runtime) as address:
+        page: Page = await _open(browser, address, 1280)
+        try:
+            card = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Claude Code"))
+            await expect(card.get_by_text("Choose again")).to_be_visible()
+            await card.get_by_label("Model").select_option("sonnet")
+            await expect(card.get_by_text("Choose again")).to_have_count(0)
+            kept = await runtime.store.kv_get(WORKER_KEY)
+            assert kept is not None and json.loads(kept)["model"] == "sonnet"
+        finally:
+            await page.close()
+            await runtime.store.kv_delete(WORKER_KEY)

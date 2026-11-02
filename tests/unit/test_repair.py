@@ -3,19 +3,25 @@ the environment a session gets, the book of problems, REVIEW.md's paths that nee
 request and the last line of an answer. The lines of the stream are those ``claude -p --output-format stream-json``
 printed on the owner's Mac (2026-11-02), shortened."""
 
+import asyncio
 import json
 from pathlib import Path
 
 import pytest
 
+from dotagent.core.errors import RepairError
 from dotagent.repair.claude import (
+    DEFAULT_WORKER,
     DENIED_TOOLS,
+    NO_MCP,
     SCRATCH_NAMES,
     ClaudeAccount,
     LimitWindow,
+    WorkerChoice,
     account_of,
     claude_argv,
     limited,
+    look_argv,
     outcome_of,
     usage_of,
     usage_room,
@@ -31,13 +37,16 @@ from dotagent.repair.github import (
     settled,
 )
 from dotagent.repair.night import (
+    WORKER_KEY,
     KeptWindow,
     RepairSession,
     answer_of,
     brief,
     checks_brief,
+    looks_due,
     pr_title,
     problem_after,
+    read_worker,
     review_brief,
     room_left,
 )
@@ -54,6 +63,8 @@ from dotagent.repair.problems import (
     with_problem,
     with_sightings,
 )
+from dotagent.repair.second import read_transcript, outside, trace_of, transcript_path, verdict_of
+from dotagent.store.db import Store
 from dotagent.store.models import EventRecord
 
 _REPO: Path = Path(__file__).resolve().parents[2]
@@ -127,12 +138,92 @@ def test_a_session_gets_no_key_that_bills_another_than_the_plan_and_throwaway_fo
 
 
 def test_a_session_runs_with_nobody_to_answer_and_never_merges() -> None:
-    argv = claude_argv("claude", "fix it", "s-1")
+    argv = claude_argv("claude", "fix it", "s-1", DEFAULT_WORKER, NO_MCP)
     assert argv[:3] == ("claude", "-p", "fix it") and argv[3:5] == ("--resume", "s-1")
     joined: str = " ".join(argv)
     assert "--permission-mode auto" in joined and "--permission-prompts none" in joined
     assert "--output-format stream-json" in joined and "Bash(gh pr merge:*)" in DENIED_TOOLS
-    assert "--resume" not in claude_argv("claude", "fix it", None)
+    assert "--resume" not in claude_argv("claude", "fix it", None, DEFAULT_WORKER, NO_MCP)
+    # Claude Code's own model and effort until the owner chooses; no MCP server of the owner's (item 933).
+    assert "--model" not in argv and "--effort" not in argv
+    assert argv[argv.index("--mcp-config") + 1] == NO_MCP and "--strict-mcp-config" in argv
+
+
+def test_a_session_works_with_the_model_effort_and_speed_chosen_and_signs_nothing_as_claude() -> None:
+    """Item 933: the owner's choice reaches the command, and no commit or pull request carries Claude's line."""
+    chosen = WorkerChoice(model="opus", effort="xhigh", fast=True)
+    argv = claude_argv("claude", "fix it", None, chosen, NO_MCP)
+    assert argv[argv.index("--model") + 1] == "opus" and argv[argv.index("--effort") + 1] == "xhigh"
+    settings = json.loads(argv[argv.index("--settings") + 1])
+    assert settings == {"fastMode": True, "attribution": {"commit": "", "pr": "", "sessionUrl": False}}
+    plain = claude_argv("claude", "x", None, DEFAULT_WORKER, NO_MCP)
+    assert json.loads(plain[plain.index("--settings") + 1])["fastMode"] is False
+
+
+def test_a_second_look_may_only_read() -> None:
+    argv = look_argv("claude", "look", WorkerChoice(model="sonnet", effort="default", fast=False))
+    tools = argv[argv.index("--tools") + 1 : argv.index("--tools") + 4]
+    assert tools == ("Read", "Grep", "Glob") and "--permission-mode" not in argv
+    assert "--strict-mcp-config" in argv and argv[argv.index("--model") + 1] == "sonnet"
+    assert "--no-session-persistence" in argv
+
+
+def test_the_stream_says_whether_a_session_ran_in_fast_mode_and_why_not() -> None:
+    off = _RESULT.replace(
+        '"is_error": false',
+        '"is_error": false, "fast_mode_state": "off", "fast_mode_disabled_reason": "extra_usage_disabled"',
+    )
+    outcome = outcome_of([_INIT, off], 0, False, "")
+    assert (outcome.fast_mode, outcome.fast_mode_off_why) == ("off", "extra_usage_disabled")
+    plain = outcome_of([_INIT, _RESULT], 0, False, "")
+    assert (plain.fast_mode, plain.fast_mode_off_why) == (None, None)
+
+
+_TRANSCRIPT: tuple[str, ...] = (
+    json.dumps({"type": "user", "message": {"content": "fix it"}}),
+    "not json",
+    json.dumps(
+        {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {"type": "text", "text": "Reading."},
+                    {"type": "tool_use", "name": "Bash", "input": {"command": "rg -n snapshot src"}},
+                    {"type": "tool_use", "name": "Edit", "input": {"file_path": "/w/.claude/worktrees/repair-a/x.py"}},
+                    {"type": "tool_use", "name": "Write", "input": {"file_path": "/w/.git/hooks/pre-push"}},
+                    {"type": "tool_use", "name": "NotebookEdit", "input": {"notebook_path": "n.ipynb"}},
+                    {"type": "tool_use", "name": "Read", "input": {"file_path": "/etc/hosts"}},
+                ]
+            },
+        }
+    ),
+)
+
+
+def test_a_transcript_says_what_a_session_wrote_and_ran_and_what_is_outside_its_checkout() -> None:
+    """Item 933: the writes as the tools named them (a read is none), the commands in order; a relative path is read
+    from the checkout, and ``..`` by its words."""
+    trace = trace_of(_TRANSCRIPT)
+    assert trace.commands == ("rg -n snapshot src",) and not trace.delegated
+    assert trace.written == ("/w/.claude/worktrees/repair-a/x.py", "/w/.git/hooks/pre-push", "n.ipynb")
+    folder = Path("/w/.claude/worktrees/repair-a")
+    assert outside(trace.written, folder) == ("/w/.git/hooks/pre-push",)
+    assert outside(("../../../loosened.py", "sub/../ok.py", "/w/.claude/worktrees/repair-ab/x"), folder) == (
+        "../../../loosened.py",
+        "/w/.claude/worktrees/repair-ab/x",
+    )
+
+
+def test_a_transcript_is_where_claude_code_names_the_folder_of_its_checkout() -> None:
+    path = transcript_path(Path("/h/.claude/projects"), Path("/Users/me/Dot/.claude/worktrees/repair-prb_1-2a"), "s-1")
+    assert path == Path("/h/.claude/projects/-Users-me-Dot--claude-worktrees-repair-prb-1-2a/s-1.jsonl")
+
+
+def test_a_look_answers_merge_or_hold_on_its_last_line() -> None:
+    assert verdict_of("Read it all.\nMERGE: the fix and its test only") == ("merge", "the fix and its test only")
+    assert verdict_of("HOLD: a hook was written\n") == ("hold", "a hook was written")
+    assert verdict_of("MERGE: fine\nbut then more")[0] == "none"
+    assert verdict_of("")[0] == "none"
 
 
 def test_the_stream_says_the_session_its_answer_its_tokens_and_the_plans_window() -> None:
@@ -376,3 +467,65 @@ def test_a_usage_report_of_another_shape_lists_no_window() -> None:
 def test_a_host_name_that_does_not_resolve_is_no_defect_of_dots() -> None:
     """Item 932: the first repair night found four guessed hosts NXDOMAIN, which the book counted as a defect."""
     assert not is_defect("the host name could not be resolved")
+
+
+def test_a_second_look_is_due_for_a_pull_request_whose_newest_session_ended_as_main_moved() -> None:
+    """Item 933: due while the problem waits with that pull request and its newest session ended so; a look that held
+    it, ending as the owner's, is newer, so it is not looked at twice."""
+    book = with_sightings(EMPTY_BOOK, [Sighting(kind="daemon", words="x: y", evidence="e", at=1.0)], 2.0)
+    problem = book.problems[0].model_copy(update={"status": "waiting", "pr_url": "https://github.com/o/r/pull/7"})
+    book = with_problem(book, problem)
+    moved = RepairSession(
+        problem_id=problem.id,
+        account="a@b.dev",
+        session_id="s-1",
+        started_at=1.0,
+        ended_at=2.0,
+        rounds=1,
+        input_tokens=0,
+        output_tokens=0,
+        cost_usd=0.0,
+        end="main_moved",
+        pr_url=problem.pr_url,
+        note="During the session your checkout of Dot changed",
+        window=None,
+    )
+    assert looks_due(book, [moved]) == ((problem, moved),)
+    held = moved.model_copy(update={"started_at": 3.0, "end": "needs_owner", "note": "Second look: no"})
+    assert looks_due(book, [moved, held]) == ()
+    assert looks_due(with_problem(book, problem.model_copy(update={"status": "fixed"})), [moved]) == ()
+    assert looks_due(book, [moved.model_copy(update={"pr_url": ""})]) == ()
+
+
+def test_a_session_may_hand_no_work_to_a_helper_whose_transcript_the_look_does_not_read() -> None:
+    """The second pre-push review of item 933: a helper agent's tools are in a transcript of its own."""
+    assert {"Agent", "Task"} <= set(DENIED_TOOLS)
+    helper = json.dumps(
+        {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Agent", "input": {"prompt": "x"}}]}}
+    )
+    assert trace_of([helper]).delegated
+
+
+async def test_a_choice_of_how_claude_code_works_that_cannot_be_read_stops_the_night(tmp_path: Path) -> None:
+    """The third pre-push review of item 933: never a model or an effort the owner did not choose."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        assert await read_worker(store) == DEFAULT_WORKER
+        await store.kv_set(WORKER_KEY, WorkerChoice(model="opus", effort="max", fast=False).model_dump_json())
+        assert (await read_worker(store)).model == "opus"
+        await store.kv_set(WORKER_KEY, '{"model": "gpt"}')
+        with pytest.raises(RepairError, match="choose it again"):
+            await read_worker(store)
+    finally:
+        await store.close()
+
+
+async def test_a_transcript_that_cannot_be_read_is_a_repair_error_its_look_holds(tmp_path: Path) -> None:
+    """The fifth pre-push review of item 933: text that is no UTF-8, or a folder, never fails the night."""
+    broken: Path = tmp_path / "s.jsonl"
+    await asyncio.to_thread(broken.write_bytes, b'{"type": "assistant"}\n\xe2\x82')
+    with pytest.raises(RepairError, match="transcript cannot be read"):
+        await read_transcript(broken)
+    with pytest.raises(RepairError, match="transcript cannot be read"):
+        await read_transcript(tmp_path)
+    assert await read_transcript(tmp_path / "gone.jsonl") is None

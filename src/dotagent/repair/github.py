@@ -42,6 +42,8 @@ _REVIEW_FILE: re.Pattern[str] = re.compile(r"the review is in (\S+\.md)")
 _RUN_ID: re.Pattern[str] = re.compile(r"/actions/runs/(\d+)")
 # The folder of Claude Code's own checkouts under the owner's.
 _WORKTREES: str = ".claude/worktrees/"
+# The most commits of main a second look reads for one with no pull request (item 933).
+_MOST_COMMITS_READ: int = 100
 # What is kept of a failed check's log for the session.
 _LOG_KEPT: int = 6000
 
@@ -198,8 +200,13 @@ async def branch_items(folder: Path, env: Mapping[str, str]) -> tuple[int, ...]:
     subjects: str = await command(
         ("git", "-C", str(folder), "log", "--reverse", "--format=%s", "origin/main..HEAD"), folder, env
     )
+    return items_of(subjects.splitlines())
+
+
+def items_of(subjects: Sequence[str]) -> tuple[int, ...]:
+    """The item numbers of commit ``subjects``, in order, each once (``Item <n>: ...``, ``Items <n> and <m>: ...``)."""
     found: list[int] = []
-    for subject in subjects.splitlines():
+    for subject in subjects:
         head: re.Match[str] | None = _ITEM_SUBJECT.match(subject)
         if head is not None:
             found.extend(int(number) for number in re.findall(r"\d+", head.group(1)))
@@ -331,6 +338,109 @@ async def pr_state(repo: Path, number: int, env: Mapping[str, str]) -> str:
     """The state of the pull request ``number`` (``OPEN``, ``MERGED``, ``CLOSED``)."""
     data: object = _json(await command(("gh", "pr", "view", str(number), "--json", "state"), repo, env), "its state")
     return str(data.get("state", "")) if isinstance(data, dict) else ""
+
+
+class PrHead(FrozenModel):
+    """Where a pull request stands (item 933): its state (``OPEN``, ``MERGED``, ``CLOSED``), its branch, the commit its
+    branch is at, and GitHub's ``mergeStateStatus`` of it (``BEHIND`` main, ``UNKNOWN`` while GitHub works it out,
+    ``CLEAN``, ``BLOCKED`` and the others)."""
+
+    state: str
+    branch: str
+    sha: str
+    merge_state: str
+
+    @property
+    def behind(self) -> bool:
+        return self.merge_state == "BEHIND"
+
+    @property
+    def known(self) -> bool:
+        """Whether GitHub has said where it stands against main."""
+        return self.merge_state not in ("", "UNKNOWN")
+
+
+async def pr_head(repo: Path, number: int, env: Mapping[str, str]) -> PrHead:
+    """Where the pull request ``number`` stands, read now. Raises :class:`RepairError` for an answer that names none."""
+    raw: str = await command(
+        ("gh", "pr", "view", str(number), "--json", "state,headRefName,headRefOid,mergeStateStatus"), repo, env
+    )
+    data: object = _json(raw, "its head")
+    if not isinstance(data, dict):
+        raise RepairError("GitHub's CLI named no head of the pull request", {"number": number, "output": raw[:400]})
+    state: object = data.get("state")
+    branch: object = data.get("headRefName")
+    sha: object = data.get("headRefOid")
+    if not isinstance(state, str) or not isinstance(branch, str) or not isinstance(sha, str) or not sha:
+        raise RepairError("GitHub's CLI named no head of the pull request", {"number": number, "output": raw[:400]})
+    merge_state: object = data.get("mergeStateStatus")
+    return PrHead(state=state, branch=branch, sha=sha, merge_state=merge_state if isinstance(merge_state, str) else "")
+
+
+async def pr_items(repo: Path, number: int, env: Mapping[str, str]) -> tuple[int, ...]:
+    """The item numbers of the commits of the pull request ``number``, as GitHub holds them."""
+    raw: str = await command(
+        ("gh", "pr", "view", str(number), "--json", "commits", "--jq", ".commits[].messageHeadline"), repo, env
+    )
+    return items_of(raw.splitlines())
+
+
+async def commits_without_pr(repo: Path, since: str, env: Mapping[str, str]) -> tuple[str, ...]:
+    """The commits main holds on GitHub after ``since`` that belong to no merged pull request (item 933): GitHub's
+    protection lets none in but through one, so one there came past it. Raises :class:`RepairError` for more than
+    :data:`_MOST_COMMITS_READ` of them, which are not all read."""
+    await command(("git", "-C", str(repo), "fetch", "--quiet", "origin", "main"), repo, env)
+    listed: str = await command(("git", "-C", str(repo), "rev-list", f"{since}..origin/main"), repo, env)
+    shas: list[str] = [line for line in listed.splitlines() if line]
+    if len(shas) > _MOST_COMMITS_READ:
+        raise RepairError("main moved by too many commits to read", {"since": since, "commits": len(shas)})
+    strays: list[str] = []
+    for sha in shas:
+        merged: str = await command(
+            (
+                "gh",
+                "api",
+                f"repos/{{owner}}/{{repo}}/commits/{sha}/pulls",
+                "--jq",
+                "[.[] | select(.merged_at != null)] | length",
+            ),
+            repo,
+            env,
+        )
+        if merged.strip() in ("", "0"):
+            strays.append(sha)
+    return tuple(strays)
+
+
+async def checkout_clean(repo: Path, env: Mapping[str, str]) -> bool:
+    """Whether the owner's checkout at ``repo`` has no change to a tracked file and stands on a commit of main on
+    GitHub (item 933): what a merge would pull into and restart with."""
+    changed: str = await command(("git", "-C", str(repo), "status", "--porcelain", "--untracked-files=no"), repo, env)
+    if changed.strip():
+        return False
+    try:
+        await command(("git", "-C", str(repo), "merge-base", "--is-ancestor", "HEAD", "origin/main"), repo, env)
+    except RepairError:
+        return False
+    return True
+
+
+async def update_branch(repo: Path, number: int, env: Mapping[str, str]) -> None:
+    """Bring the branch of the pull request ``number`` up to main on GitHub (a merge of main into it), so that its
+    checks run on what a merge would make."""
+    await command(("gh", "pr", "update-branch", str(number)), repo, env)
+
+
+async def pr_diff(repo: Path, number: int, env: Mapping[str, str]) -> str:
+    """The change of the pull request ``number`` as GitHub holds it, a unified diff."""
+    return await command(("gh", "pr", "diff", str(number)), repo, env)
+
+
+async def checkout_at(repo: Path, folder: Path, branch: str, sha: str, env: Mapping[str, str]) -> None:
+    """A checkout of its own at ``folder`` of the commit ``sha`` of ``branch`` on GitHub, fetched first, on no
+    branch."""
+    await command(("git", "-C", str(repo), "fetch", "--quiet", "origin", branch), repo, env)
+    await command(("git", "-C", str(repo), "worktree", "add", "--detach", str(folder), sha), repo, env)
 
 
 async def drop_remote_branch(repo: Path, branch: str, env: Mapping[str, str]) -> None:

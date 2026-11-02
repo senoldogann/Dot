@@ -40,8 +40,8 @@ from dotagent.mcp.catalogue import ServiceKind
 from dotagent.mcp.types import McpFailure
 from dotagent.notify.keys import keys_problem
 from dotagent.policy.types import ApprovalMode
-from dotagent.repair.claude import ClaudeAccount
-from dotagent.repair.night import RepairSession
+from dotagent.repair.claude import ClaudeAccount, WorkerChoice
+from dotagent.repair.night import FastSeen, RepairSession
 from dotagent.repair.problems import Problem
 from dotagent.scheduler import NightWork
 from dotagent.secrets import SecretSource
@@ -2204,7 +2204,7 @@ class RulesUsage(FrozenModel):
 class RepairView(FrozenModel):
     """Settings › Self-repair (items 919-921): whether it is on (a repository to repair) and how it merges, the account
     of ``claude`` signed in on this Mac (``None``: none), the book of problems, the sessions kept, the newest first,
-    and whether a night is under way."""
+    whether a night is under way, and how Claude Code works for it."""
 
     repo: str
     time: str
@@ -2214,3 +2214,8 @@ class RepairView(FrozenModel):
     problems: list[Problem]
     sessions: list[RepairSession]
     running: bool
+    # How Claude Code works for Dot (item 933), and whether the last session that asked for fast mode got it.
+    worker: WorkerChoice
+    # The kept choice cannot be read: the nights stop until the owner chooses again (``worker`` shows the default).
+    worker_lost: bool
+    fast_seen: FastSeen | None

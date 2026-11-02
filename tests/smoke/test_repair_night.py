@@ -33,7 +33,7 @@ from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
-type Mode = Literal["pr", "no_fix", "limited", "rogue", "rename", "tamper"]
+type Mode = Literal["pr", "no_fix", "limited", "rogue", "rename", "tamper", "busy"]
 
 _REVIEW: str = "# Review\n\n## Always needs a human\n\n- `src/dotagent/policy/`\n- `src/dotagent/agent/review.py`\n"
 _GIT_ENV: dict[str, str] = {
@@ -55,6 +55,24 @@ if sys.argv[1:3] == ["-p", "/usage"]:
         {"kind": "session", "percent": float(used), "resets_at": "2100-01-01T00:00:00+00:00", "is_active": True},
         {"kind": "weekly_scoped", "percent": 100, "is_active": False}]}}}))
     sys.exit(0)
+if "--tools" in sys.argv:
+    # A second look (item 933): it may only read; its verdict is the file "look"'s, MERGE by default.
+    with (here / "looks.jsonl").open("a") as looks:
+        looks.write(json.dumps({"argv": sys.argv[1:], "cwd": os.getcwd()}) + "\\n")
+    verdict = (here / "look").read_text().strip() if (here / "look").exists() else "MERGE: the change is its fix alone"
+    print(json.dumps({"type": "system", "subtype": "init", "session_id": "look-1"}))
+    print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "result": "Read it.\\n" + verdict,
+                      "session_id": "look-1", "total_cost_usd": 0.1, "num_turns": 2, "permission_denials": [],
+                      "usage": {"input_tokens": 50, "output_tokens": 5}}))
+    sys.exit(0)
+# The session's transcript, where Claude Code keeps it: its writes, as its tools name them.
+import re
+projects = Path(os.environ["CLAUDE_CONFIG_DIR"]) / "projects" / re.sub(r"[^A-Za-z0-9]", "-", os.getcwd())
+projects.mkdir(parents=True, exist_ok=True)
+def wrote(path):
+    use = {"type": "tool_use", "name": "Write", "input": {"file_path": str(Path(path).resolve())}}
+    with (projects / "s-7.jsonl").open("a") as transcript:
+        transcript.write(json.dumps({"type": "assistant", "message": {"content": [use]}}) + "\\n")
 with (here / "calls.jsonl").open("a") as calls:
     calls.write(json.dumps({"argv": sys.argv[1:], "cwd": os.getcwd(), "keys": sorted(os.environ),
                             "dot_home": os.environ.get("DOT_HOME", ""),
@@ -70,7 +88,9 @@ say({"type": "rate_limit_event", "session_id": "s-7", "rate_limit_info": {"statu
 if mode == "tamper":
     # Outside its own checkout, in the owner's (three folders up: .claude/worktrees/<name>), and a fix of its own.
     Path("../../../loosened.py").write_text("ALLOW_EVERYTHING = True\\n")
+    wrote("../../../loosened.py")
     Path("fix.txt").write_text("fixed\\n")
+    wrote("fix.txt")
     subprocess.run(["git", "add", "fix.txt"], check=True)
     subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
     answer = "Fixed.\\nREADY: fixed"
@@ -85,12 +105,24 @@ elif mode == "rogue":
     # Past what its environment was meant to keep it from: straight to main (a local origin needs no sign-in).
     subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], check=True)
     answer = "Fixed.\\nREADY: fixed"
-elif mode == "pr":
+elif mode in ("pr", "busy"):
     again = "--resume" in sys.argv
     name = "fix-again.txt" if again else "fix.txt"
     Path(name).write_text("fixed\\n")
+    wrote(name)
+    if mode == "busy":
+        # Meanwhile another agent of the owner's leaves a folder in their checkout: no write of the session's.
+        Path("../../../another-agent").mkdir(exist_ok=True)
+        Path("../../../another-agent/notes.md").write_text("mine\\n")
     subprocess.run(["git", "add", name], check=True)
     subprocess.run(["git", "commit", "-q", "-m", "Item 1: answer the review" if again else "Item 1: fix"], check=True)
+    if mode == "busy" and (here / "push_main").exists():
+        # And, by a command of its own its transcript does not show, a commit of its own straight to main.
+        def out(*argv):
+            return subprocess.run(argv, check=True, capture_output=True, text=True).stdout.strip()
+        base = out("git", "rev-parse", "origin/main")
+        sneak = out("git", "commit-tree", base + "^{tree}", "-p", base, "-m", "sneak")
+        subprocess.run(["git", "push", "-q", "origin", sneak + ":refs/heads/main"], check=True)
     if (here / "forge").exists():
         # A mark of a passed review, as the hook writes one, for the commit it has not reviewed.
         git_dir = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], check=True,
@@ -114,9 +146,36 @@ import json, sys
 from pathlib import Path
 here = Path(__file__).resolve().parent
 args = sys.argv[1:]
-if args[:2] == ["pr", "view"]:
+if args[:2] == ["pr", "view"] and "state,headRefName,headRefOid,mergeStateStatus" in args:
+    import subprocess
+    listed = subprocess.run(["git", "-C", str(here.parent / "origin.git"), "branch", "--list", "repair/*",
+                             "--format=%(refname:short) %(objectname)"], check=True, capture_output=True, text=True)
+    branch, sha = listed.stdout.split()
+    merged = (here / "merges").exists()
+    behind = (here / "merge_state").exists() and not (here / "updates").exists()
+    print(json.dumps({"state": "MERGED" if merged else "OPEN", "headRefName": branch, "headRefOid": sha,
+                      "mergeStateStatus": "BEHIND" if behind else "CLEAN"}))
+elif args[:2] == ["pr", "view"] and "commits" in args:
+    print("Item 1: fix")
+elif args[:1] == ["api"] and "/commits/" in args[1]:
+    # Every commit of main belongs to a merged pull request, but when the session pushed to main itself.
+    print("0" if (here / "push_main").exists() else "1")
+elif args[:2] == ["pr", "view"]:
     files = [line for line in (here / "files").read_text().splitlines() if line]
     print(json.dumps({"files": [{"path": name} for name in files]}))
+elif args[:2] == ["pr", "diff"]:
+    print("diff --git a/fix.txt b/fix.txt\\n+fixed")
+elif args[:2] == ["pr", "update-branch"]:
+    # As GitHub does: a merge of main into the branch, a new head.
+    import subprocess
+    origin = str(here.parent / "origin.git")
+    def git(*argv):
+        return subprocess.run(["git", "-C", origin, *argv], check=True, capture_output=True, text=True).stdout.strip()
+    branch = git("branch", "--list", "repair/*", "--format=%(refname:short)")
+    merge = git("commit-tree", branch + "^{tree}", "-p", branch, "-p", "main", "-m", "Merge main")
+    git("update-ref", "refs/heads/" + branch, merge)
+    with (here / "updates").open("a") as updates:
+        updates.write(" ".join(args) + "\\n")
 elif args[:2] == ["pr", "list"]:
     print("[]")
 elif args[:2] == ["pr", "create"]:
@@ -430,8 +489,10 @@ async def test_main_moved_during_the_session_by_no_merge_of_dots_stops_the_night
     told."""
     async with _night(login_env, stand_ins, "rogue", "on_pass") as (runtime, restarts):
         sessions, told = await _play(runtime, restarts)
+        # It opened no pull request, so there is none to look at again (item 933).
         assert [session.end for session in sessions] == ["main_moved"]
         assert not (stand_ins / "merges").exists() and restarts == []
+        assert not (stand_ins / "looks.jsonl").exists()
         assert [event.data["title"] for event in told] == [NEEDS_YOU_TITLE]
         book: Book = read_book(await runtime.store.kv_get(BOOK_KEY))
         # The problem is tried again: the session was stopped, not answered.
@@ -480,10 +541,14 @@ async def test_a_session_that_writes_in_the_owners_checkout_stops_the_night_befo
     git config and hooks) before it merges: a change stops the night, nothing is merged, pulled or restarted."""
     async with _night(login_env, stand_ins, "tamper", "on_pass") as (runtime, restarts):
         sessions, told = await _play(runtime, restarts)
-        assert [session.end for session in sessions] == ["main_moved"]
+        assert [session.end for session in sessions] == ["main_moved", "needs_owner"]
         assert "your checkout of Dot" in sessions[0].note
+        # Its second look (item 933) reads the session's transcript: a write outside its checkout holds it, with no
+        # model asked.
+        assert sessions[1].note.startswith("Second look: its session wrote outside its checkout: ")
+        assert sessions[1].note.endswith("loosened.py") and not (stand_ins / "looks.jsonl").exists()
         assert not (stand_ins / "merges").exists() and restarts == []
-        assert [event.data["title"] for event in told] == [NEEDS_YOU_TITLE]
+        assert [event.data["title"] for event in told] == [NEEDS_YOU_TITLE, NEEDS_YOU_TITLE]
 
 
 async def test_a_session_whose_push_then_fails_is_still_checked_for_what_it_changed_outside(
@@ -495,5 +560,99 @@ async def test_a_session_whose_push_then_fails_is_still_checked_for_what_it_chan
     _refusing_hook(stand_ins.parent / "Dot" / ".git" / "hooks" / "pre-push")
     async with _night(login_env, stand_ins, "tamper", "on_pass") as (runtime, restarts):
         sessions, told = await _play(runtime, restarts)
-        assert [session.end for session in sessions] == ["main_moved"] and restarts == []
-        assert [event.data["title"] for event in told] == [NEEDS_YOU_TITLE]
+        assert sessions[0].end == "main_moved" and restarts == []
+        assert not (stand_ins / "merges").exists()
+        assert told[0].data["title"] == NEEDS_YOU_TITLE
+
+
+async def test_a_checkout_another_agent_changed_during_the_session_gets_a_second_look_that_merges(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 933: the owner's checkout moved while the session ran, by no write of the session's (another agent left a
+    folder in it). The night stops the session as before, then looks again: the transcript shows the session wrote in
+    its own checkout only, the branch is brought up to main, its checks pass, and a session that may only read answers
+    MERGE. The pull request is merged at the head it looked at, and the restart is asked for."""
+    (stand_ins / "merge_state").write_text("BEHIND", encoding="utf-8")
+    async with _night(login_env, stand_ins, "busy", "on_pass") as (runtime, restarts):
+        sessions, told = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["main_moved", "merged"], [s.note for s in sessions]
+        assert sessions[1].note == "Second look: the change is its fix alone"
+        assert sessions[1].session_id == "look-1" and sessions[1].pr_url == "https://github.com/o/r/pull/7"
+        (looked,) = [json.loads(line) for line in (stand_ins / "looks.jsonl").read_text(encoding="utf-8").splitlines()]
+        # It may only read, with no MCP server of the owner's, in a checkout of its own of the head.
+        assert looked["argv"][looked["argv"].index("--tools") + 1 : looked["argv"].index("--tools") + 4] == [
+            "Read",
+            "Grep",
+            "Glob",
+        ]
+        assert "--strict-mcp-config" in looked["argv"] and "/.claude/worktrees/look-" in str(looked["cwd"])
+        assert "<<COMMANDS " in str(looked["argv"]) and "your checkout of Dot" in str(looked["argv"])
+        assert (stand_ins / "updates").read_text(encoding="utf-8").split() == ["pr", "update-branch", "7"]
+        merged: list[str] = (stand_ins / "merges").read_text(encoding="utf-8").split()
+        assert merged[:5] == ["pr", "merge", "7", "--squash", "--match-head-commit"]
+        assert merged[5] == _pushed(stand_ins.parent / "origin.git")
+        assert restarts == ["restart"]
+        assert [event.data["title"] for event in told] == [NEEDS_YOU_TITLE, FIXED_TITLE]
+        book: Book = read_book(await runtime.store.kv_get(BOOK_KEY))
+        assert [problem.status for problem in book.problems] == ["fixed"]
+
+
+async def test_a_second_look_that_holds_leaves_the_pull_request_to_the_owner(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 933: the look answers HOLD; nothing is merged, and the problem waits for the owner with its reason."""
+    (stand_ins / "look").write_text("HOLD: a command wrote in the owner's home", encoding="utf-8")
+    async with _night(login_env, stand_ins, "busy", "on_pass") as (runtime, restarts):
+        sessions, _ = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["main_moved", "needs_owner"]
+        assert sessions[1].note == "Second look: a command wrote in the owner's home"
+        assert not (stand_ins / "merges").exists() and restarts == []
+        book: Book = read_book(await runtime.store.kv_get(BOOK_KEY))
+        assert [(problem.status, problem.note) for problem in book.problems] == [
+            ("waiting", "Second look: a command wrote in the owner's home")
+        ]
+
+
+async def test_a_pull_request_left_by_an_earlier_night_is_looked_at_first(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 933: a pull request a session of an earlier night left because something moved is looked at when the next
+    night begins, before any new session."""
+    async with _night(login_env, stand_ins, "busy", "on_pass") as (runtime, restarts):
+        (stand_ins / "look").write_text("NO VERDICT", encoding="utf-8")
+        first, _ = await _play(runtime, restarts)
+        assert [session.end for session in first] == ["main_moved", "needs_owner"]
+        # The earlier night as it was before its look: the main_moved session is the newest of its problem.
+        await runtime.store.kv_set(SESSIONS_KEY, night_module.SessionLog(sessions=first[:1]).model_dump_json())
+        (stand_ins / "look").unlink()
+        second, _ = await _play(runtime, restarts)
+        assert [session.end for session in second] == ["merged"] and restarts == ["restart"]
+        assert second[0].note == "Second look: the change is its fix alone"
+
+
+async def test_a_second_look_reads_mains_commits_from_github_not_from_the_nights_note(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """The review of item 933: the session wrote in the owner's checkout and pushed to main by a command its transcript
+    does not show; the night's note names the checkout only. The look reads main's commits since the session began
+    from GitHub, finds one of no pull request and holds it, with no model asked."""
+    (stand_ins / "push_main").write_text("", encoding="utf-8")
+    async with _night(login_env, stand_ins, "busy", "on_pass") as (runtime, restarts):
+        sessions, _ = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["main_moved", "needs_owner"]
+        assert "your checkout of Dot" in sessions[0].note and sessions[0].main_before is not None
+        assert sessions[1].note.startswith("Second look: main holds commits of no pull request: ")
+        assert not (stand_ins / "looks.jsonl").exists() and not (stand_ins / "merges").exists()
+        assert restarts == []
+
+
+async def test_with_merge_ask_a_pull_request_stopped_because_something_moved_gets_no_second_look(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """The third pre-push review of item 933: with ``merge = "ask"`` every pull request is the owner's, so none is
+    looked at again or merged."""
+    async with _night(login_env, stand_ins, "busy", "ask") as (runtime, restarts):
+        sessions, _ = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["main_moved"]
+        assert not (stand_ins / "looks.jsonl").exists() and not (stand_ins / "merges").exists()
+        assert restarts == []

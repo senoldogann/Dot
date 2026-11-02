@@ -43,10 +43,14 @@ from dotagent.core.text import redact_known
 from dotagent.core.types import FrozenModel
 from dotagent.notify.owner import tell_owner
 from dotagent.repair.claude import (
+    DEFAULT_WORKER,
+    NO_MCP,
     ClaudeAccount,
     ClaudeOutcome,
     LimitWindow,
     PlanWindow,
+    WorkerChoice,
+    claude_argv,
     limited,
     read_account,
     read_usage,
@@ -96,6 +100,7 @@ from dotagent.repair.problems import (
     with_problem,
     with_sightings,
 )
+from dotagent.repair.second import LOOK_NOTE, MERGED_BEFORE, NO_PR_COMMIT, UNCHECKED, LookOutcome, second_look
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
@@ -122,6 +127,10 @@ SESSIONS_KEY: str = "repair.sessions"
 LIMIT_KEY: str = "repair.limit"
 # When the scheduler last started a night (epoch seconds as text).
 NIGHT_KEY: str = "repair.night_at"
+# How Claude Code works for Dot, as the owner chose it (item 933, a :class:`WorkerChoice`), and whether the last session
+# that asked for fast mode got it (a :class:`FastSeen`).
+WORKER_KEY: str = "repair.worker"
+FAST_KEY: str = "repair.fast_mode"
 SESSIONS_KEPT: int = 100
 # The record read the first night: the week before it.
 FIRST_LOOK_S: float = 7 * 24 * 3600.0
@@ -207,6 +216,9 @@ class RepairSession(FrozenModel):
     note: str
     # The plan's window as the session's last round saw it, when it said.
     window: LimitWindow | None
+    # Where main stood on GitHub when the session began (item 933), which its second look reads from; ``None`` for a
+    # session kept before, or one that ended before it was read.
+    main_before: str | None = None
 
 
 class SessionLog(FrozenModel):
@@ -218,6 +230,42 @@ class KeptWindow(FrozenModel):
 
     account: str
     window: LimitWindow
+
+
+class FastSeen(FrozenModel):
+    """Whether the last session that asked for fast mode answered in it (``on``, ``off``, ``cooldown``), why not when
+    its stream said, and when (epoch seconds)."""
+
+    state: str
+    why: str | None
+    at: float
+
+
+async def read_worker(store: Store) -> WorkerChoice:
+    """How Claude Code works for Dot: as the owner chose it, or :data:`DEFAULT_WORKER` until they do. Raises
+    :class:`RepairError` for a choice that cannot be read: a night never runs with a model the owner did not choose."""
+    kept: str | None = await store.kv_get(WORKER_KEY)
+    if kept is None:
+        return DEFAULT_WORKER
+    try:
+        return WorkerChoice.model_validate_json(kept)
+    except ValidationError as error:
+        raise RepairError(
+            "the choice of how Claude Code works cannot be read: choose it again on Settings › Self-repair",
+            {"key": WORKER_KEY, "errors": error.error_count(), "kept_chars": len(kept)},
+        ) from error
+
+
+def read_fast(raw: str | None) -> FastSeen | None:
+    """What the last session that asked for fast mode got, or ``None`` before one did, and for what cannot be read
+    (logged): it only tells the page what happened, so the page still shows."""
+    if raw is None:
+        return None
+    try:
+        return FastSeen.model_validate_json(raw)
+    except ValidationError as error:
+        log.error("repair_fast_mode_unreadable", errors=error.error_count(), kept_chars=len(raw))
+        return None
 
 
 def read_sessions(raw: str | None) -> tuple[RepairSession, ...]:
@@ -372,6 +420,7 @@ def _session(
     end: SessionEnd,
     pr_url: str,
     note: str,
+    main_before: str | None,
 ) -> RepairSession:
     return RepairSession(
         problem_id=problem.id,
@@ -387,6 +436,7 @@ def _session(
         pr_url=pr_url,
         note=note[-_TAIL_CHARS:],
         window=spent.window,
+        main_before=main_before,
     )
 
 
@@ -416,10 +466,12 @@ def problem_after(problem: Problem, session: RepairSession) -> Problem:
 
 
 class Night(FrozenModel):
-    """What a night needs besides the runtime: the repository, and the plain environment of git and GitHub's CLI."""
+    """What a night needs besides the runtime: the repository, the plain environment of git and GitHub's CLI, and how
+    Claude Code works (read once a night: a choice made during one is the next night's)."""
 
     repo: Path
     env: dict[str, str]
+    worker: WorkerChoice
 
 
 def pr_title(items: Sequence[int], commits: Sequence[str]) -> str:
@@ -471,9 +523,12 @@ async def _work(
     ends: list[SessionEnd] = []
     merged_branch: list[str] = []
 
+    # Where main stood when the session began, once read.
+    main_at: list[str] = []
+
     def ended(end: SessionEnd, note: str) -> RepairSession:
         ends.append(end)
-        return _session(problem, account, started, clock(), spent, end, url, note)
+        return _session(problem, account, started, clock(), spent, end, url, note, main_at[0] if main_at else None)
 
     async def ask(prompt: str) -> ClaudeOutcome:
         """A round of the session, cut to what is left of the night."""
@@ -481,7 +536,12 @@ async def _work(
         if left < ROUND_LEAST_S:
             raise _NightOver("the night's time is spent", {"left_s": left})
         timeout_s: float = min(config.session_minutes * 60.0, left)
-        return await run_claude(config.claude, folder, prompt, spent.session_id, env, timeout_s)
+        argv: tuple[str, ...] = claude_argv(config.claude, prompt, spent.session_id, night.worker, NO_MCP)
+        outcome: ClaudeOutcome = await run_claude(argv, folder, env, timeout_s)
+        if night.worker.fast and outcome.fast_mode is not None:
+            seen: FastSeen = FastSeen(state=outcome.fast_mode, why=outcome.fast_mode_off_why, at=clock())
+            await runtime.store.kv_set(FAST_KEY, seen.model_dump_json())
+        return outcome
 
     start: str = ""
     try:
@@ -491,6 +551,7 @@ async def _work(
         listed: tuple[str, ...] = human_paths(await review_on_main(night.repo, night.env)) or ("*",)
         human: tuple[str, ...] = (*PROTECTED, *listed)
         main_before: str = await main_on_github(night.repo, night.env)
+        main_at.append(main_before)
         since: float = time.time()
 
         print_before: str = ""
@@ -503,7 +564,7 @@ async def _work(
             if await main_on_github(night.repo, night.env) == main_before:
                 return None
             merged: tuple[str, ...] = await merged_since(night.repo, since, night.env)
-            return "main moved: " + (", ".join(merged) or "a commit with no pull request")
+            return "main moved: " + (", ".join(merged) or NO_PR_COMMIT)
 
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         masked: Problem = problem.model_copy(
@@ -622,7 +683,7 @@ async def _work(
                 unexpected = await moved()
             except RepairError as error:
                 # What cannot be checked is taken as changed: the night stops and the owner looks.
-                unexpected = f"main and your checkout could not be checked ({error.message})"
+                unexpected = f"{UNCHECKED} ({error.message})"
             if unexpected is not None:
                 log.error("repair_main_moved", problem_id=problem.id, branch=branch, what=unexpected)
                 return ended("main_moved", f"During the session {unexpected}.")
@@ -664,6 +725,82 @@ async def _tell(runtime: Runtime, problem: Problem, session: RepairSession) -> N
     await tell_owner(runtime.bus, title, f"{problem.title}{link}", _PAGE)
 
 
+def looks_due(book: Book, sessions: Sequence[RepairSession]) -> tuple[tuple[Problem, RepairSession], ...]:
+    """The pull requests a second look is due for (item 933): of each problem that waits with a pull request, the
+    newest session on it, when that session ended because main or the owner's checkout moved and opened that pull
+    request. A look that held one ends as the owner's (``needs_owner``), so it is not looked at twice."""
+    newest: dict[str, RepairSession] = {}
+    for session in sessions:
+        if session.problem_id not in newest or session.started_at >= newest[session.problem_id].started_at:
+            newest[session.problem_id] = session
+    due: list[tuple[Problem, RepairSession]] = []
+    for problem in book.problems:
+        last: RepairSession | None = newest.get(problem.id)
+        if (
+            problem.status == "waiting"
+            and problem.pr_url
+            and last is not None
+            and last.end == "main_moved"
+            and last.pr_url == problem.pr_url
+        ):
+            due.append((problem, last))
+    return tuple(due)
+
+
+# How a second look's end reads as a session's.
+_LOOK_ENDS: dict[str, SessionEnd] = {
+    "merged": "merged",
+    "merged_unpulled": "merged_unpulled",
+    "merged_before": "merged_unpulled",
+    "held": "needs_owner",
+    "closed": "needs_owner",
+}
+
+
+async def _look(
+    runtime: Runtime,
+    night: Night,
+    problem: Problem,
+    last: RepairSession,
+    account: ClaudeAccount,
+    deadline: float,
+    clock: Clock,
+    sleep: Sleep,
+) -> RepairSession:
+    """The second look of ``last``'s pull request (:mod:`dotagent.repair.second`), as a session of ``problem``'s."""
+    config = runtime.config.repair
+    started: float = clock()
+    minutes: int = max(1, min(config.checks_minutes, int((deadline - clock()) // 60)))
+
+    async def wait_checks(number: int) -> tuple[Check, ...]:
+        return await _wait_checks(night.repo, number, night.env, minutes, clock, sleep)
+
+    try:
+        looked: LookOutcome = await second_look(
+            config.claude,
+            night.repo,
+            night.env,
+            PROTECTED,
+            night.worker,
+            last.pr_url,
+            last.session_id,
+            last.main_before,
+            last.note,
+            min(config.session_minutes * 60.0, deadline - clock()),
+            wait_checks,
+            sleep,
+        )
+    except RepairError as error:
+        log.warning("repair_look_failed", problem_id=problem.id, error=error.message, context=error.context)
+        looked = LookOutcome(end="held", why=f"the look failed: {error.message}", outcome=None)
+    spent: _Spent = _Spent(rounds=0, input_tokens=0, output_tokens=0, cost_usd=0.0, session_id=None, window=None)
+    if looked.outcome is not None:
+        spent = _spent(spent, looked.outcome)
+    end: SessionEnd = _LOOK_ENDS[looked.end]
+    note: str = f"{LOOK_NOTE}{looked.why}"
+    return _session(problem, account, started, clock(), spent, end, last.pr_url, note, last.main_before)
+
+
 async def repair_night(runtime: Runtime, restart: Restart, clock: Clock, sleep: Sleep) -> tuple[RepairSession, ...]:
     """One night of repairs (see the module): the sessions it ran. Raises :class:`RepairError` when ``[repair] repo``
     is no git checkout."""
@@ -677,10 +814,43 @@ async def repair_night(runtime: Runtime, restart: Restart, clock: Clock, sleep: 
     since: float = book.looked_at if book.looked_at is not None else now - FIRST_LOOK_S
     book = with_sightings(book, await sightings_since(store, since, log_dir() / LOG_NAME), now)
     await store.kv_set(BOOK_KEY, book.model_dump_json())
-    night: Night = Night(repo=repo, env=dict(runtime.shell_env))
+    night: Night = Night(repo=repo, env=dict(runtime.shell_env), worker=await read_worker(store))
     kept: tuple[RepairSession, ...] = read_sessions(await store.kv_get(SESSIONS_KEY))
     done: list[RepairSession] = []
     deadline: float = now + NIGHT_LIMIT_S
+
+    async def keep(problem: Problem, session: RepairSession) -> None:
+        """Keep ``session``, the problem as it left it, and tell the owner."""
+        nonlocal book
+        done.append(session)
+        book = with_problem(book, problem_after(problem, session))
+        await store.kv_set(BOOK_KEY, book.model_dump_json())
+        await store.kv_set(SESSIONS_KEY, SessionLog(sessions=(*kept, *done)[-SESSIONS_KEPT:]).model_dump_json())
+        log.info("repair_look_ended", problem_id=problem.id, end=session.end, pr=session.pr_url)
+        await _tell(runtime, problem, session)
+
+    async def look(problem: Problem, last: RepairSession) -> bool:
+        """A second look at ``last``'s pull request when Dot merges on its own (``merge = "on_pass"``: with ``"ask"``
+        every pull request is the owner's, the third pre-push review), the night has time and no emergency stop, and
+        the plan has room; whether it merged (the night ends then)."""
+        if config.merge != "on_pass" or deadline - clock() < SESSION_LEAST_S:
+            return False
+        if await asyncio.to_thread(failsafe_path().exists):
+            return False
+        account: ClaudeAccount | None = await asyncio.to_thread(read_account, claude_state(night.env))
+        if account is None or not await _has_room(store, night, account, config.claude, config.leave_room, clock()):
+            return False
+        session: RepairSession = await _look(runtime, night, problem, last, account, deadline, clock, sleep)
+        await keep(problem, session)
+        if session.end == "merged":
+            await restart()
+        # A merge of the look's own ends the night, as a session's does; one found merged already does not.
+        return session.end in ("merged", "merged_unpulled") and not session.note.endswith(MERGED_BEFORE)
+
+    # The pull requests a session left because something moved around it are looked at again first (item 933).
+    for waiting, last in looks_due(book, kept):
+        if await look(waiting, last):
+            return tuple(done)
     while deadline - clock() >= SESSION_LEAST_S:
         # The account is read again before each session: a switcher may have signed another one in (item 921).
         account: ClaudeAccount | None = await asyncio.to_thread(read_account, claude_state(night.env))
@@ -722,6 +892,10 @@ async def repair_night(runtime: Runtime, restart: Restart, clock: Clock, sleep: 
             await store.kv_set(LIMIT_KEY, seen.model_dump_json())
         log.info("repair_session_ended", problem_id=problem.id, end=session.end, pr=session.pr_url)
         await _tell(runtime, working, session)
+        if session.end == "main_moved" and session.pr_url:
+            # Its pull request is looked at again now (item 933); the night ends after, whatever it came to.
+            await look(problem_after(working, session), session)
+            break
         if session.end in ("main_moved", "out_of_time"):
             break
         if session.end in ("merged", "merged_unpulled"):

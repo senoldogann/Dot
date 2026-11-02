@@ -12,8 +12,8 @@ waiting for you and open, the account), then what waits for you with its pull re
 session's problem, how it ended and why in a line that opens whole), the problems next in line (the most seen first, a
 few and the rest a click away) and the closed ones folded; a problem's placeholders read as words (item 932). It starts
 a night by hand (**Run now**):
-`GET /api/repair` gives them, and `POST /api/repair/now` starts a night (409 with no repository, or while one is under
-way).
+`GET /api/repair` gives them, `POST /api/repair/now` starts a night (409 with no repository, or while one is under
+way), and `PUT /api/repair/worker` keeps how Claude Code works (item 933).
 
 ## The book of problems
 
@@ -67,6 +67,17 @@ Claude Code runs as `claude -p` on the problem, in a checkout made from `origin/
   back (`GH_CONFIG_DIR=…`, `git -c credential.helper=…`): Claude Code reads its own sign-in from the same Keychain, so
   no sandbox of the Mac can take one from it and leave the other. A few commands are refused by name besides, which
   read commands by their first words, not every spelling.
+- **How it works (item 933).** Settings › Self-repair › *Claude Code* picks its model (Claude Code's default, Fable,
+  Opus, Sonnet or Haiku, the newest of each), its effort (default, low to max) and fast mode. Each night takes the
+  choice as it stands when the night begins (kv `repair.worker`); the second looks below work so too. A choice that
+  cannot be read stops the nights rather than run with another; the page says so and takes a new one. Fast mode is
+  billed to a plan as extra usage: an account without it runs at the standard speed, and the page says so with what
+  the last session that asked for it got (Claude Code's own words, `extra_usage_disabled`).
+- **No line of Claude's.** A session's commits and pull requests carry no `Co-Authored-By` trailer or footer of
+  Claude's: it runs with Claude Code's `attribution` settings empty.
+- **Only the MCP servers Dot gives it.** A session runs with `--strict-mcp-config`: none of your own Claude Code's
+  servers reach it. Without it a session took every one of them (measured 2026-11-02: your Chrome DevTools server,
+  Claude Docs, and the claude.ai connectors, Gmail and Drive among them, waiting only for a sign-in).
 - **Its rights.** A session runs with your rights, as Dot's own runs do: it has a shell and can write wherever you
   can, outside its checkout too. No sandbox of the Mac could keep it to its folder and leave Claude Code its own
   sign-in. What Dot checks is what it would merge, pull and restart with: GitHub's protection of `main`, the files of
@@ -138,9 +149,42 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   every file git does not track, its git config and its hooks read through their links. Files git ignores (`.venv`)
   are not in it. It reads both again before it merges, and after every session it merged nothing for, one that
   failed too; what cannot be read counts as changed. When either changed by no doing of Dot's, the night stops at
-  once: nothing more is merged, pulled or restarted, and you are told what changed (*A fix of Dot's own needs you*: "During the session main moved: #…", or "your
-  checkout of Dot … changed"). One you merged or edited yourself in that time stops the night too; its problem is
-  tried again on a later night.
+  once: nothing of that session is merged, pulled or restarted but by its second look (below, with `merge =
+  "on_pass"`), and you are told what changed (*A fix of Dot's own needs you*: "During the session main moved: #…", or
+  "your checkout of Dot … changed"). One you merged or edited yourself in that time stops the night too. A problem
+  whose session opened a pull request waits with it, for the second look or for you; one with none is tried again on a
+  later night.
+- **A second look (item 933).** With `merge = "on_pass"`, a session stopped so that opened a pull request is looked
+  at again, at once and, for one an earlier night left, when the next night begins, before any new session (one at a
+  time, while the night has time, no emergency stop is set and the plan has room). With `"ask"` it waits for you, as
+  every pull request does. In the order a defect is cheapest to find, it is held for you when:
+  - the night could not read `main` and your checkout after the session, where `main` stood when the session began
+    is not known, the pull request is closed, it changes a path that needs you, or GitHub does not say within two
+    minutes whether it is behind `main`;
+  - a commit `main` holds since the session began belongs to no merged pull request (read from GitHub, commit by
+    commit, never from the night's note, which names what it saw first);
+  - Claude Code's transcript of the session (`~/.claude/projects/<its checkout>/<session>.jsonl`) is gone, or names
+    a file the session edited or wrote outside its checkout;
+  - the session handed work to a helper agent (`Agent`, `Task`: their tools go to a transcript of their own, which is
+    not read; a session is refused those tools besides);
+  - its checks do not all pass once its branch is brought up to `main`: the checks of the new head, read once GitHub
+    has made it (two minutes at most), and held when the head moved while they were read;
+  - a new Claude Code session that may only read (`Read`, `Grep`, `Glob`: no shell, no edit, no MCP server), in a
+    checkout of its own of the pull request's head, does not end with `MERGE:`. It is given what moved, the change and
+    the session's shell commands, the last two fenced as data, and holds what it cannot tell;
+  - your checkout of Dot changes a tracked file, or stands on a commit `main` does not hold.
+
+  Otherwise it is merged (squashed, or rebased when it holds several items, so that each can be reverted alone) only
+  while its head is the one looked at, your checkout is pulled when it is on `main`, and Dot restarts once idle. Its
+  session is kept like any (its note begins `Second look:`); one that held it ends as yours (*Waits for you*, with its
+  reason) and is not looked at again. A pull request found merged already counts its problem fixed, and the night
+  goes on.
+
+  What it does not read: a command by more than its words (what a script the session wrote did when run is read as a
+  file of its change, not as what happened on the Mac), and the transcript is a file the session itself could have
+  written with your rights. What does not rest on the session is read from GitHub and git: `main`'s commits, the
+  checks, the pull request's files and your tracked files. Files git does not track in your checkout, its git config
+  and its hooks are judged only by the session's commands as its transcript gives them.
 - **Failures.** The emergency stop, or another cancel, leaves the problem as it was, never *being fixed* for good. A
   session that ended with its pull request open but not merged (the night's time, the plan, a step failing) leaves
   the problem waiting for you with that pull request, never a second one on a later night. A

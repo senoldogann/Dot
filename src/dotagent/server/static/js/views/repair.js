@@ -1,10 +1,10 @@
 // Settings › Self-repair (items 919-921, its look item 932): what Dot's own repairs come to, for the owner to read at a
 // glance. An overview leads (whether it is on and when, what it works on now, how many problems are fixed, wait for the
-// owner or are open, the account of Claude Code, Run now); then what waits for the owner, each with its pull request and
-// why; then the nights, each session by its problem, how it ended and why in a line that opens whole; then the
-// problems next in line, the most seen first, a few and the rest a click away, and the closed ones folded. A problem's
-// words are the book's, its placeholders (`<n>`, `<quoted>`) read as words. Whether it is on, when, and how it merges
-// are `[repair]` in the config file.
+// owner or are open, the account of Claude Code, Run now); then how Claude Code works (its model, effort and fast mode,
+// item 933); then what waits for the owner, each with its pull request and why; then the nights, each session by its
+// problem, how it ended and why in a line that opens whole; then the problems next in line, the most seen first, a few
+// and the rest a click away, and the closed ones folded. A problem's words are the book's, its placeholders (`<n>`,
+// `<quoted>`) read as words. Whether it is on, when, and how it merges are `[repair]` in the config file.
 
 import { api } from "../api.js";
 import { ago, el } from "../dom.js";
@@ -47,6 +47,25 @@ const END_TONE = {
 const NEXT_SHOWN = 5;
 // The longest a problem's words are shown on its row; whole on a hover.
 const TITLE_CHARS = 110;
+// How Claude Code may work for Dot (item 933): its model, by Claude Code's names of the newest of each family, and how
+// hard it thinks; "default" is Claude Code's own choice.
+const MODELS = [
+  ["default", "Claude Code's default"],
+  ["fable", "Fable"],
+  ["opus", "Opus"],
+  ["sonnet", "Sonnet"],
+  ["haiku", "Haiku"],
+];
+const EFFORTS = [
+  ["default", "Default"],
+  ["low", "Low"],
+  ["medium", "Medium"],
+  ["high", "High"],
+  ["xhigh", "Extra high"],
+  ["max", "Max"],
+];
+// Why a session that asked for fast mode ran at the standard speed, as Claude Code says it.
+const FAST_OFF = { extra_usage_disabled: "the account has no extra usage, which fast mode is billed to" };
 // The book's placeholders, as words.
 const PLACEHOLDERS = [
   [/<n>/g, "…"],
@@ -132,6 +151,45 @@ function overview(view, runNow) {
   return el("div", { class: "stack" }, tiles, setCard(account));
 }
 
+/** A select of `choices` (`[value, words]`) at `value`, which calls `onPick(value)` when another is picked. */
+function picker(label, choices, value, onPick) {
+  const select = el("select", { class: "select sm", "aria-label": label }, ...choices.map(([key, words]) => el("option", { value: key, selected: key === value }, words)));
+  select.addEventListener("change", () => onPick(select.value));
+  return select;
+}
+
+/** What the last session that asked for fast mode got, in words; "" before one did. */
+function fastSaid(seen) {
+  if (seen === null) {
+    return "";
+  }
+  if (seen.state === "on") {
+    return `The last session ran in fast mode, ${ago(seen.at)}.`;
+  }
+  const why = seen.why === null ? "" : `: ${FAST_OFF[seen.why] ?? seen.why.replaceAll("_", " ")}`;
+  return `The last session ran at the standard speed${why}.`;
+}
+
+/** How Claude Code works for Dot: its model, its effort and fast mode, each saved as it changes. */
+function workerCard(view, save) {
+  const worker = view.worker;
+  const fast = el("button", {
+    class: "switch",
+    type: "button",
+    role: "switch",
+    "aria-checked": String(worker.fast),
+    "aria-label": "Fast mode",
+    onclick: () => save({ ...worker, fast: !worker.fast }),
+  });
+  const seen = fastSaid(view.fast_seen);
+  return setCard(
+    view.worker_lost ? setRow({ title: "Choose again", lead: "Your last choice cannot be read, so the nights wait: pick a model to save a new one." }) : null,
+    setRow({ title: "Model", lead: "Of each session and second look.", control: picker("Model", MODELS, worker.model, (model) => save({ ...worker, model })) }),
+    setRow({ title: "Effort", lead: "How hard it thinks before it answers.", control: picker("Effort", EFFORTS, worker.effort, (effort) => save({ ...worker, effort })) }),
+    setRow({ title: "Fast mode", lead: `Faster answers, billed to your plan as extra usage.${seen === "" ? "" : ` ${seen}`}`, control: fast }),
+  );
+}
+
 /** The row of a problem: its words, how often and how lately it was seen, its status and its pull request. */
 function problemRow(problem) {
   const seen = `${problem.kind.replace("_", " ")} · seen ${problem.count}× · last ${ago(problem.last_at)}`;
@@ -181,6 +239,14 @@ export function mount(root, ctx) {
   let showAll = false;
   const holder = el("div", { class: "stack" }, loadingPanel());
 
+  async function saveWorker(worker) {
+    await attempt(async () => {
+      view = await api.put("/repair/worker", worker);
+      toast("ok", "Saved: the next night works so.");
+      paint();
+    });
+  }
+
   async function runNow() {
     await attempt(async () => {
       view = await api.post("/repair/now", {});
@@ -223,6 +289,7 @@ export function mount(root, ctx) {
         "div",
         { class: "set-sections", role: "region", "aria-label": "Self-repair" },
         overview(view, runNow),
+        setSection({ title: "Claude Code", lead: "How it works on Dot's problems and looks again at its pull requests.", body: workerCard(view, saveWorker) }),
         waiting.length === 0 ? null : setSection({ title: "Waits for you", lead: "A fix that needs your look, or one Dot stopped on.", body: setCard(...waiting.map(problemRow)) }),
         setSection({
           title: "Nights",
