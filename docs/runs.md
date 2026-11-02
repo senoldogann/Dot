@@ -74,9 +74,13 @@ is the answer (a small model that is offered both writes the call out as text).
   facts under the side panel's More count them and say how many checks flagged something (item 260), and the Cost panel
   keeps the summaries' share. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
-  paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
-  check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
-  ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
+  paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), the
+  ids of Dot's own records the run's calls and their results named (a run, a chat, a thing on Dot's list, a work order,
+  a schedule, an approval, an objective; the newest 60, item 924), each of which `recall` reads back with the ids next
+  to it (the chat of a run, the runs of a chat, the run of a thing to do), so that a run that comes back to old work
+  recalls it step by step rather than from a summary that lost it (`recall` fences what a run that read outside content
+  wrote and marks the reader untrusted); and a check lists names, paths and links in the summary that the conversation
+  never had (an address cut short, with the ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
   it; a name the summary abbreviates itself, with an ellipsis inside it or a `<placeholder>`, is not looked up). The
   `compacted` event names the model,
   how the summary came about, the attempts it took, what the check found and the estimated size of the prompt before
@@ -93,11 +97,20 @@ happened. The evidence stands under the step in the web UI, in every note that c
 step that must wait for others names them (`depends_on`, step numbers; a cycle or a number outside the plan is refused),
 the plan reads `(after 1, 2)` and the web UI shows the same, and the result of every plan change says which steps are
 ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that are ready together
-are independent, so the run can hand each to `delegate` in one turn, naming the step; the delegated run's report then
+are independent, so the run can hand each to `delegate` in one turn, naming the step (not one with a `brief`, which
+went to its helper already, below: delegated too, its work would be done twice); the delegated run's report then
 closes the step (done with the report's start as evidence, or failed) without a mark of the run's own; a step the plan
 does not have (a slip, or a delegate before the plan) does not stop the delegation: the run goes, the result's first
 line says the step was not in the plan, and nothing is marked. A `delegate` call waits up to four hours for its
-run's report. A run that calls `finish` with steps still open is asked once to close them; the conversation draws no line
+run's report. **Fan-out** (item 927) does it by the plan rather than by the model: a step of `update_plan` may carry a
+`brief`, an instruction a run that cannot see the conversation can follow, and when two or more pending steps with one
+wait for nothing open, they run at once as helpers of the run, at most `[agent] fan_out` (3; 0 or 1: none), as
+`delegate` runs them (the run's model and bounds, research for a research run), while the plan shows them in progress;
+each comes back marked done or failed with its report as the evidence, and the reports are in the plan's result, fenced
+and marking the run untrusted when a helper read content third parties can author. A single ready step is the run's own,
+and a helper's own plan fans out nothing, nor does the plan of an agent whose role leaves `delegate` out. The DeepSeek Harness super-agent article measured that a model left to decide
+hands no work to helpers (5 tries of 5), and on the owner's Mac 4 runs of 127 were helpers; more helpers at once spend
+more tokens for less time. A run that calls `finish` with steps still open is asked once to close them; the conversation draws no line
 for it (item 852), the plan's marks show the steps. A plan can also hold the run's targets (`targets` of `update_plan`,
 at most 600 characters): for a goal that names an outcome, what the run will reach and how its own tools measure it.
 They stay until new targets
@@ -503,13 +516,13 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
-| Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools` |
+| Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools`, `recall` (a record a compaction named, read back, item 924) |
 | Team            | `create_agent`, `create_team` (a team of agents, item 864), `message_agent`, `assign_work`, `work_orders`, `review_work` (work orders the agents work on without the lead waiting, item 907) |
 | Office          | `agents_now`, `read_agent_chat` (what the other agents do now and one's chat, item 890)                            |
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Pages           | `show_page`                                                                                                        |
 | Drafts          | `draft_message`                                                                                                    |
-| Mail, calendars | `mail_search`, `mail_read`, `calendar_events`                                                                      |
+| Mail, calendars | `mail_search`, `mail_read`, `calendar_events`; `pass_reply` (item 926, tool group `replies`): a reply to a mail a chat sent, handed to that chat |
 | Skills          | `skill`, `find_help`; `skill_save` (item 893, tool group `skills`): how the owner said to do a kind of work, kept   |
 | MCP             | `mcp__<server>__<tool>`; the server `web-research` comes with Dot (item 583): `mcp__web-research__web_scrape`, `web_map`, `web_extract` and the crawl tools `web_crawl_start`, `web_crawl_status`, `web_crawl_results`, `web_crawl_cancel` (its search is a rung of `web_search`, item 655) |
 

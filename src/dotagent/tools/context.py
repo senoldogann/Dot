@@ -81,6 +81,11 @@ class Spawner(Protocol):
         than the goal (item 831: a group chat's conversation); the goal stays what its row and its page name."""
         ...
 
+    async def hand_reply(self, from_run_id: str, thread_id: str, goal: str, opening: str) -> RunRecord:
+        """Start a run in the chat ``thread_id`` for a reply to a mail it sent (item 926), for the run ``from_run_id``
+        that found it: ``goal`` is Dot's words, ``opening`` what the run reads first; it starts untrusted."""
+        ...
+
 
 @dataclass(frozen=True)
 class ToolContext:

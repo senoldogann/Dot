@@ -96,6 +96,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "schedule",
         "team",
         "office",
+        "replies",
         "recon",
         "pages",
         "skills",
@@ -111,6 +112,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "accounts",
         "schedule",
         "office",
+        "replies",
         "recon",
         "pages",
         "skills",
@@ -149,6 +151,8 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "skill",
         "find_help",
         "judge_items",
+        # The ids a compaction note keeps are read back with it (item 924).
+        "recall",
     }
     # web_crawl and web_extract (item 41) and write_notes (item 34) joined the core: measured share 0.412 before the
     # notes tool, with the descriptions of the crawler's tools trimmed. find_help (item 163) joined it at 0.447, and
@@ -172,6 +176,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "office",
         "pages",
         "recon",
+        "replies",
         "skills",
         "team",
         "terminal",
@@ -245,6 +250,7 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "- team: making a lasting teammate agent for a role the work needs again or in parallel (create_agent, "
         "create_team)",
         "- office: what the other agents do now, and reading one's chat to help it (agents_now, read_agent_chat)",
+        "- replies: handing a reply to a mail Dot sent to the chat that sent it, where that work goes on (pass_reply)",
         "- recon: a site or host you own: addresses, TLS, headers, technology, open ports, and a form's payload check "
         "(recon, security_scan)",
         "- pages: showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views "

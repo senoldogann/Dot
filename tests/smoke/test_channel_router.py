@@ -327,6 +327,8 @@ async def test_an_answer_is_masked_of_the_secrets_dot_holds_and_cut_to_the_chann
     assert secret not in sent and "The password is ***." in sent
     assert len(sent) <= LIMIT
     assert sent.endswith(f"{BASE}#/runs/{run.id}") and "The rest of the answer is in Dot" in sent
+    # The answer is cut at its words too (item 928): 100 at most before the line with the link.
+    assert len(sent.split("\n\n… The rest")[0].split()) <= 100
 
 
 async def test_an_answer_is_masked_of_a_value_a_vault_filled_as_it_is_of_the_keys_in_the_env_file(

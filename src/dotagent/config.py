@@ -296,6 +296,8 @@ class AgentConfig(FrozenModel):
     # that sets it still loads.
     campaign_browser: BrowserMode
     consult_max_per_run: int = Field(ge=0)
+    # How many independent steps of a plan run at once as helpers (item 927); 0 or 1: none, the run does them itself.
+    fan_out: int = Field(default=3, ge=0, le=6)
     # At least the floor a run's tool output keeps however small the model's window (dotagent.agent.scaffold).
     tool_output_chars: int = Field(ge=2000)
     # The context size of every model without one of its own in [models.context] (dotagent.agent.scaffold).
@@ -553,6 +555,8 @@ class ChannelsConfig(FrozenModel):
     imessage: bool
     progress: ProgressMode
     language: Literal["auto", "en", "tr"] = "auto"
+    # The most words of a run's answer a channel sends (item 928), the rest a link away; 0 sends it whole.
+    answer_words: int = Field(default=100, ge=0, le=2000)
 
 
 # What a reaction does once the run it is about has ended (item 586): ``follow_up`` starts a run in the same chat, as

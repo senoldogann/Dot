@@ -5,7 +5,7 @@ phone's narrow screen the items of a list with a long one stand apart and a head
 
 import pytest
 
-from dotagent.channels.text import as_plain_text, cut_with_link, line_kinds, one_line
+from dotagent.channels.text import as_plain_text, cut_answer, cut_with_link, first_words, line_kinds, one_line
 
 LINK: str = "https://mac.example.ts.net/#/runs/run_1"
 
@@ -278,3 +278,35 @@ def test_a_mark_after_a_backslash_is_the_mark() -> None:
         == "*not emphasis* and 5 * 3 and # no heading"
     )
     assert as_plain_text("\\- not a bullet") == "- not a bullet"
+
+
+def test_an_answer_past_its_words_is_cut_at_a_sentence_end_with_the_link_and_a_short_one_goes_whole() -> None:
+    """Item 928: the cap on a channel's answer is the code's: at most so many words, cut where a sentence ends among the
+    last third of them when one does, then the line with the link to the rest; one within the cap goes as it is."""
+    from dotagent.channels.words import ENGLISH
+
+    short: str = "Done. The file is in the workspace."
+    assert first_words(short, 100) is None and cut_answer(short, 100, 2000, LINK, ENGLISH) == short
+    sentences: str = " ".join(f"Sentence {number} has five words." for number in range(60))
+    cut: str = cut_answer(sentences, 100, 2000, LINK, ENGLISH)
+    head: str = cut.split("\n\n… The rest")[0]
+    assert len(head.split()) <= 100 and head.endswith("words.")
+    assert cut.endswith(LINK) and "The rest of the answer is in Dot" in cut
+    # A colon opens what follows and ends no sentence (the pre-push review): the cut is not right before a list.
+    opening: str = "word " * 70 + "These are the steps:\n- " + "step " * 40
+    kept: str | None = first_words(opening, 100)
+    assert kept is not None and not kept.endswith(":") and len(kept.split()) == 100
+    # Nor does the dot of a numbered item or a short form: the cut does not end on an empty "2." (the fourth review).
+    listed: str = "word " * 70 + "See e.g. these:\n1. one\n2. " + "step " * 40
+    kept_list: str | None = first_words(listed, 100)
+    assert kept_list is not None and not kept_list.endswith(("2.", "1.", "e.g.")) and len(kept_list.split()) == 100
+    # A sentence that ends on a number does end there (the fifth review): "Total 42." is no numbered item.
+    counted: str = "word " * 70 + "The total is 42. " + "more " * 40
+    assert first_words(counted, 100) == "word " * 70 + "The total is 42."
+    # No sentence end in reach: cut at the hundredth word; 0 sends the answer whole, within the characters.
+    run_on: str = "word " * 300
+    assert len(cut_answer(run_on, 100, 2000, None, ENGLISH).split("\n\n…")[0].split()) == 100
+    assert cut_answer(run_on, 0, 2000, LINK, ENGLISH) == run_on
+    # The characters still bound it: a hundred long words do not pass the channel's size.
+    long_words: str = ("x" * 40 + " ") * 150
+    assert len(cut_answer(long_words, 100, 1000, LINK, ENGLISH)) <= 1000

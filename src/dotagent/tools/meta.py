@@ -30,8 +30,10 @@ from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import EventRecord, RunMode
-from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
+from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
+from dotagent.tools.delegate import DELEGATE_TOOL
+from dotagent.tools.fan_out import FannedOut, fan_out, ready_steps
 from dotagent.tools.groups import CORE_GROUP, groups_of, tools_in
 
 _log = get_logger(__name__)
@@ -273,6 +275,10 @@ _EVIDENCE_DESCRIPTION: str = (
 )
 
 
+# How long the plan tool may take when it hands steps to helpers (item 927): as long as a delegated run may.
+_FAN_OUT_TIMEOUT_S: float = 4 * 3600.0
+
+
 class PlanStep(ToolArgs):
     text: str = Field(description="One short step.")
     status: StepStatus = Field(
@@ -290,8 +296,18 @@ class PlanStep(ToolArgs):
         default_factory=list,
         max_length=20,
         description=(
-            "The numbers of the steps this one waits for, if any. Steps that wait for nothing open are independent: "
-            "the plan says which are ready, and delegate can run them in one turn."
+            "The numbers of the steps this one waits for, if any. Steps that wait for nothing open are ready: two or "
+            "more with a brief go to helpers at once, never delegate those too; delegate can run the others in one "
+            "turn."
+        ),
+    )
+    # Empty: the step is the run's own. A provider sees an optional text.
+    brief: str = Field(
+        default="",
+        max_length=4000,
+        description=(
+            "Only for a step a helper can do alone: its whole instruction with every input, as the helper sees "
+            "nothing of this chat. Two or more ready steps with one run at once as helpers."
         ),
     )
 
@@ -309,6 +325,14 @@ class UpdatePlanArgs(ToolArgs):
             "the targets already recorded; new targets replace them."
         ),
     )
+
+
+async def _hands_on(ctx: ToolContext) -> bool:
+    """Whether the run may hand its steps to helpers (item 927): a run of the loop that was given ``delegate`` (an
+    agent whose role leaves it out was not, and a helper never is) and is no helper of another."""
+    if ctx.spawner is None or ctx.mode == "chat" or ctx.run_tools is None or DELEGATE_TOOL not in ctx.run_tools:
+        return False
+    return (await ctx.runtime.store.get_run(ctx.run_id)).parent_run_id is None
 
 
 async def _latest_plan(ctx: ToolContext) -> PlanPayload:
@@ -335,7 +359,26 @@ def _update_plan_tool() -> RegisteredTool:
             for step in args.steps
         )
         steps: tuple[PlanItem, ...] = checked_dependencies(rewritten_steps(previous.steps, given))
-        return await _record_plan(ctx, PlanPayload(steps=steps, targets=targets))
+        plan: PlanPayload = PlanPayload(steps=steps, targets=targets)
+        # The independent steps with a brief go to helpers at once (item 927), by the plan rather than the model.
+        briefs: dict[int, str] = {
+            index: step.brief.strip() for index, step in enumerate(args.steps) if step.brief.strip()
+        }
+        most: int = ctx.runtime.config.agent.fan_out
+        ready: list[int] = ready_steps(steps, briefs)[:most]
+        if len(ready) < 2 or not await _hands_on(ctx):
+            return await _record_plan(ctx, plan)
+        working: tuple[PlanItem, ...] = tuple(
+            step.model_copy(update={"status": "in_progress"}) if index in ready else step
+            for index, step in enumerate(steps)
+        )
+        await _record_plan(ctx, plan.model_copy(update={"steps": working}))
+        done: FannedOut = await fan_out(ctx, plan, ready, briefs)
+        recorded: ToolResult = await _record_plan(ctx, done.plan)
+        reports: str = "\n\n".join(f"Step {number}, by its helper:\n{result.text}" for number, result in done.results)
+        text: str = f"Steps {', '.join(str(index + 1) for index in ready)} ran at once as helpers.\n{recorded.text}"
+        result: ToolResult = ok(f"{text}\n\n{reports}" if reports else text)
+        return mark_untrusted(result) if done.tainted else result
 
     return make_tool(
         name=UPDATE_PLAN_TOOL,
@@ -348,9 +391,10 @@ def _update_plan_tool() -> RegisteredTool:
         ),
         args_model=UpdatePlanArgs,
         modes=ALL_MODES,
-        # Plan changes read and rewrite the latest plan, so the calls of one reply must apply in order.
+        # Plan changes read and rewrite the latest plan, so the calls of one reply must apply in order. Its helpers
+        # (item 927) take as long as delegated runs may.
         parallel_safe=False,
-        timeout_s=10.0,
+        timeout_s=_FAN_OUT_TIMEOUT_S,
         classify=classify,
         run=run,
     )

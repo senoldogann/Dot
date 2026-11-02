@@ -107,6 +107,7 @@ from dotagent.core.errors import (
     FailSafeTriggered,
     InvalidValueError,
     NotFoundError,
+    PolicyDenied,
     RunCancelled,
     RunConflict,
     RunHoldLapsed,
@@ -124,7 +125,7 @@ from dotagent.llm.types import ONE_MESSAGE_LEVELS, Effort, ModelInfo, OneMessage
 from dotagent.memory.service import REFLECTION_SOURCE, SavedMemory
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
-from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
+from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, REPLY_SOURCE, UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.proactive.text import one_line
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -215,21 +216,12 @@ _THREAD_INSTRUCTION_RUNS: int = 30
 # a later run of its chat: the notice of a command in the background (item 229), a run of Dot's own initiative (item
 # 715), and a resumed run, whose goal is the goal of the run it resumes, which counts or not as that run's does (the
 # code review of item 715: a resume of Dot's own run made its words the owner's).
-_NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset({BACKGROUND_SOURCE, INITIATIVE_SOURCE, RESUME_SOURCE})
+_NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset({BACKGROUND_SOURCE, INITIATIVE_SOURCE, RESUME_SOURCE, REPLY_SOURCE})
 # The sources of runs and chats nobody watches or that are Dot's own (item 860): a chat one of them opened is not the
 # owner's, and a run one of them started in the owner's chat has no owner there to answer. Not the run that tells a
 # chat its command in the background ended (``BACKGROUND_SOURCE``): it goes on with the owner's chat, under their eyes
 # (the independent review of item 860: a mail its run had put off until a command ended went out unasked).
-_NOBODY_WATCHES: frozenset[str] = frozenset(
-    {
-        SCHEDULE_SOURCE,
-        WATCHER_SOURCE,
-        NOTICE_SOURCE,
-        REFLECTION_SOURCE,
-        EVAL_SOURCE,
-        INITIATIVE_SOURCE,
-    }
-)
+_NOBODY_WATCHES: frozenset[str] = UNWATCHED_SOURCES | {NOTICE_SOURCE, REFLECTION_SOURCE, EVAL_SOURCE}
 # The approval modes from the strictest to the loosest: the user answers before every change, the user answers, the
 # review model answers, no one is asked.
 _APPROVALS_STRICTEST_FIRST: tuple[ApprovalMode, ...] = ("supervised", "ask", "auto", "yolo")
@@ -1007,6 +999,49 @@ class RunManager:
             RunOpening(text=opening, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS, tainted=tainted),
             None,
             None,
+        )
+        return run
+
+    async def hand_reply(self, from_run_id: str, thread_id: str, goal: str, opening: str) -> RunRecord:
+        """Start a run in the chat ``thread_id`` for a reply to a mail that chat sent (item 926), with the model and the
+        approval mode of the chat's newest run: ``goal`` is Dot's words, ``opening`` what the run reads first (where the
+        reply came from and what the run that found it said of it). It starts untrusted, whatever its finder read, as a
+        watcher's run does: a third party's mail set it off, and its finder may have read it by a way that marks
+        nothing, a command's output (the third pre-push review of item 926). Nobody watches it
+        (:data:`REPLY_SOURCE`): in the owner's chat the review model judges what it would send.
+
+        Only a run of a schedule's or a watcher's that works now, and is no run of Dot's own initiative, may hand one
+        (``from_run_id``): what the new run sends is judged as the owner's chat's, so a run whose messages ask the
+        owner in every mode (item 850) would hand one there to send without asking (the pre-push review of item 926).
+        Raises :class:`PolicyDenied` for any other run, :class:`RunConflict` while a run works in the chat; the reply
+        is handed again later."""
+        handle: RunHandle | None = self._handles.get(from_run_id)
+        finder: RunRecord = await self._runtime.store.get_run(from_run_id)
+        if handle is None or handle.gate.owners_word or finder.source not in (SCHEDULE_SOURCE, WATCHER_SOURCE):
+            raise PolicyDenied(
+                "only a run of a schedule or a watcher of the owner's hands a reply to another chat; deal with it here",
+                {"run_id": from_run_id, "source": finder.source, "thread_id": thread_id},
+            )
+        newest: list[RunRecord] = await self._runtime.store.list_runs(1, thread_id)
+        if newest and newest[0].status in WORKING_STATUSES:
+            raise RunConflict(
+                "a run works in that chat now; hand the reply later", {"thread_id": thread_id, "run_id": newest[0].id}
+            )
+        last: RunRecord | None = newest[0] if newest else None
+        run, _ = await self._launch(
+            goal,
+            "task",
+            None if last is None else last.model,
+            thread_id,
+            REPLY_SOURCE,
+            None,
+            None,
+            "standard",
+            None if last is None else last.approvals,
+            None,
+            RunOpening(text=opening, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS, tainted=True),
+            None,
+            None if last is None else last.agent_id,
         )
         return run
 
@@ -3108,7 +3143,7 @@ class RunManager:
     async def _nobody_watches(self, run: RunRecord) -> bool:
         """Whether nobody watches ``run`` (item 699): a schedule's (a campaign's sessions are), a watcher's, or a helper
         of one."""
-        if run.source in (SCHEDULE_SOURCE, WATCHER_SOURCE, INITIATIVE_SOURCE):
+        if run.source in UNWATCHED_SOURCES:
             return True
         if run.parent_run_id is None:
             return False

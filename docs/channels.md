@@ -37,8 +37,10 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   run that ended (the stop's own end among it) still comes.
 - When a run of that chat ends, its answer is sent back in the same conversation, **marked with a zero-width space** at
   its start, which your phone draws as nothing (item 918; it was a `◆ ` before).
-  The answer is masked of the secrets Dot holds, sent as plain text and cut to about 2,000 characters, with a link to
-  the chat in Dot for the rest. A messaging app draws no Markdown, so the answer reads clean (item 617): a list item
+  The answer is masked of the secrets Dot holds, sent as plain text and cut to its first 100 words (`[channels]
+  answer_words`, item 928: the code's cap, not only the model's instruction below; at the end of a sentence among the
+  last third of them when one is there) and to about 2,000 characters in any case, with a link to the chat in Dot for
+  the rest. A messaging app draws no Markdown, so the answer reads clean (item 617): a list item
   has a bullet (`• `, a nested one `  ◦ `, a task its box; a numbered item stays as it is), a heading stands on a line
   of its own with a blank line before it, a horizontal rule and the `> ` of a quote are gone, and so are the marks of
   bold, emphasis, strike and code (a link reads *words (address)*). A table reads as a phone's narrow screen holds it

@@ -37,6 +37,7 @@ from dotagent.launchd import (
     RESTART_NIGHT_LIMIT_S,
     RESTART_POLL_S,
     RESTART_WAIT_LIMIT_S,
+    WATCHDOG_LABEL,
     JobState,
     LaunchAgent,
     Removal,
@@ -44,18 +45,24 @@ from dotagent.launchd import (
     ServiceStatus,
     build_launch_agent,
     build_restart_job,
+    build_watchdog_job,
     cancel_restart_job,
     inspect_job,
     inspect_restart_job,
+    inspect_watchdog_job,
     install_job,
     install_restart_job,
+    install_watchdog_job,
     launch_agent_path,
     render_launch_agent,
     render_restart_job,
+    render_watchdog_job,
     restart_job,
     restart_job_path,
     service_status,
     uninstall_job,
+    uninstall_watchdog_job,
+    watchdog_agent_path,
 )
 from dotagent.server.daemon import run_daemon
 from dotagent.server.guard import PROOF_PATH, daemon_proof, read_token
@@ -262,11 +269,21 @@ async def cmd_service_status(command: ServiceStatusCommand) -> int:
     url: str = health_url(config.server.host, config.server.port)
     status: ServiceStatus = await service_status(_plist_path(), os.getuid())
     waiting: JobState | None = await inspect_restart_job(os.getuid())
+    watchdog: JobState | None = await inspect_watchdog_job(os.getuid())
     health: HealthView | None = await probe_daemon(url)
     sys.stdout.write(f"job      {LABEL}\n")
     sys.stdout.write(f"file     {status.plist}{'' if status.installed else '  (not installed)'}\n")
     sys.stdout.write(f"launchd  {_job_line(status.job)}\n")
     sys.stdout.write(f"restart  {_restart_line(waiting)}\n")
+    sys.stdout.write(
+        "watchdog "
+        + (
+            f"looks every minute whether the daemon answers and a run makes steps ({WATCHDOG_LABEL})"
+            if watchdog is not None
+            else "not loaded ('dotx service install' loads it)"
+        )
+        + "\n"
+    )
     if health is None:
         sys.stdout.write(f"daemon   does not answer at {base_url(config.server.host, config.server.port)}\n")
         failure: DaemonFailure | None = await asyncio.to_thread(daemon_failure_in, _own_log())
@@ -346,6 +363,13 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
     health: HealthView | None = await wait_for_daemon(url, _START_WAIT_S)
     if health is None:
         raise await _unanswered(url, uid, began)
+    # The watchdog (item 925), once the daemon answers: its first look would else count a start as a miss.
+    watchdog: RestartJob = build_watchdog_job(sys.executable, dot_home(), log_dir(), os.environ)
+    await install_watchdog_job(watchdog_agent_path(Path.home()), render_watchdog_job(watchdog), uid)
+    sys.stdout.write(
+        f"Loaded the watchdog {WATCHDOG_LABEL}: every minute it looks whether the daemon answers (it restarts one that "
+        "has not for three minutes) and tells you of a run that makes no step.\n"
+    )
     sys.stdout.write(
         f"The daemon answers at {base_url(config.server.host, config.server.port)} (version {health.version}). "
         "It starts at every login and again after a crash.\n"
@@ -521,6 +545,10 @@ async def cmd_service_uninstall(command: ServiceUninstallCommand) -> int:
         "uninstall the service, which stops the daemon at once",
         "uninstall it from a terminal of your own, once the run has ended",
     )
+    # The watchdog goes first, so that it does not restart the daemon this stops (item 925).
+    gone: Removal = await uninstall_watchdog_job(watchdog_agent_path(Path.home()), os.getuid())
+    if gone.was_loaded or gone.file_removed:
+        sys.stdout.write(f"Removed the watchdog {WATCHDOG_LABEL}.\n")
     # A restart that waits would find no job to restart: it goes with the service.
     if await cancel_restart_job(restart_job_path(dot_home()), os.getuid()):
         sys.stdout.write(f"Cancelled the restart that waited for the runs to end ({RESTART_LABEL}).\n")

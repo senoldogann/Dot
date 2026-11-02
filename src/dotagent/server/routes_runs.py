@@ -33,6 +33,7 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import workspace_dir
 from dotagent.llm.router import parse_model_ref
+from dotagent.notify.owner import tell_owner
 from dotagent.policy.chat_permits import key_of_record, may_remember
 from dotagent.proactive import INITIATIVE_SOURCE
 from dotagent.scheduler.loops import LoopRhythm, loop_goal, loop_name, loop_rhythm
@@ -79,6 +80,8 @@ from dotagent.server.views import (
     StartRunRequest,
     SteerRequest,
     StreamQuery,
+    StuckRequest,
+    StuckView,
     UndoRequest,
     picks_of,
 )
@@ -489,6 +492,21 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         await store.get_run(run_id)
         await ctx.manager.stop(run_id)
         return await detail(run_id)
+
+    @router.post("/runs/{run_id}/stuck")
+    async def run_stuck(run_id: str, request: StuckRequest) -> StuckView:
+        """The watchdog saw the run work for ``quiet_s`` seconds with no event (item 925): the owner is told, once the
+        watchdog asks, with the run's page to open; a run that no longer works is not told."""
+        run: RunRecord = await store.get_run(run_id)
+        if run.status != "running":
+            return StuckView(told=False)
+        minutes: int = max(1, round(request.quiet_s / 60))
+        goal: str = " ".join(run.goal.split())[:120]
+        await tell_owner(
+            ctx.runtime.bus, "A task makes no progress", f"{minutes} min with no step: {goal}", f"#/runs/{run.id}"
+        )
+        log.warning("run_stuck_told", run_id=run.id, quiet_s=request.quiet_s)
+        return StuckView(told=True)
 
     @router.get("/runs/{run_id}/screencast")
     async def run_screencast(run_id: str) -> StreamingResponse:

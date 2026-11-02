@@ -350,13 +350,20 @@ async def _execute_one(
     started: float = time.monotonic()
     # The secrets Dot holds, masked in the step's events as the forms of keys are.
     known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+    tool: RegisteredTool | None = registry.tools.get(call.name)
+    # The call's own limit goes with it (item 925): the watchdog reads a run inside a call that may take hours (a
+    # helper, a wait) as busy until that limit, not as stuck.
     await ctx.runtime.bus.emit(
         ctx.run_id,
         "tool_call",
-        {"call_id": call.id, "tool": call.name, "args": _safe_json(call.arguments, known)},
+        {
+            "call_id": call.id,
+            "tool": call.name,
+            "args": _safe_json(call.arguments, known),
+            "timeout_s": tool.timeout_s if tool is not None else 0.0,
+        },
         True,
     )
-    tool: RegisteredTool | None = registry.tools.get(call.name)
     action: ActionInfo | None = None
     waited_s: float = 0.0
     decision: StepDecision | None = None

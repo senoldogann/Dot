@@ -243,6 +243,11 @@ campaign_failed_sessions = 3
 campaign_browser = "attach"
 # The most questions a run may ask the helper models ([models] helpers) with the consult tool; 0 offers no consult.
 consult_max_per_run = 5
+# How many independent steps of a plan run at once as helpers (item 927): a step of update_plan with a brief (an
+# instruction a run that cannot see the conversation can follow) that waits for no open step is ready, and when two or
+# more are, they go to helpers at the same time, as delegate runs them, and come back marked done or failed with their
+# reports. More helpers at once spend more tokens for less time. 0 or 1 keeps every step the run's own.
+fan_out = 3
 tool_output_chars = 12000
 # The prompt budget of a run: past context_elide_share (60 %) of it older tool output is shortened, past
 # context_summarise_share (85 %, below) the older part of the run is summarized. "most" gives each model three quarters
@@ -843,6 +848,10 @@ progress = "steps"
 # progress, how a run ended, what was left out. "auto" (the default) speaks the language of your last message there,
 # English or Turkish; "en" or "tr" holds one. An answer is in the language the model wrote it in.
 language = "auto"
+# answer_words: the most words of a run's answer that go there (item 928), cut at the end of a sentence when one is
+# close, then a line with the link to the rest in Dot; a run started from a channel is told to write in 100 words.
+# 0 sends the whole answer (within the 2,000 characters a message holds).
+answer_words = 100
 
 [reactions]
 # Reactions on Dot's messages (item 586, docs/runs.md): a button under each message of Dot's opens a palette: 👍 good,

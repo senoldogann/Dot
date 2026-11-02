@@ -33,6 +33,11 @@ LABEL: str = "dev.dotagent.dot"
 # The one-shot job that restarts the daemon once no run works (item 441), and the module of dotagent it runs.
 RESTART_LABEL: str = "dev.dotagent.restart-when-idle"
 RESTART_MODULE: str = "dotagent.restart_when_idle"
+# The watchdog (item 925): a job of its own, outside the daemon, that launchd starts every WATCHDOG_INTERVAL_S seconds,
+# and the module of dotagent it runs. It looks whether the daemon answers and whether a run works without a step.
+WATCHDOG_LABEL: str = "dev.dotagent.watchdog"
+WATCHDOG_MODULE: str = "dotagent.watchdog"
+WATCHDOG_INTERVAL_S: int = 60
 # How often that job looks at the runs, and how long it waits before it gives up without restarting.
 RESTART_POLL_S: float = 5.0
 RESTART_WAIT_LIMIT_S: float = 2 * 60 * 60
@@ -115,6 +120,23 @@ class RestartPlist(TypedDict):
     EnvironmentVariables: dict[str, str]
 
 
+class WatchdogPlist(TypedDict):
+    """The keys of the property list of the watchdog (item 925): a job launchd starts every ``StartInterval`` seconds,
+    with no ``KeepAlive``, each look a process of its own that ends."""
+
+    Label: str
+    ProgramArguments: list[str]
+    RunAtLoad: bool
+    StartInterval: int
+    AbandonProcessGroup: bool
+    ProcessType: str
+    LimitLoadToSessionType: str
+    WorkingDirectory: str
+    StandardOutPath: str
+    StandardErrorPath: str
+    EnvironmentVariables: dict[str, str]
+
+
 class RestartJob(FrozenModel):
     """What the restart that waits runs and where it keeps its files; ``render_restart_job`` turns it into the property
     list."""
@@ -174,6 +196,11 @@ def service_target(uid: int) -> str:
 def job_target(uid: int, label: str) -> str:
     """The launchd name of the job ``label`` of the graphical session of the user."""
     return f"{domain_target(uid)}/{label}"
+
+
+def watchdog_agent_path(user_home: Path) -> Path:
+    """Where the watchdog's property list is (item 925): beside the daemon's, so that it is loaded at every login."""
+    return user_home / "Library" / "LaunchAgents" / f"{WATCHDOG_LABEL}.plist"
 
 
 def restart_job_path(home: Path) -> Path:
@@ -292,6 +319,40 @@ def render_restart_job(job: RestartJob) -> bytes:
     return plistlib.dumps(restart_plist(job), fmt=plistlib.FMT_XML, sort_keys=True)
 
 
+def build_watchdog_job(python: str, home: Path, logs: Path, environ: Mapping[str, str]) -> RestartJob:
+    """The watchdog's job (item 925): :data:`WATCHDOG_MODULE` run with ``python`` from Dot's home ``home``, its output
+    in ``logs``; ``DOT_HOME`` and ``DOT_LOG_DIR`` handed on when set here."""
+    return RestartJob(
+        python=python,
+        working_directory=str(home),
+        stdout_path=str(logs / "watchdog.out.log"),
+        stderr_path=str(logs / "watchdog.err.log"),
+        environment=_job_environment(home, logs, environ),
+    )
+
+
+def watchdog_plist(job: RestartJob) -> WatchdogPlist:
+    """The property list of the watchdog (item 925): a look at load and every :data:`WATCHDOG_INTERVAL_S` seconds, each
+    a process that ends; ``AbandonProcessGroup`` keeps launchd from killing the restart a look started."""
+    return WatchdogPlist(
+        Label=WATCHDOG_LABEL,
+        ProgramArguments=[job.python, "-P", "-m", WATCHDOG_MODULE],
+        RunAtLoad=True,
+        StartInterval=WATCHDOG_INTERVAL_S,
+        AbandonProcessGroup=True,
+        ProcessType="Background",
+        LimitLoadToSessionType="Aqua",
+        WorkingDirectory=job.working_directory,
+        StandardOutPath=job.stdout_path,
+        StandardErrorPath=job.stderr_path,
+        EnvironmentVariables=job.environment,
+    )
+
+
+def render_watchdog_job(job: RestartJob) -> bytes:
+    return plistlib.dumps(watchdog_plist(job), fmt=plistlib.FMT_XML, sort_keys=True)
+
+
 def _int_of(text: str | None) -> int | None:
     return int(text) if text is not None and text.isdigit() else None
 
@@ -376,6 +437,11 @@ async def _inspect(target: str) -> JobState | None:
 async def inspect_job(uid: int) -> JobState | None:
     """What launchd keeps about the job of the daemon, or ``None`` when the job is not loaded. Changes nothing."""
     return await _inspect(service_target(uid))
+
+
+async def inspect_watchdog_job(uid: int) -> JobState | None:
+    """What launchd keeps about the watchdog (item 925), or ``None`` when it is not loaded. Changes nothing."""
+    return await _inspect(job_target(uid, WATCHDOG_LABEL))
 
 
 async def inspect_restart_job(uid: int) -> JobState | None:
@@ -480,6 +546,26 @@ async def install_job(plist: Path, content: bytes, uid: int) -> bool:
     replaced: bool = await _install(LABEL, plist, content, uid)
     log.info("service_installed", plist=str(plist), replaced=replaced)
     return replaced
+
+
+async def install_watchdog_job(plist: Path, content: bytes, uid: int) -> bool:
+    """Load the watchdog from the property list ``content`` (see :func:`_install`, item 925), which starts its first
+    look. Returns whether one was loaded already."""
+    replaced: bool = await _install(WATCHDOG_LABEL, plist, content, uid)
+    log.info("watchdog_installed", plist=str(plist), replaced=replaced)
+    return replaced
+
+
+async def uninstall_watchdog_job(plist: Path, uid: int) -> Removal:
+    """Unload the watchdog and delete its property list (item 925)."""
+    target: str = job_target(uid, WATCHDOG_LABEL)
+    was_loaded: bool = await _inspect(target) is not None
+    if was_loaded:
+        await _checked(["bootout", target], "launchctl cannot unload the watchdog")
+        await _wait_until_unloaded(target)
+    file_removed: bool = await asyncio.to_thread(_remove_file, plist)
+    log.info("watchdog_uninstalled", plist=str(plist), was_loaded=was_loaded, file_removed=file_removed)
+    return Removal(was_loaded=was_loaded, file_removed=file_removed)
 
 
 async def install_restart_job(plist: Path, content: bytes, uid: int) -> bool:
