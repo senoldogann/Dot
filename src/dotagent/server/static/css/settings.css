@@ -2986,6 +2986,12 @@
   gap: 0;
 }
 
+/* The evening check-in's time stands on its line, beside its switch (item 930): as wide as a time. */
+.checkin-time {
+  width: auto;
+  flex: 0 0 auto;
+}
+
 .brief-mark {
   display: inline-flex;
   flex: none;

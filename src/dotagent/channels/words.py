@@ -428,6 +428,7 @@ TURKISH: Words = Words(
         "Dot let go of a thing": "Bir işi bıraktım",
         "A work order needs you": "Bir iş emri seni bekliyor",
         "Your morning brief": "Sabah özetin",
+        "Your evening check-in": "Akşam yoklaman",
         "An exit cannot sell yet": "Bir çıkış henüz satamıyor",
         "A target was reached and sold": "Hedefe ulaşıldı, satıldı",
         "A stop was reached and sold": "Zarar durdura ulaşıldı, satıldı",

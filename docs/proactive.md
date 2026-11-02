@@ -82,6 +82,20 @@ What goes out of the Mac is what any run's goes (see [What leaves this Mac](safe
 above, and what the mail and calendar tools return, go to the model the run runs on, and the first line of the answer
 goes to your phone's push service and, with iMessage on, to Apple's iMessage servers. Nothing is sent anywhere else.
 
+## Evening check-in
+
+The morning brief's twin at the end of the day (item 930), after Codync's lead bot, which checks in at 09:00 and 18:00
+to follow up on what is open and offer the next step. Schedules › Evening check-in is one line: its time and its
+switch (`GET` and `PUT /api/checkin`, `{enabled, time, days}`; off at 18:00 every day until you switch it on). On, Dot
+writes it at that time as a schedule of its own, which only reads (`research`; its notice is always), in one chat
+for all check-ins, named "Evening check-in". Its run reads Dot's record of itself in a fence, as the brief's does
+(what waits for you, the objectives and work orders, the runs that failed, the campaigns at work), and one part of its
+own: the runs of your day that ended done since the last check-in (or the last twelve hours), the newest twelve, by
+their goals and the first line of their answers, whose taint the run takes. It writes, in the language you write to
+Dot in, what got done, what still waits for you, how your objectives and work orders stand, what failed, and last the
+next step Dot proposes for tomorrow, one to three concrete steps that follow from the record, each saying why. Its
+first line, at most 140 characters, goes to your phone and iMessage under *Your evening check-in* (*Akşam yoklaman*).
+
 ## Watchers
 
 **Watchers** is the panel under the brief on Schedules (with none, its head says *None yet* and a line says what a
