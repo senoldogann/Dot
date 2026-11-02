@@ -99,7 +99,8 @@ async def graph_of(store: Store, steps: int) -> HarnessGraph:
         probed: object = facts.get("probed")
         if isinstance(probed, str) and probed in known:
             edges.append(GraphEdge(source=step.id, target=probed, kind="probed"))
-        if step.from_run is not None:
+        # A night with nothing to tell a better text from luck took no run (item 931), whatever its record names.
+        if step.from_run is not None and facts.get("no_signal") is not True:
             if step.from_run not in runs:
                 try:
                     runs[step.from_run] = plain_line((await store.get_run(step.from_run)).goal, _LABEL_CHARS)

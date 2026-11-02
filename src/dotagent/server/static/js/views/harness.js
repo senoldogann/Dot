@@ -217,9 +217,12 @@ function stepRow(step) {
           ...joined([
             // A night that only worked on the pool (its record names what has headroom) takes no task, whatever it came
             // to: tried, failed or nothing left to learn, and the words say which (items 719, 762).
-            step.from_run === null
-              ? (poolNightWords(step.state, facts) ?? "no task to learn from")
-              : el("a", { href: `#/runs/${step.from_run}` }, "the task it learned from"),
+            // A night with nothing to tell a better text from luck (item 931) took no run either: it is left for later.
+            facts.no_signal === true
+              ? "nothing to tell a better text from luck"
+              : step.from_run === null
+                ? (poolNightWords(step.state, facts) ?? "no task to learn from")
+                : el("a", { href: `#/runs/${step.from_run}` }, "the task it learned from"),
             `${plural(candidates, "version", "versions")} proposed`,
           ]),
         ),

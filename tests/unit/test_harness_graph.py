@@ -148,3 +148,22 @@ async def test_a_step_whose_record_is_not_json_is_a_fault_not_a_blank(tmp_path: 
             await graph_of(store, 10)
     finally:
         await store.close()
+
+
+async def test_a_night_with_nothing_to_tell_a_better_text_from_luck_draws_no_run_it_learned_from(
+    tmp_path: Path,
+) -> None:
+    """Item 931: such a night takes no run, though its record names the one it looked at."""
+    store: Store = await _store(tmp_path)
+    try:
+        thread = await store.create_thread("t", "test")
+        run = await store.create_run(
+            thread.id, "Change the port", "task", "ollama:m", None, "ui", "medium", "standard", None, "ask", False,
+            None, None, None,
+        )  # fmt: skip
+        step: HarnessStep = await store.create_harness_step(2.0, run.id, None)
+        await store.finish_harness_step(step.id, 3.0, "keep", json.dumps({"no_signal": True}), None)
+        graph: HarnessGraph = await graph_of(store, 10)
+        assert [node.id for node in graph.nodes] == [step.id] and graph.edges == ()
+    finally:
+        await store.close()
