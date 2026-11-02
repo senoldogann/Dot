@@ -4698,6 +4698,26 @@
    own while the Mac is idle (a row a thing, with where it stands and the button that takes it off or puts it back), and
    the box that puts a thing of yours on it. ---------- */
 
+/* Its title folds the rest away (the switch and the count stay in the head); the rest keeps the panel's gaps. */
+.initiative-fold {
+  flex: none;
+  margin: -4px 0 -4px -8px;
+  padding: 4px 8px;
+  color: inherit;
+  font: inherit;
+}
+
+.initiative-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.initiative-panel[data-open="false"] > .panel-head {
+  border-bottom: 0;
+}
+
 .initiative-list {
   padding: var(--space-2) var(--space-4) 0;
 }

@@ -376,6 +376,24 @@ async def test_the_card_on_schedules_switches_it_and_keeps_the_list(login_env: d
                     # Let go again, so that the next window counts its own thing beside the run's.
                     await added.get_by_role("button", name=f"Take {title} off the list").click()
                     await expect(added).to_have_attribute("data-status", "dropped")
+                    # Its title folds the rest away, the switch and the count staying in sight, and the fold is kept
+                    # through a reload.
+                    fold: Locator = card.get_by_role("button", name="On its own", exact=True)
+                    await expect(fold).to_have_attribute("aria-expanded", "true")
+                    await expect(fold.locator(".chev")).to_have_css("transform", "matrix(0, 1, -1, 0, 0, 0)")
+                    await fold.click()
+                    await expect(fold).to_have_attribute("aria-expanded", "false")
+                    # The chevron points to the side folded, down open, as every fold's does.
+                    await expect(fold.locator(".chev")).to_have_css("transform", "none")
+                    await expect(card.locator(".initiative-list")).to_be_hidden()
+                    await expect(card.get_by_role("textbox", name="A thing for Dot's list")).to_be_hidden()
+                    await expect(switch).to_be_visible()
+                    await expect(card.locator(".panel-head .hint")).to_have_text("On · 1 to do")
+                    await page.screenshot(path=str(tmp_path / f"initiative-folded-{width}.png"), full_page=True)
+                    await page.reload()
+                    await expect(fold).to_have_attribute("aria-expanded", "false", timeout=15000)
+                    await fold.click()
+                    await expect(card.locator(".initiative-list")).to_be_visible()
                     await page.close()
             finally:
                 await browser.close()

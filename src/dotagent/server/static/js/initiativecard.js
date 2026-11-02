@@ -1,12 +1,14 @@
 // Dot's own initiative on Schedules (item 715): a switch, and the list of what Dot means to do for you on its own while
 // the Mac is idle, each in a chat of its own (`GET` and `PUT /api/initiative`). What a run put on the list, what you put
 // on it yourself (the box at the foot), what is being done and what was done or let go lately; a thing to do can be
-// taken off, one that was let go put back.
+// taken off, one that was let go put back. Its title folds the rest away, the switch and the count staying in sight, the
+// choice kept per browser (`dot.fold.initiative`), open the first time.
 
 import { api } from "./api.js";
 import { clip, el, modelName } from "./dom.js";
 import { icon } from "./icons.js";
 import { inlineError } from "./panels.js";
+import { readPref, writePref } from "./prefs.js";
 import { attempt, toast } from "./ui.js";
 
 const TITLE_CHARS = 200;
@@ -19,6 +21,8 @@ const STATE = {
   dropped: { label: "Let go", mark: "x" },
 };
 const WHO = { owner: "You put it on the list", run: "A run put it on the list" };
+// Whether the card is folded to its head, kept as the folds of the pages are (panels.js): "open" or "closed".
+const FOLD_KEY = "dot.fold.initiative";
 
 /** What a thing's row says under its title: why, and what came of it. */
 function rowText(todo) {
@@ -101,17 +105,35 @@ export function mountInitiative() {
   const input = el("input", { class: "input", type: "text", maxlength: String(TITLE_CHARS), placeholder: "Something Dot can do for you on its own", "aria-label": "A thing for Dot's list" });
   const add = el("button", { class: "btn sm", type: "submit", disabled: true, "aria-label": "Add to the list", title: "Add to the list" }, icon("plus"), el("span", { class: "label" }, "Add"));
   const form = el("form", { class: "row initiative-add" }, input, add);
+  const body = el("div", { class: "initiative-body", id: "initiative-body" }, lead, judge, peak, idleNote, holder, form);
+  let folded = readPref(FOLD_KEY) === "closed";
+  // The title is the fold's button; the count and the switch sit beside it, so using the switch never folds the card.
+  const fold = el(
+    "button",
+    { class: "fold-toggle initiative-fold", type: "button", "aria-controls": body.id, onclick: () => setFolded(!folded) },
+    el("span", { class: "chev" }, icon("chevron")),
+    el("span", { class: "fold-title" }, "On its own"),
+  );
   const element = el(
     "section",
     { class: "memory-panel notes-panel watcher-panel initiative-panel", dataset: { initiative: "" } },
-    el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "On its own"), count, el("span", { class: "spacer" }), toggle),
-    lead,
-    judge,
-    peak,
-    idleNote,
-    holder,
-    form,
+    el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, fold), count, el("span", { class: "spacer" }), toggle),
+    body,
   );
+
+  /** Fold the card to its head (`shut`) or open it, and keep the choice. */
+  function setFolded(shut) {
+    folded = shut;
+    writePref(FOLD_KEY, shut ? "closed" : "open");
+    paintFold();
+  }
+
+  function paintFold() {
+    fold.setAttribute("aria-expanded", String(!folded));
+    body.hidden = folded;
+    element.dataset.open = String(!folded);
+  }
+  paintFold();
 
   function paint(fresh) {
     view = fresh;
