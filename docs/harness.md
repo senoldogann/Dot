@@ -333,7 +333,8 @@ yours (item 931, below), most often not the one the candidates answer.
   tonight, none the loop wrote has headroom, and no task of the pool is *hard* (failed in more than a quarter of its
   attempts: one failed once in six is as often a slip of the model's). On the owner's Mac every task scored on passed
   2/2 under the base and both candidates, two nights running, at 1.6 and 2.5 million tokens a night. The step is
-  recorded `keep`, and its decision says why.
+  recorded `keep`, and its decision says why. It takes no run: the next step that proposes still learns from the run
+  that went worst before it.
 - **A role's malformed answer after the probes is a warning, not the night's failure** (item 931): the experience
   writer's answer that is no verdict (on 2026-11-02 its entry came as a sentence, twice) leaves the step as the probes
   decided it, with the warning in its record (`warnings`).

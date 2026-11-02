@@ -1479,9 +1479,10 @@ async def test_a_step_that_proposes_scores_the_candidates_first_on_the_task_writ
 async def test_a_night_with_nothing_to_tell_a_better_text_from_luck_proposes_and_plays_nothing(
     login_env: dict[str, str],
 ) -> None:
-    """Item 931: no task was written tonight, none the loop wrote has headroom, and every task of the pool passes more
-    often than not. The step asks the proposer nothing and plays nothing (two nights on the owner's Mac spent 1.6 and
-    2.5 million tokens on candidates that could only come out the same as the base)."""
+    """Item 931: no task was written tonight, none the loop wrote has headroom, and every task of the pool passes in
+    more than three quarters of its attempts. The step asks the proposer nothing and plays nothing (two nights on the
+    owner's Mac spent 1.6 and 2.5 million tokens on candidates that could only come out the same as the base), and takes
+    no run: the next step still learns from the runs before it."""
     turns: list[ScriptedTurn] = [_FINISH, _NO_TASK]
     asked: list[ProbeAsk] = []
     ready: dict[str, object] = {**_HEADROOM, "headroom_least": 0}
@@ -1492,6 +1493,8 @@ async def test_a_night_with_nothing_to_tell_a_better_text_from_luck_proposes_and
         assert step.state == "keep" and step.error is None, step
         assert "nothing was proposed: no task tells a better text from luck" in str(facts["decision"])
         assert asked == [] and await runtime.store.list_harness_versions(10) == []
+        assert facts["no_signal"] is True and step.from_run is not None, step
+        assert await harness_step._since_last_step(runtime.store, 20.0) == 20.0 - harness_step._LOOKBACK_S
 
 
 async def test_an_experience_writer_that_answers_malformed_leaves_the_night_as_the_probes_decided_it(

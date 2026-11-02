@@ -257,8 +257,8 @@ async def _carry_out(
     now: float,
     task_run: str | None = None,
 ) -> _Outcome:
-    """The step ``step`` under ``base``, the version in use when it began, which ``scoring`` was planned for; on a
-    step that only tries the pool, ``task_run`` is the run a task is written from (item 904), which it does not take."""
+    """The step ``step`` under ``base``, the version in use when it began, which ``scoring`` was planned for;
+    ``task_run`` is the run a task is written from (items 904 and 931), the worst clean one, which it does not take."""
     store: Store = runtime.store
     config: HarnessConfig = runtime.config.harness
     # The values Dot holds, which a probe's own home cannot know: a stored text is played, or shown to a role, only as
@@ -351,17 +351,20 @@ async def _carry_out(
         own[learned.id] = learned
     # Nothing tells a better text from luck (item 931): no task was written tonight, none the loop wrote has headroom,
     # and every task of the pool with headroom passes in more than three quarters of its attempts. The step proposes and
-    # plays nothing then; a
-    # task writer that failed tonight still fails the step, so that the night never reads clean (the review).
+    # plays nothing then, and takes no run: it is marked ``no_signal``, which :func:`_since_last_step` passes over, so
+    # that the run that went worst is still there for the next step that proposes. A task writer that failed tonight
+    # still fails the step, so that the night never reads clean (the review).
     if not plan.scripted and learned is None and not scoring.hard and not any(task in own for task in scoring.headroom):
+        left: str = "" if from_run is None else f"; {from_run} is left for a step that proposes"
         return _Outcome(
             state="keep",
             facts={
                 "from_run": from_run,
+                "no_signal": True,
                 "task": learned_note,
                 "decision": (
                     "nothing was proposed: no task tells a better text from luck (every task with headroom passes in "
-                    "more than three quarters of its attempts, and none was written from a run)"
+                    f"more than three quarters of its attempts, and none was written from a run){left}"
                 ),
             },
             error="; ".join(errors) or None,
@@ -770,11 +773,13 @@ async def _since_last_step(store: Store, now: float) -> float:
     """When the newest step that learned from a run began, and never further back than :data:`_LOOKBACK_S` from
     ``now``: a scripted check (`--scripted`) is recorded like any step but does not move the window the next step
     learns from, nor does a step that took no run (item 719: one that only tried the pool, whatever it came to, or
-    found none to learn from), so that the run that went worst meanwhile is still there for the next step that
+    found none to learn from), nor one that proposed nothing for want of a task to tell a better text by (item 931,
+    ``no_signal``), so that the run that went worst meanwhile is still there for the next step that
     proposes. One rule bounds it: a week, whether the last step that took a run was longer ago or there was none."""
     oldest: float = now - _LOOKBACK_S
     for earlier in await store.harness_steps_with_run(oldest, _RECENT_STEPS):
-        if step_facts(earlier).get("scripted") is not True:
+        facts: dict[str, JsonValue] = step_facts(earlier)
+        if facts.get("scripted") is not True and facts.get("no_signal") is not True:
             return earlier.started_at
     return oldest
 
@@ -819,12 +824,11 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
     # A step that only tries the pool learns from no run and takes none, not even one named by hand, which its decision
     # says: the run that went worst is left to the first step that proposes (item 719, pre-push review rounds 1 to 3).
     left_for_later: str | None = None
-    # The run a task is written from (item 904): the one the step learns from, or, on a step that only tries the pool,
-    # the one that went worst, which the step does not take: a pool every task of which is passed would leave the loop
-    # nothing to propose on for good, and the tasks written from the owner's runs are what gives it some.
+    # The run a task is written from (items 904 and 931), on any step: the worst run that read nothing third parties
+    # can author, which the step does not take. A pool every task of which is passed would leave the loop nothing to
+    # propose on for good, and the tasks written from the owner's runs are what gives it some.
     task_run: str | None = None
     if not plan.scripted:
-        # The worst run that read nothing third parties can author (item 931), on any step.
         clean: RunRecord | None = await pick_clean_run(store, await _since_last_step(store, now))
         task_run = None if clean is None else clean.id
     if not scoring.ready:
