@@ -39,8 +39,8 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   its start, which your phone draws as nothing (item 918; it was a `◆ ` before).
   The answer is masked of the secrets Dot holds, sent as plain text and cut to its first 100 words (`[channels]
   answer_words`, item 928: the code's cap, not only the model's instruction below; at the end of a sentence among the
-  last third of them when one is there) and to about 2,000 characters in any case, with a link to the chat in Dot for
-  the rest. A messaging app draws no Markdown, so the answer reads clean (item 617): a list item
+  last third of them when one is there) and to about 2,000 characters in any case, with a line that the rest is in
+  Dot on your Mac (with `[channels] links` on, a link to the chat in Dot for it). A messaging app draws no Markdown, so the answer reads clean (item 617): a list item
   has a bullet (`• `, a nested one `  ◦ `, a task its box; a numbered item stays as it is), a heading stands on a line
   of its own with a blank line before it, a horizontal rule and the `> ` of a quote are gone, and so are the marks of
   bold, emphasis, strike and code (a link reads *words (address)*). A table reads as a phone's narrow screen holds it
@@ -131,8 +131,12 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   question and went on to need an approval is told when the window of the first line ends, with the newest of the
   waits that still wait and how many more (*… (and 1 more)*); one you answered meanwhile is not told, as the line
   would be false.
-- **The links** go to the name a phone reaches the Mac by (`[server] reach`, see [Dot on the phone](phone.md)), as the
-  phone's own pages open there, and never carry the access token. This Mac's own address, `127.0.0.1`, opens nothing on a
+- **No links, by default** (item 934, the owner's word: *no link to the chat in my messages*): `[channels] links =
+  false` sends no message with a link, whatever `[server] reach` says, so each reads as with no address below (*The
+  rest of the answer is in Dot on your Mac*, *Answer it in Dot on your Mac, not here*, a tell and nothing after it),
+  and the tab says so in its facts. Approvals are answered in Dot either way.
+- **The links**, with `[channels] links = true`, go to the name a phone reaches the Mac by (`[server] reach`, see [Dot
+  on the phone](phone.md)), as the phone's own pages open there, and never carry the access token. This Mac's own address, `127.0.0.1`, opens nothing on a
   phone, so with no `[server] reach` no link is sent (item 611): an answer cut short says *The rest of the answer is
   in Dot on your Mac*, a wait says *Answer it in Dot on your Mac, not here*, a line of tells is the tell and nothing
   after it, and the tab says why once, in its facts (*Links in messages*, below). Settings › Phone sets the name.

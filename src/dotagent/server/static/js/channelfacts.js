@@ -97,12 +97,16 @@ export function seenFacts(seen, now = Date.now() / 1000, zone = undefined) {
 }
 
 /**
- * What the links in Dot's messages open at (item 611), as a row of the facts: the name a phone reaches Dot by, or, with
- * none, why no link is sent and where the lines send the owner instead.
+ * What the facts say of the links in Dot's messages: where they open, or why there are none (`off`: `[channels] links`
+ * is off, item 934; else `[server] reach` names no address a phone can open, item 611).
  * @param {string | null} links
+ * @param {boolean} off
  * @returns {[string, string]}
  */
-export function linkFact(links) {
+export function linkFact(links, off) {
+  if (off) {
+    return ["Links in messages", "none: [channels] links is off, so a message says to open Dot on your Mac."];
+  }
   return [
     "Links in messages",
     links === null

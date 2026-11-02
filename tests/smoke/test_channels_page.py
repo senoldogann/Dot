@@ -64,7 +64,7 @@ class Served:
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        "[browser]\nheadless = true\n\n[memory]\nembed_enabled = false\n", encoding="utf-8"
+        "[browser]\nheadless = true\n\n[memory]\nembed_enabled = false\n\n[channels]\nlinks = true\n", encoding="utf-8"
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))

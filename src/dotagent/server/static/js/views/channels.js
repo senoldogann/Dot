@@ -233,7 +233,7 @@ export function mount(root, ctx) {
     const facts = el(
       "dl",
       { class: "kv kv-rows channel-seen" },
-      [...seenFacts(view.seen), linkFact(view.links)].map(([label, value]) => el("div", null, el("dt", null, label), el("dd", null, value))),
+      [...seenFacts(view.seen), linkFact(view.links, view.links_off)].map(([label, value]) => el("div", null, el("dt", null, label), el("dd", null, value))),
     );
     const row = setRow({
       title: "What Dot sees in Messages",

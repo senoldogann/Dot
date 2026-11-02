@@ -849,9 +849,13 @@ progress = "steps"
 # English or Turkish; "en" or "tr" holds one. An answer is in the language the model wrote it in.
 language = "auto"
 # answer_words: the most words of a run's answer that go there (item 928), cut at the end of a sentence when one is
-# close, then a line with the link to the rest in Dot; a run started from a channel is told to write in 100 words.
+# close, then a line that the rest is in Dot; a run started from a channel is told to write in 100 words.
 # 0 sends the whole answer (within the 2,000 characters a message holds).
 answer_words = 100
+# links: whether a message there carries the link to its page in Dot (the chat, the run that waits for you, the brief),
+# made from [server] reach (item 934). Off: a cut answer ends "the rest of the answer is in Dot on your Mac", and a
+# wait says to answer it in Dot. Approvals are answered in Dot either way.
+links = false
 
 [reactions]
 # Reactions on Dot's messages (item 586, docs/runs.md): a button under each message of Dot's opens a palette: 👍 good,

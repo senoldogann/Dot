@@ -550,13 +550,17 @@ class ChannelsConfig(FrozenModel):
     themselves in Messages and answers in it, and tells them there what it says on its own (item 582) (``imessage``),
     and whether a run started from there tells what it does while it works (``progress``, item 618). Settings ›
     Channels switches both, live. ``language`` is the language of the lines Dot writes there itself (item 805):
-    ``auto`` speaks the language of the owner's last message."""
+    ``auto`` speaks the language of the owner's last message. ``links`` is whether its messages link to Dot's pages
+    (item 934)."""
 
     imessage: bool
     progress: ProgressMode
     language: Literal["auto", "en", "tr"] = "auto"
-    # The most words of a run's answer a channel sends (item 928), the rest a link away; 0 sends it whole.
+    # The most words of a run's answer a channel sends (item 928), the rest in Dot; 0 sends it whole.
     answer_words: int = Field(default=100, ge=0, le=2000)
+    # Whether a channel's messages carry the link to their page in Dot (item 934): off by the owner's word, so that a
+    # cut answer, a wait and a tell name Dot on the Mac instead.
+    links: bool = False
 
 
 # What a reaction does once the run it is about has ended (item 586): ``follow_up`` starts a run in the same chat, as

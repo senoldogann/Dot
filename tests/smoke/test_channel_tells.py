@@ -73,7 +73,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory, replies: Replies) ->
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\nlessons = "off"\n'
-        "playbooks = false\n\n[memory]\nembed_enabled = false\n",
+        "playbooks = false\n\n[memory]\nembed_enabled = false\n\n[channels]\nlinks = true\n",
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
@@ -259,6 +259,26 @@ async def test_the_line_opens_a_page_of_dot_at_the_address_its_links_open_at(
         ]
         # Never an address that carries the access token, which a message would hand to the messaging service.
         assert "token" not in named.osascript.sent[0][1]
+
+
+async def test_with_links_off_a_line_carries_no_link_whatever_the_name_a_phone_reaches_the_mac_by(
+    runtime: Runtime, manager: RunManager, tmp_path: Path
+) -> None:
+    """Item 934, the owner's word: ``[channels] links = false`` (the default) sends no link, ``[server] reach`` or not,
+    and the tab's facts say it is off."""
+    off: Runtime = dataclasses.replace(
+        runtime,
+        config=runtime.config.model_copy(
+            update={"channels": runtime.config.channels.model_copy(update={"links": False})}
+        ),
+    )
+    async with serving(off, manager, tmp_path, reach=["mac.example.ts.net"]) as quiet:
+        await quiet.tell("Watchers", "Mail from the bank", "#/schedules")
+        await _until(lambda: len(quiet.osascript.sent) == 1, "the line reached Messages")
+        assert quiet.osascript.sent == [(PHONE, f"{MARKER}Watchers: Mail from the bank")]
+        assert quiet.channels.router.link("run_1") is None
+        view = await quiet.channels.view()
+        assert view.imessage.links is None and view.imessage.links_off
 
 
 async def test_with_no_name_a_phone_reaches_the_mac_by_the_lines_carry_no_link(

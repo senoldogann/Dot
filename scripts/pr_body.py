@@ -4,7 +4,7 @@ A pull request carries a batch: the items a session built, each with its own `ro
 says what was built, how it was checked and what was left; a body written again by hand says it twice and drifts. For
 one item the title is `Item <n>: <heading>` (the heading's first letter in lower case) and the body the entry without
 its heading and its `Log:`; for several, `Items <n>, <m> and <k>: <heading>; <heading>; <heading>` and one section for
-each, under `## Item <n>: <heading>`; the attribution line ends it.
+each, under `## Item <n>: <heading>`. No line of the tool that wrote it is added (item 934, the owner's word).
 
 Usage: uv run python scripts/pr_body.py <item>... --title
        uv run python scripts/pr_body.py <item>...
@@ -18,7 +18,6 @@ from pathlib import Path
 
 ROOT: Path = Path(__file__).resolve().parent.parent
 _HEADING: re.Pattern[str] = re.compile(r"^### ([1-9]\d*)\. (.+)$")
-_ATTRIBUTION: str = "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
 
 
 class EntryError(ValueError):
@@ -44,8 +43,8 @@ def title(entry: str) -> str:
 
 
 def body(entry: str) -> str:
-    """The entry without its heading and its log, and the attribution line under it."""
-    return _section(entry) + f"\n\n{_ATTRIBUTION}\n"
+    """The entry without its heading and its log; no line of the tool that wrote it (the owner's word, item 934)."""
+    return _section(entry) + "\n"
 
 
 def _section(entry: str) -> str:
@@ -70,7 +69,7 @@ def batch_body(entries: list[str]) -> str:
     if len(entries) == 1:
         return body(entries[0])
     sections: list[str] = [f"## {title(entry)}\n\n{_section(entry)}" for entry in entries]
-    return "\n\n".join(sections) + f"\n\n{_ATTRIBUTION}\n"
+    return "\n\n".join(sections) + "\n"
 
 
 def main(arguments: list[str]) -> int:
