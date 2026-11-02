@@ -595,6 +595,10 @@ async def test_a_brief_that_failed_is_told_as_any_schedules_failure(
 async def test_another_schedule_fires_with_its_own_goal_and_tells_its_end_as_before(
     runtime: Runtime, manager: RunManager, scheduler: Scheduler, client: httpx.AsyncClient, told: Told
 ) -> None:
+    # The tick fires every schedule due by then: a brief an earlier test left on, due within the five minutes, would
+    # tell its own end (it failed on 2026-11-02 at 05:00 UTC, the brief's hour). Only the plain schedule is there.
+    for record in await runtime.store.list_schedules():
+        await runtime.store.delete_schedule(record.id)
     created: httpx.Response = await client.post(
         "/api/schedules", json={"name": "Plain", "goal": "Say hello.", "cron": "*/5 * * * *", "mode": "research"}
     )

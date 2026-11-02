@@ -196,7 +196,8 @@ of one word (words counted by their spaces, so a task in a script written withou
 its reason: it says no work; your own box takes what you write. A run given a thing ends as it is done; Dot marks it
 done, or to try again when the run failed, and the run is told never to change the list or Dot's database itself. You
 put one on it with the box at the card's foot; **Remove** takes a thing to do off it, **Again** puts back one that was
-let go.
+let go. The card's title folds the rest of it away, its switch and its count (**On · 2 to do**) still in sight, and
+opens it again; the browser keeps the choice (item 929).
 
 **When it works.** The scheduler looks at every tick. Switched on, it starts one of its runs when none of the Mac's runs
 works, nobody touched the keyboard, the mouse or the trackpad for `idle_minutes` (10), `gap_minutes` (15) have passed

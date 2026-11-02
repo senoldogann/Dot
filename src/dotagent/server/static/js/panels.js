@@ -220,7 +220,7 @@ export function segmented(options, selected, onSelect) {
  * Whether a foldable block is open: what the person chose last time (kept per browser under `id`), else `openByDefault`.
  * `flip()` toggles it, remembers the new state and returns it.
  */
-function foldState(id, openByDefault) {
+export function foldState(id, openByDefault) {
   const key = `${FOLD_KEY_PREFIX}${id}`;
   const stored = readPref(key);
   let open = stored === null ? openByDefault : stored === "open";
