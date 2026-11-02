@@ -46,6 +46,15 @@ class ScoringPlan(FrozenModel):
     headroom: tuple[str, ...]
     untried: int
     ready: bool
+    # The tasks with headroom failed often enough to tell a better text from luck (item 931): failed in more than
+    # a quarter of their attempts (:data:`HARD_RATE`). A task the version in use fails once in six is as often a slip of
+    # the model's as anything a text could change: on the owner's Mac every task scored on passed 2/2 under the base
+    # and both candidates, two nights running, and each night spent 1.6 to 2.5 million tokens learning nothing.
+    hard: tuple[str, ...]
+
+
+# A task with headroom is hard when the version in use passes it less often than this: it failed more than a quarter.
+HARD_RATE: float = 0.75
 
 
 def pool_of(config: HarnessConfig) -> tuple[str, ...]:
@@ -109,4 +118,5 @@ def plan_scoring(config: HarnessConfig, records: dict[str, TaskRecord], own: Seq
         headroom=tuple(record.task_id for record in with_headroom),
         untried=sum(1 for task in pool if task not in records),
         ready=len(with_headroom) >= config.headroom_least,
+        hard=tuple(record.task_id for record in with_headroom if record.rate < HARD_RATE),
     )

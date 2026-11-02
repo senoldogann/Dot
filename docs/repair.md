@@ -7,7 +7,11 @@ check passes, or leaves it for you. [The harness](harness.md) improves what Dot 
 code itself.
 
 It is off until `[repair] repo` names the git checkout of Dot's code (`~/Desktop/Dot` on the owner's Mac). Settings ›
-Rules and memory › Self-repair shows the book, the sessions and the account, and starts a night by hand (**Run now**):
+Rules and memory › Self-repair leads with an overview (on or off and when, what it works on now, the problems fixed,
+waiting for you and open, the account), then what waits for you with its pull request and why, the nights by date (each
+session's problem, how it ended and why in a line that opens whole), the problems next in line (the most seen first, a
+few and the rest a click away) and the closed ones folded; a problem's placeholders read as words (item 932). It starts
+a night by hand (**Run now**):
 `GET /api/repair` gives them, and `POST /api/repair/now` starts a night (409 with no repository, or while one is under
 way).
 
@@ -25,7 +29,9 @@ Some failures do not count, because they are the run's own doing, the world's, o
 
 - An approval refused or expired.
 - A tool in use by another run.
-- A page that is not there.
+- A page that is not there, or a host name that does not resolve (most often an address the model guessed; the first
+  night's session found it, item 932). This takes every such failure of the DNS, a resolver down for a while among
+  them: one would show in the runs it stopped, not as a defect of Dot's code.
 - A command, a script or an AppleScript the model wrote that failed.
 - A text that did not appear on a page.
 - An edit whose text was not in the file.

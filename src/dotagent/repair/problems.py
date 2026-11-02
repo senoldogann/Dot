@@ -67,6 +67,9 @@ _NOT_DEFECT_WORDS: tuple[str, ...] = (
     "The text has not appeared",
     "the text to replace was not found",
     "syntax error",
+    # A host the DNS answers does not exist (NXDOMAIN): an address the model guessed, not a defect (found by the first
+    # repair night, 2026-11-02, which could not change this file itself).
+    "could not be resolved",
 )
 # The events of the daemon's log that are the repair night's own (items 919-921), never read as a problem.
 _OWN_EVENTS: tuple[str, ...] = ("repair_",)
