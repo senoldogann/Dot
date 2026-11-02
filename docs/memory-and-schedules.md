@@ -273,6 +273,22 @@ composer (items 281 and 400; see [Runs](runs.md)); a chat with such a schedule w
 `[agent] reflection_time` (see Reflection in [Autonomy](autonomy.md)); it is not a schedule and does not count against
 `max_schedules`.
 
+**A reply goes to the chat it belongs to** (item 926). When a run sends a message for you (a mail's Send, a mail
+command, a script), Dot keeps the mail addresses that step and the run's calls so far named (the field To, a command's
+recipient) by the run's chat. A run that reads your mail on its own (a schedule such as one that reads your inbox every
+two hours, or a watcher) is told to hand each reply to a mail Dot sent from another chat to that chat with
+`pass_reply`, the sender and a few lines of where it is and what it asks: the code finds the chat other than its own
+that wrote to the sender last in 60 days and starts a run there, which reads the reply and goes on with that chat's
+work (an application, an offer, a client's thread) rather than the schedule's chat answering it with no knowledge of
+it. That run's source is
+`reply`: nobody watches it, its goal is Dot's words, it starts untrusted (what it was handed comes of a mail a third
+party wrote), and in your chat the review model judges what it would send, as for a schedule's run there (item 860); it
+takes the chat's model and approval mode. The same sender is handed once in 12 hours; one no other chat wrote to, and a
+reply to the finder's own chat, stay with the finder; while a run works in that chat it is handed later. Only a run of
+a schedule or a watcher of yours hands a reply on, refused by the code for any other run: what the reply's run sends
+in your chat is judged as that chat's, so a run of Dot's own initiative, whose messages ask you in every mode (item
+850), keeps its replies.
+
 The **Morning brief** (item 570) is a schedule too, set on a card under your schedules (its **Settings** open in a
 dialog, item 615) and labelled **Brief** in the list: a read-only run (`research`) at the time you set whose goal Dot
 builds each time it fires, from what it knows of

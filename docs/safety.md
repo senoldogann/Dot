@@ -310,10 +310,12 @@ trading off.
    chat made among them. While you are there (a run of yours, or the one that tells the chat its command in the
    background ended), a payment is handed to you, as in every mode that asks, one within a cap you pre-approved for its
    site asks your yes, as in `ask`, and a message or a post asks your yes; one you do not answer in time is kept as a card
-   with its draft, for your yes later (item 922). In a run that a schedule, a watcher or a notice started there, which nobody watches, the review model judges a message
-   or a post against your words, lawful, harmless and called for ("legal ise, tehlike arz etmiyorsa ve bir amaç içinse
-   yollasın; ajanın niyeti önemli"): its yes sends it, its no refuses it, and what it cannot tell comes to you; a
-   payment is still handed to you. Its words are the goal of the schedule, which a run of the chat may have written
+   with its draft, for your yes later (item 922). In a run that a schedule, a watcher, a notice or a reply handed on
+   started there, which nobody watches, the review model judges a message or a post against your words, lawful,
+   harmless and called for ("legal ise, tehlike arz etmiyorsa ve bir amaç içinse yollasın; ajanın niyeti önemli"): its
+   yes sends it, its no refuses it, and what it cannot tell comes to you; a payment is still handed to you. Only a run
+   of a schedule or a watcher of yours hands a reply on (item 926), never one of Dot's own initiative, whose messages
+   ask you. Its words are the goal of the schedule, which a run of the chat may have written
    (`schedule_create`); the rule of lawful and harmless holds whatever it says, and a run that read outside content is
    checked before it makes a schedule (item 525). Such a run resumed after a restart is taken as yours, there to
    answer: its message waits for your yes. No rule of yours answers for you. A chat a schedule, a watcher, a notice, the

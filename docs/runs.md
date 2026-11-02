@@ -513,7 +513,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Pages           | `show_page`                                                                                                        |
 | Drafts          | `draft_message`                                                                                                    |
-| Mail, calendars | `mail_search`, `mail_read`, `calendar_events`                                                                      |
+| Mail, calendars | `mail_search`, `mail_read`, `calendar_events`; `pass_reply` (item 926, tool group `replies`): a reply to a mail a chat sent, handed to that chat |
 | Skills          | `skill`, `find_help`; `skill_save` (item 893, tool group `skills`): how the owner said to do a kind of work, kept   |
 | MCP             | `mcp__<server>__<tool>`; the server `web-research` comes with Dot (item 583): `mcp__web-research__web_scrape`, `web_map`, `web_extract` and the crawl tools `web_crawl_start`, `web_crawl_status`, `web_crawl_results`, `web_crawl_cancel` (its search is a rung of `web_search`, item 655) |
 

@@ -14,7 +14,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.harness.components import GivenText
 from dotagent.mcp.types import McpPurpose
 from dotagent.policy.types import ApprovalMode, Preset
-from dotagent.proactive import INITIATIVE_SOURCE, WATCHER_SOURCE
+from dotagent.proactive import UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import SKILL_TOOL, Skill
@@ -28,6 +28,7 @@ from dotagent.tools.groups import ACCOUNTS_GROUP, group_lines, quotes_a_server, 
 from dotagent.tools.help import FIND_HELP_TOOL
 from dotagent.tools.meta import ASK_USER_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.pages import SHOW_PAGE_TOOL
+from dotagent.tools.replies import PASS_REPLY_TOOL
 from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 from dotagent.tools.work_orders import ASSIGN_WORK_TOOL
 
@@ -507,6 +508,14 @@ _NOTHING_NEW: str = (
     "with nothing_new true and say so in a sentence: its end is then not pushed to them."
 )
 
+# A run that reads the owner's mail on its own (a schedule, a watcher) hands each reply to a mail Dot sent to the chat
+# that sent it (item 926), where that work goes on; the tool finds the chat by the sender.
+_HAND_REPLIES: str = (
+    f"A reply you find to a mail Dot sent from another chat (an application, an offer, a client's thread) is that "
+    f"chat's work: hand it there with {PASS_REPLY_TOOL} (the sender and, in a few lines, where it is and what it asks) "
+    "rather than answer it here; deal here only with what it says belongs to no other chat."
+)
+
 _LEFT_QUESTIONS: str = (
     "Questions: nobody answers during this run. ask_user leaves your question for the user and returns at once; go on "
     "with what does not depend on the answer. If nothing can be done without it, end the run and say exactly what you "
@@ -679,10 +688,12 @@ def _environment(inputs: PromptInputs) -> str:
     # Only a run that can delegate is told to split: a delegated run cannot delegate again.
     if inputs.split and DELEGATE_TOOL in inputs.tool_names:
         lines.append(f"- {_SPLIT_TEXT}")
-    if inputs.source in (SCHEDULE_SOURCE, WATCHER_SOURCE, INITIATIVE_SOURCE):
+    if inputs.source in UNWATCHED_SOURCES:
         lines.append(f"- {_UNATTENDED_LEAVING if inputs.questions == 'leave' else _UNATTENDED}")
     if inputs.source == SCHEDULE_SOURCE:
         lines.append(f"- {_NOTHING_NEW}")
+    if inputs.source in (SCHEDULE_SOURCE, WATCHER_SOURCE) and PASS_REPLY_TOOL in inputs.tool_names:
+        lines.append(f"- {_HAND_REPLIES}")
     if inputs.source == DELEGATE_SOURCE:
         lines.append(f"- {_DELEGATED}")
     channel: str | None = next((title for name, title in TITLES.items() if name == inputs.source), None)

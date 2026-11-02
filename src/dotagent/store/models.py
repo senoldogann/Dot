@@ -994,3 +994,14 @@ class HarnessExperience(FrozenModel):
     confidence: str
     created_at: float
     tainted: bool
+
+
+class Correspondent(FrozenModel):
+    """An address a run of the chat ``thread_id`` wrote to (item 926): the run, when, and when a reply from it was last
+    handed to that chat (None: never)."""
+
+    address: str
+    thread_id: str
+    run_id: str
+    at: float
+    handed_at: float | None

@@ -2,6 +2,7 @@
 approval modes answers the policy's questions without the user."""
 
 import asyncio
+import re
 import time
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, NoReturn
@@ -143,6 +144,15 @@ def _rejection(outcome: ApprovalOutcome) -> str:
     if outcome.status == "expired" or note == "":
         return f"the user did not approve this action ({outcome.status})"
     return f"the user did not approve this action ({outcome.status}, with the note “{note}”)"
+
+
+# A mail address as a run writes one (item 926), an address a search names as a sender (`from:x@y`, which the run
+# looked for and does not write to), how many of the run's newest calls are read for them when it sends a message (the
+# compose, the field "To" and the Send are a few steps apart), and how many are kept of one message.
+_MAIL_ADDRESS: re.Pattern[str] = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+_SEARCHED_SENDER: re.Pattern[str] = re.compile(r"\bfrom:\s*[\"']?[^\s\"']+", re.IGNORECASE)
+_CALLS_READ: int = 20
+_MOST_ADDRESSES: int = 20
 
 
 class SiteLocks:
@@ -489,6 +499,8 @@ class RunGate:
         note, answered_by = await self._authorize_decision(
             info, decision, rules, tainted, unkept, held is not None, judged
         )
+        if "message_send" in info.flags:
+            await self._note_correspondents(info)
         if allowance is not None and state is not None:
             # The payment goes ahead under its caps, whichever question let it through (the guard asks first when the
             # step also sends or posts, item 429): it counts against the site's day. A refusal or a hand-off raised.
@@ -507,6 +519,25 @@ class RunGate:
         # that the cut leaves no half of a secret (item 551).
         _, said = await _shown(info, decision)
         return Authorization(note=note, decision=step_decision(said, answered_by, self._preset, tainted))
+
+    async def _note_correspondents(self, info: ActionInfo) -> None:
+        """Keep the addresses a message this run sends goes to, by its chat (item 926), so that a reply from one of them
+        that a schedule of the owner's finds is handed to that chat (:mod:`dotagent.tools.replies`). They are the mail
+        addresses the step and the run's newest :data:`_CALLS_READ` calls named (the field "To", a command's
+        recipient, a script's), but for one a search names as a sender; a run of no chat keeps none. They are kept once
+        the step is let through, before it runs: a send that then fails noted the chat that tried to write, which a
+        reply goes to all the same."""
+        if self.chat_id is None:
+            return
+        texts: list[str] = [info.summary, info.target, *await self._store.call_texts(self._run_id, _CALLS_READ)]
+        found: list[str] = sorted(
+            {address.lower() for text in texts for address in _MAIL_ADDRESS.findall(_SEARCHED_SENDER.sub(" ", text))}
+        )
+        if found:
+            await self._store.note_correspondents(found[:_MOST_ADDRESSES], self.chat_id, self._run_id, time.time())
+            log.info(
+                "correspondents_noted", run_id=self._run_id, chat=self.chat_id, count=min(len(found), _MOST_ADDRESSES)
+            )
 
     def _capped_site(self, info: ActionInfo) -> str | None:
         """The site of a payment step with an amount on a site with pre-approved caps; ``None`` for any other action."""

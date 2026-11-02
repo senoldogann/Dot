@@ -250,7 +250,7 @@ from dotagent.memory.service import (
     words_only,
 )
 from dotagent.oauth.tokens import Account
-from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
+from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import schedule_timing
@@ -284,6 +284,7 @@ from dotagent.tools.groups import (
     BROWSER_GROUP,
     CORE_GROUP,
     GROUPS_EVENT,
+    REPLIES_GROUP,
     TODOS_GROUP,
     group_of,
     groups_event,
@@ -358,9 +359,7 @@ _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
 )
 # The sources of runs no message of the owner's started (item 664). "background" is agent/manager.py's
 # BACKGROUND_SOURCE, which imports this module.
-_UNASKED_SOURCES: frozenset[str] = frozenset(
-    {SCHEDULE_SOURCE, WATCHER_SOURCE, NOTICE_SOURCE, REFLECTION_SOURCE, RESUME_SOURCE, INITIATIVE_SOURCE, "background"}
-)
+_UNASKED_SOURCES: frozenset[str] = UNWATCHED_SOURCES | {NOTICE_SOURCE, REFLECTION_SOURCE, RESUME_SOURCE, "background"}
 
 _SUMMARY_ATTEMPTS: int = 3
 # The most skills named under a message, besides those the instructions list (item 404).
@@ -2349,7 +2348,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # The tool groups that are on; they only grow. A grouped run starts with core, the groups its thread used and the
     # servers the owner picked for its message (item 318); a run of Dot's own initiative with its list too, so that a
     # thing the owner said not to do is let go at once (item 912: such a run asked the owner instead, three times).
-    own: tuple[str, ...] = (TODOS_GROUP,) if run.source == INITIATIVE_SOURCE else ()
+    own: tuple[str, ...] = (
+        (TODOS_GROUP,)
+        if run.source == INITIATIVE_SOURCE
+        # A run that reads the owner's mail on its own hands a reply to its chat (item 926) from its first step.
+        else (REPLIES_GROUP,)
+        if run.source in (SCHEDULE_SOURCE, WATCHER_SOURCE)
+        else ()
+    )
     on: frozenset[str] = (
         frozenset({CORE_GROUP, *used_groups(history), *picked_groups(opening.picks), *own}) & frozenset(groups)
         if grouped
