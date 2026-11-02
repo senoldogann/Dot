@@ -7,8 +7,7 @@
 import { api } from "./api.js";
 import { clip, el, modelName } from "./dom.js";
 import { icon } from "./icons.js";
-import { inlineError } from "./panels.js";
-import { readPref, writePref } from "./prefs.js";
+import { foldState, inlineError } from "./panels.js";
 import { attempt, toast } from "./ui.js";
 
 const TITLE_CHARS = 200;
@@ -21,8 +20,8 @@ const STATE = {
   dropped: { label: "Let go", mark: "x" },
 };
 const WHO = { owner: "You put it on the list", run: "A run put it on the list" };
-// Whether the card is folded to its head, kept as the folds of the pages are (panels.js): "open" or "closed".
-const FOLD_KEY = "dot.fold.initiative";
+// Whether the card is folded to its head, kept as the folds of the pages are (panels.js `foldState`, `dot.fold.` and this).
+const FOLD_ID = "initiative";
 
 /** What a thing's row says under its title: why, and what came of it. */
 function rowText(todo) {
@@ -106,11 +105,11 @@ export function mountInitiative() {
   const add = el("button", { class: "btn sm", type: "submit", disabled: true, "aria-label": "Add to the list", title: "Add to the list" }, icon("plus"), el("span", { class: "label" }, "Add"));
   const form = el("form", { class: "row initiative-add" }, input, add);
   const body = el("div", { class: "initiative-body", id: "initiative-body" }, lead, judge, peak, idleNote, holder, form);
-  let folded = readPref(FOLD_KEY) === "closed";
+  const folding = foldState(FOLD_ID, true);
   // The title is the fold's button; the count and the switch sit beside it, so using the switch never folds the card.
   const fold = el(
     "button",
-    { class: "fold-toggle initiative-fold", type: "button", "aria-controls": body.id, onclick: () => setFolded(!folded) },
+    { class: "fold-toggle initiative-fold", type: "button", "aria-controls": body.id, onclick: () => flipFold() },
     el("span", { class: "chev" }, icon("chevron")),
     el("span", { class: "fold-title" }, "On its own"),
   );
@@ -121,17 +120,17 @@ export function mountInitiative() {
     body,
   );
 
-  /** Fold the card to its head (`shut`) or open it, and keep the choice. */
-  function setFolded(shut) {
-    folded = shut;
-    writePref(FOLD_KEY, shut ? "closed" : "open");
+  /** Fold the card to its head or open it, and keep the choice. */
+  function flipFold() {
+    folding.flip();
     paintFold();
   }
 
   function paintFold() {
-    fold.setAttribute("aria-expanded", String(!folded));
-    body.hidden = folded;
-    element.dataset.open = String(!folded);
+    const open = folding.isOpen();
+    fold.setAttribute("aria-expanded", String(open));
+    body.hidden = !open;
+    element.dataset.open = String(open);
   }
   paintFold();
 
