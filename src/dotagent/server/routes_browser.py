@@ -6,6 +6,16 @@ from fastapi import APIRouter
 from pydantic import JsonValue
 
 from dotagent.browser.attach import INSPECT_PAGE, ChromeState, inspect_chrome
+from dotagent.browser.chrome_import import (
+    ImportReport,
+    chrome_is_open,
+    chrome_profile_names,
+    chrome_profile_titles,
+    cookie_count,
+    has_stored_cookies,
+    import_chrome_profile,
+    require_importable,
+)
 from dotagent.browser.devtools import devtools_address
 from dotagent.browser.login import open_sign_in_window
 from dotagent.browser.look import PageLook
@@ -17,11 +27,13 @@ from dotagent.browser.profiles import (
     delete_profile,
     known_profile,
     listed_profiles,
+    name_for_import,
     profile_dir,
 )
+from dotagent.browser.readable import readable_cookies
 from dotagent.browser.session import BrowserSession
 from dotagent.config_edit import BrowserSetting, SettingValue, set_browser_mode, set_browser_setting
-from dotagent.core.errors import InvalidValueError, RunConflict
+from dotagent.core.errors import BrowserError, InvalidValueError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, config_path
 from dotagent.server.context import ServerContext
@@ -33,6 +45,12 @@ from dotagent.server.views import (
     BrowserRaiseRequest,
     BrowserRemoteInputRequest,
     BrowserView,
+    ChromeImportOptions,
+    ChromeImportRequest,
+    ChromeImportResult,
+    ChromeImportSource,
+    ChromeImportTarget,
+    ProfileCheck,
 )
 
 _log = get_logger("dotagent.server.routes_browser")
@@ -214,6 +232,144 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         await refuse_while_open(name)
         await asyncio.to_thread(clear_site_data, profile_dir(name))
         return await state()
+
+    def import_options() -> ChromeImportOptions:
+        """What Import from Chrome offers (blocking: it reads the files of the owner's Chrome and of Dot's profiles)."""
+        data_dir = chrome_data_dir()
+        chrome_open: bool = chrome_is_open(data_dir)
+        listed = listed_profiles()
+        taken: list[str] = [profile.name for profile in listed]
+        # The name Chrome shows for a profile, or its folder's for one Chrome names nowhere; its cookies are counted
+        # only while Chrome is closed, as one that runs holds the file as it writes it.
+        titles: dict[str, str] = chrome_profile_titles(data_dir)
+        sources: list[ChromeImportSource] = []
+        for folder in chrome_profile_names(data_dir):
+            cookies: int | None = None
+            uncounted: str | None = None
+            if not chrome_open:
+                # A profile whose cookies cannot be counted is listed saying so, not left out with the others (the
+                # pre-push review of item 917): its import says what holds it.
+                try:
+                    cookies = cookie_count(data_dir, folder)
+                except BrowserError as error:
+                    _log.warning("chrome_cookies_uncounted", folder=folder, error=error.message, context=error.context)
+                    uncounted = error.message
+            sources.append(
+                ChromeImportSource(
+                    folder=folder,
+                    name=titles.get(folder, folder),
+                    cookies=cookies,
+                    uncounted=uncounted,
+                    new_name=name_for_import(titles.get(folder, folder), taken),
+                )
+            )
+        return ChromeImportOptions(
+            chrome_open=chrome_open,
+            sources=tuple(sources),
+            targets=tuple(
+                ChromeImportTarget(
+                    name=profile.name, kind=profile.kind, signed_in=has_stored_cookies(profile_dir(profile.name))
+                )
+                for profile in listed
+                if profile.kind != "incognito"
+            ),
+            in_use=session.config.profile,
+        )
+
+    @router.get("/browser/chrome-import")
+    async def chrome_import_options() -> ChromeImportOptions:
+        """The profiles of the owner's Chrome that hold cookies, with the names Chrome shows for them and their cookies
+        (counted while Chrome is closed), and the profiles of Dot's own Chrome an import may fill (item 917). The
+        owner's Chrome is only read."""
+        return await asyncio.to_thread(import_options)
+
+    async def free_for_import(name: str, use: bool) -> None:
+        """Make the profile ``name`` free for an import: refused while runs are active when it is the one in use or is
+        to be (Dot's Chrome is let go of then), and while a Chrome window has it open."""
+        in_use: bool = session.config.profile == name
+        if in_use or use:
+            refuse_while_runs("sign-ins cannot be imported into the profile tasks use")
+        own: BrowserSession = ctx.runtime.browsers.session_for("own")
+        if own.config.profile == name:
+            await own.let_go_of_chrome()
+        await refuse_while_open(name)
+
+    @router.post("/browser/chrome-import")
+    async def import_from_chrome(request: ChromeImportRequest) -> ChromeImportResult:
+        """Copy the cookies and the local storage of the owner's Chrome profile ``source`` into a profile of Dot's own
+        Chrome (item 917), as ``dotx browser import-chrome`` does: into a new one named after it for ``into`` null,
+        which goes again when the import fails, or into ``into``, whose sign-ins are replaced only with ``replace``.
+        Chrome must be quit; Incognito is refused, as it keeps nothing. ``use`` makes tasks work on it. The owner's
+        Chrome is only read and nothing is decrypted: Chrome reads the cookies with its key in the Keychain, which the
+        check that follows asks for (``POST /api/browser/profiles/{name}/check``)."""
+        data_dir = chrome_data_dir()
+        if await asyncio.to_thread(chrome_is_open, data_dir):
+            raise RunConflict(
+                "Chrome is open; quit it (⌘Q) so that its files are complete, and import again",
+                {"source": request.source},
+            )
+        made: bool = request.into is None
+        if request.into is None:
+            listed = await asyncio.to_thread(listed_profiles)
+            titles: dict[str, str] = await asyncio.to_thread(chrome_profile_titles, data_dir)
+            name: str = name_for_import(titles.get(request.source, request.source), [view.name for view in listed])
+        else:
+            name = request.into
+            await asyncio.to_thread(known_profile, name)
+            # Incognito is refused before anything is let go of (the pre-push review of item 917).
+            require_importable(profile_dir(name))
+            if await asyncio.to_thread(has_stored_cookies, profile_dir(name)) and not request.replace:
+                raise InvalidValueError(
+                    f"{name} holds sign-ins already; say to replace them, or import into a new profile",
+                    {"profile": name},
+                )
+        await free_for_import(name, request.use)
+        if made:
+            await asyncio.to_thread(add_profile, name)
+        try:
+            report: ImportReport = await asyncio.to_thread(
+                import_chrome_profile, data_dir, request.source, profile_dir(name)
+            )
+        except Exception as error:
+            if made:
+                # The profile was made for this import alone, and nothing of it was made: it goes with it. A stop of the
+                # request is let through and leaves it, as the copy may still be under way in its thread.
+                try:
+                    await asyncio.to_thread(delete_profile, name)
+                except OSError as cleanup:
+                    raise BrowserError(
+                        "the import failed, and the profile made for it could not be removed: delete it in Settings › "
+                        "Browser",
+                        {"profile": name, "error": str(error), "cleanup": str(cleanup)},
+                    ) from error
+            raise
+        if request.use:
+            await ctx.runtime.browsers.use_profile(name)
+            await asyncio.to_thread(set_browser_setting, config_path(), "profile", name)
+        return ChromeImportResult(
+            profile=name,
+            cookies=report.cookies,
+            loadable=report.loadable,
+            local_storage_bytes=report.local_storage_bytes,
+            staging_left=report.staging_left,
+            browser=await state(),
+        )
+
+    @router.post("/browser/profiles/{name}/check")
+    async def check_browser_profile(name: str) -> ProfileCheck:
+        """How many cookies Chrome reads from the profile ``name`` (item 917), in a hidden Chrome of its own: the check
+        that ends an import, when macOS may ask whether Chrome may use its key in the Keychain. None read is an error
+        that says what to do."""
+        await asyncio.to_thread(known_profile, name)
+        await free_for_import(name, False)
+        readable: int = await readable_cookies(session.config, ctx.runtime.config.server, profile_dir(name))
+        if readable == 0:
+            raise BrowserError(
+                'Chrome could not read the copied cookies; allow Chrome to use "Chrome Safe Storage" in the Keychain '
+                "(Always Allow) and import again, replacing them: Chrome has dropped the cookies it could not read",
+                {"profile": name},
+            )
+        return ProfileCheck(readable=readable)
 
     @router.delete("/browser/profiles/{name}")
     async def delete_browser_profile(name: str) -> BrowserView:

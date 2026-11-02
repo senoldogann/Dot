@@ -20,6 +20,7 @@ from dotagent.browser.chrome_import import (
 )
 from dotagent.browser.keychain import read_keychain_mode, write_keychain_mode
 from dotagent.browser.profile_lock import IMPORT_LOCK, held_for_import, held_for_start
+from dotagent.browser.profiles import name_for_import
 from dotagent.core.errors import BrowserError
 from dotagent.core.paths import browser_incognito_dir
 
@@ -324,3 +325,34 @@ def test_an_import_does_not_remove_what_an_earlier_one_could_not_put_back(tmp_pa
     with pytest.raises(BrowserError, match="earlier import"):
         import_chrome_profile(data_dir, "Default", dot_profile)
     assert kept.read_bytes() == b"what the profile held"
+
+
+def test_the_profiles_of_chrome_are_named_as_chrome_shows_them_and_their_cookies_counted(tmp_path: Path) -> None:
+    """Item 917: the names come from Chrome's Local State, none for a Chrome that never wrote one; the cookies are
+    counted without changing the file; a Local State that cannot be read is an error that names it."""
+    data_dir: Path = make_chrome(tmp_path / "Chrome")
+    assert chrome_import.chrome_profile_titles(data_dir) == {}
+    (data_dir / "Local State").write_text(
+        json.dumps({"profile": {"info_cache": {"Default": {"name": " Senol "}, "Profile 1": {"name": ""}}}}),
+        encoding="utf-8",
+    )
+    assert chrome_import.chrome_profile_titles(data_dir) == {"Default": "Senol"}
+    before: float = (data_dir / "Default" / "Cookies").stat().st_mtime
+    assert chrome_import.cookie_count(data_dir, "Default") == 3
+    assert (data_dir / "Default" / "Cookies").stat().st_mtime == before
+    (data_dir / "Local State").write_text("{not json", encoding="utf-8")
+    with pytest.raises(BrowserError, match="list of its profiles"):
+        chrome_import.chrome_profile_titles(data_dir)
+
+
+def test_a_new_profile_for_an_import_is_named_after_the_chrome_profile_and_never_twice() -> None:
+    """Item 917: what a profile's name may not hold is left out, Default and Incognito and the names taken get a
+    number, and a name with nothing left is Chrome's."""
+    assert name_for_import("Senol", []) == "Senol"
+    assert name_for_import("Senol", ["senol"]) == "Senol 2"
+    assert name_for_import("Senol", ["Senol", "Senol 2"]) == "Senol 3"
+    assert name_for_import("Şenol (iş) 💼", []) == "Şenol iş"
+    assert name_for_import("_Work-", []) == "Work-"
+    assert name_for_import("Default", []) == "Default 2"
+    assert name_for_import("💼", ["Chrome"]) == "Chrome 2"
+    assert len(name_for_import("x" * 80, [])) == 44

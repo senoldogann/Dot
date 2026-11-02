@@ -10,11 +10,14 @@ step fails, and the staging directory, which holds a plain copy of the local sto
 """
 
 import contextlib
+import json
 import os
 import shutil
 import sqlite3
 import time
 from pathlib import Path
+
+from pydantic import JsonValue
 
 from dotagent.browser.keychain import marker_path, write_keychain_mode
 from dotagent.browser.profile_lock import held_for_import, profile_holder_pid
@@ -34,6 +37,8 @@ _STAGING: str = "import-staging"
 _ASIDE: str = "previous"
 # What it is called once the import was made and the profile no longer needs it.
 _REPLACED: str = "replaced"
+# The file of a Chrome data directory that names its profiles as Chrome shows them (item 917).
+_LOCAL_STATE: str = "Local State"
 # Chrome stores times as microseconds since 1601-01-01.
 _CHROME_EPOCH_OFFSET_S: int = 11_644_473_600
 _MICROSECONDS: int = 1_000_000
@@ -57,6 +62,51 @@ def chrome_profile_names(data_dir: Path) -> list[str]:
     if not data_dir.is_dir():
         return []
     return sorted(entry.name for entry in data_dir.iterdir() if (entry / _COOKIES).is_file())
+
+
+def chrome_profile_titles(data_dir: Path) -> dict[str, str]:
+    """The names Chrome shows for the profiles of ``data_dir``, by folder, from its ``Local State``; none for a data
+    directory without one (a Chrome that never ran). A file that cannot be read is an error, which names it."""
+    state: Path = data_dir / _LOCAL_STATE
+    if not state.is_file():
+        return {}
+    try:
+        parsed: JsonValue = json.loads(state.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        raise BrowserError(
+            "Chrome's list of its profiles could not be read", {"file": str(state), "error": str(error)}
+        ) from error
+    profile: JsonValue = parsed.get("profile") if isinstance(parsed, dict) else None
+    cache: JsonValue = profile.get("info_cache") if isinstance(profile, dict) else None
+    if not isinstance(cache, dict):
+        return {}
+    titles: dict[str, str] = {}
+    for folder, info in cache.items():
+        name: JsonValue = info.get("name") if isinstance(info, dict) else None
+        if isinstance(name, str) and name.strip() != "":
+            titles[folder] = name.strip()
+    return titles
+
+
+def cookie_count(data_dir: Path, folder: str) -> int:
+    """How many cookies the Chrome profile ``folder`` of ``data_dir`` holds, read without changing its file; for a
+    Chrome that is closed, as one that runs holds the file as it writes it (item 917)."""
+    database: Path = data_dir / folder / _COOKIES
+    try:
+        with contextlib.closing(sqlite3.connect(f"{database.resolve().as_uri()}?mode=ro", uri=True)) as connection:
+            row: tuple[int] | None = connection.execute("SELECT COUNT(*) FROM cookies").fetchone()
+    except sqlite3.Error as error:
+        raise BrowserError(
+            "the cookies of that Chrome profile could not be counted", {"file": str(database), "error": str(error)}
+        ) from error
+    if row is None:
+        raise BrowserError("the cookie database of that Chrome profile returned no count", {"file": str(database)})
+    return row[0]
+
+
+def chrome_is_open(data_dir: Path) -> bool:
+    """Whether a Chrome holds the data directory ``data_dir``, which an import needs closed (item 917)."""
+    return profile_holder_pid(data_dir) is not None
 
 
 def has_stored_cookies(dot_profile: Path) -> bool:

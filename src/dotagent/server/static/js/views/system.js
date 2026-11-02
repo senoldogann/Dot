@@ -1378,6 +1378,9 @@ function standbySetting({ choose }) {
   return { element, paint, hide };
 }
 
+// How often Import from Chrome looks again whether your Chrome was quit (item 917).
+const IMPORT_LOOK_MS = 3000;
+
 /** The Models page's sections: the roles, the fallbacks and every model by provider. `asked` is the model an address
  * asked for (`#/settings/models?model=<ref>`, the context meter's link, item 396), "" for none: once listed, its provider's
  * fold opens and its row comes into sight, marked, with the focus on its context size. `head` is the page's head: what the
@@ -1826,10 +1829,24 @@ function buildBrowser(isDisposed, head) {
     icon("plus"),
     el("span", { class: "label" }, "Add profile"),
   );
+  // Import from Chrome (item 917): the sign-ins of a profile of your Chrome copied into one of Dot's, in a dialog.
+  const importButton = el(
+    "button",
+    {
+      class: "set-link",
+      type: "button",
+      title: "Copy the sign-ins of your Chrome into Dot's",
+      "aria-label": "Import from Chrome",
+      "aria-haspopup": "dialog",
+      onclick: () => attempt(openImportChrome),
+    },
+    icon("download"),
+    el("span", { class: "label" }, "Import from Chrome"),
+  );
   const profileSetting = setSection({
     title: "Profiles",
     lead: "Each profile of Dot's own Chrome keeps its own sign-ins and saved site data, and tasks work on the one in use.",
-    actions: addButton,
+    actions: el("div", { class: "profile-actions" }, importButton, addButton),
     body: setCard(profileList),
   });
   profileSetting.hidden = true;
@@ -2047,6 +2064,131 @@ function buildBrowser(isDisposed, head) {
         return true;
       },
     });
+  }
+
+  /**
+   * Import from Chrome (item 917): the profiles of your Chrome that hold cookies on the left, the profile of Dot's to
+   * fill on the right (a new one named after it, or one there is, whose sign-ins are replaced), then the copy and the
+   * check that Chrome reads it. While your Chrome is open the dialog says to quit it and looks again every few seconds.
+   */
+  async function openImportChrome() {
+    let options = await api.get("/browser/chrome-import");
+    if (isDisposed()) {
+      return;
+    }
+    const uid = `import-${Date.now()}`;
+    const sources = el("div", { class: "import-choices", role: "radiogroup", "aria-label": "From" });
+    const targets = el("div", { class: "import-choices", role: "radiogroup", "aria-label": "Into" });
+    const quit = el("div", { class: "note warn import-quit", role: "status", hidden: true }, icon("alert"), el("span", null, "Your Chrome is open. Quit it (⌘Q) to import: its files are complete only then. Dot looks again every few seconds."));
+    const none = el("p", { class: "hint", hidden: true }, "No profile of your Chrome holds cookies on this Mac.");
+    const use = el("input", { type: "checkbox", checked: true });
+    const useRow = el("label", { class: "import-use" }, use, el("span", null, "Tasks use it from Chrome's next start"));
+    const replaced = el("p", { class: "hint import-replaced", hidden: true }, "Its sign-ins are replaced by these.");
+
+    const picked = (group) => group.querySelector("input:checked")?.value ?? null;
+
+    function choice(group, value, title, sub, checked) {
+      const input = el("input", { class: "visually-hidden import-radio", type: "radio", name: `${uid}-${group}`, value, checked });
+      return el(
+        "label",
+        { class: "import-choice" },
+        input,
+        el("span", { class: "import-choice-text" }, el("span", { class: "import-choice-title" }, title), el("span", { class: "import-choice-sub" }, sub)),
+        el("span", { class: "import-check", "aria-hidden": "true" }, icon("check")),
+      );
+    }
+
+    function cookiesOf(source) {
+      if (source.uncounted !== null) {
+        return "Its cookies could not be counted";
+      }
+      return source.cookies === null ? "Chrome is open" : plural(source.cookies, "cookie", "cookies");
+    }
+
+    function paintSources() {
+      const was = picked(sources) ?? options.sources[0]?.folder ?? null;
+      sources.replaceChildren(...options.sources.map((source) => choice("from", source.folder, source.name, cookiesOf(source), source.folder === was)));
+      none.hidden = options.sources.length > 0;
+      quit.hidden = !options.chrome_open || options.sources.length === 0;
+    }
+
+    function paintTargets() {
+      const was = picked(targets) ?? "";
+      const source = options.sources.find((one) => one.folder === picked(sources));
+      const fresh = choice("into", "", "New profile", source === undefined ? "Made for these sign-ins" : `Named “${source.new_name}”`, was === "");
+      targets.replaceChildren(
+        fresh,
+        ...options.targets.map((target) =>
+          choice("into", target.name, profileLabel(target), target.signed_in ? "Holds sign-ins" : "Empty", target.name === was),
+        ),
+      );
+      const into = options.targets.find((target) => target.name === picked(targets));
+      replaced.hidden = into === undefined || !into.signed_in;
+      // A profile in use is used already.
+      useRow.hidden = into !== undefined && into.name === options.in_use;
+    }
+
+    sources.addEventListener("change", paintTargets);
+    targets.addEventListener("change", paintTargets);
+    paintSources();
+    paintTargets();
+    const body = el(
+      "div",
+      { class: "import-chrome" },
+      el("div", { class: "import-side" }, el("div", { class: "import-label" }, "From"), sources, none),
+      el("span", { class: "import-arrow", "aria-hidden": "true" }, icon("arrowRight")),
+      el("div", { class: "import-side" }, el("div", { class: "import-label" }, "Into"), targets, replaced, useRow),
+    );
+    let watching = 0;
+    const dialog = formDialog({
+      title: "Import from Chrome",
+      size: "wide",
+      description: "Copy the sign-ins of a profile of your Chrome into Dot's own Chrome. Your Chrome is only read. Chrome then asks macOS for its key: if macOS asks whether Chrome may use “Chrome Safe Storage”, choose Always Allow.",
+      body: [quit, body],
+      submitLabel: "Import",
+      valid: () => !options.chrome_open && picked(sources) !== null,
+      returnFocus: importButton,
+      onSubmit: async () => {
+        const into = picked(targets);
+        const target = options.targets.find((one) => one.name === into);
+        const result = await api.post("/browser/chrome-import", {
+          source: picked(sources),
+          into: into === "" ? null : into,
+          replace: target?.signed_in === true,
+          use: !useRow.hidden && use.checked,
+        });
+        view = result.browser;
+        if (!isDisposed()) {
+          paint();
+        }
+        const label = profileLabel(view.profiles.find((one) => one.name === result.profile) ?? { name: result.profile, kind: "added" });
+        toast("ok", `Copied ${plural(result.cookies, "cookie", "cookies")} into ${label}. Checking that Chrome reads them…`);
+        // The check runs once the dialog is closed (the pre-push review of item 917): the import is made, and one that
+        // Chrome cannot read is imported again from a dialog opened anew, which lists the profile and replaces it.
+        attempt(async () => {
+          const check = await api.post(`/browser/profiles/${encodeURIComponent(result.profile)}/check`, {});
+          toast("ok", `Chrome reads ${plural(check.readable, "cookie", "cookies")} in ${label}: tasks there are signed in as your Chrome was.`);
+        });
+        return true;
+      },
+    });
+    // While your Chrome is open, the list is read again every few seconds, until it is quit or the dialog closes.
+    watching = window.setInterval(() => {
+      if (!options.chrome_open) {
+        return;
+      }
+      api.get("/browser/chrome-import").then(
+        (fresh) => {
+          dialog.fail(null);
+          options = fresh;
+          paintSources();
+          paintTargets();
+          dialog.revalidate();
+        },
+        (error) => dialog.fail(error),
+      );
+    }, IMPORT_LOOK_MS);
+    dialog.closed.then(() => window.clearInterval(watching));
   }
 
   async function clearProfile(profile, label) {

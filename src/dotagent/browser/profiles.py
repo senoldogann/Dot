@@ -7,7 +7,9 @@ profile in use before Chrome starts on it, and so is the word that keeps its ses
 """
 
 import math
+import re
 import shutil
+from collections.abc import Collection
 from pathlib import Path
 from typing import Literal
 
@@ -79,6 +81,9 @@ _SAVED_SIGN_INS: tuple[str, ...] = _databases(
 )
 
 type ProfileKind = Literal["default", "incognito", "added"]
+# What a profile's name may not hold (``[browser] profile``): anything but letters, digits, spaces, dashes and
+# underscores.
+_NOT_IN_A_NAME: re.Pattern[str] = re.compile(r"[^\w -]")
 
 
 class ProfileView(FrozenModel):
@@ -123,6 +128,21 @@ def add_profile(name: str) -> None:
     if len(added) >= MAX_ADDED_PROFILES:
         raise InvalidValueError(f"at most {MAX_ADDED_PROFILES} profiles can be added", {"name": name})
     (browser_profiles_dir() / name).mkdir(parents=True)
+
+
+def name_for_import(title: str, taken: Collection[str]) -> str:
+    """The name of a new profile that sign-ins of the Chrome profile ``title`` are imported into (item 917): its
+    letters, digits, spaces, dashes and underscores, from a letter or a digit, at most 44 of them, "Chrome" when none
+    is left, and a number after it when a profile of ``taken`` has it (Default and Incognito among them)."""
+    kept: str = _NOT_IN_A_NAME.sub("", title)
+    base: str = kept.lstrip(" _-")[:44].rstrip() or "Chrome"
+    folded: set[str] = {name.casefold() for name in (*taken, DEFAULT_PROFILE, INCOGNITO_PROFILE)}
+    candidate: str = base
+    number: int = 2
+    while candidate.casefold() in folded:
+        candidate = f"{base} {number}"
+        number += 1
+    return candidate
 
 
 def known_profile(name: str) -> ProfileView:

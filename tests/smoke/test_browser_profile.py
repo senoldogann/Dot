@@ -22,8 +22,8 @@ from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, imp
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode, write_keychain_mode
 from dotagent.browser.login import chrome_arguments
 from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.readable import readable_cookies
 from dotagent.browser.session import BrowserSession, no_runs_at_work
-from dotagent.cli_browser import _readable_cookies
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 
 pytestmark = pytest.mark.browser
@@ -123,7 +123,7 @@ async def test_the_check_of_an_import_runs_in_dots_own_chrome_whatever_the_brows
     profile: Path, attach_config: BrowserConfig
 ) -> None:
     await save_cookie_in_ordinary_chrome(profile, "http://127.0.0.1:9")
-    assert await _readable_cookies(attach_config, SERVER, profile) == 1
+    assert await readable_cookies(attach_config, SERVER, profile) == 1
 
 
 async def test_the_sign_ins_of_a_profile_that_a_real_chrome_wrote_are_imported(profile: Path, tmp_path: Path) -> None:

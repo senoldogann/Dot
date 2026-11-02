@@ -30,6 +30,20 @@ the sites Dot should use with your accounts:
   too, as in Dot's own profile (item 453). `--replace` is asked for only when Dot's profile holds a cookie, and the
   Incognito profile is refused, as Dot's Chrome empties it as it starts. When the Keychain refused Chrome, Chrome has
   dropped the cookies it could not read: allow it and import again with `--replace`.
+- Settings › Browser › Profiles › **Import from Chrome** (item 917) does the same in a dialog: **From** lists the
+  profiles of your Chrome that hold cookies, by the names Chrome shows for them (its `Local State`) and with their
+  cookies, counted while Chrome is closed (one whose cookies cannot be counted is listed saying so, with why in
+  `uncounted`); **Into** offers a new profile named after the one picked (its letters,
+  digits, spaces, `-` and `_`, a number after it when the name is taken), or a profile of Dot's but Incognito, one that
+  holds sign-ins saying that they are replaced; **Tasks use it** makes it the profile in use. While your Chrome is open
+  the dialog says to quit it and looks again every 3 seconds; Import stays off until then. The import is the command's
+  (`POST /api/browser/chrome-import`, `{"source": "<folder>", "into": "<profile>" or null, "replace", "use"}`; 409 while
+  Chrome is open, 422 for a profile that holds sign-ins without `replace`; a new profile made for an import that fails
+  goes with it), and the check that ends it, once the dialog has closed, counts the cookies Chrome reads in a hidden
+  Chrome of its own (`POST /api/browser/profiles/<name>/check`; none read is an error that says what to do: the dialog
+  opened again lists the profile, to import into it replacing them), which is when macOS may ask whether Chrome may use
+  "Chrome Safe Storage". Both are refused while runs are active when the profile is the one in use or is
+  to be. `GET /api/browser/chrome-import` lists what the dialog offers; your Chrome is only read.
 
 Cookies are encrypted with a key, and a profile cannot be read with another key than the one it was written with. A
 profile that Dot made uses Playwright's mock keychain in the sign-in window and in the automated sessions alike, so no

@@ -9,6 +9,7 @@ from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile, require_importable
 from dotagent.browser.login import open_profile_for_login
 from dotagent.browser.profiles import profile_dir
+from dotagent.browser.readable import readable_cookies
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import Attachment
 from dotagent.cli_commands import (
@@ -18,29 +19,13 @@ from dotagent.cli_commands import (
     BrowserLoginCommand,
     Command,
 )
-from dotagent.config import AppConfig, BrowserConfig, ServerConfig, load_user_config
+from dotagent.config import AppConfig, BrowserConfig, load_user_config
 from dotagent.config_edit import set_browser_mode
 from dotagent.core.errors import BrowserError, InvalidValueError
 from dotagent.core.paths import chrome_data_dir, config_path, downloads_dir
 
 _MEGABYTE: int = 1_000_000
 _CHECK_THREAD: str = "attach-check"
-
-
-async def _readable_cookies(config: BrowserConfig, server: ServerConfig, profile: Path) -> int:
-    """Open the profile in a hidden Chrome of its own, whatever ``[browser] mode`` says, and count the cookies that
-    Chrome can read. It takes no DevTools connections: the port is the daemon's Chrome's."""
-    session: BrowserSession = BrowserSession(
-        config.model_copy(update={"headless": True, "mode": "own", "debug_port": 0}),
-        server,
-        profile,
-        downloads_dir(),
-        no_runs_at_work,
-    )
-    try:
-        return await session.stored_cookie_count()
-    finally:
-        await session.aclose()
 
 
 async def cmd_browser_import_chrome(command: BrowserImportChromeCommand) -> int:
@@ -68,7 +53,7 @@ async def cmd_browser_import_chrome(command: BrowserImportChromeCommand) -> int:
             f"Warning: {report.staging_left} could not be removed. It holds sign-ins and local storage (what Dot's "
             "profile held before, or a plain copy of your Chrome's): delete it.\n"
         )
-    readable: int = await _readable_cookies(settings.browser, settings.server, dot_profile)
+    readable: int = await readable_cookies(settings.browser, settings.server, dot_profile)
     if readable == 0:
         raise BrowserError(
             'Chrome could not read the copied cookies; allow Chrome to use "Chrome Safe Storage" in the Keychain and '

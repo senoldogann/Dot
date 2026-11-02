@@ -8,6 +8,8 @@ drives a real headless Chrome on a throw-away profile against a page served on t
 import asyncio
 import io
 import json
+import os
+import socket
 import threading
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
@@ -17,19 +19,24 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Literal
 
+import httpx
 import pytest
 from form_dialogs import closes_with_escape, foot_is_in_view, keeps_inside_the_window, open_form, shows_the_failure
 from PIL import Image
 from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
+from pydantic import JsonValue
+from test_browser_profile import save_cookie_in_ordinary_chrome
 
 from dotagent.agent.manager import RunManager
+from dotagent.browser.chrome_import import has_stored_cookies
+from dotagent.browser.keychain import read_keychain_mode, write_keychain_mode
 from dotagent.browser.look import PageLook
 from dotagent.browser.modes import browser_data_dir
 from dotagent.browser.profiles import DEFAULT_PROFILE, INCOGNITO_PROFILE, add_profile, profile_dir
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ScriptRun
 from dotagent.config import AppConfig, BrowserConfig, ServerConfig, load_config, load_default_config
-from dotagent.core.paths import config_path
+from dotagent.core.paths import chrome_data_dir, config_path
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
@@ -547,3 +554,108 @@ async def test_settings_browser_adds_uses_and_deletes_a_profile(tmp_path: Path) 
                 await page.close()
         finally:
             await browser.close()
+
+
+def _name_chrome_profile(chrome: Path, name: str) -> None:
+    """Give the Default profile of the Chrome data directory ``chrome`` the name Chrome shows for it, in its Local
+    State, as a Chrome whose owner named it has."""
+    state: Path = chrome / "Local State"
+    local: dict[str, JsonValue] = json.loads(state.read_text(encoding="utf-8")) if state.is_file() else {}
+    local["profile"] = {"info_cache": {"Default": {"name": name}}}
+    state.write_text(json.dumps(local), encoding="utf-8")
+
+
+@pytest.mark.browser
+async def test_settings_browser_imports_the_sign_ins_of_a_chrome_profile_into_a_profile_of_dots(
+    tmp_path: Path,
+) -> None:
+    """Item 917: Import from Chrome lists the profiles of the owner's Chrome by the names Chrome shows, with their
+    cookies, and copies one into a new profile of Dot's named after it, which tasks then use; while Chrome is open it
+    says to quit it and imports nothing, and a profile that holds sign-ins is replaced only when the owner says so. The
+    Chrome here is a throw-away one a real Chrome wrote, on the mock keychain: no Keychain is asked."""
+    async with _daemon(()) as (_manager, address), async_playwright() as playwright:
+        chrome: Path = chrome_data_dir()
+        await asyncio.to_thread(chrome.mkdir, 0o700, True)
+        await save_cookie_in_ordinary_chrome(chrome, "http://127.0.0.1:9")
+        await asyncio.to_thread(_name_chrome_profile, chrome, "Senol")
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            for index, (width, scheme) in enumerate(_SHOTS):
+                page: Page = await _page(browser, address, width, scheme)
+                # The check that ends an import starts Chrome on the profile: answered here, it is the API's below.
+                await page.route("**/api/browser/profiles/*/check", lambda route: route.fulfill(json={"readable": 1}))
+                await page.goto(f"{address}/#/settings/browser")
+                opener: Locator = page.get_by_role("button", name="Import from Chrome")
+                await expect(opener).to_have_attribute("aria-haspopup", "dialog")
+                dialog: Locator = await open_form(page, opener, "Import from Chrome")
+                sources: Locator = dialog.get_by_role("radiogroup", name="From")
+                into: Locator = dialog.get_by_role("radiogroup", name="Into")
+                await expect(sources.locator(".import-choice")).to_have_text(["Senol1 cookie"])
+                await expect(sources.get_by_role("radio")).to_be_checked()
+                await keeps_inside_the_window(page)
+                await foot_is_in_view(page, dialog)
+                if index == 0:
+                    await expect(into.locator(".import-choice")).to_have_text(
+                        ["New profileNamed “Senol”", "DefaultEmpty"]
+                    )
+                    await page.screenshot(path=tmp_path / f"import-chrome-{width}-{scheme}.png")
+                    await _changed(
+                        page,
+                        "/api/browser/chrome-import",
+                        dialog.get_by_role("button", name="Import", exact=True).click,
+                    )
+                    await expect(dialog).to_have_count(0)
+                    await expect(page.get_by_text("Chrome reads 1 cookie in Senol")).to_be_visible()
+                    await expect(page.locator("[data-profile='Senol']")).to_contain_text("In use")
+                    assert 'profile = "Senol"\n' in _kept()
+                    assert has_stored_cookies(profile_dir("Senol"))
+                    assert read_keychain_mode(profile_dir("Senol")) == "system"
+                else:
+                    await closes_with_escape(page, dialog, opener)
+                    # A profile that holds sign-ins says that an import replaces them.
+                    dialog = await open_form(page, opener, "Import from Chrome")
+                    await expect(into.locator(".import-choice")).to_have_text(
+                        ["New profileNamed “Senol 2”", "DefaultEmpty", "SenolHolds sign-ins"]
+                    )
+                    await into.locator(".import-choice", has_text="Holds sign-ins").click()
+                    await expect(dialog.get_by_text("Its sign-ins are replaced by these.")).to_be_visible()
+                    await page.screenshot(path=tmp_path / f"import-chrome-{width}-{scheme}.png")
+                await page.close()
+        finally:
+            await browser.close()
+        async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
+            refused: httpx.Response = await http.post(
+                "/api/browser/chrome-import",
+                json={"source": "Default", "into": "Senol", "replace": False, "use": False},
+            )
+            assert refused.status_code == 422 and "holds sign-ins already" in refused.text, refused.text
+            incognito: httpx.Response = await http.post(
+                "/api/browser/chrome-import",
+                json={"source": "Default", "into": "incognito", "replace": True, "use": False},
+            )
+            assert incognito.status_code == 422 and "Incognito keeps nothing" in incognito.text, incognito.text
+            # The cookies Chrome reads from the profile, the check the page asks for after an import; the profile is
+            # put on the mock keychain the cookies were written with, so that no Keychain is asked.
+            write_keychain_mode(profile_dir("Senol"), "mock")
+            checked: httpx.Response = await http.post("/api/browser/profiles/Senol/check")
+            assert checked.status_code == 200 and checked.json() == {"readable": 1}, checked.text
+            # A profile whose cookies cannot be counted is listed saying so, beside the others.
+            broken: Path = chrome / "Profile 1" / "Cookies"
+            await asyncio.to_thread(broken.parent.mkdir)
+            await asyncio.to_thread(broken.write_bytes, b"not a database")
+            listed: httpx.Response = await http.get("/api/browser/chrome-import")
+            assert [(one["folder"], one["cookies"]) for one in listed.json()["sources"]] == [
+                ("Default", 1),
+                ("Profile 1", None),
+            ], listed.text
+            assert "could not be counted" in listed.json()["sources"][1]["uncounted"]
+            # A Chrome that holds its data directory: its cookies are not counted, and nothing is imported.
+            await asyncio.to_thread((chrome / "SingletonLock").symlink_to, f"{socket.gethostname()}-{os.getpid()}")
+            options: httpx.Response = await http.get("/api/browser/chrome-import")
+            assert options.json()["chrome_open"] is True and options.json()["sources"][0]["cookies"] is None
+            assert options.json()["sources"][0]["uncounted"] is None
+            held: httpx.Response = await http.post(
+                "/api/browser/chrome-import", json={"source": "Default", "into": None, "replace": False, "use": False}
+            )
+            assert held.status_code == 409 and "quit it" in held.text, held.text
+            assert [profile["name"] for profile in options.json()["targets"]] == ["default", "Senol"]

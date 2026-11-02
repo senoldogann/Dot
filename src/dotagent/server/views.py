@@ -14,7 +14,7 @@ from dotagent.agent.skill_history import VersionDetail
 from dotagent.agent.skill_proposals import ProposalView
 from dotagent.agent.templates import MOST_TEMPLATE_QUESTIONS, TEMPLATE_ANSWER_CHARS
 from dotagent.browser.look import PageLook
-from dotagent.browser.profiles import ProfileView
+from dotagent.browser.profiles import ProfileKind, ProfileView
 from dotagent.config import (
     SHOWN_NAME,
     AfterRun,
@@ -1595,6 +1595,67 @@ class BrowserView(FrozenModel):
     look: PageLook
     profile: str
     profiles: tuple[ProfileView, ...]
+
+
+class ChromeImportSource(FrozenModel):
+    """A profile of the owner's Chrome to import sign-ins from (item 917): its folder, the name Chrome shows for it,
+    its cookies (``None`` while Chrome is open, or when they could not be counted, ``uncounted`` saying why), and the
+    name a new profile of Dot's made for it would get."""
+
+    folder: str
+    name: str
+    cookies: int | None
+    uncounted: str | None
+    new_name: str
+
+
+class ChromeImportTarget(FrozenModel):
+    """A profile of Dot's own Chrome to import sign-ins into (item 917; Incognito keeps nothing, so it is none), and
+    whether it holds sign-ins an import would replace."""
+
+    name: str
+    kind: ProfileKind
+    signed_in: bool
+
+
+class ChromeImportOptions(FrozenModel):
+    """What Import from Chrome offers (item 917): whether the owner's Chrome is open, which an import needs closed, the
+    profiles of that Chrome that hold cookies, the profiles of Dot's own Chrome, and the one in use."""
+
+    chrome_open: bool
+    sources: tuple[ChromeImportSource, ...]
+    targets: tuple[ChromeImportTarget, ...]
+    in_use: str
+
+
+class ChromeImportRequest(FrozenModel):
+    """Import the sign-ins of the Chrome profile ``source`` (its folder) into the profile ``into`` of Dot's own Chrome,
+    or into a new one for ``None`` (item 917). ``replace`` says yes to replacing the sign-ins ``into`` holds, and
+    ``use`` makes tasks work on the profile from Chrome's next start."""
+
+    source: str = Field(min_length=1, max_length=64, pattern=r"^[\w ]+$")
+    into: BrowserProfileName | None
+    replace: bool
+    use: bool
+
+
+class ChromeImportResult(FrozenModel):
+    """What an import from Chrome did (item 917): the profile it filled, the cookies copied (``cookies`` last past a
+    restart and have not expired, ``loadable`` adds those with no expiry), the local storage, a folder it could not
+    remove, and the browser as it stands after it."""
+
+    profile: str
+    cookies: int
+    loadable: int
+    local_storage_bytes: int
+    staging_left: str | None
+    browser: BrowserView
+
+
+class ProfileCheck(FrozenModel):
+    """How many cookies Chrome reads from a profile of Dot's (item 917), the check that ends an import."""
+
+    readable: int
 
 
 class ConnectionView(FrozenModel):
