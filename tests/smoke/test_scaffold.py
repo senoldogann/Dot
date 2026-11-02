@@ -343,13 +343,14 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     # up compacting at every step once the instructions grew by a few words (item 404). It was 32 000 until three tools
     # joined the fixed part (items 714 and 715), 33 600 until three more did (items 740 and 746), and 35 200 until the
     # security scan and the Deep-OS skill did (item 781), 37 000 until `ask_secret` joined the core tools (item
-    # 857), 38 000 until the shell's description pointed to wait_until and its group was listed (item 887), and 39 000
-    # until the work orders and the objectives joined (items 907 and 908).
+    # 857), 38 000 until the shell's description pointed to wait_until and its group was listed (item 887), 39 000
+    # until the work orders and the objectives joined (items 907 and 908), and 41 000 until `recall` joined the core
+    # tools and a plan's step could carry a brief (items 924 and 927).
     turns: list[ScriptedTurn] = _reading(40)
-    small: Played = await _play(_config({}, 6), login_env, 41_000, turns)
+    small: Played = await _play(_config({}, 6), login_env, 42_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(41_000, None, 30_750, 30_750, 3844, True),)
+    assert small.scaffolds == (_scaffold(42_000, None, 31_500, 31_500, 3938, True),)
     assert roomy.scaffolds == (_scaffold(None, None, 96_000, 81_600, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
@@ -372,8 +373,8 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for compaction in small.compactions:
         before, after = compaction["tokens_before"], compaction["tokens_after"]
         assert isinstance(before, int) and isinstance(after, int), compaction
-        assert after < before and after <= 30_750, compaction
-    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 30_750
+        assert after < before and after <= 31_500, compaction
+    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 31_500
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
     # history again at the very next step.
     gaps: list[int] = [

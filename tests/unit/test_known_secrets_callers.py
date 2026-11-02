@@ -93,6 +93,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     # What one agent quotes of the others (item 890): every secret Dot holds is masked.
     "tools/office.py:_agents_now_tool.run": (True,),
     "tools/office.py:_read_agent_chat_tool.run": (True,),
+    # A record read back by its id (item 924) is masked as a chat read is.
+    "tools/recall.py:_recall_tool.run": (True,),
     "agent/reactions.py:_holds_a_secret": (False,),
     # An agent is exported only if its words hold none; the file has the values masked.
     "server/routes_agents.py:agents_router.export_agent": (False,),

@@ -395,3 +395,36 @@ def test_a_summary_still_lacking_sections_gets_an_empty_heading_for_each() -> No
     filled: str = with_empty_sections(summary, lacking)
     assert filled == "GOAL: x\nDONE: y\nSTATE: z\nDECISIONS:\nPROBLEMS:\nNEXT:"
     assert missing_sections(filled) == ()
+
+
+def test_the_ledger_keeps_the_ids_a_run_named_and_the_note_lists_them_for_recall() -> None:
+    """Item 924: the ids of Dot's own records the calls and their results named are kept, the newest last (one named
+    again moves there), and the note of a compaction lists them with the tool that reads one back; a path or an address
+    is not one, and neither is an id of a record recall does not read."""
+    ledger = with_actions(
+        new_ledger(GOAL),
+        [
+            (
+                _call("recall", {"id": "run_mvz1a2b3_0a1b2c"}),
+                True,
+                "Run run_mvz1a2b3_0a1b2c: done, chat thr_mvz1a2b3_9f8e7d",
+            ),
+            (
+                _call("read_file", {"path": "~/notes/todo_list.md"}),
+                True,
+                "mem_mvz1a2b3_111111 and todo_mvz1a2b3_222222",
+            ),
+        ],
+    )
+    ledger = with_actions(ledger, [(_call("recall", {"id": "run_mvz1a2b3_0a1b2c"}), True, "again")])
+    assert ledger.named == ("thr_mvz1a2b3_9f8e7d", "todo_mvz1a2b3_222222", "run_mvz1a2b3_0a1b2c")
+    pinned: str = render_pinned(ledger, EMPTY_PLAN, 4000)
+    assert "## Ids of Dot's records named so far, newest last (read one back with recall)" in pinned
+    assert "thr_mvz1a2b3_9f8e7d, todo_mvz1a2b3_222222, run_mvz1a2b3_0a1b2c" in pinned
+
+
+def test_the_check_knows_the_ids_of_approvals_and_rules_as_dot_writes_them() -> None:
+    """Item 924: the check named ``apv_`` and ``rule_``, prefixes Dot never writes; an approval's id (``apr_``) or a
+    rule's (``rul_``) a summary made up went unseen."""
+    made_up = check_continuity("NEXT: answer apr_mvz1a2b3_abcdef.", "nothing", new_ledger(GOAL), "/Users/x")
+    assert "apr_mvz1a2b3_abcdef" in made_up.unverified

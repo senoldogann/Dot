@@ -52,6 +52,7 @@ from dotagent.store.models import (
     CampaignRecord,
     ChatChoices,
     ChatTeam,
+    Correspondent,
     DraftChannel,
     DraftRecord,
     DraftStatus,
@@ -218,6 +219,10 @@ CREATE TABLE IF NOT EXISTS queue_claims (
 CREATE TABLE IF NOT EXISTS run_stops (run_id TEXT PRIMARY KEY, asked_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS run_taints (run_id TEXT PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS sent_messages (key TEXT PRIMARY KEY, sent_at REAL NOT NULL, target TEXT);
+CREATE TABLE IF NOT EXISTS correspondents (
+    address TEXT NOT NULL, thread_id TEXT NOT NULL, run_id TEXT NOT NULL, at REAL NOT NULL, handed_at REAL,
+    PRIMARY KEY (address, thread_id)
+);
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL
 );
@@ -3090,6 +3095,50 @@ class Store:
             return SentMessage(key=str(row["key"]), sent_at=float(row["sent_at"]), target=row["target"])
 
         return await self._unit(statements)
+
+    @_writing
+    async def note_correspondents(self, addresses: Sequence[str], thread_id: str, run_id: str, at: float) -> None:
+        """Keep that the run ``run_id`` of the chat ``thread_id`` wrote to ``addresses`` at ``at`` (item 926), so that a
+        reply from one of them is handed to that chat; a chat that wrote again to an address is the one it names."""
+        await self._db.executemany(
+            "INSERT INTO correspondents(address, thread_id, run_id, at) VALUES (?, ?, ?, ?)"
+            " ON CONFLICT(address, thread_id) DO UPDATE SET run_id = excluded.run_id, at = excluded.at",
+            [(address, thread_id, run_id, at) for address in addresses],
+        )
+        await self._db.commit()
+
+    async def chat_that_wrote_to(self, address: str, besides: str, since: float) -> Correspondent | None:
+        """The chat other than ``besides`` (the finder's own, the third pre-push review of item 926: a run that named
+        an address in passing must not keep its reply from the chat that wrote to it) that wrote to ``address`` last
+        since ``since`` (item 926), or None."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT * FROM correspondents WHERE address = ? AND thread_id != ? AND at >= ? ORDER BY at DESC LIMIT 1",
+            (address, besides, since),
+        )
+        if row is None:
+            return None
+        return Correspondent(
+            address=str(row["address"]),
+            thread_id=str(row["thread_id"]),
+            run_id=str(row["run_id"]),
+            at=float(row["at"]),
+            handed_at=None if row["handed_at"] is None else float(row["handed_at"]),
+        )
+
+    @_writing
+    async def note_handed(self, address: str, thread_id: str, at: float) -> None:
+        """Keep that a reply from ``address`` was handed to the chat ``thread_id`` at ``at`` (item 926)."""
+        await self._db.execute(
+            "UPDATE correspondents SET handed_at = ? WHERE address = ? AND thread_id = ?", (at, address, thread_id)
+        )
+        await self._db.commit()
+
+    async def call_texts(self, run_id: str, limit: int) -> list[str]:
+        """The arguments of the run's tool calls as they were stored, the newest ``limit`` of them (item 926)."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT data FROM events WHERE run_id = ? AND kind = 'tool_call' ORDER BY id DESC LIMIT ?", (run_id, limit)
+        )
+        return [str(row["data"]) for row in rows]
 
     @_writing
     async def settle_sent(self, key: str, target: str) -> None:

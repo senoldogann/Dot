@@ -23,6 +23,8 @@ BROWSER_GROUP: str = "browser"
 ACCOUNTS_GROUP: str = "accounts"
 # Dot's own list (item 715), on from the start of a run of its own initiative (item 912).
 TODOS_GROUP: str = "todos"
+# Handing a reply to the chat that sent the mail (item 926), on from the start of a schedule's and a watcher's run.
+REPLIES_GROUP: str = "replies"
 
 # The groups whose tools share a name prefix. A tool with none of these prefixes is in its group of _GROUP_OF_TOOL, or
 # in core.
@@ -53,6 +55,7 @@ _GROUP_OF_TOOL: dict[str, str] = {
     # The owner's saved contact details (item 621).
     "vault_contacts": "vault",
     # Dot's own list of work for later (item 715).
+    "pass_reply": REPLIES_GROUP,
     "todo_add": TODOS_GROUP,
     "todo_drop": TODOS_GROUP,
     # What the owner wants moved forward over time, which Dot's own runs keep beside the list (item 908).
@@ -76,6 +79,7 @@ _PURPOSES: dict[str, str] = {
     "drafts": "an email or a message you write for the owner, who sends it from the conversation",
     "team": "making a lasting teammate agent for a role the work needs again or in parallel",
     "office": "what the other agents do now, and reading one's chat to help it",
+    "replies": "handing a reply to a mail Dot sent to the chat that sent it, where that work goes on",
     "pages": "showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views",
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",

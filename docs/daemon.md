@@ -1190,6 +1190,22 @@ dotx service uninstall   # stop the daemon and remove the job
   them, `DOT_RUN_SHELL`), `service restart`, `service install` and `service uninstall` refuse: the daemon would stop
   under the run, and the run's end would kill the command before it loads the daemon again (or, for the uninstall,
   before it removes the job's file, which would bring the daemon back at the next login).
+- **The watchdog** (item 925), `dev.dotagent.watchdog`, is a launchd job of its own beside the daemon's (its property
+  list in `~/Library/LaunchAgents`, `StartInterval` 60, `RunAtLoad`, no `KeepAlive`): `service install` loads it once
+  the daemon answers, `service uninstall` removes it first, and `service status` says whether it is loaded. Each
+  minute a process runs `python -P -m dotagent.watchdog` and ends. launchd starts the daemon again when it exits; the
+  watchdog catches what is no crash. When the daemon's job has a process and its health check does not answer (or does
+  not within 3 seconds) three looks in a row, it restarts the daemon as `service restart` does and shows a
+  notification of the Mac, as a daemon that does not answer tells nobody (`watchdog_unanswered`, `watchdog_restarted`
+  in `dotx.log`); a restart that fails is told to you too ("Dot does not answer"), and tried again three looks on.
+  A restart that waits for the runs is left to do its work, and a job with no process is launchd's to
+  start. When the daemon answers, a run that works with no event for longer than a model call and a command may take
+  (`[agent] model_call_timeout_s`, `[shell] max_timeout_s`; 30 minutes at least) is told to you once, through the daemon
+  (`POST /api/runs/{id}/stuck`: "A task makes no progress", with its page; `watchdog_run_stuck`). A run inside a call
+  that may take longer (a helper's run or a fan-out, 4 hours; a wait; a question to you, 24 hours) counts as busy until
+  that call's own limit, which its `tool_call` event carries, has passed too. A run that waits for your approval is
+  `blocked`, not stuck. What it saw is kept in `watchdog.json` in Dot's home; the database is read
+  through a read-only connection.
 - **A run restarts the daemon with `dotx service restart --when-idle`, never with a launchd job of its own** (item 441;
   the shell tool's description tells the model so). A run that merged a change of Dot's own code wants the daemon
   restarted once it has ended, and restarting at once would cut the run itself off. A run reaches launchctl only in
