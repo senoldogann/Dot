@@ -33,6 +33,8 @@ class _World:
     home: Path
     asked: list[list[str]] = field(default_factory=list)
     plists: list[bytes] = field(default_factory=list)
+    # The watchdog's property lists (item 925), loaded once the daemon answers.
+    watchdogs: list[bytes] = field(default_factory=list)
 
     def tools_run(self) -> list[str]:
         return [Path(words[0]).name if "clang" not in words else "clang" for words in self.asked]
@@ -61,6 +63,10 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _World:
         seen.plists.append(content)
         return False
 
+    async def watch(path: Path, content: bytes, uid: int) -> bool:
+        seen.watchdogs.append(content)
+        return False
+
     async def answers(url: str, seconds: float) -> HealthView:
         return HealthView(ok=True, version="0.0.0-test")
 
@@ -75,6 +81,8 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _World:
     monkeypatch.setattr(cli_daemon, "service_status", status)
     monkeypatch.setattr(cli_daemon, "probe_daemon", nobody)
     monkeypatch.setattr(cli_daemon, "install_job", install)
+    # Never launchd's: a test loads no job of the owner's session.
+    monkeypatch.setattr(cli_daemon, "install_watchdog_job", watch)
     monkeypatch.setattr(cli_daemon, "wait_for_daemon", answers)
     monkeypatch.setattr(dot_app, "_run", run)
     return seen
@@ -104,6 +112,12 @@ async def test_a_service_installed_from_a_terminal_keeps_the_apps_tools_and_its_
     assert job["ProgramArguments"][0] == str(app_program(app_path(app_install.home)))
     assert app_program(app_path(app_install.home)).read_bytes() == PREBUILT
     assert app_install.tools_run() == ["codesign"], app_install.asked
+    # The watchdog is loaded with the service, every minute, from Dot's home (item 925).
+    (watchdog,) = app_install.watchdogs
+    looks = plistlib.loads(watchdog)
+    assert looks["Label"] == "dev.dotagent.watchdog" and looks["StartInterval"] == 60
+    assert looks["ProgramArguments"][-2:] == ["-m", "dotagent.watchdog"]
+    assert looks["EnvironmentVariables"]["DOT_HOME"] == str(app_install.home)
 
 
 async def test_a_service_installed_on_a_checkout_has_the_standard_path_and_an_app_built_with_clang(

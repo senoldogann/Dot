@@ -771,6 +771,18 @@ class FreeModeView(FrozenModel):
     free: bool
 
 
+class StuckRequest(FrozenModel):
+    """What the watchdog saw of a run that works with no step (item 925): for how many seconds it had no event."""
+
+    quiet_s: float = Field(ge=0, allow_inf_nan=False)
+
+
+class StuckView(FrozenModel):
+    """Whether the owner was told of the stuck run (item 925): not when it no longer works."""
+
+    told: bool
+
+
 class SandboxView(FrozenModel):
     """Whether the processes of a run outside yolo start in the macOS sandbox now (item 262)."""
 
