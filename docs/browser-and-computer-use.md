@@ -118,9 +118,11 @@ the run's browser calls has started Chrome. The run is told to connect with Play
 `defaultViewport: null`. Dot's Chrome does not start while another program holds the port, with an error that names
 the port; a script reaches whatever listens on the port, which is Dot's Chrome while it runs. Settings › Browser sets it
 (`POST /api/browser/debug-port`, refused while runs are active and when the port is taken): every browser session is
-checked before any changes, Dot's Chrome, open on another port, is closed and starts on the new one with the next call
-that needs it, and the value is written to `config.toml`. The port asks for no token: while Dot's Chrome runs, any
-program on this Mac can connect to it and drive Chrome with the sign-ins of Dot's profile.
+checked before any changes, the value is written to `config.toml` first, then taken, and its keys are put back when it
+is not (item 942: a file that cannot take it changes nothing, and a port refused is not kept for the next start; so are
+the mode, the profile and how pages look, whose five settings are written in one edit), and Dot's Chrome, open on
+another port, is closed and starts on the new one with the next call that needs it. The port asks for no token: while
+Dot's Chrome runs, any program on this Mac can connect to it and drive Chrome with the sign-ins of Dot's profile.
 
 
 Settings › Browser has these rows (item 354), in sections each named over its card (items 378 and 564): where it

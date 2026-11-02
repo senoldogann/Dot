@@ -11,8 +11,11 @@ import pytest
 
 from dotagent.config import BrowserMode
 from dotagent.config_edit import (
+    browser_values,
+    restore_browser_values,
     set_browser_mode,
     set_browser_setting,
+    set_browser_settings,
     set_default_model,
     set_embeddings,
     set_judge_provider,
@@ -353,3 +356,39 @@ def test_an_amount_with_decimals_changed_twice_is_replaced_whole_and_the_comment
         "min_volume": 2_500_000.0,
     }
     assert "max_order = 30.5  # mine" in config.read_text(encoding="utf-8")
+
+
+def test_the_look_of_pages_is_written_in_one_edit_or_not_at_all(tmp_path: Path) -> None:
+    """Item 942 (the review of 2026-11-02): the five settings of how pages look were written one by one, so a file that
+    could not take the third kept two; now all of them, or none."""
+    path: Path = tmp_path / "config.toml"
+    path.write_text("# mine\n[browser]\nheadless = true\n", encoding="utf-8")
+    settings = (
+        ("fit_window", False),
+        ("viewport_width", 1280),
+        ("viewport_height", 900),
+        ("appearance", "dark"),
+        ("zoom", 1.25),
+    )
+    set_browser_settings(path, settings)
+    browser = tomllib.loads(path.read_text(encoding="utf-8"))["browser"]
+    assert {key: browser[key] for key, _ in settings} == dict(settings) and browser["headless"] is True
+    assert path.read_text(encoding="utf-8").startswith("# mine\n")
+    broken: str = "[browser\nheadless = true\n"
+    path.write_text(broken, encoding="utf-8")
+    with pytest.raises(ConfigError):
+        set_browser_settings(path, settings)
+    assert path.read_text(encoding="utf-8") == broken
+
+
+def test_the_keys_a_route_kept_are_put_back_and_a_setting_kept_meanwhile_stays(tmp_path: Path) -> None:
+    """Item 942, the review: a change the daemon refused takes back its own keys only, one it did not hold taken out."""
+    path: Path = tmp_path / "config.toml"
+    path.write_text("[browser]\ndebug_port = 9222\n", encoding="utf-8")
+    before = browser_values(path, ("debug_port", "zoom"))
+    assert before == (("debug_port", 9222), ("zoom", None))
+    set_browser_settings(path, (("debug_port", 9333), ("zoom", 1.5)))
+    set_browser_setting(path, "raise_window", True)
+    restore_browser_values(path, before)
+    browser = tomllib.loads(path.read_text(encoding="utf-8"))["browser"]
+    assert browser == {"debug_port": 9222, "raise_window": True}

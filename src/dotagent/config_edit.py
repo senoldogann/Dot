@@ -432,6 +432,35 @@ def _edit(
     """Replace the config file at ``path`` with ``change`` of its text, once the result, parsed again, holds
     ``value`` at ``keys`` (nothing there for ``None``) and every other setting unchanged; else nothing is written and
     the error says to do ``by_hand`` by hand."""
+    _edit_all(path, ((keys, value),), change, by_hand)
+
+
+def set_browser_settings(path: Path, settings: tuple[tuple[BrowserSetting, SettingValue], ...]) -> None:
+    """Write each ``[browser] key = value`` of ``settings`` into the config file at ``path`` in one edit (item 942):
+    all of them are written, or, when one cannot be, none."""
+    _edit_all(
+        path,
+        tuple((("browser", key), value) for key, value in settings),
+        lambda text: _with_all(text, settings),
+        "set " + ", ".join(f"{key} = {_literal(value)}" for key, value in settings) + " under [browser]",
+    )
+
+
+def _with_all(text: str, settings: tuple[tuple[BrowserSetting, SettingValue], ...]) -> str:
+    for key, value in settings:
+        text = with_browser_setting(text, key, value)
+    return text
+
+
+def _edit_all(
+    path: Path,
+    values: tuple[tuple[tuple[str, ...], SettingValue | None], ...],
+    change: Callable[[str], str],
+    by_hand: str,
+) -> None:
+    """Replace the config file at ``path`` with ``change`` of its text, once the result, parsed again, holds each value
+    of ``values`` at its keys (nothing there for ``None``) and every other setting unchanged; else nothing is written
+    and the error says to do ``by_hand`` by hand."""
     with _EDITING:
         try:
             before: str = path.read_text(encoding="utf-8") if path.exists() else ""
@@ -443,21 +472,65 @@ def _edit(
             new_settings: JsonObject = tomllib.loads(after)
         except tomllib.TOMLDecodeError as error:
             raise _by_hand(by_hand, path, f"the edited file is not valid TOML: {error}") from error
-        held: object = _value_at(new_settings, keys)
-        # A type of its own as well: TOML's true is not an integer 1, nor a string "true".
-        if held != value or (value is not None and type(held) is not type(value)):
-            raise _by_hand(by_hand, path, "the edited file does not hold the new value")
-        if _without(new_settings, keys) != _without(old_settings, keys):
+        new_rest: JsonObject = new_settings
+        old_rest: JsonObject = old_settings
+        for keys, value in values:
+            held: object = _value_at(new_settings, keys)
+            # A type of its own as well: TOML's true is not an integer 1, nor a string "true".
+            if held != value or (value is not None and type(held) is not type(value)):
+                raise _by_hand(by_hand, path, "the edited file does not hold the new value")
+            new_rest = _without(new_rest, keys)
+            old_rest = _without(old_rest, keys)
+        if new_rest != old_rest:
             raise _by_hand(by_hand, path, "the edit changed another setting")
-        # A config.toml that is a link (to a dotfiles repository) is written where it leads, and stays a link.
-        target: Path = link_target(path)
-        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        descriptor, temporary = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-                handle.write(after)
-            os.chmod(temporary, target.stat().st_mode & 0o777 if target.exists() else _FILE_MODE)
-            os.replace(temporary, target)
-        except OSError:
-            Path(temporary).unlink(missing_ok=True)
-            raise
+        _replace(path, after)
+
+
+def _replace(path: Path, text: str) -> None:
+    """Write ``text`` as the config file at ``path`` at once (a file beside it, moved in its place). A config.toml that
+    is a link (to a dotfiles repository) is written where it leads, and stays a link."""
+    target: Path = link_target(path)
+    target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.chmod(temporary, target.stat().st_mode & 0o777 if target.exists() else _FILE_MODE)
+        os.replace(temporary, target)
+    except OSError:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
+def browser_values(
+    path: Path, keys: tuple[BrowserSetting, ...]
+) -> tuple[tuple[BrowserSetting, SettingValue | None], ...]:
+    """What the config file at ``path`` holds for ``keys`` of ``[browser]`` now, ``None`` for one it does not hold: to
+    put them back as they were (:func:`restore_browser_values`)."""
+    with _EDITING:
+        settings: JsonObject = _parse(path.read_text(encoding="utf-8"), path) if path.exists() else {}
+    table: object = settings.get("browser")
+    held: dict[str, object] = table if isinstance(table, dict) else {}
+    values: list[tuple[BrowserSetting, SettingValue | None]] = []
+    for key in keys:
+        value: object = held.get(key)
+        values.append((key, value if isinstance(value, str | bool | int | float | list) else None))
+    return tuple(values)
+
+
+def restore_browser_values(path: Path, values: tuple[tuple[BrowserSetting, SettingValue | None], ...]) -> None:
+    """Put ``[browser]``'s keys of ``values`` back in the config file at ``path`` (one it did not hold is taken out),
+    leaving every other setting as it stands now (item 942): a change the daemon could not take is taken back, and a
+    setting another route kept meanwhile stays."""
+
+    def change(text: str) -> str:
+        for key, value in values:
+            text = _without_value(text, "browser", key) if value is None else with_browser_setting(text, key, value)
+        return text
+
+    _edit_all(
+        path,
+        tuple((("browser", key), value) for key, value in values),
+        change,
+        "put back " + ", ".join(key for key, _ in values) + " under [browser]",
+    )

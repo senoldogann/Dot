@@ -44,9 +44,12 @@ from dotagent.core.text import redact_json, redact_secrets, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.mcp.masking import masked_context
 from dotagent.previews.quicklook import QuickLook, open_quick_look
+from dotagent.server.bodylimit import MOST as BODY_MOST
+from dotagent.server.bodylimit import PUBLIC_MOST as PUBLIC_BODY_MOST
+from dotagent.server.bodylimit import BodyLimit
 from dotagent.server.compress import GzipExceptEventStreams
 from dotagent.server.context import ServerContext
-from dotagent.server.guard import LocalGuard
+from dotagent.server.guard import LocalGuard, needs_token
 from dotagent.server.kept_pages import KeptPages, ServedPages, keep_pages
 from dotagent.server.phones import PairedPhones
 from dotagent.server.routes_about import about_router
@@ -262,6 +265,8 @@ def create_app(ctx: ServerContext) -> FastAPI:
 
     # Added before the guard, so that the guard wraps it and its answer carries the guard's headers (item 558).
     app.add_middleware(_AnswerFaults)
+    # Inside the guard: a request it refuses is never read; one it lets through is held to its limit (item 942).
+    app.add_middleware(BodyLimit, most=BODY_MOST, public_most=PUBLIC_BODY_MOST, guarded=needs_token)
     app.add_middleware(
         LocalGuard,
         token=ctx.token,

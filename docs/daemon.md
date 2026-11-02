@@ -1148,7 +1148,10 @@ a path without a `.` or `..` segment (`..%2F`, as a browser sends it, reads as o
 address and, when it has one, an `Origin` of the server itself; every call under `/api` except
 `/api/health`, `/api/proof` and `/api/phone/pair` needs the bearer token in `<home>/api-token` (mode 0600), or the key
 of a paired phone that is still listed (item 670, [Dot on the phone](phone.md)), which pairing codes and the paired
-phones' routes do not take (403). A page a run showed
+phones' routes do not take (403). A request's body is read whole only within its limit, after the guard let it
+through: 4 KB on what it lets through without a token (those three routes, the pages and the files), 32 MB on every
+route that needs the token or a phone's key (an attachment of 20 MB in base64); a longer one, declared
+or streamed, is answered 413 and read no further (item 942). A page a run showed
 (`/pages/<id>`) needs none: its id cannot be guessed, and it is served sandboxed (see [Tools](runs.md#tools)). `dotx url` puts
 the token in the fragment of the address (`#token=…`), so it never reaches the server or a log; the page keeps it in the
 browser's local storage and removes it from the address bar. A page that cannot sign in says why: a token the daemon

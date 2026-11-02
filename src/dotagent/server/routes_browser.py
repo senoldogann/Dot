@@ -1,6 +1,7 @@
 """Routes for which Chrome the browser tools work in: Dot's own, or the one the user has open."""
 
 import asyncio
+from collections.abc import Awaitable, Callable
 
 from fastapi import APIRouter
 from pydantic import JsonValue
@@ -32,7 +33,15 @@ from dotagent.browser.profiles import (
 )
 from dotagent.browser.readable import readable_cookies
 from dotagent.browser.session import BrowserSession
-from dotagent.config_edit import BrowserSetting, SettingValue, set_browser_mode, set_browser_setting
+from dotagent.config_edit import (
+    BrowserSetting,
+    SettingValue,
+    browser_values,
+    restore_browser_values,
+    set_browser_mode,
+    set_browser_setting,
+    set_browser_settings,
+)
 from dotagent.core.errors import BrowserError, InvalidValueError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, config_path
@@ -54,6 +63,24 @@ from dotagent.server.views import (
 )
 
 _log = get_logger("dotagent.server.routes_browser")
+
+
+async def kept_then_taken(
+    keys: tuple[BrowserSetting, ...], keep: Callable[[], None], take: Callable[[], Awaitable[None]]
+) -> None:
+    """Keep settings ``keys`` of ``[browser]`` in the config file (``keep``), then take them in the running daemon
+    (``take``); when the daemon refuses them, those keys are put back as they were, and nothing else (item 942). So a
+    file that cannot be written changes nothing, a change the daemon refuses (a port that is taken) is not kept for the
+    next start, and a setting another route kept meanwhile stays."""
+    before: tuple[tuple[BrowserSetting, SettingValue | None], ...] = await asyncio.to_thread(
+        browser_values, config_path(), keys
+    )
+    await asyncio.to_thread(keep)
+    try:
+        await take()
+    except BaseException:
+        await asyncio.to_thread(restore_browser_values, config_path(), before)
+        raise
 
 
 def browser_router(ctx: ServerContext) -> APIRouter:
@@ -120,11 +147,14 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         active: list[JsonValue] = list(ctx.manager.active_run_ids())
         if active:
             raise RunConflict("the browser cannot be switched while tasks are active", {"active_runs": active})
+
         # A session a campaign made for the mode the main one is going to is closed first (item 554): the main session
         # works in it now, and the other would keep its Chrome on the same profile.
-        await ctx.runtime.browsers.retire_other(request.mode)
-        await adopt_mode(session, request.mode, open_users_chrome)
-        await asyncio.to_thread(set_browser_mode, config_path(), request.mode)
+        async def take() -> None:
+            await ctx.runtime.browsers.retire_other(request.mode)
+            await adopt_mode(session, request.mode, open_users_chrome)
+
+        await kept_then_taken(("mode",), lambda: set_browser_mode(config_path(), request.mode), take)
         return await state()
 
     @router.post("/browser/sign-in")
@@ -172,8 +202,12 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         active: list[JsonValue] = list(ctx.manager.active_run_ids())
         if active:
             raise RunConflict("the DevTools port cannot be changed while tasks are active", {"active_runs": active})
-        await ctx.runtime.browsers.set_debug_port(request.debug_port)
-        await asyncio.to_thread(set_browser_setting, config_path(), "debug_port", request.debug_port)
+        # A write that fails must not leave a DevTools port open that the page says was not set (item 942).
+        await kept_then_taken(
+            ("debug_port",),
+            lambda: set_browser_setting(config_path(), "debug_port", request.debug_port),
+            lambda: ctx.runtime.browsers.set_debug_port(request.debug_port),
+        )
         return await state()
 
     @router.post("/browser/enabled")
@@ -191,7 +225,6 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         active: list[JsonValue] = list(ctx.manager.active_run_ids())
         if active:
             raise RunConflict("how pages look cannot be changed while tasks are active", {"active_runs": active})
-        await ctx.runtime.browsers.set_look(request)
         settings: tuple[tuple[BrowserSetting, SettingValue], ...] = (
             ("fit_window", request.fit_window),
             ("viewport_width", request.viewport_width),
@@ -199,8 +232,12 @@ def browser_router(ctx: ServerContext) -> APIRouter:
             ("appearance", request.appearance),
             ("zoom", request.zoom),
         )
-        for key, value in settings:
-            await asyncio.to_thread(set_browser_setting, config_path(), key, value)
+        # All five in one edit (item 942): never half of them, nor taken and not kept.
+        await kept_then_taken(
+            tuple(key for key, _ in settings),
+            lambda: set_browser_settings(config_path(), settings),
+            lambda: ctx.runtime.browsers.set_look(request),
+        )
         return await state()
 
     @router.post("/browser/profiles")
@@ -215,8 +252,11 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         Chrome is let go of, so the change is refused while runs are active."""
         await asyncio.to_thread(known_profile, request.name)
         refuse_while_runs("the profile cannot be changed")
-        await ctx.runtime.browsers.use_profile(request.name)
-        await asyncio.to_thread(set_browser_setting, config_path(), "profile", request.name)
+        await kept_then_taken(
+            ("profile",),
+            lambda: set_browser_setting(config_path(), "profile", request.name),
+            lambda: ctx.runtime.browsers.use_profile(request.name),
+        )
         return await state()
 
     @router.post("/browser/profiles/{name}/clear")
