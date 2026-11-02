@@ -4031,6 +4031,16 @@
   overflow-wrap: anywhere;
 }
 
+/* The texts of the version in use, folded to how many points they hold until opened (item 938). */
+.follow-texts > summary {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
 .follow-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

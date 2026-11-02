@@ -1,7 +1,8 @@
 // Settings › Self-improvement (items 393 and 566, docs/harness.md: the harness): what Dot improves around its model, in plain
-// words (item 503). An overview of four tiles, the version in use with its two texts, the versions with Use and Set aside and
-// a form for one of the owner's, which opens in a dialog (item 615), the nightly learning with the nights it ran, the
-// lessons they kept, and how it is set.
+// words (item 503). An overview of four tiles, the nightly learning with its newest nights (all a click away), the version
+// in use with its two texts folded to how many points they hold, the versions with Use and Set aside and a form for one of
+// the owner's, which opens in a dialog (item 615), and the lessons the nights kept, both folded to their counts (item
+// 938), and how it is set.
 
 import { api } from "../api.js";
 import { clip, dateTime, el, joined, nextNight, plural } from "../dom.js";
@@ -79,13 +80,18 @@ function textBlock(text) {
   return text === "" ? el("pre", { class: "harness-text empty" }, "nothing") : el("pre", { class: "harness-text" }, text);
 }
 
-/** A text of a version as a list, a line a point: the dash a line starts with is the list's own mark, and the words
- * between backticks are code. */
-function bulletList(text) {
-  const lines = text
+/** The points of a text of a version: a line a point, without the dash it starts with. */
+function pointsOf(text) {
+  return text
     .split("\n")
     .map((line) => line.replace(/^\s*[-*•]\s+/, "").trim())
     .filter((line) => line !== "");
+}
+
+/** A text of a version as a list, a line a point: the dash a line starts with is the list's own mark, and the words
+ * between backticks are code. */
+function bulletList(text) {
+  const lines = pointsOf(text);
   if (lines.length === 0) {
     return el("p", { class: "follow-none" }, "nothing");
   }
@@ -325,8 +331,11 @@ function overview(view, steps) {
   return card;
 }
 
-/** What the version in use says, in two columns: habits and tool guidance as lists; with none in use, a line that says so. */
-function followBody(view, handlers) {
+/**
+ * What the version in use says, in two columns: habits and tool guidance as lists, folded to how many they are until
+ * opened (`textsOpen`, kept by the page through its repaints: `onTexts(open)`); with none in use, a line that says so.
+ */
+function followBody(view, handlers, textsOpen, onTexts) {
   const adopted = view.adopted;
   if (adopted === null) {
     return setCard(
@@ -356,11 +365,21 @@ function followBody(view, handlers) {
           { class: "hint follow-refused" },
           `${capital(refusal)}: the part that fails is left out of every task's instructions. Set this version aside and write another.`,
         ),
+    // Folded to how many habits and tips it holds (item 938): their words took the middle of the page on a phone.
     el(
-      "div",
-      { class: "follow-columns" },
-      column("Habits · how to work", adopted.habits),
-      column("Tips · what this Mac and its apps want", adopted.tool_guidance),
+      "details",
+      { class: "follow-texts", open: textsOpen, ontoggle: (event) => onTexts(event.currentTarget.open) },
+      el(
+        "summary",
+        null,
+        `${plural(pointsOf(adopted.habits).length, "habit", "habits")} · ${plural(pointsOf(adopted.tool_guidance).length, "tip", "tips")}`,
+      ),
+      el(
+        "div",
+        { class: "follow-columns" },
+        column("Habits · how to work", adopted.habits),
+        column("Tips · what this Mac and its apps want", adopted.tool_guidance),
+      ),
     ),
   );
 }
@@ -404,8 +423,14 @@ function nightCost(view) {
   return `Each night Dot tries new versions on test tasks with its main model, ${view.main_model}: up to ${Math.round(view.step_tokens / 1e6)} million pieces of text read and written, as AI services count them, and ${plural(Math.round(view.step_minutes), "minute", "minutes")}.`;
 }
 
-/** The nightly learning: when it runs and what it does, and under that the nights it ran, the newest first. */
-function nightlyBody(view, steps, onSchedule) {
+// The nights the page shows before "Show all" (item 938).
+const NIGHTS_SHOWN = 3;
+
+/**
+ * The nightly learning: when it runs and what it does, and under that the nights it ran, the newest first: the newest
+ * few, and all of them while `showAll` holds (`onShowAll()` flips it).
+ */
+function nightlyBody(view, steps, onSchedule, showAll, onShowAll) {
   const on = view.step_time !== "off";
   const when = setRow({
     title: on ? `Every night at ${view.step_time}` : "The nightly learning is off",
@@ -429,7 +454,23 @@ function nightlyBody(view, steps, onSchedule) {
       emptyPanel("bolt", "Nothing learned yet", el("span", null, on ? "The first night comes at its time." : "Switch the nightly learning on above, and Dot learns once a night.", el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, "In Terminal, ", el("code", { class: "mono" }, "dotx harness step"), " runs it once now.")))),
     );
   }
-  return setCard(when, el("div", { class: "night-head" }, el("span", { class: "follow-label" }, "Recent nights"), nightLegend()), ...steps.map(stepRow));
+  const shown = showAll ? steps : steps.slice(0, NIGHTS_SHOWN);
+  const more =
+    steps.length > NIGHTS_SHOWN
+      ? el(
+          "div",
+          { class: "panel-foot" },
+          el("button", { class: "btn ghost sm", type: "button", "aria-expanded": String(showAll), onclick: onShowAll }, showAll ? "Show fewer" : `Show all ${steps.length} nights`),
+        )
+      : null;
+  return setCard(when, el("div", { class: "night-head" }, el("span", { class: "follow-label" }, "Recent nights"), nightLegend()), ...shown.map(stepRow), more);
+}
+
+/** A section folded to its title and a count (item 938), open once the owner opens it; `actions` sit beside the title. */
+function foldedSection(id, title, count, actions, body) {
+  const card = foldCard({ id, title, actions, body, openByDefault: false });
+  card.setSummary(el("span", { class: "hint" }, count));
+  return card.element;
 }
 
 function fact(term, words) {
@@ -550,6 +591,9 @@ export function mount(root, ctx) {
   let disposed = false;
   let view = null;
   let steps = [];
+  // Whether every night is listed, or the newest few, and whether the texts in use are open (item 938).
+  let allNights = false;
+  let textsOpen = false;
   let experiences = [];
   const holder = el("div", null, loadingPanel());
   // The button at the head of Versions opens the form of the owner's own version in a dialog (item 615). It is made once:
@@ -613,20 +657,37 @@ export function mount(root, ctx) {
         "div",
         { class: "set-sections" },
         overview(view, steps),
-        setSection({ title: "What Dot follows now", body: followBody(view, handlers) }),
+        // What happens each night first, then what Dot follows, folded; the versions and the lessons fold to their
+        // counts (item 938).
         setSection({
-          title: ["Versions", el("span", { class: "harness-count" }, String(view.versions_total))],
-          actions: opener,
-          body: versionsBody(handlers),
+          title: "Nightly learning",
+          body: nightlyBody(
+            view,
+            steps,
+            (stepTime, switchingOn) => schedule(stepTime, switchingOn),
+            allNights,
+            () => {
+              allNights = !allNights;
+              paint();
+            },
+          ),
         }),
-        setSection({ title: "Nightly learning", body: nightlyBody(view, steps, (stepTime, switchingOn) => schedule(stepTime, switchingOn)) }),
         setSection({
-          title: "Lessons learned",
-          body:
-            experiences.length === 0
-              ? setCard(emptyPanel("sparkle", "No lesson yet", "A night of learning keeps one when a change clearly helped or hurt in its test."))
-              : setCard(...experiences.map(experienceRow)),
+          title: "What Dot follows now",
+          body: followBody(view, handlers, textsOpen, (open) => {
+            textsOpen = open;
+          }),
         }),
+        foldedSection("harness-versions", "Versions", plural(view.versions_total, "version", "versions"), opener, versionsBody(handlers)),
+        foldedSection(
+          "harness-lessons",
+          "Lessons learned",
+          plural(view.experiences_total, "lesson", "lessons"),
+          null,
+          experiences.length === 0
+            ? setCard(emptyPanel("sparkle", "No lesson yet", "A night of learning keeps one when a change clearly helped or hurt in its test."))
+            : setCard(...experiences.map(experienceRow)),
+        ),
         howItLearns(view),
       ),
     );

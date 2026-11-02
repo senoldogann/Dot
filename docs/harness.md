@@ -493,9 +493,12 @@ lessons kept. The two counts are of every
 step and lesson, past the newest the lists below show. On a phone the tiles go two to a row, and no column of the page
 is wider than the screen, the narrowest iPhone's too.
 
-*What Dot follows now* is a card with the adopted version's summary, an *In use* pill and **Set aside** at its head, and
-its texts side by side under it where the page is wide enough (*Habits · how to work*, *Tips · what this Mac and its
-apps want*), or that Dot's built-in instructions alone are in use. **Write your own**, at the head of *Versions* (item 566),
+Under the tiles come, in this order (item 938): *Nightly learning*, *What Dot follows now*, *Versions* and *Lessons
+learned*, the last two folded to their counts until opened, then *How it learns*. *What Dot follows now* is a card with
+the adopted version's summary, an *In use* pill and **Set aside** at its head, and its texts folded to how many habits and
+tips they hold; opened (and kept open while the page is drawn again), they stand side by side where the page is wide
+enough (*Habits · how to work*, *Tips · what this Mac and its apps want*), or that Dot's built-in instructions alone are
+in use. **Write your own**, at the head of *Versions* (item 566),
 opens the form in a dialog (item 615), so that the page keeps its size; it takes habits and tips (the tool guidance; prefilled
 from the adopted version) and a summary, and says what each takes (item 412): that writing one is optional since the
 nightly learning proposes
@@ -507,11 +510,11 @@ first, with its state, who made it (you, or Dot's proposer or composer) and when
 is about and the moments of the run it answers, the trial's contrast, the decisions of a composition) under *Full text and
 notes*, **Use** on each version not in use (it asks first for one from outside content) and **Set aside** on a new or
 tried one; the version in use is set aside from *What Dot follows now*, and setting a version aside asks first. *Nightly
-learning*, under *Versions*, opens with when the step runs (every night at its time, with the next one, or that it is
+learning* opens with when the step runs (every night at its time, with the next one, or that it is
 off), what a night costs (up to `step_tokens` tokens of the main model, which it names, and `step_minutes` minutes),
 and a switch and a time of day (item 721): switching it on asks first and says that cost again, a time is kept as it
-is chosen, and off needs no question; it and *Lessons learned* list the newest steps and experiences, a step with the
-run it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and the final check
+is chosen, and off needs no question; it lists the newest three steps (**Show all** the rest, item 938) and *Lessons
+learned* the newest experiences, a step with the run it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and the final check
 (the final set), who chooses, and the limits; the test tasks are the guards and the tasks the version in use still
 fails, or, while too few are known, how many of the pool Dot has tried to find them (item 719). A night that only tried
 tasks reads *trying tasks*, and its row says it tried test tasks; one that found every task known says it tried no

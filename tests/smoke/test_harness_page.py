@@ -125,7 +125,27 @@ async def _open(browser: Browser, client: httpx.AsyncClient, width: int) -> Page
     host, port = _address(client)
     await page.goto(ui_url(host, port, TOKEN))
     await page.goto(f"http://{host}:{port}/#/settings/harness")
+    await _unfold(page)
     return page
+
+
+async def _unfold(page: Page) -> None:
+    """Open what the page folds (item 938): the versions, the lessons and the texts of the version in use, as the owner
+    opens them, for the tests that read them."""
+    await expect(page.get_by_role("group", name="Overview")).to_be_visible()
+    for name in ("Versions", "Lessons learned"):
+        await page.locator(".fold-toggle", has_text=name).click()
+        await expect(page.locator(".fold-toggle", has_text=name)).to_have_attribute("aria-expanded", "true")
+    if await page.locator("details.follow-texts").count() > 0:
+        await _open_texts(page)
+
+
+async def _open_texts(page: Page) -> None:
+    """Open the texts of the version in use, folded to how many points they hold (item 938)."""
+    texts: Locator = page.locator("details.follow-texts")
+    if await texts.get_attribute("open") is None:
+        await texts.locator("summary").click()
+    await expect(texts).to_have_attribute("open", "")
 
 
 def _section(page: Page, name: str) -> Locator:
@@ -178,6 +198,7 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
         await expect(dialog).to_have_count(0)
         await expect(opener).to_be_focused()
         in_use = _section(page, "What Dot follows now")
+        await _open_texts(page)
         await expect(in_use.get_by_text(HABIT)).to_be_visible()
         await expect(in_use.locator(".badge", has_text="In use")).to_be_visible()
         row = page.locator("[data-version]")
@@ -246,6 +267,7 @@ async def test_the_phone_lists_self_improvement_among_how_dot_works(
         # phone, nor on an iPhone mini (375 points wide) or the first iPhone SE (320).
         tiles = page.get_by_role("group", name="Overview").locator(".stat-tile")
         await expect(tiles).to_have_count(4)
+        await _open_texts(page)
         await expect(page.locator(".follow-columns")).to_be_visible()
         for width in (390, 375, 320):
             await page.set_viewport_size({"width": width, "height": 844})
@@ -347,6 +369,7 @@ async def test_a_version_written_from_outside_content_wears_a_pill_and_asks_befo
             # A version of the owner's is used with no question.
             await page.locator(f"[data-version='{own.id}']").get_by_role("button", name="Use", exact=True).click()
             await expect(page.get_by_role("dialog")).to_have_count(0)
+            await _open_texts(page)
             await expect(_section(page, "What Dot follows now").get_by_text("Read first.")).to_be_visible()
             assert (await client.get("/api/harness")).json()["adopted"]["id"] == own.id
             # Yes uses it, and the pill stays on it where it is in use.
@@ -493,7 +516,7 @@ async def test_the_versions_come_fifty_at_a_time_and_the_ones_in_use_and_older_s
             await expect(rows).to_have_count(51)
             await expect(rows.first.locator(".badge")).to_have_text("In use")
             await expect(rows.first).to_have_attribute("data-version", oldest.id)
-            await expect(_section(page, "Versions").locator(".harness-count")).to_have_text(str(total))
+            await expect(page.locator(".fold-toggle", has_text="Versions")).to_contain_text(f"{total} versions")
             # The fifty newest and the one in use, which is older: the others are those left.
             more: Locator = page.get_by_role("button", name=f"Show {total - 51} older versions")
             await expect(more).to_be_visible()
@@ -549,3 +572,28 @@ async def test_the_nightly_learning_is_switched_on_and_timed_on_the_page(
         await page.close()
         # The other tests of this home read the settings file's time: what the page kept is passed over.
         await runtime.store.kv_set(STEP_TIME_KEY, "")
+
+
+async def test_the_page_leads_with_the_nights_and_folds_the_texts_versions_and_lessons(
+    browser: Browser, client: httpx.AsyncClient
+) -> None:
+    """Item 938: the nightly learning comes before what Dot follows, whose texts fold to how many points they hold, and
+    the versions and the lessons fold to their counts until opened; the nights list the newest three."""
+    page: Page = await browser.new_page(viewport={"width": 390, "height": 900})
+    await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    host, port = _address(client)
+    await page.goto(ui_url(host, port, TOKEN))
+    await page.goto(f"http://{host}:{port}/#/settings/harness")
+    try:
+        await expect(page.get_by_role("group", name="Overview")).to_be_visible()
+        headings: list[str] = await page.locator(".set-section-title, .fold-title").all_inner_texts()
+        assert headings.index("Nightly learning") < headings.index("What Dot follows now"), headings
+        for name in ("Versions", "Lessons learned"):
+            await expect(page.locator(".fold-toggle", has_text=name)).to_have_attribute("aria-expanded", "false")
+        texts: Locator = page.locator("details.follow-texts")
+        if await texts.count() > 0:
+            await expect(texts.locator(".follow-columns")).to_be_hidden()
+            await expect(texts.locator("summary")).to_contain_text("habit")
+        assert await page.locator("[data-step]").count() <= 3
+    finally:
+        await page.close()

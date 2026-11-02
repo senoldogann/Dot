@@ -334,14 +334,17 @@ async def test_what_is_tapped_on_a_phone_is_a_fingers_size(browser: Browser, ser
     finally:
         await page.context.close()
     # The link from an approval to a rule is drawn on the page of the controls, as it stands on a card.
-    for route, selector in (
-        ("/controls", ".approval-rule"),
-        ("/settings/harness", ".harness-write"),
-        ("/settings/harness", ".version-toggle"),
-        ("/licences", ".notice-head"),
+    # A control in a folded card is reached once it is opened (Versions, item 938).
+    for route, selector, fold in (
+        ("/controls", ".approval-rule", None),
+        ("/settings/harness", ".harness-write", None),
+        ("/settings/harness", ".version-toggle", "Versions"),
+        ("/licences", ".notice-head", None),
     ):
         page = await _phone(browser, address, route)
         try:
+            if fold is not None:
+                await page.locator(".fold-toggle", has_text=fold).click()
             await expect(page.locator(selector).first).to_be_visible(timeout=15_000)
             small += await _too_small(page, selector)
         finally:
