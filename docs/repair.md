@@ -156,7 +156,8 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
     on main, Dot pulls it fast-forward only. The night then ends, and Dot asks for its own restart once it is idle
     (`dotx service restart --when-idle`, run with `python -P`, item 943). It does not go on in a process whose code
     on disk has changed, and the next night takes the next problem. A restart that gave up (a run waited for you two
-    hours) leaves the daemon on the code before: the next night then repairs nothing, asks for the restart again and
+    hours) leaves the daemon on the code before: a night whose checkout's commit is newer than its process (by the
+    commit's time) then repairs nothing, asks for the restart again and
     tells you (*Dot waits to restart on new code*, item 943).
   - `merge = "ask"` (the default): the pull request waits for you.
 - **Cleanup.** The checkout is removed afterwards. Its branch stays when it has a pull request, or commits that wait

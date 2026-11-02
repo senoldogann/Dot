@@ -42,7 +42,7 @@ from dotagent.config_edit import (
     set_browser_setting,
     set_browser_settings,
 )
-from dotagent.core.errors import BrowserError, InvalidValueError, RunConflict
+from dotagent.core.errors import BrowserError, ConfigError, InvalidValueError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, config_path
 from dotagent.server.context import ServerContext
@@ -79,7 +79,11 @@ async def kept_then_taken(
     try:
         await take()
     except BaseException:
-        await asyncio.to_thread(restore_browser_values, config_path(), before)
+        # The daemon's refusal is the answer; a file that cannot be put back is logged with its cause, not said instead.
+        try:
+            await asyncio.to_thread(restore_browser_values, config_path(), before)
+        except (ConfigError, OSError) as error:
+            _log.error("browser_setting_not_put_back", keys=list(keys), error=str(error))
         raise
 
 
