@@ -9,8 +9,8 @@
 import { api } from "../api.js";
 import { ago, el } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, loadingPanel, setCard, setRow, setSection } from "../panels.js";
-import { attempt, toast } from "../ui.js";
+import { emptyPanel, errorPanel, foldCard, loadingPanel, setCard, setRow, setSection } from "../panels.js";
+import { attempt, confirmDialog, toast } from "../ui.js";
 
 const STATUS = {
   open: "Open",
@@ -151,6 +151,67 @@ function overview(view, runNow) {
   return el("div", { class: "stack" }, tiles, setCard(account));
 }
 
+// A step of a session at work as the page names it (item 939): a mark and a verb by its kind.
+const STEP_MARKS = { read: "R", edit: "✎", write: "+", run: "$", search: "⌕", plan: "≡", other: "•" };
+const STEP_VERBS = { read: "Read", edit: "Edited", write: "Wrote", run: "Ran", search: "Searched", plan: "Planned", other: "Used" };
+// The newest steps the card shows before "All steps", and how often the page reads the night while one is at work.
+const NOW_STEPS = 4;
+const POLL_MS = 4000;
+// While no night works, the night is read once in this many of those.
+const IDLE_TICKS = 8;
+
+/** How long since `since` (epoch seconds), as "4m 12s" or "1h 05m". */
+function elapsed(since, now) {
+  const seconds = Math.max(0, Math.round(now - since));
+  const minutes = Math.floor(seconds / 60);
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m` : `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
+
+/** A step of the session at work: its mark, its verb and its words; `current` marks the newest. */
+function stepLine(step, current) {
+  return el(
+    "li",
+    { class: `repair-step${current ? " current" : ""}` },
+    el("span", { class: "repair-step-mark", "aria-hidden": "true" }, STEP_MARKS[step.kind] ?? "•"),
+    el("span", { class: "repair-step-words" }, el("b", null, STEP_VERBS[step.kind] ?? step.kind), " ", el("span", { class: "mono" }, step.words)),
+  );
+}
+
+/**
+ * What the night works on now (item 939): a session or a second look, how long and which round, the problem, the model
+ * and whose plan, its newest steps (all of them while `allSteps`; `onAll()` flips it) and Stop (`onStop()`).
+ */
+function nowCard(live, allSteps, onAll, onStop) {
+  const steps = allSteps ? live.steps : live.steps.slice(-NOW_STEPS);
+  const model = live.model === "default" ? "Claude Code's model" : `${live.model[0].toUpperCase()}${live.model.slice(1)}`;
+  const effort = live.effort === "default" ? "" : ` · ${live.effort}`;
+  return el(
+    "section",
+    { class: "card repair-now", "aria-label": "Working now" },
+    el(
+      "div",
+      { class: "repair-now-head" },
+      el("span", { class: "repair-live", "aria-hidden": "true" }),
+      el("b", null, live.kind === "look" ? "Looking again" : "Working"),
+      el("span", { class: "hint" }, " · ", el("span", { class: "repair-elapsed", dataset: { since: String(live.started_at) } }, elapsed(live.started_at, Date.now() / 1000)), ` · round ${live.round}`),
+      el("span", { class: "grow" }),
+      el("button", { class: "btn sm danger", type: "button", onclick: onStop }, icon("stop"), "Stop"),
+    ),
+    el("div", { class: "repair-now-title", title: live.title }, readable(live.title)),
+    el("div", { class: "hint" }, `${model}${effort} · ${live.account}`),
+    steps.length === 0
+      ? el("p", { class: "hint repair-now-wait" }, "Starting…")
+      : el("ol", { class: "repair-steps", "aria-label": "Its newest steps" }, steps.map((step, index) => stepLine(step, index === steps.length - 1))),
+    live.steps.length > NOW_STEPS
+      ? el(
+          "button",
+          { class: "btn ghost sm", type: "button", "aria-expanded": String(allSteps), onclick: onAll },
+          allSteps ? "Fewer steps" : `All ${live.steps.length} steps`,
+        )
+      : null,
+  );
+}
+
 /** A select of `choices` (`[value, words]`) at `value`, which calls `onPick(value)` when another is picked. */
 function picker(label, choices, value, onPick) {
   const select = el("select", { class: "select sm", "aria-label": label }, ...choices.map(([key, words]) => el("option", { value: key, selected: key === value }, words)));
@@ -188,6 +249,19 @@ function workerCard(view, save) {
     setRow({ title: "Effort", lead: "How hard it thinks before it answers.", control: picker("Effort", EFFORTS, worker.effort, (effort) => save({ ...worker, effort })) }),
     setRow({ title: "Fast mode", lead: `Faster answers, billed to your plan as extra usage.${seen === "" ? "" : ` ${seen}`}`, control: fast }),
   );
+}
+
+/** How Claude Code works, folded at the page's foot to its model and effort (item 939): it is set once, read often. */
+function workerFold(view, save) {
+  // A choice that cannot be read stops the nights: it is never folded away, whatever the page last kept (the review).
+  if (view.worker_lost) {
+    return setSection({ title: "Claude Code", body: workerCard(view, save) });
+  }
+  const worker = view.worker;
+  const card = foldCard({ id: "repair-worker", title: "Claude Code", actions: null, body: workerCard(view, save), openByDefault: false });
+  const words = MODELS.find(([key]) => key === worker.model)?.[1] ?? worker.model;
+  card.setSummary(el("span", { class: "hint" }, `${words} · ${worker.effort === "default" ? "default effort" : worker.effort}${worker.fast ? " · fast" : ""}`));
+  return card.element;
 }
 
 /** The row of a problem: its words, how often and how lately it was seen, its status and its pull request. */
@@ -237,6 +311,12 @@ export function mount(root, ctx) {
   let disposed = false;
   let view = null;
   let showAll = false;
+  // Whether the card of the night at work lists all its steps (item 939), and its slot, drawn again on its own.
+  let allSteps = false;
+  // The reads of the night so far, and whether the last one failed (said once).
+  let ticks = 0;
+  let readFailed = false;
+  const nowSlot = el("div", { class: "repair-now-slot" });
   const holder = el("div", { class: "stack" }, loadingPanel());
 
   async function saveWorker(worker) {
@@ -245,6 +325,74 @@ export function mount(root, ctx) {
       toast("ok", "Saved: the next night works so.");
       paint();
     });
+  }
+
+  async function stopNight() {
+    const sure = await confirmDialog({
+      title: "Stop the night?",
+      message: "The session of Claude Code ends with what it started; its problem stays as it was, to be tried again.",
+      confirmLabel: "Stop",
+      danger: true,
+      focusCancel: true,
+    });
+    if (!sure) {
+      return;
+    }
+    await attempt(async () => {
+      view = await api.post("/repair/stop", {});
+      toast("ok", "The night is stopped.");
+      paint();
+    });
+  }
+
+  /** The card of what the night works on now, in its slot; nothing while none is at work. */
+  function paintNow() {
+    nowSlot.replaceChildren(
+      view.running && view.live !== null
+        ? nowCard(
+            view.live,
+            allSteps,
+            () => {
+              allSteps = !allSteps;
+              paintNow();
+            },
+            () => attempt(stopNight),
+          )
+        : [],
+    );
+  }
+
+  /**
+   * Read the night again (item 939): every few seconds while one works, the card alone drawn again, and every
+   * IDLE_TICKS of them while none does, so that one the schedule starts shows; the whole page once it starts or ends.
+   * A read that fails is said once, until one succeeds (the daemon restarts after a merge): the card keeps the last.
+   */
+  async function poll() {
+    ticks += 1;
+    if (disposed || view === null || document.hidden || (!view.running && ticks % IDLE_TICKS !== 0)) {
+      return;
+    }
+    let fresh;
+    try {
+      fresh = await api.get("/repair");
+    } catch (error) {
+      if (!readFailed) {
+        readFailed = true;
+        toast("error", `Self-repair could not be read: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return;
+    }
+    readFailed = false;
+    if (disposed) {
+      return;
+    }
+    const changed = fresh.running !== view.running;
+    view = fresh;
+    if (changed) {
+      paint();
+    } else if (view.running) {
+      paintNow();
+    }
   }
 
   async function runNow() {
@@ -288,8 +436,8 @@ export function mount(root, ctx) {
       el(
         "div",
         { class: "set-sections", role: "region", "aria-label": "Self-repair" },
+        nowSlot,
         overview(view, runNow),
-        setSection({ title: "Claude Code", lead: "How it works on Dot's problems and looks again at its pull requests.", body: workerCard(view, saveWorker) }),
         waiting.length === 0 ? null : setSection({ title: "Waits for you", lead: "A fix that needs your look, or one Dot stopped on.", body: setCard(...waiting.map(problemRow)) }),
         setSection({
           title: "Nights",
@@ -298,8 +446,10 @@ export function mount(root, ctx) {
         }),
         setSection({ title: "Next in line", lead: "What Dot's record shows going wrong again and again, the most seen first.", body: nextUp(open) }),
         closed.length === 0 ? null : setSection({ title: "Closed", body: el("details", { class: "repair-closed" }, el("summary", null, `${closed.length} fixed or not Dot's`), setCard(...closed.map(problemRow))) }),
+        workerFold(view, saveWorker),
       ),
     );
+    paintNow();
   }
 
   async function load() {
@@ -319,7 +469,16 @@ export function mount(root, ctx) {
   ctx.head.setLead("Each night Claude Code fixes a problem Dot found in its own record, with a test and a pull request.");
   root.append(holder);
   attempt(load);
+  // The time on the card goes on by the second; the night is read again every few seconds while one works.
+  const ticker = window.setInterval(() => {
+    for (const node of nowSlot.querySelectorAll(".repair-elapsed")) {
+      node.textContent = elapsed(Number(node.dataset.since), Date.now() / 1000);
+    }
+  }, 1000);
+  const reader = window.setInterval(() => attempt(poll), POLL_MS);
   return () => {
     disposed = true;
+    window.clearInterval(ticker);
+    window.clearInterval(reader);
   };
 }

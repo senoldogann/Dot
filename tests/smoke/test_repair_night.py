@@ -83,6 +83,9 @@ with (here / "calls.jsonl").open("a") as calls:
 def say(item):
     print(json.dumps(item), flush=True)
 say({"type": "system", "subtype": "init", "session_id": "s-7"})
+# A step, as Claude Code streams one (item 939).
+say({"type": "assistant", "session_id": "s-7", "message": {"content": [{"type": "tool_use", "name": "Read",
+     "input": {"file_path": os.getcwd() + "/REVIEW.md"}}]}})
 status = "rejected" if mode == "limited" else "allowed"
 say({"type": "rate_limit_event", "session_id": "s-7", "rate_limit_info": {"status": status, "resetsAt": 4102444800,
      "rateLimitType": "five_hour", "unifiedWindows": {"five_hour": {"utilization": 0.3}}}})
@@ -397,6 +400,8 @@ async def test_a_fix_whose_checks_pass_is_merged_and_the_restart_asked(
         assert "Your item number is 931" in str(call["argv"])
         book: Book = read_book(await runtime.store.kv_get(BOOK_KEY))
         assert [problem.status for problem in book.problems] == ["fixed"]
+        # What the page showed while it worked is gone once it has ended (item 939).
+        assert await runtime.store.kv_get(night_module.LIVE_KEY) is None
         assert [event.data["title"] for event in told] == [FIXED_TITLE]
         assert read_sessions(await runtime.store.kv_get(SESSIONS_KEY)) == sessions
         # The checkout is gone; its branch stays, for its pull request.

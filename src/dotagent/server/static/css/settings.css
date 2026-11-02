@@ -5501,6 +5501,80 @@
 /* Settings › Self-repair (items 919-921, its look item 932): a row's status beside the link of its pull request; a
    fix merged is good, one that waits for the owner a warning. A problem's words keep to two lines (whole on a hover),
    a note to one that opens whole. */
+/* What the night works on now (item 939): a card above the overview, its time going on, its newest steps and Stop. */
+.repair-now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border-color: color-mix(in oklab, var(--ok) 45%, var(--border));
+}
+
+.repair-now-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.repair-now-head .grow {
+  flex: 1;
+}
+
+.repair-live {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--ok) 25%, transparent);
+}
+
+.repair-now-title {
+  font-weight: var(--weight-title);
+  overflow-wrap: anywhere;
+}
+
+.repair-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.repair-step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  min-width: 0;
+}
+
+.repair-step-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-3);
+  font-family: var(--mono);
+}
+
+.repair-step.current .repair-step-mark {
+  background: color-mix(in oklab, var(--ok) 25%, transparent);
+  color: var(--ok);
+}
+
+.repair-step-words {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.repair-step-words .mono {
+  color: var(--muted);
+}
+
 .repair-status {
   display: inline-flex;
   align-items: center;

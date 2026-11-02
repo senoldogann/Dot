@@ -43,7 +43,7 @@ from pydantic import JsonValue
 from dotagent.core.errors import RepairError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
-from dotagent.repair.claude import ClaudeOutcome, WorkerChoice, look_argv, run_claude, worker_env
+from dotagent.repair.claude import ClaudeOutcome, StepSink, WorkerChoice, look_argv, run_claude, worker_env
 from dotagent.repair.github import (
     Check,
     PrHead,
@@ -282,10 +282,12 @@ async def second_look(
     time_left: Callable[[], float],
     wait_checks: ChecksWait,
     sleep: Sleep,
+    on_step: StepSink,
 ) -> LookOutcome:
     """The second look of the pull request at ``pr_url``, opened by the session ``session_id`` of ``repo`` (see the
     module); ``moved`` is what the night saw move. ``wait_checks(number)`` waits for its checks, ``sleep`` between
-    reads of its head; ``time_left()`` is how long its session may take, read once the waits are over."""
+    reads of its head; ``time_left()`` is how long its session may take, read once the waits are over; ``on_step``
+    takes each step of that session as it is seen (item 939)."""
     number: int | None = pr_number(pr_url)
     if number is None:
         return LookOutcome(end="held", why="no pull request to look at", outcome=None)
@@ -362,7 +364,7 @@ async def second_look(
         await checkout_at(repo, look, head.branch, head.sha, env)
         prompt: str = look_brief(diff, trace.commands, moved, secrets.token_hex(8))
         outcome: ClaudeOutcome = await run_claude(
-            look_argv(claude, prompt, worker_choice), look, worker_env(env, scratch), timeout_s
+            look_argv(claude, prompt, worker_choice), look, worker_env(env, scratch), timeout_s, on_step
         )
     finally:
         try:

@@ -7,13 +7,22 @@ check passes, or leaves it for you. [The harness](harness.md) improves what Dot 
 code itself.
 
 It is off until `[repair] repo` names the git checkout of Dot's code (`~/Desktop/Dot` on the owner's Mac). Settings ›
-Rules and memory › Self-repair leads with an overview (on or off and when, what it works on now, the problems fixed,
-waiting for you and open, the account), then what waits for you with its pull request and why, the nights by date (each
-session's problem, how it ended and why in a line that opens whole), the problems next in line (the most seen first, a
-few and the rest a click away) and the closed ones folded; a problem's placeholders read as words (item 932). It starts
-a night by hand (**Run now**):
-`GET /api/repair` gives them, `POST /api/repair/now` starts a night (409 with no repository, or while one is under
-way), and `PUT /api/repair/worker` keeps how Claude Code works (item 933).
+Rules and memory › Self-repair leads, while a night works, with what it works on now (item 939): a session or a second
+look, how long (its time going on by the second) and which round, the problem, the model, effort and account, and its
+newest four steps (what Claude Code read, edited, wrote, searched or ran, a command by the description Claude Code gave
+it, all of its newest forty a click away; masked of the secrets Dot holds before they are cut), read again every four
+seconds while the page is in sight (every half minute while none works, so that one the schedule starts shows; a read
+that fails is said once), with **Stop**, which
+asks first and ends the night as the emergency stop does: the session ends with what it started and its problem stays
+as it was. Then an overview (on or off and when, what it works on now, the problems fixed, waiting for you and open, the
+account), what waits for you with its pull request and why, the nights by date (each session's problem, how it ended and
+why in a line that opens whole), the problems next in line (the most seen first, a few and the rest a click away), the
+closed ones folded, and, folded at the foot to its model and effort, how Claude Code works (a section never folded
+while its choice cannot be read, as the nights wait on it); a problem's placeholders
+read as words (item 932). It starts a night by hand (**Run now**): `GET /api/repair` gives them (`live`, what the night
+works on now, from kv `repair.live`, its steps' words masked of the secrets Dot holds), `POST /api/repair/now` starts a
+night (409 with no repository, or while one is under way), `POST /api/repair/stop` stops one (409 with none), and `PUT
+/api/repair/worker` keeps how Claude Code works (item 933).
 
 ## The book of problems
 

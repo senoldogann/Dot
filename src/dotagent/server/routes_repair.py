@@ -9,10 +9,12 @@ from dotagent.core.errors import RepairError, RunConflict
 from dotagent.repair.claude import DEFAULT_WORKER, ClaudeAccount, WorkerChoice, read_account
 from dotagent.repair.night import (
     FAST_KEY,
+    LIVE_KEY,
     SESSIONS_KEY,
     WORKER_KEY,
     claude_state,
     read_fast,
+    read_live,
     read_sessions,
     read_worker,
 )
@@ -29,6 +31,7 @@ def repair_router(ctx: ServerContext) -> APIRouter:
         account: ClaudeAccount | None = await asyncio.to_thread(read_account, claude_state(ctx.runtime.shell_env))
         book = read_book(await ctx.runtime.store.kv_get(BOOK_KEY))
         sessions = read_sessions(await ctx.runtime.store.kv_get(SESSIONS_KEY))
+        running: bool = ctx.scheduler is not None and ctx.scheduler.repairing()
         # A choice that cannot be read stops the nights; the page still opens, says so and takes a new one.
         lost: bool = False
         try:
@@ -43,9 +46,10 @@ def repair_router(ctx: ServerContext) -> APIRouter:
             account=account,
             problems=sorted(book.problems, key=lambda problem: (problem.status != "open", -problem.count)),
             sessions=list(reversed(sessions)),
-            running=ctx.scheduler is not None and ctx.scheduler.repairing(),
+            running=running,
             worker=worker,
             worker_lost=lost,
+            live=read_live(await ctx.runtime.store.kv_get(LIVE_KEY)) if running else None,
             fast_seen=read_fast(await ctx.runtime.store.kv_get(FAST_KEY)),
         )
 
@@ -61,6 +65,14 @@ def repair_router(ctx: ServerContext) -> APIRouter:
             raise RunConflict("Self-repair is off: [repair] repo names no checkout of Dot's code", {})
         if ctx.scheduler is None or not ctx.scheduler.repair_now():
             raise RunConflict("a night of repairs is under way already, or this daemon schedules nothing", {})
+        return await view()
+
+    @router.post("/repair/stop")
+    async def repair_stop() -> RepairView:
+        """Stop the night under way (item 939): its session of Claude Code ends with what it started, and its problem
+        stays as it was. 409 when none is under way."""
+        if ctx.scheduler is None or not await ctx.scheduler.stop_repair():
+            raise RunConflict("no night of repairs is under way", {})
         return await view()
 
     @router.put("/repair/worker")

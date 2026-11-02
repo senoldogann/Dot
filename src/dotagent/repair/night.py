@@ -45,10 +45,13 @@ from dotagent.notify.owner import tell_owner
 from dotagent.repair.claude import (
     DEFAULT_WORKER,
     NO_MCP,
+    STEP_CHARS,
     ClaudeAccount,
     ClaudeOutcome,
     LimitWindow,
     PlanWindow,
+    RepairStep,
+    StepSink,
     WorkerChoice,
     claude_argv,
     limited,
@@ -230,6 +233,55 @@ class KeptWindow(FrozenModel):
 
     account: str
     window: LimitWindow
+
+
+# What a session or a look is doing now, for the page while it works (item 939, a :class:`LiveSession`), and how many of
+# its newest steps it keeps.
+LIVE_KEY: str = "repair.live"
+LIVE_STEPS: int = 40
+
+
+class LiveSession(FrozenModel):
+    """What the night is working on now (item 939): the problem, whether a session fixes it or a second look reads its
+    pull request, when it began, its round, whose plan, the model and effort it works with, and its newest steps (their
+    words masked of the secrets Dot holds)."""
+
+    problem_id: str
+    title: str
+    kind: Literal["session", "look"]
+    started_at: float
+    round: int
+    account: str
+    model: str
+    effort: str
+    steps: tuple[RepairStep, ...]
+
+
+def live_sink(store: Store, live: LiveSession, steps: list[RepairStep], known: Sequence[str]) -> StepSink:
+    """What hands each step of ``live`` to the page: kept in ``steps`` (shared by the rounds of a session, the newest
+    :data:`LIVE_STEPS`), masked of ``known`` and then cut to :data:`~dotagent.repair.claude.STEP_CHARS`, and written
+    whole as the live state."""
+
+    async def on_step(step: RepairStep) -> None:
+        # Masked whole, then cut: a secret cut first is no longer known by its words (the pre-push review).
+        masked: str = redact_known(step.words, tuple(known))
+        steps.append(step.model_copy(update={"words": masked[:STEP_CHARS]}))
+        del steps[:-LIVE_STEPS]
+        await store.kv_set(LIVE_KEY, live.model_copy(update={"steps": tuple(steps)}).model_dump_json())
+
+    return on_step
+
+
+def read_live(raw: str | None) -> LiveSession | None:
+    """What the night is working on now, or ``None`` when nothing is (and for what cannot be read, logged: it only tells
+    the page)."""
+    if raw is None:
+        return None
+    try:
+        return LiveSession.model_validate_json(raw)
+    except ValidationError as error:
+        log.error("repair_live_unreadable", errors=error.error_count(), kept_chars=len(raw))
+        return None
 
 
 class FastSeen(FrozenModel):
@@ -525,6 +577,8 @@ async def _work(
 
     # Where main stood when the session began, once read.
     main_at: list[str] = []
+    # The newest steps of the session's rounds, for the page while it works (item 939).
+    steps: list[RepairStep] = []
 
     def ended(end: SessionEnd, note: str) -> RepairSession:
         ends.append(end)
@@ -537,7 +591,21 @@ async def _work(
             raise _NightOver("the night's time is spent", {"left_s": left})
         timeout_s: float = min(config.session_minutes * 60.0, left)
         argv: tuple[str, ...] = claude_argv(config.claude, prompt, spent.session_id, night.worker, NO_MCP)
-        outcome: ClaudeOutcome = await run_claude(argv, folder, env, timeout_s)
+        live: LiveSession = LiveSession(
+            problem_id=problem.id,
+            title=masked.title,
+            kind="session",
+            started_at=started,
+            round=spent.rounds + 1,
+            account=account.email,
+            model=night.worker.model,
+            effort=night.worker.effort,
+            steps=tuple(steps),
+        )
+        await runtime.store.kv_set(LIVE_KEY, live.model_dump_json())
+        outcome: ClaudeOutcome = await run_claude(
+            argv, folder, env, timeout_s, live_sink(runtime.store, live, steps, known)
+        )
         if night.worker.fast and outcome.fast_mode is not None:
             seen: FastSeen = FastSeen(state=outcome.fast_mode, why=outcome.fast_mode_off_why, at=clock())
             await runtime.store.kv_set(FAST_KEY, seen.model_dump_json())
@@ -704,6 +772,7 @@ async def _work(
         except RepairError as error:
             log.warning("repair_checkout_not_removed", folder=str(folder), error=error.message)
         await asyncio.to_thread(shutil.rmtree, scratch, True)
+        await runtime.store.kv_delete(LIVE_KEY)
 
 
 async def _tell(runtime: Runtime, problem: Problem, session: RepairSession) -> None:
@@ -783,6 +852,19 @@ async def _look(
     async def wait_checks(number: int) -> tuple[Check, ...]:
         return await _wait_checks(night.repo, number, night.env, minutes, clock, sleep)
 
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+    live: LiveSession = LiveSession(
+        problem_id=problem.id,
+        title=redact_known(problem.title, known),
+        kind="look",
+        started_at=started,
+        round=1,
+        account=account.email,
+        model=night.worker.model,
+        effort=night.worker.effort,
+        steps=(),
+    )
+    await runtime.store.kv_set(LIVE_KEY, live.model_dump_json())
     try:
         looked: LookOutcome = await second_look(
             config.claude,
@@ -797,10 +879,13 @@ async def _look(
             lambda: min(config.session_minutes * 60.0, deadline - clock()),
             wait_checks,
             sleep,
+            live_sink(runtime.store, live, [], known),
         )
     except RepairError as error:
         log.warning("repair_look_failed", problem_id=problem.id, error=error.message, context=error.context)
         looked = LookOutcome(end="held", why=f"the look failed: {error.message}", outcome=None)
+    finally:
+        await runtime.store.kv_delete(LIVE_KEY)
     spent: _Spent = _Spent(rounds=0, input_tokens=0, output_tokens=0, cost_usd=0.0, session_id=None, window=None)
     if looked.outcome is not None:
         spent = _spent(spent, looked.outcome)

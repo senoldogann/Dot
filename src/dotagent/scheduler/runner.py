@@ -352,6 +352,18 @@ class Scheduler:
         self._repairing = asyncio.create_task(self._repair(), name="repair-night")
         return True
 
+    async def stop_repair(self) -> bool:
+        """Stop the repair night under way, by the owner's hand (Settings › Self-repair, item 939): its task is
+        cancelled, which ends the session of Claude Code with everything it started and leaves its problem as it was,
+        as the emergency stop does; waits until it has ended. ``False`` when none is under way."""
+        task: asyncio.Task[None] | None = self._repairing
+        if task is None or task.done():
+            return False
+        task.cancel()
+        await asyncio.wait({task})
+        log.info("repair_stopped_by_the_owner")
+        return True
+
     async def _repair_if_due(self, now: float) -> None:
         """Start the repair night (item 921) in a task when its daily time has passed since the last one (or the last
         attempt); the daemon's scheduler alone, never while one is under way, never with ``[repair] time`` off or no

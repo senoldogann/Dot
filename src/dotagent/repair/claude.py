@@ -19,7 +19,8 @@ line that reads commands by their first words, not every spelling of them."""
 import asyncio
 import contextlib
 import json
-from collections.abc import Iterable, Mapping, Sequence
+import time
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -380,8 +381,73 @@ def limited(outcome: ClaudeOutcome) -> bool:
     return outcome.limit is not None and outcome.limit.status not in ("", "allowed", "allowed_warning")
 
 
-async def _read_stream(stream: asyncio.StreamReader, kept: list[str]) -> None:
-    """Keep the lines of ``stream`` an outcome is read from (:data:`_KEPT_TYPES`) until it ends."""
+class RepairStep(FrozenModel):
+    """A step a session took, as the page shows it while it works (item 939): what kind of step (``read``, ``edit``,
+    ``write``, ``run``, ``search``, ``plan``, ``other``), its words (the file, the command's own description or its
+    line, the pattern) and when it was seen (epoch seconds)."""
+
+    kind: str
+    words: str
+    at: float
+
+
+# The longest words of a step the page keeps.
+STEP_CHARS: int = 160
+# The tools of Claude Code by the kind of step the page names them, and the field of their input that says what.
+_STEP_KINDS: dict[str, tuple[str, str]] = {
+    "Read": ("read", "file_path"),
+    "Edit": ("edit", "file_path"),
+    "MultiEdit": ("edit", "file_path"),
+    "Write": ("write", "file_path"),
+    "NotebookEdit": ("edit", "notebook_path"),
+    "Grep": ("search", "pattern"),
+    "Glob": ("search", "pattern"),
+    "TodoWrite": ("plan", ""),
+}
+
+type StepSink = Callable[[RepairStep], Awaitable[None]]
+
+
+def steps_of(item: Mapping[str, object], cwd: str, at: float) -> tuple[RepairStep, ...]:
+    """The steps a line of the stream (an ``assistant`` message, read as JSON) shows the session taking: one for each
+    tool it called, a path in its checkout named from the checkout, a command by the description Claude Code gave it
+    or, with none, by its line, whole: they are cut once masked (:func:`~dotagent.repair.night.live_sink`, the pre-push
+    review: a secret cut first is no longer known by its whole words)."""
+    if item.get("type") != "assistant":
+        return ()
+    message: object = item.get("message")
+    content: object = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, list):
+        return ()
+    steps: list[RepairStep] = []
+    for block in content:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        name: object = block.get("name")
+        given: object = block.get("input")
+        fields: dict[str, object] = given if isinstance(given, dict) else {}
+        if not isinstance(name, str):
+            continue
+        if name == "Bash":
+            said: object = fields.get("description") or fields.get("command")
+            kind, words = "run", said if isinstance(said, str) else ""
+        elif name in _STEP_KINDS:
+            kind, field = _STEP_KINDS[name]
+            value: object = fields.get(field) if field else "the steps of the work"
+            words = value if isinstance(value, str) else ""
+            prefix: str = cwd.rstrip("/") + "/"
+            words = words.removeprefix(prefix)
+        else:
+            kind, words = "other", name
+        steps.append(RepairStep(kind=kind, words=" ".join(words.split()), at=at))
+    return tuple(steps)
+
+
+async def _read_stream(
+    stream: asyncio.StreamReader, kept: list[str], cwd: str, on_step: StepSink, clock: Callable[[], float]
+) -> None:
+    """Keep the lines of ``stream`` an outcome is read from (:data:`_KEPT_TYPES`) until it ends, and hand each step the
+    session takes to ``on_step`` as it is seen (item 939)."""
     while True:
         raw: bytes = await stream.readline()
         if not raw:
@@ -391,8 +457,17 @@ async def _read_stream(stream: asyncio.StreamReader, kept: list[str]) -> None:
             item: object = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if isinstance(item, dict) and item.get("type") in _KEPT_TYPES:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") in _KEPT_TYPES:
             kept.append(line)
+        for step in steps_of(item, cwd, clock()):
+            try:
+                await on_step(step)
+            except Exception:
+                # A step the page cannot be given is logged with its cause and the stream is read on: the session must
+                # not stall on a full pipe for what is only shown (the pre-push review of item 939).
+                log.exception("repair_step_not_shown", kind=step.kind)
 
 
 async def _read_tail(stream: asyncio.StreamReader) -> str:
@@ -400,10 +475,12 @@ async def _read_tail(stream: asyncio.StreamReader) -> str:
     return data.decode("utf-8", errors="replace")[-_STDERR_KEPT:]
 
 
-async def run_claude(argv: Sequence[str], cwd: Path, env: Mapping[str, str], timeout_s: float) -> ClaudeOutcome:
+async def run_claude(
+    argv: Sequence[str], cwd: Path, env: Mapping[str, str], timeout_s: float, on_step: StepSink
+) -> ClaudeOutcome:
     """Run one session, the command ``argv`` (:func:`claude_argv`, :func:`look_argv`), in ``cwd`` with ``env``, at most
-    ``timeout_s`` (then it is ended, with everything it started). Raises :class:`RepairError` when the program cannot
-    be started."""
+    ``timeout_s`` (then it is ended, with everything it started), handing each step it takes to ``on_step`` as it is
+    seen (item 939). Raises :class:`RepairError` when the program cannot be started."""
     binary: str = argv[0]
     try:
         process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
@@ -424,7 +501,7 @@ async def run_claude(argv: Sequence[str], cwd: Path, env: Mapping[str, str], tim
     assert process.stdout is not None and process.stderr is not None
     kept: list[str] = []
     timed_out: bool = False
-    reading: asyncio.Task[None] = asyncio.create_task(_read_stream(process.stdout, kept))
+    reading: asyncio.Task[None] = asyncio.create_task(_read_stream(process.stdout, kept, str(cwd), on_step, time.time))
     tail: asyncio.Task[str] = asyncio.create_task(_read_tail(process.stderr))
     try:
         async with asyncio.timeout(timeout_s):

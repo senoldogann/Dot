@@ -41,7 +41,7 @@ from dotagent.mcp.types import McpFailure
 from dotagent.notify.keys import keys_problem
 from dotagent.policy.types import ApprovalMode
 from dotagent.repair.claude import ClaudeAccount, WorkerChoice
-from dotagent.repair.night import FastSeen, RepairSession
+from dotagent.repair.night import FastSeen, LiveSession, RepairSession
 from dotagent.repair.problems import Problem
 from dotagent.scheduler import NightWork
 from dotagent.secrets import SecretSource
@@ -2231,3 +2231,5 @@ class RepairView(FrozenModel):
     # The kept choice cannot be read: the nights stop until the owner chooses again (``worker`` shows the default).
     worker_lost: bool
     fast_seen: FastSeen | None
+    # What the night works on now, while one is under way (item 939).
+    live: LiveSession | None

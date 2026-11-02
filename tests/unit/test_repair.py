@@ -18,12 +18,14 @@ from dotagent.repair.claude import (
     SCRATCH_NAMES,
     ClaudeAccount,
     LimitWindow,
+    RepairStep,
     WorkerChoice,
     account_of,
     claude_argv,
     limited,
     look_argv,
     outcome_of,
+    steps_of,
     usage_of,
     usage_room,
     worker_env,
@@ -39,15 +41,19 @@ from dotagent.repair.github import (
     settled,
 )
 from dotagent.repair.night import (
+    LIVE_KEY,
     WORKER_KEY,
     KeptWindow,
+    LiveSession,
     RepairSession,
     answer_of,
     brief,
     checks_brief,
+    live_sink,
     looks_due,
     pr_title,
     problem_after,
+    read_live,
     read_worker,
     review_brief,
     room_left,
@@ -563,3 +569,66 @@ def test_the_print_of_the_owners_git_config_leaves_out_the_branches_but_main(tmp
     assert printed(base + '[branch "x"] [core]\n\tfsmonitor = /tmp/payload\n') != kept
     # A quote escaped in a subsection: the key after it is url's.
     assert printed(base + '[url "https://h/x\\"y"]\n\tinsteadOf = https://github.com/\n') != kept
+
+
+def test_a_line_of_the_stream_names_the_steps_the_session_takes() -> None:
+    """Item 939: what the page shows while a session works, a step for each tool it called."""
+    line = {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {"type": "text", "text": "Let me look."},
+                {"type": "tool_use", "name": "Read", "input": {"file_path": "/w/repair-a/src/x.py"}},
+                {
+                    "type": "tool_use",
+                    "name": "Bash",
+                    "input": {"command": "uv run pytest -q", "description": "Run the tests"},
+                },
+                {"type": "tool_use", "name": "Bash", "input": {"command": "git  status\n --short"}},
+                {"type": "tool_use", "name": "Grep", "input": {"pattern": "settle"}},
+                {"type": "tool_use", "name": "Edit", "input": {"file_path": "/elsewhere/y.py"}},
+                {"type": "tool_use", "name": "WebFetch", "input": {"url": "https://x"}},
+            ]
+        },
+    }
+    steps = steps_of(line, "/w/repair-a", 5.0)
+    assert [(step.kind, step.words) for step in steps] == [
+        ("read", "src/x.py"),
+        ("run", "Run the tests"),
+        ("run", "git status --short"),
+        ("search", "settle"),
+        ("edit", "/elsewhere/y.py"),
+        ("other", "WebFetch"),
+    ]
+    assert all(step.at == 5.0 for step in steps)
+    assert steps_of({"type": "result"}, "/w", 1.0) == ()
+    long = {
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "x" * 500}}]},
+    }
+    # Whole here: they are cut once masked (the pre-push review).
+    assert len(steps_of(long, "/w", 1.0)[0].words) == 500
+
+
+async def test_the_live_state_keeps_the_newest_steps_masked(tmp_path: Path) -> None:
+    """Item 939: a command that names a secret Dot holds shows it masked, and the newest forty steps are kept."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        live = LiveSession(
+            problem_id="prb_1", title="x", kind="session", started_at=1.0, round=1, account="a@b.dev",
+            model="opus", effort="high", steps=(),
+        )  # fmt: skip
+        steps: list[RepairStep] = []
+        sink = live_sink(store, live, steps, ("hunter2-secret",))
+        for number in range(45):
+            await sink(RepairStep(kind="run", words=f"curl -H 'key: hunter2-secret' {number}", at=float(number)))
+        kept = read_live(await store.kv_get(LIVE_KEY))
+        assert kept is not None and len(kept.steps) == 40 and kept.steps[-1].words.endswith(" 44")
+        assert all("hunter2-secret" not in step.words for step in kept.steps)
+        # A secret where the words are cut is masked whole first, so no start of it is kept (the pre-push review).
+        await sink(RepairStep(kind="run", words="x" * 150 + " hunter2-secret", at=99.0))
+        last = read_live(await store.kv_get(LIVE_KEY))
+        assert last is not None and "hunter2" not in last.steps[-1].words and len(last.steps[-1].words) <= 160
+        assert read_live("not json") is None and read_live(None) is None
+    finally:
+        await store.close()
