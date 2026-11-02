@@ -1058,12 +1058,18 @@ async def test_the_evening_check_in_tells_the_day_done_and_the_next_step_in_its_
         "Fix the invoice export", "task", OPUS, None, "ui", None, None, "standard", None, "yolo", False, ()
     )
     await _until_over(manager, scheduler, done.id)
-    answer: httpx.Response = await client.put("/api/checkin", json={"enabled": True, "time": "18:00", "days": "every"})
+    # Two hours on, whatever the hour the test runs at: the day the check-in reads (the twelve hours before it fires)
+    # holds the run it names. A fixed 18:00 fired tomorrow once the clock was past it, and read nothing of today.
+    at: datetime = datetime.now(runtime.schedule_zone) + timedelta(hours=2)
+    time_of_day: str = f"{at.hour:02d}:{at.minute:02d}"
+    answer: httpx.Response = await client.put(
+        "/api/checkin", json={"enabled": True, "time": time_of_day, "days": "every"}
+    )
     assert answer.status_code == 200, answer.text
     view: JsonObject = answer.json()
-    assert view["enabled"] is True and view["time"] == "18:00" and isinstance(view["schedule_id"], str)
+    assert view["enabled"] is True and view["time"] == time_of_day and isinstance(view["schedule_id"], str)
     record: ScheduleRecord = await runtime.store.get_schedule(str(view["schedule_id"]))
-    assert (record.mode, record.cron, record.name) == ("research", "0 18 * * *", "Evening check-in")
+    assert (record.mode, record.cron, record.name) == ("research", f"{at.minute} {at.hour} * * *", "Evening check-in")
     assert not await is_brief(runtime.store, record.id)
     WRITER.answer = "Tomorrow: send the invoice export to the accountant first.\nDone today: the invoice export."
     assert record.next_run_at is not None
