@@ -37,7 +37,9 @@ RESTART_MODULE: str = "dotagent.restart_when_idle"
 RESTART_POLL_S: float = 5.0
 RESTART_WAIT_LIMIT_S: float = 2 * 60 * 60
 # How long it waits besides for the night's learning under way (item 815): a step of the harness takes up to
-# [harness] step_minutes (90 by default), the reflection and the plugin scout's night less.
+# [harness] step_minutes (90 by default), the reflection and the plugin scout's night less. A repair night (item 921)
+# may take longer, a session after another; it ends after the first change it merges (asking for the restart when it
+# pulled it).
 RESTART_NIGHT_LIMIT_S: float = 3 * 60 * 60
 # What launchd gives a job is only /usr/bin:/bin:/usr/sbin:/sbin; shell commands of the agent get the login shell's own.
 SERVICE_PATH: str = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"

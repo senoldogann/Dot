@@ -18,6 +18,7 @@ import * as harness from "./harness.js";
 import * as keys from "./keys.js";
 import * as memory from "./memory.js";
 import * as phone from "./phone.js";
+import * as repair from "./repair.js";
 import * as rules from "./rules.js";
 import * as snapshots from "./snapshots.js";
 import * as trading from "./trading.js";
@@ -37,6 +38,7 @@ const MOUNTS = {
   rules: rules.mount,
   memory: memory.mount,
   harness: harness.mount,
+  repair: repair.mount,
   phone: phone.mount,
   channels: channels.mount,
   snapshots: snapshots.mount,

@@ -2,7 +2,9 @@
 as long as the Dot daemon lives."""
 
 import asyncio
+import sys
 import time
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.learning_health import (
@@ -32,6 +34,8 @@ from dotagent.plugins.scout import ScoutStopped
 from dotagent.plugins.scout_types import ScoutState
 from dotagent.proactive.brief import BriefFiring, is_brief, prepare, tell_brief
 from dotagent.proactive.initiative import Initiative
+from dotagent.repair.github import command
+from dotagent.repair.night import NIGHT_KEY, repair_night
 from dotagent.runtime import Runtime
 from dotagent.scheduler import (
     SCHEDULE_MISSED_EVENT,
@@ -134,9 +138,9 @@ class Scheduler:
     """
 
     def __init__(self, runtime: Runtime, manager: RunManager, scout: bool = False) -> None:
-        """``scout`` lets the plugin scout's night start (item 711): the daemon's scheduler alone, since a night
-        reads GitHub and calls the review model, which a scheduler made elsewhere (a test ticking its own clock) must
-        not."""
+        """``scout`` lets the plugin scout's night start (item 711), and the repair night (item 921): the daemon's
+        scheduler alone, since a night reads GitHub, calls the review model or runs Claude Code, which a scheduler made
+        elsewhere (a test ticking its own clock) must not."""
         self._runtime: Runtime = runtime
         self._may_scout: bool = scout
         self._manager: RunManager = manager
@@ -154,6 +158,9 @@ class Scheduler:
         # The plugin scout's night (item 711), timed like the reflection.
         self._scouted_from: float = time.time()
         self._scouting: asyncio.Task[None] | None = None
+        # The repair night (item 921), timed like the reflection.
+        self._repaired_from: float = time.time()
+        self._repairing: asyncio.Task[None] | None = None
         # Dot's own initiative (item 715): its runs while the Mac is idle, started from the tick.
         self._initiative: Initiative = Initiative(runtime, manager)
         # The watch of trading (items 770, 772): sells at a stop or a target, with no model, between runs, and starts
@@ -207,6 +214,9 @@ class Scheduler:
         scouting: asyncio.Task[None] | None = self._scouting
         if scouting is not None:
             scouting.cancel()
+        repairing: asyncio.Task[None] | None = self._repairing
+        if repairing is not None:
+            repairing.cancel()
         await self._initiative.stop()
         loop: asyncio.Task[None] | None = self._loop
         if loop is None:
@@ -227,6 +237,8 @@ class Scheduler:
             await asyncio.wait({self._stepping})
         if self._scouting is not None:
             await asyncio.wait({self._scouting})
+        if self._repairing is not None:
+            await asyncio.wait({self._repairing})
 
     def reflecting(self) -> bool:
         """Whether a reflection is under way."""
@@ -256,6 +268,7 @@ class Scheduler:
             self._reflect_if_due,
             self._step_if_due,
             self._scout_if_due,
+            self._repair_if_due,
             self._check_learning,
             self._initiative.tick,
             self._manager.desk.follow_up,
@@ -313,7 +326,8 @@ class Scheduler:
 
     def night_work(self) -> tuple[NightWork, ...]:
         """The night's learning under way now (item 815), which a restart would cut off: the reflection, the harness's
-        step and the plugin scout's night, this scheduler's or one the owner started with Look now."""
+        step, the plugin scout's night (this scheduler's or one the owner started with Look now) and the repair night
+        (item 921)."""
         work: list[NightWork] = []
         if self.reflecting():
             work.append("reflection")
@@ -321,7 +335,67 @@ class Scheduler:
             work.append("harness_step")
         if (self._scouting is not None and not self._scouting.done()) or scout_service.running(self._runtime):
             work.append("plugin_scout")
+        if self.repairing():
+            work.append("repair")
         return tuple(work)
+
+    def repairing(self) -> bool:
+        """Whether a repair night is under way."""
+        return self._repairing is not None and not self._repairing.done()
+
+    def repair_now(self) -> bool:
+        """Start a repair night now, by the owner's hand (Settings › Self-repair, item 921): ``False`` when one is under
+        way already. The night itself stops before a session while the emergency stop is engaged."""
+        if self.repairing():
+            return False
+        self._repairing = asyncio.create_task(self._repair(), name="repair-night")
+        return True
+
+    async def _repair_if_due(self, now: float) -> None:
+        """Start the repair night (item 921) in a task when its daily time has passed since the last one (or the last
+        attempt); the daemon's scheduler alone, never while one is under way, never with ``[repair] time`` off or no
+        ``repo``. While the emergency stop is engaged none starts, and one under way is cancelled, which ends its
+        session of Claude Code and the commands it started."""
+        if await _emergency_stop_engaged():
+            if self._repairing is not None and not self._repairing.done():
+                self._repairing.cancel()
+                log.info("repair_stopped_by_emergency_stop")
+            return
+        config = self._runtime.config.repair
+        if not self._may_scout or not config.repo or config.time == REFLECTION_OFF:
+            return
+        if self._repairing is not None and not self._repairing.done():
+            return
+        if not reflection_due(config.time, self._repaired_from, now, self._zone):
+            return
+        kept: str | None = await self._runtime.store.kv_get(NIGHT_KEY)
+        anchor: float = max(self._repaired_from, float(kept) if kept is not None else 0.0)
+        if not reflection_due(config.time, anchor, now, self._zone):
+            return
+        self._repaired_from = now
+        await self._runtime.store.kv_set(NIGHT_KEY, str(now))
+        self._repairing = asyncio.create_task(self._repair(), name="repair-night")
+
+    async def _repair(self) -> None:
+        """Task body of the repair night, and the one place its errors end: logged, and the next night tries again."""
+        try:
+            done = await repair_night(self._runtime, self._restart_when_idle, time.time, asyncio.sleep)
+        except DotError as exc:
+            log.error("repair_night_failed", error=exc.message, context=exc.context)
+        except Exception:
+            log.exception("repair_night_crashed")
+        else:
+            log.info("repair_night_done", sessions=len(done), ends=[session.end for session in done])
+
+    async def _restart_when_idle(self) -> None:
+        """Ask for the daemon's restart once no run works and none of the night's work is under way (the repair night
+        merged a change into the owner's checkout): ``dotx service restart --when-idle``, as a change of Dot's code
+        asks for it."""
+        await command(
+            (sys.executable, "-m", "dotagent", "service", "restart", "--when-idle"),
+            Path.home(),
+            self._runtime.shell_env,
+        )
 
     async def _step_if_due(self, now: float) -> None:
         """Start the step of the harness (item 391) in a task when its daily time has passed since the last one (or the

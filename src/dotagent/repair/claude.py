@@ -10,17 +10,20 @@ plan it used; a switcher that signs another account in is followed at the next s
 The program streams JSON lines (``--output-format stream-json``): ``system``/``init`` names the session, which a later
 call resumes (``--resume``); ``rate_limit_event`` says how much of the plan's window is used and when it resets; and
 ``result`` ends it with the answer, the turns, the tokens and what it would have cost on the API. A session works with
-``--permission-mode auto``, nobody to answer a prompt (``--permission-prompts none``: what would ask is refused), and
-the tools of :data:`DENIED_TOOLS` refused outright: merging is Dot's, by ``[repair] merge``, and the rest would act on
-the owner's Mac or repository beyond a change of its own."""
+``--permission-mode auto``, nobody to answer a prompt (``--permission-prompts none``: what would ask is refused). What
+is meant to commit on its own branch and leave the rest to Dot, and its environment has no way to GitHub by default
+(:func:`worker_env`): a default its own shell could set back, so what holds is what the night checks after each
+session (:func:`~dotagent.repair.github.merged_behind_dot`). The tools of :data:`DENIED_TOOLS` are refused besides, a
+line that reads commands by their first words, not every spelling of them."""
 
 import asyncio
 import contextlib
 import json
 from collections.abc import Iterable, Mapping
+from datetime import datetime
 from pathlib import Path
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, StrictFloat, StrictInt, ValidationError
 
 from dotagent.core.errors import RepairError
 from dotagent.core.logs import get_logger
@@ -47,6 +50,9 @@ DENIED_TOOLS: tuple[str, ...] = (
     "Bash(pkill:*)",
     "Bash(killall:*)",
     "Bash(sudo:*)",
+    "Bash(gh auth:*)",
+    "Bash(git credential:*)",
+    "Bash(git credential-osxkeychain:*)",
 )
 # The names of the environment a session never gets: each makes ``claude`` bill an API or a cloud instead of the plan.
 _BILLING_NAMES: frozenset[str] = frozenset(
@@ -59,15 +65,31 @@ _BILLING_NAMES: frozenset[str] = frozenset(
         "CLAUDE_CODE_USE_FOUNDRY",
     }
 )
-# The ends of names that hold a secret of Dot's or of another program's, which a session has no need of; GitHub's
-# own token stays, as the session pushes its branch and opens its pull request.
+# The ends of names that hold a secret of Dot's or of another program's, which a session has no need of (GitHub's own
+# tokens among them).
 _SECRET_ENDS: tuple[str, ...] = ("_API_KEY", "_TOKEN", "_SECRET", "_PASSWORD", "_PASSWORD_FILE", "_KEY")
-_GITHUB_NAMES: frozenset[str] = frozenset({"GH_TOKEN", "GITHUB_TOKEN"})
+# What keeps a session from GitHub by default (the review of item 921): ``gh`` reads its sign-in from an empty folder,
+# git's credential helpers (the Keychain's among them) are reset to none and it may not ask for a password, and ssh is
+# no way out, so that Dot pushes, opens the pull request and merges it. Checked on the owner's Mac (2026-11-02): ``git
+# push`` stops at "could not read Username", ``gh`` says it is not signed in. A command of the session's own can set
+# these back: the night checks after each session what reached main.
+_NO_GITHUB: dict[str, str] = {
+    "GIT_CONFIG_COUNT": "1",
+    "GIT_CONFIG_KEY_0": "credential.helper",
+    "GIT_CONFIG_VALUE_0": "",
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "/usr/bin/false",
+    "SSH_ASKPASS": "/usr/bin/false",
+    "GIT_SSH_COMMAND": "/usr/bin/false",
+}
+_DROPPED_NAMES: frozenset[str] = frozenset({"SSH_AUTH_SOCK", "GH_HOST", "GH_ENTERPRISE_TOKEN"})
 # The folders of Dot's own state, each pointed somewhere new for a session, so that no test it runs touches the
 # owner's Dot (CLAUDE.md: "Point DOT_HOME, DOT_LOG_DIR and DOT_CHROME_DIR at throwaway folders first").
 SCRATCH_NAMES: tuple[str, ...] = ("DOT_HOME", "DOT_LOG_DIR", "DOT_CHROME_DIR")
 # A line of the stream may be long (a turn that read a big file): the reader takes lines up to this size.
 _LINE_LIMIT: int = 32 * 1024 * 1024
+# How long the stream is read after the program exited and its group was ended.
+_STREAM_END_S: float = 30.0
 # What is kept of what the program wrote to its error stream, for a failure's context.
 _STDERR_KEPT: int = 4000
 # The kinds of line an outcome is read from; the turns in between are the session's own.
@@ -137,16 +159,20 @@ def read_account(state_file: Path) -> ClaudeAccount | None:
 
 def worker_env(env: Mapping[str, str], scratch: Path) -> dict[str, str]:
     """The environment of a session: ``env`` without what would bill another than the plan or holds a secret it has no
-    need of, and with the folders of Dot's own state in ``scratch``."""
+    need of, kept from GitHub (:data:`_NO_GITHUB`), and with the folders of Dot's own state in ``scratch``."""
     kept: dict[str, str] = {
         name: value
         for name, value in env.items()
         if name not in _BILLING_NAMES
-        and (name in _GITHUB_NAMES or not name.upper().endswith(_SECRET_ENDS))
+        and not name.upper().endswith(_SECRET_ENDS)
         and name not in SCRATCH_NAMES
+        and name not in _DROPPED_NAMES
+        and not name.startswith("GIT_CONFIG_")
     }
     for name in SCRATCH_NAMES:
         kept[name] = str(scratch / name.removeprefix("DOT_").lower())
+    kept["GH_CONFIG_DIR"] = str(scratch / "gh")
+    kept.update(_NO_GITHUB)
     return kept
 
 
@@ -309,14 +335,19 @@ async def run_claude(
     try:
         async with asyncio.timeout(timeout_s):
             await process.wait()
+        # What the session left behind in its group (a server, a test worker) may hold the stream open: it ends here,
+        # so that the answer already given is read rather than waited past (the ninth review).
+        kill_group(process.pid)
+        async with asyncio.timeout(_STREAM_END_S):
             await reading
     except TimeoutError:
-        timed_out = True
+        timed_out = process.returncode is None
         kill_group(process.pid)
         await process.wait()
     finally:
+        # What the session started and left behind (a server, a watcher) ends with it, whatever ended the session.
+        kill_group(process.pid)
         if process.returncode is None:
-            kill_group(process.pid)
             with contextlib.suppress(ProcessLookupError):
                 await process.wait()
         reading.cancel()
@@ -342,3 +373,129 @@ def validated_window(raw: str) -> LimitWindow | None:
         return LimitWindow.model_validate_json(raw)
     except ValidationError:
         return None
+
+
+# ``claude -p /usage``: Claude Code's own report of the plan's windows, read locally with no model call (measured on the
+# owner's Mac, 2026-11-02: no turn, no cost; Codync reads it the same way). The empty strict MCP config keeps it from
+# starting every MCP server the owner set up.
+USAGE_ARGS: tuple[str, ...] = (
+    "-p",
+    "/usage",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--no-session-persistence",
+    "--strict-mcp-config",
+    "--mcp-config",
+    '{"mcpServers":{}}',
+)
+USAGE_TIMEOUT_S: float = 60.0
+
+
+class PlanWindow(FrozenModel):
+    """A window of the plan as ``/usage`` reports it: its kind (``session``, the five hours; ``weekly_all``;
+    ``weekly_scoped``, one model's week), how much of it is used (0 to 100), whether it applies now and when it
+    resets (epoch seconds, when said)."""
+
+    kind: str
+    percent: float
+    active: bool
+    resets_at: float | None
+
+
+class _Limit(BaseModel):
+    """One of ``usage_report.rate_limits.limits``, as Claude Code reports it (the fields Dot reads)."""
+
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    kind: str
+    percent: StrictInt | StrictFloat
+    is_active: bool | None = None
+    resets_at: str | None = None
+
+
+class _Rates(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    limits: list[_Limit]
+
+
+class _Report(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    rate_limits: _Rates
+
+
+class _UsageLine(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    usage_report: _Report
+
+
+def _resets(text: str | None) -> float | None:
+    if text is None:
+        return None
+    try:
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError:
+        return None
+
+
+def usage_of(lines: Iterable[str]) -> tuple[PlanWindow, ...]:
+    """The windows the ``usage_report`` of a ``/usage`` stream lists, read through its model (the eighth review): a
+    line that is no such report, or one shaped otherwise (``rate_limits`` missing or null), lists none."""
+    for line in lines:
+        try:
+            report: _UsageLine = _UsageLine.model_validate_json(line)
+        except ValidationError:
+            continue
+        return tuple(
+            PlanWindow(
+                kind=limit.kind,
+                percent=float(limit.percent),
+                active=limit.is_active is not False,
+                resets_at=_resets(limit.resets_at),
+            )
+            for limit in report.usage_report.rate_limits.limits
+        )
+    return ()
+
+
+def usage_room(windows: Iterable[PlanWindow], leave_room: float) -> bool:
+    """Whether every window that applies now is used less than ``leave_room`` (0 to 1) of it; a week of one model the
+    sessions do not use is not one."""
+    return all(window.percent < leave_room * 100.0 for window in windows if window.active)
+
+
+async def read_usage(binary: str, env: Mapping[str, str], cwd: Path) -> tuple[PlanWindow, ...]:
+    """The plan's windows by ``/usage``. Raises :class:`RepairError` when the program fails, takes longer than
+    :data:`USAGE_TIMEOUT_S` or reports none."""
+    try:
+        process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+            binary,
+            *USAGE_ARGS,
+            cwd=str(cwd),
+            env=dict(env),
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
+        )
+    except OSError as error:
+        raise RepairError("Claude Code's usage could not be read", {"binary": binary, "error": str(error)}) from error
+    try:
+        async with asyncio.timeout(USAGE_TIMEOUT_S):
+            out, err = await process.communicate()
+    except TimeoutError as error:
+        raise RepairError("Claude Code's usage took too long to read", {"binary": binary}) from error
+    finally:
+        kill_group(process.pid)
+        if process.returncode is None:
+            await asyncio.shield(process.wait())
+    windows: tuple[PlanWindow, ...] = usage_of(out.decode("utf-8", errors="replace").splitlines())
+    if not windows:
+        raise RepairError(
+            "Claude Code reported no usage",
+            {"code": process.returncode, "stderr": err.decode("utf-8", errors="replace")[-_STDERR_KEPT:]},
+        )
+    return windows

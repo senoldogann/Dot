@@ -69,6 +69,7 @@ from dotagent.server.routes_phone import phone_router
 from dotagent.server.routes_proactive import proactive_router
 from dotagent.server.routes_queue import queue_router
 from dotagent.server.routes_reactions import reactions_router
+from dotagent.server.routes_repair import repair_router
 from dotagent.server.routes_runs import runs_router
 from dotagent.server.routes_snapshots import snapshots_router
 from dotagent.server.routes_system import health_router, proof_router, system_router
@@ -221,6 +222,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(phone_router(ctx, phones))
     app.include_router(channels_router(ctx))
     app.include_router(snapshots_router(ctx))
+    app.include_router(repair_router(ctx))
     app.include_router(assistant_router(ctx))
     app.include_router(accounts_router(ctx))
     app.include_router(vault_router(ctx))

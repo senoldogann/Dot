@@ -40,6 +40,9 @@ from dotagent.mcp.catalogue import ServiceKind
 from dotagent.mcp.types import McpFailure
 from dotagent.notify.keys import keys_problem
 from dotagent.policy.types import ApprovalMode
+from dotagent.repair.claude import ClaudeAccount
+from dotagent.repair.night import RepairSession
+from dotagent.repair.problems import Problem
 from dotagent.scheduler import NightWork
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
@@ -2184,3 +2187,18 @@ class RulesUsage(FrozenModel):
     partial: bool
     rules: list[RuleUsage]
     problem: str | None
+
+
+class RepairView(FrozenModel):
+    """Settings › Self-repair (items 919-921): whether it is on (a repository to repair) and how it merges, the account
+    of ``claude`` signed in on this Mac (``None``: none), the book of problems, the sessions kept, the newest first,
+    and whether a night is under way."""
+
+    repo: str
+    time: str
+    merge: str
+    sessions_per_day: int
+    account: ClaudeAccount | None
+    problems: list[Problem]
+    sessions: list[RepairSession]
+    running: bool

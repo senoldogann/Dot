@@ -68,6 +68,8 @@ _NOT_DEFECT_WORDS: tuple[str, ...] = (
     "the text to replace was not found",
     "syntax error",
 )
+# The events of the daemon's log that are the repair night's own (items 919-921), never read as a problem.
+_OWN_EVENTS: tuple[str, ...] = ("repair_",)
 # The tools whose failure with an exit code or a time limit is the command's own, which the model wrote.
 _COMMAND_TOOLS: frozenset[str] = frozenset({"shell", "terminal_open", "terminal_send"})
 _COMMAND_ENDS: tuple[str, ...] = ("[exit ", "[timed out")
@@ -209,6 +211,22 @@ def with_problem(book: Book, problem: Problem) -> Book:
     )
 
 
+def released(book: Book) -> Book:
+    """``book`` with every problem left *being fixed* open again (the eighth review): a night starts only when none is
+    under way, so one still marked so was cut off with its daemon (a crash, a kill, the Mac shutting down), which no
+    cleanup of the night's own could undo. Its try stays counted."""
+    return book.model_copy(
+        update={
+            "problems": tuple(
+                problem.model_copy(update={"status": "open", "note": "Its session was cut off with Dot's daemon."})
+                if problem.status == "working"
+                else problem
+                for problem in book.problems
+            )
+        }
+    )
+
+
 def read_book(raw: str | None) -> Book:
     """The book kept as ``raw`` (``None``: none yet)."""
     return EMPTY_BOOK if raw is None else Book.model_validate_json(raw)
@@ -271,6 +289,9 @@ def log_sightings(lines: Iterable[str], since: float) -> list[Sighting]:
         if at < since:
             continue
         event: object = entry.get("event")
+        if isinstance(event, str) and event.startswith(_OWN_EVENTS):
+            # The repair night's own errors are never its problems: a session must not be handed its own guard.
+            continue
         error: object = entry.get("error") or entry.get("exception") or ""
         words: str = f"{event}: {error}" if error else str(event)
         if is_defect(str(error)):
