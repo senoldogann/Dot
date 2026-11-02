@@ -12,6 +12,7 @@ import os
 import stat
 import subprocess
 import sys
+import time
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -34,7 +35,9 @@ from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
-type Mode = Literal["pr", "no_fix", "limited", "rogue", "rename", "tamper", "busy", "tracked", "pulled", "rewound"]
+type Mode = Literal[
+    "pr", "no_fix", "limited", "rogue", "rename", "tamper", "busy", "tracked", "pulled", "rewound", "selfpush"
+]
 
 _REVIEW: str = "# Review\n\n## Always needs a human\n\n- `src/dotagent/policy/`\n- `src/dotagent/agent/review.py`\n"
 _GIT_ENV: dict[str, str] = {
@@ -109,6 +112,30 @@ elif mode == "rogue":
     # Past what its environment was meant to keep it from: straight to main (a local origin needs no sign-in).
     subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], check=True)
     answer = "Fixed.\\nREADY: fixed"
+elif mode == "selfahead":
+    # A commit of its own pushed to its branch by itself, then one more on top, for Dot's push to bring alone.
+    Path("sneak.txt").write_text("unreviewed\\n")
+    wrote("sneak.txt")
+    subprocess.run(["git", "add", "sneak.txt"], check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "Item 1: sneak"], check=True)
+    shown = subprocess.run(["git", "branch", "--show-current"], check=True, capture_output=True, text=True)
+    ref = "HEAD:refs/heads/" + shown.stdout.strip()
+    subprocess.run(["git", "push", "-q", "--no-verify", "origin", ref], check=True)
+    Path("fix.txt").write_text("fixed\\n")
+    wrote("fix.txt")
+    subprocess.run(["git", "add", "fix.txt"], check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
+    answer = "Fixed it.\\nREADY: fixed"
+elif mode == "selfpush":
+    Path("fix.txt").write_text("fixed\\n")
+    wrote("fix.txt")
+    subprocess.run(["git", "add", "fix.txt"], check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
+    # Past what its environment was meant to keep it from: its own branch to GitHub, no hook run on it.
+    shown = subprocess.run(["git", "branch", "--show-current"], check=True, capture_output=True, text=True)
+    branch = shown.stdout.strip()
+    subprocess.run(["git", "push", "-q", "--no-verify", "origin", "HEAD:refs/heads/" + branch], check=True)
+    answer = "Fixed it.\\nREADY: fixed"
 elif mode == "rewound":
     # A command of its own takes the owner's checkout back to an older commit of main: a fix of main's undone there.
     subprocess.run(["git", "-C", "../../..", "reset", "-q", "--hard", "HEAD~1"], check=True)
@@ -257,9 +284,24 @@ def _review_hook(hook: Path, review: Path) -> None:
         f'#!/bin/sh\n{where}{passed}if [ ! -e "{review}" ]; then\n'
         f'  touch "{review}"\n  mkdir -p .git/claude-review\n'
         f'  echo "Important: the fix has no test" > .git/claude-review/review.md\n'
-        f'  echo "{stop}" >&2\n  exit 1\nfi\nexit 0\n',
+        f'  echo "{stop}" >&2\n  exit 1\nfi\n'
+        'mkdir -p "$(git rev-parse --absolute-git-dir)/claude-review"\n'
+        'touch "$(git rev-parse --absolute-git-dir)/claude-review/$sha.pass"\nexit 0\n',
         encoding="utf-8",
     )
+    hook.chmod(0o755)
+
+
+# What the real hook does for a commit it passed: a mark of it in the git folder, which Dot reads after the push.
+_PASS_MARK: str = (
+    'while read _ sha _ _; do mkdir -p "$(git rev-parse --absolute-git-dir)/claude-review"; '
+    'touch "$(git rev-parse --absolute-git-dir)/claude-review/$sha.pass"; done\n'
+)
+
+
+def _passing_hook(hook: Path) -> None:
+    """A pre-push hook that passes every push and marks it, as the review hook does on a PASS."""
+    hook.write_text(f"#!/bin/sh\n{_PASS_MARK}exit 0\n", encoding="utf-8")
     hook.chmod(0o755)
 
 
@@ -305,6 +347,8 @@ def stand_ins(tmp_path: Path) -> Iterator[Path]:
     _git(repo, "add", "REVIEW.md", "scripts/next_item.py")
     _git(repo, "commit", "-q", "-m", "start")
     _git(repo, "push", "-q", "origin", "main")
+    # The repository's review hook, as one that passes every push (a test that needs another writes its own).
+    _passing_hook(repo / ".git" / "hooks" / "pre-push")
     yield folder
 
 
@@ -341,7 +385,7 @@ async def _night(
             Sighting(kind="daemon", words="schedule_start_failed: no such effort", evidence=f"line {n}", at=10.0 + n)
             for n in range(3)
         ]
-        book: Book = with_sightings(EMPTY_BOOK, seen, 20.0)
+        book: Book = with_sightings(EMPTY_BOOK, seen, 20.0, 0.0)
         await runtime.store.kv_set(BOOK_KEY, book.model_dump_json())
         restarts: list[str] = []
         try:
@@ -350,8 +394,12 @@ async def _night(
             await close_runtime(runtime)
 
 
+# A daemon that began after every commit of the test's repository: it runs the code its checkout holds (item 943).
+_FRESH: float = time.time() + 365 * 24 * 3600.0
+
+
 async def _play(
-    runtime: Runtime, restarts: list[str], switcher: Path | None = None
+    runtime: Runtime, restarts: list[str], switcher: Path | None = None, running_since: float = _FRESH
 ) -> tuple[tuple[RepairSession, ...], list[EventRecord]]:
     """A night, its sessions and what the owner was told. With ``switcher`` (the stand-ins' folder), the night's wait
     after a refused session plays the owner's switcher: another account is signed in, whose plan has room."""
@@ -369,7 +417,7 @@ async def _play(
 
     told: list[EventRecord] = []
     async with runtime.bus.subscribe_kinds(frozenset({OWNER_TOLD_EVENT})) as feed:
-        sessions = await repair_night(runtime, restart, lambda: 1_000_000.0, sleep)
+        sessions = await repair_night(runtime, restart, lambda: 1_000_000.0, sleep, running_since)
         told.extend(_drained(feed))
     return sessions, told
 
@@ -721,7 +769,7 @@ async def test_a_pull_request_found_merged_already_counts_fixed_and_the_night_go
             Sighting(kind="daemon", words="memory_failed: no such note", evidence=f"m {n}", at=30.0 + n)
             for n in range(3)
         ]
-        await runtime.store.kv_set(BOOK_KEY, with_sightings(book, other, 40.0).model_dump_json())
+        await runtime.store.kv_set(BOOK_KEY, with_sightings(book, other, 40.0, 0.0).model_dump_json())
         second, _ = await _play(runtime, restarts)
         assert second[0].end == "merged_unpulled" and second[0].note == "Second look: it was merged already"
         # The look asked for no restart: only a merge of the next session's does.
@@ -739,6 +787,33 @@ async def test_another_branchs_section_written_in_the_owners_git_config_does_not
     async with _night(login_env, stand_ins, "tracked", "on_pass") as (runtime, restarts):
         sessions, _ = await _play(runtime, restarts)
         assert [session.end for session in sessions] == ["merged"] and restarts == ["restart"]
+
+
+async def test_a_branch_the_session_pushed_itself_is_never_opened_nor_merged(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 943 (the review of 2026-11-02): a session that reached GitHub by a command of its own and pushed its branch
+    leaves Dot's push nothing to send, so the review hook never reviews it and git exits 0. A push is a passed review
+    only with the hook's mark of it: here none, so no pull request is opened and the session is the owner's."""
+    async with _night(login_env, stand_ins, "selfpush", "on_pass") as (runtime, restarts):
+        sessions, _ = await _play(runtime, restarts)
+        assert sessions[0].end == "needs_owner", [session.note for session in sessions]
+        # Read first where the branch stands on GitHub: not where Dot left it (nowhere), so Dot pushes nothing.
+        assert "not where Dot left it" in sessions[0].note and sessions[0].pr_url == ""
+        assert not (stand_ins / "merges").exists() and restarts == []
+
+
+async def test_a_night_in_a_process_older_than_its_checkouts_code_asks_for_the_restart_and_repairs_nothing(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 943 (the review of 2026-11-02): a merge's restart that gave up (a run waited for the owner for two hours)
+    left the daemon on the code before it. The next night works on no problem in it: it asks for the restart again and
+    tells the owner."""
+    async with _night(login_env, stand_ins, "pr", "on_pass") as (runtime, restarts):
+        sessions, told = await _play(runtime, restarts, None, 0.0)
+        assert sessions == () and restarts == ["restart"]
+        assert [event.data["title"] for event in told] == [night_module.RESTART_TITLE]
+        assert not (stand_ins / "calls.jsonl").exists()
 
 
 async def test_the_owners_pull_along_main_during_a_session_does_not_stop_it(
@@ -775,4 +850,17 @@ async def test_a_session_that_takes_the_owners_checkout_back_along_main_is_stopp
         sessions, _ = await _play(runtime, restarts)
         assert sessions[0].end == "main_moved", [session.note for session in sessions]
         assert "went to a commit that is not main's ahead of where it stood" in sessions[0].note
+        assert not (stand_ins / "merges").exists() and restarts == []
+
+
+async def test_a_branch_the_session_pushed_part_of_itself_is_never_opened_nor_merged(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 943, the pre-push review: a session pushed a commit of its own to its branch, then made one more. The hook
+    would review only what Dot's push brings on top and mark the head passed; the branch on GitHub is not where Dot
+    left it (nowhere), so nothing is pushed, opened or merged."""
+    async with _night(login_env, stand_ins, "selfahead", "on_pass") as (runtime, restarts):
+        sessions, _ = await _play(runtime, restarts)
+        assert sessions[0].end == "needs_owner", [session.note for session in sessions]
+        assert "not where Dot left it" in sessions[0].note and sessions[0].pr_url == ""
         assert not (stand_ins / "merges").exists() and restarts == []

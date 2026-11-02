@@ -36,7 +36,7 @@ from dotagent.proactive.brief import BriefFiring, is_brief, prepare, tell_brief
 from dotagent.proactive.checkin import is_checkin, prepare_checkin, tell_checkin
 from dotagent.proactive.initiative import Initiative
 from dotagent.repair.github import command
-from dotagent.repair.night import NIGHT_KEY, repair_night
+from dotagent.repair.night import NIGHT_KEY, PROCESS_STARTED_AT, repair_night
 from dotagent.runtime import Runtime
 from dotagent.scheduler import (
     SCHEDULE_MISSED_EVENT,
@@ -122,6 +122,13 @@ async def _emergency_stop_engaged() -> bool:
 def _chat_busy(error: DotError) -> bool:
     """Whether a firing's start was refused because a run works in the chat it goes on in (item 723)."""
     return isinstance(error, RunConflict) and "thread_id" in error.context
+
+
+def restart_argv(python: str) -> tuple[str, ...]:
+    """The command that asks for the daemon's restart once idle (item 943): with ``-P``, so that the folder it runs in
+    (the home folder, which a sandboxed run may write) is no place Python imports a module from, as the launchd jobs
+    and the harness's probes run (a ``~/dotagent/__main__.py`` a run left there would run instead of Dot)."""
+    return (python, "-P", "-m", "dotagent", "service", "restart", "--when-idle")
 
 
 class Scheduler:
@@ -392,7 +399,9 @@ class Scheduler:
     async def _repair(self) -> None:
         """Task body of the repair night, and the one place its errors end: logged, and the next night tries again."""
         try:
-            done = await repair_night(self._runtime, self._restart_when_idle, time.time, asyncio.sleep)
+            done = await repair_night(
+                self._runtime, self._restart_when_idle, time.time, asyncio.sleep, PROCESS_STARTED_AT
+            )
         except DotError as exc:
             log.error("repair_night_failed", error=exc.message, context=exc.context)
         except Exception:
@@ -404,11 +413,7 @@ class Scheduler:
         """Ask for the daemon's restart once no run works and none of the night's work is under way (the repair night
         merged a change into the owner's checkout): ``dotx service restart --when-idle``, as a change of Dot's code
         asks for it."""
-        await command(
-            (sys.executable, "-m", "dotagent", "service", "restart", "--when-idle"),
-            Path.home(),
-            self._runtime.shell_env,
-        )
+        await command(restart_argv(sys.executable), Path.home(), self._runtime.shell_env)
 
     async def _step_if_due(self, now: float) -> None:
         """Start the step of the harness (item 391) in a task when its daily time has passed since the last one (or the

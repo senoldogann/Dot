@@ -50,6 +50,7 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "channels/router.py:ChannelRouter._say_answer": (True,),
     "repair/night.py:_look": (True,),
     "repair/night.py:_work": (True,),
+    "repair/night.py:repair_night": (True,),
     "channels/service.py:Channels._seen": (True,),
     # A skill a model wrote, masked before it is written.
     "agent/playbooks.py:_write_reply": (True,),

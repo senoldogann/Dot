@@ -114,6 +114,9 @@ class Problem(FrozenModel):
     tries: int
     pr_url: str
     note: str
+    # When it was fixed or let go (item 943): what is seen of a fixed one before the code that holds its fix runs does
+    # not open it again; ``None`` for one kept before.
+    settled_at: float | None = None
 
 
 class Book(FrozenModel):
@@ -152,9 +155,20 @@ def _evidence(sighting: Sighting) -> str:
     return " ".join(sighting.evidence.split())[:EVIDENCE_CHARS]
 
 
-def with_sightings(book: Book, sightings: Sequence[Sighting], now: float) -> Book:
-    """``book`` with ``sightings`` counted in, read at ``now``. A problem fixed or let go that is seen after it was is
-    open again, with a note that says so; one being worked on or waiting on the owner keeps its status."""
+def fixed_again(problem: Problem, sighting: Sighting, running_since: float) -> bool:
+    """Whether ``sighting`` of the fixed ``problem`` says its fix did not hold (item 943): seen by the code that holds
+    the fix, a process that began (``running_since``) after it was fixed, and after that. What the code before it
+    logged, while the merge waited for a restart and through it, is no word on the fix. One fixed before item 943 kept
+    no time of it, and is read so from its last sighting before."""
+    settled: float = problem.last_at if problem.settled_at is None else problem.settled_at
+    return running_since > settled and sighting.at > running_since
+
+
+def with_sightings(book: Book, sightings: Sequence[Sighting], now: float, running_since: float) -> Book:
+    """``book`` with ``sightings`` counted in, read at ``now`` by a process that began at ``running_since``. A fixed
+    problem is open again, with a note that says so, when the code that holds its fix sees it (:func:`fixed_again`);
+    one let go stays let go (item 943: a session found it no defect of Dot's, and seeing it again says nothing new); one
+    being worked on or waiting on the owner keeps its status."""
     found: dict[str, Problem] = {problem.id: problem for problem in book.problems}
     for sighting in sorted(sightings, key=lambda seen: seen.at):
         title: str = normalized(sighting.words)
@@ -178,7 +192,7 @@ def with_sightings(book: Book, sightings: Sequence[Sighting], now: float) -> Boo
                 note="",
             )
             continue
-        back: bool = before.status in ("fixed", "declined") and sighting.at > before.last_at
+        back: bool = before.status == "fixed" and fixed_again(before, sighting, running_since)
         found[key] = before.model_copy(
             update={
                 "evidence": tuple(dict.fromkeys((*before.evidence, line)))[-EVIDENCE_KEPT:],

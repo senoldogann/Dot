@@ -50,8 +50,11 @@ Some failures do not count, because they are the run's own doing, the world's, o
   week had ended on a step the owner had not approved.
 
 Two sightings of one defect are one problem. Dot compares the words with ids, numbers, quoted words, paths and addresses
-taken out. A problem keeps its newest five lines of evidence. A fixed problem that is seen again opens again: the fix
-did not hold. The book keeps 200 problems at most (kv `repair.book`).
+taken out. A problem keeps its newest five lines of evidence; its words and evidence are masked of the secrets Dot
+holds before its title is made, as a title's numbers are written `<n>` (item 943). A fixed problem that is seen again
+by the code that holds its fix (a daemon that began after it was fixed, seen after that) opens again: the fix did not
+hold; what the code before it logged meanwhile does not (item 943). One let go stays let go. The book keeps 200
+problems at most (kv `repair.book`).
 
 A problem is handed out once it was seen `least_seen` times (2), the most seen first. It gets two sessions at most;
 after that it waits for you.
@@ -129,13 +132,16 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
     after it;
   - what Dot installs and runs with: `pyproject.toml`, `uv.lock`, the `package.json` and `package-lock.json` files and
     the desktop app's `Cargo.toml` and `Cargo.lock`, so that a dependency changed by its lock alone is yours to take.
-- **Review.** Dot pushes the session's commit through the repository's pre-push hook, from your checkout of Dot,
-  never from the session's: the hook's reviewer reads REVIEW.md, CLAUDE.md and its settings from the folder it runs
-  in, and its base from `origin/main`, which a session could have changed in its own checkout and in the refs all
-  checkouts share. Your checkout is the one Dot's print guards, `main` is fetched first, and a mark of a passed
-  review for that commit is removed (the hook skips a commit it holds one for), so that only the hook's own review
-  passes it. When the hook stops the push, its review goes back to the same
-  session (`--resume`), fenced as a finding, and Dot pushes the session's next commit. A push is given half an hour.
+- **Review.** Dot pushes the session's commit through the repository's pre-push hook, from your checkout of Dot, never
+  from the session's: the hook's reviewer reads REVIEW.md, CLAUDE.md and its settings from the folder it runs in, and
+  its base from `origin/main`, which a session could have changed in its own checkout and in the refs all checkouts
+  share. Your checkout is the one Dot's print guards, `main` is fetched first, and a mark of a passed review for that
+  commit is removed (the hook skips a commit it holds one for), so that only the hook's own review passes it. Before
+  each push Dot reads where the branch stands on GitHub, which must be where Dot left it (nowhere before its first
+  push): a session that pushed to it itself, which would have the hook review only what comes after, pushes nothing; and
+  a push that goes through without the hook's mark of that commit (a hooks path set elsewhere) opens no pull request.
+  Either is yours (*Needs you*, item 943). When the hook stops the push, its review goes back to the same session
+  (`--resume`), fenced as a finding, and Dot pushes the session's next commit. A push is given half an hour.
 - **The pull request.** Its title is the commit's subject (`Item <n>: ...`). Its body holds the commits and says it
   came from the self-repair, with the problem and the session.
 - **Checks.** Dot waits for the checks for `checks_minutes` at most (45), looking every minute. The failed ones go back
@@ -148,8 +154,10 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
     failure is read back from GitHub: merged is merged. Dot then deletes the branch on GitHub and, once the checkout is
     gone, here. If your checkout (`repo`) is
     on main, Dot pulls it fast-forward only. The night then ends, and Dot asks for its own restart once it is idle
-    (`dotx service restart --when-idle`). It does not go on in a process whose code on disk has changed, and the next
-    night takes the next problem.
+    (`dotx service restart --when-idle`, run with `python -P`, item 943). It does not go on in a process whose code
+    on disk has changed, and the next night takes the next problem. A restart that gave up (a run waited for you two
+    hours) leaves the daemon on the code before: the next night then repairs nothing, asks for the restart again and
+    tells you (*Dot waits to restart on new code*, item 943).
   - `merge = "ask"` (the default): the pull request waits for you.
 - **Cleanup.** The checkout is removed afterwards. Its branch stays when it has a pull request, or commits that wait
   for you (the session asked for you, or the review still stopped it); otherwise it is deleted.

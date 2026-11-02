@@ -63,11 +63,13 @@ from dotagent.repair.claude import (
 )
 from dotagent.repair.github import (
     Check,
+    UnreviewedPush,
     all_passed,
     along_main,
     branch_commits,
     branch_files,
     branch_items,
+    checkout_committed_at,
     checkout_print,
     drop_branch,
     drop_checkout,
@@ -97,6 +99,7 @@ from dotagent.repair.problems import (
     Book,
     Problem,
     ProblemStatus,
+    Sighting,
     next_problem,
     read_book,
     released,
@@ -126,6 +129,9 @@ type SessionEnd = Literal[
     "out_of_time",
 ]
 
+# When this process began, as near as it is known: the night runs in the daemon, which imports this module as it starts
+# its scheduler (``repair_night``'s ``running_since``, item 943).
+PROCESS_STARTED_AT: float = time.time()
 # The keys of the kv table: the sessions kept, and the plan's window as the last session saw it.
 SESSIONS_KEY: str = "repair.sessions"
 LIMIT_KEY: str = "repair.limit"
@@ -190,6 +196,7 @@ LOG_NAME: str = "dotx.log"
 FIXED_TITLE: str = "Dot fixed a problem of its own"
 READY_TITLE: str = "A fix of Dot's own is ready"
 NEEDS_YOU_TITLE: str = "A fix of Dot's own needs you"
+RESTART_TITLE: str = "Dot waits to restart on new code"
 _PAGE: str = "#/settings/repair"
 # The words of the last line of a session's answer.
 _READY: str = "READY:"
@@ -521,7 +528,10 @@ def problem_after(problem: Problem, session: RepairSession) -> Problem:
         # Its sessions are spent: it is the owner's now, and the page says so.
         status = "waiting"
         note = f"Tried {problem.tries} times; the last: {note}"[:_TAIL_CHARS]
-    return problem.model_copy(update={"status": status, "pr_url": session.pr_url or problem.pr_url, "note": note})
+    settled: float | None = session.ended_at if status in ("fixed", "declined") else problem.settled_at
+    return problem.model_copy(
+        update={"status": status, "pr_url": session.pr_url or problem.pr_url, "note": note, "settled_at": settled}
+    )
 
 
 class Night(FrozenModel):
@@ -711,7 +721,11 @@ async def _work(
                         raise _NightOver("the night's time is spent before a push", {})
                     # Pushed from the owner's checkout, never the session's, through the hook's own review.
                     await waiting("review")
-                    review: str | None = await push_branch(night.repo, head, branch, night.env)
+                    try:
+                        review: str | None = await push_branch(night.repo, head, branch, pushed or None, night.env)
+                    except UnreviewedPush as unreviewed:
+                        # Never opened nor merged: what reached GitHub is the owner's to look at (item 943).
+                        return ended("needs_owner", unreviewed.message)
                     if review is not None:
                         if spent.rounds >= config.rounds:
                             return ended(
@@ -947,9 +961,11 @@ async def _look(
     return _Looked(session=session, merged_before=looked.end == "merged_before")
 
 
-async def repair_night(runtime: Runtime, restart: Restart, clock: Clock, sleep: Sleep) -> tuple[RepairSession, ...]:
-    """One night of repairs (see the module): the sessions it ran. Raises :class:`RepairError` when ``[repair] repo``
-    is no git checkout."""
+async def repair_night(
+    runtime: Runtime, restart: Restart, clock: Clock, sleep: Sleep, running_since: float
+) -> tuple[RepairSession, ...]:
+    """One night of repairs (see the module), in a process that began at ``running_since``: the sessions it ran.
+    Raises :class:`RepairError` when ``[repair] repo`` is no git checkout."""
     config = runtime.config.repair
     repo: Path | None = await asyncio.to_thread(_checkout_of, config.repo)
     if repo is None:
@@ -958,9 +974,31 @@ async def repair_night(runtime: Runtime, restart: Restart, clock: Clock, sleep: 
     now: float = clock()
     book: Book = released(read_book(await store.kv_get(BOOK_KEY)))
     since: float = book.looked_at if book.looked_at is not None else now - FIRST_LOOK_S
-    book = with_sightings(book, await sightings_since(store, since, log_dir() / LOG_NAME), now)
+    # Masked before a title is made of them (item 943): a title's numbers are written <n>, after which a secret with
+    # digits is no longer known by its words, and a title reaches the page, the push and Claude Code's brief.
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+    sightings: list[Sighting] = [
+        sighting.model_copy(
+            update={"words": redact_known(sighting.words, known), "evidence": redact_known(sighting.evidence, known)}
+        )
+        for sighting in await sightings_since(store, since, log_dir() / LOG_NAME)
+    ]
+    book = with_sightings(book, sightings, now, running_since)
     await store.kv_set(BOOK_KEY, book.model_dump_json())
     night: Night = Night(repo=repo, env=dict(runtime.shell_env), worker=await read_worker(store))
+    # A process older than the code its checkout holds (a merge whose restart gave up while a run waited for the owner,
+    # item 943) works on no problem: it asks for the restart again and tells the owner, rather than go on in it.
+    if await checkout_committed_at(night.repo, night.env) > running_since:
+        log.warning("repair_waits_for_restart", running_since=running_since)
+        await tell_owner(
+            runtime.bus,
+            RESTART_TITLE,
+            "The code in your checkout of Dot is newer than the code Dot runs (a fix merged, or a pull or commit of "
+            "yours), so no repair starts tonight; Dot restarts once no task works.",
+            _PAGE,
+        )
+        await restart()
+        return ()
     kept: tuple[RepairSession, ...] = read_sessions(await store.kv_get(SESSIONS_KEY))
     done: list[RepairSession] = []
     deadline: float = now + NIGHT_LIMIT_S

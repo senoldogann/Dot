@@ -235,19 +235,32 @@ async def head_of(folder: Path, env: Mapping[str, str]) -> str:
     return (await command(("git", "-C", str(folder), "rev-parse", "HEAD"), folder, env)).strip()
 
 
-async def push_branch(repo: Path, head: str, branch: str, env: Mapping[str, str]) -> str | None:
+async def push_branch(repo: Path, head: str, branch: str, pushed: str | None, env: Mapping[str, str]) -> str | None:
     """Push the commit ``head`` as ``branch`` from the owner's checkout at ``repo``, never from the session's, through
     the repository's pre-push hook (the tenth review of item 921): the hook reads its instructions and its settings from
     the folder it runs in, and its base from ``origin/main``, which a session could have left changed in its own
     checkout and in the refs all checkouts share. The owner's checkout is the one Dot's print guards; ``main`` is
     fetched first, and a mark of a passed review for ``head`` is removed, so that only the hook's own review passes it.
-    Gives ``None`` once it is pushed, or the review the hook wrote when it stopped the push (its BLOCK), for the session
-    to answer. Raises :class:`RepairError` for any other failure."""
+    ``pushed`` is the commit Dot last pushed there, ``None`` before its first push. Gives ``None`` once it is pushed
+    with the hook's mark of a passed review, or the review the hook wrote when it
+    stopped the push (its BLOCK), for the session to answer. Raises :class:`UnreviewedPush` for a push that went through
+    with no such mark, and :class:`RepairError` for any other failure."""
     await command(("git", "-C", str(repo), "fetch", "--quiet", "origin", "main"), repo, env)
+    # The branch on GitHub must stand where Dot left it: nowhere before Dot's first push, at ``pushed`` after (item
+    # 943, the pre-push review). A session that pushed a commit of its own there would have the hook review only what
+    # came after it, and mark the head passed.
+    listed: str = await command(("git", "-C", str(repo), "ls-remote", "origin", f"refs/heads/{branch}"), repo, env)
+    remote: str | None = listed.split()[0] if listed.split() else None
+    if remote != pushed:
+        raise UnreviewedPush(
+            "the branch on GitHub is not where Dot left it: the session may have pushed to it itself",
+            {"branch": branch, "on_github": remote, "pushed_by_dot": pushed},
+        )
     git_dir: str = (await command(("git", "-C", str(repo), "rev-parse", "--absolute-git-dir"), repo, env)).strip()
     await asyncio.to_thread((Path(git_dir) / "claude-review" / f"{head}.pass").unlink, True)
     # No ``-u``: an upstream would be written in the git config the print guards.
     argv: tuple[str, ...] = ("git", "-C", str(repo), "push", "origin", f"{head}:refs/heads/{branch}")
+    mark: Path = Path(git_dir) / "claude-review" / f"{head}.pass"
     try:
         await command_within(argv, repo, env, PUSH_TIMEOUT_S)
     except RepairError as error:
@@ -264,7 +277,19 @@ async def push_branch(repo: Path, head: str, branch: str, env: Mapping[str, str]
             raise RepairError(
                 "the review hook stopped the push and its review cannot be read", {"path": str(review)}
             ) from missing
+    # A push that went through is a passed review only with the hook's own mark of it (item 943, the review of
+    # 2026-11-02): a branch the session pushed itself leaves Dot's push nothing to send, and a hooks path it set in the
+    # owner's global git config runs no hook; either way git exits 0 and nothing was reviewed.
+    if not await asyncio.to_thread(mark.exists):
+        raise UnreviewedPush(
+            "the push went through with no review of the hook's: the branch may have been pushed by the session itself",
+            {"branch": branch, "head": head},
+        )
     return None
+
+
+class UnreviewedPush(RepairError):
+    """A push of a session's branch that went through without the review hook's mark of a passed review."""
 
 
 async def open_pr(folder: Path, branch: str, title: str, body: str, env: Mapping[str, str]) -> str:
@@ -588,6 +613,12 @@ async def along_main(repo: Path, before: str, after: str, env: Mapping[str, str]
     main: str = await main_on_github(repo, env)
     await command(("git", "-C", str(repo), "fetch", "--quiet", "origin", "main"), repo, env)
     return await is_ancestor(repo, before, after, env) and await is_ancestor(repo, after, main, env)
+
+
+async def checkout_committed_at(repo: Path, env: Mapping[str, str]) -> float:
+    """When the commit the owner's checkout at ``repo`` stands on was made (epoch seconds; item 943)."""
+    out: str = await command(("git", "-C", str(repo), "log", "-1", "--format=%ct"), repo, env)
+    return float(out.strip())
 
 
 async def checkout_print(repo: Path, env: Mapping[str, str]) -> str:

@@ -147,7 +147,7 @@ async def test_on_it_shows_the_problems_their_fixes_and_the_sessions(
             for number, name in enumerate(("alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf"), 1)
         ),
     ]
-    book = with_sightings(EMPTY_BOOK, seen, now)
+    book = with_sightings(EMPTY_BOOK, seen, now, 0.0)
     fixed = next(problem for problem in book.problems if problem.kind == "daemon")
     waited = next(problem for problem in book.problems if problem.title.startswith("browser_open"))
     book = with_problem(book, fixed.model_copy(update={"status": "fixed", "pr_url": PR}))
