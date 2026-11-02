@@ -108,6 +108,7 @@ from dotagent.tools.objectives import build_objective_tools
 from dotagent.tools.office import build_office_tools
 from dotagent.tools.pages import build_page_tools
 from dotagent.tools.posts import build_post_tools
+from dotagent.tools.recall import build_recall_tools
 from dotagent.tools.recon import build_recon_tool
 from dotagent.tools.registry import ToolRegistry, build_registry
 from dotagent.tools.schedule import build_schedule_tools
@@ -268,6 +269,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_team_tools(),
         build_work_order_tools(),
         build_office_tools(),
+        build_recall_tools(),
         build_consult_tools(),
         (build_recon_tool(), build_security_tool()),
         build_meta_tools(),

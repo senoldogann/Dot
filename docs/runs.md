@@ -74,9 +74,13 @@ is the answer (a small model that is offered both writes the call out as text).
   facts under the side panel's More count them and say how many checks flagged something (item 260), and the Cost panel
   keeps the summaries' share. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
-  paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
-  check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
-  ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
+  paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), the
+  ids of Dot's own records the run's calls and their results named (a run, a chat, a thing on Dot's list, a work order,
+  a schedule, an approval, an objective; the newest 60, item 924), each of which `recall` reads back with the ids next
+  to it (the chat of a run, the runs of a chat, the run of a thing to do), so that a run that comes back to old work
+  recalls it step by step rather than from a summary that lost it (`recall` fences what a run that read outside content
+  wrote and marks the reader untrusted); and a check lists names, paths and links in the summary that the conversation
+  never had (an address cut short, with the ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
   it; a name the summary abbreviates itself, with an ellipsis inside it or a `<placeholder>`, is not looked up). The
   `compacted` event names the model,
   how the summary came about, the attempts it took, what the check found and the estimated size of the prompt before
@@ -503,7 +507,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
-| Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools` |
+| Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools`, `recall` (a record a compaction named, read back, item 924) |
 | Team            | `create_agent`, `create_team` (a team of agents, item 864), `message_agent`, `assign_work`, `work_orders`, `review_work` (work orders the agents work on without the lead waiting, item 907) |
 | Office          | `agents_now`, `read_agent_chat` (what the other agents do now and one's chat, item 890)                            |
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |

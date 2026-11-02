@@ -309,6 +309,7 @@ from dotagent.tools.meta import (
 from dotagent.tools.objectives import OBJECTIVE_TOOLS
 from dotagent.tools.office import AGENTS_NOW_TOOL, READ_AGENT_CHAT_TOOL
 from dotagent.tools.posts import POST_TOOLS
+from dotagent.tools.recall import RECALL_TOOL
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import skill_instructions
 from dotagent.tools.team import CREATE_AGENT_TOOL, CREATE_TEAM_TOOL, MESSAGE_AGENT_TOOL
@@ -337,6 +338,8 @@ AGENT_CORE_TOOLS: tuple[str, ...] = (
     REACT_TOOL,
     AGENTS_NOW_TOOL,
     READ_AGENT_CHAT_TOOL,
+    # The ids a compaction note names are read back with it (item 924), whatever tools the agent's role names.
+    RECALL_TOOL,
 )
 # A delegated run asks the owner nothing, a secret neither (item 857): its parent asks, in its own chat.
 _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(

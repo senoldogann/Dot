@@ -32,6 +32,10 @@ _BOOKKEEPING_TOOLS: frozenset[str] = frozenset({"update_plan", "mark_plan_step",
 _TOUCH_KEYS: frozenset[str] = frozenset({"path", "paths", "url", "cwd", "file", "destination"})
 _LEDGER_ACTIONS: int = 40
 _LEDGER_TOUCHED: int = 60
+# How many of the ids a run named the ledger keeps, the newest (item 924), and the tool that reads one back
+# (:data:`dotagent.tools.recall.RECALL_TOOL`, named here to keep this module pure).
+_LEDGER_NAMED: int = 60
+_RECALL: str = "recall"
 _LEDGER_INSTRUCTIONS: int = 20
 _ACTION_ARGS_CHARS: int = 160
 _ACTION_RESULT_CHARS: int = 160
@@ -42,8 +46,11 @@ _IDENTIFIERS_SHOWN: int = 12
 _IDENTIFIER: re.Pattern[str] = re.compile(
     r"https?://[^\s)\]>\"'`]+"  # addresses
     r"|(?:~|/Users|/tmp|/private|/var|/opt|/Applications|/Library)(?:/[\w.@+\-]+)+"  # absolute paths
-    r"|\b(?:run|thr|mem|sch|apv|rule)_[a-z0-9]{6,}_[a-z0-9]{4,}\b"  # Dot's own ids
+    r"|\b(?:run|thr|mem|sch|apr|rul|todo|wo|obj|agt|cmp|team)_[a-z0-9]{6,}_[a-z0-9]{4,}\b"  # Dot's own ids
 )
+# The ids of Dot's own records a run names, which a compaction note keeps for :data:`_RECALL` (item 924): those
+# the recall tool reads back. The prefixes are :func:`dotagent.core.ids.new_id`'s.
+_DOT_ID: re.Pattern[str] = re.compile(r"\b(?:run|thr|todo|wo|sch|apr|obj)_[a-z0-9]{6,}_[a-z0-9]{4,}\b")
 # The ellipsis is the mark Dot's own renderings leave on a value they cut (the pinned actions, a page's text), which
 # a summary copies as it is.
 _TRAILING_PUNCTUATION: str = ".,;:!?…"
@@ -76,6 +83,9 @@ class RunLedger(FrozenModel):
     action_count: int
     touched: tuple[str, ...]
     compactions: int
+    # The ids of Dot's own records the run's calls and their results named, oldest first (item 924): a compaction note
+    # lists them, so that the run can read each back with the recall tool rather than lose it to the summary.
+    named: tuple[str, ...] = ()
 
 
 class ContinuityCheck(FrozenModel):
@@ -136,11 +146,18 @@ def with_actions(ledger: RunLedger, done: Sequence[tuple[ToolCall, bool, str]]) 
     for call, succeeded, _ in work:
         if succeeded:
             touched.update(dict.fromkeys(_touched_values(call)))
+    # An id named again moves to the newest end, so that the ids still at work are the ones kept.
+    named: dict[str, None] = dict.fromkeys(ledger.named)
+    for call, _, text in work:
+        for found in _DOT_ID.findall(f"{dumps_compact(call.arguments)}\n{text}"):
+            named.pop(found, None)
+            named[found] = None
     return ledger.model_copy(
         update={
             "actions": (*ledger.actions, *actions)[-_LEDGER_ACTIONS:],
             "action_count": ledger.action_count + len(actions),
             "touched": tuple(touched)[-_LEDGER_TOUCHED:],
+            "named": tuple(named)[-_LEDGER_NAMED:],
         }
     )
 
@@ -315,8 +332,11 @@ def render_pinned(ledger: RunLedger, plan: PlanPayload, max_chars: int) -> str:
     sections: list[str] = _task_sections(ledger, plan)
     room: int = max_chars - len("\n".join(sections))
     touched: list[str] = _newest_fitting([f"- {item}" for item in ledger.touched], room // 3)
+    # The ids the run named (item 924) take up to a sixth of the room, out of what the actions would have.
+    named: list[str] = _newest_fitting(list(ledger.named), room // 6)
     actions: list[str] = _newest_fitting(
-        [_action_line(action) for action in ledger.actions], room - len("\n".join(touched))
+        [_action_line(action) for action in ledger.actions],
+        room - len("\n".join(touched)) - len(", ".join(named)),
     )
     if ledger.actions:
         unlisted: str = _unlisted(ledger.action_count - len(actions))
@@ -325,6 +345,10 @@ def render_pinned(ledger: RunLedger, plan: PlanPayload, max_chars: int) -> str:
     if ledger.touched:
         sections.append(f"## Files and addresses touched so far{_unlisted(len(ledger.touched) - len(touched))}")
         sections.extend(touched)
+    if named:
+        # The ids the run named, on one line: each can be read back with recall, with the ids next to it.
+        sections.append(f"## Ids of Dot's records named so far, newest last (read one back with {_RECALL})")
+        sections.append(", ".join(named))
     return "\n".join(sections)
 
 
