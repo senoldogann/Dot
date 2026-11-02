@@ -231,7 +231,7 @@ decides, which is what `yolo` means (item 443); `[initiative] approvals` set to 
 first.
 
 But in a chat Dot opened on its own initiative, three steps wait for you in every mode, `yolo` and `auto` too (item
-850, your word of 2026-10-30):
+850, your word of 2026-10-30), unless free mode is on (item 922, [Safety](safety.md#safety)):
 - a message sent for you: an email, a chat or text message, a reply;
 - a post in your name;
 - a project's change put live: a deploy to production, a pull request merged, a push that names the main branch
@@ -241,10 +241,19 @@ This holds for every run of that chat, as the owner's answers in it start runs t
 - The question is yours alone: the review model never answers it, and a rule of yours that allows the step does not
   answer it either.
 - Its card shows the step as the policy reads it, and your yes is for that step.
-- Nobody watches the run. Its question waits for you while the run waits, and one nobody answers in time is a
-  refusal, after which the run goes on with the rest. With `[policy] unanswered = "park"` a release is kept for you in
-  its chat (item 482). A message or a post never is, since a yes given later never covers a step that reaches other
-  people (item 483).
+- Nobody watches Dot's own run, so it does not wait (item 922): the step is kept for you as a card in its chat, for 30
+  days, and the run is told to keep its draft as it is to go out (a mail saved in Drafts, a post or a release left
+  ready), to go on with the rest and to say where the draft is. The same step again is that card (one step of a kind
+  waits in a chat at a time but for a command or a script, as its references change). Your yes on the card starts a run
+  in that chat, or reaches the one at work there, which then asks you before such a step rather than keep it. That run
+  may do the step exactly as the card showed it, once and in that run only, for a command of the shell or an
+  application's script. Any other step (a Send button of a page, a terminal's line, an MCP call) is never met again as
+  the card showed it, so there your yes has the run open the draft, and the step itself asks you once more; so does any
+  other send. The yes binds the command as the card showed it, not the files it reads: a command that sends a file of
+  the workspace sends it as it is when you say yes. Skip refuses it until you write there. Past 20 cards waiting in a
+  chat (or the chats of one schedule) and 50 in all, a send is not kept but refused, its draft kept, and the run says
+  so. A run of yours in that chat (your answer to it) asks you, and a send of it you do not answer in time is kept as a
+  card too.
 
 In `yolo` your own chats ask you before a payment, a message or mail sent for you and a public post (item 860); in a
 schedule's run in one of your chats the review model judges a message or a post, and a payment is handed to you; a

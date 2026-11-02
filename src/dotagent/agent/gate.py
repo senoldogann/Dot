@@ -4,16 +4,23 @@ approval modes answers the policy's questions without the user."""
 import asyncio
 import time
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 from dotagent.agent.approvals import TIMEOUT_DECIDER, ApprovalBroker, ApprovalOutcome, Kept
 from dotagent.agent.authorization import Answerer, Authorization, step_decision
 from dotagent.agent.declined import OWNER_DECIDERS, Declined, declined_key, refusal_text, still_declined
 from dotagent.agent.parking import (
+    EXACT_KEY,
+    KEPT_SEND_KEY,
     PERMIT_DECIDER,
+    SEND_FLAGS,
+    SEND_KEEP_S,
+    UNKEPT_SOURCES,
     Parking,
     kept_ask_text,
     kept_digest,
+    kept_send_digest,
+    kept_send_text,
     kept_text,
     permit_parkable,
     skipped_text,
@@ -141,7 +148,8 @@ def _rejection(outcome: ApprovalOutcome) -> str:
 class SiteLocks:
     """The locks the gates of all runs share, per site: one for its pace and one for its spending. Whether a public
     action or a payment may go ahead depends on what the other runs did on the site, so the gates read that, decide
-    and record the action one at a time; a decision that waits for the user holds the next one on the same site."""
+    and record the action one at a time; a payment's question holds the next one on the same site, and a public
+    action's question is asked outside the pace lock (item 922)."""
 
     def __init__(self) -> None:
         self._pace: dict[str, asyncio.Lock] = {}
@@ -234,6 +242,11 @@ class RunGate:
         # question ends as a refusal; and whether the owner left one unanswered since they last wrote, so that the
         # run's next hand-offs are kept at once rather than waited for again.
         self._parking: Parking | None = None
+        # Where the sends of a chat of Dot's own initiative are kept for the owner's yes (item 922), and the ones their
+        # yes lets through in this run, once each.
+        self._send_parking: Parking | None = None
+        self._sends_allowed: frozenset[str] = frozenset()
+        self._owner_answers_sends: bool = False
         self._owner_away: bool = False
 
     @property
@@ -303,6 +316,16 @@ class RunGate:
         them there too (item 485)."""
         return self._parking
 
+    @property
+    def send_parking(self) -> Parking | None:
+        """Where this run keeps the sends of a chat of Dot's own initiative for the owner's yes (item 922)."""
+        return self._send_parking
+
+    def keep_sends_for(self, parking: Parking | None) -> None:
+        """Keep the sends of a chat of Dot's own initiative for the owner's yes where ``parking`` says (item 922), and
+        let a yes given to one through there; None for a run of any other chat."""
+        self._send_parking = parking
+
     def keep_for(self, parking: Parking | None) -> None:
         """Keep the steps the run hands to the owner that nobody answers in time, as ``parking`` says (item 482); None
         refuses them as before."""
@@ -343,7 +366,7 @@ class RunGate:
         # on the same site would wait for it (item 525).
         # A step the run's mode refuses anyway (a research run's change) is not put to the review model first.
         if (
-            self._approval_mode == "yolo"
+            self._mode_now() == "yolo"
             and self._taint_check
             and self.tainted
             and checked_when_tainted(info)
@@ -353,20 +376,36 @@ class RunGate:
         paced: PacedAction | None = paced_action(info)
         if paced is None:
             return await self._decide(info, weighed)
+        # The pace is read before the step is decided, so that the owner is not asked about a step the pace refuses,
+        # and decided outside the site's lock (item 922): a question waits as long as the owner takes, and the other
+        # runs' steps on the site must not wait for it. Under the lock the pace is read again, the step spaced and
+        # counted, one at a time: a pace the other runs filled meanwhile refuses it, the owner's yes notwithstanding.
+        # A paced step is one of a page, which a kept send's yes never lets through (:func:`kept_send_digest`), so no
+        # such yes is spent on a step the pace then refuses.
+        await self._keep_pace(info, paced, "")
+        authorized: Authorization = await self._decide(info, weighed)
+        # A step the pace refuses here was recorded as let through by its decision; the refusal's policy event follows
+        # that record, and the run is told it did not happen.
         async with self._locks.pace(paced.host):
-            await self._keep_pace(info, paced)
-            authorized: Authorization = await self._decide(info, weighed)
+            await self._keep_pace(
+                info,
+                paced,
+                "it was let through, but other runs filled the site's pace while it was decided, so it did "
+                "not happen: ",
+            )
             await self._space(paced)
             await self._store.record_paced_action(paced.host, paced.pace, time.time(), self._run_id)
         return authorized
 
-    async def _keep_pace(self, info: ActionInfo, paced: PacedAction) -> None:
-        """Refuse the action when its site had as many of its class as the pace allows in the last hour or day."""
+    async def _keep_pace(self, info: ActionInfo, paced: PacedAction, lead: str) -> None:
+        """Refuse the action when its site had as many of its class as the pace allows in the last hour or day; ``lead``
+        goes before the reason (the read after the step was decided says so, item 922)."""
         now: float = time.time()
         times: list[float] = await self._store.paced_times(paced.host, paced.pace, now - DAY_S)
-        refusal: str | None = pace_refusal(self._pace, paced, times, now)
-        if refusal is None:
+        found: str | None = pace_refusal(self._pace, paced, times, now)
+        if found is None:
             return
+        refusal: str = f"{lead}{found}"
         decision: Decision = Decision(verdict="deny", source="pace", reason=refusal, rule_id=None)
         shown, said = await _shown(info, decision)
         # A refusal before the policy weighs the step: the run's taint as it stands.
@@ -381,6 +420,11 @@ class RunGate:
         if wait > 0:
             log.info("pace_wait", run_id=self._run_id, host=paced.host, seconds=round(wait, 1))
             await asyncio.sleep(wait)
+
+    def _mode_now(self) -> ApprovalMode:
+        """The approval mode a step is decided in: the run's own, or yolo while the owner's free mode is on (item 922),
+        which asks nothing, from the next step on."""
+        return "yolo" if self._approvals.free else self._approval_mode
 
     async def _decide(self, info: ActionInfo, weighed: ActionInfo | None) -> Authorization:
         """What the policy says and who answers its question: the action goes through, or the call raises. A payment
@@ -398,7 +442,7 @@ class RunGate:
         # The taint the policy weighs, kept with the step's record (item 474).
         tainted: bool = self.tainted
         decided: Decision = decide(info, self._mode, tainted, self._preset, rules, allowance, weighed)
-        if self._approval_mode == "yolo" and decided.source == "auto_review":
+        if self._mode_now() == "yolo" and decided.source == "auto_review":
             # What the always-on review refuses in every other mode, a yolo run does without asking: the layers
             # after the review still judge the step, and a refusal among them stands (item 443).
             rest: Decision = decide_past_review(info, self._mode, tainted, self._preset, rules, allowance, weighed)
@@ -411,14 +455,23 @@ class RunGate:
                 # A step that both reads a secret and hands money over is waived for both: its record says what each
                 # would have asked (item 443).
                 decided = rest.model_copy(update={"reason": f"{rest.reason}; also {review.reason}"})
-        decision: Decision = supervised(decided, info) if self._approval_mode == "supervised" else decided
+        decision: Decision = supervised(decided, info) if self._mode_now() == "supervised" else decided
+        # The owner's free mode (item 922) asks nothing, these steps neither.
         held: Decision | None = (
-            initiative_guard(info)
+            None
+            if self._approvals.free
+            else initiative_guard(info)
             if self.owners_word
             else owners_guard(info)
-            if self.owners_chat and self._approval_mode == "yolo"
+            if self.owners_chat and self._mode_now() == "yolo"
             else None
         )
+        # Whether a yes given later may not answer the question by itself (item 483): one raised by what the run read,
+        # or about Dot's own files, as the policy raised it before a guard took it over, and any question of a run that
+        # read content third parties can author (the pre-push review of item 922: the guard's source hid it, and such
+        # a send was kept for a later yes that did it unasked). Such a send is kept all the same, its draft with it,
+        # but the run the yes reaches asks the owner for the step itself.
+        unkept: bool = decision.source in UNKEPT_SOURCES or tainted
         if held is not None and decision.verdict in ("allow", "ask"):
             # In a chat of Dot's own initiative a message, a post or a release is the owner's question, in every mode;
             # in a yolo run of a chat the owner opened, a payment, a message or a post is (item 860): what any rule or
@@ -433,7 +486,9 @@ class RunGate:
             and decision.verdict == "ask"
             and "financial" not in info.flags
         )
-        note, answered_by = await self._authorize_decision(info, decision, rules, tainted, held is not None, judged)
+        note, answered_by = await self._authorize_decision(
+            info, decision, rules, tainted, unkept, held is not None, judged
+        )
         if allowance is not None and state is not None:
             # The payment goes ahead under its caps, whichever question let it through (the guard asks first when the
             # step also sends or posts, item 429): it counts against the site's day. A refusal or a hand-off raised.
@@ -441,7 +496,7 @@ class RunGate:
                 state.host, state.amount.value, state.amount.currency, time.time(), self._run_id
             )
             log.info("spend_recorded", run_id=self._run_id, host=state.host, amount=state.amount.value)
-        elif self._approval_mode == "yolo" and state is not None:
+        elif self._mode_now() == "yolo" and state is not None:
             # A yolo run does the payment a cap would have held (item 443), and what it spends counts against the site's
             # day as any other payment's does: a later run of a mode that asks must meet the true total.
             await self._store.record_spend(
@@ -471,6 +526,7 @@ class RunGate:
         decision: Decision,
         rules: list[RuleRecord],
         tainted: bool,
+        unkept: bool,
         owners: bool = False,
         judged: bool = False,
     ) -> tuple[str, Answerer]:
@@ -479,7 +535,7 @@ class RunGate:
         it, and the policy event keeps it (item 474), however long an answer takes."""
         if decision.verdict == "allow":
             return "", "policy"
-        if self._approval_mode == "yolo" and decision.verdict != "deny" and not owners:
+        if self._mode_now() == "yolo" and decision.verdict != "deny" and not owners:
             # A yolo run asks nothing else (the owner's word of 2026-10-20, item 443): a credential, a spend, Dot's own
             # files, the review's refusal — the step does it, and the record says what it would have asked. A refusal
             # is not a question and stands below; nor is a step waived that ``owners`` marks: of a chat of Dot's own
@@ -498,6 +554,21 @@ class RunGate:
             await self._emit_policy(shown, said, tainted)
             log.warning("declined_again_refused", run_id=self._run_id, tool=info.tool)
             raise ApprovalRejected(refusal_text(earlier), {"action": _describe(shown), "note": earlier.note})
+        # A message, a post or a release (item 922): the owner's yes to one kept for them lets it through once in the
+        # run it reached; in a chat of Dot's own initiative, a run nobody is there for keeps it for their yes, its
+        # draft with it, rather than waits.
+        sends: Parking | None = self._send_parking
+        if decision.verdict == "ask" and SEND_FLAGS.intersection(info.flags):
+            if not unkept and await self._allowed_send(info, decision):
+                return "", "user"
+            if (
+                owners
+                and decision.source == "initiative"
+                and sends is not None
+                and not self.owner_there
+                and not self._owner_answers_sends
+            ):
+                await self._keep_send(info, decision, tainted, sends, unkept)
         allowed: ApprovalRecord | None = await self._kept_answer(info, decision, tainted)
         if allowed is not None:
             return allowed.note.strip(), "user"
@@ -505,7 +576,7 @@ class RunGate:
         # (item 850), and so is one of a yolo run of the owner's chat (item 860), but a message or a post of a run they
         # are not there for (a schedule's), which the review model judges (``judged``): legal, harmless, and called
         # for by their words; what it cannot tell goes to them.
-        route: Route = "reviewer" if judged else "user" if owners else route_for(decision, self._approval_mode)
+        route: Route = "reviewer" if judged else "user" if owners else route_for(decision, self._mode_now())
         if route == "waived":
             return await self._waive(info, decision), "yolo"
         # The owner's yes for the kind in this chat answers before the review model would (item 866: in `auto`, and a
@@ -513,8 +584,84 @@ class RunGate:
         if await self._permitted_in_chat(info, decision):
             return "", "user"
         if route == "reviewer":
-            return await self._review(info, decision, tainted)
-        return await self._ask_user(info, decision, "", tainted), "user"
+            return await self._review(info, decision, tainted, unkept)
+        return await self._ask_user(info, decision, "", tainted, unkept), "user"
+
+    def owner_answers_sends(self) -> None:
+        """Ask the owner, and wait, before a send of this run from now on rather than keep it (item 922): their yes to
+        a kept send reached this run while it works, so they are there; a step it cannot do on that yes asks them."""
+        self._owner_answers_sends = True
+
+    def allow_send_once(self, digest: str) -> None:
+        """Let the step whose fingerprint is ``digest`` through once (item 922): the owner said yes to it, kept as a
+        send of a chat of Dot's own initiative, and this is the run their yes reached. It holds in this run alone, until
+        it ends."""
+        self._sends_allowed = self._sends_allowed | {digest}
+
+    async def _allowed_send(self, info: ActionInfo, decision: Decision) -> bool:
+        """Whether the owner's yes to a kept send lets this step through (item 922): it is that step exactly as its card
+        showed it (its tool, kind, summary, target, amount, every flag, :func:`kept_digest`), in the run their yes
+        reached, once; recorded so. A run that read outside content may do it too: the step is the one they saw, whole,
+        and nothing it read can make it another."""
+        exact: str | None = kept_digest(info)
+        if exact is None or exact not in self._sends_allowed:
+            return False
+        self._sends_allowed = self._sends_allowed - {exact}
+        shown, said = await _shown(info, decision)
+        await self._approvals.record_automatic(
+            self._run_id,
+            info.tool,
+            f"{shown.summary} — {said.reason}",
+            approval_severity(info),
+            _describe(shown),
+            "approved",
+            PERMIT_DECIDER,
+            "the user said yes to this step when it was kept for them",
+        )
+        log.info("kept_send_done", run_id=self._run_id, tool=info.tool)
+        return True
+
+    async def _keep_send(
+        self, info: ActionInfo, decision: Decision, tainted: bool, parking: Parking, unkept: bool
+    ) -> NoReturn:
+        """Keep a send of a run nobody is there for, in a chat of Dot's own initiative, for the owner's yes (item 922),
+        with the step's policy event, which no question emitted (:meth:`_keep_send_card` says the rest)."""
+        shown, said = await _shown(info, decision)
+        await self._emit_policy(shown, said, tainted)
+        await self._keep_send_card(info, decision, parking, unkept)
+
+    async def _keep_send_card(self, info: ActionInfo, decision: Decision, parking: Parking, unkept: bool) -> NoReturn:
+        """Keep a send for the owner's yes (item 922): for :data:`SEND_KEEP_S`, the run told to keep its draft and go
+        on (raised as :class:`ApprovalParked`); a Skip of theirs they have not taken back by writing there refuses it.
+        The step's policy event is the caller's: a question that expired emitted it before it was asked. With
+        ``unkept`` the card is never exact: the yes has the run ask for the step itself (item 483)."""
+        digest, matched = kept_send_digest(info)
+        # A campaign's session ends with the card, and its next one is no run a yes reaches: a campaign's send is never
+        # exact, and the session that goes on asks for it (the tenth pre-push review of item 922).
+        exact: bool = matched and not unkept and parking.campaign_id is None
+        shown, said = await _shown(info, decision)
+        skipped: ApprovalRecord | None = await self._approvals.skipped(digest, parking)
+        if skipped is not None:
+            log.warning("skipped_send_refused", run_id=self._run_id, tool=info.tool, approval_id=skipped.id)
+            raise ApprovalRejected(skipped_text(skipped.id), {"action": _describe(shown), "approval_id": skipped.id})
+        kept: Kept | None = await self._approvals.keep(
+            self._run_id,
+            info.tool,
+            f"{shown.summary} — {said.reason}",
+            approval_severity(info),
+            {**_describe(shown), KEPT_SEND_KEY: True, EXACT_KEY: exact},
+            digest,
+            parking.model_copy(update={"keep_s": SEND_KEEP_S}),
+        )
+        if kept is None:
+            raise ApprovalRejected(
+                "too many steps wait for the user already, so this one is not kept: keep its draft and say so",
+                {"action": _describe(shown)},
+            )
+        log.info("send_kept", run_id=self._run_id, tool=info.tool, approval_id=kept.record.id, created=kept.created)
+        raise ApprovalParked(
+            kept_send_text(kept.record.id, kept.created), {"action": _describe(shown), "approval_id": kept.record.id}
+        )
 
     async def _permitted_in_chat(self, info: ActionInfo, decision: Decision) -> bool:
         """Whether the owner's "don't ask again in this chat" answers this question (item 866): a yes of theirs for the
@@ -707,7 +854,7 @@ class RunGate:
         log.warning("secret_egress_refused", run_id=self._run_id, tool=info.tool)
         raise PolicyDenied(decision.reason, {"action": _describe(shown), "source": decision.source})
 
-    async def _review(self, info: ActionInfo, decision: Decision, tainted: bool) -> tuple[str, Answerer]:
+    async def _review(self, info: ActionInfo, decision: Decision, tainted: bool, unkept: bool) -> tuple[str, Answerer]:
         """Auto: the review model answers from the user's instructions; what it cannot tell goes to the user, who then
         answered."""
         verdict: ReviewVerdict = await self._reviewer(
@@ -716,7 +863,7 @@ class RunGate:
         reason: str = shorten_reason(verdict.reason)
         if verdict.decision == "escalate":
             passed_on: str = f"The review model passed this on to you: {reason}"
-            return await self._ask_user(info, decision, passed_on, tainted), "user"
+            return await self._ask_user(info, decision, passed_on, tainted, unkept), "user"
         shown, said = await _shown(info, decision)
         await self._approvals.record_automatic(
             self._run_id,
@@ -734,7 +881,9 @@ class RunGate:
             )
         return "", "reviewer"
 
-    async def _ask_user(self, info: ActionInfo, decision: Decision, passed_on: str, tainted: bool) -> str:
+    async def _ask_user(self, info: ActionInfo, decision: Decision, passed_on: str, tainted: bool, unkept: bool) -> str:
+        """Ask the owner about the step and wait; ``unkept`` is a question no later yes answers by itself (item 483): a
+        send of it nobody answered is kept, but not exact (item 922)."""
         # The card, the question and the push to the owner's phone show the step with its secrets masked (item 551).
         shown, said = await _shown(info, decision)
         await self._emit_policy(shown, said, tainted)
@@ -757,6 +906,17 @@ class RunGate:
             unanswered: ApprovalRejected = await self._keep(info, shown, decision, summary, severity)
             self._owner_away = isinstance(unanswered, ApprovalParked)
             raise unanswered
+        # A message, a post or a release nobody answered in time is kept with its draft for the owner's yes, in every
+        # chat, rather than refused (item 922: "Dot bizden cevap beklerken zaman aşımına uğrayıp error veriyor").
+        held: Parking | None = self._send_parking
+        if (
+            outcome.status == "expired"
+            and outcome.decided_by == TIMEOUT_DECIDER
+            and held is not None
+            and decision.verdict == "ask"
+            and SEND_FLAGS.intersection(info.flags)
+        ):
+            await self._keep_send_card(info, decision, held, unkept)
         if outcome.status != "approved":
             # The owner's no is kept; a question nobody answered in time, or one the eval harness refused, is no answer.
             key: str | None = declined_key(info)

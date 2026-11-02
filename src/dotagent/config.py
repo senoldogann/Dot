@@ -410,6 +410,8 @@ class PolicyConfig(FrozenModel):
     preset: Preset
     approvals: ApprovalMode
     yolo_taint_check: bool
+    # The owner's free mode (item 922): on, no run asks anything, whatever its mode; Settings › Rules switches it.
+    free: bool
     approval_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     unanswered: Unanswered
     parked_hours: float = Field(gt=0, le=24 * 30, allow_inf_nan=False)

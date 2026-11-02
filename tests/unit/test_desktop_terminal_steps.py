@@ -274,6 +274,8 @@ def _fake_context(contexts: tuple[StepContext, ...], authorized: list[ActionInfo
         protected=(),
         dot_paths=(),
         peers=SimpleNamespace(take_app=lambda run_id, app: None),
+        # The owner's free mode is off (item 922).
+        approvals=SimpleNamespace(free=False),
     )
     return cast(
         ToolContext,

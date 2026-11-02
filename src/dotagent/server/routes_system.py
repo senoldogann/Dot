@@ -45,6 +45,7 @@ from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, 
 from dotagent.config_edit import (
     set_context_size,
     set_default_model,
+    set_free_mode,
     set_judge_provider,
     set_resume,
     set_role_model,
@@ -123,6 +124,8 @@ from dotagent.server.views import (
     ElsewhereItem,
     ElsewhereRefusal,
     FailsafeView,
+    FreeModeRequest,
+    FreeModeView,
     HealthView,
     JudgeRequest,
     JudgeView,
@@ -398,6 +401,23 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             ctx.runtime.judge.set_provider(before)
             raise
         return judge_now()
+
+    @router.get("/policy/free")
+    async def free_mode() -> FreeModeView:
+        return FreeModeView(free=ctx.runtime.approvals.free)
+
+    @router.put("/policy/free")
+    async def switch_free_mode(request: FreeModeRequest, http: Request) -> FreeModeView:
+        """Switch the owner's free mode (item 922), from every run's next step on: on, no run asks anything, in every
+        chat and every approval mode; off, each run asks as its mode says. The config file keeps it as ``[policy]
+        free``; one that cannot be changed leaves the mode as it was. Switching it on is done on the Mac (item 678: a
+        phone's key cannot widen for good what runs do unasked, which would outlast its removal); off, it narrows, which
+        a phone may do."""
+        if request.free:
+            refuse_from_a_phone(http.scope, "switch free mode on")
+        await asyncio.to_thread(set_free_mode, config_path(), request.free)
+        ctx.runtime.approvals.switch_free(request.free)
+        return FreeModeView(free=ctx.runtime.approvals.free)
 
     @router.get("/shell/sandbox")
     async def sandbox() -> SandboxView:

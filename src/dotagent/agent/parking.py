@@ -11,6 +11,8 @@ gate and the manager do the rest."""
 import hashlib
 from collections.abc import Mapping
 
+from pydantic import JsonValue
+
 from dotagent.agent.declined import declined_key
 from dotagent.config import PolicyConfig
 from dotagent.core.types import FrozenModel
@@ -42,6 +44,9 @@ _UNPERMITTED_FLAGS: frozenset[Flag] = frozenset(
 # The questions a yes given later never answers: the one the run's untrusted reading raised (the policy's stop for an
 # injection), and the one about Dot's own files, which the owner answers as it happens.
 _UNPERMITTED_SOURCES: frozenset[DecisionSource] = frozenset({"taint", "own_files"})
+# Of them, the ones whose send is kept but never exact (item 922 keeps item 483's line: a later yes does not answer
+# it by itself, the run it reaches asks for the step).
+UNKEPT_SOURCES: frozenset[DecisionSource] = _UNPERMITTED_SOURCES
 
 
 class Parking(FrozenModel):
@@ -99,6 +104,83 @@ def kept_digest(info: ActionInfo) -> str | None:
         )
     )
     return hashlib.blake2b(parts.encode(), digest_size=16).hexdigest()
+
+
+# What a run of a chat Dot opened on its own initiative keeps for the owner's yes rather than wait for it (item 922): a
+# message sent for them, a post in their name, a project's change put live (the steps of item 850). Nobody is there to
+# answer while it works: the step is left as a card, its draft kept, and done once the owner says yes.
+SEND_FLAGS: frozenset[Flag] = frozenset({"message_send", "public_post", "release"})
+# How long such a step waits for the owner's yes: the longest a kept step may (``[policy] parked_hours`` at most 30
+# days), for the owner's word of 2026-11-02 is that their answer has no time limit.
+SEND_KEEP_S: float = 30 * 24 * 3600.0
+
+
+# The marks a send kept for the owner's yes carries on its card (item 922): that it is one, and whether its fingerprint
+# is the step exactly as the card shows it (:func:`kept_digest`), which their yes then lets through once.
+KEPT_SEND_KEY: str = "kept_send"
+# The tools whose step its card shows whole, so that a later run can repeat it exactly: a command of the shell (the
+# folder it runs in is in its summary when the call names one, the workspace else) and an application's script. Any
+# other is not, a page's or a screen's step (its references are new), nor a terminal's, whose card names a session by a
+# number that a restart gives again to another folder or program (the independent review of item 922).
+_EXACT_TOOLS: frozenset[str] = frozenset({"shell", "apple_script"})
+EXACT_KEY: str = "exact"
+
+
+def kept_send_digest(info: ActionInfo) -> tuple[str, bool]:
+    """The fingerprint a send kept for the owner's yes is kept under (item 922), and whether it is the step exactly as
+    its card shows it: :func:`kept_digest`, of a tool whose step a later run can repeat (:data:`_EXACT_TOOLS`); or, for
+    any other step and one whose card shows less than all of it, its tool and what of it reaches others, which keeps
+    one such step of a kind waiting in a chat and which no yes lets through."""
+    exact: str | None = kept_digest(info)
+    if exact is not None and info.tool in _EXACT_TOOLS:
+        return exact, True
+    parts: str = "\n".join(("send", info.tool, ",".join(sorted(SEND_FLAGS.intersection(info.flags)))))
+    return hashlib.blake2b(parts.encode(), digest_size=16).hexdigest(), False
+
+
+def is_kept_send(args: Mapping[str, JsonValue]) -> bool:
+    """Whether a kept step is a send kept for the owner's yes (item 922), by the mark its card carries."""
+    return args.get(KEPT_SEND_KEY) is True
+
+
+def send_parking(conversation_id: str, campaign_id: str | None, schedule_id: str | None) -> Parking:
+    """Where a run of a chat Dot opened on its own initiative keeps its sends for the owner's yes (item 922), whatever
+    ``[policy] unanswered`` says: its conversation, for :data:`SEND_KEEP_S`."""
+    return Parking(thread_id=conversation_id, campaign_id=campaign_id, schedule_id=schedule_id, keep_s=SEND_KEEP_S)
+
+
+def kept_send_text(approval_id: str, created: bool) -> str:
+    """What a run is told of a send kept for the owner's yes (item 922): it did not happen; its draft stays."""
+    waits: str = (
+        "is kept for the user's yes"
+        if created
+        else "joins a card that waits for the user's yes already, of a send of this kind in this chat, which may be "
+        "of another draft"
+    )
+    return (
+        f"This step {waits} ({approval_id}): it did not happen, and nobody is asked now. Keep what you wrote as a "
+        "draft, as it is to go out (a mail saved in Drafts, a post or a release left ready), and do not send or "
+        "publish it another way. Go on with what does not depend on it, then end the run and say where each draft is, "
+        "so that the user's yes finds it. When the user says yes, the work goes on in this conversation, and it is "
+        "done then."
+    )
+
+
+def allowed_send_text(approval_id: str, summary: str, note: str, exact: bool) -> str:
+    """What the run the owner's yes starts is told of a send kept for it (item 922): Dot's words. A step its card
+    showed exactly goes through once, done exactly so; any other asks the owner once more, as its page is new."""
+    said: str = "" if note.strip() == "" else f" They wrote: {note.strip()}"
+    how: str = (
+        "Do it now, exactly as the card showed it, once: it goes through without asking."
+        if exact
+        else "Open the drafts kept for it (the mails in Drafts, the posts or the releases left ready, as the answers "
+        "of this conversation name them) and do each as it stands: the step itself asks them once more, as its page is "
+        "new."
+    )
+    return (
+        f"The user said yes to the step that waited for them ({approval_id}): {summary}. {how} Send or publish "
+        f"nothing else.{said}"
+    )
 
 
 def permit_parkable(info: ActionInfo, decision: Decision) -> bool:

@@ -462,6 +462,15 @@ approvals = "ask"
 # fills a login or deletes outside the workspace (item 525): its refusal stands, and nobody is asked; any other answer
 # lets the step run. false turns the check off. In every mode, such a run sends no secret Dot holds out of the Mac.
 yolo_taint_check = true
+# Free mode (item 922, the owner's word of 2026-11-02: "istediğimizde her türlü serbest mod"): true, no run asks you
+# anything, in every chat and every approval mode: a payment, a message or mail sent for you, a public post and a
+# project's change put live too, in your chats and in Dot's own. A refusal still stands (a research run stays
+# read-only, the limits of trading and of a site's pace hold), and so does the review model's check of a yolo run that
+# read outside content (yolo_taint_check above). Settings › Rules switches it while the daemon runs.
+free = false
+# How long a question waits for your answer, in seconds. A message, a post or a release nobody answers in that time is
+# not refused but kept as a card with its draft, in every chat, and done once you say yes (item 922: "Dot bizden cevap
+# beklerken zaman aşımına uğrayıp error veriyor"); a public action's question is asked outside its site's pace.
 approval_timeout_s = 900.0
 # What a question nobody answers within approval_timeout_s comes to (item 482): "refuse" (the run is told no, as
 # always) or "park": a step the run hands to you (money, a credential, a rule of yours that hands it off) is kept for

@@ -47,6 +47,7 @@ type ConfigTable = Literal[
     "judge",
     "memory",
     "models",
+    "policy",
     "reactions",
     "server",
     "shell",
@@ -75,6 +76,7 @@ type InitiativeSetting = Literal["look_model"]
 type JudgeSetting = Literal["provider"]
 type MemorySetting = Literal["embed_enabled"]
 type ModelsSetting = Literal["main", "fast", "review", "vision", "standby"]
+type PolicySetting = Literal["free"]
 type ReactionsSetting = Literal["follow_ups", "good", "love", "wrong", "again", "explain", "hold"]
 type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
@@ -103,6 +105,7 @@ type SettingKey = (
     | JudgeSetting
     | MemorySetting
     | ModelsSetting
+    | PolicySetting
     | ReactionsSetting
     | ServerSetting
     | ShellSetting
@@ -382,6 +385,12 @@ def set_builtin_server(path: Path, switch: BuiltinMcpSetting, on: bool) -> None:
     """Write a switch of ``[builtin_mcp]``, whether an MCP server that comes with Dot is started (item 583), into the
     config file at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "builtin_mcp", switch, on)
+
+
+def set_free_mode(path: Path, on: bool) -> None:
+    """Write ``[policy] free``, the owner's free mode, in which no run asks anything (item 922), into the config file at
+    ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "policy", "free", on)
 
 
 def set_shell_sandbox(path: Path, on: bool) -> None:

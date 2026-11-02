@@ -167,7 +167,8 @@ A delegated run takes the approval mode of the run that started it and has no go
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the
 schedule leaves open, so what a schedule does while nobody is there depends on them: with `ask`, a question of the
 policy waits `approval_timeout_s` and then counts as a refusal, or, for a step handed to you with `[policy] unanswered =
-"park"`, is kept for you (Steps kept for you, below). A no you gave a run holds for the rest of it: the same action is
+"park"`, is kept for you (Steps kept for you, below), and a message, a post or a release is kept as a card with its
+draft (Sends kept for you, below, item 922). A no you gave a run holds for the rest of it: the same action is
 refused at once until you write to it again (item 456, [Safety](safety.md#safety)); a `yolo` run asks only the steps
 of item 860 (a payment, a message or mail, a public post, in a chat you opened), and a no you gave one of them holds
 there the same way.
@@ -195,6 +196,17 @@ is still answering is cut short and asked again with it, item 509), clearing no 
 answer does not ([Safety](safety.md#safety)), or, once it has ended, carries the work on as above, in a run that starts
 as untrusted as the run that asked ended. A run of a message sent with Plan first, and a run of a `dotx` command, which
 no other process can reach while it works, wait for every answer.
+
+**Sends kept for you** (item 922). A message, a post or a release whose question nobody answers in
+`approval_timeout_s` is not refused but kept as a card with its draft, in every chat and whatever `unanswered` says:
+the run is told to keep the draft as it is to go out and to say where it is, and goes on. In a chat Dot opened on its
+own initiative a run nobody watches keeps it at once, with no wait. Your yes starts a run in that chat, or reaches the
+one at work there: a command of the shell or an application's script is done exactly as its card showed it, once, and
+any other step (a Send button of a page) asks you once more from the draft. A send of a run that read content third
+parties can author, or whose question was about Dot's own files, is kept too, but never done on the yes alone: the run
+the yes reaches asks you for the step itself (item 483's line: a later yes never answers such a question by itself).
+So is a send a campaign's session kept: its yes is told to the campaign's next session, which asks you for the step. The yes binds the
+command as the card showed it, not the files it reads. [Proactive](proactive.md) says more.
 
 **Steps kept for you.** A step the policy hands to you (money, a credential, a rule of yours that hands it off) waits
 `approval_timeout_s` for **I did it**, as every question of the policy does. With `[policy] unanswered = "park"` (item
@@ -230,9 +242,10 @@ unused yes back too. Skip on a kept step, either kind, holds in that conversatio
 with no card, until you write there again (a message of yours, or a run you start). Allow once is for one step; a
 question open now has **Don't ask again in this chat** too, whose yes holds for the step's kind for the rest of the
 chat (item 866, [Safety](safety.md#safety) says which kinds and what never). Any other question still counts as a
-refusal when nobody answers, and nothing is kept in `yolo` or in an eval: the payment, message or post a `yolo` run of
-your chat asks (item 860) is refused when nobody answers; but in a chat Dot opened on its own initiative a `yolo` run
-asks its release and keeps it as a run that asks does, and a message or a post there is asked, never kept (item 850). A delegated run keeps its
+refusal when nobody answers, and nothing of the kind is kept in `yolo` or in an eval: the payment a `yolo` run of your
+chat asks (item 860) is refused when nobody answers. A message, a post or a release nobody answered is kept as a card
+with its draft in every chat but an eval's (Sends kept for you, above, item 922), and in a chat Dot opened on its own
+initiative a run nobody watches keeps it at once. A delegated run keeps its
 steps where the run that delegated it does (item 485): the card is on the delegated run's page and in the Activity list,
 the step is the chat's of the run at the top, and your answer reaches that run, while it works, or else a run that goes
 on from its goal in its chat (tainted as any of the runs it goes on from ended), which may do an allowed step itself or

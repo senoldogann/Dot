@@ -120,6 +120,8 @@ async def test_a_phone_key_cannot_widen_for_good_what_runs_do_unasked(own_home: 
         widening: list[tuple[str, str, dict[str, object]]] = [
             ("POST", "/mcp/servers", {"service": None, "name": "x", "address": "npx x", "origin": "http://a"}),
             ("PUT", "/shell/sandbox", {"sandbox": False}),
+            # Free mode asks nothing anywhere, for good (item 922): switched on from the Mac alone.
+            ("PUT", "/policy/free", {"free": True}),
             ("POST", "/rules", {"behavior": "allow", "tool_glob": "shell", "match_regex": "", "description": ""}),
         ]
         for method, path, body in widening:
@@ -140,6 +142,9 @@ async def test_a_phone_key_cannot_widen_for_good_what_runs_do_unasked(own_home: 
         for method, path, body in narrowing:
             allowed: httpx.Response = await client.request(method, path, json=body, headers=phone)
             assert allowed.status_code == 201, (path, allowed.text)
+        # Free mode switched off narrows: a phone may (item 922).
+        off: httpx.Response = await client.put("/policy/free", json={"free": False}, headers=phone)
+        assert off.status_code == 200 and off.json() == {"free": False}, off.text
         rule: httpx.Response = await client.post(
             "/rules",
             json={"behavior": "allow", "tool_glob": "shell", "match_regex": "", "description": ""},

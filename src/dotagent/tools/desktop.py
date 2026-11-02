@@ -452,7 +452,9 @@ def _act_tool() -> RegisteredTool:
 
         # A secure field is the user's outside yolo (item 429): the step's review hands a credential to them, and a
         # field found secure only as the step runs is refused. A yolo run asks nothing, and types it (item 443).
-        secure_field: SecureFieldCheck = refuse_secure_field if ctx.approvals != "yolo" else enter_secure_field
+        secure_field: SecureFieldCheck = (
+            refuse_secure_field if ctx.approvals != "yolo" and not ctx.runtime.approvals.free else enter_secure_field
+        )
         limit: int = ctx.runtime.config.desktop.max_batch_steps
         outcome: ActOutcome = await ctx.runtime.desktop.act(
             ctx.thread_id,

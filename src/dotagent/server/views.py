@@ -756,6 +756,18 @@ class SandboxRequest(FrozenModel):
     sandbox: bool
 
 
+class FreeModeRequest(FrozenModel):
+    """Whether the owner's free mode is on (item 922): ``[policy] free``."""
+
+    free: bool
+
+
+class FreeModeView(FrozenModel):
+    """Whether the owner's free mode is on now (item 922): no run asks anything."""
+
+    free: bool
+
+
 class SandboxView(FrozenModel):
     """Whether the processes of a run outside yolo start in the macOS sandbox now (item 262)."""
 

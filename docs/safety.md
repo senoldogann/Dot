@@ -303,8 +303,8 @@ trading off.
    gönderme ya da ödeme yapma gibi şeyler bana sorsun"), whatever started the run in it, a schedule that a run of the
    chat made among them. While you are there (a run of yours, or the one that tells the chat its command in the
    background ended), a payment is handed to you, as in every mode that asks, one within a cap you pre-approved for its
-   site asks your yes, as in `ask`, and a message or a post asks your yes; one you do not answer in time is refused. In
-   a run that a schedule, a watcher or a notice started there, which nobody watches, the review model judges a message
+   site asks your yes, as in `ask`, and a message or a post asks your yes; one you do not answer in time is kept as a card
+   with its draft, for your yes later (item 922). In a run that a schedule, a watcher or a notice started there, which nobody watches, the review model judges a message
    or a post against your words, lawful, harmless and called for ("legal ise, tehlike arz etmiyorsa ve bir amaç içinse
    yollasın; ajanın niyeti önemli"): its yes sends it, its no refuses it, and what it cannot tell comes to you; a
    payment is still handed to you. Its words are the goal of the schedule, which a run of the chat may have written
@@ -1164,8 +1164,12 @@ automated likes and bulk or aggressive following, and warn that scripting its we
 
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
-counts as a refusal. With `[policy] unanswered = "park"` a hand-off nobody answers is kept for you instead and the run
-goes on without it (item 482, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)); your **I did
+counts as a refusal, but a message, a post or a release, which is kept as a card with its draft until you say yes, in
+every chat (item 922, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)); a run of Dot's own
+initiative, which nobody watches, keeps such a step at once, and past the caps of kept steps (20 in a chat, 50 in all)
+it is refused, its draft kept ([Proactive](proactive.md)). A public action's question is asked outside its site's pace,
+which other runs keep meanwhile. With `[policy] unanswered = "park"` a hand-off nobody answers is kept
+for you instead and the run goes on without it (item 482, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)); your **I did
 it** on it gives the run no authority, and the words it sends restore no trust. A question whose card shows all of a
 step that reaches nobody (a command, a file read or a folder listing, a page read or a web search; never one the run's
 untrusted reading raised, nor one about Dot's own files) is kept too, and your **Allow once** lets the run do that exact
@@ -1182,7 +1186,8 @@ tell apart are not one. This is the default approval mode, `ask`, and `supervise
 message or mail sent for you and a public post, in a chat you opened (item 860). In every mode
 that asks (item 429), money and credentials are handed to you on a card in the chat, and a message or a post in your
 name waits there for your yes in `supervised` and `ask`, for the review model's in `auto`. In a chat Dot opened on its
-own initiative, a message, a post or a release waits for your own yes in every mode, `yolo` and `auto` too (item 850).
+own initiative, a message, a post or a release waits for your own yes in every mode, `yolo` and `auto` too (item 850),
+but free mode (below).
 A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer; one it can
 go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
@@ -1192,6 +1197,15 @@ commas) or your own words. The run reads which option you chose, and whether it 
 typed in the terminal before a prompt for a decision appears (the next message of a chat, typed while the run worked)
 is set aside and answers nothing, and the prompt says so; at a hand-off only Enter or a yes says that you did the step,
 and any other answer skips it (item 558).
+
+**Free mode** (item 922, `[policy] free`, Settings › Rules › How Dot asks, `GET|PUT /api/policy/free`): on, no run asks
+anything, in every chat and every approval mode, from its next step: a payment, a message or mail sent for you, a
+public post and a release too, in your chats and in Dot's own, as a `yolo` run of a chat nobody watches does; each step
+is recorded with why it would have asked. A refusal still stands (a research run stays read-only, the pace of a site
+and the limits of trading hold), and so does the review model's check of a `yolo` run that read outside content when
+`yolo_taint_check` is on. A run that starts while it is on is told so; a field of a secret (a page's, a window's, a terminal's password
+prompt) is typed as in `yolo`, and the sandbox stays as the run's own mode has it. An eval never runs in it (`eval_config`). Off, every run asks as its mode says. A phone may switch it off, not on (item 678, [Phone](phone.md): it would
+outlast the phone's removal).
 
 **Messages from a channel** (item 572, [Channels](channels.md)). With iMessage on (Settings › Channels), a message you
 send to yourself starts a run as one typed in the web UI does: it is yours and trusted, so the run starts untainted, in

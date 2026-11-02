@@ -196,6 +196,8 @@ def _context(run: tuple[Store, EventBus, RunRecord], workspace: Path, gate: RunG
         peers=Peers(),
         protected=(Path.home() / ".ssh",),
         dot_paths=(),
+        # The owner's free mode is off (item 922).
+        approvals=SimpleNamespace(free=False),
     )
     return ToolContext(
         runtime=runtime,  # type: ignore[arg-type]

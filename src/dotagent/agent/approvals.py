@@ -49,14 +49,28 @@ class ApprovalBroker:
     or the run itself. ``approval_requested`` is always followed by ``approval_decided``, so no UI keeps offering a
     question that nobody can answer any more. A question a run left (``leave``) holds nothing up: it stays open, after
     the run too, until the user answers or skips it.
+
+    ``timeout_s`` is how long a question waits for its answer. ``free`` is the owner's free mode (item 922, ``[policy]
+    free``), which every run's gate reads as it decides a step: on, no run asks anything.
     """
 
     def __init__(self, store: Store, bus: EventBus, timeout_s: float) -> None:
         self._store: Store = store
         self._bus: EventBus = bus
         self._timeout_s: float = timeout_s
+        self._free: bool = False
         self._waiting: dict[str, asyncio.Future[ApprovalOutcome]] = {}
         self._run_of: dict[str, str] = {}
+
+    @property
+    def free(self) -> bool:
+        """Whether the owner's free mode is on (item 922): no run asks anything."""
+        return self._free
+
+    def switch_free(self, on: bool) -> None:
+        """Switch the owner's free mode, for every run's next step (item 922)."""
+        self._free = on
+        log.info("free_mode_switched", on=on)
 
     async def request(self, run_id: str, tool: str, summary: str, severity: str, args: JsonObject) -> ApprovalOutcome:
         record: ApprovalRecord = await self._store.create_approval(run_id, tool, summary, severity, args)

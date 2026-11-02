@@ -32,7 +32,7 @@ goal, in a fence since it may hold what a page or a mail wrote, and each free ag
 two whose role fits a real part of that work, each with that part in a few words, or none. Such a helper walks over to
 the one at work, its tag saying "Offers to help …", and both panels list the offer with **Let it help**: the helper's
 run starts as a helper of the run at work, as `message_agent` starts one, so that it asks you what that run would ask
-(an initiative's message, post or release, in every mode) and starts as untrusted as it is (item 902; item 896 only told
+(an initiative's message, post or release, in every mode but free mode, item 922) and starts as untrusted as it is (item 902; item 896 only told
 the run at work it could hand a part over, and a run near its end went on without): its goal, in fixed words, names the
 one it helps and its run at work, and has it read where that run stands with `read_agent_chat` (that run's chat, not the
 newest, fenced when it read outside content), do the part its role fits and end with what it found or made. The run at
