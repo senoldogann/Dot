@@ -249,17 +249,17 @@ async def test_the_gallery_installs_lists_and_removes_a_plugin(
                 await expect(cards).to_have_count(3)
                 order: str = "cards => cards.map(card => card.dataset.plugin)"
                 assert await cards.evaluate_all(order) == ["acme", "brand-kit", "base-tools"]
-                # A plugin with no logo wears a skill's puzzle piece on a tile of its kind's colour; a logo is a
-                # picture in its own colours on a light tile.
+                # A plugin with no logo wears a skill's puzzle piece, a plugin with one its logo, both in the ink on
+                # the same quiet tile (item 946).
                 acme: Locator = _card(page, "acme")
-                await expect(acme.locator(".plugin-mark[data-tint] svg[data-icon='puzzle']")).to_have_count(1)
+                await expect(acme.locator(".plugin-mark svg[data-icon='puzzle']")).to_have_count(1)
                 tile: str = await acme.locator(".plugin-mark").evaluate(
                     "(mark) => getComputedStyle(mark).backgroundImage"
                 )
-                assert tile.startswith("linear-gradient"), tile
-                logo: Locator = _card(page, "base-tools").locator(".plugin-mark img.plugin-logo")
-                await expect(logo).to_have_attribute("src", "/icons/plugins/supabase-icon.svg")
-                assert await logo.evaluate("(image) => image.decode().then(() => image.naturalWidth > 0)")
+                assert tile == "none", tile
+                logo: Locator = _card(page, "base-tools").locator(".plugin-mark .mark-logo")
+                shape: str = await logo.evaluate("(node) => node.style.getPropertyValue('--logo')")
+                assert shape == 'url("/icons/plugins/supabase-icon.svg")', shape
                 # The check of a plugin from its maker, and who publishes it, its kind and its skills.
                 await expect(acme.locator(".gallery-verified")).to_have_count(1)
                 await expect(_card(page, "brand-kit").locator(".gallery-verified")).to_have_count(0)

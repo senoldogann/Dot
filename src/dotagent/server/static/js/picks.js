@@ -7,8 +7,8 @@
 
 import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
-import { markContent, markInk, wearsDot } from "./marks.js";
-import { onServerMarks, serverMark, wantServerMarks } from "./palette.js";
+import { markContent, wearsDot } from "./marks.js";
+import { onServerMarks, serverMark, signedAccount, wantServerMarks } from "./palette.js";
 import { toast } from "./ui.js";
 
 // The daemon's limits (server/views.py).
@@ -44,23 +44,12 @@ function tint(node, name) {
 }
 
 /** Draw the mark of the chip of the MCP server `name` into `holder` (its `.pick-mark`): its service's mark as the at menu
- * draws it, on the tile's ground, light in both colour schemes (item 530); Dot's own icon for a server of no service,
- * and for one the palette has not named yet (item 581). */
+ * draws it, in the chip's colour (items 530 and 946); Dot's own icon for a server of no service, and for one the palette
+ * has not named yet (item 581). */
 function paintServerMark(holder, name) {
   const mark = serverMark(name);
   holder.replaceChildren(markContent(mark));
-  if (wearsDot(mark)) {
-    holder.dataset.mark = "dot";
-    holder.style.removeProperty("--plugin-ink");
-    return;
-  }
-  holder.dataset.mark = "service";
-  const ink = markInk(mark.colour);
-  if (ink === null) {
-    holder.style.removeProperty("--plugin-ink");
-  } else {
-    holder.style.setProperty("--plugin-ink", ink);
-  }
+  holder.dataset.mark = wearsDot(mark) ? "dot" : "service";
 }
 
 // A chip drawn before the palette arrived wears Dot's icon: each chip that names a server is drawn again as the palette
@@ -73,7 +62,31 @@ onServerMarks(() => {
       paintServerMark(holder, name);
     }
   }
+  for (const chip of document.querySelectorAll(".pick-chip[data-kind='account']")) {
+    paintAccount(chip);
+  }
 });
+
+/** Draw the chip of an account (`chip`, its address in `data-name`) as its provider: the provider's mark and name
+ * (item 946: "Google", not the address, which its title keeps), once the palette names the account; until then, and for
+ * an account no longer signed in, the mail icon and the address. */
+function paintAccount(chip) {
+  const address = chip.getAttribute("data-name");
+  const holder = chip.querySelector(".pick-mark");
+  const label = chip.querySelector(".pick-name");
+  if (address === null || holder === null || label === null) {
+    return;
+  }
+  const account = signedAccount(address);
+  if (account === null) {
+    return;
+  }
+  holder.replaceChildren(markContent(account.mark));
+  holder.dataset.mark = "service";
+  label.textContent = account.provider_name;
+  chip.title = `The ${account.provider_name} account ${address}`;
+  chip.dataset.provider = account.provider;
+}
 
 /** The mark of a pick of `kind` ("plugin", "skill" or "plan") named `name`: its icon in its colour; a server wears its
  * service's mark. */
@@ -98,6 +111,10 @@ function pickChip(kind, name, onRemove) {
   }
   if (onRemove !== null) {
     chip.append(el("button", { class: "pick-remove", type: "button", title: `Remove ${name}`, "aria-label": `Remove ${name}`, onclick: onRemove }, icon("x")));
+  }
+  if (kind === "account") {
+    paintAccount(chip);
+    wantServerMarks();
   }
   return chip;
 }

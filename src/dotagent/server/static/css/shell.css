@@ -693,15 +693,14 @@
 }
 
 .side-connect-mark {
-  --plugin-ink: var(--mark-ink);
   display: grid;
   place-items: center;
   width: 20px;
   height: 20px;
   border-radius: var(--radius-xs);
-  background: var(--mark-ground);
-  box-shadow: 0 0 0 2px var(--surface), inset 0 0 0 1px var(--mark-ring);
-  color: var(--plugin-ink);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 2px var(--surface), inset 0 0 0 1px var(--border);
+  color: var(--text);
 }
 
 .side-connect-mark + .side-connect-mark {

@@ -12,7 +12,7 @@ import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
 import { icon } from "./icons.js";
-import { markContent, markInk, wearsDot } from "./marks.js";
+import { markContent, wearsDot } from "./marks.js";
 import { touchFirst, trackHeight } from "./layout.js";
 import { openMenu } from "./menu.js";
 import { createMicrophone } from "./microphone.js";
@@ -109,18 +109,13 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
   }
 
   function itemMark(item) {
-    // An MCP server, and each of its tools, wear the mark of its service as the service's Customize tile wears it, on
-    // that tile's light ground, or Dot's own icon for a server of no service (items 447, 477 and 581); an account its
+    // An MCP server, and each of its tools, wear the mark of its service as the service's Customize tile wears it, in
+    // the tile's ink (item 946), or Dot's own icon for a server of no service (items 447, 477 and 581); an account its
     // provider's (item 496).
     if (item.kind === "plugin" || item.kind === "tool" || item.kind === "account") {
       const mark = item.mark ?? null;
       const ground = wearsDot(mark) ? "dot" : "service";
-      const span = el("span", { class: "slash-mark", dataset: { kind: item.kind, mark: ground } }, markContent(mark));
-      const ink = mark === null ? null : markInk(mark.colour);
-      if (ink !== null) {
-        span.style.setProperty("--plugin-ink", ink);
-      }
-      return span;
+      return el("span", { class: "slash-mark", dataset: { kind: item.kind, mark: ground } }, markContent(mark));
     }
     // A skill is a puzzle piece and a command a terminal in a box, plain lines in the menu's ink (item 537).
     if (item.kind === "skill") {

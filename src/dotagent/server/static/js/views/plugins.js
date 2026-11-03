@@ -20,32 +20,25 @@ import { api } from "../api.js";
 import { customizeHead } from "../customizehead.js";
 import { compact, el, foldSearch, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { tintMark } from "../marks.js";
+import { markContent } from "../marks.js";
 import { aboutToggle, emptyPanel, errorPanel, loadingPanel, segmented } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
-/** The kinds of the gallery's plugins, in their words, each with the colour of themes.css (`--mark-<hue>`) of the tile
- * of the mark of a plugin of the kind with no logo. */
+/** The kinds of the gallery's plugins, in their words. */
 const CATEGORIES = {
-  development: { label: "Development", hue: "blue" },
-  design: { label: "Design", hue: "pink" },
-  product: { label: "Product", hue: "violet" },
-  data: { label: "Data", hue: "teal" },
-  business: { label: "Business", hue: "orange" },
-  writing: { label: "Writing", hue: "green" },
+  development: { label: "Development" },
+  design: { label: "Design" },
+  product: { label: "Product" },
+  data: { label: "Data" },
+  business: { label: "Business" },
+  writing: { label: "Writing" },
 };
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-/** The mark of a plugin of the gallery: its logo on the light tile a connector's logo sits on, else the puzzle piece a
- * skill wears (item 537) on a tile of its kind's colour; a plugin of no kind of the gallery's takes the development
- * one. */
+/** The mark of a plugin of the gallery: its logo, else the puzzle piece a skill wears (item 537), in the tile's ink
+ * (item 946). */
 function galleryMark(plugin) {
-  if (plugin.logo !== null && plugin.logo !== undefined) {
-    return el("span", { class: "plugin-mark", "aria-hidden": "true" }, el("img", { class: "plugin-logo", src: `/icons/plugins/${plugin.logo}`, alt: "" }));
-  }
-  const mark = el("span", { class: "plugin-mark", "aria-hidden": "true", dataset: { tint: "" } }, icon("puzzle"));
-  mark.style.setProperty("--plugin-hue", `var(--mark-${(CATEGORIES[plugin.category] ?? CATEGORIES.development).hue})`);
-  return mark;
+  return el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent({ logo: plugin.logo ?? null, glyph: "puzzle" }));
 }
 
 /** Whether Dot installed the plugin: from the commit the gallery pins, from an older one (`outdated`, item 558), or from
@@ -292,7 +285,7 @@ export function mount(root, ctx) {
     return el(
       "article",
       { class: "gallery-card scout-card", dataset: { plugin: proposal.id, kind: proposal.kind, risk: proposal.risk ?? "none" } },
-      galleryMark({ logo: null, category: proposal.category }),
+      galleryMark({ logo: null }),
       el(
         "div",
         { class: "gallery-card-main" },
@@ -448,7 +441,6 @@ export function mount(root, ctx) {
    * Remove for one in Dot's own plugins folder (a folder of the config's is taken out of the config). */
   function otherCard(other) {
     const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, icon("puzzle"));
-    tintMark(mark, null, other.name);
     let removeButton = null;
     if (other.own) {
       const label = `Remove ${other.name}`;
@@ -487,15 +479,6 @@ export function mount(root, ctx) {
     return [...plugins].sort(order === "newest" ? (a, b) => b.added.localeCompare(a.added) || byStars(a, b) : byStars);
   }
 
-  /** The head's marks, scattered about a soft light: the first featured plugins' and, between them, logos of the
-   * gallery, so that the head shows what kinds of plugins it holds. */
-  function paintHead() {
-    const featuredOnes = gallery.plugins.filter((plugin) => plugin.featured && plugin.logo === null);
-    const logos = gallery.plugins.filter((plugin) => plugin.logo !== null);
-    const shownMarks = [featuredOnes[0], logos[0], featuredOnes[1], logos[1], featuredOnes[2]].filter((plugin) => plugin !== undefined);
-    head.setMarks(shownMarks.map(galleryMark));
-  }
-
   function paintCounts() {
     const [allButton, featuredButton, installedButton] = filters.element.children;
     const installed = gallery.plugins.filter(isInstalled).length + gallery.others.length;
@@ -505,7 +488,6 @@ export function mount(root, ctx) {
   }
 
   function paintList() {
-    paintHead();
     paintCounts();
     featured.hidden = words !== "" || shown !== "all";
     paintScout();

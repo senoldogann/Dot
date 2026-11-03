@@ -69,9 +69,9 @@ def test_a_server_of_the_palette_wears_the_mark_its_customize_tile_wears() -> No
         [],
     )
     assert [(server.name, server.mark) for server in view.servers] == [
-        ("context7", ServiceMark(logo=None, glyph=None, colour=None)),
-        ("deepwiki", ServiceMark(logo=None, glyph="search", colour=None)),
-        ("microsoft-learn", ServiceMark(logo="microsoft-icon.svg", glyph=None, colour=None)),
+        ("context7", ServiceMark(logo=None, glyph=None)),
+        ("deepwiki", ServiceMark(logo=None, glyph="search")),
+        ("microsoft-learn", ServiceMark(logo="microsoft-icon.svg", glyph=None)),
         ("notes", None),
     ]
 

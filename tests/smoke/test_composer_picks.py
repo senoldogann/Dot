@@ -747,12 +747,18 @@ def _titled(server: str) -> str:
 
 
 async def _mark_of(mark: Locator) -> str:
-    """What a mark shows, as the page drew it: its picture's file or its icon's name."""
+    """What a mark shows, as the page drew it: its logo's file (a picture, or a shape in one colour) or its icon's
+    name."""
     shown: str = await mark.evaluate(
         """(node) => {
           const picture = node.querySelector("img.plugin-logo");
           if (picture !== null) {
             return `logo:${picture.getAttribute("src")}`;
+          }
+          // A logo is drawn in one colour, its file's shape as a mask (item 946).
+          const shape = node.querySelector(".mark-logo");
+          if (shape !== null) {
+            return `logo:${shape.style.getPropertyValue("--logo").replace(/^url\\("(.*)"\\)$/, "$1")}`;
           }
           const glyph = node.querySelector("svg[data-icon]");
           return glyph !== null ? `icon:${glyph.dataset.icon}` : `nothing:${node.textContent.trim()}`;
@@ -811,8 +817,9 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     {
                         "address": ACCOUNT,
                         "provider": "google",
+                        "provider_name": "Google",
                         "reads": "Gmail and Google Calendar",
-                        "mark": {"logo": "google-icon.svg", "glyph": None, "colour": None},
+                        "mark": {"logo": "google-icon.svg", "glyph": None},
                     }
                 ],
             }
@@ -856,17 +863,28 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     # The account stands in a group of its own, with its provider's logo (item 496).
                     account: Locator = menu.get_by_role("option").filter(has_text=ACCOUNT).locator(".slash-mark")
                     assert await _mark_of(account) == "logo:/icons/plugins/google-icon.svg"
+                    # Picked, its chip names its provider with the provider's mark, its address in its title (item
+                    # 946); taken away again before the servers' turn.
+                    await menu.get_by_role("option").filter(has_text=ACCOUNT).click()
+                    chip: Locator = page.locator(f".composer .pick-chip[data-name='{ACCOUNT}']")
+                    await expect(chip.locator(".pick-name")).to_have_text("Google")
+                    await expect(chip).to_have_attribute("title", f"The Google account {ACCOUNT}")
+                    assert await _mark_of(chip.locator(".pick-mark")) == "logo:/icons/plugins/google-icon.svg"
+                    await chip.locator(".pick-remove").click()
+                    await goal.fill("")
+                    await goal.type("@")
                     for name in MARKED:
                         mark: Locator = menu.get_by_role("option").filter(has_text=name).locator(".slash-mark")
                         assert await _mark_of(mark) == tiles[name], name
-                        # On a light ground in both colour schemes, as a logo's tile on the Customize page.
+                        # On the quiet tile of the Customize page, in the ink (item 946): no light ground of its own.
                         ground: str = await mark.evaluate("(node) => getComputedStyle(node).backgroundColor")
-                        assert ground == "rgb(255, 255, 255)", (name, ground)
+                        assert ground not in ("rgb(255, 255, 255)", "rgba(0, 0, 0, 0)"), (name, ground)
                     fixture: Locator = menu.get_by_role("option").filter(has_text=SERVER).locator(".slash-mark")
                     assert await _mark_of(fixture) == DOT_MARK
                     await page.screenshot(path=str(tmp_path / f"at-marks-{width}-{scheme}.png"), animations="disabled")
-                    # Picked for the message, a server's chip wears the same mark (item 530): its service's, on the
-                    # tile's ground, or Dot's own icon for a server of no service (item 581).
+                    # Picked for the message, a server's chip wears the same mark (item 530): its service's, in the
+                    # chip's own colour on no tile (item 946), or Dot's own icon for a server of no service (item
+                    # 581).
                     for name in (*MARKED, SERVER):
                         await goal.fill("")
                         await goal.type(f"@{name}")
@@ -874,7 +892,7 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                         chip_mark: Locator = page.locator(f".composer .pick-chip[data-name='{name}'] .pick-mark")
                         assert await _mark_of(chip_mark) == (tiles[name] if name in MARKED else DOT_MARK), name
                         chip_ground: str = await chip_mark.evaluate("(node) => getComputedStyle(node).backgroundColor")
-                        assert (chip_ground == "rgb(255, 255, 255)") == (name in MARKED), (name, chip_ground)
+                        assert chip_ground == "rgba(0, 0, 0, 0)", (name, chip_ground)
                     await page.screenshot(path=str(tmp_path / f"chips-{width}-{scheme}.png"), animations="disabled")
                     for _ in range(len(MARKED) + 1):
                         await page.locator(".composer .pick-remove").first.click()
@@ -953,9 +971,9 @@ async def test_a_server_chip_drawn_before_the_palette_arrives_wears_dots_icon_an
                 assert [await _mark_of(marks.nth(at)) for at in range(2)] == [DOT_MARK, DOT_MARK]
                 arrived.set()
                 served: Locator = page.locator(".composer .pick-chip[data-name='microsoft-learn'] .pick-mark")
-                await expect(served.locator("img.plugin-logo")).to_have_count(1)
+                await expect(served.locator(".mark-logo")).to_have_count(1)
                 assert await _mark_of(served) == "logo:/icons/plugins/microsoft-icon.svg"
-                assert await served.evaluate("(node) => getComputedStyle(node).backgroundColor") == "rgb(255, 255, 255)"
+                assert await served.evaluate("(node) => getComputedStyle(node).backgroundColor") == "rgba(0, 0, 0, 0)"
                 of_no_service: Locator = page.locator(f".composer .pick-chip[data-name='{SERVER}'] .pick-mark")
                 assert await _mark_of(of_no_service) == DOT_MARK
             finally:

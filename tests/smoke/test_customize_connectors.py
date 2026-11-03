@@ -7,10 +7,9 @@ with no Sign in in a browser without a window; a service Dot cannot reach is not
 says how it connects, where it stands and where its data goes: Notes' Open System Settings shows the Automation pane
 under a line that names Dot, the program to open there, and goes under that line on a phone. The "+" of Calendar asks
 macOS and its tile says Allowed, and still does once the application is closed and macOS tells nothing about it (item
-288). The old address of Connect apps leads to the page. Every mark is a picture or an icon on a tile that is white in
-both colour schemes: a logo in its own colours, Calendar's the icon of the application itself, read from its bundle (the
-Mac's own here), Mail's its glyph and Outlook's the plug (no bundle to read, not installed), each on a tile of its
-colour (item 542); the Accounts card heads the list and no service's own page, and the "+" of a tile keeps its width.
+288). The old address of Connect apps leads to the page. Every mark is drawn in one colour, the theme's ink, on the same
+quiet tile (item 946): a logo through its file's shape, Calendar's and Mail's their glyphs and Outlook's the plug; the
+Accounts card heads the list and no service's own page, and the "+" of a tile keeps its width.
 
 macOS is never asked here and System Settings never opens: the test answers for them (``_Mac``). The sign-ins are read
 for real, from a cookie file in the profile of Dot's browser.
@@ -187,9 +186,6 @@ async def _box(locator: Locator) -> FloatRect:
     return box
 
 
-_LOADED: str = "(image) => image.decode().then(() => image.naturalWidth > 0)"
-
-
 async def _check_marks(page: Page) -> None:
     """The marks of the list as the page draws them, and the Accounts card above it."""
     # Every picture has loaded or failed (``complete``) before one is called broken: the Accounts card's too.
@@ -198,31 +194,38 @@ async def _check_marks(page: Page) -> None:
         "[...document.querySelectorAll('img')].filter((image) => image.naturalWidth === 0).map((image) => image.src)"
     )
     assert broken == []
-    # A logo is a picture in its own colours on a tile that is white in both colour schemes.
+    # A logo is drawn in one colour, the tile's ink, through its file's shape (item 946); the file is there.
     github: Locator = _tile(page, "github").locator(".plugin-mark")
-    await expect(github.locator("img.plugin-logo")).to_have_attribute("src", "/icons/plugins/github-icon.svg")
-    assert await github.locator("img").evaluate(_LOADED)
-    assert await github.evaluate("(mark) => getComputedStyle(mark).backgroundColor") == "rgb(255, 255, 255)"
-    # Calendar wears its application's icon, read from its bundle; Mail keeps its glyph and Outlook, with no mark of
-    # its own, wears the plug, each on a tile of its colour (item 542).
-    calendar: Locator = _tile(page, "calendar").locator(".plugin-mark")
-    await expect(calendar).to_have_attribute("data-icon", "app")
-    await expect(calendar.locator("img")).to_have_attribute("src", re.compile(r"^blob:"))
-    assert await calendar.locator("img").evaluate(_LOADED)
-    await expect(_tile(page, "mail").locator(".plugin-mark .icon")).to_have_count(1)
-    await expect(_tile(page, "mail").locator(".plugin-mark[data-icon]")).to_have_count(0)
+    shape: Locator = github.locator(".mark-logo")
+    logo: str = await shape.evaluate("(node) => node.style.getPropertyValue('--logo')")
+    assert logo == 'url("/icons/plugins/github-icon.svg")', logo
+    assert (await page.request.get(f"{page.url.split('#')[0]}icons/plugins/github-icon.svg")).ok
+    inked: bool = await shape.evaluate(
+        "(node) => getComputedStyle(node).backgroundColor === getComputedStyle(node.parentElement).color"
+        " && getComputedStyle(node).maskImage.startsWith('url(')"
+    )
+    assert inked
+    # The applications of the Mac keep their glyph (Calendar, Mail) and Outlook, with no mark of its own, wears the
+    # plug, each in the same ink on the same quiet tile as a logo: no tile of a colour of its own (item 946).
+    for listing in ("calendar", "mail"):
+        await expect(_tile(page, listing).locator(".plugin-mark .icon")).to_have_count(1)
+        await expect(_tile(page, listing).locator(".plugin-mark[data-icon]")).to_have_count(0)
     outlook: Locator = _tile(page, "outlook").locator(".plugin-mark")
     await expect(outlook.locator("svg.icon")).to_have_attribute("data-icon", "plug")
-    await expect(outlook).to_have_attribute("data-tint", "")
-    assert await outlook.evaluate("(mark) => getComputedStyle(mark).backgroundImage.startsWith('linear-gradient')")
+    same: bool = await outlook.evaluate(
+        "(mark, other) => { const a = getComputedStyle(mark); const b = getComputedStyle(other);"
+        " return a.backgroundColor === b.backgroundColor && a.color === b.color && a.backgroundImage === 'none'; }",
+        await github.element_handle(),
+    )
+    assert same
     # The tile's "+" keeps its width beside long words, on a phone too.
     widths: list[float] = await page.locator("button.plugin-add").evaluate_all(
         "(buttons) => buttons.map((button) => button.getBoundingClientRect().width)"
     )
     assert len(widths) > 10 and min(widths) >= 31.5, widths
-    # The Accounts card: both providers in their colours, and its title clear of its line.
+    # The Accounts card: both providers' marks, and its title clear of its line.
     accounts: Locator = page.locator("section[aria-label='Accounts']")
-    await expect(accounts.locator("img.account-mark")).to_have_count(2)
+    await expect(accounts.locator(".account-mark .mark-logo")).to_have_count(2)
     apart: bool = await accounts.locator(".card-head").evaluate(
         "(head) => { const title = document.createRange(); title.selectNodeContents(head.querySelector('.grow'));"
         " const a = title.getBoundingClientRect(); const b = head.querySelector('.hint').getBoundingClientRect();"

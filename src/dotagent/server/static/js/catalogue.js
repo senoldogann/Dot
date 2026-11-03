@@ -5,7 +5,7 @@
 // OneDrive itself, to sign in; the sign-in page in Dot's browser for an application of the web; an MCP server that Dot
 // tries first, and signs in to in this browser on the service's own page when it asks.
 
-import { api, blobUrl } from "./api.js";
+import { api } from "./api.js";
 import { clip, el, plural } from "./dom.js";
 import { markContent, markTile } from "./marks.js";
 import { field } from "./panels.js";
@@ -34,27 +34,10 @@ const VAULT_TOKEN_HELP = "https://start.1password.com/developer-tools/infrastruc
 // While Dot tries a server or waits for a sign-in, the page asks how it stands this often.
 const MCP_POLL_MS = 2000;
 
-/**
- * A service's mark on its tile: its logo in its own colours on a tile that is light in both colour schemes, else the
- * interface's icon or the plug on a tile of the listing's colour (item 542). `appIcon` is the pending `blob:` URL of
- * the icon of the application of this Mac the service stands for, as the owner has it installed
- * (`GET /connections/{id}/icon`), or null; the icon takes the tile's place once it is read, and the mark is as drawn
- * meanwhile, and as it stays when the icon cannot be read (the one that asked says why).
- */
-export function pluginMark(plugin, appIcon) {
+/** A service's mark on its tile (item 946): its logo, else the interface's icon or the plug, in the tile's ink. */
+export function pluginMark(plugin) {
   const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent(plugin));
-  markTile(mark, plugin, plugin.id);
-  if (appIcon !== null) {
-    appIcon.then(
-      (url) => {
-        mark.dataset.icon = "app";
-        delete mark.dataset.tint;
-        delete mark.dataset.light;
-        mark.replaceChildren(el("img", { class: "plugin-logo", src: url, alt: "" }));
-      },
-      () => undefined,
-    );
-  }
+  markTile(mark, plugin);
   return mark;
 }
 
@@ -170,31 +153,10 @@ export function createCatalogue(onChange) {
   // The steps under way, by what they act on (`app:<id>`, `mcp:<service or name>`, `server:<name>`): their buttons stay
   // off while the page paints again, and an application's says that macOS asks.
   const busy = new Set();
-  // The icons of the applications of this Mac shown, by application: the `blob:` URL of each, pending or made.
-  const appIcons = new Map();
   function changed() {
     if (!disposed) {
       onChange();
     }
-  }
-
-  /** The pending `blob:` URL of the icon of the application `plugin` stands for, read once, when that application is
-   * installed and has one; else null. */
-  function appIcon(plugin) {
-    const app = plugin.app === null ? undefined : listing.apps.find((one) => one.id === plugin.app);
-    if (app === undefined || !app.icon) {
-      return null;
-    }
-    let pending = appIcons.get(app.id);
-    if (pending === undefined) {
-      pending = blobUrl(`/connections/${encodeURIComponent(app.id)}/icon`);
-      appIcons.set(app.id, pending);
-      pending.catch((error) => {
-        appIcons.delete(app.id);
-        console.error(`the icon of ${app.name} could not be read`, error);
-      });
-    }
-    return pending;
   }
 
   /** Where `way` stands now: its application of `GET /connections`, or its server and service of `GET /mcp/servers`. */
@@ -558,7 +520,6 @@ export function createCatalogue(onChange) {
     },
     /** Whether the step that acts on `key` is under way. */
     busy: (key) => busy.has(key),
-    appIcon,
     wayNow,
     connected,
     firstStep,
@@ -580,11 +541,6 @@ export function createCatalogue(onChange) {
     dispose() {
       disposed = true;
       clearTimeout(polling);
-      for (const pending of appIcons.values()) {
-        // An icon that could not be read was reported where it was asked for; there is no URL to let go of.
-        pending.then((url) => URL.revokeObjectURL(url), () => undefined);
-      }
-      appIcons.clear();
     },
   };
 }

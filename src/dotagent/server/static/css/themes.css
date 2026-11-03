@@ -99,17 +99,14 @@
   --knob: light-dark(#ffffff, #f5f4f0);
   /* The page of a document as Quick Look draws it (item 268): white in both schemes, as the Mac draws it. */
   --paper: #ffffff;
-  /* The tile a service's mark sits on (item 437): light in both schemes, so that a dark logo (GitHub, X, Vercel)
-     reads in the dark scheme too; an icon of the interface on it is drawn in the tile's ink. */
+  /* A light tile in both schemes, for what keeps its own colours: a language's logo, a model provider's, the phone's
+     QR code and the sign-in page's mark (item 437; a service's mark is drawn in the theme's ink, item 946). */
   --mark-ground: #ffffff;
   --mark-ink: #2b2a27;
   --mark-ring: rgb(0 0 0 / 10%);
-  /* A mark that is no logo (item 542): its icon in white on a tile of its colour, lit from its top left. A mark with
-     no colour of its own takes one of these six by its id, and a kind of the gallery's plugins one of them too: each is
-     dark enough for the white icon in every look and scheme. */
+  /* Six colours dark enough for a white icon in every look and scheme, for the few things drawn in colour on purpose:
+     the loop's and the initiative's marks, a file's kind. */
   --mark-on-hue: #ffffff;
-  --mark-shade: #000000;
-  --mark-gloss: rgb(255 255 255 / 22%);
   --mark-blue: #2f6fdb;
   --mark-pink: #c4378f;
   --mark-violet: #7a4fe0;

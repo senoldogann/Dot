@@ -4,13 +4,13 @@
 
 **Customize** (items 278, 289, 316, 401, 542 and 545), whose Connectors [Connect apps](#connect-apps) opens, has three
 tabs: **Plugins**, the gallery of the plugins Dot installs ([Customize › Plugins](#customize--plugins)); **Skills**, the
-skills it reads ([Skills and plugins](#skills-and-plugins)); and **Connectors**, the services Dot works with
-([Customize › Connectors](#customize--connectors)). Each opens with the same head (item 545): a card lit by the theme's
-accent with the tab's title, a line on what it holds, its search and its controls, and a few of its marks scattered
-beside them, which a phone leaves out. `#/customize` opens Plugins. The old address `#/connect` leads to
-Connectors, and so does a service's page at the address it had before item 542, `#/customize/plugins/<service>`, since
-the gallery's plugins took that name; but for the four services whose gallery plugin has the same name (Cloudflare,
-Supabase, MongoDB and Hugging Face), where that address opens the plugin's page.
+skills it reads ([Skills and plugins](#skills-and-plugins)); and **Connectors**, the services Dot works with ([Customize
+› Connectors](#customize--connectors)). Each opens with the same head (items 545 and 946): the tab's title and a line on
+what it holds on the page's own ground, then its search with its controls beside it on one row. `#/customize` opens
+Plugins. The old address `#/connect` leads to Connectors, and so does a service's page at the address it had before item
+542, `#/customize/plugins/<service>`, since the gallery's plugins took that name; but for the four services whose
+gallery plugin has the same name (Cloudflare, Supabase, MongoDB and Hugging Face), where that address opens the plugin's
+page.
 
 ## Customize › Plugins
 
@@ -21,11 +21,11 @@ count) and an order, **Popular** (the stars its repository had when it was pinne
 it). A plugin's card has its mark, its name with a check when its publisher makes what its skills are about, who
 publishes it, its kind and how many skills it brings, what it does, and **Install**, or **Installed** with a Remove. A
 card opens the plugin's own page: the skills it brings, the repository and the commit Dot pins, its licence, its stars
-and since when the gallery has it. A plugin with no logo wears a skill's puzzle piece (item 537) on a tile of its
-kind's colour: Development blue, Design pink, Product violet, Data teal, Business orange, Writing green. On a phone New
-& noteworthy is a row that scrolls sideways. `GET /api/plugin-gallery` lists the plugins with where each stands
-(`available`, `installed`, or `taken` when a plugin of Dot's has its name) and the plugins Dot reads that are not the
-gallery's, which **Installed** lists under "Not from the gallery", with a Remove for one in Dot's own plugins folder.
+and since when the gallery has it. A plugin with no logo wears a skill's puzzle piece (item 537), in the theme's ink on
+the quiet tile every mark stands on (item 946). On a phone New & noteworthy is a row that scrolls sideways. `GET
+/api/plugin-gallery` lists the plugins with where each stands (`available`, `installed`, or `taken` when a plugin of
+Dot's has its name) and the plugins Dot reads that are not the gallery's, which **Installed** lists under "Not from the
+gallery", with a Remove for one in Dot's own plugins folder.
 
 The gallery (`plugins/gallery_list.py`) holds 22 plugins of 201 skills, each from a repository under the MIT or Apache
 2.0 licence, pinned to a commit and to the hash of the files of its skills:
@@ -167,28 +167,23 @@ managers (item 493), Code, Design, Data, Research, Communication, Productivity, 
 narrower window); on a phone its cards are rows as the other sections' are, the mark beside the words (item 604). Each
 card has the service's mark, what Dot does with it, how it connects (Sign in, Key, Open to all, On this Mac, On this Mac · Key; and by Connected app,
 Mac app, Dot's browser, Synced folder or 1Password), where it stands, and its first step
-in words on the line of its name (**Add**, **Allow**, **Sign in**, **Connect**), and lifts under the pointer; a card
+in words on the line of its name (**Add**, **Allow**, **Sign in**, **Connect**); a card
 opens the service's own page: each way it connects, with where it stands and its step, the **Actions** of its connected
 app once it is ready, and **Where its data goes**. **Check again** reads them all anew. `GET /api/plugins` returns the listings
 (`connections/directory.py`).
 
-Each tile's mark is the service's own logo, in its own colours, on a tile that is white in both colour schemes (a dark
-logo such as GitHub's or X's reads in the dark scheme too). The logos are files of `static/icons/plugins`: from
-[gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0), and, for the brands it draws as a wordmark alone
-(Stripe, Wix, Zapier, Webflow, Mixpanel, HubSpot and Sanity), not at all (Calendly, Semrush and the twelve
-more of item 535) or with an element that may reach past the file (Next.js), Simple Icons' symbol in the brand's
-colour (version 16.35.0, CC0), DuckDB's in black, as its yellow does not show on the tile;
-the folder's LICENSE names the files, the source and the commit they came from, and the brands' guidelines. A mark
-identifies its service and nothing more. The applications of this Mac (Mail, Calendar, Notes, Reminders, Messages,
-Contacts, Excel, Word, PowerPoint, Outlook and OneDrive) show the icon of the application you have installed, read from
-its bundle when the page is drawn (`GET /api/connections/{id}/icon`, a PNG; `connections/app_icons.py`), since Apple's
-and Microsoft's artwork is not Dot's to ship; one that is not installed keeps its own mark. A service with no logo
-(DeepWiki, Context7, Jina, Outlook, Mobbin, Parallel, Plain, MailerLite, Klaviyo and 30 of item 535's, Honeycomb, Attio
-and Granola among them; Cal.com's symbol is its wordmark, too small to read) wears the icon of the interface it was
-given, else the plug, in white on a tile of its colour lit from its top left, as an application's icon is (item 542);
-one with no colour of its own takes one of six by its id, the same wherever it shows. A server added by hand wears the
-mark of the service it is one of, and the composer's menus draw a server and its tools with the same mark (item 477),
-on their own light ground.
+Each tile's mark is the service's logo, drawn in one colour, the theme's ink, on a quiet tile a step up from the card
+(item 946): the file's shape alone, as a mask over that ink, so that a logo reads the same in every look and scheme and
+no brand's colours show. The logos are files of `static/icons/plugins`: Simple Icons' symbol (version 16.36.0, CC0) for
+every brand it draws, and [gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0) for the rest (Slack, Microsoft,
+OpenAI, AWS and twenty more); the folder's LICENSE names the files, the source and the commit they came from, and the
+brands' guidelines. A mark identifies its service and nothing more. A service with no logo (the applications of this
+Mac, DeepWiki, Context7, Jina, Mobbin, Parallel, Plain, MailerLite, Klaviyo, Honeycomb, Attio and Granola among them;
+Cal.com's symbol is its wordmark, too small to read) wears the icon of the interface it was given, else the plug, in the
+same ink on the same tile. A server added by hand wears the mark of the service it is one of, and the composer's menus
+draw a server and its tools with the same mark (item 477); a server's or an account's chip in the composer and under a
+message wears it in the chip's own colour, and an account's chip names its provider (Google, Microsoft) rather than its
+address, which its title keeps (item 946).
 
 **Item 535** brought 84 MCP servers more, each tried first as Dot reaches it (`mcp/catalogue.py` says how and what was
 left out with why). Code: Vercel (whose server lets Dot register now), Sourcegraph, grep.app, Xcode (Xcode's own
@@ -615,14 +610,14 @@ as a read, with no flag; any other counts as one that may change things (`destru
 
 ## Skills and plugins
 
-**Customize › Skills** (items 317 and 545) lists the skills Dot reads as cards, two a row (one on a phone), each with
-its mark light on a tile of its colour (the colour its name picks, as a plugin's is on Plugins), what it is for and
-that Dot has it, under the head of Customize with Personal and System, **Save from a chat** and **Import from other
-apps**, with a search and, past a section's first six cards, See N more. **Personal** holds yours
-(Dot's skills folder and the `[skills] dirs` folders), those imported from the Mac's other agents (with Remove) and the
-learned ones (below, with Share and Drop); **System** holds those that come with Dot and those of its plugins. **Save
-from a chat** writes the skill of a chat that ended done (`POST /api/runs/{id}/skill`). Under Personal, Found on this
-Mac and Import from other apps (below). The old address `#/settings/skills` leads here.
+**Customize › Skills** (items 317 and 545) lists the skills Dot reads as one list, a row each (item 946), each with its
+icon in the theme's ink on the quiet tile every mark stands on, what it is for on one line and that Dot has it, under
+the head of Customize with Personal and System, **Save from a chat** and **Import from other apps**, with a search and,
+past a section's first six cards, See N more. **Personal** holds yours (Dot's skills folder and the `[skills] dirs`
+folders), those imported from the Mac's other agents (with Remove) and the learned ones (below, with Share and Drop);
+**System** holds those that come with Dot and those of its plugins. **Save from a chat** writes the skill of a chat that
+ended done (`POST /api/runs/{id}/skill`). Under Personal, Found on this Mac and Import from other apps (below). The old
+address `#/settings/skills` leads here.
 
 A skill is a folder of instructions for one kind of work, in the Agent Skills layout: `<name>/SKILL.md` with a YAML
 frontmatter (`name`, `description`, and Dot's own `icon`, the name of one of the interface's icons, item 408: a skill

@@ -5,13 +5,14 @@
 import { api } from "./api.js";
 import { el } from "./dom.js";
 import { explain } from "./errors.js";
+import { markContent } from "./marks.js";
 import { attempt, detailsFold, toast } from "./ui.js";
 
 // How often the card reads the accounts again after a sign-in starts, and for how long.
 const FOLLOW_MS = 3000;
 const FOLLOW_FOR_MS = 10 * 60 * 1000;
-// The providers' own marks, in full colour: the files the list of the plugins shows Google and Microsoft with.
-const MARKS = { google: "/icons/plugins/google-icon.svg", microsoft: "/icons/plugins/microsoft-icon.svg" };
+// The providers' marks: the files the list of the plugins shows Google and Microsoft with, drawn in the tile's ink.
+const MARKS = { google: "google-icon.svg", microsoft: "microsoft-icon.svg" };
 
 /** The card: returns `element`, `read`, which settles once the card has read the accounts the first time or said why
  * it could not, and `dispose()`. */
@@ -29,10 +30,8 @@ export function accountsCard() {
   );
 
   function mark(provider) {
-    const source = MARKS[provider.id];
-    return source === undefined
-      ? el("span", { class: "account-mark", "aria-hidden": "true" }, provider.name.slice(0, 1))
-      : el("img", { class: "account-mark", src: source, alt: "", width: "24", height: "24" });
+    const logo = MARKS[provider.id];
+    return el("span", { class: "account-mark", "aria-hidden": "true" }, logo === undefined ? provider.name.slice(0, 1) : markContent({ logo, glyph: null }));
   }
 
   function row(provider) {

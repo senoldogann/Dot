@@ -1,28 +1,27 @@
 The marks in this folder come from two sources, both released under CC0 1.0 Universal
-(https://creativecommons.org/publicdomain/zero/1.0/).
+(https://creativecommons.org/publicdomain/zero/1.0/). Dot draws every one in one colour, the theme's ink, through the
+file's shape alone (a CSS mask, item 946), so that a file's own colours never show.
+
+Simple Icons (https://simpleicons.org), version 16.36.0: each file as the source draws it, the brand's symbol as one
+path: 1password.svg, airtable.svg, alibabacloud.svg, astro-icon.svg, atlassian.svg, betterstack.svg, braintrust.svg,
+brave.svg, buildkite-icon.svg, calendly.svg, chrome.svg, clerk-icon.svg, clickup-icon.svg, cloudflare-icon.svg,
+contentful.svg, convex.svg, digital-ocean-icon.svg, dropbox.svg, duckdb.svg, elevenlabs-icon.svg, excalidraw.svg,
+expo-icon.svg, figma.svg, firebase-icon.svg, framer.svg, github-icon.svg, gitlab-icon.svg, google-icon.svg, grafana.svg,
+greenhouse.svg, helpscout-icon.svg, hubspot.svg, hugging-face-icon.svg, instagram-icon.svg, intercom-icon.svg, kagi.svg,
+kubernetes.svg, linear-icon.svg, lottiefiles.svg, lucid.svg, mailgun-icon.svg, mapbox-icon.svg, miro-icon.svg,
+mixpanel.svg, model-context-protocol-icon.svg, mongodb-icon.svg, neon-icon.svg, netlify-icon.svg, new-relic-icon.svg,
+nextdotjs.svg, notion-icon.svg, nuxt-icon.svg, pagerduty-icon.svg, paypal.svg, perplexity-icon.svg, posthog-icon.svg,
+postman-icon.svg, prisma.svg, pulumi-icon.svg, resend-icon.svg, sanity.svg, semrush.svg, sentry-icon.svg, shadcnui.svg,
+shopify.svg, shortcut-icon.svg, snyk.svg, socket.svg, stripe.svg, supabase-icon.svg, svelte-icon.svg, todoist-icon.svg,
+vercel-icon.svg, webflow.svg, wix.svg, wordpress-icon.svg, x.svg, xcode.svg, zapier.svg. Simple Icons names Google
+Chrome's symbol googlechrome; the files keep the names the catalogue gives them.
 
 gilbarbara/logos (https://github.com/gilbarbara/logos), commit dafdf2df1334b2327497bfff40111aff0713c992 of 2026-10-17
-(its LICENSE.txt is CC0 1.0 Universal): each file as the source draws it, in the brand's own colours, unchanged:
-airtable.svg, amplitude-icon.svg, apify-icon.svg, apollostack.svg, astro-icon.svg, atlassian.svg,
-aws.svg, brave.svg, buildkite-icon.svg, chrome.svg, clerk-icon.svg, clickup-icon.svg, close.svg, cloudflare-icon.svg,
-contentful.svg, customerio-icon.svg, digital-ocean-icon.svg, dropbox.svg, elevenlabs-icon.svg, exa-icon.svg,
-expo-icon.svg, figma.svg, firebase-icon.svg, firecrawl-icon.svg, framer.svg, github-icon.svg, gitlab-icon.svg,
-google-icon.svg, grafana.svg, helpscout-icon.svg, heroku-icon.svg, hugging-face-icon.svg, incident-icon.svg,
-instagram-icon.svg, intercom-icon.svg, kubernetes.svg, launchdarkly-icon.svg, linear-icon.svg, linkedin-icon.svg,
-mailgun-icon.svg, mapbox-icon.svg, microsoft-azure.svg, microsoft-icon.svg, microsoft-onedrive.svg, miro-icon.svg,
-model-context-protocol-icon.svg, monday-icon.svg, mongodb-icon.svg, neon-icon.svg, netlify-icon.svg, new-relic-icon.svg,
-notion-icon.svg, nuxt-icon.svg, openai-icon.svg, pagerduty-icon.svg, paypal.svg, perplexity-icon.svg, pinecone-icon.svg,
-playwright.svg, posthog-icon.svg, postman-icon.svg, prisma.svg, productboard-icon.svg, pulumi-icon.svg, resend-icon.svg,
-sentry-icon.svg, shopify.svg, shortcut-icon.svg, slack-icon.svg, snyk.svg, sourcegraph.svg, supabase-icon.svg,
-svelte-icon.svg, tavily.svg, todoist-icon.svg, vercel-icon.svg, wordpress-icon.svg, workos-icon.svg, x.svg, xcode.svg.
-
-Simple Icons (https://simpleicons.org), version 16.35.0: alibabacloud.svg, betterstack.svg, braintrust.svg,
-calendly.svg, convex.svg, duckdb.svg, excalidraw.svg, greenhouse.svg, hubspot.svg, kagi.svg, lottiefiles.svg, lucid.svg,
-mixpanel.svg, nextdotjs.svg, sanity.svg, semrush.svg, shadcnui.svg, socket.svg, stripe.svg, webflow.svg, wix.svg,
-zapier.svg. gilbarbara/logos draws these brands as a wordmark alone, too small to read in a tile, or not at all, or
-(Next.js) with an element that may reach past the file, so each keeps Simple Icons' symbol: the icon's path alone, with
-the brand's colour as the file's fill. DuckDB's is filled black instead, as its yellow (FFF000) does not show on the
-white tile.
+(its LICENSE.txt is CC0 1.0 Universal), for the brands Simple Icons does not draw: each file as the source draws it,
+unchanged, of which Dot shows the shape: amplitude-icon.svg, apify-icon.svg, apollostack.svg, aws.svg, close.svg,
+customerio-icon.svg, exa-icon.svg, firecrawl-icon.svg, heroku-icon.svg, incident-icon.svg, launchdarkly-icon.svg,
+linkedin-icon.svg, microsoft-azure.svg, microsoft-icon.svg, microsoft-onedrive.svg, monday-icon.svg, openai-icon.svg,
+pinecone-icon.svg, playwright.svg, productboard-icon.svg, slack-icon.svg, sourcegraph.svg, tavily.svg, workos-icon.svg.
 
 The marks are trademarks of their owners. Dot shows each to identify the service it stands for, and nothing more; its
 use implies no endorsement. The owners' brand guidelines, where Simple Icons names them:

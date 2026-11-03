@@ -75,8 +75,7 @@ def test_a_way_no_catalogue_holds_is_refused() -> None:
 
 # What an SVG that is shown as a picture must not hold: it would run something or load something.
 _FORBIDDEN_TAGS: frozenset[str] = frozenset({"script", "foreignObject", "image", "use", "style", "a", "animate", "set"})
-_FILL: re.Pattern[str] = re.compile(r"#[0-9A-Fa-f]{6}")
-_LOGO_REFERENCE: re.Pattern[str] = re.compile(r"/icons/plugins/([A-Za-z0-9-]+\.svg)")
+_LOGO_REFERENCE: re.Pattern[str] = re.compile(r"\"([a-z0-9-]+\.svg)\"")
 
 
 def _licence_paragraph(licence: str, start: str) -> str:
@@ -91,11 +90,10 @@ def test_each_mark_is_a_logo_file_an_icon_of_the_interface_or_the_plug() -> None
     icons: set[str] = _icon_names()
     logos: set[str] = set()
     for listing in PLUGINS:
-        assert listing.colour is None or re.fullmatch(r"[0-9A-F]{6}", listing.colour), listing.id
         if listing.logo is not None:
             logos.add(listing.logo)
-            # A logo is drawn in its own colours: the listing's colour is for an icon and its tile.
-            assert listing.colour is None and listing.glyph is None, listing.id
+            # A listing with a logo names no icon of the interface besides it.
+            assert listing.glyph is None, listing.id
         elif listing.glyph is not None:
             assert listing.glyph in icons, listing.glyph
     # A listing with neither wears the plug (item 542), which the page draws.
@@ -124,9 +122,8 @@ def test_the_logo_files_are_svg_pictures_that_run_nothing_and_reach_nothing_each
                 if "href" in attribute or "url(" in value:
                     assert value.startswith("#") or value.startswith("url(#"), (name, attribute, value)
         if name in simple:
-            # A Simple Icons symbol is one path in the brand's colour, which the file's fill gives it.
+            # A Simple Icons symbol is one path; the page draws its shape in the theme's ink (item 946).
             assert [child.tag for child in root] == [f"{_SVG}path"], name
-            assert _FILL.fullmatch(root.get("fill") or ""), name
 
 
 def test_the_pages_script_names_only_logo_files_that_are_there() -> None:
@@ -136,13 +133,3 @@ def test_the_pages_script_names_only_logo_files_that_are_there() -> None:
         named |= set(_LOGO_REFERENCE.findall(script.read_text(encoding="utf-8")))
     assert {"google-icon.svg", "microsoft-icon.svg"} <= named
     assert all((_LOGOS / name).is_file() for name in named), named
-
-
-def test_a_listing_of_an_application_of_the_mac_names_it() -> None:
-    apps: dict[str, str] = {app.id: app.name for app in (*MAC_APPS, *FOLDER_APPS)}
-    for view in plugin_views():
-        ways: list[str] = [way.ref for way in view.ways if way.kind in ("mac", "folder") and way.ref is not None]
-        assert view.app == (ways[0] if ways else None), view.id
-        assert view.app is None or view.app in apps, view.id
-    # The ten applications of the Mac and OneDrive, each listed under its own id.
-    assert sorted(view.id for view in plugin_views() if view.app is not None) == sorted(apps)

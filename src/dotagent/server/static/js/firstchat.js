@@ -8,6 +8,7 @@ import { api } from "./api.js";
 import { assistant, saveAssistant } from "./assistant.js";
 import { el } from "./dom.js";
 import { NAME_CHARS } from "./face.js";
+import { markContent } from "./marks.js";
 import { shownOwner } from "./presence.js";
 import { getSnapshot } from "./state.js";
 import { attempt } from "./ui.js";
@@ -213,7 +214,7 @@ export function buildFirstChat({ startLook, onSkipped }) {
       el(
         "div",
         { class: "row" },
-        el("img", { class: "first-connect-mark", src: "/icons/plugins/google-icon.svg", alt: "", width: "28", height: "28" }),
+        el("span", { class: "first-connect-mark", "aria-hidden": "true" }, markContent({ logo: "google-icon.svg", glyph: null })),
         el("div", { class: "grow" }, el("div", { class: "first-connect-name" }, "Gmail and Google Calendar"), el("div", { class: "hint" }, `Let ${name} use them, signed in to Google in Dot's browser.`)),
         connect,
       ),

@@ -1751,7 +1751,7 @@ a.pill:hover {
   margin: 0;
 }
 
-/* A provider's mark, as a service's on the Connectors list: its colours on a tile that is light in both colour schemes. */
+/* A provider's mark, as a service's on the Connectors list (item 946): its logo in the ink on the quiet tile. */
 .account-mark {
   display: inline-grid;
   flex: none;
@@ -1759,13 +1759,16 @@ a.pill:hover {
   box-sizing: border-box;
   width: 28px;
   height: 28px;
-  padding: 4px;
   border-radius: var(--radius-sm);
-  background: var(--mark-ground);
-  box-shadow: inset 0 0 0 1px var(--mark-ring);
-  color: var(--mark-ink);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text);
   font-weight: var(--weight-title);
-  object-fit: contain;
+}
+
+.account-mark > .plugin-logo {
+  width: 16px;
+  height: 16px;
 }
 
 .account-name {
@@ -1864,18 +1867,60 @@ a.pill:hover {
   margin: 0 0 8px;
 }
 
-.plugin-grid,
-.skill-grid {
+.plugin-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 @media (max-width: 720px) {
-  .plugin-grid,
-  .skill-grid {
+  .plugin-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* The skills are one list (item 946): a row each in one frame, a line between them, what each does on one line. */
+.skill-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--box-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.skill-grid > .skill-card {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+}
+
+.skill-grid > .skill-card:first-child {
+  border-top: 0;
+}
+
+.skill-grid > .skill-card:hover {
+  background: color-mix(in oklab, var(--surface-2) 60%, transparent);
+}
+
+/* A skill's row: its mark on the line of its name, what it does on one line; a proposal keeps its steps whole. */
+.skill-grid > .skill-card:not(.proposal-card) {
+  align-items: center;
+}
+
+.skill-grid > .skill-card:not(.proposal-card) .skill-does {
+  -webkit-line-clamp: 1;
+}
+
+.skill-grid > .empty-state {
+  border-top: 1px solid var(--border);
+}
+
+.skill-grid > .empty-state:first-child {
+  border-top: 0;
 }
 
 .plugin-tile,
@@ -2015,45 +2060,40 @@ a.pill:hover {
   margin-top: var(--space-2);
 }
 
-/* The mark of a service (item 437): a tile that is light in both colour schemes, so that a dark logo (GitHub, X,
-   Vercel) reads in the dark scheme too. A logo is a picture in its own colours; an icon stands on a tile of its own
-   colour (below). An application of this Mac wears its own icon, which is its own tile: it takes none. */
+/* The mark of a service, a plugin or a skill (items 437 and 946): a quiet tile a step up from the card, its logo or
+   icon in the theme's ink, the same in every look and scheme. */
 .plugin-mark {
-  --plugin-ink: var(--mark-ink);
   display: grid;
   flex: none;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-sm);
-  background: var(--mark-ground);
-  box-shadow: inset 0 0 0 1px var(--mark-ring);
-  color: var(--plugin-ink);
-}
-
-.plugin-mark[data-icon="app"] {
-  background: none;
-  box-shadow: none;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text);
 }
 
 .plugin-mark .icon {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   color: inherit;
 }
 
 .plugin-logo {
-  width: 28px;
-  height: 28px;
+  width: 18px;
+  height: 18px;
   object-fit: contain;
 }
 
-/* An icon of the Mac holds its squircle inside a margin of its own, about a twelfth of its width on each side: drawn a
-   fifth larger than the tile, its squircle is as large as the tiles of the logos. */
-.plugin-mark[data-icon="app"] .plugin-logo {
-  width: 120%;
-  height: 120%;
-  max-width: none;
+/* A logo in one colour (item 946, marks.js): the file's shape alone, as a mask over the ink of where it stands, so that
+   a brand's own colours never show and a logo reads in every look and scheme. */
+.mark-logo {
+  display: block;
+  flex: none;
+  background-color: currentcolor;
+  -webkit-mask: var(--logo) center / contain no-repeat;
+  mask: var(--logo) center / contain no-repeat;
 }
 
 /* Dot's own icon (item 581), which a server of no service wears (marks.js): its own tile, as an application's icon is,
@@ -2077,27 +2117,6 @@ a.pill:hover {
   border-radius: var(--radius-xs);
 }
 
-/* A mark that is no logo (item 542): a connector's icon, the plug of one with no mark of its own and a gallery plugin's
-   puzzle piece, light on a tile of its colour lit from its top left, as an application's icon is (a mark with no colour
-   of its own takes one of six by its id, marks.js). On a colour too light for a light icon the icon takes the ink. */
-:is(.plugin-mark, .skill-mark)[data-tint] {
-  --plugin-hue: var(--mark-blue);
-  background: linear-gradient(
-    150deg,
-    color-mix(in oklab, var(--plugin-hue) 78%, var(--mark-ground)),
-    var(--plugin-hue) 55%,
-    color-mix(in oklab, var(--plugin-hue) 84%, var(--mark-shade))
-  );
-  box-shadow:
-    inset 0 0 0 1px var(--mark-ring),
-    inset 0 1px 0 var(--mark-gloss);
-  color: var(--mark-on-hue);
-}
-
-:is(.plugin-mark, .skill-mark)[data-tint][data-light] {
-  color: var(--mark-ink);
-}
-
 .plugin-hero {
   display: flex;
   align-items: flex-start;
@@ -2105,15 +2124,15 @@ a.pill:hover {
 }
 
 .plugin-hero .plugin-mark {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius);
 }
 
 .plugin-hero .plugin-logo,
 .plugin-hero .plugin-mark .icon {
-  width: 38px;
-  height: 38px;
+  width: 26px;
+  height: 26px;
 }
 
 .plugin-title {
@@ -2181,47 +2200,42 @@ a.pill:hover {
   gap: var(--space-3);
 }
 
+/* The head of a tab (item 946): the tab's title and its line on the page's own ground, then its search and its filters
+   and buttons on one row, which wraps on a narrow window. */
 .customize-hero {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  overflow: hidden;
-  padding: 28px 32px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background:
-    radial-gradient(75% 150% at 100% 0%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 70%),
-    radial-gradient(60% 120% at 0% 100%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 70%),
-    var(--surface);
-}
-
-.customize-hero-main {
   display: grid;
-  flex: 1 1 auto;
-  gap: var(--space-2);
-  min-width: 0;
-  max-width: 560px;
+  gap: var(--space-1);
 }
 
 .customize-hero-title {
   margin: 0;
   color: var(--text);
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: var(--weight-title);
   letter-spacing: var(--tracking-title);
-  line-height: var(--leading-2xl);
+  line-height: var(--leading-xl);
 }
 
 .customize-hero-line {
+  max-width: 68ch;
   margin: 0;
-  color: var(--text-2);
+  color: var(--muted);
+}
+
+.customize-hero-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .customize-find {
   position: relative;
   display: flex;
+  flex: 1 1 260px;
   align-items: center;
-  margin-top: var(--space-2);
+  min-width: 0;
 }
 
 .customize-find > .icon {
@@ -2233,79 +2247,19 @@ a.pill:hover {
   pointer-events: none;
 }
 
-/* The search stands out of the lit card: the card's own ground in the light scheme, a step up from it in the dark. */
 .customize-search.input {
-  height: 40px;
+  width: 100%;
+  height: 36px;
   padding-left: 36px;
-  background: light-dark(var(--surface), var(--surface-2));
+  background: var(--surface);
 }
 
-/* The tab's own filters and buttons, under its search (item 545). */
+/* The tab's own filters and buttons, beside its search (items 545 and 946). */
 .customize-hero-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-1);
-}
-
-.customize-hero-marks {
-  position: relative;
-  flex: none;
-  width: 236px;
-  height: 148px;
-  margin-right: var(--space-2);
-}
-
-.customize-hero-mark {
-  position: absolute;
-  filter: drop-shadow(0 6px 14px var(--shadow-ink-deep));
-}
-
-.customize-hero-mark > .plugin-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius);
-}
-
-.customize-hero-mark .plugin-logo {
-  width: 34px;
-  height: 34px;
-}
-
-.customize-hero-mark .plugin-mark .icon {
-  width: 28px;
-  height: 28px;
-}
-
-.customize-hero-mark:nth-child(1) {
-  top: 46px;
-  left: 0;
-  transform: rotate(-10deg);
-}
-
-.customize-hero-mark:nth-child(2) {
-  top: 4px;
-  left: 64px;
-  transform: rotate(6deg) scale(1.08);
-}
-
-.customize-hero-mark:nth-child(3) {
-  top: 80px;
-  left: 92px;
-  transform: rotate(-4deg) scale(1.15);
-}
-
-.customize-hero-mark:nth-child(4) {
-  top: 18px;
-  left: 152px;
-  transform: rotate(9deg);
-}
-
-.customize-hero-mark:nth-child(5) {
-  top: 90px;
-  left: 176px;
-  transform: rotate(-7deg) scale(0.9);
 }
 
 .gallery-section-head {
@@ -2369,25 +2323,12 @@ a.pill:hover {
 
 .gallery-card:hover {
   border-color: var(--border-strong);
-  box-shadow: var(--shadow-raised);
 }
 
 /* A featured card stands up: its mark over its words, its button at its top right, three lines of what it does. */
 .gallery-featured .gallery-card {
   flex-direction: column;
   padding: var(--space-4);
-  background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 6%, var(--surface)), var(--surface) 70%);
-}
-
-.gallery-featured .plugin-mark {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius);
-}
-
-.gallery-featured .plugin-mark .icon {
-  width: 24px;
-  height: 24px;
 }
 
 .gallery-featured .gallery-action {
@@ -2547,19 +2488,15 @@ a.pill:hover {
 }
 
 .gallery-page-head > .plugin-mark {
-  width: 64px;
-  height: 64px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius);
 }
 
-.gallery-page-head > .plugin-mark .icon {
-  width: 32px;
-  height: 32px;
-}
-
+.gallery-page-head > .plugin-mark .icon,
 .gallery-page-head .plugin-logo {
-  width: 40px;
-  height: 40px;
+  width: 26px;
+  height: 26px;
 }
 
 .gallery-page-head > .gallery-card-main {
@@ -2731,19 +2668,6 @@ a.pill:hover {
     scroll-snap-align: start;
   }
 
-  .customize-hero {
-    padding: var(--space-5);
-  }
-
-  .customize-hero-marks {
-    display: none;
-  }
-
-  .customize-hero-title {
-    font-size: var(--text-xl);
-    line-height: var(--leading-xl);
-  }
-
   /* Who publishes a plugin reads at the size of what it does (item 329). */
   .gallery-card-by {
     font-size: var(--text-sm);
@@ -2887,20 +2811,9 @@ a.pill:hover {
   background: var(--surface-2);
 }
 
-/* A skill's card lifts under the pointer as a plugin's does, its mark light on a tile of its colour. */
+/* A skill's row lights under the pointer (item 946). */
 .skill-card {
-  transition:
-    border-color var(--motion-base) var(--ease),
-    box-shadow var(--motion-base) var(--ease);
-}
-
-.skill-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-raised);
-}
-
-.skill-mark[data-tint] .icon {
-  color: inherit;
+  transition: background var(--motion-base) var(--ease);
 }
 
 @media (max-width: 1100px) {
@@ -2919,16 +2832,17 @@ a.pill:hover {
   display: grid;
   flex: none;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-sm);
-  background: var(--surface-3);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .skill-mark .icon {
-  width: 20px;
-  height: 20px;
-  color: var(--text-2);
+  width: 16px;
+  height: 16px;
+  color: var(--text);
 }
 
 .skill-head {
@@ -3503,13 +3417,20 @@ dialog.modal.versions-dialog {
 
 /* The same tile as the provider's mark of Customize › Connectors. */
 .first-connect-mark {
+  display: grid;
   flex: none;
-  box-sizing: border-box;
-  padding: 4px;
+  place-items: center;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-sm);
-  background: var(--mark-ground);
-  box-shadow: inset 0 0 0 1px var(--mark-ring);
-  object-fit: contain;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text);
+}
+
+.first-connect-mark > .plugin-logo {
+  width: 16px;
+  height: 16px;
 }
 
 .first-connect-name {
@@ -4943,13 +4864,12 @@ dialog.modal.versions-dialog {
   height: 18px;
 }
 
-/* A server and its tools wear their service's mark as its Customize tile does (item 477): on the tile's ground, light
-   in both colour schemes, its icon in --plugin-ink. */
+/* A server and its tools wear their service's mark as its Customize tile does (items 477 and 946): on the quiet tile,
+   in the ink. */
 .slash-mark[data-mark="service"] {
-  --plugin-ink: var(--mark-ink);
-  color: var(--plugin-ink);
-  background: var(--mark-ground);
-  box-shadow: inset 0 0 0 1px var(--mark-ring);
+  color: var(--text);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .slash-mark[data-mark="service"] .icon,
@@ -9114,24 +9034,19 @@ dialog.modal.page-dialog .shown-page-frame {
   height: 14px;
 }
 
-/* A server's chip wears its service's mark as the at menu does (item 530): on the tile's ground, light in both colour
-   schemes, a logo in its own colours, an icon in --plugin-ink. */
+/* A server's or an account's chip wears its service's mark (items 530 and 946): its logo or icon in the chip's own
+   colour, as a skill's icon is, on no tile. */
 .pick-mark[data-mark="service"] {
-  --plugin-ink: var(--mark-ink);
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: var(--radius-xs);
-  color: var(--plugin-ink);
-  background: var(--mark-ground);
-  box-shadow: inset 0 0 0 1px var(--mark-ring);
+  width: 16px;
+  height: 16px;
 }
 
 .pick-mark[data-mark="service"] .icon,
 .pick-mark[data-mark="service"] .plugin-logo {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 
 

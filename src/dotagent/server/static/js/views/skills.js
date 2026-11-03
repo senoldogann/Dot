@@ -20,7 +20,7 @@ import { api, query } from "../api.js";
 import { customizeHead } from "../customizehead.js";
 import { ago, clip, el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { IMPORTED_SKILL_MARK, LEARNED_SKILL_MARK, skillMark, tintMark } from "../marks.js";
+import { IMPORTED_SKILL_MARK, LEARNED_SKILL_MARK, skillMark } from "../marks.js";
 import { emptyPanel, errorPanel, foldGroup, loadingPanel, segmented } from "../panels.js";
 import { proposalCard } from "../skillproposals.js";
 import { showVersions } from "../skillversions.js";
@@ -463,7 +463,7 @@ function skillCard({ name, description, mark, facts, actions, have, haveMark = "
   return el(
     "div",
     { class: "skill-card", dataset: { skill: name } },
-    tintedMark("skill-mark", mark, name),
+    skillTile(mark),
     el(
       "div",
       { class: "skill-main" },
@@ -480,12 +480,9 @@ function skillCard({ name, description, mark, facts, actions, have, haveMark = "
   );
 }
 
-/** The mark `mark` (an icon's name) of the skill `name` on a tile of its colour (item 545), as a plugin's is on
- * Plugins: the colour its name picks, the same wherever it shows. */
-function tintedMark(className, mark, name) {
-  const node = el("span", { class: className, "aria-hidden": "true" }, icon(mark));
-  tintMark(node, null, name);
-  return node;
+/** The mark `mark` (an icon's name) of a skill on its quiet tile, in the tile's ink (item 946). */
+function skillTile(mark) {
+  return el("span", { class: "skill-mark", "aria-hidden": "true" }, icon(mark));
 }
 
 /** A card's facts: its chips, then one quiet line of the rest. */
@@ -862,7 +859,6 @@ export function mount(root) {
     const systemCount = palette.skills.filter((skill) => skill.source === BUILTIN_SOURCE || skill.source.startsWith(PLUGIN_SOURCE)).length;
     personalButton.textContent = `Personal ${personalCount}`;
     systemButton.textContent = `System ${systemCount}`;
-    head.setMarks(palette.skills.map((skill) => tintedMark("plugin-mark", skillMark(skill), skill.name)));
     const parts = shown === "personal" ? personal() : system();
     holder.replaceChildren(...parts.filter((part) => part !== null));
   }

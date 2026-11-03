@@ -265,7 +265,7 @@ function serviceParts(catalogue, plugin) {
     el(
       "header",
       { class: "plugin-hero", dataset: { plugin: plugin.id } },
-      pluginMark(plugin, catalogue.appIcon(plugin)),
+      pluginMark(plugin),
       el("div", { class: "plugin-main" }, el("h2", { class: "plugin-title" }, plugin.name), el("div", { class: "plugin-does" }, plugin.does), el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), catalogue.standing(plugin))),
     ),
     does.length < 2 ? null : card("does", "What Dot does with it", "sparkle", el("ul", { class: "plugin-list" }, does.map((line) => el("li", null, line)))),
@@ -323,7 +323,7 @@ export function mount(root, ctx) {
     return el(
       "div",
       { class: "plugin-tile", dataset: { plugin: plugin.id, connected: String(isConnected) } },
-      pluginMark(plugin, catalogue.appIcon(plugin)),
+      pluginMark(plugin),
       el(
         "div",
         { class: "plugin-main" },
@@ -339,7 +339,7 @@ export function mount(root, ctx) {
    * service's tile wears it (items 408 and 477), else Dot's own icon (item 581). */
   function serverMark(server) {
     const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent(server.mark));
-    markTile(mark, server.mark, server.name);
+    markTile(mark, server.mark);
     return mark;
   }
 
@@ -471,14 +471,8 @@ export function mount(root, ctx) {
     });
   }
 
-  /** The head's marks: the logos of the popular services. */
-  function paintHead() {
-    head.setMarks(catalogue.plugins.filter((plugin) => plugin.section === "popular" && plugin.logo !== null).map((plugin) => pluginMark(plugin, null)));
-  }
-
   function paintList() {
     paintTabs();
-    paintHead();
     const showing = catalogue.plugins.filter((plugin) => (shown === "all" || catalogue.connected(plugin)) && matches(plugin));
     const others = catalogue.servers.servers.filter((server) => server.service === null && (words === "" || foldSearch(`${server.name} ${server.address}`).includes(words)));
     const parts = sections(showing);

@@ -171,7 +171,8 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             # The ready server with no logo shows none: one mark, the logo's.
             marks: Locator = button.locator(".side-connect-mark")
             await expect(marks).to_have_count(1)
-            await expect(marks.locator("img")).to_have_attribute("src", f"/icons/plugins/{sentry.logo}")
+            logo: str = await marks.locator(".mark-logo").evaluate("(shape) => shape.style.getPropertyValue('--logo')")
+            assert logo == f'url("/icons/plugins/{sentry.logo}")', logo
 
             # It opens Customize › Connectors, no dialog over the page, and stands for the page while it is open.
             await button.click()

@@ -1,16 +1,14 @@
 """Routes of the applications of Customize › Connectors (item 278): where each one stands, and the step that sets it up;
-the listings of the Connectors page (item 316), which takes those steps; and the icon of an application of the Mac, read
-from its bundle."""
+and the listings of the Connectors page (item 316), which takes those steps."""
 
 import asyncio
 import time
 from pathlib import Path
 
 from fastapi import APIRouter
-from fastapi.responses import Response
 
 from dotagent.browser.session import BrowserSession
-from dotagent.connections import app_icons, mac
+from dotagent.connections import mac
 from dotagent.connections.catalogue import FOLDER_APPS, MAC_APPS, WEB_APPS, FolderApp, MacApp, WebApp
 from dotagent.connections.directory import plugin_views
 from dotagent.connections.states import (
@@ -63,16 +61,15 @@ def connections_router(ctx: ServerContext) -> APIRouter:
     # The questions macOS asks the owner now, by application: each ends with the owner's answer.
     asking: dict[str, asyncio.Future[mac.AutomationState]] = {}
 
-    def live_state(app: MacApp) -> tuple[ConnectionState, bool]:
-        """What macOS says about ``app`` now, and whether the installed application has an icon to show."""
-        installed: Path | None = mac.installed_app(app.bundle_id)
-        if installed is None:
-            return "not_installed", False
-        return mac.automation_state(app.bundle_id), app_icons.icon_file(installed) is not None
+    def live_state(app: MacApp) -> ConnectionState:
+        """What macOS says about ``app`` now."""
+        if mac.installed_app(app.bundle_id) is None:
+            return "not_installed"
+        return mac.automation_state(app.bundle_id)
 
     async def mac_view(app: MacApp, program: Path) -> ConnectionView:
         """Where ``app`` stands for ``program``; an answer macOS gives about it is kept for when it does not run."""
-        live, icon = await asyncio.to_thread(live_state, app)
+        live: ConnectionState = await asyncio.to_thread(live_state, app)
         key: str = _answer_key(program, app.bundle_id)
         kept: str | None = await store.kv_get(key)
         if live in _KEPT_ANSWERS and live != kept:
@@ -86,7 +83,6 @@ def connections_router(ctx: ServerContext) -> APIRouter:
             state=state,
             step=mac_step(state),
             waiting=app.id in asking,
-            icon=icon,
         )
 
     def folder_view(app: FolderApp) -> ConnectionView:
@@ -100,7 +96,6 @@ def connections_router(ctx: ServerContext) -> APIRouter:
             state=state,
             step=folder_step(state),
             waiting=False,
-            icon=installed is not None and app_icons.icon_file(installed[1]) is not None,
         )
 
     def web_view(app: WebApp, cookies: frozenset[CookieKey]) -> ConnectionView:
@@ -113,7 +108,6 @@ def connections_router(ctx: ServerContext) -> APIRouter:
             state=state,
             step=web_step(state, session.config.headless),
             waiting=False,
-            icon=False,
         )
 
     async def cookies() -> frozenset[CookieKey]:
@@ -140,35 +134,6 @@ def connections_router(ctx: ServerContext) -> APIRouter:
             headless=session.config.headless,
             runner=perms.program_name(program),
         )
-
-    def icon_of(app_id: str) -> Path:
-        """The ``.icns`` file of the installed application ``app_id`` of the Mac or of a synced folder;
-        ``NotFoundError`` for an application of the web, one that is not installed and one whose bundle holds no icon
-        file."""
-        bundle_ids: tuple[str, ...]
-        found_mac: MacApp | None = next((app for app in MAC_APPS if app.id == app_id), None)
-        found_folder: FolderApp | None = next((app for app in FOLDER_APPS if app.id == app_id), None)
-        if found_mac is not None:
-            bundle_ids = (found_mac.bundle_id,)
-        elif found_folder is not None:
-            bundle_ids = found_folder.bundle_ids
-        else:
-            raise NotFoundError("Dot lists no such application of this Mac", {"app_id": app_id})
-        installed: tuple[str, Path] | None = mac.installed_one_of(bundle_ids)
-        if installed is None:
-            raise NotFoundError("the application is not installed", {"app_id": app_id, "bundle_ids": list(bundle_ids)})
-        icns: Path | None = app_icons.icon_file(installed[1])
-        if icns is None:
-            raise NotFoundError("the application has no icon file", {"app_id": app_id, "app": str(installed[1])})
-        return icns
-
-    @router.get("/connections/{app_id}/icon")
-    async def app_icon(app_id: str) -> Response:
-        """The icon of the application ``app_id`` as the owner has it installed, a PNG read from its bundle (Apple's
-        and Microsoft's artwork is not shipped with Dot); 404 for an application of the web, one that is not installed
-        and one with no icon file."""
-        icns: Path = await asyncio.to_thread(icon_of, app_id)
-        return Response(await asyncio.to_thread(app_icons.icon_png, icns), media_type="image/png")
 
     @router.get("/plugins")
     async def list_plugins() -> PluginsView:

@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 
 from dotagent.connections.directory import ServiceMark
 from dotagent.mcp.types import McpTool
+from dotagent.oauth.providers import PROVIDERS
 from dotagent.oauth.tokens import Account
 from dotagent.server.callback_page import PROVIDER_MARKS
 from dotagent.server.views import PaletteAccount, PaletteServer, PaletteSkill, PaletteTool, PaletteView
@@ -47,8 +48,9 @@ def palette_view(
             PaletteAccount(
                 address=account.address,
                 provider=account.provider,
+                provider_name=PROVIDERS[account.provider].name,
                 reads=account_reads(account.provider),
-                mark=ServiceMark(logo=PROVIDER_MARKS[account.provider], glyph=None, colour=None),
+                mark=ServiceMark(logo=PROVIDER_MARKS[account.provider], glyph=None),
             )
             for account in accounts
         ),

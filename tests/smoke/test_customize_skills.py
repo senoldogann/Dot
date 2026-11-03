@@ -183,12 +183,15 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         await expect(_section(page, "imported").locator(".skill-card")).to_have_count(1)
                         shared: Locator = _card(page, _SHARED)
                         await expect(shared.locator(".skill-have")).to_have_text("Learned")
-                        # Two cards a row on a wide page, measured once what the Mac's other agents set up is read
-                        # and drawn (the page paints again then).
+                        # One list, a row each (item 946), on a wide page too, measured once what the Mac's other
+                        # agents set up is read and drawn (the page paints again then).
                         await expect(page.get_by_text("Found on this Mac")).to_be_visible()
                         first: FloatRect = await _box(own.locator(".skill-card").nth(0))
                         second: FloatRect = await _box(own.locator(".skill-card").nth(1))
-                        assert first["y"] == second["y"] and second["x"] > first["x"], (first, second)
+                        assert first["x"] == second["x"] and second["y"] >= first["y"] + first["height"] - 1, (
+                            first,
+                            second,
+                        )
                         # The search finds one skill by its name.
                         search: Locator = page.get_by_role("searchbox", name="Search skills")
                         await search.press_sequentially("own-skill-7")

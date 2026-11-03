@@ -1533,11 +1533,13 @@ class PaletteServer(FrozenModel):
 
 
 class PaletteAccount(FrozenModel):
-    """An account signed in, as the at menu offers it (item 496): its address, its provider, what of it a run reads
-    (its mail and calendar, by the provider's names), and the mark of the provider as the Accounts card wears it."""
+    """An account signed in, as the at menu offers it (item 496): its address, its provider and the provider's name
+    (``Google``, ``Microsoft``: what the account's chip says, item 946), what of it a run reads (its mail and calendar,
+    by the provider's names), and the mark of the provider as the Accounts card wears it."""
 
     address: str
     provider: str
+    provider_name: str
     reads: str
     mark: ServiceMark
 
@@ -1689,8 +1691,7 @@ class ConnectionView(FrozenModel):
     """One application of Customize › Connectors (items 278 and 316). ``kind`` says how Dot reaches it: ``mac``, it
     drives it with AppleScript; ``web``, it uses it in its own browser; ``folder``, it reads and writes the folder it
     keeps in sync. ``state`` is where it stands and ``step`` what sets it up (``connections/states.py``), ``None``
-    when there is none to take; ``waiting`` is true while macOS asks the owner about it on the Mac; ``icon`` is true
-    when the installed application has an icon of its own to show (``GET /connections/{id}/icon``)."""
+    when there is none to take; ``waiting`` is true while macOS asks the owner about it on the Mac."""
 
     id: str
     kind: ConnectionKind
@@ -1699,7 +1700,6 @@ class ConnectionView(FrozenModel):
     state: ConnectionState
     step: ConnectionStep | None
     waiting: bool
-    icon: bool
 
 
 class ConnectionsView(FrozenModel):
