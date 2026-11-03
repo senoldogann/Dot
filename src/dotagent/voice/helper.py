@@ -123,7 +123,8 @@ class _Outcome:
 @dataclass
 class _Stream:
     """A stream open with the program (item 969): the program, the language it writes down, the number the next piece
-    must have, the bytes of sound it was given, and when it opened and last had a piece (the helper's clock)."""
+    must have, the bytes of sound it was given, when it opened and last had a piece (the helper's clock), and whether
+    the tick ended it and its words are awaited (it still counts among the open, and the cross still kills it)."""
 
     process: asyncio.subprocess.Process
     language: str
@@ -132,6 +133,7 @@ class _Stream:
     opened: float
     last: float
     lock: asyncio.Lock
+    ending: bool
 
 
 def _digest_of(path: Path) -> str | None:
@@ -393,15 +395,23 @@ class Transcriber:
         name: str = secrets.token_urlsafe(_STREAM_ID_BYTES)
         now: float = time.monotonic()
         self._streams[name] = _Stream(
-            process=process, language=language, next_piece=0, given=0, opened=now, last=now, lock=asyncio.Lock()
+            process=process,
+            language=language,
+            next_piece=0,
+            given=0,
+            opened=now,
+            last=now,
+            lock=asyncio.Lock(),
+            ending=False,
         )
         if self._watching is None or self._watching.done():
             self._watching = asyncio.create_task(self._watch())
         return name
 
     def _stream(self, name: str) -> _Stream:
+        """The stream ``name`` that still takes sound: one the tick ended takes no more."""
         found: _Stream | None = self._streams.get(name)
-        if found is None:
+        if found is None or found.ending:
             raise NotFoundError(
                 "that recording is no longer open: press the microphone again", {"stream": name[:_TAG_CHARS]}
             )
@@ -428,6 +438,8 @@ class Transcriber:
             stream.given += len(pcm)
             stream.last = time.monotonic()
             await self._write(name, stream, pcm)
+            # A write the program was slow to take is no silence of the page's.
+            stream.last = time.monotonic()
 
     async def _write(self, name: str, stream: _Stream, pcm: bytes) -> None:
         """Write ``pcm`` to the program's input. A program that ended already (a language it has no dictation of) is
@@ -451,15 +463,24 @@ class Transcriber:
         back (``""`` when nothing was heard). ``VoiceError`` says what to do when the Mac could not write it down."""
         stream: _Stream = self._stream(name)
         async with stream.lock:
+            if stream.ending or self._streams.get(name) is not stream:
+                raise NotFoundError("that recording is no longer open: press the microphone again", {})
+            stream.ending = True
             started: float = time.monotonic()
-            await self._write(name, stream, _TAIL)
-            self._streams.pop(name, None)
-            pipe: asyncio.StreamWriter | None = stream.process.stdin
-            if pipe is not None:
-                pipe.close()
-            seconds: float = RUN_TIMEOUT_S if stream.language in self._written else FIRST_RUN_TIMEOUT_S
-            outcome: _Outcome = await self._answer(stream, seconds)
-            text: str = self._words(outcome, stream.language)
+            try:
+                await self._write(name, stream, _TAIL)
+                pipe: asyncio.StreamWriter | None = stream.process.stdin
+                if pipe is not None:
+                    pipe.close()
+                seconds: float = RUN_TIMEOUT_S if stream.language in self._written else FIRST_RUN_TIMEOUT_S
+                outcome: _Outcome = await self._answer(stream, seconds)
+                # The cross while the words were awaited: the program was killed, and nothing is said of it.
+                if self._streams.get(name) is not stream:
+                    raise NotFoundError("that recording was dropped", {})
+                text: str = self._words(outcome, stream.language)
+            finally:
+                if self._streams.get(name) is stream:
+                    del self._streams[name]
         self._written.add(stream.language)
         log.info(
             "voice_written_down",
@@ -506,8 +527,13 @@ class Transcriber:
             await asyncio.sleep(_STREAM_WATCH_S)
             now: float = time.monotonic()
             for name, stream in list(self._streams.items()):
+                # One the tick ended waits for its words under a time limit of its own.
+                if stream.ending:
+                    continue
                 waited: float = STREAM_IDLE_S if stream.next_piece > 0 else STREAM_FIRST_PIECE_S
-                idle: bool = now - stream.last > waited
+                # A piece being handed to the program is no silence of the page's, however slow the program is to take
+                # it: the page sends the next once it is taken.
+                idle: bool = not stream.lock.locked() and now - stream.last > waited
                 if idle or now - stream.opened > STREAM_LIFE_S:
                     log.warning("voice_stream_dropped", reason="idle" if idle else "too long", language=stream.language)
                     await self._kill(name)

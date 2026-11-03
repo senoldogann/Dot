@@ -5,8 +5,10 @@
 // `unsupported-language` (the Mac has no dictation of the language) and `failed` (anything else). The words go nowhere
 // else: no file, no log, no standard error.
 //
-// The model is made ready while the owner still speaks, and what was said is written down as it comes, so the answer is
-// there a moment after the input ends: measured on this Mac, 0.04 s to 0.08 s after 12 s of Turkish fed in real time.
+// The input is read from the first moment, whatever the model is doing: the sound waits in memory while the model is
+// made ready (and, the first time a language is used, downloaded), so the daemon's writes never wait on a full pipe.
+// What was said is written down as it comes, so the answer is there a moment after the input ends: measured on this
+// Mac, 0.04 s to 0.08 s after 12 s of Turkish fed in real time.
 //
 // It writes with macOS 26's own dictation model, on this Mac (`DictationTranscriber`, 54 languages, Turkish among
 // them, where `SpeechTranscriber` has ten and no Turkish). That needs no permission: it asks for no Speech Recognition
@@ -52,6 +54,7 @@ struct Transcribe {
         else {
             fail("failed", "the format of the input could not be made")
         }
+        let sound = readInput()
         do {
             if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
                 try await request.downloadAndInstall()
@@ -71,7 +74,22 @@ struct Transcribe {
                 }
             }
             try await analyzer.start(inputSequence: inputs)
-            let heard = await readInput(given: given, wanted: wanted, converter: converter, feed: feed)
+            var heard = false
+            var left = Data()
+            for await read in sound {
+                left.append(read)
+                let whole = left.count - left.count % 2
+                if whole == 0 {
+                    continue
+                }
+                let block = Data(left.prefix(whole))
+                left = Data(left.dropFirst(whole))
+                guard let buffer = pcm(block, given), let ready = converted(buffer, wanted, converter) else {
+                    continue
+                }
+                heard = true
+                feed.yield(AnalyzerInput(buffer: ready))
+            }
             feed.finish()
             if heard {
                 try await analyzer.finalizeAndFinishThroughEndOfInput()
@@ -85,37 +103,21 @@ struct Transcribe {
         }
     }
 
-    /// Read the standard input to its end on a thread of its own, handing each block to `feed` as the model wants it.
-    /// Whether any sound came.
-    static func readInput(
-        given: AVAudioFormat, wanted: AVAudioFormat, converter: AVAudioConverter?,
-        feed: AsyncStream<AnalyzerInput>.Continuation
-    ) async -> Bool {
-        await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
-            Thread.detachNewThread {
-                var heard = false
-                var left = Data()
-                while true {
-                    let read = FileHandle.standardInput.availableData
-                    if read.isEmpty {
-                        break
-                    }
-                    left.append(read)
-                    let whole = left.count - left.count % 2
-                    if whole == 0 {
-                        continue
-                    }
-                    let block = Data(left.prefix(whole))
-                    left = Data(left.dropFirst(whole))
-                    guard let buffer = pcm(block, given), let ready = converted(buffer, wanted, converter) else {
-                        continue
-                    }
-                    heard = true
-                    feed.yield(AnalyzerInput(buffer: ready))
+    /// The standard input as it comes, read to its end on a thread of its own from the moment this is called: what
+    /// is read waits in the stream (which keeps every element) until it is taken.
+    static func readInput() -> AsyncStream<Data> {
+        let (sound, feed) = AsyncStream<Data>.makeStream(bufferingPolicy: .unbounded)
+        Thread.detachNewThread {
+            while true {
+                let read = FileHandle.standardInput.availableData
+                if read.isEmpty {
+                    break
                 }
-                done.resume(returning: heard)
+                feed.yield(read)
             }
+            feed.finish()
         }
+        return sound
     }
 
     /// `bytes` of 16-bit samples as a buffer of `format`.

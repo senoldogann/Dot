@@ -64,7 +64,7 @@ case "$control" in
   failed) printf '{{"error":"failed","detail":"the model broke"}}\\n'; exit 1 ;;
   crash) echo "Fatal error: boom" >&2; exit 139 ;;
   garbage) echo "{secret} is not json" ;;
-  late) sleep 30 ;;
+  late) exec sleep 30 ;;
 esac
 """
 
@@ -350,6 +350,51 @@ async def test_a_stream_no_piece_comes_to_is_dropped_by_itself_and_waits_longer_
     with pytest.raises(NotFoundError):
         await transcriber.feed(waiting, 1, PIECE)
     assert [entry["reason"] for entry in logs if entry["event"] == "voice_stream_dropped"] == ["idle", "idle"]
+
+
+async def test_a_stream_the_tick_ended_counts_until_its_words_come_and_the_cross_still_kills_it(
+    stand: Stand, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pre-push review of item 969: a stream left the count as its tick came, so that a third program could start
+    while two still wrote down, and the cross found nothing to kill while the words were awaited."""
+    monkeypatch.setattr(helper, "FIRST_RUN_TIMEOUT_S", 30.0)
+    transcriber: Transcriber = _transcriber(stand)
+    stand.says("late")
+    first: str = await transcriber.open("tr-TR")
+    await transcriber.open("en-US")
+    await transcriber.feed(first, 0, PIECE)
+    ending: asyncio.Task[str] = asyncio.create_task(transcriber.end(first))
+    await asyncio.sleep(0.3)
+    assert not ending.done()
+    with pytest.raises(VoiceError) as busy:
+        await transcriber.open("tr-TR")
+    assert busy.value.context["code"] == "busy"
+    # A piece or a second tick for it is refused: it takes no more sound.
+    with pytest.raises(NotFoundError):
+        await transcriber.feed(first, 1, PIECE)
+    await transcriber.drop(first)
+    with pytest.raises(NotFoundError, match="dropped"):
+        await ending
+    assert sorted(_gone(pid) for pid in await _started(stand, 2)) == [False, True]
+
+
+async def test_a_program_slow_to_take_its_sound_is_no_silence_of_the_pages(
+    stand: Stand, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pre-push review of item 969: a program that does not read (the real one reads from its first moment, the
+    model downloading or not) left a piece waiting on a full pipe, and the watch took the wait for a page gone."""
+    monkeypatch.setattr(helper, "STREAM_IDLE_S", 0.3)
+    monkeypatch.setattr(helper, "_STREAM_WATCH_S", 0.1)
+    transcriber: Transcriber = _transcriber(stand)
+    stand.says("slow")
+    name: str = await transcriber.open("tr-TR")
+    # More than a pipe holds: the write waits for a program that does not read.
+    feeding: asyncio.Task[None] = asyncio.create_task(transcriber.feed(name, 0, bytes(512 * 1024)))
+    await asyncio.sleep(1.0)
+    assert not feeding.done()
+    await transcriber.drop(name)
+    with pytest.raises((VoiceError, NotFoundError)):
+        await feeding
 
 
 async def test_a_program_that_reports_an_error_says_what_to_do_in_plain_words(stand: Stand) -> None:
