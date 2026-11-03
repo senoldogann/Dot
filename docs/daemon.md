@@ -254,8 +254,9 @@ The recorder holds:
 - a wave that moves while the engine hears a sound (drawn from the engine's own word that it hears one; for a
   recording, from how loud the microphone's sound is);
 - the time since the browser began to listen;
-- a tick that puts the words in the box, after what it holds, once the engine has settled them (a recording: once the
-  Mac has written it down).
+- a tick that puts the words heard in the box, after what it holds, at once; the engine settles the words it may still
+  change for up to three seconds after it, and the settled ones take their place while the box still holds them as they
+  were put, never over what the owner wrote since (item 968; a recording: once the Mac has written it down).
 
 Until the tick the box keeps what it held. The dictation also ends:
 

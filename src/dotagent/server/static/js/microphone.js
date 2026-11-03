@@ -1,7 +1,7 @@
 // The microphone of a composer (item 574): a button where the page can listen. Pressed, it turns the composer's controls
 // into a recorder (item 605): a cross that drops the dictation, a wave that moves while the engine hears a sound, the time
-// since it began to listen, and a tick that ends it. The words go into the box when the owner presses the tick, or when a
-// pause ends the dictation by itself; until then the box keeps what it held. It also ends when the owner types (the
+// since it began to listen, and a tick that ends it. The words go into the box when the owner presses the tick, at once
+// (item 968), or when a pause ends the dictation by itself; until then the box keeps what it held. It also ends when the owner types (the
 // dictation is dropped), when a message is sent and when the page goes out of sight. Nothing is sent by voice alone: the
 // owner reads what the box holds and sends it as usual.
 //
@@ -37,8 +37,9 @@ const WRITING = "Writing down what you said…";
 // How many bars the wave holds, and how often a new one comes in: the oldest go out at the left, past the recorder's width.
 const BARS = 96;
 const WAVE_MS = 90;
-// How long the tick waits for the engine to settle what it heard before the words it has go into the box all the same
-// (an iPhone's later dictation that heard none then says it is Safari's: item 616).
+// How long the engine is given, after the tick, to settle the words it may still change: the box took the words heard
+// at the tick (item 968), and the settled ones take their place when the box still holds them as they were put. After
+// it, the engine is let go (an iPhone's later dictation that heard none then says it is Safari's: item 616).
 const SETTLE_MS = 3000;
 
 /**
@@ -121,6 +122,9 @@ export function createMicrophone({ textarea, setInterim }) {
   let withTheMac = false;
   // Whether the tick had a keyboard's focus when it was pressed: turned off while the engine settles, it lets it go.
   let tickHadFocus = false;
+  // What the box held once the tick put the words heard in it (item 968), while the engine settles them: the settled
+  // words take its place only when the box still holds it. Null when no tick waits.
+  let putAtTick = null;
   // Which dictation this is, counted at each start. A dictation's end clears the tick's wait before another starts;
   // the count is a second guard that the wait ends only the dictation it was pressed in.
   let dictations = 0;
@@ -162,6 +166,10 @@ export function createMicrophone({ textarea, setInterim }) {
     if (heard === null || heard === textarea.value) {
       return;
     }
+    // After the tick the box is the owner's again: the settled words do not take the place of their own (item 968).
+    if (putAtTick !== null && textarea.value !== putAtTick) {
+      return;
+    }
     writing = true;
     textarea.value = heard;
     // The composer hears it as it hears typing: it grows the box, keeps the draft and wakes the send.
@@ -180,6 +188,7 @@ export function createMicrophone({ textarea, setInterim }) {
     paint(listening);
     if (listening) {
       dictations += 1;
+      putAtTick = null;
       // The engine may say it began before the dictation says it listens (an engine that starts at once): its time stays.
       heard = null;
       dropped = false;
@@ -205,9 +214,18 @@ export function createMicrophone({ textarea, setInterim }) {
       putHeard();
     }
     heard = null;
+    putAtTick = null;
+    closed(focusedOn);
+  }
+
+  /** The recorder goes and the composer's controls are back. The tick or the cross that had a keyboard's focus
+   * (`focusedOn`) goes out of sight with the recorder: the box takes it, the words in it. A tap's focus (Chrome on a phone
+   * gives a tapped button one) stays put, so no keyboard opens on the screen. */
+  function closed(focusedOn) {
+    paint(false);
+    clearInterval(ticking);
+    ticking = null;
     beganAt = null;
-    // The tick or the cross that had a keyboard's focus goes out of sight with the recorder: the box takes it, the words
-    // in it. A tap's focus (Chrome on a phone gives a tapped button one) stays put, so no keyboard opens on the screen.
     if (tickHadFocus || (recorder.contains(focusedOn) && focusedOn.matches(":focus-visible"))) {
       textarea.focus();
     }
@@ -280,13 +298,18 @@ export function createMicrophone({ textarea, setInterim }) {
   }
 
   button.addEventListener("click", () => {
+    // A dictation still settling the words of its tick (item 968) gives way to the new one, its words in the box.
+    if (putAtTick !== null && dictation.listening()) {
+      drop();
+    }
     listenTheWayOfNow();
     dictation.toggle();
   });
   cancel.addEventListener("click", drop);
   done.addEventListener("click", () => {
-    // The engine settles what it heard and ends; the words go into the box then. One that does not end soon is ended
-    // with the words it has, and an iPhone's later one that heard none says it is Safari's (item 616).
+    // The words heard go into the box at once and the recorder goes (item 968); the engine settles what it heard
+    // meanwhile, and the settled words take their place. One that does not end soon is ended, and an iPhone's later one
+    // that heard none says it is Safari's (item 616).
     tickHadFocus = done.matches(":focus-visible");
     done.disabled = true;
     // A recording is with the Mac after the tick, which may take a while: the cross stays, to give up waiting.
@@ -297,6 +320,10 @@ export function createMicrophone({ textarea, setInterim }) {
     // A dictation the stop ended at once (its engine had not begun: the browser still asked) leaves nothing to wait
     // for; a recording waits for the Mac's answer as long as it takes.
     if (way === "recognition" && dictation.listening()) {
+      const focusedOn = document.activeElement;
+      putHeard();
+      putAtTick = textarea.value;
+      closed(focusedOn);
       const pressedIn = dictations;
       settling = setTimeout(() => {
         if (pressedIn === dictations) {

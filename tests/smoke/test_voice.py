@@ -452,10 +452,13 @@ async def test_the_microphone_ends_by_itself_after_a_pause_with_what_it_heard(br
     await page.context.close()
 
 
-async def test_the_tick_waits_for_the_engine_to_settle_what_it_heard(browser: Browser, address: str) -> None:
-    """Item 605: the engine settles the words it may still change after its stop. The recorder stays, its buttons off,
-    and the settled words go into the box when the engine ends; one that does not end within three seconds is ended
-    with the words it has."""
+async def test_the_tick_puts_the_words_in_the_box_at_once_and_the_settled_ones_after(
+    browser: Browser, address: str
+) -> None:
+    """Item 968 (item 605 waited for the engine, up to three seconds): the tick puts the words heard in the box at once
+    and the recorder goes; the engine settles the words it may still change meanwhile, and the settled ones take their
+    place when the box still holds them as they were put. One that does not end within three seconds is let go, and
+    what the owner wrote after the tick stays theirs."""
     page: Page = await _open(browser, address, 1280, clock=True)
     mic: Locator = _microphone(page)
     recorder: Locator = _recorder(page)
@@ -466,31 +469,39 @@ async def test_the_tick_waits_for_the_engine_to_settle_what_it_heard(browser: Br
     # The tick pressed by the keyboard.
     await done.focus()
     await page.keyboard.press("Enter")
-    await expect(recorder).to_be_visible()
-    await expect(done).to_be_disabled()
-    await expect(page.locator(GOAL)).to_have_value("")
-    # The engine settles what it may still change, then ends: the settled words go into the box.
-    await page.evaluate("() => window.__voice.hear([['hello world', true]])")
-    await page.clock.run_for(1_100)
-    await expect(page.locator(GOAL)).to_have_value("hello world")
+    await expect(page.locator(GOAL)).to_have_value("hello wor")
     await expect(recorder).to_be_hidden()
     # The keyboard's focus the tick had goes to the box with the words.
     await expect(page.locator(GOAL)).to_be_focused()
-    # An engine that does not end: three seconds after the tick, the dictation ends with what it heard.
+    # The engine settles what it may still change, then ends: the settled words take the place of the first.
+    await page.evaluate("() => window.__voice.hear([['hello world', true]])")
+    await page.clock.run_for(1_100)
+    await expect(page.locator(GOAL)).to_have_value("hello world")
+    # An engine that does not end: its words are in the box at the tick, and three seconds after it, it is let go.
     await page.locator(GOAL).fill("")
     await page.locator(GOAL).blur()
     await page.evaluate("() => { window.__voice.endAfter = 60000; }")
     await mic.click()
     await page.evaluate("() => window.__voice.hear([['still here', true]])")
     await done.click()
-    await page.clock.run_for(2_900)
-    await expect(recorder).to_be_visible()
-    await page.clock.run_for(200)
     await expect(recorder).to_be_hidden()
     await expect(page.locator(GOAL)).to_have_value("still here")
+    await page.clock.run_for(3_100)
     assert await _voice(page, "voice.aborts") == 1
     # A tick pressed by the pointer leaves the focus be: a phone opens no keyboard on the screen for it.
     await expect(page.locator(GOAL)).not_to_be_focused()
+    # What the owner writes after the tick is theirs: settled words that come later do not take its place.
+    await page.locator(GOAL).fill("")
+    await page.locator(GOAL).blur()
+    await page.evaluate("() => { window.__voice.endAfter = 1000; }")
+    await mic.click()
+    await page.evaluate("() => window.__voice.hear([['good mor', false]])")
+    await done.click()
+    await expect(page.locator(GOAL)).to_have_value("good mor")
+    await page.locator(GOAL).press_sequentially("ning")
+    await page.evaluate("() => window.__voice.hear([['good morning to you', true]])")
+    await page.clock.run_for(1_100)
+    await expect(page.locator(GOAL)).to_have_value("good morning")
     await page.context.close()
 
 
