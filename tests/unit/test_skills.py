@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from dotagent.agent.playbooks import PlaybookMeta, list_playbooks, save_meta
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.config import McpServerConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import PluginError, SkillError
@@ -31,7 +32,7 @@ from dotagent.skills.catalog import (
 from dotagent.skills.discover import find_skill_files
 from dotagent.skills.icons import ICON_NAMES, skill_icon
 from dotagent.skills.office import CLOUD_STORAGE, OFFICE_APPS, ONEDRIVE_APP, app_version, onedrive_folders
-from dotagent.skills.parse import parse_skill
+from dotagent.skills.parse import cut_description, parse_skill
 from dotagent.skills.types import PYTHON_MARK, Skill
 from dotagent.tools.skill import fence_skill, with_python
 
@@ -105,6 +106,20 @@ def test_a_skill_s_icon_is_its_frontmatter_s_when_the_interface_has_it_else_read
     assert len(ICON_NAMES) >= 88 and {"mail", "lockOpen", "x", "puzzle"} <= ICON_NAMES
 
 
+def test_a_skill_named_otherwise_than_its_folder_or_described_at_length_loads(tmp_path: Path) -> None:
+    """Item 948: a plugin's skill named apart from its folder (Canva's) or described past the specification's 1024
+    characters (Wix's) was left out of every run unseen; it loads, by its frontmatter's name, its words cut."""
+    file: Path = tmp_path / "brand-check" / "SKILL.md"
+    named: Skill = parse_skill(
+        file, "---\nname: canva-brand-check\ndescription: Check a design.\n---\nbody\n", "plugin canva"
+    )
+    assert (named.name, named.root) == ("canva-brand-check", file.parent)
+    long: str = " ".join(["word"] * 400)
+    described: Skill = parse_skill(file, f"---\nname: brand-check\ndescription: {long}\n---\nbody\n", "plugin canva")
+    assert len(described.description) <= 1024 and described.description.endswith("word…")
+    assert cut_description("short words", 1024) == "short words"
+
+
 def test_a_byte_order_mark_before_the_frontmatter_is_tolerated(tmp_path: Path) -> None:
     file: Path = tmp_path / "tidy" / "SKILL.md"
     assert parse_skill(file, "﻿" + _simple("tidy"), "home").name == "tidy"
@@ -119,7 +134,6 @@ def test_a_byte_order_mark_before_the_frontmatter_is_tolerated(tmp_path: Path) -
         ("---\n- a list\n---\nbody\n", "not a mapping"),
         ("---\nname: Tidy\ndescription: x\n---\nbody\n", "does not follow the Agent Skills specification"),
         ("---\nname: tidy\n---\nbody\n", "does not follow the Agent Skills specification"),
-        ("---\nname: other\ndescription: x\n---\nbody\n", "not the name of its folder"),
         ("---\nname: tidy\ndescription: x\n---\n\n   \n", "no instructions after the frontmatter"),
     ],
 )
@@ -267,6 +281,27 @@ def test_the_names_of_the_skills_dot_learned_or_was_taught_are_kept_for_its_play
         f"plugin/{name}/SKILL.md": f"the name {name} {kept}"
         for name in ("taught-setup", "learned-count-files", "playbook-old", "taught-extra-notes")
     }
+
+
+def test_a_playbook_named_apart_from_its_folder_is_left_out(tmp_path: Path) -> None:
+    """Item 948: a skill of another folder may go by a name its folder does not carry, but one of Dot's own playbooks,
+    kept and dated by its folder's name, would then be offered under another playbook's record: it is left out."""
+    playbooks: Path = tmp_path / "playbooks"
+    for folder, name in (("learned-a", "learned-b"), ("learned-c", "learned-c")):
+        save_meta(
+            _skill_dir(playbooks, folder, _simple(name)),
+            PlaybookMeta(
+                name=folder, kind="count", host="", runs=("run_a",), acting_steps=(1,), written_at=1.0,
+                updated_at=1.0, uses=0, failures=0,
+            ),
+        )  # fmt: skip
+    catalog = load_catalog((SkillRoot(path=playbooks, source="learned"),))
+    assert [skill.name for skill in catalog.skills] == ["learned-c"]
+    assert [problem.reason.split(" (")[0] for problem in catalog.problems] == [
+        "the name in SKILL.md is not the name of its folder, which a skill Dot learned or was taught must carry"
+    ]
+    # The playbooks' own list leaves it out too, so that no record is found under the other name.
+    assert [entry.skill.name for entry in list_playbooks(playbooks)] == ["learned-c"]
 
 
 def test_the_fence_around_a_skill_cannot_be_closed_from_inside(tmp_path: Path) -> None:

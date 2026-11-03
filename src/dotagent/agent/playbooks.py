@@ -106,7 +106,7 @@ from dotagent.skills.catalog import (
     PLAYBOOK_SOURCE,
     TAUGHT_PREFIX,
     playbook_root,
-    read_skill,
+    read_playbook,
 )
 from dotagent.skills.parse import parse_skill, split_frontmatter
 from dotagent.skills.types import SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
@@ -1105,8 +1105,9 @@ async def date_reads(root: Path, skills: Sequence[Skill], at: float) -> None:
 
 def _renamed(folder: Path, was: str) -> None:
     """The skill in ``folder``, which was ``was`` and now has the name of its folder, under that name in its SKILL.md
-    and its record: the loader reads a skill whose name is its folder's, and a listing or a drop finds it by that name
-    (item 557). A skill that cannot be read stays as it is, logged: moving it aside never fails the retirement."""
+    and its record: the loader reads a playbook only under its folder's name (item 948), and a listing or a drop finds
+    it by that name (item 557). A skill that cannot be read stays as it is, logged: moving it aside never fails the
+    retirement."""
     file: Path = folder / SKILL_FILE
     try:
         yaml_text, body = split_frontmatter(file, file.read_text(encoding="utf-8"))
@@ -1209,12 +1210,13 @@ def _entries(folder: Path, retired: bool) -> list[PlaybookEntry]:
         if not child.name.startswith(PLAYBOOK_PREFIXES) or not file.is_file():
             continue
         try:
-            skill: Skill = read_skill(file, PLAYBOOK_SOURCE)
+            skill: Skill = read_playbook(file)
             meta: PlaybookMeta = read_meta(child)
         except (SkillError, NotFoundError) as error:
-            # One skill the loader cannot read (edited by hand, written by an older Dot, no UTF-8 text) or whose record
-            # cannot be read is left out, as the catalog leaves it out; the others, and the runs that are offered them,
-            # go on. A learned skill with no entry is not offered (:func:`offered_skills`).
+            # One skill the loader cannot read (edited by hand, written by an older Dot, no UTF-8 text, named apart from
+            # its folder) or whose record cannot be read is left out, as the catalog leaves it out; the others, and
+            # the runs that are offered them, go on. A learned skill with no entry is not offered
+            # (:func:`offered_skills`).
             log.warning("playbook_unreadable", path=str(file), error=error.message, context=error.context)
             continue
         entries.append(PlaybookEntry(skill=skill, meta=meta, retired=retired))

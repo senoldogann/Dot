@@ -98,12 +98,27 @@ def read_skill(file: Path, source: str) -> Skill:
     return parse_skill(file, text, source)
 
 
+def read_playbook(file: Path) -> Skill:
+    """The skill ``file`` holds, one of Dot's own playbooks (learned or taught): as :func:`read_skill`, and named as its
+    folder is. A skill of another folder may go by a name its folder does not carry (item 948), but a playbook is kept,
+    dated, listed and dropped by its folder's name (items 557 and 585): one named otherwise would be found under another
+    playbook's record, so it raises :class:`SkillError`, for the catalog and the playbooks' list alike."""
+    skill: Skill = read_skill(file, PLAYBOOK_SOURCE)
+    if skill.name != file.parent.name:
+        raise SkillError(
+            "the name in SKILL.md is not the name of its folder, which a skill Dot learned or was taught must carry",
+            {"path": str(file), "name": skill.name, "folder": file.parent.name},
+        )
+    return skill
+
+
 def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
-    """Read every root. A root that is missing, a folder that is not a skill, a name used twice, or a name that is
-    Dot's (:data:`PLAYBOOK_PREFIXES`, on a skill that is not in the playbook folder) is reported and left out while the
-    other skills still load. A skill reached through two roots (a symlink and its target) counts once, and so does a
-    copy of one (the same name, description and instructions in its SKILL.md in another folder, as a sync of the same
-    skills leaves; the other files of the folders are not compared, and the first one's are used).
+    """Read every root. A root that is missing, a folder that is not a skill, a name used twice, a name that is Dot's
+    (:data:`PLAYBOOK_PREFIXES`, on a skill that is not in the playbook folder), or a playbook named apart from its
+    folder (:func:`read_playbook`) is reported and left out while the other skills still load. A skill reached through
+    two roots (a symlink and its target) counts once, and so does a copy of one (the same name, description and
+    instructions in its SKILL.md in another folder, as a sync of the same skills leaves; the other files of the folders
+    are not compared, and the first one's are used).
     A skill of a plugin whose name another skill has, and is no copy of it, is offered as ``<plugin>-<skill>``
     (:func:`plugin_skill_name`, item 817): two plugins (or a plugin and the owner) may each bring a ``code-review`` of
     their own, and the second was left out. It is left out only when that name is taken too or is no skill name.
@@ -127,7 +142,7 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
                 continue
             seen.add(real)
             try:
-                skill: Skill = read_skill(file, root.source)
+                skill: Skill = read_playbook(file) if root.source == PLAYBOOK_SOURCE else read_skill(file, root.source)
             except SkillError as exc:
                 problems.append(SkillProblem(path=file, reason=_reason(exc)))
                 continue

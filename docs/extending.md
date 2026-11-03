@@ -641,7 +641,10 @@ goes on, as it recalls its notes by words then. A skill that shares only some of
 ask for more than one kind of work. Dot always looks in `<home>/skills` and in the `skills/` folder of every plugin;
 `[skills] dirs` lists more directories (each holds skill folders; `~` expands). Skills written for Claude Code load
 unchanged: Dot reads only `name`, `description` and its own `icon` of the frontmatter, so other keys (a date or a nested
-map under `metadata`, a list of `allowed-tools`) do not leave a skill out. To use your own, put `dirs =
+map under `metadata`, a list of `allowed-tools`) do not leave a skill out, and neither does a `name` other than
+its folder's (a plugin's `canva-brand-check` in `brand-check`: the skill goes by its frontmatter's name, as Claude Code
+takes it) nor a description past the specification's 1,024 characters (cut there with an ellipsis; item 948). Dot's
+own learned and taught skills still carry their folders' names, by which they are kept. To use your own, put `dirs =
 ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be
 one skill folder (`~/.claude/skills/<name>`), to take some skills only: `~/.claude/skills` can hold skills written for
 Claude Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The skills you wrote for

@@ -14,17 +14,21 @@ SKILL_NAME_PATTERN: str = r"^[a-z0-9]+(-[a-z0-9]+)*$"
 # Stands for Dot's own Python in a skill's instructions, which the skill tool replaces with its path as the shell takes
 # it: that Python has the libraries for Office files (item 196).
 PYTHON_MARK: str = "{{dot_python}}"
+# The most characters of a skill's description, as the specification has it: what the prompt lists of one.
+DESCRIPTION_CHARS: int = 1024
 
 
 class SkillFrontmatter(FrozenModel):
     """The keys of a SKILL.md's YAML frontmatter that Dot reads, as the Agent Skills specification defines them. Every
     other key is ignored, whatever it holds, so a skill written for another agent still loads: skills written for Claude
-    Code put dates and nested maps under ``metadata``, where the specification asks for strings."""
+    Code put dates and nested maps under ``metadata``, where the specification asks for strings. A description longer
+    than the specification's :data:`DESCRIPTION_CHARS` loads too, cut to them (item 948: Wix's skills were left out
+    for it, unseen), as Claude Code takes such a skill."""
 
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     name: str = Field(min_length=1, max_length=64, pattern=SKILL_NAME_PATTERN)
-    description: str = Field(min_length=1, max_length=1024)
+    description: str = Field(min_length=1)
     # Dot's own key (item 408): the name of one of the interface's icons; another agent's skill has none, or holds
     # anything under it, which leaves the skill in and the icon to its words.
     icon: object | None = None

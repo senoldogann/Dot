@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from dotagent.core.errors import SkillError
 from dotagent.skills.icons import skill_icon
-from dotagent.skills.types import Skill, SkillFrontmatter
+from dotagent.skills.types import DESCRIPTION_CHARS, Skill, SkillFrontmatter
 
 _DELIMITER: str = "---"
 
@@ -46,20 +46,27 @@ def parse_frontmatter(path: Path, yaml_text: str) -> SkillFrontmatter:
         ) from exc
 
 
+def cut_description(words: str, most: int) -> str:
+    """``words`` on one line, cut to ``most`` characters at a space with an ellipsis when they are longer."""
+    line: str = " ".join(words.split())
+    if len(line) <= most:
+        return line
+    kept: str = line[: most - 1]
+    space: int = kept.rfind(" ")
+    return (kept[:space] if space > most // 2 else kept).rstrip(" ,;:.") + "…"
+
+
 def parse_skill(path: Path, text: str, source: str) -> Skill:
-    """The skill written in ``path`` (a SKILL.md), whose folder must carry the name of the frontmatter."""
+    """The skill written in ``path`` (a SKILL.md), by the name of its frontmatter. Its folder may carry another
+    (item 948): the specification asks for the same, but plugins name a skill ``canva-brand-check`` in a folder
+    ``brand-check``, and Claude Code takes the frontmatter's; Dot left such skills out, unseen by the run and the
+    owner."""
     yaml_text, body = split_frontmatter(path, text)
     front: SkillFrontmatter = parse_frontmatter(path, yaml_text)
-    folder: str = path.parent.name
-    if front.name != folder:
-        raise SkillError(
-            "the name in SKILL.md is not the name of its folder",
-            {"path": str(path), "name": front.name, "folder": folder},
-        )
     instructions: str = body.strip()
     if instructions == "":
         raise SkillError("SKILL.md has no instructions after the frontmatter", {"path": str(path)})
-    description: str = " ".join(front.description.split())
+    description: str = cut_description(front.description, DESCRIPTION_CHARS)
     return Skill(
         name=front.name,
         description=description,
