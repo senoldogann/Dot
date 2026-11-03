@@ -163,7 +163,8 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
 - **Cleanup.** The checkout is removed afterwards. Its branch stays when it has a pull request, or commits that wait
   for you (the session asked for you, or the review still stopped it); otherwise it is deleted.
 - **Main moved.** GitHub refuses a push straight to `main` of a commit whose checks have not passed (its protection
-  requires `gate`, `browser (pages)` and `browser (phone)`, up to date, for admins too: read on 2026-11-02), so the one
+  requires `gate`, `gate (part 2)`, `browser (pages)`, `browser (phone 1)` and `browser (phone 2)`, for admins too,
+  but no longer that a pull request be up to date with `main`, item 944), so the one
   way into `main` is a pull request whose checks passed. When a session begins, Dot reads where `main` stands on
   GitHub and takes a print of your checkout of Dot: its commit, which may only go forward along main (to a commit of
   main on GitHub that comes after it: a pull of yours, a deploy, item 940; back, or off main, counts as changed; a pull

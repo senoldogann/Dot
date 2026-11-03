@@ -9,7 +9,10 @@ stand-ins. The tests of the accounts signed in (items 422 and 424) keep their to
 application that runs, and that service takes seconds when the Mac is busy. The Swift compiler that builds the program
 which writes a recording down (item 626) is one that does not exist too, so that no test builds Swift, opens Apple's
 frameworks or asks the owner's developer tools whether this Mac can write down: every page a browser test opens asks
-``GET /api/voice``, and answers that the Mac cannot. The tests of the microphone's recording point it at a stand-in."""
+``GET /api/voice``, and answers that the Mac cannot. The tests of the microphone's recording point it at a stand-in.
+
+``--part k/n`` keeps the files of one part of n (item 944): the gate runs the smoke tests in two parts, on two runners
+at once, the files dealt to the parts in turn by their sorted paths, so that a new file joins a part by itself."""
 
 import fcntl
 import os
@@ -33,6 +36,33 @@ MISSING_SWIFTC: str = "/nonexistent/dot-tests/swiftc"
 # Keychain refuses before ``security`` runs (item 628: ``security`` itself would use the login keychain in its place),
 # so that no test reads or writes the owner's login keychain through them; the tests of the sign-ins make their own.
 MISSING_KEYCHAIN: str = "/nonexistent/dot-tests/accounts.keychain-db"
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption("--part", action="store", default=None, help="k/n: run only the files of part k of n (item 944)")
+
+
+def files_of_part(files: list[str], part: int, parts: int) -> set[str]:
+    """The files part ``part`` (from 1) of ``parts`` runs: every ``parts``-th of the sorted paths, from its own."""
+    if not 1 <= part <= parts:
+        raise ValueError(f"part {part} is not one of 1 to {parts}")
+    return set(sorted(set(files))[part - 1 :: parts])
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    said: str | None = config.getoption("--part")
+    if said is None:
+        return
+    part_text, _, parts_text = said.partition("/")
+    if not (part_text.isdigit() and parts_text.isdigit()):
+        raise pytest.UsageError(f"--part takes k/n, as 1/2, not {said!r}")
+    kept_files: set[str] = files_of_part(
+        [item.nodeid.split("::")[0] for item in items], int(part_text), int(parts_text)
+    )
+    kept: list[pytest.Item] = [item for item in items if item.nodeid.split("::")[0] in kept_files]
+    dropped: list[pytest.Item] = [item for item in items if item.nodeid.split("::")[0] not in kept_files]
+    config.hook.pytest_deselected(items=dropped)
+    items[:] = kept
 
 
 def pytest_configure(config: pytest.Config) -> None:

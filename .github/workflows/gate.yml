@@ -31,6 +31,9 @@ concurrency:
   group: gate-${{ github.ref }}
   cancel-in-progress: true
 
+# The work is spread over five runners at once (item 944), the most macOS runners a free account runs together, so that
+# a change waits on its slowest part, about seven minutes, not on all of it in a row: the checks, the unit tests and the
+# first half of the smoke tests here; the eval references and the second half in `smoke`; the browser tests in three.
 jobs:
   gate:
     runs-on: macos-latest
@@ -74,17 +77,47 @@ jobs:
         run: npm run check
       - name: Unit tests
         run: uv run pytest tests/unit -q -n auto -p no:cacheprovider
+      # The smoke tests' files are dealt to two parts in turn (tests/smoke/conftest.py), the second in `smoke`.
+      - name: Offline smoke tests, part 1
+        run: >
+          uv run pytest tests/smoke -q -n auto -p no:cacheprovider --part 1/2 --durations=10
+          -m "not live and not browser and not internet and not desktop and not hosted"
+
+  smoke:
+    name: gate (part 2)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      DOT_HOME: ${{ github.workspace }}/.ci/home
+      DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
+      DOT_CHROME_DIR: ${{ github.workspace }}/.ci/chrome
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --frozen
+      - name: Ripgrep
+        run: brew install ripgrep
+      - name: Throw-away home
+        run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Eval references
         run: uv run dotx eval check
-      - name: Offline smoke tests
+      - name: Offline smoke tests, part 2
         run: >
-          uv run pytest tests/smoke -q -n auto -p no:cacheprovider
+          uv run pytest tests/smoke -q -n auto -p no:cacheprovider --part 2/2 --durations=10
           -m "not live and not browser and not internet and not desktop and not hosted"
 
   # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
-  # and the face. In two parts, on runners of their own, each on one worker: a runner has three cores and a worker
-  # drives a Chrome and a daemon of its own, and at two or three workers pages ran out of their time.
+  # and the face. In three parts, on runners of their own, each on one worker: a runner has three cores and a worker
+  # drives a Chrome and a daemon of its own, and at two or three workers pages ran out of their time. The phone's two
+  # parts are split by the time their files took (item 944): the first holds the walk through every page, which alone
+  # takes three minutes; a new phone file joins the second.
   browser:
     name: browser (${{ matrix.part.name }})
     strategy:
@@ -95,11 +128,19 @@ jobs:
             tests: >-
               tests/smoke/test_browser_*.py tests/smoke/test_secret_fields.py tests/smoke/test_page_guards.py
               tests/smoke/test_face.py
+          - name: phone 1
+            tests: >-
+              tests/smoke/test_phone_all_pages.py tests/smoke/test_phone_screens.py tests/smoke/test_phone_reach.py
+              tests/smoke/test_phone_rows.py tests/smoke/test_phone_lists.py tests/smoke/test_phone_pages.py
           # A phone back on a network that wakes measures seconds of grace against the runner's own clock, which a
           # slow runner does not keep: it runs at night (browser.yml) and on the developer's Mac.
-          - name: phone
+          - name: phone 2
             tests: >-
-              tests/smoke/test_phone_*.py --deselect
+              tests/smoke/test_phone_*.py
+              --deselect tests/smoke/test_phone_all_pages.py --deselect tests/smoke/test_phone_screens.py
+              --deselect tests/smoke/test_phone_reach.py --deselect tests/smoke/test_phone_rows.py
+              --deselect tests/smoke/test_phone_lists.py --deselect tests/smoke/test_phone_pages.py
+              --deselect
               tests/smoke/test_phone_return.py::test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_network_wakes
     runs-on: macos-latest
     timeout-minutes: 45

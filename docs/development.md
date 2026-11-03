@@ -121,12 +121,17 @@ on the tagged commit (`.github/workflows/gate.yml`, on macOS because the package
 Markdown at the root, `docs/` or the issue and pull request templates alone skips it): the format check, the lint, mypy,
 the checks of the interface (`npm run check`), the unit tests, `dotx eval check` and every smoke test that needs no
 service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not hosted"`). The
-tests run spread over the cores with `-n auto` (pytest-xdist). Beside it, its `browser` job runs the core of the browser
-tests (item 486) in two parts, the pages and the phone, each on a runner of its own and one worker (a runner has three
-cores and a worker drives a Chrome and a daemon; at two or three workers pages ran out of their time): the files whose
-names start `test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards and the
-face, in Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides nothing of
-the gate's. `.github/workflows/browser.yml` runs every browser test every night and when asked (`gh workflow run
+tests run spread over the cores with `-n auto` (pytest-xdist), and over two runners at once (item 944): the smoke
+tests' files are dealt to two parts in turn by their sorted paths (`--part k/n`, `tests/smoke/conftest.py`), the first
+run by the `gate` job after the checks and the unit tests, the second by `gate (part 2)` after `dotx eval check`. Beside
+them, the `browser` job runs the core of the browser tests (item 486) in three parts, the pages and the phone's two (the
+first with the walk through every page, the slowest file; a new phone file joins the second), each on a runner of its
+own and one worker (a runner has three cores and a worker drives a Chrome and a daemon; at two or three workers pages
+ran out of their time): five runners in all, the most macOS runners a free account runs together, so that a pull
+request waits on its slowest part, not on all of it in a row. The browser files are those whose names start
+`test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards and the face, in
+Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides nothing of the
+gate's. `.github/workflows/browser.yml` runs every browser test every night and when asked (`gh workflow run
 browser.yml --ref <branch>`), on one worker, for hours; a red night is GitHub's to show, and blocks nothing. The phone's
 test of a network that wakes after the page comes back measures seconds of grace against the runner's clock, which a
 slow runner does not keep, so the core leaves it to the night and to your Mac. A browser test that leans on another
