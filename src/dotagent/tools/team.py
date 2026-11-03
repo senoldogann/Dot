@@ -318,11 +318,6 @@ def _create_agent_tool() -> RegisteredTool:
         if unknown:
             raise ToolInputError(f"no tool has the name {', '.join(unknown)}", {"tools": ", ".join(unknown)})
         tools: tuple[str, ...] = agent_tools(args.tools, ctx.run_tools)
-        checked_considered(
-            args.agents_considered,
-            await run_team(ctx),
-            "send the work to the agent whose role fits it with message_agent (or assign_work) rather than make one",
-        )
         agents: list[AgentRecord] = await ctx.runtime.store.list_agents()
         taken: AgentRecord | None = find_agent(agents, name)
         if taken is not None:
@@ -330,6 +325,11 @@ def _create_agent_tool() -> RegisteredTool:
                 "an agent has that name already; message it, or choose another name",
                 {"agent": taken.name, "role": taken.role},
             )
+        checked_considered(
+            args.agents_considered,
+            await run_team(ctx),
+            "send the work to the agent whose role fits it with message_agent (or assign_work) rather than make one",
+        )
         # What it carries into every later run, with the secrets Dot holds masked (the review of 2026-11-01).
         held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         made: AgentRecord = await ctx.runtime.store.create_agent(
