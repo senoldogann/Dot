@@ -36,7 +36,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   # A deleted branch has nothing to review.
   [[ "$local_sha" == "$zero_sha" ]] && continue
 
-  if [[ "$remote_sha" == "$zero_sha" ]]; then
+  # A new branch, and one rewritten by a rebase onto main (its old head is no ancestor of the new: item 955), are
+  # reviewed from where they leave main, so that the pull requests main took meanwhile are not read as theirs.
+  if [[ "$remote_sha" == "$zero_sha" ]] || ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
     base=$(git merge-base origin/main "$local_sha")
   else
     base=$remote_sha

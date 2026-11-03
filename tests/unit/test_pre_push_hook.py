@@ -113,6 +113,26 @@ def test_a_merge_of_main_that_resolved_a_conflict_by_editing_the_change_is_revie
     assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
 
 
+def test_a_branch_rebased_onto_main_is_reviewed_from_where_it_leaves_main(repo: Path, tmp_path: Path) -> None:
+    """Item 955: a repair session rebases its branch onto main and renumbers its item, which changes its patch; its old
+    head is no ancestor of the new one, so the review reads the branch from where it leaves main, not a diff from the
+    old head that would hold every pull request main took meanwhile."""
+    pushed: str = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "main")
+    _commit(repo, "other.txt", "another session's merged change\n", "main takes another pull request")
+    _git(repo, "push", "-q", "origin", "main")
+    _git(repo, "checkout", "-q", "feature")
+    _git(repo, "rebase", "-q", "main")
+    _commit(repo, "feature.txt", "its own change, renumbered\n", "renumber")
+    _git(repo, "fetch", "-q", "origin")
+    head: str = _git(repo, "rev-parse", "HEAD")
+    done, asked = _run_hook(repo, tmp_path, head, pushed)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    git_dir: Path = Path(_git(repo, "rev-parse", "--absolute-git-dir"))
+    reviewed: str = (git_dir / "claude-review" / f"{head}.diff").read_text(encoding="utf-8")
+    assert "its own change, renumbered" in reviewed and "another session's merged change" not in reviewed
+
+
 def test_after_three_blocked_reviews_the_hook_says_to_reconsider_the_approach(repo: Path, tmp_path: Path) -> None:
     review_dir: Path = repo / ".git" / "claude-review"
     review_dir.mkdir(exist_ok=True)

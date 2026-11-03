@@ -36,7 +36,20 @@ from dotagent.tools.shell import read_login_env
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 type Mode = Literal[
-    "pr", "no_fix", "limited", "rogue", "rename", "tamper", "busy", "tracked", "pulled", "rewound", "selfpush"
+    "pr",
+    "no_fix",
+    "limited",
+    "rogue",
+    "rename",
+    "tamper",
+    "busy",
+    "tracked",
+    "pulled",
+    "rewound",
+    "selfpush",
+    "overtaken",
+    "renumbered",
+    "setback",
 ]
 
 _REVIEW: str = "# Review\n\n## Always needs a human\n\n- `src/dotagent/policy/`\n- `src/dotagent/agent/review.py`\n"
@@ -109,9 +122,75 @@ elif mode == "rogue":
     Path("fix.txt").write_text("fixed\\n")
     subprocess.run(["git", "add", "fix.txt"], check=True)
     subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
-    # Past what its environment was meant to keep it from: straight to main (a local origin needs no sign-in).
+    # Past what its environment was meant to keep it from: straight to main (a local origin needs no sign-in), by no
+    # pull request.
     subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], check=True)
+    (here / "push_main").write_text("")
     answer = "Fixed.\\nREADY: fixed"
+elif mode == "renumbered":
+    # Item 955: main takes the session's item number meanwhile; told the new one Dot took, it moves its entry there.
+    def out(*argv, given=None):
+        return subprocess.run(argv, check=True, capture_output=True, text=True, input=given).stdout.strip()
+    if "--resume" in sys.argv:
+        import re as numbers
+        new = numbers.search(r"1 to (\\d+)", " ".join(sys.argv)).group(1)
+        subprocess.run(["git", "reset", "-q", "--hard", "origin/main"], check=True)
+        Path("roadmap").mkdir(exist_ok=True)
+        Path("roadmap", new + ".md").write_text("### " + new + ". fix\\n")
+        wrote("roadmap/" + new + ".md")
+        subprocess.run(["git", "add", "roadmap"], check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "Item " + new + ": fix"], check=True)
+        answer = "Renumbered.\\nREADY: fixed"
+    else:
+        Path("roadmap").mkdir(exist_ok=True)
+        Path("roadmap", "1.md").write_text("### 1. fix\\n")
+        wrote("roadmap/1.md")
+        subprocess.run(["git", "add", "roadmap"], check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
+        # Another session's item 1 is merged into main meanwhile.
+        base = out("git", "rev-parse", "origin/main")
+        blob = out("git", "hash-object", "-w", "--stdin", given="### 1. another's\\n")
+        index = os.environ.copy()
+        index["GIT_INDEX_FILE"] = str(Path("..", "other-index").resolve())
+        subprocess.run(["git", "read-tree", base], check=True, env=index)
+        subprocess.run(["git", "update-index", "--add", "--cacheinfo", "100644," + blob + ",roadmap/1.md"], check=True,
+                       env=index)
+        tree = subprocess.run(["git", "write-tree"], check=True, capture_output=True, text=True,
+                              env=index).stdout.strip()
+        other = out("git", "commit-tree", tree, "-p", base, "-m", "Item 1: another session's")
+        subprocess.run(["git", "push", "-q", "origin", other + ":refs/heads/main"], check=True)
+        answer = "Fixed it.\\nREADY: fixed"
+elif mode == "setback":
+    # Item 955 (the pre-push review): main is set onto another history, past its protection, by no new stray commit.
+    Path("fix.txt").write_text("fixed\\n")
+    wrote("fix.txt")
+    subprocess.run(["git", "add", "fix.txt"], check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
+    # Onto a history of its own: a commit of main's tree with no parent, which the commits API says came by a pull
+    # request as every commit does here.
+    tree = subprocess.run(["git", "rev-parse", "origin/main^{tree}"], check=True, capture_output=True,
+                          text=True).stdout.strip()
+    other = subprocess.run(["git", "commit-tree", tree, "-m", "another history"], check=True, capture_output=True,
+                           text=True).stdout.strip()
+    subprocess.run(["git", "push", "-q", "-f", "origin", other + ":refs/heads/main"], check=True)
+    answer = "Fixed it.\\nREADY: fixed"
+elif mode == "overtaken":
+    # Item 955: while it works another pull request is merged into main; told so, it rebases its branch onto main.
+    def out(*argv):
+        return subprocess.run(argv, check=True, capture_output=True, text=True).stdout.strip()
+    if "--resume" in sys.argv:
+        subprocess.run(["git", "fetch", "-q", "origin", "main"], check=True)
+        subprocess.run(["git", "rebase", "-q", "origin/main"], check=True)
+        answer = "Brought up.\\nREADY: fixed"
+    else:
+        Path("fix.txt").write_text("fixed\\n")
+        wrote("fix.txt")
+        subprocess.run(["git", "add", "fix.txt"], check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "Item 1: fix"], check=True)
+        base = out("git", "rev-parse", "origin/main")
+        other = out("git", "commit-tree", base + "^{tree}", "-p", base, "-m", "Item 2: another session's")
+        subprocess.run(["git", "push", "-q", "origin", other + ":refs/heads/main"], check=True)
+        answer = "Fixed it.\\nREADY: fixed"
 elif mode == "selfahead":
     # A commit of its own pushed to its branch by itself, then one more on top, for Dot's push to bring alone.
     Path("sneak.txt").write_text("unreviewed\\n")
@@ -211,6 +290,15 @@ if args[:2] == ["pr", "view"] and "state,headRefName,headRefOid,mergeStateStatus
     behind = (here / "merge_state").exists() and not (here / "updates").exists()
     print(json.dumps({"state": "MERGED" if merged else "OPEN", "headRefName": branch, "headRefOid": sha,
                       "mergeStateStatus": "BEHIND" if behind else "CLEAN"}))
+elif args[:2] == ["pr", "view"] and "mergeable" in args:
+    # GitHub cannot merge it once, while the marker stands (item 955).
+    stuck = here / "conflicting"
+    print(json.dumps({"mergeable": "CONFLICTING" if stuck.exists() else "MERGEABLE"}))
+    if stuck.exists():
+        stuck.unlink()
+elif args[:2] == ["pr", "edit"]:
+    with (here / "edits").open("a") as edits:
+        edits.write(" ".join(args[:3]) + "\\n")
 elif args[:2] == ["pr", "view"] and "commits" in args:
     print("Item 1: fix")
 elif args[:1] == ["api"] and "/commits/" in args[1]:
@@ -576,6 +664,59 @@ async def test_main_moved_during_the_session_by_no_merge_of_dots_stops_the_night
         book: Book = read_book(await runtime.store.kv_get(BOOK_KEY))
         # The problem is tried again: the session was stopped, not answered.
         assert [problem.status for problem in book.problems] == ["open"]
+
+
+async def test_main_moved_by_a_merged_pull_request_has_the_session_bring_its_branch_up_and_merge(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 955: main moved under the session by another merged pull request (the commits API says it came by one),
+    which ended the session before. Now the session is told what main took, rebases its branch onto main, Dot pushes it
+    again (replacing its own push), retitles the pull request and merges it once the checks pass on the new head."""
+    async with _night(login_env, stand_ins, "overtaken", "on_pass") as (runtime, restarts):
+        sessions, _told = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["merged"], sessions[0].note
+        calls: list[dict[str, object]] = _calls(stand_ins)
+        assert len(calls) == 2 and "Main moved while you worked" in json.dumps(calls[1]["argv"])
+        assert (stand_ins / "merges").exists() and (stand_ins / "edits").exists()
+
+
+async def test_a_main_set_back_stops_the_session_though_no_commit_came_without_a_pull_request(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 955 (the pre-push review): main set back by a commit (a push past its protection) adds no commit without a
+    pull request, so only main going forward counts as merged pull requests: the session ends main moved, unmerged."""
+    async with _night(login_env, stand_ins, "setback", "on_pass") as (runtime, restarts):
+        sessions, _told = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["main_moved"], sessions[0].note
+        assert "set back or onto another history" in sessions[0].note and not (stand_ins / "merges").exists()
+
+
+async def test_a_session_whose_item_number_main_took_is_given_a_new_one_and_merged(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 955 (the pre-push review): the session has no way to GitHub, where the numbers in use are read, so Dot takes
+    the new number (`scripts/next_item.py`, here 931) and names it in the brief; the session moves its entry there and
+    the branch is merged under it."""
+    async with _night(login_env, stand_ins, "renumbered", "on_pass") as (runtime, restarts):
+        sessions, _told = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["merged"], sessions[0].note
+        said: str = json.dumps(_calls(stand_ins)[1]["argv"])
+        assert "your item 1 now" in said and "1 to 931" in said and (stand_ins / "merges").exists()
+
+
+async def test_a_pull_request_github_cannot_merge_is_brought_up_rather_than_left_without_checks(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 955: #764 took an item number main had taken meanwhile, and GitHub, which could not merge it, ran no check;
+    the session ended at main moved. Now the session is told GitHub cannot merge it, and once it is brought up, it is
+    checked and merged."""
+    (stand_ins / "conflicting").write_text("", encoding="utf-8")
+    async with _night(login_env, stand_ins, "pr", "on_pass") as (runtime, restarts):
+        sessions, _told = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["merged"], sessions[0].note
+        calls: list[dict[str, object]] = _calls(stand_ins)
+        said: str = json.dumps(calls[1]["argv"])
+        assert "GitHub cannot merge your pull request as it stands" in said and (stand_ins / "merges").exists()
 
 
 async def test_a_change_to_the_gates_own_sources_waits_for_the_owner_whatever_review_md_lists(

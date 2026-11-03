@@ -52,6 +52,7 @@ from dotagent.repair.night import (
     checks_brief,
     live_sink,
     looks_due,
+    main_moved_brief,
     pr_title,
     problem_after,
     read_live,
@@ -691,3 +692,16 @@ def test_the_restart_a_merge_asks_for_imports_nothing_from_the_folder_it_runs_in
     """Item 943 (the review of 2026-11-02): it runs in the home folder, which a sandboxed run may write; ``-P`` keeps
     a ``dotagent/__main__.py`` left there from running instead of Dot."""
     assert restart_argv("/usr/bin/python3")[:4] == ("/usr/bin/python3", "-P", "-m", "dotagent")
+
+
+def test_the_brief_of_main_moving_names_what_main_took_and_asks_for_new_numbers_only_when_taken() -> None:
+    """Item 955: the session is told main's commit, what was merged (in a fence), whether GitHub could not merge its
+    pull request, and, when main holds its items' entries, to take new numbers."""
+    plain: str = main_moved_brief("abc123", ["#7 Item 9: another (other-branch)"], [], False, "n0nce")
+    assert "it stands at abc123 now" in plain and "`git rebase abc123`" in plain and "git fetch" not in plain
+    assert "<<MERGED n0nce>>\n#7 Item 9: another (other-branch)\n<<end MERGED n0nce>>" in plain
+    assert "new number" not in plain and "GitHub cannot merge" not in plain
+    # The session has no way to GitHub: Dot took the new numbers, and the brief names each.
+    taken: str = main_moved_brief("abc123", [], [(945, 954), (946, 955)], True, "n0nce")
+    assert "your item 945, your item 946 now" in taken and "945 to 954, 946 to 955" in taken
+    assert "GitHub cannot merge your pull request as it stands" in taken and "(no pull request named)" in taken

@@ -147,7 +147,8 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
 - **Checks.** Dot waits for the checks for `checks_minutes` at most (45), looking every minute. The failed ones go back
   to the same session, each with the end of the log of its failed steps, fenced. When the session holds a failure not
   its change's and commits nothing, Dot runs the failed checks again. A session gets `rounds` rounds in all (3): the
-  first, and one for each review that stopped it and each time its checks failed.
+  first, and one for each review that stopped it, each time its checks failed and each time it was brought up to
+  `main` (item 955).
 - **Merge.** With every check passed:
   - `merge = "on_pass"`: Dot merges the pull request into main, squashed (rebased for several items), only while its
     head is still the commit whose files and checks it looked at (`--match-head-commit`). A merge that reports a
@@ -173,10 +174,27 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   every file git does not track, its git config as git reads it (but the entries of branches other than `main`, which
   `git push -u` of another agent's work writes: item 935) and its hooks read through their links. Files git ignores
   (`.venv`) are not in it. It reads both again before it merges, and after every session it merged nothing for, one that
-  failed too; what cannot be read counts as changed. When either changed by no doing of Dot's, the night stops at
-  once: nothing of that session is merged, pulled or restarted but by its second look (below, with `merge =
-  "on_pass"`), and you are told what changed (*A fix of Dot's own needs you*: "During the session main moved: #…", or
-  "your checkout of Dot … changed"). One you merged or edited yourself in that time stops the night too. A problem
+  failed too; what cannot be read counts as changed. When your checkout changed by no doing of Dot's, or `main` took a
+  commit that is no merged pull request's, or was set back or onto another history (it may only go forward), the night
+  stops at once: nothing of that session is merged, pulled or
+  restarted but by its second look (below, with `merge = "on_pass"`), and you are told what changed (*A fix of Dot's
+  own needs you*: "During the session main moved: a commit with no pull request …", or "your checkout of Dot …
+  changed"). One you edited yourself in that time stops the night too.
+- **Main moved by merged pull requests (item 955).** `main` moving by pull requests merged meanwhile (yours, another
+  session's) ends nothing. Before the checks are waited for and again before the merge, Dot reads where `main` stands;
+  when it moved past what the branch was brought up to, or GitHub cannot merge the pull request (a conflict, which runs
+  no check), Dot fetches `main` in your checkout (never in the session's, whose git config the session could set; the
+  two share their commits) and the session is told `main`'s commit and what was
+  merged, rebases its branch onto it, resolving the conflicts, and moves its items to the new numbers Dot took for them
+  when `main` holds the entries of its own (`scripts/next_item.py`, which Dot runs: the session has no way to
+  GitHub). Dot pushes
+  the branch again through the review hook (which reviews a rebased branch from where it leaves `main`, not with the
+  pull requests `main` took), replacing its own last push with a lease on that very commit (what anyone
+  else pushed there is refused), gives the pull request the title and body of the branch as it stands, and waits for
+  the checks on the new head; only a head whose every check passed on the `main` it holds is merged. Each bringing up
+  counts as a round of `[repair] rounds`, as each answer to failed checks does (a session that spends them being
+  overtaken ends as `main_moved`, for the second look below) (the session is given each failed
+  check's log, fixes it and Dot pushes again; a failure it holds not its change's has the failed checks run again). A problem
   whose session opened a pull request waits with it, for the second look or for you; one with none is tried again on a
   later night.
 - **A second look (item 933).** With `merge = "on_pass"`, a session stopped so that opened a pull request is looked

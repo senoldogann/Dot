@@ -258,8 +258,11 @@ async def push_branch(repo: Path, head: str, branch: str, pushed: str | None, en
         )
     git_dir: str = (await command(("git", "-C", str(repo), "rev-parse", "--absolute-git-dir"), repo, env)).strip()
     await asyncio.to_thread((Path(git_dir) / "claude-review" / f"{head}.pass").unlink, True)
-    # No ``-u``: an upstream would be written in the git config the print guards.
-    argv: tuple[str, ...] = ("git", "-C", str(repo), "push", "origin", f"{head}:refs/heads/{branch}")
+    # No ``-u``: an upstream would be written in the git config the print guards. A branch brought up to main is
+    # rewritten (item 955): it replaces Dot's last push only, with a lease on that very commit, so that what anyone
+    # else pushed there in between is refused rather than overwritten.
+    lease: tuple[str, ...] = () if pushed is None else (f"--force-with-lease=refs/heads/{branch}:{pushed}",)
+    argv: tuple[str, ...] = ("git", "-C", str(repo), "push", *lease, "origin", f"{head}:refs/heads/{branch}")
     mark: Path = Path(git_dir) / "claude-review" / f"{head}.pass"
     try:
         await command_within(argv, repo, env, PUSH_TIMEOUT_S)
@@ -300,6 +303,12 @@ async def open_pr(folder: Path, branch: str, title: str, body: str, env: Mapping
     if pr_number(out) is None:
         raise RepairError("GitHub's CLI gave no link of the pull request it opened", {"output": out[:_OUTPUT_KEPT]})
     return out.strip().splitlines()[-1]
+
+
+async def retitle_pr(repo: Path, number: int, title: str, body: str, env: Mapping[str, str]) -> None:
+    """Give the pull request ``number`` the title and body of its branch as it stands now: a session that took new
+    item numbers (item 955) has its title name them."""
+    await command(("gh", "pr", "edit", str(number), "--title", title, "--body", body), repo, env)
 
 
 async def pr_files(repo: Path, number: int, env: Mapping[str, str]) -> tuple[str, ...]:
@@ -450,6 +459,31 @@ async def checkout_clean(repo: Path, env: Mapping[str, str]) -> bool:
     return await is_ancestor(repo, head, main, env)
 
 
+async def pr_mergeable(repo: Path, number: int, env: Mapping[str, str]) -> str:
+    """Whether GitHub can merge the pull request ``number`` into main: ``MERGEABLE``, ``CONFLICTING`` (a pull request
+    GitHub runs no check of, item 955), or ``UNKNOWN`` while it works it out."""
+    raw: str = await command(("gh", "pr", "view", str(number), "--json", "mergeable"), repo, env)
+    data: object = _json(raw, "whether it can be merged")
+    said: object = data.get("mergeable") if isinstance(data, dict) else None
+    if not isinstance(said, str) or not said:
+        raise RepairError(
+            "GitHub's CLI did not say whether the pull request can be merged",
+            {"number": number, "output": raw[:_OUTPUT_KEPT]},
+        )
+    return said
+
+
+async def items_on_main(repo: Path, main: str, items: Sequence[int], env: Mapping[str, str]) -> tuple[int, ...]:
+    """The item numbers of ``items`` whose roadmap entry main's commit ``main`` holds: another session took them while
+    this one worked (item 955). Main is fetched in the owner's checkout at ``repo``, never in the session's, whose git
+    config and hooks the session may have set (the pre-push review): the checkouts share their objects and refs, so the
+    session's sees what was fetched and rebases onto it."""
+    await command(("git", "-C", str(repo), "fetch", "--quiet", "origin", "main"), repo, env)
+    listed: str = await command(("git", "-C", str(repo), "ls-tree", "--name-only", main, "roadmap/"), repo, env)
+    held: set[str] = {line.strip() for line in listed.splitlines()}
+    return tuple(item for item in items if f"roadmap/{item}.md" in held)
+
+
 async def update_branch(repo: Path, number: int, env: Mapping[str, str]) -> None:
     """Bring the branch of the pull request ``number`` up to main on GitHub (a merge of main into it), so that its
     checks run on what a merge would make."""
@@ -544,11 +578,19 @@ async def next_item(repo: Path, python: str, env: Mapping[str, str]) -> int:
     """The next free item number of the repository at ``repo``, by its own ``scripts/next_item.py`` run with Dot's
     sign-in to GitHub (it reads the open pull requests and pushed branches): a session has no way to GitHub, so it is
     given its number (the eleventh review of item 921). Raises :class:`RepairError` when none can be told."""
-    out: str = await command((python, "scripts/next_item.py", "1"), repo, env)
-    found: re.Match[str] | None = re.match(r"\s*(\d+)", out)
-    if found is None:
-        raise RepairError("scripts/next_item.py gave no item number", {"output": out[:_OUTPUT_KEPT]})
-    return int(found.group(1))
+    return (await next_items(repo, python, 1, env))[0]
+
+
+async def next_items(repo: Path, python: str, count: int, env: Mapping[str, str]) -> tuple[int, ...]:
+    """The next ``count`` free item numbers, taken together as :func:`next_item` takes one: the new numbers of a
+    session whose own main took meanwhile (item 955). Raises :class:`RepairError` when they cannot be told."""
+    out: str = await command((python, "scripts/next_item.py", str(count)), repo, env)
+    found: list[str] = re.findall(r"\d+", out.splitlines()[0] if out.strip() else "")
+    if len(found) < count:
+        raise RepairError(
+            "scripts/next_item.py gave too few item numbers", {"count": count, "output": out[:_OUTPUT_KEPT]}
+        )
+    return tuple(int(number) for number in found[:count])
 
 
 async def has_commits(folder: Path, start: str, env: Mapping[str, str]) -> bool:
