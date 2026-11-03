@@ -552,8 +552,9 @@ machine, a file sent by a tool known by name (`aws s3`, `gsutil`, `gcloud storag
 `svn commit`, `lftp`, `smbclient`, `croc`, `wormhole send`; item 725: every command of the storage services of `aws`,
 `gcloud` and `az`, `aws s3 ls` too, and any verb of the others but those that only read, a link anyone can open to a
 file (`rclone link`, `gsutil signurl`) included, a copy in either direction, as which side is remote is not told), a
-change on a code host, inline code that reaches the network or runs a command of it, and a read that may reach a
-protected location, item 531) ask even when the preset or an `allow` rule would let them through; only a `preapproved`
+change on a code host, a project's change put live (`fly deploy`, `wrangler deploy`, `firebase deploy`, `vercel
+--prod`, `netlify deploy --prod`; item 962), inline code that reaches the network or runs a command of it, and a read
+that may reach a protected location, item 531) ask even when the preset or an `allow` rule would let them through; only a `preapproved`
 rule skips the question. A project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. A package published or
 an image pushed (`npm publish`, `twine upload`, `cargo publish`, `gem push`, `docker push`; item 725) is a public post,
 asked in every preset whether or not the run read outside content. The error of a call that reached outside marks it too
@@ -626,7 +627,7 @@ message or a post in a chat you opened, and those of a chat of Dot's own initiat
 steered by what a stranger wrote. Two checks hold for such a run, and neither asks you:
 
 - *The taint check.* Before a yolo run marked untrusted does a step an instruction planted in what it read would be
-  after (a message, a post, an upload or data sent out, a payment, an order with real money on your trading account
+  after (a message, a post, an upload or data sent out, a deploy (item 962), a payment, an order with real money on your trading account
   (item 763), a credential, a login filled from your password manager, privilege or system settings, a schedule or a note it saves, an install, a change of Dot's own files, a read
   of your secrets, a deletion outside the workspace), the review model (`[models] review`) judges it against your own
   instructions, as it does in `auto`, with the run marked untrusted. A step it refuses is refused: the run is told why

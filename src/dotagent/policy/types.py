@@ -135,7 +135,8 @@ TAINTING_KINDS: frozenset[ActionKind] = frozenset(
 OUTSIDE_CHANNELS: frozenset[str] = frozenset({"web", "browser"})
 
 # Flags whose consequences reach beyond the machine, or beyond the run (persistence: what is remembered or scheduled
-# shapes every later run; upload: what a command sends to a server, a push, a form, a remote copy; install: software
+# shapes every later run; upload: what a command sends to a server, a push, a form, a remote copy; release: a project's
+# change put live; install: software
 # installed, or a script the line downloaded or a blob it decoded and runs, which stays on the Mac and runs with the
 # owner's rights after the run); untrusted input must never trigger them silently.
 TAINT_ESCALATION_FLAGS: frozenset[Flag] = frozenset(
@@ -153,6 +154,8 @@ TAINT_ESCALATION_FLAGS: frozenset[Flag] = frozenset(
         "system_settings",
         "persistence",
         "install",
+        # A project's change put live (a deploy, item 962): it reaches beyond the Mac as an upload does.
+        "release",
         # A read that may reach a protected location (item 531): a rule of the owner's that allows it still asks once
         # the run has read untrusted content.
         "protected_read",

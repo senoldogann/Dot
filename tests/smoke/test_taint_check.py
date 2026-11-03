@@ -169,6 +169,21 @@ async def test_a_run_that_read_nothing_outside_a_step_of_no_such_kind_and_the_ch
     assert (await off.authorize_recorded(REPLY)).decision.answered_by == "yolo"
 
 
+async def test_a_yolo_run_that_read_outside_content_puts_no_change_live_past_the_review_model(room: Room) -> None:
+    """Item 962: a deploy (the shell guard's ``release`` flag alone) is checked by the review model as an upload is,
+    and its refusal stands; a run that read nothing from outside deploys as it is told."""
+    deploy: ActionInfo = ActionInfo(
+        tool="shell", kind="shell", risk="medium", summary="fly deploy", target="fly deploy", flags=("release",)
+    )
+    gate: RunGate = _gate(room, "yolo", _Reviewer(decision="deny", asked=[]))
+    gate.taint()
+    with pytest.raises(ApprovalRejected) as refused:
+        await gate.authorize_recorded(deploy)
+    assert "read outside content" in refused.value.message
+    clean: RunGate = _gate(room, "yolo", _nobody)
+    assert (await clean.authorize_recorded(deploy)).decision.answered_by in ("yolo", "policy")
+
+
 @pytest.fixture
 def held(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     """A secret Dot holds: a value of the ``.env`` of a Dot home of the test's own."""
