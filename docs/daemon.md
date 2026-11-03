@@ -238,9 +238,9 @@ in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
 links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
-sent is the text as typed. A **microphone** by the send (item 574) turns the box's controls into a recorder
-while it listens (item 605), as a phone's apps do. It listens one of two ways, which the page chooses as it starts (items
-626, 969):
+sent is the text as typed. A **microphone** by the send (item 574) turns the box's controls into a recorder while it
+listens (item 605), as a phone's apps do. It listens one of two ways, which the page chooses as it starts (items 626,
+969):
 
 - by recording the voice and streaming it to the Mac, which writes it down as it is said: on every device whose Mac can
   (a Mac's browser, the desktop app, an iPhone, an iPad, a browser with no speech recognition, Firefox, which then shows
@@ -298,30 +298,32 @@ microphone back, the box's words kept as its draft; the keyboard's own microphon
 reading aloud first, as Safari does not hear while it speaks.
 
 **The recording** (items 626, 969) is how every device hears where the Mac can write down: from the moment the
-microphone opens, and every time (Safari's recognition on an iPhone hears the first dictation of a page and at times none
-after it, and nothing a page does brings it back, item 616). Pressing the microphone opens a stream to the Mac
+microphone opens, and every time (Safari's recognition on an iPhone hears the first dictation of a page and at times
+none after it, and nothing a page does brings it back, item 616). Pressing the microphone opens a stream to the Mac
 (`POST /api/voice/streams`), which starts the program that writes down while the microphone opens, so that it is ready
-by the first word, and opens the microphone itself, in the press, so that iOS lets the audio start: `getUserMedia` with the browser's own echo cancelling and noise suppression, Web Audio
-and an audio worklet (`voicecapture.js`, a script of the page's own address, which its content security policy
-allows). If iOS puts the audio context aside as it turns to the microphone, the page asks it to run once more; one that
-still does not run says so and what to do. The page brings the sound down to 16 kHz mono 16-bit samples and sends them to
-the Mac as it records, in numbered pieces, one at a time, a quarter of a second at the least and two seconds at the most
-(what came while one was on its way goes in the next), five minutes at the most; the Mac writes them down as they come. A block of the microphone's sound is a sound when it is as loud as 0.01 (the root of its mean
-square, 0 to 1; measured with the speech of `say`: speech mostly 0.1 to 0.2, its pauses 0, the soft ends of its words
-between), and it counts for 0.4 seconds after, so that the pause between two words is no silence. The tick sends what
-is left and ends the stream (`POST /api/voice/streams/<id>/end`), a voice too quiet to count as a sound included: the
-Mac says when it heard nothing, and only a tick before the first block of sound came in has nothing to write down, and
-drops it. A pause of fifteen seconds after a sound and the five minutes end the stream too; six seconds with no sound at
-all end it by themselves, saying nothing was heard, and drop it. The Mac wrote down what was said while it was said, so
-its words come a moment after the tick (0.04 s to 0.11 s measured on this Mac after a sentence of Turkish or English);
-the recorder says **Writing down what you said…** in the wave's place, quietly, until they come, with the cross to give
-up waiting, and the words go into the box after what it held. Every end (the tick, the cross, typing, a message sent,
-the page out of sight, an error) lets the microphone go at once: its tracks end, which puts an iPhone's microphone light
-out, the audio context closes and what waited to be sent is dropped; every end but the tick drops the stream at the Mac
-too (`DELETE /api/voice/streams/<id>`), and a press while the browser still asks drops it. A piece that could not be
-sent loses the recording (the Mac would write down one with a hole in it). A failure says what to do in plain words,
-and the box keeps its words: the Mac could not be reached, it cannot write down this language (choose another in
-Settings › General › Voice), it is writing down two other recordings, nothing was heard.
+by the first word, and opens the microphone itself, in the press, so that iOS lets the audio start: `getUserMedia` with
+the browser's own echo cancelling and noise suppression, Web Audio and an audio worklet (`voicecapture.js`, a script of
+the page's own address, which its content security policy allows). If iOS puts the audio context aside as it turns to
+the microphone, the page asks it to run once more; one that still does not run says so and what to do. The page brings
+the sound down to 16 kHz mono 16-bit samples and sends them to the Mac as it records, in numbered pieces, one at a time,
+a quarter of a second at the least and two seconds at the most (what came while one was on its way goes in the next),
+five minutes at the most; the Mac writes them down as they come. A block of the microphone's sound is a sound when it is
+as loud as 0.01 (the root of its mean square, 0 to 1; measured with the speech of `say`: speech mostly 0.1 to 0.2, its
+pauses 0, the soft ends of its words between), and it counts for 0.4 seconds after, so that the pause between two words
+is no silence. The tick sends what is left and ends the stream (`POST /api/voice/streams/<id>/end`), a voice too quiet
+to count as a sound included: the Mac says when it heard nothing, and only a tick before the first block of sound came
+in has nothing to write down, and drops it. A pause of fifteen seconds after a sound and the five minutes end the stream
+too; six seconds with no sound at all end it by themselves, saying nothing was heard, and drop it. The Mac wrote down
+what was said while it was said, so its words come a moment after the tick (0.04 s to 0.11 s measured on this Mac after
+a sentence of Turkish or English); the recorder says **Writing down what you said…** in the wave's place, quietly, until
+they come, with the cross to give up waiting, and the words go into the box after what it held. Every end (the tick, the
+cross, typing, a message sent, the page out of sight, an error) lets the microphone go at once: its tracks end, which
+puts an iPhone's microphone light out, the audio context closes and what waited to be sent is dropped; every end but the
+tick drops the stream at the Mac too (`DELETE /api/voice/streams/<id>`), and a press while the browser still asks drops
+it. A piece that could not be sent loses the recording (the Mac would write down one with a hole in it): the recording
+ends at once and says why, not at the tick. A failure says what to do in plain words, and the box keeps its words: the
+Mac could not be reached, it cannot write down this language (choose another in Settings › General › Voice), it is
+writing down two other recordings, nothing was heard.
 
 The Mac writes it down with macOS 26's own dictation, on the device, through a small program the daemon builds with the
 Swift compiler of Apple's developer tools the first time it is needed (`src/dotagent/voice`). `GET /api/voice` says
@@ -347,20 +349,22 @@ the most, numbered from 0 in the order they were recorded; `POST /api/voice/stre
 empty when nothing was heard; `DELETE /api/voice/streams/<id>` drops one. They are behind the token like every route, so
 the phone paired in Settings › Phone reaches them as it reaches the composer. A piece that is no base64 of whole
 samples, one out of its turn (which drops the stream: a piece was lost on the way) and one past five minutes are a 422
-that says what to do; a stream that is no longer open is a 404; so is a Mac that cannot a 422, with `context.code`
+that says what to do; a stream that is no longer open is a 404; a Mac that cannot is a 422 too, with `context.code`
 `unavailable`, `unsupported-language`, `busy` (two streams are open, the most at once, as the model is large),
 `too-long`, `timeout` (60 seconds after the tick; five minutes the first time a language is used, as macOS downloads
 its model from Apple then) or `failed`; never a stack. A stream no piece came to for 20 seconds (a page that went away)
-is dropped by itself, and so is one open longer than the longest recording.
+is dropped by itself, and so is one open longer than the longest recording; before its first piece it is given two
+minutes, as the browser may ask you for the microphone first (an iPhone asks twice), for as long as you read.
 
 The daemon hands the samples to the program through a pipe, never a file, and at the tick 0.8 seconds of silence after
 them (the dictation model drops the last word of a recording that ends as the word does), then ends its input; only
 those samples reach Apple's audio code. The sound and the words are never logged and never kept: the log has how long
-the recording was and how long the words took after the tick. The program is built once in a daemon's life, in a folder of mode 0700 under `<home>/voice`, from a copy of its
-source made there; a run's commands may read that folder and not change it (it is among what Dot loads and runs,
-[Safety](safety.md)). The daemon keeps the SHA-256 of what it built in memory and hashes the file again before each run,
-and builds anew when it is not the file it built. It starts the program with an argument list (the language alone), a
-small environment and a time limit, never through a shell, and at most two at once.
+the recording was and how long the words took after the tick. The program is built once in a daemon's life, in a folder
+of mode 0700 under `<home>/voice`, from a copy of its source made there; a run's commands may read that folder and not
+change it (it is among what Dot loads and runs, [Safety](safety.md)). The daemon keeps the SHA-256 of what it built in
+memory and hashes the file again before each run, and builds anew when it is not the file it built. It starts the
+program with an argument list (the language alone), a small environment and a time limit, never through a shell, and at
+most two at once.
 
 Nothing is sent by voice alone: you read the box and send as usual. A message whose answer was lost
 on its way back (the page says the sending failed and keeps the message) is done once when it is sent again, here and in
@@ -1559,21 +1563,20 @@ and Quit. Closing the window keeps the shell in the menu bar.
   other address and any new window, and gives its page nothing it asks of the web view (the microphone, the camera,
   where the Mac is), since wry grants every request no one answers (item 594).
 - **Files** drop into the composer as in the browser.
-- **The microphone** (item 594). The composer's dictation (item 574) is WebKit's speech recognition (the app keeps it
-  whatever the Mac can write down: item 626 records only on an iPhone or an iPad and where the browser has none), which
-  macOS gives
-  an app only once it says why it asks (its `Info.plist`: the microphone and speech recognition) and, under the hardened
-  runtime, is entitled to the microphone (`Dot.entitlements`, the runtime's one exception the app asks for). macOS asks
-  you the first time the microphone is pressed, and System Settings › Privacy & Security › Microphone and Speech
-  Recognition list Dot after. The shell gives the microphone to a page of the daemon's own address alone, and nothing
-  else a page asks of the web view, to any page. It is told what is asked, not by which frame, and judges the window's
-  page; the UI's frames (a page a run showed, a drawing of a file) are sandboxed, which WebKit refuses before the shell
-  is asked. The page given the microphone could record sound with it too (`getUserMedia`), as a site given a browser's
-  microphone can; Dot's takes only the words. What you say may go to Apple to be recognized, as in Safari
-  ([Safety](safety.md)). A Dot.app built before it can do neither: its composer says so and names macOS Dictation (item
-  593), and does not send you to System Settings, which would fix nothing (item 636). For a Dot.app that does ask, a
-  refused microphone has the daemon show System Settings at the pane where Dot is switched on. The daemon tells the two
-  apart by reading the Dot.app that runs, found by its bundle identifier (`dev.dot.desktop`) with
+- **The microphone** (item 594). The composer's microphone records the voice and streams it to the Mac where the Mac can
+  write down (item 969), as in a browser, and is WebKit's speech recognition where it cannot (item 574); either macOS
+  gives an app only once it says why it asks (its `Info.plist`: the microphone and speech recognition) and, under the
+  hardened runtime, is entitled to the microphone (`Dot.entitlements`, the runtime's one exception the app asks for).
+  macOS asks you the first time the microphone is pressed, and System Settings › Privacy & Security › Microphone and
+  Speech Recognition list Dot after. The shell gives the microphone to a page of the daemon's own address alone, and
+  nothing else a page asks of the web view, to any page. It is told what is asked, not by which frame, and judges the
+  window's page; the UI's frames (a page a run showed, a drawing of a file) are sandboxed, which WebKit refuses before
+  the shell is asked. The page given the microphone records sound with it (`getUserMedia`) for the Mac to write down,
+  and the voice stays on the Mac; where the Mac cannot write down, what you say may go to Apple to be recognized, as in
+  Safari ([Safety](safety.md)). A Dot.app built before it can do neither: its composer says so and names macOS Dictation
+  (item 593), and does not send you to System Settings, which would fix nothing (item 636). For a Dot.app that does ask,
+  a refused microphone has the daemon show System Settings at the pane where Dot is switched on. The daemon tells the
+  two apart by reading the Dot.app that runs, found by its bundle identifier (`dev.dot.desktop`) with
   `NSRunningApplication`: its `Info.plist` must give both reasons in words, and its signature (`codesign -dv` and
   `codesign -d --entitlements - --xml`) must have no hardened runtime or carry `com.apple.security.device.audio-input`.
   What it read is kept while the app's `Info.plist` and the seal of its signature stay as they were, so an update is

@@ -327,18 +327,29 @@ async def test_opens_at_the_same_moment_cannot_pass_the_count_together(stand: St
             await transcriber.drop(name)
 
 
-async def test_a_stream_no_piece_comes_to_is_dropped_by_itself(stand: Stand, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_a_stream_no_piece_comes_to_is_dropped_by_itself_and_waits_longer_for_its_first(
+    stand: Stand, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pre-push review of item 969: the page opens the stream at the press, and the browser may ask the owner for
+    the microphone first, for as long as they read: before its first piece a stream waits longer."""
     monkeypatch.setattr(helper, "STREAM_IDLE_S", 0.3)
+    monkeypatch.setattr(helper, "STREAM_FIRST_PIECE_S", 1.2)
     monkeypatch.setattr(helper, "_STREAM_WATCH_S", 0.1)
     transcriber: Transcriber = _transcriber(stand)
     stand.says("late")
     with capture_logs() as logs:
-        name: str = await transcriber.open("tr-TR")
-        await transcriber.feed(name, 0, PIECE)
-        await asyncio.sleep(1.0)
+        fed: str = await transcriber.open("tr-TR")
+        waiting: str = await transcriber.open("tr-TR")
+        await transcriber.feed(fed, 0, PIECE)
+        await asyncio.sleep(0.8)
+        with pytest.raises(NotFoundError):
+            await transcriber.feed(fed, 1, PIECE)
+        # Still open, as the owner still reads the browser's question; its first piece is taken.
+        await transcriber.feed(waiting, 0, PIECE)
+        await asyncio.sleep(0.8)
     with pytest.raises(NotFoundError):
-        await transcriber.feed(name, 1, PIECE)
-    assert [entry["reason"] for entry in logs if entry["event"] == "voice_stream_dropped"] == ["idle"]
+        await transcriber.feed(waiting, 1, PIECE)
+    assert [entry["reason"] for entry in logs if entry["event"] == "voice_stream_dropped"] == ["idle", "idle"]
 
 
 async def test_a_program_that_reports_an_error_says_what_to_do_in_plain_words(stand: Stand) -> None:

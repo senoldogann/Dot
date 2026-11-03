@@ -212,9 +212,9 @@ def web_research_dir() -> Path:
 
 
 def voice_dir() -> Path:
-    """Where the daemon builds the program that writes recordings down (item 626) and keeps, for as long as it takes to
-    write one down, the recording itself: a folder of mode 0700 for each, made when the daemon first needs it. What is
-    built here the daemon runs, so a run's commands may not change it (``runtime._dot_paths``)."""
+    """Where the daemon builds the program that writes down what is said (items 626, 969): a folder of mode 0700 for
+    each build, made when the daemon first needs it; the sound itself goes to the program through a pipe and is never
+    written here. What is built here the daemon runs, so a run's commands may not change it (``runtime._dot_paths``)."""
     return dot_home() / "voice"
 
 

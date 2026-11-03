@@ -23,12 +23,14 @@ export const MOST_PIECE_SAMPLES = 2 * RECORDING_RATE;
 /**
  * A stream in `language` to the Mac by `mac`'s calls, opened now. `push(samples)` gives it 16 kHz 16-bit samples as they
  * are recorded; `finish()` sends what is left, ends the stream and resolves to the words, or rejects with the first
- * error of any call (a piece that could not be sent loses the recording: the Mac would write down a recording with a
- * hole in it); `cancel()` drops it, at the Mac too, and nothing more is sent.
+ * error of any call; `cancel()` drops it, at the Mac too, and nothing more is sent. A stream that could not be opened,
+ * or a piece that could not be sent, loses the recording (the Mac would write down a recording with a hole in it):
+ * `failed(error)` says so at once, while the owner may still be speaking, and nothing more is sent.
  * @param {MacStream} mac
  * @param {string} language
+ * @param {(error: Error) => void} failed
  */
-export function openStream(mac, language) {
+export function openStream(mac, language, failed) {
   /** @type {Int16Array[]} */
   let pending = [];
   let pendingSamples = 0;
@@ -39,7 +41,7 @@ export function openStream(mac, language) {
   /** @type {Promise<void> | null} */
   let flight = null;
   /** @type {Error | null} */
-  let failed = null;
+  let failure = null;
   let ending = false;
   let cancelled = false;
 
@@ -52,10 +54,21 @@ export function openStream(mac, language) {
       }
       pump();
     },
-    (error) => {
-      failed = error;
-    },
+    (error) => fail(error),
   );
+
+  /** The first failure loses the stream, and is said once. */
+  function fail(error) {
+    if (failure !== null) {
+      return;
+    }
+    failure = error;
+    pending = [];
+    pendingSamples = 0;
+    if (!cancelled) {
+      failed(error);
+    }
+  }
 
   function dropAtTheMac(opened) {
     mac.drop(opened).catch((error) => console.warn("a stream to the Mac could not be dropped", error));
@@ -63,7 +76,7 @@ export function openStream(mac, language) {
 
   /** Send the next piece when none is on its way and enough waits (or the tick came). */
   function pump() {
-    if (name === null || flight !== null || failed !== null || cancelled || pendingSamples === 0) {
+    if (name === null || flight !== null || failure !== null || cancelled || pendingSamples === 0) {
       return;
     }
     if (!ending && pendingSamples < PIECE_SAMPLES) {
@@ -83,7 +96,7 @@ export function openStream(mac, language) {
       },
       (error) => {
         flight = null;
-        failed = error;
+        fail(error);
       },
     );
   }
@@ -93,7 +106,7 @@ export function openStream(mac, language) {
     push(samples) {
       // Five minutes are the most the Mac takes: what goes past them is cut off.
       const taken = samples.subarray(0, Math.max(0, MAX_SAMPLES - sent));
-      if (ending || cancelled || taken.length === 0) {
+      if (ending || cancelled || failure !== null || taken.length === 0) {
         return;
       }
       sent += taken.length;
@@ -105,8 +118,8 @@ export function openStream(mac, language) {
       ending = true;
       await opening;
       for (;;) {
-        if (failed !== null) {
-          throw failed;
+        if (failure !== null) {
+          throw failure;
         }
         if (cancelled || name === null) {
           throw new Error("the stream to the Mac was dropped");

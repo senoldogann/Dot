@@ -39,7 +39,7 @@ function macOf() {
 
 test("the pieces go in their order once a quarter second waits, two seconds at the most, and the tick sends the rest", async () => {
   const mac = macOf();
-  const stream = openStream(mac.stream, "tr-TR");
+  const stream = openStream(mac.stream, "tr-TR", (error) => mac.calls.push(["failed", error.message]));
   // Sound recorded while the stream opens waits for it.
   stream.push(new Int16Array(3 * MOST_PIECE_SAMPLES));
   assert.deepEqual(mac.calls, [["open", "tr-TR"]]);
@@ -59,19 +59,26 @@ test("the pieces go in their order once a quarter second waits, two seconds at t
   ]);
 });
 
-test("a piece that could not be sent loses the recording: the tick says why and ends nothing", async () => {
+test("a piece that could not be sent loses the recording: it is said at once, and the tick ends nothing", async () => {
   const mac = macOf();
-  const stream = openStream(mac.stream, "tr-TR");
+  const stream = openStream(mac.stream, "tr-TR", (error) => mac.calls.push(["failed", error.message]));
   mac.opened();
   mac.failing = new Error("the Mac went away");
   stream.push(new Int16Array(PIECE_SAMPLES));
+  await arrive();
+  // Said at once, while the owner may still speak, and once; nothing more is sent.
+  assert.deepEqual(mac.calls.at(-1), ["failed", "the Mac went away"]);
+  stream.push(new Int16Array(PIECE_SAMPLES));
+  await arrive();
+  assert.equal(mac.calls.filter(([call]) => call === "feed").length, 1);
   await assert.rejects(stream.finish(), /the Mac went away/);
   assert.equal(mac.calls.filter(([call]) => call === "end").length, 0);
+  assert.equal(mac.calls.filter(([call]) => call === "failed").length, 1);
 });
 
 test("a stream dropped before it opened is dropped at the Mac once it has, and is sent nothing", async () => {
   const mac = macOf();
-  const stream = openStream(mac.stream, "tr-TR");
+  const stream = openStream(mac.stream, "tr-TR", (error) => mac.calls.push(["failed", error.message]));
   stream.push(new Int16Array(PIECE_SAMPLES));
   stream.cancel();
   stream.cancel();

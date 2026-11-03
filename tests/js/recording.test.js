@@ -583,6 +583,23 @@ test("what goes wrong on the way to the Mac is said in plain words, and the box 
   );
 });
 
+test("a piece the Mac could not be sent ends the recording at once and says why, the microphone let go", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { recording, seen, mic, mac } = await listening({ held: "Dear Ada," });
+  mac.failFeed = Object.assign(new Error("unreachable"), { status: 0 });
+  for (let index = 0; index < 10; index += 1) {
+    mic.last().block(block());
+  }
+  await arrive();
+  assert.equal(recording.listening(), false);
+  assert.equal(seen.problems.length, 1);
+  assert.match(seen.problems[0], /^The Mac could not be reached/);
+  assert.equal(mic.last().stopped, 1);
+  assert.deepEqual(mac.sent, []);
+  assert.deepEqual(mac.dropped, ["stream-1"]);
+  assert.deepEqual(seen.shown, []);
+});
+
 test("an answer that comes after the cross writes nothing into the box, and nothing twice", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const { recording, seen, mic, mac } = await listening();

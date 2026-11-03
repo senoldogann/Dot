@@ -211,7 +211,7 @@ export function createRecording({
     stopReading();
     state(true);
     // The program that writes down starts now, while the microphone opens: it is ready by the first word.
-    stream = openStream(mac, language());
+    stream = openStream(mac, language(), (error) => lost(mine, error));
     let opening;
     try {
       opening = capture(
@@ -242,6 +242,16 @@ export function createRecording({
         }
       },
     );
+  }
+
+  /** The stream to the Mac failed while the microphone opened or listened: what is said from now on would be lost, so
+   * the recording ends at once and says why. After the tick, the tick's own wait says it. */
+  function lost(mine, error) {
+    if (mine !== generation || (phase !== "opening" && phase !== "listening")) {
+      return;
+    }
+    console.warn("a recording could not be streamed to the Mac", error);
+    finish(sendProblem(error));
   }
 
   /** The owner's tick: the microphone lets go and the stream ends; the Mac has written down all but its last moment. */

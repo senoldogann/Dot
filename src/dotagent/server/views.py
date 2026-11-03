@@ -91,7 +91,8 @@ PickedName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=
 _KEY_CHARS: int = 1000
 # Base64 takes four characters for every three bytes.
 _UPLOAD_B64_CHARS: int = (MAX_ATTACHMENT_BYTES + 2) // 3 * 4
-# A recording of the composer's microphone has a limit of its own (item 626): five minutes of 16 kHz mono sound.
+# A piece of the sound the composer's microphone streams has a limit of its own (item 969): two seconds of 16 kHz mono
+# sound; the five minutes of a whole recording are the daemon's to count (voice/helper.py).
 _PIECE_B64_CHARS: int = (MAX_PIECE_BYTES + 2) // 3 * 4
 
 

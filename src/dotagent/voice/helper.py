@@ -61,8 +61,10 @@ BUILD_TIMEOUT_S: float = 180.0
 RUN_TIMEOUT_S: float = 60.0
 FIRST_RUN_TIMEOUT_S: float = 300.0
 # A stream no piece came to for this long is dropped: the page that opened it went away. A page sends a piece about
-# every quarter of a second while it records.
+# every quarter of a second while it records. Before its first piece a stream waits longer: the page opens it at the
+# press, and the browser may ask the owner for the microphone first (an iPhone asks twice), for as long as they read.
 STREAM_IDLE_S: float = 20.0
+STREAM_FIRST_PIECE_S: float = 120.0
 # The most a stream may live, past the longest recording: what is left open longer is dropped.
 STREAM_LIFE_S: float = MAX_RECORDING_SECONDS + 60.0
 _STREAM_WATCH_S: float = 2.0
@@ -498,13 +500,14 @@ class Transcriber:
         return _Outcome(process.returncode if process.returncode is not None else -1, out, err)
 
     async def _watch(self) -> None:
-        """Drop the streams that no piece came to for ``STREAM_IDLE_S`` seconds or that lived past ``STREAM_LIFE_S``,
-        until none is open."""
+        """Drop the streams that no piece came to for ``STREAM_IDLE_S`` seconds (``STREAM_FIRST_PIECE_S`` before the
+        first) or that lived past ``STREAM_LIFE_S``, until none is open."""
         while self._streams:
             await asyncio.sleep(_STREAM_WATCH_S)
             now: float = time.monotonic()
             for name, stream in list(self._streams.items()):
-                idle: bool = now - stream.last > STREAM_IDLE_S
+                waited: float = STREAM_IDLE_S if stream.next_piece > 0 else STREAM_FIRST_PIECE_S
+                idle: bool = now - stream.last > waited
                 if idle or now - stream.opened > STREAM_LIFE_S:
                     log.warning("voice_stream_dropped", reason="idle" if idle else "too long", language=stream.language)
                     await self._kill(name)

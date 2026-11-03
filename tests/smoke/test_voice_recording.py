@@ -512,9 +512,16 @@ async def test_what_goes_wrong_is_said_in_plain_words_and_the_box_keeps_its_word
         await _tick(page).click()
         await expect(_recorder(page)).to_be_hidden(timeout=_WAIT_MS)
 
-    # A language the Mac cannot write down.
+    async def record_until_it_ends() -> None:
+        """A failure of the stream ends the recording while the owner speaks, before any tick (item 969)."""
+        await _microphone(page).click()
+        await page.evaluate("() => window.__mic.speak(2.0)")
+        await expect(_recorder(page)).to_be_hidden(timeout=_WAIT_MS)
+        await _released(page)
+
+    # A language the Mac cannot write down: its program says so as it starts, and the next piece is refused.
     mac_can.says(mode="error", code="unsupported-language")
-    await record_and_tick()
+    await record_until_it_ends()
     await expect(toast).to_contain_text(
         "The Mac cannot write down this language. Choose another in Settings › General › Voice."
     )
@@ -533,7 +540,7 @@ async def test_what_goes_wrong_is_said_in_plain_words_and_the_box_keeps_its_word
     # A Mac that cannot be reached.
     mac_can.says(text=_WORDS)
     await page.route("**/api/voice/streams**", lambda route: route.abort())
-    await record_and_tick()
+    await record_until_it_ends()
     await expect(toast).to_contain_text("The Mac could not be reached, so what you said was not written down.")
     await page.unroute("**/api/voice/streams**")
     await toast.click()
