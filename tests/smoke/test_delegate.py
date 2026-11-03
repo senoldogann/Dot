@@ -21,7 +21,7 @@ from ollama_live import live_with
 from dotagent.agent.loop import RunOpening
 from dotagent.agent.manager import RunHandle, RunManager
 from dotagent.config import load_config
-from dotagent.core.errors import RunConflict
+from dotagent.core.errors import InvalidValueError, RunConflict
 from dotagent.core.paths import workspace_dir
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import NO_PICKS, EventRecord, RunMode, RunRecord, ThreadRecord
@@ -231,6 +231,32 @@ async def test_work_that_goes_on_in_a_chat_starts_as_tainted_as_its_last_run_end
     sender = cast(RunHandle, clean)
     assert await manager._starts_tainted(sender, earlier.thread_id, "team", goes_on)
     assert not await manager._starts_tainted(sender, earlier.thread_id, "team", fresh)
+
+
+async def test_an_agents_chat_takes_one_run_at_a_time_and_is_not_rewound_past_its_work(runtime: Runtime) -> None:
+    """Item 952 (the pre-push review): an agent's work goes on in its one chat, so the store keeps that chat to one run
+    at work whichever process starts it, and refuses to rewind it to before work an agent did there: that work's runs
+    keep no place in its history, and a rewind would cut their words and leave them counted."""
+    store = runtime.store
+    chat: ThreadRecord = await store.create_thread("Desk", "team")
+    parent: RunRecord = await _stored_run(runtime, "task", None, "ui")
+    asked: RunRecord = await store.create_run(
+        chat.id, "Tell Desk", "task", MODEL_REF, None, "ui", "medium", "standard", None, "ask", False, None, None, "a"
+    )
+    await store.finish_run(asked.id, "done", "Done.")
+    work: RunRecord = await store.create_run(
+        chat.id, "Work", "task", MODEL_REF, parent.id, "team", "medium", "standard", None, "ask", False, None, None, "a"
+    )
+    # Another process's piece of work for the same agent is refused while that one works.
+    with pytest.raises(RunConflict) as refused:
+        await store.create_run(
+            chat.id, "More", "task", MODEL_REF, parent.id, "team", "medium", "standard", None, "ask", False, None,
+            None, "b",
+        )  # fmt: skip
+    assert refused.value.context["run_ids"] == [work.id]
+    await store.finish_run(work.id, "done", "Done.")
+    with pytest.raises(InvalidValueError, match="an agent worked in this chat after this message"):
+        await store.rewind_chat(asked.id, [asked.id])
 
 
 async def test_a_research_run_only_delegates_research(runtime: Runtime, manager: RunManager) -> None:

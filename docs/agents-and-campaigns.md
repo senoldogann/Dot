@@ -328,8 +328,10 @@ agent and the message; the agent answers in a run of its own (its instructions, 
 of its approvals and the sender's, so an agent set to `yolo` asks when a run that asks messages it) that cannot see the
 sender's conversation, in the agent's one chat, named after it, which every piece of work sent to it continues, so it
 reads what it did before (item 952: a chat a message filled the list, five a week for Growth Lead); while a run works
-there, the next piece takes a chat of its own, so that two sent at once run side by side; since a run there reads the
-work before it, it starts as untrusted as that work ended (see [Safety](safety.md)), and the reply comes back as the tool's result, the way a delegated run's report does. The prompt
+there, the next piece takes a chat of its own, so that two sent at once run side by side, and the store refuses a
+second run there from another process; since a run there reads the work before it, it starts as untrusted as that
+work ended (see [Safety](safety.md)); and the chat is not rewound to before work an agent did in it, whose runs keep
+no place in its history, and the reply comes back as the tool's result, the way a delegated run's report does. The prompt
 lists the team by name and role under "Team" whenever there is another agent to message; an agent does not message
 itself, and an answering run messages no one further. The sender's chat shows the exchange as a delegated row wearing
 the agent's face: a line of the conversation, no card, its face in the column of the faces and its words where theirs

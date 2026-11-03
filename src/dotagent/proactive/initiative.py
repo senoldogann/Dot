@@ -47,11 +47,12 @@ from dotagent.proactive.todos import (
 from dotagent.runtime import Runtime
 from dotagent.store.db import Store
 from dotagent.store.endings import PREFIX_EMERGENCY_STOP, RESULT_SHUTDOWN
-from dotagent.store.models import WORKING_STATUSES, RunMode, RunRecord, TodoRecord
+from dotagent.store.models import WORKING_STATUSES, RunMode, RunRecord, ThreadRecord, TodoRecord
+
+log = get_logger(__name__)
 
 # How many runs of a chat are read to tell whether one works there.
 _RUNS_READ: int = 10
-log = get_logger(__name__)
 
 LOOK_TITLE: str = "Looking for work to do for you"
 _DAY_S: float = 86_400.0
@@ -594,7 +595,7 @@ class Initiative:
         start that kept failing made a chat at every tick)."""
         store: Store = self._runtime.store
         titled: str = thread_title(title)
-        kept = await store.latest_thread(INITIATIVE_SOURCE, titled)
+        kept: ThreadRecord | None = await store.latest_thread(INITIATIVE_SOURCE, titled)
         free: bool = (
             kept is not None
             and not self._manager.at_work_in(kept.id)

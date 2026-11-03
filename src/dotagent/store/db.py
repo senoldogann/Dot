@@ -1211,8 +1211,8 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
     ("once", "TEXT"),
     # Where the run's first message went in its chat's history (item 282): the version of that history and the place in
-    # it, NULL for a delegated run, which has a chat of its own, and for a run from before; and when a rewind took the
-    # run out of its chat, NULL while it is in it.
+    # it, NULL for a delegated run (a helper's chat is its own; an agent's, item 952, is not rewound past its work) and
+    # for a run from before; and when a rewind took the run out of its chat, NULL while it is in it.
     ("history_version", "INTEGER"),
     ("history_seq", "INTEGER"),
     ("rewound_at", "REAL"),
@@ -2192,9 +2192,9 @@ class Store:
     ) -> list[ThreadSummary]:
         """The chats, the pinned ones first (the last pinned first, so they are listed however old), then the latest
         activity first: every thread with a run a person started on it, with the latest of those runs. Threads holding
-        only delegated runs are left out, and so are the threads of a campaign's sessions after the first, which start
-        in threads of their own: the campaign's page lists them, and the campaign's conversation stays a chat. The
-        runs a rewind took out of their chat (item 282) are not counted. Each chat says its loop (item 580), the
+        only delegated runs are left out, and so is the thread of a campaign's sessions after the first, which go on in
+        one of the campaign's (item 952): the campaign's page lists it, and the campaign's conversation stays a chat.
+        The runs a rewind took out of their chat (item 282) are not counted. Each chat says its loop (item 580), the
         schedules that make none of their own going on in their chat when ``same_chat`` (``[scheduler] same_chat``),
         and the team it is with (item 610); with ``team_id``, only the chats with that team are listed."""
         rows: list[aiosqlite.Row] = await self._all(
@@ -2624,7 +2624,8 @@ class Store:
 
     async def runs_from(self, run_id: str) -> list[RunRecord]:
         """The run ``run_id`` and the later runs still in its chat, oldest first: what :meth:`rewind_chat` would take
-        out of the chat now (item 282). None for a helper's run, which has a chat of its own."""
+        out of the chat now (item 282). None for a delegated run: a helper's chat is its own, and an agent's is not
+        rewound past its work (item 952)."""
         return [_run(row) for row in await self._all(_RUNS_FROM, (run_id, run_id))]
 
     async def rewind_chat(self, run_id: str, expected: Sequence[str]) -> RewindCut:
@@ -2657,6 +2658,19 @@ class Store:
             if row["rewound_at"] is not None:
                 raise RunConflict("the chat was rewound to before this message already", context)
             await self._refuse_working_chats((run.thread_id,), "a chat cannot be rewound while a run works on it")
+            # An agent's chat holds the work sent to it (item 952), whose runs keep no place in its history: a rewind
+            # past one would cut its words and leave the run counted, read as the next work's history (the pre-push
+            # review), so a chat is not rewound to before work an agent did in it.
+            later_work: aiosqlite.Row | None = await self._one(
+                "SELECT COUNT(*) AS n FROM runs WHERE thread_id = ? AND parent_run_id IS NOT NULL AND source = ?"
+                " AND created_at >= ?",
+                (run.thread_id, TEAM_SOURCE, run.created_at),
+            )
+            if later_work is not None and int(later_work["n"]) > 0:
+                raise InvalidValueError(
+                    "an agent worked in this chat after this message: it cannot be rewound to before that work",
+                    {**context, "runs": int(later_work["n"])},
+                )
             queued: aiosqlite.Row | None = await self._one(
                 "SELECT COUNT(*) AS n FROM queued_messages WHERE thread_id = ?", (run.thread_id,)
             )
@@ -2790,7 +2804,8 @@ class Store:
         working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
         # Where the run's first message goes in the chat's history (item 282): the history's version and the place after
         # its last message. Nothing comes in between, as a chat has one run at work at a time and a run stores all it
-        # says before it stops working. A delegated run works in a chat of its own, which is never rewound.
+        # says before it stops working. A delegated run has none: a helper works in a chat of its own, and an agent's
+        # chat, which its work goes on in (item 952), is not rewound past that work (:meth:`rewind_chat`).
         place: str = (
             "NULL, NULL"
             if parent_run_id is not None
@@ -2798,10 +2813,16 @@ class Store:
             " (SELECT COALESCE(MAX(seq), -1) + 1 FROM messages WHERE thread_id = ?)"
         )
         # A chat has one run at work at a time, whichever process drives it, and none beside a queued message that
-        # another process is starting (:meth:`claim_queued`); a delegated run works in a chat of its own. A process
-        # keeps its own runs on a chat apart itself (``RunManager``), its run whose end is still to be stored too.
+        # another process is starting (:meth:`claim_queued`). A helper works in a chat of its own; an agent's work goes
+        # on in the agent's one chat (item 952), where another process's run at work refuses it too, so that two runs
+        # never write one history (the pre-push review). A process keeps its own runs on a chat apart itself
+        # (``RunManager``, an agent's lock), its run whose end is still to be stored too.
+        shared: bool = parent_run_id is not None and source == TEAM_SOURCE
         refusal: str = (
-            ""
+            f" WHERE NOT EXISTS (SELECT 1 FROM runs WHERE thread_id = ? AND status IN ({','.join('?' * len(working))})"
+            " AND owner IS NOT ?)"
+            if shared
+            else ""
             if parent_run_id is not None
             else " WHERE NOT EXISTS (SELECT 1 FROM runs WHERE thread_id = ? AND parent_run_id IS NULL"
             f" AND status IN ({','.join('?' * len(working))}) AND owner IS NOT ?)"
@@ -2837,14 +2858,20 @@ class Store:
                 owner,
                 record.follows_reaction,
                 *(() if parent_run_id is not None else (thread_id, thread_id)),
-                *(() if parent_run_id is not None else (thread_id, *working, owner, thread_id, owner)),
+                *(
+                    (thread_id, *working, owner)
+                    if shared
+                    else ()
+                    if parent_run_id is not None
+                    else (thread_id, *working, owner, thread_id, owner)
+                ),
             ),
         ) as cursor:
             inserted: aiosqlite.Row | None = await cursor.fetchone()
         await self._db.commit()
         if inserted is None:
             rows = await self._all(
-                "SELECT id FROM runs WHERE thread_id = ? AND parent_run_id IS NULL"
+                f"SELECT id FROM runs WHERE thread_id = ?{'' if shared else ' AND parent_run_id IS NULL'}"
                 f" AND status IN ({','.join('?' * len(working))}) AND owner IS NOT ? ORDER BY created_at",
                 (thread_id, *working, owner),
             )
