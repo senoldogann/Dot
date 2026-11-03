@@ -212,7 +212,7 @@ why (in any case) goes before the older ones and may start while another run wor
 thing a run put on the list, or one that came of content third parties can author (a page, a mail), is never urgent,
 however it is marked. It does the oldest thing to do, in a chat of its own named after it (under **Dot's work** at
 the foot of the sidebar, folded, items 822 and 855; a thing of the same name goes on in the chat of the last, once no
-run works there, item 952); with nothing to do, it looks for work every `look_every_hours` (6) with a research run (in
+run works there, and starts marked when that chat's last run read outside content, item 952); with nothing to do, it looks for work every `look_every_hours` (6) with a research run (in
 one chat, *Looking for work to do for you*, which each look continues, starting marked when the look before read
 outside content; item 952), which reads what it remembers of you, the record the morning brief reads (what waits for you, the
 runs

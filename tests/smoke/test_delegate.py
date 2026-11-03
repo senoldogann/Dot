@@ -193,10 +193,24 @@ async def test_an_agents_work_goes_on_in_its_one_chat_unless_that_chat_is_at_wor
     agent = await runtime.store.create_agent(
         "Desk", "Answers questions.", "", "", None, None, ("read_file",), None, None
     )
+    sender: RunRecord = await _stored_run(runtime, "task", None, "ui")
     first: str = await manager._agent_chat(agent)
     assert (await runtime.store.get_thread(first)).title == "Desk"
     run: RunRecord = await runtime.store.create_run(
-        first, "goal", "task", MODEL_REF, None, "team", "medium", "standard", None, "ask", False, None, agent.id, None
+        first,
+        "goal",
+        "task",
+        MODEL_REF,
+        sender.id,
+        "team",
+        "medium",
+        "standard",
+        None,
+        "ask",
+        False,
+        None,
+        agent.id,
+        None,
     )
     # At work there: the next piece goes to a chat of its own.
     second: str = await manager._agent_chat(agent)
@@ -206,11 +220,37 @@ async def test_an_agents_work_goes_on_in_its_one_chat_unless_that_chat_is_at_wor
     assert await manager._agent_chat(agent) == first
     # A chat made while the first was at work is taken again once it is free, not a third one made.
     newer: RunRecord = await runtime.store.create_run(
-        second, "goal", "task", MODEL_REF, None, "team", "medium", "standard", None, "ask", False, None, agent.id, None
+        second,
+        "goal",
+        "task",
+        MODEL_REF,
+        sender.id,
+        "team",
+        "medium",
+        "standard",
+        None,
+        "ask",
+        False,
+        None,
+        agent.id,
+        None,
     )
     await runtime.store.finish_run(newer.id, "done", "Done.")
     busy: RunRecord = await runtime.store.create_run(
-        second, "goal", "task", MODEL_REF, None, "team", "medium", "standard", None, "ask", False, None, agent.id, None
+        second,
+        "goal",
+        "task",
+        MODEL_REF,
+        sender.id,
+        "team",
+        "medium",
+        "standard",
+        None,
+        "ask",
+        False,
+        None,
+        agent.id,
+        None,
     )
     assert await manager._agent_chat(agent) == first
     await runtime.store.finish_run(busy.id, "done", "Done.")

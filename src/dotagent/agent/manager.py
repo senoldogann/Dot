@@ -1501,9 +1501,7 @@ class RunManager:
         karışıklığa yol açıyor"). A new one when it has none yet, or while its own has a run at work: two pieces of work
         sent at once still run side by side."""
         store: Store = self._runtime.store
-        received: list[RunRecord] = [
-            run for run in await store.agent_messages(agent.id, _AGENT_RUNS_READ) if run.agent_id == agent.id
-        ]
+        received: list[RunRecord] = await store.work_sent_to(agent.id, _AGENT_RUNS_READ)
         # Its chats from the newest it worked in: the first one free, so that a chat made while another was at work is
         # taken again rather than a third made.
         seen: set[str] = set()

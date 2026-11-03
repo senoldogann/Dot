@@ -6328,6 +6328,16 @@ class Store:
         )
         return [_run(row) for row in rows]
 
+    async def work_sent_to(self, agent_id: str, limit: int) -> list[RunRecord]:
+        """The newest ``limit`` runs of the work sent to the agent (item 952), newest first: not the runs of what it
+        sent, so that an agent that messages others often still finds its own chat (the pre-push review of item 953)."""
+        rows = await self._all(
+            "SELECT * FROM runs WHERE source = ? AND agent_id = ? AND parent_run_id IS NOT NULL"
+            " ORDER BY created_at DESC LIMIT ?",
+            (TEAM_SOURCE, agent_id, limit),
+        )
+        return [_run(row) for row in rows]
+
     async def agent_messages(self, agent_id: str, limit: int) -> list[RunRecord]:
         """The newest ``limit`` runs behind the messages the agent sent or received (item 87), newest first."""
         rows = await self._all(
