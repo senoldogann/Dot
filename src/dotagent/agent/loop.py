@@ -2156,6 +2156,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         # The plan of the run it resumes becomes this run's plan: the plan tools and the plan reminder go on with it.
         if opening.resumed.plan.steps:
             await runtime.bus.emit(run.id, PLAN_EVENT, plan_event_data(opening.resumed.plan), True)
+    # What the message came with stands under it at once (item 967): the run's start (the notes recalled, the skills
+    # matched, the browser, a vision model describing the pictures) takes seconds, and the page waited for it.
+    if opening.files:
+        await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(opening.files)}, True)
+    if opening.picks != NO_PICKS:
+        await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(opening.picks), True)
     ref: ModelRef = parse_model_ref(run.model)
     info: ModelInfo = await runtime.router.model_info(ref)
     if not info.tools and run.mode != "chat":
@@ -2394,10 +2400,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         opening.files,
         info.vision,
     )
-    if opening.files:
-        await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(opening.files)}, True)
-    if opening.picks != NO_PICKS:
-        await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(opening.picks), True)
     history.append(goal)
     await runtime.store.append_messages(run.thread_id, [goal])
     # Under the message (item 404): the notes recalled for it that no earlier message of the chat carries with the

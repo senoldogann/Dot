@@ -949,6 +949,9 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
     started: float = time.monotonic()
     runtime: Runtime = agent.runtime
     run = agent.run
+    # What the message came with stands under it at once (item 967), before OpenCode's server and session start.
+    if agent.opening.files:
+        await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(agent.opening.files)}, True)
     ref: ModelRef = parse_model_ref(run.model)
     provider: OpenCodeProvider = await _server_of(runtime, ref)
     # Outside yolo the agent works in the sandbox of the run's commands, a server of its own (item 677).
@@ -979,8 +982,6 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
         goal: Message = await message_with_attachments(
             runtime, run.thread_id, run.id, agent.opening.text, agent.opening.files, info.vision
         )
-        if agent.opening.files:
-            await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(agent.opening.files)}, True)
         await runtime.store.append_messages(run.thread_id, [goal])
         queue: asyncio.Queue[_Item] = asyncio.Queue()
         follow: _Follow = _Follow(
