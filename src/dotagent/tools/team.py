@@ -65,8 +65,10 @@ _MOST_REFUSALS: int = 8
 # not made again (item 950: agents_considered).
 _TEAM_PURPOSE_CHARS: int = 500
 _MOST_TEAM_AGENTS: int = 12
-# The most calls of create_team one run has refused: a run that keeps being refused stops.
+# The most calls of create_team one run has refused: a run that keeps being refused stops. Its results are read from
+# the newest so many of the run's.
 _MOST_REFUSED_TEAM_CALLS: int = 3
+_RESULTS_READ: int = 500
 
 
 class MessageAgentArgs(ToolArgs):
@@ -368,13 +370,6 @@ class CreateTeamArgs(ToolArgs):
     agents: list[str] = Field(min_length=2, max_length=_MOST_TEAM_AGENTS, description="Its agents' names.")
 
 
-def _team_name_of(call: EventRecord) -> str:
-    """The name a ``create_team`` call gave, folded; "" for a call whose arguments cannot be read."""
-    args: object = call.data.get("args")
-    name: object = args.get("name") if isinstance(args, dict) else None
-    return name.strip().casefold() if isinstance(name, str) else ""
-
-
 def render_team(team: TeamRecord, members: Sequence[AgentRecord]) -> str:
     """The tool's result: the team, who is in it, and where the owner finds it."""
     names: str = ", ".join(agent.name for agent in members)
@@ -403,6 +398,17 @@ def _create_team_tool() -> RegisteredTool:
         if ctx.run_tools is None:
             # A delegated run and one that answers a message make no team, as they make no agent.
             raise ToolExecutionError("this run cannot make teams", {"run_id": ctx.run_id})
+        # A run whose calls keep being refused stops, whatever refused them (the pre-push review of item 953).
+        results: list[EventRecord] = await ctx.runtime.store.events_of_kind(ctx.run_id, "tool_result", _RESULTS_READ)
+        refused: int = sum(
+            1 for event in results if event.data.get("tool") == CREATE_TEAM_TOOL and event.data.get("ok") is False
+        )
+        if refused >= _MOST_REFUSED_TEAM_CALLS:
+            raise ToolInputError(
+                f"create_team was refused {refused} times in this run; make the team on the Agents page or ask the "
+                "owner what it should hold",
+                {"refused": str(refused)},
+            )
         agents: list[AgentRecord] = await ctx.runtime.store.list_agents()
         members: list[AgentRecord] = []
         unknown: list[str] = []
@@ -425,19 +431,6 @@ def _create_team_tool() -> RegisteredTool:
         teams: list[TeamRecord] = await ctx.runtime.store.list_teams()
         if any(team.name.casefold() == name.casefold() for team in teams):
             raise ToolInputError("a team has that name already; choose another", {"team": name})
-        # The run's calls, this one among them, all of them however long the run: what it made counts by the teams
-        # under the names it gave.
-        calls: list[EventRecord] = await ctx.runtime.store.tool_calls_named(ctx.run_id, CREATE_TEAM_TOOL)
-        named: set[str] = {_team_name_of(call) for call in calls}
-        made_here: int = sum(1 for team in teams if team.name.casefold() in named)
-        # The calls before this one that made no team.
-        refused: int = len(calls) - 1 - made_here
-        if refused >= _MOST_REFUSED_TEAM_CALLS:
-            raise ToolInputError(
-                f"create_team was refused {refused} times in this run; make the team on the Agents page or ask the "
-                "owner what it should hold",
-                {"made": str(made_here), "refused": str(refused)},
-            )
         team: TeamRecord = await ctx.runtime.store.create_team(
             name, args.purpose.strip(), [agent.id for agent in members], None
         )

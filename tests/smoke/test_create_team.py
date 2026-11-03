@@ -58,6 +58,8 @@ _TURNS: list[ScriptedTurn] = [
     _call(CREATE_TEAM_TOOL, name="Launch team", agents=["Press Writer", "Reviewer"]),
     _call(CREATE_TEAM_TOOL, name="Ghosts", agents=["Press Writer", "Nobody Made Me"]),
     _call(CREATE_TEAM_TOOL, name="Alone", agents=["Press Writer", "press writer"]),
+    # Refused three times: the run stops making teams, even one that would do (the pre-push review of item 953).
+    _call(CREATE_TEAM_TOOL, name="Second team", agents=["Press Writer", "Reviewer"]),
     _call(FINISH_TOOL, answer="The team is made.", success=True),
 ]
 
@@ -122,3 +124,4 @@ async def test_a_run_makes_its_agents_then_the_team_of_them(runtime: Runtime) ->
     assert not said[1][0] and "a team has that name already" in said[1][1]
     assert not said[2][0] and "no agent has the name Nobody Made Me" in said[2][1]
     assert not said[3][0] and "a team has two agents at least" in said[3][1]
+    assert not said[4][0] and "create_team was refused 3 times in this run" in said[4][1]
