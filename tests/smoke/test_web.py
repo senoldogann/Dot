@@ -21,7 +21,7 @@ import pytest_asyncio
 
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
-from dotagent.core.errors import DotError, WebError, WebTransportError
+from dotagent.core.errors import DotError, WebError, WebHandshakeRefused, WebTransportError
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo
@@ -372,6 +372,40 @@ async def test_a_refused_connection_is_tried_twice_and_the_error_names_its_cause
     assert time.perf_counter() - started >= 0.15  # the pause between the two tries is 0.2 to 0.4 s
     assert failure.value.context["error_type"] == "ConnectError"
     assert "ConnectionRefusedError" in str(failure.value.context["error"])
+    assert not isinstance(failure.value, WebHandshakeRefused)
+
+
+def _closing_hellos() -> tuple[socket.socket, int]:
+    """A listener that reads each connection's first bytes, a TLS hello, and closes it: a site that turns away the
+    plain request's hello (item 960)."""
+    listener: socket.socket = socket.create_server(("127.0.0.1", 0))
+
+    def serve() -> None:
+        while True:
+            try:
+                connection, _ = listener.accept()
+            except OSError:
+                return
+            with connection:
+                connection.recv(4096)
+
+    threading.Thread(target=serve, daemon=True).start()
+    return listener, listener.getsockname()[1]
+
+
+async def test_a_tls_hello_the_site_closes_is_told_apart_from_other_failures_in_transit(settings: Path) -> None:
+    """Item 960: a site that closes the plain request's TLS handshake raises :class:`WebHandshakeRefused`, which
+    web_fetch hands to the browser, still a failure in transit."""
+    listener, port = _closing_hellos()
+    client: WebClient = WebClient(load_config(settings).web, (), ())
+    try:
+        with pytest.raises(WebHandshakeRefused) as failure:
+            await client.get(f"https://127.0.0.1:{port}/", 1000)
+    finally:
+        await client.aclose()
+        listener.close()
+    assert failure.value.message == "the request failed in transit"
+    assert "SSL" in str(failure.value.context["error"])
 
 
 def _hanging_up(received: list[str]) -> ThreadingHTTPServer:

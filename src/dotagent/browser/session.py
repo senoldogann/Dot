@@ -2608,9 +2608,34 @@ class BrowserSession:
         return page
 
     async def _close_scratch(self, page: Page) -> None:
+        """Close the tab of a quiet read the way it was made, through Chrome's own ``Target.closeTarget``, and wait for
+        Playwright to see it closed. ``page.close()`` never came back for a tab whose failed navigation Chrome was still
+        committing its error page in (item 960: measured 2026-11-03, a second read that met ``ERR_EMPTY_RESPONSE`` or
+        ``ERR_CONNECTION_CLOSED`` three times hung each time; closed this way it took 0.02 s). A tab with no browser at
+        hand, or one closed already, is closed by ``page.close()``."""
         self._refusals.pop(page, None)
         try:
-            await page.close()
+            browser: Browser | None = page.context.browser
+            target: str | None = await page_target_id(page) if browser is not None and not page.is_closed() else None
+            if browser is None or target is None:
+                await page.close()
+                return
+            closed: asyncio.Event = asyncio.Event()
+            page.once("close", lambda _: closed.set())
+            cdp: CDPSession = await browser.new_browser_cdp_session()
+            try:
+                await cdp.send("Target.closeTarget", {"targetId": target})
+            finally:
+                with contextlib.suppress(PlaywrightError):
+                    await cdp.detach()
+            try:
+                async with asyncio.timeout(self._config.action_timeout_s):
+                    await closed.wait()
+            except TimeoutError as error:
+                raise BrowserError(
+                    "closing a tab failed",
+                    {"error": f"Chrome did not close the tab within {self._config.action_timeout_s:g} s"},
+                ) from error
         except Exception as error:
             if not browser_gone(error):
                 raise

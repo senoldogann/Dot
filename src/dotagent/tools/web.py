@@ -24,7 +24,14 @@ from dotagent.browser.session import RenderedDocument
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.browser.types import PageView
 from dotagent.config import AppConfig
-from dotagent.core.errors import BrowserError, McpError, ProviderError, ToolInputError, WebError
+from dotagent.core.errors import (
+    BrowserError,
+    McpError,
+    ProviderError,
+    ToolInputError,
+    WebError,
+    WebHandshakeRefused,
+)
 from dotagent.core.held import read_regular, workspace_folder, write_new
 from dotagent.core.text import text_window
 from dotagent.core.types import JsonObject
@@ -411,9 +418,23 @@ def _fetch_tool() -> RegisteredTool:
                 )
             except BrowserError as error:
                 browser_problem = _browser_problem(error)
-        document: FetchedDocument = await ctx.runtime.web.get(
-            url, max(config.web.fetch_max_bytes, config.web.pdf_max_bytes)
-        )
+        try:
+            document: FetchedDocument = await ctx.runtime.web.get(
+                url, max(config.web.fetch_max_bytes, config.web.pdf_max_bytes)
+            )
+        except WebHandshakeRefused as refused:
+            # A site that closes the plain request's TLS hello may let a browser's by (item 960).
+            ctx.refused_hosts.note(url)
+            if ctx.browser.quiet_reads and not browser_problem:
+                try:
+                    return await _fetch_in_browser(
+                        ctx, args, url, shown_url, "the site closed the plain request's TLS handshake"
+                    )
+                except BrowserError as error:
+                    browser_problem = _browser_problem(error)
+            if not browser_problem:
+                raise
+            return mark_untrusted(fail(f"web_fetch: {refused}\n{browser_problem}\n{NEXT_RUNG}"))
         kind: DocumentKind = document_kind(document.media_type, document.body[:512])
         nonce: str = _nonce()
         if not 200 <= document.status < 300:

@@ -579,8 +579,9 @@ session its page answers some queries with the results of another query. `web_fe
 localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set. A body is read as it comes and
 inflated a piece at a time (gzip or deflate, once): a body in more codings, or in one Dot does not read, is refused, so
 that a few hundred bytes of nested gzip are not gigabytes in memory (item 554). A page that turns the plain request away
-(HTTP 401, 403, 429, 503 or 999, LinkedIn's refusal) or shows little text without JavaScript is read in the run's
-Chrome, in a tab the owner does not work in that closes after the read: a scratch tab of Dot's own Chrome, or a tab
+(HTTP 401, 403, 429, 503 or 999, LinkedIn's refusal), closes the plain request's TLS handshake (some sites answer only
+a hello that offers HTTP/2 first, as Chrome's does; a certificate that does not verify is not tried, item 960) or shows
+little text without JavaScript is read in the run's Chrome, in a tab the owner does not work in that closes after the read: a scratch tab of Dot's own Chrome, or a tab
 opened behind the owner's in the owner's attached Chrome (item 98); the first line of the result says so. That Chrome is
 held to the same rule (item 554): a page it was served from a private or local address, in any hop of its redirects or
 where it landed, is not given back (the request for it may have been sent: a redirect of the page can have made Chrome

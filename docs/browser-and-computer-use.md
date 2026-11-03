@@ -429,7 +429,9 @@ Both modes share what follows.
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
   the Mac), and it still paints the page under Dot's computer. Such a tab is told by the id Chrome gives it, also when
   Chrome reports it before its address commits. A new tab that Chrome does not hand over within `action_timeout_s`,
-  that cannot be set up or whose run stops meanwhile is closed, not left open with no chat to close it (item 800).
+  that cannot be set up or whose run stops meanwhile is closed, not left open with no chat to close it (item 800). A
+  quiet read's tab is closed the way it was made, through Chrome's own `Target.closeTarget`: Playwright's close never
+  came back for a tab whose failed navigation Chrome was still committing its error page in (item 960).
   macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own
   (a link to a new tab, `window.open`): the app that had the focus is brought back right after, as long as the program
   that runs Dot has Accessibility. Switching tabs does not raise the window. With `true` the window comes to the front

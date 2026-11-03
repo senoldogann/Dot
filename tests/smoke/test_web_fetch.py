@@ -5,6 +5,8 @@ headless Chrome, and the result says so; a page that refuses the browser too say
 loopback address, which the web client is allowed."""
 
 import asyncio
+import contextlib
+import socketserver
 import threading
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -200,6 +202,47 @@ async def test_a_host_that_refused_once_is_read_in_the_browser_first_from_then_o
     # Another run has no such memory: the plain request is made and the page read as fetched.
     fresh: ToolResult = await _fetch(runtime, f"{wall}/open")
     assert fresh.text.startswith("Fetched ") and "Asked by a plain request." in fresh.text
+
+
+@pytest.fixture(scope="module")
+def closing() -> Iterator[str]:
+    """A site that closes every TLS hello, a plain request's and a browser's (item 960). Each connection has a thread
+    of its own: Chrome opens sockets ahead that send nothing for a while, and one of them must not keep the next
+    waiting."""
+
+    class CloseHello(socketserver.BaseRequestHandler):
+        def handle(self) -> None:
+            self.request.settimeout(5.0)
+            with contextlib.suppress(OSError):
+                self.request.recv(4096)
+
+    server: socketserver.ThreadingTCPServer = socketserver.ThreadingTCPServer(("127.0.0.1", 0), CloseHello)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"https://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    server.server_close()
+
+
+@pytest.mark.browser
+async def test_a_site_that_closes_the_plain_tls_hello_is_tried_in_dots_own_chrome(
+    runtime: Runtime, wall: str, closing: str
+) -> None:
+    """Item 960: a site that closes the plain request's TLS handshake (some answer only a hello that offers HTTP/2
+    first, as Chrome's does) is read in the browser, and the host is remembered; one that closes Chrome's too says
+    so and names the next rung. A read the browser made before, as a running Dot's Chrome has, left the tab of the
+    failed one unclosable by ``page.close()``: the call hung until it was stopped."""
+    walled: ToolResult = await _fetch(runtime, f"{wall}/wall")
+    assert walled.text.startswith("Read in Dot's browser:")
+    refused: RefusedHosts = RefusedHosts()
+    async with asyncio.timeout(60):
+        failed: ToolResult = await _fetch_as(runtime, f"{closing}/roles", refused)
+    assert failed.is_error and failed.untrusted
+    assert failed.text.startswith("web_fetch: the request failed in transit | context=")
+    assert "Dot's browser could not read it either:" in failed.text
+    assert "The site refuses this machine. Next: another source" in failed.text
+    assert len(refused) == 1
+    assert runtime.browser.current_url("fetch-test") is None
 
 
 @pytest_asyncio.fixture(loop_scope="module")

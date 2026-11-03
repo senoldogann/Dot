@@ -214,6 +214,11 @@ class WebTransportError(WebError):
     """A web request failed in transit (timeout, reset connection); trying again can help."""
 
 
+class WebHandshakeRefused(WebTransportError):
+    """A site closed or refused the TLS handshake of a plain request, its certificate not the cause: some answer only a
+    hello that offers HTTP/2 first, as a browser's does (item 960), so Dot's browser may read the page."""
+
+
 class WebThrottledError(WebError):
     """A web service answered with its rate limit or its bot check; trying again after a pause can help."""
 
