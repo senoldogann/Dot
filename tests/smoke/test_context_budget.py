@@ -70,7 +70,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 200 for `chats` and `read_chat` (item 953, the owner's ask of 2026-11-03: the chats know of each other): a
 # run finds a chat of this Mac by its title and reads it, each described in a line (25,946 measured; system 7,591,
 # tools 18,329).
-BUDGET_TOKENS: int = 25_950
+# Raised by 100 for `send_to_chat` (item 957, the same ask): a note to the run at work in another chat, described in a
+# line (26,049 measured; system 7,591, tools 18,432).
+BUDGET_TOKENS: int = 26_050
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -86,7 +88,8 @@ SYSTEM_BUDGET_TOKENS: int = 7_600
 # Raised by 1,000 for the six tools of items 907 and 908 above.
 # Raised by 350 for `recall`, `pass_reply` and a plan step's `brief` (items 924, 926 and 927) above.
 # Raised by 200 for `chats` and `read_chat` (item 953) above.
-TOOLS_BUDGET_TOKENS: int = 18_350
+# Raised by 100 for `send_to_chat` (item 957) above.
+TOOLS_BUDGET_TOKENS: int = 18_450
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

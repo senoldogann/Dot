@@ -17,7 +17,7 @@ import { helperCard } from "./helpercard.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
-import { answerMessage, besideLine, scheduleLine, userMessage } from "./messages.js";
+import { answerMessage, besideLine, chatNoteLine, scheduleLine, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
@@ -1413,6 +1413,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // A request of its own sent as the run worked, started in a chat of its own (item 915): a line that leads to it.
     started_beside(scope, record) {
       place(scope, besideLine(record.data), record.ts);
+    },
+
+    // A note a run of another chat sent to this run at work (item 957): Dot's words, a line that leads to that chat.
+    chat_note(scope, record) {
+      place(scope, chatNoteLine(record.data), record.ts);
     },
 
     // Dot's reaction on your latest message (item 664): it stands on that message, which the page finds.

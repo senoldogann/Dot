@@ -518,7 +518,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools`, `recall` (a record a compaction named, read back, item 924) |
 | Team            | `create_agent`, `create_team` (a team of agents, item 864), `message_agent`, `assign_work`, `work_orders`, `review_work` (work orders the agents work on without the lead waiting, item 907) |
-| Office          | `agents_now`, `read_agent_chat` (what the other agents do now and one's chat, item 890), `chats`, `read_chat` (the chats of this Mac, found and read, item 953) |
+| Office          | `agents_now`, `read_agent_chat` (what the other agents do now and one's chat, item 890), `chats`, `read_chat` (the chats of this Mac, found and read, item 953), `send_to_chat` (a note to the run at work in one, item 957) |
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Pages           | `show_page`                                                                                                        |
 | Drafts          | `draft_message`                                                                                                    |

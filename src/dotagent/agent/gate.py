@@ -432,6 +432,11 @@ class RunGate:
             log.info("pace_wait", run_id=self._run_id, host=paced.host, seconds=round(wait, 1))
             await asyncio.sleep(wait)
 
+    def approval_mode_now(self) -> ApprovalMode:
+        """The approval mode the run's next step is decided in (:meth:`_mode_now`): what a note to it from another
+        chat is weighed against (item 957)."""
+        return self._mode_now()
+
     def _mode_now(self) -> ApprovalMode:
         """The approval mode a step is decided in: the run's own, or yolo while the owner's free mode is on (item 922),
         which asks nothing, from the next step on."""

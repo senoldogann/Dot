@@ -97,6 +97,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     # A chat read by read_agent_chat or read_chat, and the list of chats (item 953).
     "tools/office.py:read_thread": (True,),
     "tools/office.py:_chats_tool.run": (True,),
+    # A note to the run at work in another chat (item 957): what it says and the chat's page draws is masked.
+    "tools/office.py:_send_to_chat_tool.run": (True,),
     # A record read back by its id (item 924) is masked as a chat read is.
     "tools/recall.py:_recall_tool.run": (True,),
     "agent/reactions.py:_holds_a_secret": (False,),

@@ -5,7 +5,7 @@ import { api, query } from "./api.js";
 import { el, plural, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
-import { answerMessage, besideLine,
+import { answerMessage, besideLine, chatNoteLine,
   scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
@@ -238,6 +238,10 @@ function drawFlow(past, flow, asked, events, reactions) {
       // A request of its own the owner sent as it worked, started in a chat of its own (item 915): a line here.
       batch = null;
       blocks.push({ beside: event.data });
+    } else if (event.kind === "chat_note") {
+      // A note a run of another chat sent to the run at work here (item 957): Dot's words, a line of the conversation.
+      batch = null;
+      blocks.push({ noted: event.data });
     } else if (event.kind === "dot_reaction") {
       reaction = event.data.reaction;
       reactedTo = [...blocks].reverse().find((block) => block.steer !== undefined) ?? null;
@@ -280,6 +284,8 @@ function drawFlow(past, flow, asked, events, reactions) {
       ? scheduleLine(block.schedule)
       : block.beside !== undefined
       ? besideLine(block.beside)
+      : block.noted !== undefined
+      ? chatNoteLine(block.noted)
       : block.steer !== undefined
       ? steerMessage(block, block === reactedTo ? reaction : null)
       : block.kept !== undefined

@@ -309,7 +309,13 @@ from dotagent.tools.meta import (
     UseToolsArgs,
 )
 from dotagent.tools.objectives import OBJECTIVE_TOOLS
-from dotagent.tools.office import AGENTS_NOW_TOOL, CHATS_TOOL, READ_AGENT_CHAT_TOOL, READ_CHAT_TOOL
+from dotagent.tools.office import (
+    AGENTS_NOW_TOOL,
+    CHATS_TOOL,
+    READ_AGENT_CHAT_TOOL,
+    READ_CHAT_TOOL,
+    SEND_TO_CHAT_TOOL,
+)
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.recall import RECALL_TOOL
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
@@ -343,6 +349,8 @@ AGENT_CORE_TOOLS: tuple[str, ...] = (
     # The chats of this Mac, found and read (item 953), so that an agent knows where a thing was talked about.
     CHATS_TOOL,
     READ_CHAT_TOOL,
+    # A note to the run at work in another chat (item 957), so that the agents talk across their chats.
+    SEND_TO_CHAT_TOOL,
     # The ids a compaction note names are read back with it (item 924), whatever tools the agent's role names.
     RECALL_TOOL,
 )
@@ -354,6 +362,8 @@ _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
         ASK_SECRET_TOOL,
         CONSULT_TOOL,
         MESSAGE_AGENT_TOOL,
+        # A run another handed a part to tells that run, which tells the other chats (item 957).
+        SEND_TO_CHAT_TOOL,
         CREATE_AGENT_TOOL,
         CREATE_TEAM_TOOL,
         # The lead hands work out and keeps the objectives (items 907, 908); a run it handed a part to does neither.

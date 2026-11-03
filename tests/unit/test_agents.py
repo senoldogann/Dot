@@ -17,7 +17,13 @@ from dotagent.server.views import AgentRequest
 from dotagent.store.db import Store
 from dotagent.store.models import AgentLook, AgentRecord, RunRecord, ThreadRecord
 from dotagent.tools.meta import ASK_SECRET_TOOL, ASK_USER_TOOL, FINISH_TOOL, REACT_TOOL, USE_TOOLS_TOOL
-from dotagent.tools.office import AGENTS_NOW_TOOL, CHATS_TOOL, READ_AGENT_CHAT_TOOL, READ_CHAT_TOOL
+from dotagent.tools.office import (
+    AGENTS_NOW_TOOL,
+    CHATS_TOOL,
+    READ_AGENT_CHAT_TOOL,
+    READ_CHAT_TOOL,
+    SEND_TO_CHAT_TOOL,
+)
 from dotagent.tools.recall import RECALL_TOOL
 
 
@@ -117,6 +123,7 @@ def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_react_and_tur
         READ_AGENT_CHAT_TOOL,
         CHATS_TOOL,
         READ_CHAT_TOOL,
+        SEND_TO_CHAT_TOOL,
         RECALL_TOOL,
     }
 

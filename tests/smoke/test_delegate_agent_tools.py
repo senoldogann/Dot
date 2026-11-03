@@ -45,6 +45,8 @@ _CORE: frozenset[str] = frozenset(
         # The chats of this Mac (item 953).
         "chats",
         "read_chat",
+        # A note to the run at work in another chat (item 957), which a helper does not get.
+        "send_to_chat",
     }
 )
 

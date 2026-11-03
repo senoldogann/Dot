@@ -300,6 +300,17 @@ comes fenced and marks the reading run untrusted, as that chat was (item 243), s
 another's chat; a chat's title made of a goal that came of a page or a mail (a watcher's, a thing a tainted run put on
 the list) is a third party's words, and `chats` lists it in a fence too.
 
+A run can also tell another chat something (item 957): `send_to_chat` hands a note to the run at work in a chat `chats`
+lists, which reads it before its next step, fenced under the chat it came from, as Dot's words, not yours; the chat
+shows it as a line, "Note from another chat", that leads to the chat that sent it. A note starts nothing: a chat where
+no run is at work is refused, and new work for an agent goes with `message_agent`, never into a chat of yours. A run
+sends at most six, so two runs that answer each other's notes stop; a run that may only read (research) sends none, nor
+does a helper, whose run tells it. A note always marks the run that reads it as outside content does, so that what it
+does after is judged as after a page until you write in its chat; none goes to a run whose approval mode asks you less
+than its sender's (a run in Ask mode sends none to one in YOLO), and a run of Dot's own initiative sends none to a run
+that does not ask before a message, a post or a release as it does ([Safety](safety.md)). The secrets Dot holds are
+masked in it.
+
 A run can make a teammate itself (item 99). The `create_agent` tool (a name, a role, instructions, the tools it may
 use, a model if one is wanted) makes an agent as the Agents page does, under your approvals (the `persistence` flag,
 like saving a note: `ask` asks once the run has read untrusted content, `yolo` makes it, though once the run has read

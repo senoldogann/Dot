@@ -40,6 +40,18 @@ def _no_user_text() -> str:
 
 
 @dataclass(frozen=True)
+class ChatNote:
+    """A note a run sends to the run at work in another chat (item 957, ``send_to_chat``): ``text`` is what that run
+    reads, the sender's words fenced under where they come from; ``shown`` the sender's words alone, which the chat's
+    page draws; ``from_run_id`` and ``from_thread_id`` the run that sends it and its chat."""
+
+    text: str
+    shown: str
+    from_run_id: str
+    from_thread_id: str
+
+
+@dataclass(frozen=True)
 class DelegateOutcome:
     """A delegated run that has ended, and whether it read content that third parties can author."""
 
@@ -85,6 +97,11 @@ class Spawner(Protocol):
     async def hand_reply(self, from_run_id: str, thread_id: str, goal: str, opening: str) -> RunRecord:
         """Start a run in the chat ``thread_id`` for a reply to a mail it sent (item 926), for the run ``from_run_id``
         that found it: ``goal`` is Dot's words, ``opening`` what the run reads first; it starts untrusted."""
+        ...
+
+    async def note_chat(self, thread_id: str, note: ChatNote) -> str | None:
+        """Hand ``note`` to the run at work in the chat ``thread_id`` (item 957) and return its id, ``None`` when no run
+        of this process works there: a note starts nothing."""
         ...
 
 

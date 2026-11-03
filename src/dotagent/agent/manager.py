@@ -168,7 +168,7 @@ from dotagent.store.models import (
     WorkingRun,
 )
 from dotagent.terminal.session import TerminalSession, ended_notices
-from dotagent.tools.context import DelegateOutcome
+from dotagent.tools.context import ChatNote, DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.groups import group_of, groups_of
 from dotagent.tools.meta import ASK_USER_TOOL
@@ -181,6 +181,10 @@ log = get_logger(__name__)
 STARTED_BESIDE_EVENT: str = "started_beside"
 _BESIDE_JUDGE_S: float = 12.0
 _BESIDE_LINE_CHARS: int = 160
+# A note a run sent to the run at work in another chat (item 957): the event of the line its page draws there, and how
+# much of the note the line keeps.
+CHAT_NOTE_EVENT: str = "chat_note"
+_CHAT_NOTE_LINE_CHARS: int = 600
 
 # The live event that tells the pages a chat's queue changed (item 148); it carries the chat's id.
 QUEUE_CHANGED_EVENT: str = "queue_changed"
@@ -1623,6 +1627,63 @@ class RunManager:
             )
         except asyncio.QueueShutDown as exc:
             raise RunConflict("the run is not active", {"run_id": run_id}) from exc
+
+    async def note_chat(self, thread_id: str, note: ChatNote) -> str | None:
+        """Hand ``note`` to the run at work in the chat ``thread_id`` (item 957), the chat's own run before a helper's,
+        and return its id; ``None`` when no run of this process works there, or the one that does is ending: a note
+        starts nothing. It is Dot's words, as a work order's note to its lead is (:meth:`tell`): it vouches for nothing
+        and is no instruction to the review model. It always marks the reader as content third parties can author does
+        (the owner's choice of 2026-11-03, after four pre-push reviews each found a way a run that asks less does for
+        the sender what the sender asks the owner first): whatever the reader does after it is judged as after a page,
+        in every mode, until the owner writes in its chat. The chat's page draws it as a line (:data:`CHAT_NOTE_EVENT`).
+
+        Only a run at work in this process sends one, and none to a run whose approval mode asks less than its own
+        (:data:`_APPROVALS_STRICTEST_FIRST`). A run that asks the owner before a message, a post or a release in every
+        mode (a run of Dot's own initiative, item 850) sends none to a run that does not. Raises :class:`RunConflict`
+        and :class:`PolicyDenied` for those."""
+        sender: RunHandle | None = self._handles.get(note.from_run_id)
+        if sender is None:
+            raise RunConflict("only a run at work sends a note to another chat", {"run_id": note.from_run_id})
+        there: list[RunHandle] = [handle for handle in self._handles.values() if handle.thread_id == thread_id]
+        target: RunHandle | None = next(
+            (handle for handle in there if handle.parent_run_id is None), there[0] if there else None
+        )
+        if target is None:
+            return None
+        asks: ApprovalMode = sender.gate.approval_mode_now()
+        reader_asks: ApprovalMode = target.gate.approval_mode_now()
+        if _APPROVALS_STRICTEST_FIRST.index(reader_asks) > _APPROVALS_STRICTEST_FIRST.index(asks):
+            raise PolicyDenied(
+                f"the run at work in that chat works in {reader_asks}, which asks you less than this run's {asks}: a "
+                "note would have it do unasked what this run asks first. Say it in this chat instead",
+                {"run_id": note.from_run_id, "thread_id": thread_id, "approvals": asks, "reader": reader_asks},
+            )
+        if sender.gate.owners_word and not target.gate.owners_word:
+            raise PolicyDenied(
+                "a run of Dot's own initiative asks the owner before a message, a post or a release, and the run at "
+                "work in that chat does not: a note would have it do them unasked. Say it in this chat instead",
+                {"run_id": note.from_run_id, "thread_id": thread_id},
+            )
+        tainted: bool = True
+        try:
+            self.tell(target.run_id, note.text, "note", taints=tainted)
+        except RunConflict:
+            return None
+        await self._runtime.bus.emit(
+            target.run_id,
+            CHAT_NOTE_EVENT,
+            {
+                "from_run_id": note.from_run_id,
+                "from_thread_id": note.from_thread_id,
+                "text": one_line(note.shown, _CHAT_NOTE_LINE_CHARS),
+                "tainted": tainted,
+            },
+            True,
+        )
+        log.info(
+            "chat_note_sent", run_id=target.run_id, thread_id=thread_id, from_run_id=note.from_run_id, tainted=tainted
+        )
+        return target.run_id
 
     def permit_chat(self, run_id: str) -> str | None:
         """The chat whose "don't ask again" yeses answer the questions of the run ``run_id`` (item 866): its own chat,

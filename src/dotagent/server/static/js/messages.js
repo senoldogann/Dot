@@ -94,6 +94,17 @@ export function besideLine(started) {
   );
 }
 
+/** The line a note from another chat leaves in this one (item 957): what a run of Dot's at work there told the run at
+ * work here, and the way to that chat. The words are Dot's, never yours. `noted` is the `chat_note` event's data. */
+export function chatNoteLine(noted) {
+  return el(
+    "a",
+    { class: "note schedule-line chat-note-line", href: `#/runs/${encodeURIComponent(noted.from_run_id)}` },
+    icon("message"),
+    el("span", null, el("span", { class: "schedule-made" }, "Note from another chat:"), " ", noted.text),
+  );
+}
+
 // What each reaction of Dot's on a message of yours says, for its tooltip and a screen reader (item 664).
 const DOT_REACTION_WORDS = { "👍": "understood", "👀": "looking into it" };
 

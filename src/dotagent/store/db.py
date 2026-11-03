@@ -3598,6 +3598,16 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def calls_that_worked(self, run_id: str, tool: str) -> int:
+        """How many calls of ``tool`` the run ``run_id`` made that worked, by their ``tool_result`` events (item
+        957)."""
+        row = await self._one(
+            "SELECT COUNT(*) AS n FROM events WHERE run_id = ? AND kind = 'tool_result'"
+            " AND json_extract(data, '$.tool') = ? AND json_extract(data, '$.ok') = 1",
+            (run_id, tool),
+        )
+        return 0 if row is None else int(row["n"])
+
     async def events_of_kinds(self, run_id: str, kinds: Sequence[str], limit: int) -> list[EventRecord]:
         """The newest ``limit`` events of a run that are of any of ``kinds``, oldest first."""
         marks: str = ",".join("?" * len(kinds))
