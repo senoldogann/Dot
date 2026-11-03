@@ -105,6 +105,7 @@ from dotagent.repair.problems import (
     Book,
     Problem,
     ProblemStatus,
+    PrState,
     Sighting,
     next_problem,
     read_book,
@@ -240,6 +241,8 @@ class RepairSession(FrozenModel):
     main_before: str | None = None
     # The commit the owner's checkout stood on when the session began (item 940), which its second look reads from.
     head_before: str | None = None
+    # Where its pull request stood on GitHub when it was last read (item 958); ``None`` before.
+    pr_state: PrState | None = None
 
 
 class SessionLog(FrozenModel):
@@ -468,7 +471,7 @@ def checks_brief(failed: Sequence[tuple[Check, str]], unsettled: bool, nonce: st
     )
 
 
-def _checkout_of(configured: str) -> Path | None:
+def checkout_of(configured: str) -> Path | None:
     """The git checkout ``[repair] repo`` names, or ``None`` when it names none."""
     if not configured:
         return None
@@ -566,7 +569,13 @@ def problem_after(problem: Problem, session: RepairSession) -> Problem:
         note = f"Tried {problem.tries} times; the last: {note}"[:_TAIL_CHARS]
     settled: float | None = session.ended_at if status in ("fixed", "declined") else problem.settled_at
     return problem.model_copy(
-        update={"status": status, "pr_url": session.pr_url or problem.pr_url, "note": note, "settled_at": settled}
+        update={
+            "status": status,
+            "pr_url": session.pr_url or problem.pr_url,
+            "note": note,
+            "settled_at": settled,
+            "pr_state": session.pr_state,
+        }
     )
 
 
@@ -1098,7 +1107,7 @@ async def repair_night(
     """One night of repairs (see the module), in a process that began at ``running_since``: the sessions it ran.
     Raises :class:`RepairError` when ``[repair] repo`` is no git checkout."""
     config = runtime.config.repair
-    repo: Path | None = await asyncio.to_thread(_checkout_of, config.repo)
+    repo: Path | None = await asyncio.to_thread(checkout_of, config.repo)
     if repo is None:
         raise RepairError("[repair] repo is no git checkout of Dot's code", {"repo": config.repo})
     store = runtime.store

@@ -22,6 +22,9 @@ from dotagent.repair.problems import BOOK_KEY, read_book
 from dotagent.server.context import ServerContext
 from dotagent.server.views import RepairView
 
+# How long the page waits for the reading of its pull requests' states before it opens with what was kept.
+_SETTLE_WAIT_S: float = 8.0
+
 
 def repair_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
@@ -55,6 +58,17 @@ def repair_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/repair")
     async def repair() -> RepairView:
+        return await view()
+
+    @router.post("/repair/settle")
+    async def repair_settle() -> RepairView:
+        """The page as it opens, once where its pull requests stand on GitHub was read again (item 958), or a few
+        seconds of it: a reading that takes longer goes on and the page shows it when it opens next. The page's polls
+        read ``GET /api/repair``, which asks GitHub nothing."""
+        if ctx.scheduler is not None and ctx.runtime.config.repair.repo:
+            settling: asyncio.Task[None] | None = ctx.scheduler.settle_repairs()
+            if settling is not None:
+                await asyncio.wait({settling}, timeout=_SETTLE_WAIT_S)
         return await view()
 
     @router.post("/repair/now")

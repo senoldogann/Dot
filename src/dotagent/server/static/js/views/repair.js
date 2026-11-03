@@ -18,7 +18,10 @@ const STATUS = {
   fixed: "Fixed",
   waiting: "Waits for you",
   declined: "Not Dot's",
+  closed: "Closed",
 };
+// Where a pull request stands on GitHub, read again when the page opens (item 958): what it reads, and its tone.
+const PR_STATES = { merged: ["Merged", "good"], closed: ["Closed", undefined] };
 const ENDS = {
   merged: "Merged",
   merged_unpulled: "Merged",
@@ -130,7 +133,7 @@ function overview(view, runNow) {
   const tiles = setCard(
     tile("Self-repair", on ? `On, ${view.time}` : "Off", on ? (view.merge === "on_pass" ? "Merged once every check passes" : "Merged by you") : "Set [repair] repo to turn it on"),
     tile(view.running ? "Working on" : "Now", view.running ? "Working" : "Idle", now),
-    tile("Fixed", String(count(view.problems, "fixed")), `${count(view.problems, "declined")} not Dot's`),
+    tile("Fixed", String(count(view.problems, "fixed")), `${count(view.problems, "declined")} not Dot's · ${count(view.problems, "closed")} closed`),
     tile("Waits for you", String(count(view.problems, "waiting")), `${count(view.problems, "open")} open`),
   );
   tiles.classList.add("stat-card");
@@ -266,13 +269,23 @@ function workerFold(view, save) {
   return card.element;
 }
 
+/** How a problem's status reads: its pull request's state on GitHub when that was merged or closed and settled it
+ * (item 958), else its status: a problem open again is open, whatever an older pull request of it came to. */
+function statusBadge(problem) {
+  const shown = PR_STATES[problem.pr_state];
+  if (shown !== undefined && (problem.status === "fixed" || problem.status === "closed")) {
+    return badge(shown[0], shown[1]);
+  }
+  return badge(STATUS[problem.status] ?? problem.status, problem.status === "fixed" ? "good" : problem.status === "waiting" ? "warn" : undefined);
+}
+
 /** The row of a problem: its words, how often and how lately it was seen, its status and its pull request. */
 function problemRow(problem) {
   const seen = `${problem.kind.replace("_", " ")} · seen ${problem.count}× · last ${ago(problem.last_at)}`;
   return setRow({
     title: el("span", { class: "repair-title", title: problem.title }, readable(problem.title)),
     lead: seen,
-    control: el("span", { class: "repair-status" }, badge(STATUS[problem.status] ?? problem.status, problem.status === "fixed" ? "good" : problem.status === "waiting" ? "warn" : undefined), prLink(problem.pr_url)),
+    control: el("span", { class: "repair-status" }, statusBadge(problem), prLink(problem.pr_url)),
     body: note(problem.note),
   });
 }
@@ -282,6 +295,11 @@ function problemRow(problem) {
  * or by the owner, which reads "Fixed later" (fixed) or "Let go" (not Dot's), never a warning that waits on nobody.
  */
 function endBadge(session, status) {
+  // Its pull request merged or closed on GitHub since (item 958), by the owner or another session's replay of it.
+  const shown = PR_STATES[session.pr_state];
+  if (shown !== undefined) {
+    return badge(shown[0], shown[1]);
+  }
   const settled = session.end === "merged" || session.end === "merged_unpulled" || session.end === "declined";
   if (!settled && status === "fixed") {
     return badge("Fixed later", "good");
@@ -449,7 +467,7 @@ export function mount(root, ctx) {
     const statuses = new Map(view.problems.map((problem) => [problem.id, problem.status]));
     const waiting = view.problems.filter((problem) => problem.status === "waiting");
     const open = view.problems.filter((problem) => problem.status === "open" || problem.status === "working").sort((a, b) => b.count - a.count || b.last_at - a.last_at);
-    const closed = view.problems.filter((problem) => problem.status === "fixed" || problem.status === "declined");
+    const closed = view.problems.filter((problem) => problem.status === "fixed" || problem.status === "declined" || problem.status === "closed");
     holder.replaceChildren(
       el(
         "div",
@@ -463,7 +481,7 @@ export function mount(root, ctx) {
           body: view.sessions.length === 0 ? emptyPanel("clock", "No night yet", "") : el("div", { class: "stack" }, ...nights(view.sessions, titles, statuses)),
         }),
         setSection({ title: "Next in line", lead: "What Dot's record shows going wrong again and again, the most seen first.", body: nextUp(open) }),
-        closed.length === 0 ? null : setSection({ title: "Closed", body: el("details", { class: "repair-closed" }, el("summary", null, `${closed.length} fixed or not Dot's`), setCard(...closed.map(problemRow))) }),
+        closed.length === 0 ? null : setSection({ title: "Closed", body: el("details", { class: "repair-closed" }, el("summary", null, `${closed.length} fixed, closed or not Dot's`), setCard(...closed.map(problemRow))) }),
         workerFold(view, saveWorker),
       ),
     );
@@ -472,7 +490,8 @@ export function mount(root, ctx) {
 
   async function load() {
     try {
-      view = await api.get("/repair");
+      // Opening the page reads where its pull requests stand on GitHub first (item 958); the polls below do not.
+      view = await api.post("/repair/settle", {});
     } catch (error) {
       if (!disposed) {
         holder.replaceChildren(errorPanel(error, () => attempt(load)));

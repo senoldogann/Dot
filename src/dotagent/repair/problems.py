@@ -33,7 +33,10 @@ from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, HarnessStep
 
 type ProblemKind = Literal["tool_error", "stall", "harness", "daemon"]
-type ProblemStatus = Literal["open", "working", "fixed", "waiting", "declined"]
+# ``closed``: its pull request was closed on GitHub unmerged (item 958), which Dot does not try again on its own.
+type ProblemStatus = Literal["open", "working", "fixed", "waiting", "declined", "closed"]
+# Where a pull request stands on GitHub, as the page names it (item 958).
+type PrState = Literal["open", "merged", "closed"]
 
 # The key of the kv table that holds the book, a :class:`Book` as JSON.
 BOOK_KEY: str = "repair.book"
@@ -117,6 +120,8 @@ class Problem(FrozenModel):
     # When it was fixed or let go (item 943): what is seen of a fixed one before the code that holds its fix runs does
     # not open it again; ``None`` for one kept before.
     settled_at: float | None = None
+    # Where its pull request stood on GitHub when it was last read (item 958); ``None`` before.
+    pr_state: PrState | None = None
 
 
 class Book(FrozenModel):
@@ -200,6 +205,8 @@ def with_sightings(book: Book, sightings: Sequence[Sighting], now: float, runnin
                 "last_at": max(before.last_at, sighting.at),
                 "status": "open" if back else before.status,
                 "note": f"Seen again after it was {before.status}." if back else before.note,
+                # Its merged pull request did not hold: what GitHub said of it is no word on it now (item 958).
+                "pr_state": None if back else before.pr_state,
             }
         )
     problems: list[Problem] = sorted(found.values(), key=lambda problem: problem.last_at, reverse=True)

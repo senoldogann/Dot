@@ -374,6 +374,34 @@ async def pr_state(repo: Path, number: int, env: Mapping[str, str]) -> str:
     return str(data.get("state", "")) if isinstance(data, dict) else ""
 
 
+class PrStanding(FrozenModel):
+    """Where a pull request stands (item 958): GitHub's state of it (``OPEN``, ``MERGED``, ``CLOSED``) and when it was
+    merged or closed, in epoch seconds (``None`` while it is open)."""
+
+    state: str
+    at: float | None
+
+
+async def pr_standing(repo: Path, number: int, env: Mapping[str, str]) -> PrStanding:
+    """Where the pull request ``number`` stands, and since when (:class:`PrStanding`)."""
+    data: object = _json(
+        await command(("gh", "pr", "view", str(number), "--json", "state,mergedAt,closedAt"), repo, env), "its state"
+    )
+    if not isinstance(data, dict):
+        raise RepairError("GitHub named no state of a pull request", {"number": number})
+    state: str = str(data.get("state", ""))
+    stamp: object = data.get("mergedAt") if state == "MERGED" else data.get("closedAt")
+    if not isinstance(stamp, str) or not stamp:
+        return PrStanding(state=state, at=None)
+    try:
+        at: float = datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+    except ValueError as error:
+        raise RepairError(
+            "GitHub named a time of a pull request that cannot be read", {"number": number, "time": stamp}
+        ) from error
+    return PrStanding(state=state, at=at)
+
+
 class PrHead(FrozenModel):
     """Where a pull request stands (item 933): its state (``OPEN``, ``MERGED``, ``CLOSED``), its branch, the commit its
     branch is at, and GitHub's ``mergeStateStatus`` of it (``BEHIND`` main, ``UNKNOWN`` while GitHub works it out,

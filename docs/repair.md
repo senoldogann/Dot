@@ -16,15 +16,18 @@ seconds while the page is in sight (every half minute while none works, so that 
 that fails is said once), with **Stop**, which
 asks first and ends the night as the emergency stop does: the session ends with what it started and its problem stays
 as it was. Then an overview (on or off and when, what it works on now, the problems fixed, waiting for you and open, the
-account), what waits for you with its pull request and why, the nights by date (each session's problem, how it ended and
-why in a line that opens whole; one whose problem was settled since reads *Fixed later* or *Let go*, item 940), the
-problems next in line (the most seen first, a few and the rest a click away), the
+account; the fixed count says how many are not Dot's and how many were closed, item 958), what waits for you with its
+pull request and why, the nights by date (each session's problem, how it ended and why in a line that opens whole; one
+whose problem was settled since reads *Fixed later* or *Let go*, item 940, and one whose pull request GitHub says was
+merged or closed reads *Merged* or *Closed*, item 958), the problems next in line (the most seen first, a few and the rest a click away), the
 closed ones folded, and, folded at the foot to its model and effort, how Claude Code works (a section never folded
 while its choice cannot be read, as the nights wait on it); a problem's placeholders
 read as words (item 932). It starts a night by hand (**Run now**): `GET /api/repair` gives them (`live`, what the night
 works on now, from kv `repair.live`, its steps' words masked of the secrets Dot holds), `POST /api/repair/now` starts a
-night (409 with no repository, or while one is under way), `POST /api/repair/stop` stops one (409 with none), and `PUT
-/api/repair/worker` keeps how Claude Code works (item 933).
+night (409 with no repository, or while one is under way), `POST /api/repair/stop` stops one (409 with none), `PUT
+/api/repair/worker` keeps how Claude Code works (item 933), and `POST /api/repair/settle`, which the page calls as it
+opens, reads where its pull requests stand on GitHub first (item 958, below: it waits up to eight seconds for it, and
+starts none while a night is under way) and gives them.
 
 ## The book of problems
 
@@ -224,6 +227,16 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   reason) and is not looked at again. A pull request found merged already counts its problem fixed, and the night
   goes on; a merged or closed one is settled before anything else is read (item 935). A look whose waits left the
   night less than a minute is not made, and the next night looks again.
+- **Where the pull requests stand (item 958).** A pull request left for you, or one no second look reached, may be
+  merged or closed on GitHub by you or by another session's replay of it. When Settings › Self-repair opens (it waits a
+  few seconds for it; not again while it stays open) and before each night, Dot asks GitHub the state of every pull
+  request a problem waits on and of every session's it did not merge itself, asking again twice with a growing wait when
+  an ask fails (one that still fails is logged and asked again next time, and keeps the others from nothing): the page
+  shows *Merged* or *Closed* in their place, a problem that waited on a merged one is fixed since GitHub merged it (a
+  later sighting of it by a process that began after that opens it again, as for a merge of Dot's own: a merge you have
+  not pulled is read so too) and one on a closed one is *Closed*, which no night tries again on its own. What is merged
+  or closed is not asked again. The reading and a night never run at once: a night waits for a reading under way, and
+  the page does not start one during a night, which reads them itself first.
 
   What it does not read: a command by more than its words (what a script the session wrote did when run is read as a
   file of its change, not as what happened on the Mac), and the transcript is a file the session itself could have

@@ -36,7 +36,8 @@ from dotagent.proactive.brief import BriefFiring, is_brief, prepare, tell_brief
 from dotagent.proactive.checkin import is_checkin, prepare_checkin, tell_checkin
 from dotagent.proactive.initiative import Initiative
 from dotagent.repair.github import command
-from dotagent.repair.night import NIGHT_KEY, PROCESS_STARTED_AT, repair_night
+from dotagent.repair.night import NIGHT_KEY, PROCESS_STARTED_AT, checkout_of, repair_night
+from dotagent.repair.settle import settle_stored
 from dotagent.runtime import Runtime
 from dotagent.scheduler import (
     SCHEDULE_MISSED_EVENT,
@@ -169,6 +170,8 @@ class Scheduler:
         # The repair night (item 921), timed like the reflection.
         self._repaired_from: float = time.time()
         self._repairing: asyncio.Task[None] | None = None
+        # The reading of where the repairs' pull requests stand on GitHub (item 958), which a night waits for.
+        self._settling: asyncio.Task[None] | None = None
         # Dot's own initiative (item 715): its runs while the Mac is idle, started from the tick.
         self._initiative: Initiative = Initiative(runtime, manager)
         # The watch of trading (items 770, 772): sells at a stop or a target, with no model, between runs, and starts
@@ -225,6 +228,9 @@ class Scheduler:
         repairing: asyncio.Task[None] | None = self._repairing
         if repairing is not None:
             repairing.cancel()
+        settling: asyncio.Task[None] | None = self._settling
+        if settling is not None:
+            settling.cancel()
         await self._initiative.stop()
         loop: asyncio.Task[None] | None = self._loop
         if loop is None:
@@ -247,6 +253,8 @@ class Scheduler:
             await asyncio.wait({self._scouting})
         if self._repairing is not None:
             await asyncio.wait({self._repairing})
+        if self._settling is not None:
+            await asyncio.wait({self._settling})
 
     def reflecting(self) -> bool:
         """Whether a reflection is under way."""
@@ -396,8 +404,36 @@ class Scheduler:
         await self._runtime.store.kv_set(NIGHT_KEY, str(now))
         self._repairing = asyncio.create_task(self._repair(), name="repair-night")
 
+    def settle_repairs(self) -> asyncio.Task[None] | None:
+        """Read again, in a task, where the repairs' pull requests stand on GitHub (item 958): when Settings ›
+        Self-repair opens. ``None`` while a night is under way, which reads them itself first; the reading under way
+        when one is. A night that starts meanwhile waits for it, so the two never write the book at once."""
+        if self.repairing():
+            return None
+        if self._settling is None or self._settling.done():
+            self._settling = asyncio.create_task(self._settle(), name="repair-settle")
+        return self._settling
+
+    async def _settle(self) -> None:
+        """Task body of a reading of the pull requests' states, and the one place its errors end: logged, and the next
+        reading tries again."""
+        try:
+            repo: Path | None = await asyncio.to_thread(checkout_of, self._runtime.config.repair.repo)
+            if repo is None:
+                return
+            await settle_stored(self._runtime.store, repo, dict(self._runtime.shell_env), asyncio.sleep)
+        except DotError as exc:
+            log.error("repair_settle_failed", error=exc.message, context=exc.context)
+        except Exception:
+            log.exception("repair_settle_crashed")
+
     async def _repair(self) -> None:
-        """Task body of the repair night, and the one place its errors end: logged, and the next night tries again."""
+        """Task body of the repair night, and the one place its errors end: logged, and the next night tries again.
+        Where its pull requests stand is read first (item 958), after a reading under way ends."""
+        settling: asyncio.Task[None] | None = self._settling
+        if settling is not None and not settling.done():
+            await asyncio.wait({settling})
+        await self._settle()
         try:
             done = await repair_night(
                 self._runtime, self._restart_when_idle, time.time, asyncio.sleep, PROCESS_STARTED_AT

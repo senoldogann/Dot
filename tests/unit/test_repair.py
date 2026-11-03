@@ -74,6 +74,7 @@ from dotagent.repair.problems import (
     with_sightings,
 )
 from dotagent.repair.second import outside, read_transcript, trace_of, transcript_path, verdict_of
+from dotagent.repair.settle import Standing, urls_to_read, with_pr_states
 from dotagent.scheduler.runner import restart_argv
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord
@@ -705,3 +706,45 @@ def test_the_brief_of_main_moving_names_what_main_took_and_asks_for_new_numbers_
     taken: str = main_moved_brief("abc123", [], [(945, 954), (946, 955)], True, "n0nce")
     assert "your item 945, your item 946 now" in taken and "945 to 954, 946 to 955" in taken
     assert "GitHub cannot merge your pull request as it stands" in taken and "(no pull request named)" in taken
+
+
+def test_a_pull_request_merged_or_closed_on_github_settles_its_problem_and_its_sessions() -> None:
+    """Item 958: the page reads Merged and Closed, not Waits for you, once GitHub says so; an open one still waits."""
+    book = with_sightings(EMPTY_BOOK, [Sighting(kind="daemon", words="x: y", evidence="e", at=1.0)], 2.0, 0.0)
+    url: str = "https://github.com/o/r/pull/7"
+    waiting = with_problem(book, book.problems[0].model_copy(update={"status": "waiting", "pr_url": url}))
+    left = RepairSession(
+        problem_id=book.problems[0].id,
+        account="a@b.dev",
+        session_id=None,
+        started_at=1.0,
+        ended_at=2.0,
+        rounds=1,
+        input_tokens=0,
+        output_tokens=0,
+        cost_usd=0.0,
+        end="needs_owner",
+        pr_url=url,
+        note="",
+        window=None,
+    )
+    assert urls_to_read(waiting, (left,)) == (url,)
+    merged, (merged_session,) = with_pr_states(waiting, (left,), {url: Standing(state="merged", at=5.0)})
+    assert (merged.problems[0].status, merged.problems[0].settled_at, merged_session.pr_state) == (
+        "fixed",
+        5.0,
+        "merged",
+    )
+    closed, _ = with_pr_states(waiting, (left,), {url: Standing(state="closed", at=5.0)})
+    assert (closed.problems[0].status, closed.problems[0].pr_state) == ("closed", "closed")
+    still, _ = with_pr_states(waiting, (left,), {url: Standing(state="open", at=None)})
+    assert still.problems[0].status == "waiting"
+    # Its fix did not hold: seen again by code that holds it, it is open, and no longer reads merged.
+    again = with_sightings(merged, [Sighting(kind="daemon", words="x: y", evidence="e", at=9.0)], 9.0, 6.0)
+    assert (again.problems[0].status, again.problems[0].pr_state) == ("open", None)
+    # A problem that does not wait on it keeps no state of it: the pull request may be an older session's.
+    reopened, _ = with_pr_states(again, (left,), {url: Standing(state="closed", at=10.0)})
+    assert (reopened.problems[0].status, reopened.problems[0].pr_state) == ("open", None)
+    # Read merged once, it is not read again; a session Dot merged itself never is.
+    assert urls_to_read(merged, (merged_session,)) == ()
+    assert urls_to_read(book, (left.model_copy(update={"end": "merged"}),)) == ()
