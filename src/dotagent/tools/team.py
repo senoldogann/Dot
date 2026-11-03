@@ -58,17 +58,15 @@ _NO_REPLY: str = "(it replied nothing)"
 _NAME_CHARS: int = 60
 _ROLE_CHARS: int = 120
 _INSTRUCTIONS_CHARS: int = 8000
-# The most agents one run makes (item 307): a team for the work at hand, not a crowd. Six since item 864, so that a run
-# can make the team the owner asks for (the owner: "takım oluştur agentler ile").
-_MOST_MADE_PER_RUN: int = 6
 # How many lines of what it never does an agent a run makes may carry (item 875).
 _MOST_REFUSALS: int = 8
-# The bounds of a team, the Agents page's (TeamRequest), and the most teams one run makes.
+# The bounds of a team, the Agents page's (TeamRequest). A run makes as many agents and teams as the work needs (item
+# 951: six and two a run stopped the owner's design of three agents and two teams more); one that a team covers is
+# not made again (item 950: agents_considered).
 _TEAM_PURPOSE_CHARS: int = 500
 _MOST_TEAM_AGENTS: int = 12
-_MOST_TEAMS_PER_RUN: int = 2
-# The most calls of create_team one run makes, the refused ones among them: a run that keeps being refused stops.
-_MOST_TEAM_CALLS: int = 4
+# The most calls of create_team one run has refused: a run that keeps being refused stops.
+_MOST_REFUSED_TEAM_CALLS: int = 3
 
 
 class MessageAgentArgs(ToolArgs):
@@ -326,13 +324,6 @@ def _create_agent_tool() -> RegisteredTool:
             "send the work to the agent whose role fits it with message_agent (or assign_work) rather than make one",
         )
         agents: list[AgentRecord] = await ctx.runtime.store.list_agents()
-        made_here: list[str] = [agent.name for agent in agents if agent.made_by == ctx.run_id]
-        if len(made_here) >= _MOST_MADE_PER_RUN:
-            raise ToolInputError(
-                f"a run makes at most {_MOST_MADE_PER_RUN} agents; send the work to the ones it made: "
-                f"{', '.join(made_here)}",
-                {"made": ", ".join(made_here)},
-            )
         taken: AgentRecord | None = find_agent(agents, name)
         if taken is not None:
             raise ToolInputError(
@@ -439,10 +430,13 @@ def _create_team_tool() -> RegisteredTool:
         calls: list[EventRecord] = await ctx.runtime.store.tool_calls_named(ctx.run_id, CREATE_TEAM_TOOL)
         named: set[str] = {_team_name_of(call) for call in calls}
         made_here: int = sum(1 for team in teams if team.name.casefold() in named)
-        if made_here >= _MOST_TEAMS_PER_RUN or len(calls) > _MOST_TEAM_CALLS:
+        # The calls before this one that made no team.
+        refused: int = len(calls) - 1 - made_here
+        if refused >= _MOST_REFUSED_TEAM_CALLS:
             raise ToolInputError(
-                f"a run makes at most {_MOST_TEAMS_PER_RUN} teams, in {_MOST_TEAM_CALLS} tries",
-                {"made": str(made_here)},
+                f"create_team was refused {refused} times in this run; make the team on the Agents page or ask the "
+                "owner what it should hold",
+                {"made": str(made_here), "refused": str(refused)},
             )
         team: TeamRecord = await ctx.runtime.store.create_team(
             name, args.purpose.strip(), [agent.id for agent in members], None
