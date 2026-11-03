@@ -11,7 +11,6 @@ import re
 import secrets
 import time
 from collections.abc import Coroutine
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit, urlunsplit
@@ -61,6 +60,7 @@ from dotagent.web.crawl import (
     page_links,
     scope_of,
 )
+from dotagent.web.documents import ReadableText, ReadDocument, without_body
 from dotagent.web.extract import Extraction, FieldSpec, extract
 from dotagent.web.keyed import SEARCH_KEYS, WebResearchSearch
 from dotagent.web.ladder import SearchEngine, SearchOutcome
@@ -106,6 +106,8 @@ _LIKELY_LINKS: int = 12
 # The shortest word of an address that counts when the front page's links are matched against it.
 _PATH_WORD_CHARS: int = 3
 _PATH_WORDS: re.Pattern[str] = re.compile(r"[a-z0-9]+")
+# The line above a next part cut from a document the run read before (item 956).
+CONTINUED: str = "Continued from this run's earlier read of the document; web_fetch without start reads it anew.\n"
 # The most results web_search returns; a larger number asked is lowered to it, and the result says so.
 _MAX_RESULTS: int = 10
 # The most characters of a query web_search takes (and of each word the server that comes with Dot sends the engines,
@@ -132,18 +134,11 @@ def _action(tool: str, summary: str, target: str, flags: tuple[Flag, ...]) -> Ac
     )
 
 
-@dataclass(frozen=True)
-class _Readable:
-    title: str
-    description: str
-    text: str
-
-
 def _read_html(document: FetchedDocument) -> ReadablePage:
     return html_to_text(decode_body(document.body, document.charset), document.url)
 
 
-async def _readable(document: FetchedDocument, kind: DocumentKind, max_text_bytes: int) -> _Readable:
+async def _readable(document: FetchedDocument, kind: DocumentKind, max_text_bytes: int) -> ReadableText:
     """The document as text. Pages and text files are read up to ``max_text_bytes``; a PDF needs all of its bytes."""
     cut: FetchedDocument = (
         document.model_copy(update={"body": document.body[:max_text_bytes], "truncated": True})
@@ -153,13 +148,13 @@ async def _readable(document: FetchedDocument, kind: DocumentKind, max_text_byte
     match kind:
         case "html":
             page: ReadablePage = await asyncio.to_thread(_read_html, cut)
-            return _Readable(title=page.title, description=page.description, text=page.text)
+            return ReadableText(title=page.title, description=page.description, text=page.text)
         case "pdf":
-            return _Readable(title="", description="", text=await asyncio.to_thread(pdf_to_text, cut.body, cut.url))
+            return ReadableText(title="", description="", text=await asyncio.to_thread(pdf_to_text, cut.body, cut.url))
         case "text":
-            return _Readable(title="", description="", text=decode_body(cut.body, cut.charset))
+            return ReadableText(title="", description="", text=decode_body(cut.body, cut.charset))
         case "binary":
-            return _Readable(title="", description="", text="")
+            return ReadableText(title="", description="", text="")
 
 
 def _cut_at(document: FetchedDocument, kind: DocumentKind, max_text_bytes: int) -> int | None:
@@ -171,14 +166,14 @@ def _cut_at(document: FetchedDocument, kind: DocumentKind, max_text_bytes: int) 
     )
 
 
-def _needs_javascript(document: FetchedDocument, kind: DocumentKind, readable: _Readable) -> bool:
+def _needs_javascript(document: FetchedDocument, kind: DocumentKind, readable: ReadableText) -> bool:
     return kind == "html" and looks_like_shell(document.body, len(readable.text))
 
 
 def render_document(
     shown_url: str,
     document: FetchedDocument,
-    readable: _Readable,
+    readable: ReadableText,
     cut_at_bytes: int | None,
     start: int,
     budget: int,
@@ -357,18 +352,36 @@ async def _fetch_in_browser(ctx: ToolContext, args: FetchArgs, url: str, shown_u
     nonce: str = _nonce()
     rendered: RenderedDocument = await ctx.browser.read_page(url, public_only=_public_only(ctx))
     document: FetchedDocument = browser_document(rendered)
-    readable: _Readable = await _readable(document, "html", config.web.fetch_max_bytes)
+    readable: ReadableText = await _readable(document, "html", config.web.fetch_max_bytes)
     if not 200 <= document.status < 300:
         return mark_untrusted(
             fail(render_browser_failure(shown_url, why, document.status, readable.text[:_ERROR_EXCERPT_CHARS], nonce))
         )
-    if args.start > len(readable.text):
-        return fail(f"start={args.start} is past the end of the document, which has {len(readable.text)} characters.")
-    cut_at: int | None = _cut_at(document, "html", config.web.fetch_max_bytes)
-    body: str = render_document(
-        shown_url, document, readable, cut_at, args.start, _text_budget(ctx.output_chars), nonce
+    read: ReadDocument = ReadDocument(
+        document=without_body(document),
+        readable=readable,
+        cut_at=_cut_at(document, "html", config.web.fetch_max_bytes),
+        lead=f"Read in Dot's browser: {why}.\n",
+        tail="",
     )
-    return mark_untrusted(ok(f"Read in Dot's browser: {why}.\n{body}"))
+    ctx.read_documents.keep(url, read)
+    return render_read(shown_url, read, read.lead, args.start, _text_budget(ctx.output_chars))
+
+
+def past_the_end(start: int, characters: int) -> str:
+    """What a call whose ``start`` is past the end of its document is told."""
+    return (
+        f"start={start} is past the end of the document, which has {characters} characters. Its parts begin at "
+        "start=0 and each next one at the start a result's 'More:' line gives; do not guess one."
+    )
+
+
+def render_read(shown_url: str, read: ReadDocument, lead: str, start: int, budget: int) -> ToolResult:
+    """The part of a document ``web_fetch`` read that begins at ``start``, with ``lead`` above it."""
+    if start > len(read.readable.text):
+        return fail(past_the_end(start, len(read.readable.text)))
+    body: str = render_document(shown_url, read.document, read.readable, read.cut_at, start, budget, _nonce())
+    return mark_untrusted(ok(f"{lead}{body}{read.tail}"))
 
 
 def _browser_problem(error: BrowserError) -> str:
@@ -384,6 +397,10 @@ def _fetch_tool() -> RegisteredTool:
         config: AppConfig = ctx.runtime.config
         url: str = checked_url(args.url, config)
         shown_url: str = _clip(url, _SHOWN_URL_CHARS)
+        # A next part is cut from the text the run was shown, which its start counts in (item 956).
+        held: ReadDocument | None = ctx.read_documents.held(url) if args.start > 0 else None
+        if held is not None:
+            return render_read(shown_url, held, CONTINUED, args.start, _text_budget(ctx.output_chars))
         # Why the run's browser could not read the page when it was asked to (item 98); empty until it was.
         browser_problem: str = ""
         # A host that refused this run's plain request once is not asked plainly again (item 98).
@@ -400,10 +417,10 @@ def _fetch_tool() -> RegisteredTool:
         kind: DocumentKind = document_kind(document.media_type, document.body[:512])
         nonce: str = _nonce()
         if not 200 <= document.status < 300:
-            excerpt: _Readable = (
+            excerpt: ReadableText = (
                 await _readable(document, kind, config.web.fetch_max_bytes)
                 if kind in ("html", "text")
-                else _Readable("", "", "")
+                else ReadableText("", "", "")
             )
             if document.status in _UNREADABLE_STATUS:
                 ctx.refused_hosts.note(url)
@@ -437,7 +454,7 @@ def _fetch_tool() -> RegisteredTool:
                 f"web_fetch cannot show {shown_url}: it is {document.media_type or 'of an unknown type'} "
                 f"({len(document.body)} bytes), not a page, a PDF or a text file."
             )
-        readable: _Readable = await _readable(document, kind, config.web.fetch_max_bytes)
+        readable: ReadableText = await _readable(document, kind, config.web.fetch_max_bytes)
         if _needs_javascript(document, kind, readable) and ctx.browser.quiet_reads and not browser_problem:
             try:
                 return await _fetch_in_browser(
@@ -445,19 +462,22 @@ def _fetch_tool() -> RegisteredTool:
                 )
             except BrowserError as error:
                 browser_problem = _browser_problem(error)
-        if args.start > len(readable.text):
-            return fail(
-                f"start={args.start} is past the end of the document, which has {len(readable.text)} characters."
-            )
-        cut_at: int | None = _cut_at(document, kind, config.web.fetch_max_bytes)
-        text: str = render_document(
-            shown_url, document, readable, cut_at, args.start, _text_budget(ctx.output_chars), nonce
+        note: str = (
+            "\nNote: this page shows little text without JavaScript; browser_open renders it in a real Chrome."
+            if _needs_javascript(document, kind, readable)
+            else ""
         )
-        if _needs_javascript(document, kind, readable):
-            text += "\nNote: this page shows little text without JavaScript; browser_open renders it in a real Chrome."
-            if browser_problem:
-                text += f" {browser_problem}"
-        return mark_untrusted(ok(text))
+        if note and browser_problem:
+            note += f" {browser_problem}"
+        read: ReadDocument = ReadDocument(
+            document=without_body(document),
+            readable=readable,
+            cut_at=_cut_at(document, kind, config.web.fetch_max_bytes),
+            lead="",
+            tail=note,
+        )
+        ctx.read_documents.keep(url, read)
+        return render_read(shown_url, read, read.lead, args.start, _text_budget(ctx.output_chars))
 
     return make_tool(
         name="web_fetch",
