@@ -249,7 +249,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "schedule_delete)",
         "- team: making a lasting teammate agent for a role the work needs again or in parallel (create_agent, "
         "create_team)",
-        "- office: what the other agents do now, and reading one's chat to help it (agents_now, read_agent_chat)",
+        "- office: what the other agents do now, reading one's chat to help it, and finding and reading any chat "
+        "(agents_now, read_agent_chat, chats, read_chat)",
         "- replies: handing a reply to a mail Dot sent to the chat that sent it, where that work goes on (pass_reply)",
         "- recon: a site or host you own: addresses, TLS, headers, technology, open ports, and a form's payload check "
         "(recon, security_scan)",

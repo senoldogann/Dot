@@ -2096,6 +2096,30 @@ class Store:
         )
         return None if row is None else _thread(row)
 
+    async def chat_heads(self, leave_out_source: str) -> list[tuple[str, str, str]]:
+        """Every thread with a run, the newest activity first, as its id, its title and the id of its newest run, for
+        the ``chats`` tool (item 953), which finds them by their titles' words before it reads the few it lists: the
+        owner's chats, the agents' chats and Dot's own, but not the threads of ``leave_out_source`` (a helper's, which
+        its parent's chat shows), nor the runs a rewind took out (item 282)."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "WITH ranked AS ("
+            " SELECT thread_id, id, created_at,"
+            "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place"
+            " FROM runs WHERE rewound_at IS NULL)"
+            " SELECT t.id AS thread_id, t.title AS title, r.id AS run_id FROM threads AS t JOIN ranked AS r"
+            " ON r.thread_id = t.id AND r.place = 1 WHERE t.source != ?"
+            " ORDER BY MAX(t.updated_at, r.created_at) DESC",
+            (leave_out_source,),
+        )
+        return [(str(row["thread_id"]), str(row["title"]), str(row["run_id"])) for row in rows]
+
+    async def first_run(self, thread_id: str) -> RunRecord | None:
+        """The oldest run of the thread ``thread_id``, the one whose goal its title was made of, or ``None``."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT * FROM runs WHERE thread_id = ? ORDER BY created_at, rowid LIMIT 1", (thread_id,)
+        )
+        return None if row is None else _run(row)
+
     async def get_thread(self, thread_id: str) -> ThreadRecord:
         row: aiosqlite.Row | None = await self._one("SELECT * FROM threads WHERE id = ?", (thread_id,))
         if row is None:

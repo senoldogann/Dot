@@ -6,14 +6,19 @@ understood). Two read-only tools in the group ``office``:
   for the owner, free), so a run knows whom a name or a team means.
 - ``read_agent_chat``: the newest messages of an agent's newest chat (or Dot's), with what its run does now, so a run
   sent to help can see where the other stands before it messages it (``message_agent``).
+- ``chats`` (item 953): the chats of this Mac, the owner's, the agents' and Dot's own, newest first, found by the words
+  of their titles, each with whose it is and where it stands, so a run knows where a thing was talked about.
+- ``read_chat`` (item 953): the newest messages of one of them, by its id, as ``read_agent_chat`` reads an agent's.
 
-What either quotes may carry what a page or a mail said to the run that read it: the words of a chat whose runs read
-content third parties can author are fenced and the result marked untrusted, so the reading run is tainted as that chat
-was (item 243); the secrets Dot holds are masked. Neither tool changes anything, and an agent's chat is its owner's
-data on this Mac, which every run of Dot's may already be shown by the owner."""
+What any of them quotes may carry what a page or a mail said to the run that read it: the words of a chat whose runs
+read content third parties can author are fenced and the result marked untrusted, so the reading run is tainted as that
+chat was (item 243), and a chat's title made of a goal that came of such content is fenced too; the secrets Dot holds
+are masked. None of the tools changes anything, and every chat is its owner's data on this Mac, which every run of
+Dot's may already be shown by the owner."""
 
 import asyncio
 import secrets
+import time
 from collections.abc import Sequence
 
 from pydantic import Field
@@ -23,14 +28,32 @@ from dotagent.core.errors import ToolInputError
 from dotagent.core.text import redact_known, truncate_tail, unclosing
 from dotagent.llm.types import Message
 from dotagent.policy.types import ActionInfo
+from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
+from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import AgentRecord, EventRecord, RunRecord, TeamRecord
+from dotagent.store.models import AgentRecord, EventRecord, RunRecord, TeamRecord, ThreadRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
+from dotagent.tools.delegate import DELEGATE_SOURCE
+from dotagent.tools.team import TEAM_SOURCE
 
 AGENTS_NOW_TOOL: str = "agents_now"
 READ_AGENT_CHAT_TOOL: str = "read_agent_chat"
+CHATS_TOOL: str = "chats"
+READ_CHAT_TOOL: str = "read_chat"
+# The most chats ``chats`` lists.
+_MOST_CHATS: int = 50
+_TITLE_CHARS: int = 100
+# Whose a chat is, by the source of its thread, when no agent works in it.
+_WHOSE: dict[str, str] = {
+    INITIATIVE_SOURCE: "Dot's own work",
+    SCHEDULE_SOURCE: "a schedule",
+    WATCHER_SOURCE: "a watcher",
+    NOTICE_SOURCE: "a watcher's notes",
+    "imessage": "iMessage",
+    TEAM_SOURCE: "an agent's work",
+}
 # Dot, as the tools name it: the lead of the work, not an agent record.
 DOT_NAME: str = "Dot"
 _GOAL_CHARS: int = 160
@@ -55,7 +78,11 @@ async def goal_tainted(store: Store, run_id: str) -> bool:
     ``run_queued`` event). What it read after does not touch the words of its goal (the pre-push review of item 890:
     ``agents_now`` quotes goals alone, and marked every reader untrusted once one agent had read a page)."""
     queued: EventRecord | None = await store.last_event(run_id, "run_queued")
-    return queued is not None and queued.data.get("tainted") is True
+    if queued is None:
+        # Pruned (item 556): what the run kept is whether it ended tainted, and a run whose goal came of such content
+        # starts so and ends so but where the owner wrote to it (the pre-push review of item 953).
+        return await store.pruned_run_tainted(run_id)
+    return queued.data.get("tainted") is True
 
 
 def state_words(run: RunRecord | None, waiting: bool) -> str:
@@ -89,6 +116,26 @@ def render_message(message: Message) -> str | None:
     if message.role == "tool":
         return f"  {message.tool_name or 'tool'} -> {truncate_tail(' '.join(message.content.split()), _TOOL_CHARS)}"
     return None
+
+
+async def read_thread(store: Store, newest: RunRecord, name: str, messages: int) -> ToolResult:
+    """The newest ``messages`` messages of the chat of ``newest`` (its newest run), headed by what ``name`` does now:
+    fenced and marked untrusted when one of its runs read content third parties can author (item 243), the secrets
+    Dot holds masked. ``read_agent_chat`` and ``read_chat`` (item 953) read a chat so."""
+    runs: list[RunRecord] = await store.list_runs(_RUNS_READ, newest.thread_id)
+    tainted: bool = any([await run_tainted(store, run.id) for run in runs])
+    loaded: list[Message] = await store.load_messages(newest.thread_id, 0)
+    rendered: list[str] = [line for line in map(render_message, loaded) if line is not None]
+    shown: list[str] = rendered[-messages:]
+    waiting: bool = newest.id in await _waiting_runs(store)
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+    body: str = redact_known("\n".join(shown) if shown else "(no message yet)", held)
+    head: str = f"{name} is {state_words(newest, waiting)}\nIts chat's newest {len(shown)} of {len(rendered)} messages:"
+    if tainted:
+        # Its goal too may have come of a page or a mail: inside the fence with the messages (the pre-push review).
+        fenced: str = _fence(f"{redact_known(head, held)}\n{body}", secrets.token_hex(_NONCE_BYTES), name)
+        return mark_untrusted(ok(f"{name}'s chat read content third parties can author:\n{fenced}"))
+    return ok(f"{redact_known(head, held)}\n{body}")
 
 
 class AgentsNowArgs(ToolArgs):
@@ -196,22 +243,7 @@ def _read_agent_chat_tool() -> RegisteredTool:
             return ok(f"{name} has no chat yet: it has not worked.")
         if newest.thread_id == ctx.thread_id:
             return ok(f"{name}'s chat asked for is this one: what it says is above.")
-        runs: list[RunRecord] = await store.list_runs(_RUNS_READ, newest.thread_id)
-        tainted: bool = any([await run_tainted(store, run.id) for run in runs])
-        messages: list[Message] = await store.load_messages(newest.thread_id, 0)
-        rendered: list[str] = [line for line in map(render_message, messages) if line is not None]
-        shown: list[str] = rendered[-args.messages :]
-        waiting: bool = newest.id in await _waiting_runs(store)
-        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
-        body: str = redact_known("\n".join(shown) if shown else "(no message yet)", held)
-        head: str = (
-            f"{name} is {state_words(newest, waiting)}\nIts chat's newest {len(shown)} of {len(rendered)} messages:"
-        )
-        if tainted:
-            # Its goal too may have come of a page or a mail: inside the fence with the messages (the pre-push review).
-            fenced: str = _fence(f"{redact_known(head, held)}\n{body}", secrets.token_hex(_NONCE_BYTES), name)
-            return mark_untrusted(ok(f"{name}'s chat read content third parties can author:\n{fenced}"))
-        return ok(f"{redact_known(head, held)}\n{body}")
+        return await read_thread(store, newest, name, args.messages)
 
     return make_tool(
         name=READ_AGENT_CHAT_TOOL,
@@ -225,5 +257,136 @@ def _read_agent_chat_tool() -> RegisteredTool:
     )
 
 
+class ChatsArgs(ToolArgs):
+    words: str = Field(default="", description="Words of its title; empty: the newest.")
+    limit: int = Field(default=15, ge=1, le=_MOST_CHATS)
+
+
+class ReadChatArgs(ToolArgs):
+    chat: str = Field(min_length=1, description="Its id, from chats.")
+    messages: int = Field(default=20, ge=1, le=_MOST_MESSAGES)
+
+
+def ago(seconds: float) -> str:
+    """How long ago, in its biggest unit: "just now", "5 min ago", "3 h ago", "2 days ago"."""
+    if seconds < 60:
+        return "just now"
+    if seconds < 3600:
+        return f"{int(seconds // 60)} min ago"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)} h ago"
+    days: int = int(seconds // 86400)
+    return f"{days} day{'s' if days != 1 else ''} ago"
+
+
+def title_fits(title: str, words: str) -> bool:
+    """Whether every word of ``words`` is in ``title``, regardless of case; any title fits no words."""
+    folded: str = title.casefold()
+    return all(word in folded for word in words.casefold().split())
+
+
+def whose(thread: ThreadRecord, newest: RunRecord, names: dict[str, str]) -> str:
+    """Whose a chat is, as ``chats`` says it: the agent of its newest run (``names``, by id), else Dot's own work, a
+    schedule's, a watcher's or iMessage's by its thread's source, else the owner's."""
+    if newest.agent_id is not None and newest.agent_id in names:
+        return f"{names[newest.agent_id]}'s"
+    return _WHOSE.get(thread.source, "the owner's")
+
+
+def _chats_tool() -> RegisteredTool:
+    def classify(args: ChatsArgs, _ctx: ToolContext) -> ActionInfo:
+        words: str = truncate_tail(" ".join(args.words.split()), 60)
+        summary: str = f"Find the chats about {words}" if words else "List the newest chats"
+        return ActionInfo(tool=CHATS_TOOL, kind="read", risk="safe", summary=summary, target=words, flags=())
+
+    async def run(args: ChatsArgs, ctx: ToolContext) -> ToolResult:
+        store: Store = ctx.runtime.store
+        heads: list[tuple[str, str, str]] = [
+            head for head in await store.chat_heads(DELEGATE_SOURCE) if title_fits(head[1], args.words)
+        ][: args.limit]
+        found: list[tuple[ThreadRecord, RunRecord]] = [
+            (await store.get_thread(thread_id), await store.get_run(run_id)) for thread_id, _, run_id in heads
+        ]
+        if not found:
+            asked: str = f" whose title has {args.words.strip()!r}" if args.words.strip() else ""
+            return ok(f"No chat{asked}.")
+        names: dict[str, str] = {agent.id: agent.name for agent in await store.list_agents()}
+        waiting: set[str] = await _waiting_runs(store)
+        now: float = time.time()
+        plain: list[str] = []
+        outside: list[str] = []
+        for thread, newest in found:
+            first: RunRecord | None = await store.first_run(thread.id)
+            here: str = " (this chat)" if thread.id == ctx.thread_id else ""
+            state: str = (
+                "waiting for the owner"
+                if newest.id in waiting or newest.status == "blocked"
+                else "at work"
+                if newest.status in _WORKING
+                else newest.status
+            )
+            line: str = (
+                f"- {thread.id}{here}: {truncate_tail(' '.join(thread.title.split()), _TITLE_CHARS)} · "
+                f"{whose(thread, newest, names)} · {state} · {ago(now - max(thread.updated_at, newest.created_at))}"
+            )
+            # A title is made of the goal of the chat's first run: one that came of a page or a mail is a third
+            # party's words, and a watcher's chat is named after what came in (a mail's subject), whatever is kept.
+            third_party: bool = thread.source == WATCHER_SOURCE or (
+                first is not None and await goal_tainted(store, first.id)
+            )
+            (outside if third_party else plain).append(line)
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+        head: str = f"{len(found)} chats, the newest activity first. read_chat reads one by its id."
+        listing: str = redact_known("\n".join([head, *plain]), held)
+        if not outside:
+            return ok(listing)
+        fenced: str = _fence(redact_known("\n".join(outside), held), secrets.token_hex(_NONCE_BYTES), "chats")
+        return mark_untrusted(ok(f"{listing}\nChats whose titles came of content third parties can author:\n{fenced}"))
+
+    return make_tool(
+        name=CHATS_TOOL,
+        description="List the chats of this Mac, or find one by its title.",
+        args_model=ChatsArgs,
+        modes=ALL_MODES,
+        parallel_safe=True,
+        timeout_s=15.0,
+        classify=classify,
+        run=run,
+    )
+
+
+def _read_chat_tool() -> RegisteredTool:
+    def classify(args: ReadChatArgs, _ctx: ToolContext) -> ActionInfo:
+        chat: str = truncate_tail(args.chat.strip(), 60)
+        return ActionInfo(
+            tool=READ_CHAT_TOOL, kind="read", risk="safe", summary=f"Read the chat {chat}", target=chat, flags=()
+        )
+
+    async def run(args: ReadChatArgs, ctx: ToolContext) -> ToolResult:
+        store: Store = ctx.runtime.store
+        chat: str = args.chat.strip()
+        if chat == ctx.thread_id:
+            return ok("That chat is this one: what it says is above.")
+        newest_runs: list[RunRecord] = await store.list_runs(1, chat)
+        if not newest_runs:
+            await store.get_thread(chat)
+            return ok("That chat has no message yet.")
+        thread: ThreadRecord = await store.get_thread(chat)
+        names: dict[str, str] = {agent.id: agent.name for agent in await store.list_agents()}
+        named: str = f"The chat {chat} ({whose(thread, newest_runs[0], names)})"
+        return await read_thread(store, newest_runs[0], named, args.messages)
+
+    return make_tool(
+        name=READ_CHAT_TOOL,
+        description="Read a chat's newest messages and what it does now.",
+        args_model=ReadChatArgs,
+        modes=ALL_MODES,
+        parallel_safe=True,
+        timeout_s=15.0,
+        classify=classify,
+        run=run,
+    )
+
+
 def build_office_tools() -> tuple[RegisteredTool, ...]:
-    return (_agents_now_tool(), _read_agent_chat_tool())
+    return (_agents_now_tool(), _read_agent_chat_tool(), _chats_tool(), _read_chat_tool())

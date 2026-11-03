@@ -33,7 +33,19 @@ _BOUND: frozenset[str] = frozenset({"read_file", "delegate"})
 # What every agent keeps (agent/loop.py's AGENT_CORE_TOOLS), ask_secret among them since item 857, and the office's two
 # reads since item 890.
 _CORE: frozenset[str] = frozenset(
-    {"finish", "ask_user", "ask_secret", "use_tools", "react", "agents_now", "read_agent_chat", "recall"}
+    {
+        "finish",
+        "ask_user",
+        "ask_secret",
+        "use_tools",
+        "react",
+        "agents_now",
+        "read_agent_chat",
+        "recall",
+        # The chats of this Mac (item 953).
+        "chats",
+        "read_chat",
+    }
 )
 
 

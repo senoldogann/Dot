@@ -17,7 +17,7 @@ from dotagent.server.views import AgentRequest
 from dotagent.store.db import Store
 from dotagent.store.models import AgentLook, AgentRecord, RunRecord, ThreadRecord
 from dotagent.tools.meta import ASK_SECRET_TOOL, ASK_USER_TOOL, FINISH_TOOL, REACT_TOOL, USE_TOOLS_TOOL
-from dotagent.tools.office import AGENTS_NOW_TOOL, READ_AGENT_CHAT_TOOL
+from dotagent.tools.office import AGENTS_NOW_TOOL, CHATS_TOOL, READ_AGENT_CHAT_TOOL, READ_CHAT_TOOL
 from dotagent.tools.recall import RECALL_TOOL
 
 
@@ -106,7 +106,7 @@ def test_the_templates_keep_their_files_in_the_agents_folder() -> None:
 def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_react_and_turn_groups_on() -> None:
     # An agent reacts to the owner's message as Dot does (item 664).
     # And asks the owner for a secret on its card (item 857), as it asks them anything.
-    # And sees the other agents and reads their chats (item 890).
+    # And sees the other agents and reads their chats (item 890), and finds and reads any chat (item 953).
     assert set(AGENT_CORE_TOOLS) == {
         FINISH_TOOL,
         ASK_USER_TOOL,
@@ -115,6 +115,8 @@ def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_react_and_tur
         REACT_TOOL,
         AGENTS_NOW_TOOL,
         READ_AGENT_CHAT_TOOL,
+        CHATS_TOOL,
+        READ_CHAT_TOOL,
         RECALL_TOOL,
     }
 

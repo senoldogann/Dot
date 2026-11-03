@@ -289,9 +289,16 @@ every agent with its role, its teams and what it does now (working on which goal
 knows whom a name or a team means; `read_agent_chat` reads the newest messages (20 by default, 40 at most) of an agent's
 newest chat, or Dot's, or with `run` the chat of one of its runs (item 902), with what its run does now: what you asked, what it said, the tools it called and the start of
 what they gave. So "go and help the agent of the Engineer team" is a run that finds the Engineer, reads where it stands
-and sends it what it needs with `message_agent`. Both only read. The secrets Dot holds are masked in what they quote,
-and what a chat's runs read from pages or mails comes fenced and marks the reading run untrusted, as that chat was (item
-243), so a page cannot steer one agent through another's chat.
+and sends it what it needs with `message_agent`. The chats know of each other too (item 953, the owner's ask of 2026-11-03,
+as another app's threads do): `chats` lists the chats of this Mac, yours, the agents' and Dot's own (not a helper's, which
+its parent's chat shows), the newest activity first, or those whose titles hold the words given, each with its id,
+whose it is (yours, an agent's by its name, Dot's own work, a schedule's, a watcher's, iMessage's) and where it stands
+(at work, waiting for you, done, failed) and when it last moved; `read_chat` reads one by its id as `read_agent_chat`
+reads an agent's. So "what did we decide about the Gistsmith launch" is a run that finds that chat and reads it. All
+four only read. The secrets Dot holds are masked in what they quote, and what a chat's runs read from pages or mails
+comes fenced and marks the reading run untrusted, as that chat was (item 243), so a page cannot steer one agent through
+another's chat; a chat's title made of a goal that came of a page or a mail (a watcher's, a thing a tainted run put on
+the list) is a third party's words, and `chats` lists it in a fence too.
 
 A run can make a teammate itself (item 99). The `create_agent` tool (a name, a role, instructions, the tools it may
 use, a model if one is wanted) makes an agent as the Agents page does, under your approvals (the `persistence` flag,

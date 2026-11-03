@@ -94,7 +94,9 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "tools/memory.py:_secret_refusal": (False,),
     # What one agent quotes of the others (item 890): every secret Dot holds is masked.
     "tools/office.py:_agents_now_tool.run": (True,),
-    "tools/office.py:_read_agent_chat_tool.run": (True,),
+    # A chat read by read_agent_chat or read_chat, and the list of chats (item 953).
+    "tools/office.py:read_thread": (True,),
+    "tools/office.py:_chats_tool.run": (True,),
     # A record read back by its id (item 924) is masked as a chat read is.
     "tools/recall.py:_recall_tool.run": (True,),
     "agent/reactions.py:_holds_a_secret": (False,),

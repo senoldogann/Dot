@@ -51,6 +51,9 @@ _GROUP_OF_TOOL: dict[str, str] = {
     # What the other agents do now, and reading one's chat (item 890).
     "agents_now": "office",
     "read_agent_chat": "office",
+    # The chats of this Mac, found and read by id (item 953).
+    "chats": "office",
+    "read_chat": "office",
     "show_page": "pages",
     # The owner's saved contact details (item 621).
     "vault_contacts": "vault",
@@ -78,7 +81,7 @@ _PURPOSES: dict[str, str] = {
     "memory_admin": "correcting or forgetting saved notes",
     "drafts": "an email or a message you write for the owner, who sends it from the conversation",
     "team": "making a lasting teammate agent for a role the work needs again or in parallel",
-    "office": "what the other agents do now, and reading one's chat to help it",
+    "office": "what the other agents do now, reading one's chat to help it, and finding and reading any chat",
     "replies": "handing a reply to a mail Dot sent to the chat that sent it, where that work goes on",
     "pages": "showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views",
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",

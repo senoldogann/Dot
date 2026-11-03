@@ -4,26 +4,29 @@ when a run of that chat read content third parties can author, so the reading ru
 store and registry of a scratch home; no model."""
 
 import asyncio
+import time
 from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.gate import TAINT_EVENTS
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_default_config
-from dotagent.core.errors import ToolInputError
+from dotagent.core.errors import NotFoundError, ToolInputError
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import eval_config, eval_environment, scratch_home
 from dotagent.llm.types import Message, ToolCall
 from dotagent.policy.types import ActionInfo
+from dotagent.proactive import WATCHER_SOURCE
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.store.models import AgentRecord, RunRecord
 from dotagent.tools.base import ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.groups import group_of
-from dotagent.tools.office import AGENTS_NOW_TOOL, READ_AGENT_CHAT_TOOL
+from dotagent.tools.office import AGENTS_NOW_TOOL, CHATS_TOOL, READ_AGENT_CHAT_TOOL, READ_CHAT_TOOL
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -185,3 +188,58 @@ async def test_a_named_run_is_read_and_only_one_of_the_agents_own(runtime: Runti
     assert "Ship the pricing page" in named.text and "Rename the blog folder" not in named.text
     with pytest.raises(ToolInputError):
         await _call(runtime, reader, other.id, READ_AGENT_CHAT_TOOL, {"agent": "Builder", "run": theirs.id})
+
+
+async def test_a_run_finds_the_chats_by_their_titles_and_reads_one_by_its_id(runtime: Runtime) -> None:
+    """Item 953: chats lists the chats of this Mac, the owner's and the agents', the newest first, found by the words of
+    their titles, each saying whose it is and where it stands; a title made of a goal that came of a page or a mail is
+    fenced and marks the reader untrusted. read_chat reads one by its id as read_agent_chat reads an agent's."""
+    assert {CHATS_TOOL, READ_CHAT_TOOL} <= set(AGENT_CORE_TOOLS)
+    assert group_of(CHATS_TOOL) == group_of(READ_CHAT_TOOL) == "office"
+    planner: AgentRecord = await _agent(runtime, "Planner", "Plans the launch")
+    launch: RunRecord = await _run(runtime, planner, "Plan the Gistsmith launch week", tainted=True)
+    await runtime.store.set_run_status(launch.id, "running")
+    mine: RunRecord = await _run(runtime, planner, "Write the Gistsmith press mail", tainted=False)
+
+    found: ToolResult = await _call(runtime, mine, planner.id, CHATS_TOOL, {"words": "gistsmith"})
+    assert not found.untrusted and "<agent_chat" not in found.text
+    lines: list[str] = [line for line in found.text.splitlines() if line.startswith("- ")]
+    assert [line.split(":")[0] for line in lines] == [f"- {mine.thread_id} (this chat)", f"- {launch.thread_id}"]
+    assert "Plan the Gistsmith launch week · Planner's · at work · just now" in lines[1]
+    nothing: ToolResult = await _call(runtime, mine, planner.id, CHATS_TOOL, {"words": "no such words anywhere"})
+    assert nothing.text == "No chat whose title has 'no such words anywhere'."
+
+    # A chat whose first goal came of a stranger's mail: its title is a third party's words.
+    stranger: RunRecord = await _run(
+        runtime, planner, "Answer Gistsmith's mail from Bob", tainted=False, started_tainted=True
+    )
+    fenced: ToolResult = await _call(runtime, mine, planner.id, CHATS_TOOL, {"words": "gistsmith"})
+    assert fenced.untrusted
+    assert fenced.text.index("<agent_chat") < fenced.text.index(stranger.thread_id)
+    assert fenced.text.index(launch.thread_id) < fenced.text.index("<agent_chat")
+
+    # The launch chat read a page: read_chat fences it and marks the reader; the press mail's chat it reads plain.
+    read: ToolResult = await _call(runtime, mine, planner.id, READ_CHAT_TOOL, {"chat": launch.thread_id})
+    assert read.untrusted and "owner: Plan the Gistsmith launch week" in read.text
+    assert f"The chat {launch.thread_id} (Planner's) is working on" in read.text
+    plain: ToolResult = await _call(runtime, launch, planner.id, READ_CHAT_TOOL, {"chat": mine.thread_id})
+    assert not plain.untrusted and "owner: Write the Gistsmith press mail" in plain.text
+    own: ToolResult = await _call(runtime, mine, planner.id, READ_CHAT_TOOL, {"chat": mine.thread_id})
+    assert own.text == "That chat is this one: what it says is above."
+    with pytest.raises(NotFoundError):
+        await _call(runtime, mine, planner.id, READ_CHAT_TOOL, {"chat": "thr_nobody"})
+
+    # The pre-push review: a stranger's title stays fenced once `dotx prune` took its chat's events, from what the
+    # prune kept; and a watcher's chat, named after the mail that came in, is fenced whatever is kept.
+    await runtime.store.finish_run(stranger.id, "done", "Answered.")
+    await runtime.store.delete_events_of_runs_ended_before(time.time() + 1, TAINT_EVENTS)
+    assert await runtime.store.last_event(stranger.id, "run_queued") is None
+    watched = await runtime.store.create_thread("Gistsmith mail · Win a free cruise", WATCHER_SOURCE)
+    await runtime.store.create_run(
+        watched.id, "Read it", "task", "m:m", None, WATCHER_SOURCE, "medium", "standard", None, "ask", False,
+        None, None, None,
+    )  # fmt: skip
+    pruned: ToolResult = await _call(runtime, mine, planner.id, CHATS_TOOL, {"words": "gistsmith"})
+    assert pruned.untrusted
+    fence: int = pruned.text.index("<agent_chat")
+    assert fence < pruned.text.index(stranger.thread_id) and fence < pruned.text.index(watched.id)
