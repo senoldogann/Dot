@@ -683,9 +683,11 @@
   white-space: nowrap;
 }
 
+/* Each logo bare, on no tile and no ring, side by side (item 964, the owner's ask): the button's own ground is theirs. */
 .side-connect-marks {
   display: flex;
   flex: none;
+  gap: var(--space-1);
 }
 
 .side-connect-marks:empty {
@@ -695,22 +697,15 @@
 .side-connect-mark {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-xs);
-  background: var(--surface-2);
-  box-shadow: 0 0 0 2px var(--surface), inset 0 0 0 1px var(--border);
+  width: 16px;
+  height: 16px;
   color: var(--text);
-}
-
-.side-connect-mark + .side-connect-mark {
-  margin-left: -4px;
 }
 
 .side-connect-mark .plugin-logo,
 .side-connect-mark .icon {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 /* With the sidebar next to the page, the way back to the list of chats is in sight, so a chat's page shows no link back
