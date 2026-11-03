@@ -176,8 +176,11 @@ app once it is ready, and **Where its data goes**. **Check again** reads them al
 (`connections/directory.py`).
 
 Each tile's mark is the service's logo, drawn in one colour, the theme's ink, on a quiet tile a step up from the card
-(item 946): the file's shape alone, as a mask over that ink, so that a logo reads the same in every look and scheme and
-no brand's colours show. The logos are files of `static/icons/plugins`: Simple Icons' symbol (version 16.36.0, CC0) for
+(item 946): the file's shape alone, drawn inline in that ink (item 959; a mask of the file, as before, blinked in
+Dot.app whenever the page repainted, a key typed in the composer among it), so that a logo reads the same in every look
+and scheme and no brand's colours show. Each file is read once a page and every mark of it drawn from that (`inked.js`,
+which draws a model provider's mark so too, as the composer's model pill wears it), keeping only the elements that draw
+a shape. The logos are files of `static/icons/plugins`: Simple Icons' symbol (version 16.36.0, CC0) for
 every brand it draws, and [gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0) for the rest (Slack, Microsoft,
 OpenAI, AWS and twenty more); the folder's LICENSE names the files, the source and the commit they came from, and the
 brands' guidelines. A mark identifies its service and nothing more. A service with no logo (the applications of this
@@ -228,10 +231,11 @@ same way (`args = ["-y", "some-mcp-server@1.2.3"]`).
 ### Connect apps
 
 **Connect apps** (items 492 and 545), at the foot of the sidebar right of the cog of Settings, on the sidebar's own
-ground as the cog is, opens Customize › Connectors, which it stands for while it is open, wearing the logos of three
-services whose servers are ready, the first by name and each service once, the same three while they stay connected
-(item 853; item 509 turned them every few seconds): only a service's own logo, not the icon or the plug of a server
-with none, nor Dot's own. It opened the services
+ground as the cog is, opens Customize › Connectors, which it stands for while it is open, wearing the logos of four
+services (three until item 959): those whose servers are ready, the first by name and each service once, the same ones
+while they stay connected (item 853; item 509 turned them every few seconds), only a service's own logo, not the icon
+or the plug of a server with none, nor Dot's own; and while fewer are ready, the services most connect first (Google,
+GitHub, Slack, Notion), as what it leads to. It opened the services
 in a dialog of their own until item 545, which gave the page the dialog's chips and its steps in words, so that the
 services have one place, in the look of Plugins. On a phone the button is a round one at the foot of the list of
 chats. The services, where they stand and their steps are `static/js/catalogue.js`'s.

@@ -2086,14 +2086,17 @@ a.pill:hover {
   object-fit: contain;
 }
 
-/* A logo in one colour (item 946, marks.js): the file's shape alone, as a mask over the ink of where it stands, so that
-   a brand's own colours never show and a logo reads in every look and scheme. */
+/* A logo in one colour (items 946 and 959, marks.js): the file's shape drawn inline in the ink of where it stands, so
+   that a brand's own colours never show and a logo reads in every look and scheme. */
 .mark-logo {
   display: block;
   flex: none;
-  background-color: currentcolor;
-  -webkit-mask: var(--logo) center / contain no-repeat;
-  mask: var(--logo) center / contain no-repeat;
+}
+
+.mark-logo > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* Dot's own icon (item 581), which a server of no service wears (marks.js): its own tile, as an application's icon is,
@@ -4417,42 +4420,23 @@ dialog.modal.versions-dialog {
   line-height: var(--leading-xs);
 }
 
-/* The mark of a model's provider (item 108): its SVG from static/icons/providers painted as a mask in the colour of
-   the text around it; the Claude mark keeps its own colour. */
+/* The mark of a model's provider (item 108): its SVG from static/icons/providers drawn inline in the colour of the text
+   around it (item 959, inked.js); the Claude mark keeps its own colour. */
 .provider-mark {
   display: inline-block;
   flex: none;
   width: 16px;
   height: 16px;
-  background-color: currentcolor;
-  mask: center / contain no-repeat;
+}
+
+.provider-mark > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .provider-mark[data-provider="anthropic"] {
-  background-color: var(--mark-claude);
-  mask-image: url("../icons/providers/anthropic.svg");
-}
-
-.provider-mark[data-provider="openai"] {
-  mask-image: url("../icons/providers/openai.svg");
-}
-
-.provider-mark[data-provider="ollama"] {
-  mask-image: url("../icons/providers/ollama.svg");
-}
-
-.provider-mark[data-provider="opencode_go"],
-.provider-mark[data-provider="opencode"] {
-  mask-image: url("../icons/providers/opencode_go.svg");
-}
-
-.provider-mark[data-provider="openrouter"] {
-  mask-image: url("../icons/providers/openrouter.svg");
-}
-
-.provider-mark[data-provider="generic"],
-.provider-mark[data-provider="typesafe"] {
-  mask-image: url("../icons/providers/generic.svg");
+  color: var(--mark-claude);
 }
 
 /* The approval modes of the Options menu (item 398), strictest first; YOLO chosen in the warning ink, so a run that asks

@@ -5,6 +5,7 @@
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
+import { drawInked } from "./inked.js";
 
 /** The mark of an imported skill, Dot's copy of another agent's (item 165), and of a skill Dot learned. */
 export const IMPORTED_SKILL_MARK = "download";
@@ -16,13 +17,12 @@ const LEARNED_SOURCE = "learned";
 // added by hand. A service of the catalogue keeps its own mark, or the plug: its name is no one else's to draw.
 const DOT_ICON = "/icons/icon-96.png";
 
-/** A logo of `static/icons/plugins` in one colour, the ink of the tile it stands on (item 946): the file's shape alone,
- * as a mask over that colour, so that a logo drawn in its brand's colours reads as one drawn in none, in every look
- * and scheme. */
+/** A logo of `static/icons/plugins` in one colour, the ink of the tile it stands on (item 946): the file's shape drawn
+ * inline (item 959, `inked.js`), so that a logo drawn in its brand's colours reads as one drawn in none, in every look
+ * and scheme, and a repaint around it has no image to draw anew. The shape keeps its file in `data-logo`. */
 function logoShape(file) {
-  const shape = el("span", { class: "plugin-logo mark-logo", role: "presentation" });
-  shape.style.setProperty("--logo", `url("/icons/plugins/${encodeURIComponent(file)}")`);
-  return shape;
+  const shape = el("span", { class: "plugin-logo mark-logo", role: "presentation", dataset: { logo: file } });
+  return drawInked(shape, `/icons/plugins/${encodeURIComponent(file)}`);
 }
 
 /** Whether the mark `mark` (`{ logo, glyph }`, a listing's or a server's) is a server's of no service (`null`), which

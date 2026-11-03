@@ -122,12 +122,12 @@ async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
                      .map((line) => getComputedStyle(line).fontFamily === getComputedStyle(document.body).fontFamily)"""
             )
             assert fonts and all(fonts), fonts
+            await expect(wide.locator(".provider-item .provider-mark svg").first).to_be_visible()
             marks = await wide.evaluate(
                 """() => [...document.querySelectorAll('.provider-item .provider-mark')]
-                     .map((mark) => getComputedStyle(mark).maskImage)
-                     .filter((image) => image === 'none').length"""
+                     .filter((mark) => mark.querySelector('svg') === null).length"""
             )
-            assert marks == 0, "every provider keeps its own mark"
+            assert marks == 0, "every provider keeps its own mark, drawn inline (item 959)"
             assert await wide.locator(".provider-panel").count() == 1
             assert (await wide.locator(".provider-title").text_content()) == "OpenAI"
             assert await wide.locator(".provider-section-title", has_text="Key").count() == 1

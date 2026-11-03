@@ -2,6 +2,7 @@
 // page by the names people know.
 
 import { el } from "./dom.js";
+import { drawInked } from "./inked.js";
 
 const LABELS = {
   openai: "OpenAI",
@@ -17,12 +18,18 @@ const LABELS = {
 // Go's; the rest wear the generic one.
 const MARKED = new Set(["anthropic", "openai", "ollama", "opencode_go", "openrouter", "opencode"]);
 
+// The file each marked provider wears, OpenCode's free models OpenCode Go's.
+const FILES = { opencode: "opencode_go" };
+
 /**
- * The mark of a provider: a span painted by the page as a mask of the provider's SVG (`static/icons/providers/`), in
- * the colour of the text around it; `data-provider` names the mark. An unknown provider wears the generic mark.
+ * The mark of a provider: the provider's SVG (`static/icons/providers/`) drawn inline in the colour of the text around
+ * it (item 959, `inked.js`); `data-provider` names the mark. An unknown provider wears the generic mark.
+ * @param {string} provider
  */
 export function providerMark(provider) {
-  return el("span", { class: "provider-mark", "data-provider": MARKED.has(provider) ? provider : "generic", "aria-hidden": "true" });
+  const named = MARKED.has(provider) ? provider : "generic";
+  const mark = el("span", { class: "provider-mark", "data-provider": named, "aria-hidden": "true" });
+  return drawInked(mark, `/icons/providers/${FILES[named] ?? named}.svg`);
 }
 
 /** The name of a provider as people know it, for headings and menus. */

@@ -765,10 +765,10 @@ async def _mark_of(mark: Locator) -> str:
           if (picture !== null) {
             return `logo:${picture.getAttribute("src")}`;
           }
-          // A logo is drawn in one colour, its file's shape as a mask (item 946).
+          // A logo is drawn in one colour, its file's shape inline (items 946 and 959).
           const shape = node.querySelector(".mark-logo");
           if (shape !== null) {
-            return `logo:${shape.style.getPropertyValue("--logo").replace(/^url\\("(.*)"\\)$/, "$1")}`;
+            return `logo:/icons/plugins/${shape.dataset.logo}`;
           }
           const glyph = node.querySelector("svg[data-icon]");
           return glyph !== null ? `icon:${glyph.dataset.icon}` : `nothing:${node.textContent.trim()}`;

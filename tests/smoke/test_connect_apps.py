@@ -168,11 +168,13 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
                 "(links) => links.map((link) => link.getAttribute('aria-label'))"
             )
             assert heads == ["Campaigns", "Schedules"], heads
-            # The ready server with no logo shows none: one mark, the logo's.
-            marks: Locator = button.locator(".side-connect-mark")
-            await expect(marks).to_have_count(1)
-            logo: str = await marks.locator(".mark-logo").evaluate("(shape) => shape.style.getPropertyValue('--logo')")
-            assert logo == f'url("/icons/plugins/{sentry.logo}")', logo
+            # The ready server with no logo shows none: the logo's mark first, and the services most connect first after
+            # it, four in all (item 959), each drawn inline.
+            marks: Locator = button.locator(".side-connect-mark .mark-logo")
+            await expect(marks).to_have_count(4)
+            logos: list[str] = await marks.evaluate_all("(shapes) => shapes.map((shape) => shape.dataset.logo)")
+            assert logos == [sentry.logo, "google-icon.svg", "github-icon.svg", "slack-icon.svg"], logos
+            await expect(marks.locator("svg")).to_have_count(4)
 
             # It opens Customize › Connectors, no dialog over the page, and stands for the page while it is open.
             await button.click()
@@ -219,7 +221,7 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
                 await page.get_by_role("link", name="Agents").click()
             await expect(button).not_to_have_attribute("data-current", "")
             await expect(button).not_to_have_attribute("aria-current", "page")
-            await expect(marks).to_have_count(1)
+            await expect(marks).to_have_count(4)
             assert errors == []
 
             # On a phone: a round button at the foot of the list of chats, which opens the same page.

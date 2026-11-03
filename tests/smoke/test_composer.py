@@ -247,8 +247,10 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await expect(model_pill).to_contain_text("scripted")
                 mark = model_pill.locator(".provider-mark")
                 await expect(mark).to_have_attribute("data-provider", "ollama")
+                # Drawn inline (item 959): no mask the page repaints anew as the composer grows under each key.
+                await expect(mark.locator("svg")).to_have_count(1)
                 masked: str = await mark.evaluate("(node) => getComputedStyle(node).maskImage")
-                assert "icons/providers/ollama.svg" in masked, masked
+                assert masked == "none", masked
                 served: httpx.Response = await client.get("/icons/providers/ollama.svg")
                 assert served.status_code == 200, served.status_code
                 assert served.headers["content-type"].startswith("image/svg+xml"), served.headers["content-type"]

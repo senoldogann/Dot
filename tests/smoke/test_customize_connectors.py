@@ -197,12 +197,16 @@ async def _check_marks(page: Page) -> None:
     # A logo is drawn in one colour, the tile's ink, through its file's shape (item 946); the file is there.
     github: Locator = _tile(page, "github").locator(".plugin-mark")
     shape: Locator = github.locator(".mark-logo")
-    logo: str = await shape.evaluate("(node) => node.style.getPropertyValue('--logo')")
-    assert logo == 'url("/icons/plugins/github-icon.svg")', logo
+    logo: str = await shape.evaluate("(node) => node.dataset.logo")
+    assert logo == "github-icon.svg", logo
     assert (await page.request.get(f"{page.url.split('#')[0]}icons/plugins/github-icon.svg")).ok
+    # Drawn inline (item 959), every paint of it the tile's ink: no image a repaint decodes again.
+    await expect(shape.locator("svg")).to_have_count(1)
     inked: bool = await shape.evaluate(
-        "(node) => getComputedStyle(node).backgroundColor === getComputedStyle(node.parentElement).color"
-        " && getComputedStyle(node).maskImage.startsWith('url(')"
+        "(node) => [node.querySelector('svg'), ...node.querySelectorAll('svg *')].every((part) =>"
+        " !part.hasAttribute('fill') || ['currentColor', 'none'].includes(part.getAttribute('fill')))"
+        " && getComputedStyle(node.querySelector('svg')).fill === getComputedStyle(node.parentElement).color"
+        " && getComputedStyle(node).maskImage === 'none'"
     )
     assert inked
     # The applications of the Mac keep their glyph (Calendar, Mail) and Outlook, with no mark of its own, wears the

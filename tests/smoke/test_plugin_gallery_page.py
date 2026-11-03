@@ -258,8 +258,8 @@ async def test_the_gallery_installs_lists_and_removes_a_plugin(
                 )
                 assert tile == "none", tile
                 logo: Locator = _card(page, "base-tools").locator(".plugin-mark .mark-logo")
-                shape: str = await logo.evaluate("(node) => node.style.getPropertyValue('--logo')")
-                assert shape == 'url("/icons/plugins/supabase-icon.svg")', shape
+                shape: str = await logo.evaluate("(node) => node.dataset.logo")
+                assert shape == "supabase-icon.svg", shape
                 # The check of a plugin from its maker, and who publishes it, its kind and its skills.
                 await expect(acme.locator(".gallery-verified")).to_have_count(1)
                 await expect(_card(page, "brand-kit").locator(".gallery-verified")).to_have_count(0)

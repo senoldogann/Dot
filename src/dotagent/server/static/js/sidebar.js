@@ -45,9 +45,11 @@ const ACTIVITY_SECTIONS = [
 // What a chat's row says while something of it waits for the owner, ahead of what waits (item 836).
 const WAITS_WORDS = "Waiting for you";
 const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
-// Connect apps at the foot shows the logos of this many services it is connected to (item 492), the same ones while
-// they stay connected: no longer another few every so often (item 853, the owner's ask; item 509 turned them).
-const CONNECTED_MARKS = 3;
+// Connect apps at the foot shows the logos of this many services (item 492; four since item 959, the owner's ask): the
+// ones it is connected to, the same ones while they stay connected (item 853), and while fewer are, the logos of the
+// services most connect first, in this order, as what it leads to.
+const CONNECTED_MARKS = 4;
+const OFFERED_LOGOS = ["google-icon.svg", "github-icon.svg", "slack-icon.svg", "notion-icon.svg"];
 // Where Connect apps leads (item 545): the services' tab of Customize.
 const CONNECTORS_PATH = "#/customize/connectors";
 // Which sections at the foot the owner folded, by their ids (`work`, `imessage`), kept between visits; a fold of
@@ -1572,12 +1574,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       .filter((server) => !logos.has(server.mark.logo) && logos.add(server.mark.logo));
     showMarks();
   }
-  /** Show the first few of the ready services' logos. */
+  /** Show the first few of the ready services' logos, and of the offered ones while fewer are ready. */
   function showMarks() {
-    const shown = readyServers.slice(0, CONNECTED_MARKS);
+    const connected = readyServers.slice(0, CONNECTED_MARKS).map((server) => server.mark.logo);
+    const offered = OFFERED_LOGOS.filter((logo) => !connected.includes(logo)).slice(0, CONNECTED_MARKS - connected.length);
     connectMarks.replaceChildren(
-      // Each is a logo in its own colours (item 853): no ink to set.
-      ...shown.map((server) => el("span", { class: "side-connect-mark" }, markContent(server.mark))),
+      ...[...connected, ...offered].map((logo) => el("span", { class: "side-connect-mark" }, markContent({ logo, glyph: null }))),
     );
   }
   paintConnected();

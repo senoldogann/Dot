@@ -8,7 +8,7 @@ import { el, modelName } from "../dom.js";
 import { icon } from "../icons.js";
 import { PHONE } from "../layout.js";
 import { errorPanel, loadingPanel, switchSetting } from "../panels.js";
-import { providerLabel, providerOf } from "../providers.js";
+import { providerLabel, providerMark, providerOf } from "../providers.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, detailsFold, formDialog, toast } from "../ui.js";
 
@@ -105,11 +105,10 @@ function aboutProvider(provider) {
   return { ...about, label: providerLabel(provider) };
 }
 
-/** The mark of a provider on its tile: its own logo as a mask, the generic one for a service that has none. */
-function providerMark(provider, size) {
-  const mark = el("span", { class: "provider-mark" });
-  mark.dataset.provider = provider;
-  return el("span", { class: size === "large" ? "provider-tile provider-tile-lg" : "provider-tile", "aria-hidden": "true" }, mark);
+/** The mark of a provider on its tile: its own logo drawn inline (item 959), the generic one for a service that has
+ * none. */
+function providerTile(provider, size) {
+  return el("span", { class: size === "large" ? "provider-tile provider-tile-lg" : "provider-tile", "aria-hidden": "true" }, providerMark(provider));
 }
 
 /** What a provider's models are, as the line under its name says it when its key is set: the words without their full stop. */
@@ -214,7 +213,7 @@ function buildProvider(initial, isDisposed, host) {
       type: "button",
       onclick: () => host.choose(view.provider),
     },
-    providerMark(view.provider),
+    providerTile(view.provider),
     el("span", { class: "provider-text" }, el("span", { class: "provider-name" }, about.label), line),
     dot,
   );
@@ -241,7 +240,7 @@ function buildProvider(initial, isDisposed, host) {
     "header",
     { class: "provider-head" },
     back,
-    providerMark(view.provider, "large"),
+    providerTile(view.provider, "large"),
     el("div", { class: "provider-ident" }, el("h2", { class: "provider-title" }, about.label), stateLine),
     check,
   );
