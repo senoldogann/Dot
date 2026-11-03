@@ -222,6 +222,23 @@ _NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset({BACKGROUND_SOURCE, INITIATIVE
 # chat its command in the background ended (``BACKGROUND_SOURCE``): it goes on with the owner's chat, under their eyes
 # (the independent review of item 860: a mail its run had put off until a command ended went out unasked).
 _NOBODY_WATCHES: frozenset[str] = UNWATCHED_SOURCES | {NOTICE_SOURCE, REFLECTION_SOURCE, EVAL_SOURCE}
+
+
+def _owners_message(parent: "RunHandle | None", source: str, opening: RunOpening) -> bool:
+    """Whether a run is started by a message of the owner's own: no run delegated it, it goes on from no run whose
+    words it reads (``opening.carried``: a schedule's firing, a kept step's answer, a reaction's follow-up), resumes
+    none, no stranger's words set it off, and its source is neither one whose goal is not their words nor one nobody
+    watches (item 952: such a message clears what a chat kept marked)."""
+    return (
+        parent is None
+        and not opening.carried
+        and opening.resumed is None
+        and not opening.tainted
+        and source not in _NOT_THE_OWNERS_WORDS
+        and source not in _NOBODY_WATCHES
+    )
+
+
 # The approval modes from the strictest to the loosest: the user answers before every change, the user answers, the
 # review model answers, no one is asked.
 _APPROVALS_STRICTEST_FIRST: tuple[ApprovalMode, ...] = ("supervised", "ask", "auto", "yolo")
@@ -1357,8 +1374,9 @@ class RunManager:
                     files=(),
                     resumed=None,
                     once=campaign.once,
-                    # The campaign's chat holds the session before's words: this one starts as tainted as it ended.
-                    carried=() if before is None else (before.id,),
+                    # The campaign's chat holds the words of the run before: this one starts as tainted as it ended,
+                    # whichever run that was, as a chat's next run of recurring work does (item 952).
+                    carried=tuple(run.id for run in await runtime.store.list_runs(1, thread.id)) if kept else (),
                     picks=NO_PICKS,
                 ),
                 campaign.id,
@@ -2830,6 +2848,12 @@ class RunManager:
         before the run's record is made: the chat's last run is the one before it."""
         if opening.tainted:
             return True
+        # A chat may hold the words of a run deleted since with the chat that sent it its work (item 952): the chat kept
+        # that run's mark, which binds every run there until a message of the owner's own clears it, the work that goes
+        # on there, a kept step's answer, a reaction's follow-up, a resume and the notice of a command in the
+        # background among them (the pre-push reviews of item 955).
+        if not _owners_message(parent, source, opening) and await self._runtime.store.thread_tainted(thread_id):
+            return True
         if parent is not None and parent.gate.tainted:
             return True
         if parent is None and opening.resumed is not None:
@@ -3072,6 +3096,10 @@ class RunManager:
             self._handles[run.id] = handle
             registered = True
             self._watch_asks()
+            # The owner wrote in the chat, and their run is under way: what a deleted run left marked there is theirs
+            # to have read now (item 952).
+            if _owners_message(parent, source, opening) and await runtime.store.thread_tainted(thread_id):
+                await runtime.store.clear_thread_taint(thread_id)
             return run, handle
         finally:
             if not registered:

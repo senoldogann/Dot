@@ -36,6 +36,7 @@ from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
     NO_PICKS,
+    TAINT_EVENTS,
     WORK_ORDER_MOVES,
     WORKING_STATUSES,
     AgentLook,
@@ -218,6 +219,7 @@ CREATE TABLE IF NOT EXISTS queue_claims (
 );
 CREATE TABLE IF NOT EXISTS run_stops (run_id TEXT PRIMARY KEY, asked_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS run_taints (run_id TEXT PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS thread_taints (thread_id TEXT PRIMARY KEY, ended INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS sent_messages (key TEXT PRIMARY KEY, sent_at REAL NOT NULL, target TEXT);
 CREATE TABLE IF NOT EXISTS correspondents (
     address TEXT NOT NULL, thread_id TEXT NOT NULL, run_id TEXT NOT NULL, at REAL NOT NULL, handed_at REAL,
@@ -2279,6 +2281,28 @@ class Store:
         )
         delegated: tuple[str, ...] = tuple(str(row["thread_id"]) for row in hosts)
         candidates: set[str] = await self._screenshots_of(doomed, named, delegated)
+        # An agent's chat keeps the words of the work sent to it from a chat deleted now (item 952), whose runs go: the
+        # chat keeps that a run of it read content third parties can author, as the runs said or the prune kept it, so
+        # that the work it holds next starts marked and a reader of it is marked (the pre-push review of item 956).
+        # A row says a run whose words the chat keeps read such content at all, as :meth:`chat_ever_tainted` reads a
+        # chat's runs, and stays while the chat does; ``ended`` says one of them ended so, by the rule of
+        # :func:`dotagent.agent.gate.tainted_after` read here in SQL (a row of ``run_taints`` counts beside the events,
+        # not only without them, the warier side), which a message of the owner's own clears.
+        await self._db.execute(
+            f"{doomed} INSERT INTO thread_taints(thread_id, ended) SELECT r.thread_id, MAX("
+            " EXISTS (SELECT 1 FROM run_taints AS t WHERE t.run_id = r.id)"
+            " OR EXISTS (SELECT 1 FROM events AS e WHERE e.id = (SELECT MAX(id) FROM events"
+            f"  WHERE run_id = r.id AND kind IN ({','.join('?' * len(TAINT_EVENTS))}))"
+            "  AND json_type(e.data, '$.tainted') = 'true'"
+            "  AND (e.kind != 'steer' OR json_type(e.data, '$.vouches') = 'false'))) FROM runs AS r"
+            f" WHERE r.id IN (SELECT id FROM doomed) AND r.thread_id NOT IN ({marks}) AND ("
+            " EXISTS (SELECT 1 FROM run_taints AS t WHERE t.run_id = r.id)"
+            " OR EXISTS (SELECT 1 FROM events AS e WHERE e.run_id = r.id AND e.kind IN ('tool_result', 'run_queued')"
+            "  AND json_extract(e.data, '$.tainted') = 1))"
+            " GROUP BY r.thread_id"
+            " ON CONFLICT(thread_id) DO UPDATE SET ended = MAX(thread_taints.ended, excluded.ended)",
+            (*named, *TAINT_EVENTS, *named),
+        )
         # Every event but the owner's save of a lesson, which keeps that lesson theirs, never merged nor proposed to be
         # forgotten, after its chat is gone, as the prune keeps it (the review of 2026-11-01).
         await self._db.execute(
@@ -2297,6 +2321,7 @@ class Store:
         await self._db.execute(f"DELETE FROM queue_holds WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM chat_permits WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM threads WHERE id IN ({marks})", named)
+        await self._db.execute(f"DELETE FROM thread_taints WHERE thread_id IN ({marks})", named)
         if delegated:
             host_marks: str = ",".join("?" * len(delegated))
             await self._db.execute(
@@ -2313,6 +2338,11 @@ class Store:
             await self._db.execute(
                 f"DELETE FROM threads WHERE id IN ({host_marks})"
                 " AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = threads.id)",
+                delegated,
+            )
+            await self._db.execute(
+                f"DELETE FROM thread_taints WHERE thread_id IN ({host_marks})"
+                " AND NOT EXISTS (SELECT 1 FROM threads WHERE threads.id = thread_taints.thread_id)",
                 delegated,
             )
         return candidates
@@ -2484,15 +2514,37 @@ class Store:
     async def chat_ever_tainted(self, thread_id: str) -> bool:
         """Whether a run of the chat ``thread_id`` ever read content third parties can author: an event of one of its
         runs says it was tainted (a step's result, its start), or ``dotx prune`` recorded that one ended so (item 556).
-        The owner's later words clear a run's taint, not what it read, which the chat's history keeps (item 893)."""
+        The owner's later words clear a run's taint, not what it read, which the chat's history keeps (item 893), nor
+        the mark the chat kept of a run deleted since whose words it holds (item 952)."""
         row = await self._one(
             "SELECT 1 FROM events JOIN runs ON runs.id = events.run_id"
             " WHERE runs.thread_id = ? AND events.kind IN ('tool_result', 'run_queued')"
             " AND json_extract(events.data, '$.tainted') = 1"
             " UNION ALL SELECT 1 FROM run_taints JOIN runs ON runs.id = run_taints.run_id WHERE runs.thread_id = ?"
+            " UNION ALL SELECT 1 FROM thread_taints WHERE thread_id = ?"
             " LIMIT 1",
-            (thread_id, thread_id),
+            (thread_id, thread_id, thread_id),
         )
+        return row is not None
+
+    @_writing
+    async def clear_thread_taint(self, thread_id: str) -> None:
+        """Clear the mark the chat ``thread_id`` kept of a run that ended tainted (item 952): the owner wrote in it.
+        That such a run read there stays, for :meth:`chat_ever_tainted`."""
+        await self._db.execute("UPDATE thread_taints SET ended = 0 WHERE thread_id = ?", (thread_id,))
+        await self._db.commit()
+
+    async def thread_keeps_marked_words(self, thread_id: str) -> bool:
+        """Whether the chat ``thread_id`` holds the words of a run deleted since with the chat it came from that read
+        content third parties can author at all (item 952): they stay in its history, which a reader of the chat
+        takes, after the owner's message there cleared what the work that goes on there starts with
+        (:meth:`thread_tainted`)."""
+        return await self._one("SELECT 1 FROM thread_taints WHERE thread_id = ?", (thread_id,)) is not None
+
+    async def thread_tainted(self, thread_id: str) -> bool:
+        """Whether the chat ``thread_id`` holds the words of a run that read content third parties can author, which was
+        deleted with the chat it came from (item 952, :meth:`_delete_chats`)."""
+        row = await self._one("SELECT 1 FROM thread_taints WHERE thread_id = ? AND ended = 1", (thread_id,))
         return row is not None
 
     async def pruned_run_tainted(self, run_id: str) -> bool:

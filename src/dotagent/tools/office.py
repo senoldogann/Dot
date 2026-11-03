@@ -123,7 +123,11 @@ async def read_thread(store: Store, newest: RunRecord, name: str, messages: int)
     fenced and marked untrusted when one of its runs read content third parties can author (item 243), the secrets
     Dot holds masked. ``read_agent_chat`` and ``read_chat`` (item 953) read a chat so."""
     runs: list[RunRecord] = await store.list_runs(_RUNS_READ, newest.thread_id)
-    tainted: bool = any([await run_tainted(store, run.id) for run in runs])
+    # A chat may hold the words of a run deleted since with the chat it came from, which marked it (item 952): they
+    # stay in what is read, whatever the owner wrote there since.
+    tainted: bool = await store.thread_keeps_marked_words(newest.thread_id) or any(
+        [await run_tainted(store, run.id) for run in runs]
+    )
     loaded: list[Message] = await store.load_messages(newest.thread_id, 0)
     rendered: list[str] = [line for line in map(render_message, loaded) if line is not None]
     shown: list[str] = rendered[-messages:]

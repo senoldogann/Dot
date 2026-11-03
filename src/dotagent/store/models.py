@@ -15,6 +15,10 @@ type BrowserMode = Literal["own", "attach"]
 RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled"]
 # A run in one of these has not ended.
 WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
+# The events that say whether a run is tainted after them (item 243): it starts so or not (``run_queued``), a tool's
+# result may taint it (``tool_result``), and a message of the owner that steers it clears the taint (``steer``); Dot's
+# words that the owner did a step kept for them vouch for nothing and keep it as it was (item 482).
+TAINT_EVENTS: tuple[str, ...] = ("run_queued", "tool_result", "steer")
 RunMode = Literal["task", "chat", "research"]
 # What a message, and a chat's next follow-up, asks for (item 495): a run's mode, or ``auto``, which each message
 # settles by its own words (agent/mode_words.py).

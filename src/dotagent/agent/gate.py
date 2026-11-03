@@ -52,6 +52,7 @@ from dotagent.policy.spend import SpendState, render_amount, spend_allowance, sp
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
+from dotagent.store.models import TAINT_EVENTS as STORED_TAINT_EVENTS
 from dotagent.store.models import ApprovalRecord, EventRecord, RuleRecord, RunMode
 
 if TYPE_CHECKING:
@@ -74,10 +75,10 @@ REVIEWER_DECIDER: str = "reviewer"
 TAKEOVER_EVENT: str = "takeover"
 HANDBACK_EVENT: str = "handback"
 
-# The events that say whether a run is tainted after them (item 243): it starts so or not (``run_queued``), a tool's
-# result may taint it (``tool_result``), and a message of the owner that steers it clears the taint (``steer``); Dot's
-# words that the owner did a step kept for them vouch for nothing and keep it as it was (item 482).
-TAINT_EVENTS: tuple[str, ...] = ("run_queued", "tool_result", "steer")
+
+# The events that say whether a run is tainted after them (item 243), as the store names them for what it keeps of
+# them (item 952).
+TAINT_EVENTS: tuple[str, ...] = STORED_TAINT_EVENTS
 
 
 def hold_note(seconds: float) -> str:

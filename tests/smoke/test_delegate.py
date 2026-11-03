@@ -19,19 +19,27 @@ import pytest_asyncio
 from ollama_live import live_with
 
 from dotagent.agent.loop import RunOpening
-from dotagent.agent.manager import RunHandle, RunManager
+from dotagent.agent.manager import BACKGROUND_SOURCE, RunHandle, RunManager
 from dotagent.config import load_config
 from dotagent.core.errors import InvalidValueError, RunConflict
 from dotagent.core.paths import workspace_dir
+from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.server import UI_SOURCE
 from dotagent.store.models import NO_PICKS, EventRecord, RunMode, RunRecord, ThreadRecord
-from dotagent.tools.base import ALL_MODES, RegisteredTool
+from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolResult
+from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.office import read_thread
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 OLLAMA_ROOT: str = "http://localhost:11434"
 MODEL: str = "gpt-oss:20b-cloud"
 MODEL_REF: str = f"ollama:{MODEL}"
+_SCRIPTED_PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 RUN_TIMEOUT_S: float = 240.0
 CANCEL_TIMEOUT_S: float = 60.0
 GONE_TIMEOUT_S: float = 15.0
@@ -297,6 +305,67 @@ async def test_an_agents_chat_takes_one_run_at_a_time_and_is_not_rewound_past_it
     await store.finish_run(work.id, "done", "Done.")
     with pytest.raises(InvalidValueError, match="an agent worked in this chat after this message"):
         await store.rewind_chat(asked.id, [asked.id])
+
+
+async def test_an_agents_chat_keeps_the_mark_of_work_deleted_with_the_chat_that_sent_it(
+    runtime: Runtime, manager: RunManager
+) -> None:
+    """Item 952 (the pre-push review of item 956): the work an agent did for a chat stays in the agent's one chat when
+    that chat is deleted, though its runs go; when such a run read a page, the agent's chat keeps the mark, so that its
+    next work starts marked."""
+    store = runtime.store
+    sender: RunRecord = await _stored_run(runtime, "task", None, "ui")
+    chat: ThreadRecord = await store.create_thread("Desk", "team")
+    work: RunRecord = await store.create_run(
+        chat.id, "Work", "task", MODEL_REF, sender.id, "team", "medium", "standard", None, "ask", False, None, None, "a"
+    )
+    await store.add_event(work.id, "tool_result", {"tool": "web_fetch", "ok": True, "tainted": True})
+    await store.finish_run(work.id, "done", "Done.")
+    other: RunRecord = await _stored_run(runtime, "task", None, "ui")
+    kept: RunRecord = await store.create_run(
+        chat.id, "More", "task", MODEL_REF, other.id, "team", "medium", "standard", None, "ask", False, None, None, "a"
+    )
+    await store.finish_run(kept.id, "done", "Done.")
+    assert not await store.thread_tainted(chat.id)
+    await store.finish_run(sender.id, "done", "Done.")
+    await store.delete_threads([sender.thread_id])
+    assert await store.thread_tainted(chat.id)
+    clean = cast(RunHandle, SimpleNamespace(gate=SimpleNamespace(tainted=False)))
+    goes_on = RunOpening(text="Go on.", files=(), resumed=None, once=None, carried=(kept.id,), picks=NO_PICKS)
+    assert await manager._starts_tainted(clean, chat.id, "team", goes_on)
+    finish = ScriptedTurn(
+        text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Read.", "success": True}),)
+    )
+    await runtime.router.register(_SCRIPTED_PROVIDER, ScriptedProvider(_SCRIPTED_PROVIDER, [finish, finish]))
+    # A run that reads the chat's earlier runs, as a kept step's answer and a reaction's follow-up do, though the
+    # owner's chat source starts it, is no message of the owner's own: it starts marked and clears nothing (the
+    # pre-push review of item 955).
+    follows = RunOpening(text="Done it.", files=(), resumed=None, once=None, carried=(kept.id,), picks=NO_PICKS)
+    assert await manager._starts_tainted(None, chat.id, UI_SOURCE, follows)
+    # So does the notice of a command in the background that ended there, though the chat's last run ended clean.
+    notice = RunOpening(text="It ended.", files=(), resumed=None, once=None, carried=(), picks=NO_PICKS)
+    assert await manager._starts_tainted(None, chat.id, BACKGROUND_SOURCE, notice)
+    followed, _ = await manager._launch(
+        "Done it.", "task", SCRIPTED_MODEL, chat.id, UI_SOURCE, None, None, "standard", "yolo", False, follows, None,
+        None,
+    )  # fmt: skip
+    await asyncio.wait_for(manager.wait(followed.id), RUN_TIMEOUT_S)
+    assert await store.thread_tainted(chat.id)
+    # The owner writes in the agent's chat: what is marked there is theirs to have read now, and the next work starts
+    # clean.
+    owners: RunRecord = await manager.start(
+        "I read it.", "task", SCRIPTED_MODEL, chat.id, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+    )
+    assert not await store.thread_tainted(chat.id)
+    # What the deleted run read is still in the chat's history: a lesson is not saved from it (the pre-push review of
+    # item 955, :mod:`dotagent.tools.skill_save`).
+    assert await store.chat_ever_tainted(chat.id)
+    await asyncio.wait_for(manager.wait(owners.id), RUN_TIMEOUT_S)
+    next_work = RunOpening(text="Next.", files=(), resumed=None, once=None, carried=(owners.id,), picks=NO_PICKS)
+    assert not await manager._starts_tainted(clean, chat.id, "team", next_work)
+    # A reader of the chat still reads the deleted run's words: it is marked whatever the owner wrote there since.
+    read: ToolResult = await read_thread(store, await store.get_run(owners.id), "Desk", 40)
+    assert read.untrusted
 
 
 async def test_a_research_run_only_delegates_research(runtime: Runtime, manager: RunManager) -> None:

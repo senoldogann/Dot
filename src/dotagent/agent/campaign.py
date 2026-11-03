@@ -1,7 +1,8 @@
 """Campaigns: the pure rules of a goal that Dot works on in sessions until its outcome is verified.
 
-Every session is a run that starts in a thread of its own; what carries the campaign from one session to the next is
-the brief, its opening message: the goal, the targets, the files attached to the goal, the owner's messages, the
+The first session is a run of the owner's conversation and every later one goes on in one thread of the campaign's
+(item 952), starting as untrusted as the run before it there ended; what carries the campaign from one session to the
+next is the brief, its opening message: the goal, the targets, the files attached to the goal, the owner's messages, the
 newest strategy and progress, the end of the ledger, the questions left for the owner and what became of them, and how
 the last session ended. The store keeps the campaign and its ledger; the manager starts the sessions and plans the next
 one with :func:`next_session_at`.

@@ -572,7 +572,8 @@ as your instruction, not the question the run wrote, which a page it read may ha
 run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off, a run that goes on
 in a chat of recurring work (an agent's one chat, a run of Dot's own initiative in the chat of the same name, a look
 for work's among them, a campaign's sessions', item 952) as that chat's last run ended, whoever sent it, since it reads that run's words: once such a chat read outside content, its runs stay
-marked until you write in it yourself, and the run that
+marked until you write in it yourself, and an agent's chat keeps that mark when the chat that sent it the work is
+deleted, whose runs go with it, and the run that
 tells a chat that its command in the background ended as the chat's last run ended: that message is Dot's, not yours,
 and so is the note that tells a run at work of such an end, which clears nothing. The run a watcher starts for a mail,
 an event or a notification (item 571, see [Dot comes to you](proactive.md#watchers)) starts untrusted whatever it goes
