@@ -301,7 +301,9 @@ run, its record keeps the run that made it, and the Agents page marks it "Made b
 tells a run with no team that when the work splits into roles (finding sources, writing, checking) or into parts
 that recur, it makes the teammates it needs, each with one job and only the tools its role needs, named one by one, and sends them the parts with
 `message_agent` (several at once work in parallel); with a team, it reuses a member before it makes one, never for a
-single step. An agent a run makes can do no more than the run (item 307): only tools the run has, and only the ones
+single step. With a team, `create_agent` and `delegate` take `agents_considered`, the agents nearest the work and why
+none fits, and a call without it is refused with the team listed by name and role (item 950: runs delegated research
+that Research Desk was made for, and made a Growth Strategist beside a Growth Lead). An agent a run makes can do no more than the run (item 307): only tools the run has, and only the ones
 it names: one that names none is refused, so that no agent a run makes gets every tool (item 873, after an agent
 library whose rule is one job and no leftover tool: four agents Dot made before it had every tool), a helper model or the run's own, at most six a run (three
 before item 864), and a research run makes none; its runs open with "an agent Dot made" and "Dot's instructions to

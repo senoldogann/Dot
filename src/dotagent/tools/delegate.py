@@ -12,7 +12,7 @@ from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanItem, PlanPayload, c
 from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.text import truncate_tail, unclosing
 from dotagent.policy.types import ActionInfo
-from dotagent.store.models import EventRecord, RunMode, RunRecord
+from dotagent.store.models import AgentRecord, EventRecord, RunMode, RunRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
 from dotagent.tools.context import DelegateOutcome, Spawner, ToolContext
 
@@ -29,6 +29,41 @@ _VERIFICATION = re.compile(r"(?im)^\s*(?:#{1,3}\s*)?verification\b")
 _NO_VERIFICATION: str = (
     "No Verification section was reported; treat the report as a claim and check the work before you rely on it."
 )
+
+
+# How many characters of an agent's role the list of a refusal shows.
+_ROLE_SHOWN_CHARS: int = 120
+
+
+def team_listing(team: Sequence[AgentRecord]) -> str:
+    """The agents of ``team``, each by its name and its role on a line of its own, as a refusal lists them."""
+    return "\n".join(
+        f"- {agent.name}: {truncate_tail(' '.join(agent.role.split()), _ROLE_SHOWN_CHARS)}" for agent in team
+    )
+
+
+def checked_considered(considered: str, team: Sequence[AgentRecord], instead: str) -> str | None:
+    """``considered`` (why no agent of ``team`` fits, in the model's line), held to be there whenever there is a team
+    (item 950): the prompt says a part an agent's role fits is that agent's, and the runs delegated research a Research
+    Desk was made for and made a Growth Strategist beside a Growth Lead all the same. A run with a team names the
+    nearest agents and why none fits, or is refused with the team listed and ``instead``, what to do with a fitting
+    one. ``None`` with no team; the line, trimmed, with one."""
+    if not team:
+        return None
+    said: str = " ".join(considered.split())
+    if said == "":
+        raise ToolInputError(
+            f"the team may have an agent for this: {instead}; when none fits, say in agents_considered which agents "
+            f"are nearest and why none fits. The team:\n{team_listing(team)}",
+            {"agents": len(team)},
+        )
+    return said
+
+
+async def run_team(ctx: ToolContext) -> list[AgentRecord]:
+    """The agents a run may hand work to: every agent but the one the run is (as the prompt's Team lists them)."""
+    own: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
+    return [agent for agent in await ctx.runtime.store.list_agents() if agent.id != own.agent_id]
 
 
 class DelegateArgs(ToolArgs):
@@ -52,12 +87,11 @@ class DelegateArgs(ToolArgs):
         ge=1,
         le=20,
         description=(
-            "The number of the plan step this part is: when the delegated run ends, that step is marked done with its "
-            "report as the evidence, or failed when the run did not end done, so you need not mark it yourself. A step "
-            "the plan does not have (or no plan yet) does not stop the delegation: the run goes, its result says so, "
-            "and nothing is marked."
+            "The plan step this part is: its report closes it, done, or failed when the run did not end done. A step "
+            "the plan does not have (or no plan yet) runs all the same and closes nothing."
         ),
     )
+    agents_considered: str = Field(default="", description="With a team: the nearest agents, why none fits.")
 
 
 def default_child_mode(parent: RunMode) -> RunMode:
@@ -170,6 +204,11 @@ def _delegate_tool() -> RegisteredTool:
         spawner: Spawner | None = ctx.spawner
         if spawner is None:
             raise ToolExecutionError("this run cannot start other runs", {"run_id": ctx.run_id})
+        checked_considered(
+            args.agents_considered,
+            await run_team(ctx),
+            "send the part to the agent whose role fits it with message_agent (or assign_work), not to delegate",
+        )
         mode: RunMode = default_child_mode(ctx.mode)
         unplanned: str | None = await _unplanned(args.step, ctx)
         outcome: DelegateOutcome = await spawner.delegate(
@@ -184,9 +223,8 @@ def _delegate_tool() -> RegisteredTool:
             "Run one self-contained part of the work in a separate agent with a clean context and get its final "
             "report back. Use it to keep your own context small when a part is bulky (reading many pages or files, a "
             "deep research question) and to do independent parts at the same time: call it several times in one "
-            "turn. The agent uses your model, or the helper model you name, and your tools (within the bounds of the "
-            "owner's agent you are, when you are one); it does research when you do and otherwise a task. It cannot "
-            "ask the user questions, consult a helper or delegate again. Do not delegate what one or two tool calls "
+            "turn, on your model and tools (the Delegation section says the rest). A part an agent's role fits is "
+            "that agent's. Do not delegate what one or two tool calls "
             "can do. Name the plan step the part is (step) and its report closes that step; a step the plan does not "
             "have runs all the same and closes nothing. Ask for a final `Verification:` section with the command or "
             "check and its answer; a report without one is marked as a claim."

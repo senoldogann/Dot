@@ -43,7 +43,7 @@ from dotagent.tools.base import (
     ok,
 )
 from dotagent.tools.context import DelegateOutcome, Spawner, ToolContext
-from dotagent.tools.delegate import default_child_mode
+from dotagent.tools.delegate import checked_considered, default_child_mode, run_team
 
 MESSAGE_AGENT_TOOL: str = "message_agent"
 CREATE_AGENT_TOOL: str = "create_agent"
@@ -235,6 +235,7 @@ class CreateAgentArgs(ToolArgs):
         max_length=_MOST_REFUSALS,
         description="What it never does, a line each: the edges of its job.",
     )
+    agents_considered: str = Field(default="", description="With a team: the nearest agents, why none fits.")
 
 
 def agent_tools(asked: Sequence[str], run_tools: frozenset[str]) -> tuple[str, ...]:
@@ -319,6 +320,11 @@ def _create_agent_tool() -> RegisteredTool:
         if unknown:
             raise ToolInputError(f"no tool has the name {', '.join(unknown)}", {"tools": ", ".join(unknown)})
         tools: tuple[str, ...] = agent_tools(args.tools, ctx.run_tools)
+        checked_considered(
+            args.agents_considered,
+            await run_team(ctx),
+            "send the work to the agent whose role fits it with message_agent (or assign_work) rather than make one",
+        )
         agents: list[AgentRecord] = await ctx.runtime.store.list_agents()
         made_here: list[str] = [agent.name for agent in agents if agent.made_by == ctx.run_id]
         if len(made_here) >= _MOST_MADE_PER_RUN:

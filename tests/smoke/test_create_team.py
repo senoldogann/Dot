@@ -39,6 +39,7 @@ _TURNS: list[ScriptedTurn] = [
         role="Writes the press mails",
         instructions="Short and plain.",
         tools=["read_file"],
+        agents_considered="Reviewer reviews; none writes or plans.",
     ),
     _call(
         "create_agent",
@@ -46,6 +47,7 @@ _TURNS: list[ScriptedTurn] = [
         role="Plans the launch days",
         instructions="One plan a day.",
         tools=["read_file"],
+        agents_considered="Reviewer reviews; none writes or plans.",
     ),
     _call(
         CREATE_TEAM_TOOL,

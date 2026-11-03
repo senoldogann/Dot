@@ -282,7 +282,14 @@ async def test_an_agent_that_runs_yolo_answers_a_run_that_asks_by_asking(
 def _make(name: str, role: str, tools: list[str]) -> ScriptedCall:
     return ScriptedCall(
         tool=CREATE_AGENT_TOOL,
-        arguments={"name": name, "role": role, "instructions": f"You are the team's {role.lower()}.", "tools": tools},
+        arguments={
+            "name": name,
+            "role": role,
+            "instructions": f"You are the team's {role.lower()}.",
+            "tools": tools,
+            # Item 950: with a team, the nearest agents and why none fits.
+            "agents_considered": "None of the team does this yet.",
+        },
     )
 
 

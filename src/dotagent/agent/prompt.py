@@ -662,7 +662,8 @@ pages, application windows or MCP tools, the report arrives inside <delegate_con
 
 _DELEGATE_TEAM: str = (
     "- A part that fits the role of an agent under Team below is that agent's: send it with message_agent, not to "
-    "delegate."
+    "delegate. With a team, delegate and create_agent take agents_considered: the agents nearest the part and why "
+    "none fits (item 950)."
 )
 
 _HELPERS_INTRO: str = "# Helpers\n- The user set up other models to help you: {helpers}."
