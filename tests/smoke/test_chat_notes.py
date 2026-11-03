@@ -1,7 +1,8 @@
 """A note to the run at work in another chat (item 957, ``send_to_chat``), in the real loop and store on a scripted
-model in a throw-away home: the run at work reads it before its next step as Dot's words that vouch for nothing, marked
-when the sender read content third parties can author, and its chat draws it as a line; a chat where no run works is
-refused, and so is a note of a run of Dot's own initiative to a run that does not ask what it asks. No model is called.
+model in a throw-away home: the run at work reads it before its next step as Dot's words that vouch for nothing, and
+always marked as content third parties can author, whatever its sender read; its chat draws it as a line; a chat where
+no run works is refused, and so is a note to a run that asks the owner less than its sender (a looser approval mode, or
+a run that does not ask what a run of Dot's own initiative asks). No model is called.
 """
 
 import asyncio
@@ -116,7 +117,7 @@ async def _stored_run(runtime: Runtime, title: str) -> RunRecord:
     )  # fmt: skip
 
 
-async def test_the_run_at_work_in_another_chat_reads_a_note_marked_as_its_sender_is(runtime: Runtime) -> None:
+async def test_the_run_at_work_in_another_chat_reads_a_note_always_marked(runtime: Runtime) -> None:
     manager: RunManager = RunManager(runtime)
     (runtime.workspace / "noted").unlink(missing_ok=True)
     sender: RunRecord = await _stored_run(runtime, "Research the launch")
