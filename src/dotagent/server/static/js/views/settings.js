@@ -136,12 +136,10 @@ export function mount(root, ctx) {
   const pane = el("div", { class: "settings-pane" }, head.element);
   root.append(el("div", { class: "settings-frame" }, pane));
   const dispose = MOUNTS[tab.id](pane, { ...ctx, head });
-  // The page names itself in its head; on a phone, whose page is the tab alone, the bar names the tab.
-  const paintTitle = () => setStageTitle(PHONE.matches ? el("h1", { class: "stage-h1" }, name) : null);
-  paintTitle();
-  PHONE.addEventListener("change", paintTitle);
-  return () => {
-    PHONE.removeEventListener("change", paintTitle);
-    dispose();
-  };
+  // The page names itself in its head; on a phone, whose page is the tab alone, the bar names the tab. The bar's name is
+  // always there and the width alone shows one or the other (settings.css), as the page's own name is hidden: two
+  // choices made apart, one by the script as the page was drawn and one by the style, showed both a moment after a
+  // phone turned (item 966).
+  setStageTitle(el("h1", { class: "stage-h1 set-phone-title" }, name));
+  return dispose;
 }

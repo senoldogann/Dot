@@ -156,7 +156,8 @@ async def test_the_sidebar_holds_the_settings_in_seven_sections_and_follows_the_
     await expect(parts.get_by_role("link")).to_have_text(["Models", "AI services", "Web search"])
     await expect(parts.locator("[aria-current='page']")).to_have_text("Models")
     await expect(page.locator(".set-lead")).not_to_be_empty()
-    await expect(page.locator(".stage-title")).to_be_empty()
+    # The bar's name of the tab is a phone's: on a wide window the bar shows none (item 966).
+    await expect(page.locator(".stage-title")).to_be_hidden()
 
     await parts.get_by_role("link", name="AI services").click()
     await expect(page).to_have_url(f"{base}/#/settings/keys")

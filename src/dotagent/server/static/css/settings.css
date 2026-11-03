@@ -194,7 +194,7 @@
 /* A tab's cards that are not drawn as rows yet name themselves over their body, as a phone's do (app.css): a card's head
    is the section's name, as a section's title is, and its body the card. A card that folds keeps its head on its ground
    (item 576), as a group of the health checks does: folded, the head is all there is of it. */
-@media (min-width: 721px) {
+@media not all and (max-width: 720px) {
   .settings-pane .card:not(.fold):has(> .card-head) {
     border: 0;
     background: none;
@@ -228,9 +228,16 @@
   }
 }
 
-/* On a phone the tab's name is in the bar (views/settings.js): the page opens with its line. */
+/* On a phone the tab's name is in the bar (views/settings.js): the page opens with its line. Elsewhere the page's own
+   name shows and the bar's is hidden, by the same width (item 966). */
 @media (max-width: 720px) {
   .set-title {
+    display: none;
+  }
+}
+
+@media not all and (max-width: 720px) {
+  .stage-title:has(> .set-phone-title) {
     display: none;
   }
 }

@@ -222,7 +222,8 @@ async def test_a_macs_window_opens_the_settings_on_general_with_the_nav_in_the_s
             await expect(nav.locator(".settings-nav-label")).to_have_text(list(_TABS.values()))
             await expect(nav.locator("[aria-current='page']")).to_contain_text("General")
             await expect(page.get_by_role("heading", level=1)).to_have_text("General")
-            await expect(page.locator("h1.stage-h1")).to_have_count(0)
+            # The bar's name of the tab is drawn for a phone only, by the width (item 966).
+            await expect(page.locator("h1.stage-h1")).to_be_hidden()
             await expect(page.get_by_role("button", name="Back")).to_have_count(0)
             await expect(page.locator(".settings-list")).to_have_count(0)
             card: dict[str, object] = await page.locator(".settings-pane .card:has(> .card-head)").first.evaluate(_CARD)
