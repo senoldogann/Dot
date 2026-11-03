@@ -36,7 +36,17 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     gate_jobs = _workflow("gate.yml")["jobs"]
     assert isinstance(gate_jobs, dict)
     assert "if" not in gate_jobs["browser"]
-    assert [part["name"] for part in gate_jobs["browser"]["strategy"]["matrix"]["part"]] == ["pages", "phone"]
+    assert [part["name"] for part in gate_jobs["browser"]["strategy"]["matrix"]["part"]] == [
+        "pages",
+        "phone 1",
+        "phone 2",
+    ]
+    # And both halves of the smoke tests (item 944), each on its own runner, with nothing that skips them there.
+    assert "if" not in gate_jobs["smoke"]
+    parts: list[str] = [
+        str(step.get("run", "")) for job in (gate_jobs["gate"], gate_jobs["smoke"]) for step in job["steps"]
+    ]
+    assert sum("--part 1/2" in run for run in parts) == 1 and sum("--part 2/2" in run for run in parts) == 1
     tokened: list[str] = [
         name
         for name, job in jobs.items()
