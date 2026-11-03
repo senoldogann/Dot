@@ -567,10 +567,15 @@ last, ended, whose goal holds none of Dot's words and whose quote of the message
 [Reactions](runs.md#reactions-on-dots-messages)). A note a run sends to the run at work in another chat (`send_to_chat`,
 item 957) is the same: Dot's words, never yours, that vouch for nothing and are no instruction to the review model, and
 always mark the run that reads them as outside content does, whatever its sender read, so that what it does after is
-judged as after a page until you write in its chat. A note starts nothing, a run that may only read sends none, none
-goes to a run whose approval mode asks you less than its sender's, and a run of Dot's own initiative, which asks before
-a message, a post or a release in every mode, sends none to a run that does not ask them (see
-[Agents](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
+judged as after a page until you write in its chat. A note starts nothing; a run that may only read sends none, nor does
+a run marked untrusted, which a note marks too, so that no chain of notes carries a page's words, or a note's, on past
+the rules each run keeps (item 963); none goes to a run whose approval mode asks you less than its sender's; and a run
+of Dot's own initiative, which asks before a message, a post or a release in every mode, sends none to a run that does
+not ask them, but for a run of a chat you opened (an agent's chat among them, item 963), which asks a payment, a
+message, a mail and a post itself or has the review model judge them (item 860), a release there being checked by the
+review model (item 962) as after a page; in yolo with `[policy] yolo_taint_check = false` nothing would check it, so it
+sends none there then. A `preapproved` rule of yours lets a step through in a run a note marked as it does after a page
+(see [Agents](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
 some. A message you send to the run clears the mark; your answer to a question of a run you watch does not, whether the
 run waited for it or went on (item 508), as it answers what the run asked rather than sending it on its way: the run it
 reaches stays marked, and the run it starts once that run has ended starts as untrusted as that run ended; so does

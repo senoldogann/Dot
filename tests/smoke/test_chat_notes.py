@@ -7,6 +7,7 @@ a run that does not ask what a run of Dot's own initiative asks). No model is ca
 
 import asyncio
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -170,12 +171,14 @@ async def test_the_run_at_work_in_another_chat_reads_a_note_always_marked(runtim
 
 async def test_no_note_goes_to_a_run_that_asks_less_than_its_sender(runtime: Runtime) -> None:
     """A run that asks the owner first sends no note to a run that would do it unasked: one in a stricter approval mode
-    to a looser one, and a run of Dot's own initiative to a run that does not ask what it asks."""
+    to a looser one, and a run of Dot's own initiative to a run that does not ask what it asks, a schedule's; to a run
+    of the owner's chat, which asks a payment, a message and a post itself, it does (item 963)."""
     manager: RunManager = RunManager(runtime)
     sender: RunRecord = await _stored_run(runtime, "Dot's own look")
     _sender(manager, sender, "yolo", True)
     careful: RunRecord = await _stored_run(runtime, "Pay the invoices, asking first")
     _sender(manager, careful, "ask", False)
+    scheduled: RunRecord = await _stored_run(runtime, "The nightly digest")
     workspace: Path = runtime.workspace
     (workspace / "noted").unlink(missing_ok=True)
     try:
@@ -186,9 +189,48 @@ async def test_no_note_goes_to_a_run_that_asks_less_than_its_sender(runtime: Run
             )  # fmt: skip
             async with asyncio.timeout(_TIME_LIMIT_S):
                 await _call_starts(subscription, working.id, "shell")
-        note = ChatNote(text="Release it.", shown="Release it.", from_run_id=sender.id, from_thread_id=sender.thread_id)
+        note = ChatNote(text="Look again.", shown="Look again.", from_run_id=sender.id, from_thread_id=sender.thread_id)
+        assert await manager.note_chat(working.thread_id, note) == working.id
+        # A schedule's run at work, which in yolo asks nothing of the owner: refused.
+        manager._handles[scheduled.id] = cast(
+            RunHandle,
+            SimpleNamespace(
+                run_id=scheduled.id,
+                thread_id=scheduled.thread_id,
+                parent_run_id=None,
+                gate=SimpleNamespace(owners_word=False, owners_chat=False, approval_mode_now=lambda: "yolo"),
+            ),
+        )
         with pytest.raises(PolicyDenied, match="initiative"):
-            await manager.note_chat(working.thread_id, note)
+            await manager.note_chat(scheduled.thread_id, note)
+        # The owner's chat run the note marked passes nothing on (item 963's security review): a run marked untrusted
+        # sends no note, so the initiative's words reach the schedule's run by no chain.
+        relay: RunRecord = await _stored_run(runtime, "The owner's chat that read the note")
+        manager._handles[relay.id] = cast(
+            RunHandle,
+            SimpleNamespace(
+                run_id=relay.id,
+                thread_id=relay.thread_id,
+                parent_run_id=None,
+                gate=SimpleNamespace(
+                    tainted=True, owners_word=False, owners_chat=True, approval_mode_now=lambda: "yolo"
+                ),
+            ),
+        )
+        passed = ChatNote(text="Mail it.", shown="Mail it.", from_run_id=relay.id, from_thread_id=relay.thread_id)
+        with pytest.raises(PolicyDenied, match="third parties"):
+            await manager.note_chat(scheduled.thread_id, passed)
+        manager._handles.pop(relay.id, None)
+        # With the owner's taint check off, nothing would check a release in the owner's yolo run: refused there too.
+        unchecked = runtime.config.model_copy(
+            update={"policy": runtime.config.policy.model_copy(update={"yolo_taint_check": False})}
+        )
+        manager._runtime = replace(runtime, config=unchecked)
+        try:
+            with pytest.raises(PolicyDenied, match="yolo_taint_check"):
+                await manager.note_chat(working.thread_id, note)
+        finally:
+            manager._runtime = runtime
         asked = ChatNote(text="Pay it.", shown="Pay it.", from_run_id=careful.id, from_thread_id=careful.thread_id)
         with pytest.raises(PolicyDenied, match="asks you less"):
             await manager.note_chat(working.thread_id, asked)
@@ -197,6 +239,9 @@ async def test_no_note_goes_to_a_run_that_asks_less_than_its_sender(runtime: Run
     finally:
         manager._handles.pop(sender.id, None)
         manager._handles.pop(careful.id, None)
+        manager._handles.pop(scheduled.id, None)
         (workspace / "noted").touch()
         await manager.shutdown()
-    assert await runtime.store.events_of_kind(working.id, "steer", 10) == []
+    # The one note it took is the initiative's, marked as every note is.
+    steers: list[EventRecord] = await runtime.store.events_of_kind(working.id, "steer", 10)
+    assert [(steer.data["text"], steer.data["tainted"]) for steer in steers] == [("Look again.", True)]

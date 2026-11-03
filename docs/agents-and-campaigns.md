@@ -308,7 +308,8 @@ sends at most six, so two runs that answer each other's notes stop; a run that m
 does a helper, whose run tells it. A note always marks the run that reads it as outside content does, so that what it
 does after is judged as after a page until you write in its chat; none goes to a run whose approval mode asks you less
 than its sender's (a run in Ask mode sends none to one in YOLO), and a run of Dot's own initiative sends none to a run
-that does not ask before a message, a post or a release as it does ([Safety](safety.md)). The secrets Dot holds are
+that does not ask before a message, a post or a release as it does, but for one of a chat of yours (item 963), and a
+run a note or a page marked untrusted sends none on, so that a note is never passed along ([Safety](safety.md)). The secrets Dot holds are
 masked in it.
 
 A run can make a teammate itself (item 99). The `create_agent` tool (a name, a role, instructions, the tools it may

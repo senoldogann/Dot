@@ -1639,11 +1639,20 @@ class RunManager:
 
         Only a run at work in this process sends one, and none to a run whose approval mode asks less than its own
         (:data:`_APPROVALS_STRICTEST_FIRST`). A run that asks the owner before a message, a post or a release in every
-        mode (a run of Dot's own initiative, item 850) sends none to a run that does not. Raises :class:`RunConflict`
-        and :class:`PolicyDenied` for those."""
+        mode (a run of Dot's own initiative, item 850) sends none to a run that does not, but for one in a chat the
+        owner opened (item 963). Raises :class:`RunConflict` and :class:`PolicyDenied` for those."""
         sender: RunHandle | None = self._handles.get(note.from_run_id)
         if sender is None:
             raise RunConflict("only a run at work sends a note to another chat", {"run_id": note.from_run_id})
+        # A run marked untrusted sends none (item 963's security review): what a page, or a note, which marks its
+        # reader, put in it would reach another run through it, a chain of notes past the rules each one keeps.
+        if sender.gate.tainted:
+            raise PolicyDenied(
+                "this run read content third parties can author (a page, a mail, a note from another chat), so it "
+                "sends no note to another chat: what that content asks would reach the other run through it. Say it "
+                "in this chat instead",
+                {"run_id": note.from_run_id, "thread_id": thread_id},
+            )
         there: list[RunHandle] = [handle for handle in self._handles.values() if handle.thread_id == thread_id]
         target: RunHandle | None = next(
             (handle for handle in there if handle.parent_run_id is None), there[0] if there else None
@@ -1658,10 +1667,18 @@ class RunManager:
                 "note would have it do unasked what this run asks first. Say it in this chat instead",
                 {"run_id": note.from_run_id, "thread_id": thread_id, "approvals": asks, "reader": reader_asks},
             )
-        if sender.gate.owners_word and not target.gate.owners_word:
+        # A run of a chat the owner opened (an agent's chat among them) asks a payment, a message, a mail and a post
+        # itself, or has the review model judge them (item 860), and a release there is checked by the review model,
+        # since the note marks its reader (items 962 and 963, the owner's choice), unless the owner turned that check
+        # off; and the reader, marked, sends no note on.
+        owners_reader: bool = target.gate.owners_chat and (
+            target.gate.approval_mode_now() != "yolo" or self._runtime.config.policy.yolo_taint_check
+        )
+        if sender.gate.owners_word and not (target.gate.owners_word or owners_reader):
             raise PolicyDenied(
                 "a run of Dot's own initiative asks the owner before a message, a post or a release, and the run at "
-                "work in that chat does not: a note would have it do them unasked. Say it in this chat instead",
+                "work in that chat (a schedule's or a watcher's, or one of yours in yolo with [policy] "
+                "yolo_taint_check off) does not: a note would have it do them unasked. Say it in this chat instead",
                 {"run_id": note.from_run_id, "thread_id": thread_id},
             )
         tainted: bool = True
