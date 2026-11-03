@@ -4,6 +4,7 @@ only job with an identity token; the gate can be called, and its browser job run
 browser test runs at night and on demand. Read from the workflow files themselves, so an edit that drops one is caught
 before a tag is pushed."""
 
+import re
 from pathlib import Path
 
 import yaml
@@ -43,10 +44,14 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     ]
     # And both halves of the smoke tests (item 944), each on its own runner, with nothing that skips them there.
     assert "if" not in gate_jobs["smoke"]
-    parts: list[str] = [
-        str(step.get("run", "")) for job in (gate_jobs["gate"], gate_jobs["smoke"]) for step in job["steps"]
+    halves = [
+        step
+        for job in (gate_jobs["gate"], gate_jobs["smoke"])
+        for step in job["steps"]
+        if "--part " in str(step.get("run", ""))
     ]
-    assert sum("--part 1/2" in run for run in parts) == 1 and sum("--part 2/2" in run for run in parts) == 1
+    assert sorted(re.findall(r"--part (\S+)", str(step["run"]))[0] for step in halves) == ["1/2", "2/2"]
+    assert all("if" not in step and "continue-on-error" not in step for step in halves)
     tokened: list[str] = [
         name
         for name, job in jobs.items()
