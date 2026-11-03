@@ -9,7 +9,7 @@ import pytest
 from playwright.async_api import Page
 
 from dotagent.browser import driver
-from dotagent.core.errors import BrowserError
+from dotagent.core.errors import BrowserError, TabSilentError
 
 
 class _Stuck:
@@ -24,8 +24,24 @@ class _Stuck:
 
 
 async def test_a_tab_that_answers_nothing_is_told_apart_from_a_page_still_loading() -> None:
-    with pytest.raises(BrowserError, match=r"the tab did not answer within 0\.2 s: its page is stuck"):
+    with pytest.raises(TabSilentError, match=r"the tab did not answer within 0\.2 s: its page is stuck"):
         await driver.wait_dom_quiet(cast(Page, _Stuck()), 60, 500, 200)
+
+
+async def test_a_page_that_answers_and_is_still_parsing_is_no_silent_tab() -> None:
+    """Item 954: an open shows a page that answers and is still being parsed, and fails only for one that answers
+    nothing, so the two fail with errors of their own kinds."""
+
+    class _Parsing(_Stuck):
+        async def evaluate(self, script: str, *args: object) -> object:
+            if script == "1":
+                return 1
+            await asyncio.sleep(60)
+            return None
+
+    with pytest.raises(BrowserError, match="the document was not parsed within 200 ms") as raised:
+        await driver.wait_dom_quiet(cast(Page, _Parsing()), 60, 500, 200)
+    assert not isinstance(raised.value, TabSilentError)
 
 
 async def test_a_page_busy_for_a_while_still_has_the_whole_time_to_answer() -> None:

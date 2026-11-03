@@ -42,6 +42,10 @@ _SLOW_REST_S: float = 8.0
 _LATE_HEADERS_S: float = 3.0
 # How long the server takes to answer a page's own request (item 774): past the time a wait may end early.
 _ANSWER_LATE_S: float = 7.0
+# How late the end of /held-page comes (item 954): past what the open waits for it with a navigation timeout of
+# _HELD_NAVIGATION_S, its retry after the document is replaced (5 s) included.
+_HELD_REST_S: float = 20.0
+_HELD_NAVIGATION_S: float = 2.0
 
 # How late the pages of /opens-late answer: within the wait for a new tab (one second), and after it.
 _LATE_TAB_S: float = 0.4
@@ -219,6 +223,10 @@ setTimeout(tick, 1500)</script>""",
 <button onclick="setTimeout(() => {
   location.href = `http://localhost:${location.port}/late-headers` }, 900)">Leave</button>""",
     "/late-headers": "<!doctype html><title>Blocked</title><h1>Blocked page</h1>",
+    # A page that loads, then at once goes on to one whose end comes only after _HELD_REST_S (item 954): what
+    # browser_open met on LinkedIn, whose page answered and was still being parsed when the wait for it to settle ended.
+    "/goes-on": """<!doctype html><title>Going on</title>
+<script>addEventListener('DOMContentLoaded', () => setTimeout(() => { location.href = '/held-page' }, 0))</script>""",
     # An editor that takes text only through beforeinput, as Draft.js and Lexical do, and drops what comes before it is
     # ready, ?ready= milliseconds after it takes the focus (30 by default); it shows a change ?apply= milliseconds after
     # the input (at once by default).
@@ -319,6 +327,15 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/answer-late":
             time.sleep(_ANSWER_LATE_S)
             self._plain(b"ok")
+            return
+        if path == "/held-page":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"<!doctype html><title>Held</title><h1>Held page</h1>")
+            self.wfile.flush()
+            time.sleep(_HELD_REST_S)
+            self.wfile.write(b"<p>The rest</p>")
             return
         if path == "/half-page":
             self.send_response(200)
@@ -859,6 +876,29 @@ async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_befo
         await act(session, "blocked", [Step(action="click", ref=ref_of(view.body, 'button "Leave"'))], False)
         with pytest.raises(BrowserError, match="may not be opened"):
             await session.wait_text("blocked", "Arrived", 1.0, True)
+    finally:
+        await session.aclose()
+
+
+async def test_an_open_whose_page_answers_and_does_not_settle_shows_it_as_still_loading(
+    browser_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    """Item 954: the page goes on to one still being parsed when the wait for it to settle ends. The open shows what is
+    there, saying it is still loading, where it failed with "waiting for the page to settle failed" and the run read
+    the very page with its next call."""
+    config: BrowserConfig = browser_config.model_copy(update={"navigation_timeout_s": _HELD_NAVIGATION_S})
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "downloads").mkdir()
+    session: BrowserSession = BrowserSession(
+        config, SERVER, tmp_path / "profile", tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        started: float = time.monotonic()
+        view: PageView = await session.open_url("held", f"{site}/goes-on", True)
+        assert time.monotonic() - started < _HELD_REST_S
+        assert view.url.endswith("/held-page")
+        assert 'heading "Held page"' in view.body
+        assert view.notes.count("the page is still loading; what is shown may be incomplete") == 1
     finally:
         await session.aclose()
 

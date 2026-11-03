@@ -37,7 +37,7 @@ from dotagent.browser.types import (
     VaultFieldKind,
     Viewport,
 )
-from dotagent.core.errors import BrowserError
+from dotagent.core.errors import BrowserError, TabSilentError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 
@@ -649,6 +649,10 @@ async def page_title(page: Page) -> str:
     return await _again_after_navigation(page, "reading the page title failed", page.title)
 
 
+class _PageSilent(PlaywrightTimeoutError):
+    """The page answered nothing within the bound (:func:`_wait_quiet`), told as :class:`TabSilentError`."""
+
+
 async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:
     """The document parsed, then quiet for ``quiet_ms`` (at most ``max_ms``). A tab whose page answers nothing at all
     within ``timeout_ms`` is told apart from one still parsing (item 753): a page stuck in a script, or a Chrome that
@@ -659,7 +663,7 @@ async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -
         async with asyncio.timeout(timeout_ms / 1000):
             await page.evaluate("1")
     except TimeoutError as error:
-        raise PlaywrightTimeoutError(
+        raise _PageSilent(
             f"the tab did not answer within {timeout_ms / 1000:g} s: its page is stuck, or Chrome is overloaded. Close "
             "this tab (browser_close_tab) and open the page in a new one"
         ) from error
@@ -679,12 +683,19 @@ async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -
 
 
 async def wait_dom_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:
-    """Wait for DOMContentLoaded and then for a DOM quiet window (never ``networkidle``, which analytics defeat)."""
-    await _again_after_navigation(
-        page,
-        "waiting for the page to settle failed",
-        lambda: _wait_quiet(page, quiet_ms, max_ms, timeout_ms),
-    )
+    """Wait for DOMContentLoaded and then for a DOM quiet window (never ``networkidle``, which analytics defeat). A tab
+    whose page answers nothing raises :class:`TabSilentError`, a page that answers and does not settle in time
+    :class:`BrowserError` (item 954): the caller may still read the one, not the other."""
+    try:
+        await _again_after_navigation(
+            page,
+            "waiting for the page to settle failed",
+            lambda: _wait_quiet(page, quiet_ms, max_ms, timeout_ms),
+        )
+    except BrowserError as error:
+        if isinstance(error.__cause__, _PageSilent):
+            raise TabSilentError(error.message, error.context) from error.__cause__
+        raise
 
 
 # What a step that should change the page did to it (item 739): how many changes the page's documents have had since

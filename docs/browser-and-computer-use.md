@@ -359,7 +359,10 @@ Both modes share what follows.
   The current tab is told which closed. A tab whose page does not answer a script as simple as `1` within the navigation
   timeout (`navigation_timeout_s`; a page stuck in a loop of its own, a Chrome too loaded to answer) fails saying so,
   and that it is to be closed and the page opened in a new tab (item 753): it was told as a document not yet parsed. A
-  page busy for a while (a heavy app starting) has that whole time to answer.
+  page busy for a while (a heavy app starting) has that whole time to answer. A page `browser_open` or `browser_new_tab`
+  has loaded that answers but has not settled within that time (still being parsed, or busy past the quiet window) is
+  shown as it is, with the note that it is still loading (item 954): the open failed, and the run read the very page
+  with its next call.
 - `browser_upload` hands the files straight to the file field of the element it is given (item 704): the field itself,
   which sites move off the screen or put under an icon (a click on such a field waited eight seconds and failed), the
   one file field inside it, as in a label that wraps a hidden field, or (item 745) the field its label (`for`) or its

@@ -150,6 +150,7 @@ from dotagent.core.errors import (
     HandedOff,
     PolicyDenied,
     RunConflict,
+    TabSilentError,
 )
 from dotagent.core.images import jpeg_of_size
 from dotagent.core.logs import get_logger
@@ -2233,10 +2234,30 @@ class BrowserSession:
             ) from refused
         if status is not None:
             tab.status = status
-        await self._settle(tab)
+        settled: bool = await self._settle_loaded(tab)
         await self._enforce_landing(tab)
-        capture: _Capture = await self._capture_loaded(tab, hide_secrets)
+        capture: _Capture = (
+            await self._capture_loaded(tab, hide_secrets) if settled else await self._capture(tab, hide_secrets)
+        )
         return await self._assemble(thread, tab, capture, capture.rendered, "full")
+
+    async def _settle_loaded(self, tab: Tab) -> bool:
+        """Settle the page a navigation has just loaded; whether it settled (item 954). A page that answers and does
+        not settle in time (one still parsing, or busy past the quiet window) is shown as it is with a note that it is
+        still loading, rather than failing the call: a run told only that the open failed read the very page with the
+        next call (LinkedIn, X). A tab whose page answers nothing (:class:`TabSilentError`), from which nothing could
+        be read either, still fails, saying to open the page in a new tab."""
+        try:
+            await self._settle(tab)
+        except (ForbiddenUrlError, TabSilentError):
+            raise
+        except BrowserError as error:
+            _log.info("browser_unsettled_after_load", error=str(error), url=truncate_middle(tab.page.url, 200))
+            # The wait for the navigation to commit may have said it already (:meth:`_let_commit`).
+            if _STILL_LOADING not in tab.notes:
+                add_note(tab, _STILL_LOADING)
+            return False
+        return True
 
     # ------------------------------------------------------------------ public operations
     # A view the model reads takes ``hide_secrets``: the value of a field the page marks secret then shows as

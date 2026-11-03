@@ -170,6 +170,12 @@ class BrowserError(DotError):
     """Browser automation failed."""
 
 
+class TabSilentError(BrowserError):
+    """The page of a tab answered nothing at all within the navigation timeout (item 753): it is stuck, or Chrome is
+    overloaded, so nothing can be read of it either; told apart from a page that answers and is still loading (item
+    954)."""
+
+
 class ForbiddenUrlError(BrowserError):
     """The browser rules refuse an address: Dot's own interface, a blocked host, a host outside
     ``browser.allowed_hosts`` or a scheme that is not the web's. ``url`` is the address as Chrome read it, ``reason``
