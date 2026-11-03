@@ -310,6 +310,23 @@ async def test_two_streams_at_once_are_the_most_and_the_cross_frees_one(stand: S
     assert sorted(_gone(pid) for pid in await _started(stand, 2)) == [False, True]
 
 
+async def test_opens_at_the_same_moment_cannot_pass_the_count_together(stand: Stand) -> None:
+    """The pre-push review of item 969: the count was read before the program started and the stream kept after, so
+    that opens at the same moment all passed it."""
+    transcriber: Transcriber = _transcriber(stand)
+    stand.says("late")
+    # Built first, so that the opens below reach the program's start together.
+    await transcriber.drop(await transcriber.open("tr-TR"))
+    opened: list[str | BaseException] = await asyncio.gather(
+        *(transcriber.open("tr-TR") for _ in range(4)), return_exceptions=True
+    )
+    refused: list[BaseException] = [one for one in opened if isinstance(one, BaseException)]
+    assert len(refused) == 2 and all(isinstance(one, VoiceError) for one in refused), opened
+    for name in opened:
+        if isinstance(name, str):
+            await transcriber.drop(name)
+
+
 async def test_a_stream_no_piece_comes_to_is_dropped_by_itself(stand: Stand, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(helper, "STREAM_IDLE_S", 0.3)
     monkeypatch.setattr(helper, "_STREAM_WATCH_S", 0.1)

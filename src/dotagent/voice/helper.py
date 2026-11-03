@@ -196,6 +196,9 @@ class Transcriber:
         self._warming: asyncio.Task[None] | None = None
         self._written: set[str] = set()
         self._streams: dict[str, _Stream] = {}
+        # The streams being opened: their place is taken before their program starts, so that two opens at the same
+        # moment cannot both pass the count.
+        self._opening: int = 0
         self._watching: asyncio.Task[None] | None = None
 
     def _recent_failure(self) -> VoiceError | None:
@@ -365,11 +368,13 @@ class Transcriber:
                 "that is not a language: write it as en-US or tr-TR", {"language": language[:_TAG_CHARS]}
             )
         program: Path = await self._program()
-        if len(self._streams) >= _AT_ONCE:
+        taken: int = len(self._streams) + self._opening
+        if taken >= _AT_ONCE:
             raise VoiceError(
                 "The Mac is already writing down two other recordings: try again in a moment",
-                {"code": "busy", "open": len(self._streams)},
+                {"code": "busy", "open": taken},
             )
+        self._opening += 1
         try:
             process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
                 str(program),
@@ -381,6 +386,8 @@ class Transcriber:
             )
         except OSError as error:
             raise VoiceError(UNREADABLE, {"code": "failed", "error": error.strerror or str(error)}) from error
+        finally:
+            self._opening -= 1
         name: str = secrets.token_urlsafe(_STREAM_ID_BYTES)
         now: float = time.monotonic()
         self._streams[name] = _Stream(
