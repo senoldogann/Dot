@@ -1,21 +1,21 @@
 // The microphone of a composer (item 574): a button where the page can listen. Pressed, it turns the composer's controls
 // into a recorder (item 605): a cross that drops the dictation, a wave that moves while the engine hears a sound, the time
-// since it began to listen, and a tick that ends it. The words go into the box when the owner presses the tick, at once
-// (item 968), or when a pause ends the dictation by itself; until then the box keeps what it held. It also ends when the owner types (the
-// dictation is dropped), when a message is sent and when the page goes out of sight. Nothing is sent by voice alone: the
-// owner reads what the box holds and sends it as usual.
+// since it began to listen, and a tick that ends it. The words go into the box when the owner presses the tick (at once
+// for a dictation, item 968; a moment after for a recording, which the Mac wrote down meanwhile, item 969), or when a
+// pause ends it by itself; until then the box keeps what it held. It also ends when the owner types (the dictation is
+// dropped), when a message is sent and when the page goes out of sight. Nothing is sent by voice alone: the owner reads
+// what the box holds and sends it as usual.
 //
-// The page listens one of two ways (item 626, voice.js `listeningWay`). With the browser's own speech recognition, a
-// dictation (voice.js): the browser recognizes the voice, and Safari and Chrome may send it to Apple's or Google's servers
-// to do it (docs/safety.md); Dot sends nothing itself. Or, on an iPhone or an iPad, where Safari's recognition goes deaf
-// after the first dictation of a page, and in a browser that has none, by recording the voice (recording.js): the page
-// sends the recording to the owner's Mac, which writes it down on the device, and the recorder says it is writing down
-// what was said until the words come.
+// The page listens one of two ways (items 626, 969, voice.js `listeningWay`). Wherever the Mac can write down, by
+// recording the voice (recording.js): the page streams it to the owner's Mac while the owner speaks, and the Mac writes
+// it down on the device. Where it cannot, with the browser's own speech recognition, a dictation (voice.js): the browser
+// recognizes the voice, and Safari and Chrome may send it to Apple's or Google's servers to do it (docs/safety.md); Dot
+// sends nothing itself.
 
 import { canRecord, openCapture } from "./capture.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
-import { allowAtSettings, macVoice, writeDown } from "./macvoice.js";
+import { allowAtSettings, macStream, macVoice } from "./macvoice.js";
 import { voiceLanguage } from "./readaloud.js";
 import { createRecording } from "./recording.js";
 import { toast } from "./ui.js";
@@ -74,8 +74,6 @@ export function createMicrophone({ textarea, setInterim }) {
       recognition: canListen(),
       recording: canRecord(),
       mac: macVoice().transcribe,
-      userAgent: navigator.userAgent,
-      touchPoints: navigator.maxTouchPoints,
     });
   let way = listensNow();
   if (way === null) {
@@ -274,7 +272,7 @@ export function createMicrophone({ textarea, setInterim }) {
   /** The engine of `kind`: a recording for the Mac to write down, or the browser's own dictation. */
   const engine = (kind) =>
     kind === "recording"
-      ? createRecording({ ...callbacks, writing: showWriting, capture: openCapture, send: writeDown })
+      ? createRecording({ ...callbacks, writing: showWriting, capture: openCapture, mac: macStream })
       : createDictation(callbacks);
   let dictation = engine(way);
 

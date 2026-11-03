@@ -1,7 +1,7 @@
 // What a recording of the composer's microphone is made of (item 626), with no page in it: the samples the browser gives
-// in blocks of Float32, how loud a block is, the way they are brought down to 16 kHz mono 16-bit, and the WAV file the
-// Mac is sent. The Mac reads it with macOS's own dictation (dotagent/voice), which takes a WAV and not what a
-// MediaRecorder writes: its formats differ by browser, and WebM is not a format the Mac reads.
+// in blocks of Float32, how loud a block is, the way they are brought down to 16 kHz mono 16-bit, and the bytes the Mac
+// is streamed as the owner speaks (item 969). The Mac writes them down with macOS's own dictation (dotagent/voice), which
+// takes bare samples and not what a MediaRecorder writes: its formats differ by browser.
 
 /** The rate the recording is sent at, and what the Mac's dictation model works at best. */
 export const RECORDING_RATE = 16000;
@@ -77,32 +77,14 @@ function toInt16(sample) {
 }
 
 /**
- * `samples` (16-bit mono, at `rate`) as a WAV file: the standard 44-byte header and the samples after it, little-endian.
+ * `samples` as the bytes the Mac takes (item 969): 16-bit little-endian, with no header.
  * @param {Int16Array} samples
- * @param {number} [rate]
  */
-export function wavOf(samples, rate = RECORDING_RATE) {
-  const bytes = new Uint8Array(44 + samples.length * 2);
+export function pcmOf(samples) {
+  const bytes = new Uint8Array(samples.length * 2);
   const view = new DataView(bytes.buffer);
-  const write = (at, text) => {
-    for (let index = 0; index < text.length; index += 1) {
-      view.setUint8(at + index, text.charCodeAt(index));
-    }
-  };
-  write(0, "RIFF");
-  view.setUint32(4, 36 + samples.length * 2, true);
-  write(8, "WAVEfmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, rate, true);
-  view.setUint32(28, rate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  write(36, "data");
-  view.setUint32(40, samples.length * 2, true);
   for (let index = 0; index < samples.length; index += 1) {
-    view.setInt16(44 + index * 2, samples[index], true);
+    view.setInt16(index * 2, samples[index], true);
   }
   return bytes;
 }

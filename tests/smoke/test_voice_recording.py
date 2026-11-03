@@ -1,17 +1,18 @@
-"""The composer's microphone when the page records the voice itself (item 626), in a real browser, on a phone-sized
-window and in WebKit, Safari's engine, against a real server whose Mac writes recordings down with a program of the
-test's own (``voice_stand_ins``).
+"""The composer's microphone when the page records the voice itself (items 626, 969), in a real browser, on a
+phone-sized window and in WebKit, Safari's engine, against a real server whose Mac writes down what is said with a
+program of the test's own (``voice_stand_ins``).
 
-On an iPhone Safari's speech recognition goes deaf after the first dictation of a page, so the page there records the
-microphone (getUserMedia, Web Audio and an audio worklet), sends the recording to the Mac and puts the words it answers
-in the box, every time. A browser with no speech recognition (Firefox) does it too, and everywhere else the browser's
-own recognition stays; where the Mac cannot write down, an iPhone keeps the recognition and its toast says what the Mac
+Wherever the Mac can write down, the page records the microphone (getUserMedia, Web Audio and an audio worklet),
+streams what it hears to the Mac while the owner speaks, and puts the words it answers at the tick in the box, every
+time: an iPhone's Safari, whose recognition goes deaf after the first dictation of a page, a browser with none
+(Firefox), and a computer's browser, whose recognition lost the first second or two while its engine started (item
+969). Where the Mac cannot write down, the browser's own recognition stays, and an iPhone's toast says what the Mac
 lacks.
 
 No microphone is opened, here or by the browser: Chrome's own fake microphone makes macOS ask for the microphone for the
 program that runs the tests, so `getUserMedia` itself is stood in for by a function that gives a stream Web Audio makes,
 a tone that the test turns on and off. Everything after it is the page's own: its audio context, its worklet, its
-downsampling, its WAV file, its request, and the daemon's."""
+downsampling, its stream and its requests, and the daemon's."""
 
 import asyncio
 import time
@@ -396,6 +397,8 @@ async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_ev
     box: Locator = page.locator(GOAL)
     mic: Locator = _microphone(page)
     await expect(mic).to_be_visible()
+    streamed: list[str] = []
+    page.on("request", lambda request: streamed.append(f"{request.method} {request.url.partition('/api')[2]}"))
     for round_number in (1, 2, 3):
         await _listening(page)
         # The microphone was asked for as the page asks: with the browser's own echo cancelling and noise suppression.
@@ -404,6 +407,13 @@ async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_ev
         await page.evaluate("() => window.__mic.speak(1.0)")
         await asyncio.sleep(1.5)
         await _fits(page, f"{engine} while the microphone records")
+        # The stream was opened at the press and given the sound while the owner spoke, before the tick.
+        voice: list[str] = [line for line in streamed if "/voice/streams" in line]
+        assert "POST /voice/streams" in voice, voice
+        this_one: list[str] = voice[voice.index("POST /voice/streams") + 1 :]
+        assert sum(1 for line in this_one if line.endswith("/audio")) >= 2, voice
+        assert not any(line.endswith("/end") for line in this_one), voice
+        streamed.clear()
         await _tick(page).click()
         expected: str = " ".join([_WORDS] * round_number)
         await expect(box).to_have_value(expected, timeout=_WAIT_MS)
@@ -416,16 +426,14 @@ async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_ev
     runs: list[dict[str, Any]] = mac_can.runs_made()[-3:]
     assert len(runs) == 3
     for given in runs:
-        # What reached the Mac's program: a file of Dot's own making, 16 kHz mono 16-bit, in the page's language, with
-        # a second of a tone of 220 hertz in it (the times its wave rises through zero count its pitch: 220) and the
-        # silence the daemon adds.
-        assert given["language"] == "en-US" and given["argc"] == 3
-        assert given["head"] == ["RIFF", "WAVEfmt ", "data"]
-        assert given["format"] == [1, 1, RECORDING_RATE, RECORDING_RATE * 2, 2, 16]
+        # What reached the Mac's program: 16 kHz mono 16-bit samples in the page's language, with a second of a tone of
+        # 220 hertz in it (the times its wave rises through zero count its pitch: 220, every piece in its place) and
+        # the silence the daemon adds.
+        assert given["language"] == "en-US" and given["argc"] == 2
         assert given["samples"] > RECORDING_RATE + _TAIL_SAMPLES
+        assert given["tail"] >= _TAIL_SAMPLES
         assert given["peak"] > 0.2 * 32767
         assert 0.9 * 220 <= given["crossings"] <= 1.1 * 220, given["crossings"]
-        assert given["mode"] == "0o600"
     await page.context.close()
 
 
@@ -433,6 +441,8 @@ async def test_the_cross_sends_nothing_and_lets_the_microphone_go(
     chromium: Browser, address: str, mac_can: StandIn
 ) -> None:
     page: Page = await _open(chromium, address)
+    dropped: list[str] = []
+    page.on("request", lambda request: dropped.append(request.url) if request.method == "DELETE" else None)
     box: Locator = page.locator(GOAL)
     await box.fill("Dear Ada,")
     runs: int = len(mac_can.runs_made())
@@ -444,6 +454,8 @@ async def test_the_cross_sends_nothing_and_lets_the_microphone_go(
     await _released(page)
     await asyncio.sleep(0.3)
     assert len(mac_can.runs_made()) == runs
+    # The stream is dropped at the Mac too: its program wrote nothing down.
+    assert len(dropped) == 1 and "/api/voice/streams/" in dropped[0], dropped
     await expect(box).to_have_value("Dear Ada,")
     # Typing into the box while it records takes over: it is dropped as the cross drops it.
     await _listening(page)
@@ -510,7 +522,7 @@ async def test_what_goes_wrong_is_said_in_plain_words_and_the_box_keeps_its_word
     # A program that fails.
     mac_can.says(mode="crash")
     await record_and_tick()
-    await expect(toast).to_contain_text("The Mac could not write the recording down")
+    await expect(toast).to_contain_text("The Mac could not write down what you said")
     await expect(toast).not_to_contain_text("Traceback")
     await toast.click()
     # Nothing heard in it.
@@ -520,10 +532,10 @@ async def test_what_goes_wrong_is_said_in_plain_words_and_the_box_keeps_its_word
     await toast.click()
     # A Mac that cannot be reached.
     mac_can.says(text=_WORDS)
-    await page.route("**/api/voice/transcribe", lambda route: route.abort())
+    await page.route("**/api/voice/streams**", lambda route: route.abort())
     await record_and_tick()
     await expect(toast).to_contain_text("The Mac could not be reached, so what you said was not written down.")
-    await page.unroute("**/api/voice/transcribe")
+    await page.unroute("**/api/voice/streams**")
     await toast.click()
     await expect(box).to_have_value("Dear Ada,")
     # And it works again after all that.
@@ -660,16 +672,23 @@ async def test_where_the_mac_cannot_an_iphone_keeps_safaris_recognition_and_the_
     await page.context.close()
 
 
-async def test_a_computers_browser_keeps_its_own_recognition_even_when_the_mac_can_write_down(
+async def test_a_computers_browser_records_for_the_mac_too_when_the_mac_can_write_down(
     chromium: Browser, address: str, mac_can: StandIn
 ) -> None:
+    """Item 969, the owner's choice: a browser's own recognition lost the first second or two while its engine started;
+    the page records from the moment the microphone opens and the Mac writes it down, on a computer too."""
     page: Page = await _open(chromium, address, phone=False, width=1280)
-    await _microphone(page).click()
-    await page.evaluate("() => window.__voice.hear('spoken to the browser')")
+    # The composer of the home was made as the page started, which does not wait for the Mac's answer: the one made by
+    # the next visit to the home is made after it.
+    await page.goto(f"{address}/#/settings/general")
+    await page.goto(f"{address}/#/runs")
+    await _listening(page)
+    await page.evaluate("() => window.__mic.speak(0.6)")
+    await asyncio.sleep(1.0)
     await _tick(page).click()
-    await expect(page.locator(GOAL)).to_have_value("spoken to the browser")
-    assert await page.evaluate("() => window.__voice.starts") == 1
-    assert await _mic(page, "mic.asked") == []
+    await expect(page.locator(GOAL)).to_have_value(_WORDS, timeout=_WAIT_MS)
+    await _released(page)
+    assert await page.evaluate("() => window.__voice.starts") == 0
     await page.context.close()
 
 
@@ -712,7 +731,7 @@ async def test_the_voice_card_of_an_iphone_whose_mac_can_write_down_says_where_t
     page: Page = await _open(chromium, address)
     await page.goto(f"{address}/#/settings/general")
     voice: Locator = page.locator("section.card", has=page.get_by_text("Voice", exact=True))
-    await expect(voice).to_contain_text("The microphone records your voice and sends it to your Mac")
+    await expect(voice).to_contain_text("The microphone records your voice and streams it to your Mac as you speak")
     await expect(voice).to_contain_text("it goes to no one else, and the Mac keeps nothing")
     await expect(voice).to_contain_text("downloads its model from Apple")
     await expect(voice).not_to_contain_text("Safari and Chrome may send your voice")
@@ -789,7 +808,7 @@ async def test_the_voice_card_is_written_again_when_the_macs_answer_comes_in_aft
         release.set()
     await (await the_answer.value).finished()
     # The same card, written again: it says where the voice goes now.
-    await expect(voice).to_contain_text("The microphone records your voice and sends it to your Mac")
+    await expect(voice).to_contain_text("The microphone records your voice and streams it to your Mac as you speak")
     await expect(voice).not_to_contain_text("The browser does the listening")
     await expect(voice).to_contain_text("downloads its model from Apple")
     await _fits(page, "Settings › General › Voice once the Mac has answered")

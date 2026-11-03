@@ -256,39 +256,37 @@ const MAC_SAFARI = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 const MAC_CHROME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0 Safari/537.36";
 const FIREFOX = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:140.0) Gecko/20100101 Firefox/140.0";
 
-/** The way the page listens in a browser that `recognition` and `recording` describe, with the Mac able or not. */
-function wayOf(userAgent, touchPoints, { recognition = true, recording = true, mac = true } = {}) {
-  return listeningWay({ recognition, recording, mac, userAgent, touchPoints });
+/** The way the page listens in a browser that `recognition` and `recording` describe, with the Mac able or not: the
+ * same on every device (item 969), which `userAgent` and `touchPoints` only name. */
+function wayOf(_userAgent, _touchPoints, { recognition = true, recording = true, mac = true } = {}) {
+  return listeningWay({ recognition, recording, mac });
 }
 
-test("an iPhone or an iPad records for the Mac when the Mac can write down, and keeps Safari's recognition when it cannot", () => {
-  assert.equal(wayOf(IPHONE, 5), "recording");
-  assert.equal(wayOf("Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1", 5), "recording");
-  // An iPad that asks for the computer's pages says it is a Mac with a touch screen.
-  assert.equal(wayOf(MAC_SAFARI, 5), "recording");
-  // Where the Mac cannot, the recognition stays, with the toast of item 616: better than no microphone.
-  assert.equal(wayOf(IPHONE, 5, { mac: false }), "recognition");
-  // A page that cannot record (an address that is not secure has no microphone to open) keeps the recognition too.
-  assert.equal(wayOf(IPHONE, 5, { recording: false }), "recognition");
-  // And an iPhone with neither has no microphone at all.
-  assert.equal(wayOf(IPHONE, 5, { recognition: false, mac: false }), null);
-  assert.equal(wayOf(IPHONE, 5, { recognition: false, recording: false }), null);
+test("every page records for the Mac when the Mac can write down, and keeps the browser's recognition when it cannot", () => {
+  // Item 969, the owner's choice: the microphone hears from the moment it opens, where a browser's recognition lost the
+  // first second or two while its engine started, and the voice stays on the Mac.
+  for (const [userAgent, touchPoints] of [
+    [IPHONE, 5],
+    ["Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1", 5],
+    [MAC_SAFARI, 0],
+    [MAC_CHROME, 0],
+    ["Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140.0 Mobile Safari/537.36", 5],
+  ]) {
+    assert.equal(wayOf(userAgent, touchPoints), "recording");
+    // Where the Mac cannot, the recognition stays: better than no microphone.
+    assert.equal(wayOf(userAgent, touchPoints, { mac: false }), "recognition");
+    // A page that cannot record (an address that is not secure has no microphone to open) keeps the recognition too.
+    assert.equal(wayOf(userAgent, touchPoints, { recording: false }), "recognition");
+    // And one with neither has no microphone at all.
+    assert.equal(wayOf(userAgent, touchPoints, { recognition: false, mac: false }), null);
+    assert.equal(wayOf(userAgent, touchPoints, { recognition: false, recording: false }), null);
+  }
 });
 
 test("a browser with no speech recognition records when the Mac can write down, and has no microphone when it cannot", () => {
   assert.equal(wayOf(FIREFOX, 0, { recognition: false }), "recording");
   assert.equal(wayOf(FIREFOX, 0, { recognition: false, mac: false }), null);
   assert.equal(wayOf(FIREFOX, 0, { recognition: false, recording: false }), null);
-});
-
-test("everywhere else, a Mac's Safari or Chrome and Dot.app, the browser's recognition stays whatever the Mac can", () => {
-  for (const mac of [true, false]) {
-    assert.equal(wayOf(MAC_SAFARI, 0, { mac }), "recognition");
-    assert.equal(wayOf(MAC_CHROME, 0, { mac }), "recognition");
-    assert.equal(wayOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140.0", 0, { mac }), "recognition");
-    // A phone that is not Apple's: Chrome on Android hears every time.
-    assert.equal(wayOf("Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140.0 Mobile Safari/537.36", 5, { mac }), "recognition");
-  }
 });
 
 test("an iPhone, an iPod and an iPad are Apple's touch screens, and a Mac with one touch point is not", () => {
@@ -356,7 +354,7 @@ test("what a recording met on its way to the Mac is said in plain words: unreach
     "The Mac cannot write down this language. Choose another in Settings › General › Voice.",
   );
   assert.equal(sendProblem({ status: 422, message: "The Mac took longer than 60 seconds", context: { code: "timeout" } }), "The Mac took longer than 60 seconds");
-  for (const code of ["unavailable", "no-audio", "failed"]) {
+  for (const code of ["unavailable", "busy", "too-long", "failed"]) {
     assert.equal(sendProblem({ status: 422, message: `words for the owner of ${code}`, context: { code } }), `words for the owner of ${code}`);
   }
   // What is not the Mac's own to say is no words for the owner: a request it could not read, a daemon that failed.

@@ -239,14 +239,16 @@ its marks (a heading's hashes, a list's mark, the stars of bold, the backticks o
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
 links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
 sent is the text as typed. A **microphone** by the send (item 574) turns the box's controls into a recorder
-while it listens (item 605), as a phone's apps do. It listens one of two ways, which the page chooses as it starts (item
-626):
+while it listens (item 605), as a phone's apps do. It listens one of two ways, which the page chooses as it starts (items
+626, 969):
 
+- by recording the voice and streaming it to the Mac, which writes it down as it is said: on every device whose Mac can
+  (a Mac's browser, the desktop app, an iPhone, an iPad, a browser with no speech recognition, Firefox, which then shows
+  a microphone it never had). The microphone hears from the moment it opens, where a browser's recognition lost the
+  first second or two while its engine started, the words come a moment after the tick, and the voice stays on the Mac
+  (item 969, the owner's choice). Below, the recording;
 - with the browser's own speech recognition (`SpeechRecognition` or Safari's `webkitSpeechRecognition`: Safari, Chrome
-  and the desktop app's web view), which shows the words as they come: a dictation. This is the way everywhere but the
-  next;
-- by recording the voice and having the Mac write it down: on an iPhone or an iPad, when the Mac can, and in a browser
-  that has no speech recognition (Firefox), which then shows a microphone it never had. Below, the recording.
+  and the desktop app's web view), a dictation, where the Mac cannot write down.
 
 The recorder holds:
 
@@ -295,25 +297,31 @@ stays flat. Such a dictation says that Safari heard nothing, whoever ended it, a
 microphone back, the box's words kept as its draft; the keyboard's own microphone types meanwhile. A dictation stops a
 reading aloud first, as Safari does not hear while it speaks.
 
-**The recording** (item 626) is how an iPhone or an iPad hears every time. Safari's recognition there hears the first
-dictation of a page and at times none after it, and nothing a page does brings it back (item 616 only says so), so where
-the Mac can write down, the page does not use it. Pressing the microphone opens the microphone itself, in the press, so
-that iOS lets the audio start: `getUserMedia` with the browser's own echo cancelling and noise suppression, Web Audio
+**The recording** (items 626, 969) is how every device hears where the Mac can write down: from the moment the
+microphone opens, and every time (Safari's recognition on an iPhone hears the first dictation of a page and at times none
+after it, and nothing a page does brings it back, item 616). Pressing the microphone opens a stream to the Mac
+(`POST /api/voice/streams`), which starts the program that writes down while the microphone opens, so that it is ready
+by the first word, and opens the microphone itself, in the press, so that iOS lets the audio start: `getUserMedia` with the browser's own echo cancelling and noise suppression, Web Audio
 and an audio worklet (`voicecapture.js`, a script of the page's own address, which its content security policy
 allows). If iOS puts the audio context aside as it turns to the microphone, the page asks it to run once more; one that
-still does not run says so and what to do. The page keeps the sound in memory as 16 kHz mono 16-bit samples, five
-minutes at the most. A block of the microphone's sound is a sound when it is as loud as 0.01 (the root of its mean
+still does not run says so and what to do. The page brings the sound down to 16 kHz mono 16-bit samples and sends them to
+the Mac as it records, in numbered pieces, one at a time, a quarter of a second at the least and two seconds at the most
+(what came while one was on its way goes in the next), five minutes at the most; the Mac writes them down as they come. A block of the microphone's sound is a sound when it is as loud as 0.01 (the root of its mean
 square, 0 to 1; measured with the speech of `say`: speech mostly 0.1 to 0.2, its pauses 0, the soft ends of its words
-between), and it counts for 0.4 seconds after, so that the pause between two words is no silence. The tick sends
-what was recorded, a voice too quiet to count as a sound included: the Mac says when it heard nothing, and only a tick
-before the first block of sound came in has nothing to send, and drops it. A pause of fifteen seconds after a sound and
-the five minutes send the recording too; six seconds with no sound at all end it by themselves, saying nothing was
-heard, and send nothing. The recorder says **Writing down what you said…** in the wave's place, quietly, until the
-words come, with the cross to give up waiting, and the words go into the box after what it held. Every end (the tick,
-the cross, typing, a message sent, the page out of sight, an error) lets the microphone go at once: its tracks end,
-which puts an iPhone's microphone light out, the audio context closes and the samples are dropped; a press while the
-browser still asks drops it. A failure says what to do in plain words, and the box keeps its words: the Mac could not be
-reached, it cannot write down this language (choose another in Settings › General › Voice), nothing was heard.
+between), and it counts for 0.4 seconds after, so that the pause between two words is no silence. The tick sends what
+is left and ends the stream (`POST /api/voice/streams/<id>/end`), a voice too quiet to count as a sound included: the
+Mac says when it heard nothing, and only a tick before the first block of sound came in has nothing to write down, and
+drops it. A pause of fifteen seconds after a sound and the five minutes end the stream too; six seconds with no sound at
+all end it by themselves, saying nothing was heard, and drop it. The Mac wrote down what was said while it was said, so
+its words come a moment after the tick (0.04 s to 0.11 s measured on this Mac after a sentence of Turkish or English);
+the recorder says **Writing down what you said…** in the wave's place, quietly, until they come, with the cross to give
+up waiting, and the words go into the box after what it held. Every end (the tick, the cross, typing, a message sent,
+the page out of sight, an error) lets the microphone go at once: its tracks end, which puts an iPhone's microphone light
+out, the audio context closes and what waited to be sent is dropped; every end but the tick drops the stream at the Mac
+too (`DELETE /api/voice/streams/<id>`), and a press while the browser still asks drops it. A piece that could not be
+sent loses the recording (the Mac would write down one with a hole in it). A failure says what to do in plain words,
+and the box keeps its words: the Mac could not be reached, it cannot write down this language (choose another in
+Settings › General › Voice), it is writing down two other recordings, nothing was heard.
 
 The Mac writes it down with macOS 26's own dictation, on the device, through a small program the daemon builds with the
 Swift compiler of Apple's developer tools the first time it is needed (`src/dotagent/voice`). `GET /api/voice` says
@@ -332,23 +340,27 @@ recognition (Firefox) a composer made before the answer has no microphone, and o
 can write down. A Mac that could not be asked at all (the daemon failed, or could not be reached) leaves the page as it
 was, and on an iPhone, an iPad or a browser with no speech recognition, where the Mac's answer decides how the page
 listens, the card says so. Where the Mac cannot write down, an iPhone keeps Safari's recognition, and the toast of item
-616 adds what the Mac lacks. `POST /api/voice/transcribe` takes `{"language": "tr-TR", "data_b64": "<WAV>"}` and answers
-`{"text": "…"}`, empty when nothing was heard. It is behind the token like every route, so the phone paired in Settings
-› Phone reaches it as it reaches the composer, and it reads the recording as a model before it does anything with it: a
-WAV of 16-bit mono sound of 8 to 48 kHz, five minutes and about 10 MB at most, and a language of two or three letters
-and a region (`en-US`, `tr-TR`). Anything else is a 422 that says what to do; so is a Mac that cannot, with
-`context.code` `unavailable`, `unsupported-language`, `no-audio`, `timeout` (60 seconds; five minutes the first time a
-language is used, as macOS downloads its model from Apple then) or `failed`; never a stack.
+616 adds what the Mac lacks. `POST /api/voice/streams` takes `{"language": "tr-TR"}` (two or three letters and a
+region, `en-US`, `tr-TR`), starts the program and answers `{"id": "…"}`; `POST /api/voice/streams/<id>/audio` takes
+`{"piece": 0, "data_b64": "<samples>"}`, base64 of 16-bit little-endian samples at 16 kHz with no header, two seconds at
+the most, numbered from 0 in the order they were recorded; `POST /api/voice/streams/<id>/end` answers `{"text": "…"}`,
+empty when nothing was heard; `DELETE /api/voice/streams/<id>` drops one. They are behind the token like every route, so
+the phone paired in Settings › Phone reaches them as it reaches the composer. A piece that is no base64 of whole
+samples, one out of its turn (which drops the stream: a piece was lost on the way) and one past five minutes are a 422
+that says what to do; a stream that is no longer open is a 404; so is a Mac that cannot a 422, with `context.code`
+`unavailable`, `unsupported-language`, `busy` (two streams are open, the most at once, as the model is large),
+`too-long`, `timeout` (60 seconds after the tick; five minutes the first time a language is used, as macOS downloads
+its model from Apple then) or `failed`; never a stack. A stream no piece came to for 20 seconds (a page that went away)
+is dropped by itself, and so is one open longer than the longest recording.
 
-The daemon writes the samples again behind a header of its own, with 0.8 seconds of silence after them (the dictation
-model drops the last word of a recording that ends as the word does), to a file of mode 0600 in
-`<home>/voice/recordings`, and deletes it whether the words came or not; only those samples reach Apple's audio code.
-The recording and the words are never logged and never kept: the log has how long the recording was and how long it
-took. The program is built once in a daemon's life, in a folder of mode 0700 under `<home>/voice`, from a copy of its
+The daemon hands the samples to the program through a pipe, never a file, and at the tick 0.8 seconds of silence after
+them (the dictation model drops the last word of a recording that ends as the word does), then ends its input; only
+those samples reach Apple's audio code. The sound and the words are never logged and never kept: the log has how long
+the recording was and how long the words took after the tick. The program is built once in a daemon's life, in a folder of mode 0700 under `<home>/voice`, from a copy of its
 source made there; a run's commands may read that folder and not change it (it is among what Dot loads and runs,
 [Safety](safety.md)). The daemon keeps the SHA-256 of what it built in memory and hashes the file again before each run,
-and builds anew when it is not the file it built. It starts the program with an argument list (the file and the
-language), a small environment and a time limit, never through a shell, and at most two at once.
+and builds anew when it is not the file it built. It starts the program with an argument list (the language alone), a
+small environment and a time limit, never through a shell, and at most two at once.
 
 Nothing is sent by voice alone: you read the box and send as usual. A message whose answer was lost
 on its way back (the page says the sending failed and keeps the message) is done once when it is sent again, here and in

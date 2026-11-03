@@ -235,8 +235,6 @@ function voiceListeningFacts() {
     recognition: canListen(),
     recording: canRecord(),
     mac: mac.transcribe,
-    userAgent: navigator.userAgent,
-    touchPoints: navigator.maxTouchPoints,
   });
   // What the Mac still needs before it can write down what is said, as the daemon says it, and that it could not be asked.
   const macNeeds = macOffer(mac) === "" ? [] : [macOffer(mac)];
@@ -244,15 +242,17 @@ function voiceListeningFacts() {
     mac.failed === null ? [] : [`The Mac could not be asked whether it can write down what you say: ${mac.failed}`];
   if (way === "recording") {
     return [
-      "The microphone records your voice and sends it to your Mac, which writes it down on the device with macOS's own dictation: it goes to no one else, and the Mac keeps nothing. The first time a language is used the Mac downloads its model from Apple. Nothing is sent by voice alone: the words fill the box, and you send them.",
+      "The microphone records your voice and streams it to your Mac as you speak, which writes it down on the device with macOS's own dictation: it goes to no one else, and the Mac keeps nothing. The first time a language is used the Mac downloads its model from Apple. Nothing is sent by voice alone: the words fill the box, and you send them.",
     ];
   }
   if (way === "recognition") {
     return [
       "The browser does the listening: Safari and Chrome may send your voice to Apple's or Google's servers to recognize it. Dot sends nothing itself, and nothing is sent by voice alone: the words fill the box, and you send them.",
       ...(appleTouch(navigator.userAgent, navigator.maxTouchPoints)
-        ? ["Safari on an iPhone or an iPad at times hears only the first dictation after the page loads.", ...macNeeds, ...unasked]
+        ? ["Safari on an iPhone or an iPad at times hears only the first dictation after the page loads."]
         : []),
+      ...macNeeds,
+      ...unasked,
     ];
   }
   return ["This browser has no speech recognition, so the composer shows no microphone.", ...macNeeds, ...unasked];

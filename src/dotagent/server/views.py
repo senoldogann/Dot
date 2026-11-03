@@ -77,7 +77,7 @@ from dotagent.store.models import (
 from dotagent.tailnet import TailnetState
 from dotagent.undo.restore import UndoAction, UndoState
 from dotagent.voice.desktopapp import AppState, VoicePane
-from dotagent.voice.wav import MAX_RECORDING_BYTES
+from dotagent.voice.wav import MAX_PIECE_BYTES
 
 _GOAL_CHARS: int = 50_000
 _TEXT_CHARS: int = 20_000
@@ -92,7 +92,7 @@ _KEY_CHARS: int = 1000
 # Base64 takes four characters for every three bytes.
 _UPLOAD_B64_CHARS: int = (MAX_ATTACHMENT_BYTES + 2) // 3 * 4
 # A recording of the composer's microphone has a limit of its own (item 626): five minutes of 16 kHz mono sound.
-_RECORDING_B64_CHARS: int = (MAX_RECORDING_BYTES + 2) // 3 * 4
+_PIECE_B64_CHARS: int = (MAX_PIECE_BYTES + 2) // 3 * 4
 
 
 class ErrorView(FrozenModel):
@@ -517,12 +517,24 @@ class AttachmentUpload(FrozenModel):
     data_b64: str = Field(min_length=1, max_length=_UPLOAD_B64_CHARS)
 
 
-class RecordingUpload(FrozenModel):
-    """A recording of the composer's microphone for this Mac to write down (item 626): a WAV, base64-encoded, and the
-    language it is in (``tr-TR``)."""
+class VoiceStreamOpen(FrozenModel):
+    """A stream of what the owner says, for this Mac to write down as it comes (item 969), in ``language``."""
 
     language: str = Field(min_length=2, max_length=16)
-    data_b64: str = Field(min_length=1, max_length=_RECORDING_B64_CHARS)
+
+
+class VoiceStreamView(FrozenModel):
+    """The name of a stream that was opened: the page names it in each piece it sends, and at its end."""
+
+    id: str
+
+
+class VoicePiece(FrozenModel):
+    """A piece of a stream's sound: 16 kHz mono 16-bit samples, base64-encoded, numbered from 0 in the order they were
+    recorded."""
+
+    piece: int = Field(ge=0)
+    data_b64: str = Field(min_length=1, max_length=_PIECE_B64_CHARS)
 
 
 class TranscriptView(FrozenModel):

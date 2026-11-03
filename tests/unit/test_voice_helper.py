@@ -1,9 +1,11 @@
-"""The program that writes a recording down (item 626), built by the daemon and run on a recording, with a compiler and
-a program of the test's own in the place of Apple's: no test builds Swift or touches Apple's frameworks.
+"""The program that writes down what is said (items 626, 969), built by the daemon and streamed the sound of a
+recording, with a compiler and a program of the test's own in the place of Apple's: no test builds Swift or touches
+Apple's frameworks.
 
 The stand-in compiler writes the stand-in program where `-o` says and notes each build; the stand-in program notes each
-run and answers as the test has set it. So these tests run the real code that builds once, hashes, starts a program
-with an argument list and a small environment, reads its answer, and keeps no recording."""
+run, reads its input to the end and answers as the test has set it. So these tests run the real code that builds once,
+hashes, starts a program with an argument list and a small environment, streams it the sound, reads its answer, and
+writes no sound to a file."""
 
 import asyncio
 import os
@@ -15,18 +17,18 @@ import pytest
 from structlog.testing import capture_logs
 
 from dotagent.config import load_default_config
-from dotagent.core.errors import InvalidValueError, VoiceError
+from dotagent.core.errors import InvalidValueError, NotFoundError, VoiceError
 from dotagent.core.paths import voice_dir
 from dotagent.runtime import _dot_paths
 from dotagent.voice import helper
 from dotagent.voice.helper import LANGUAGE_TAG, SOURCE, Ability, Transcriber
 from dotagent.voice.toolchain import NO_COMPILER
-from dotagent.voice.wav import RECORDING_RATE, TAIL_SECONDS, Recording
+from dotagent.voice.wav import RECORDING_RATE, TAIL_SECONDS
 
-# A recording of a tenth of a second of silence, and what the program is given of it: the header, the samples and the
+# A piece of a tenth of a second of silence, and what the program is given of a stream of it: the samples and the
 # silence after them.
-RECORDING: Recording = Recording(rate=RECORDING_RATE, pcm=bytes(3200))
-GIVEN_BYTES: int = 44 + 3200 + round(TAIL_SECONDS * RECORDING_RATE) * 2
+PIECE: bytes = bytes(3200)
+GIVEN_BYTES: int = 3200 + round(TAIL_SECONDS * RECORDING_RATE) * 2
 SECRET_WORD: str = "swordfish"
 
 _COMPILER: str = """#!/bin/sh
@@ -42,24 +44,27 @@ chmod 755 "$out"
 """
 
 _PROGRAM: str = """#!/bin/sh
-echo "$1" >> "{files}"
-echo "$# $2" >> "{runs}"
+echo "$# $1" >> "{runs}"
 echo $$ >> "{pids}"
-case "$(cat "{control}")" in
+control="$(cat "{control}")"
+case "$control" in
+  language) printf '{{"error":"unsupported-language","detail":"nope"}}\\n'; exit 1 ;;
+  slow) exec sleep 30 ;;
+esac
+given="$(wc -c | tr -d ' ')"
+case "$control" in
   environment)
     echo "PATH=$PATH HOME=$HOME" >> "{seen}"
     env | cut -d= -f1 | sort | tr '\\n' ' ' >> "{seen}"
     echo >> "{seen}"
     printf '{{"text":"seen"}}\\n' ;;
-  words) printf '{{"text":"%s %s %s"}}\\n' "$2" "$(wc -c < "$1" | tr -d ' ')" "$(stat -f %Lp "$1")" ;;
+  words) printf '{{"text":"%s %s"}}\\n' "$1" "$given" ;;
   secret) printf '{{"text":"the password is {secret}"}}\\n' ;;
   silence) printf '{{"text":""}}\\n' ;;
-  language) printf '{{"error":"unsupported-language","detail":"nope"}}\\n'; exit 1 ;;
-  audio) printf '{{"error":"no-audio","detail":"empty"}}\\n'; exit 1 ;;
   failed) printf '{{"error":"failed","detail":"the model broke"}}\\n'; exit 1 ;;
   crash) echo "Fatal error: boom" >&2; exit 139 ;;
   garbage) echo "{secret} is not json" ;;
-  slow) exec sleep 30 ;;
+  late) sleep 30 ;;
 esac
 """
 
@@ -71,7 +76,6 @@ class Stand:
     folder: Path
     builds: Path
     runs: Path
-    files: Path
     seen: Path
     pids: Path
     control: Path
@@ -93,13 +97,8 @@ class Stand:
         (found,) = (self.folder / "voice").glob("build-*/transcribe")
         return found
 
-    def recordings(self) -> list[str]:
-        """The files left in the folder recordings are kept in."""
-        kept: Path = self.folder / "voice" / "recordings"
-        return sorted(path.name for path in kept.iterdir()) if kept.exists() else []
-
     def folders(self) -> list[str]:
-        """What the voice folder holds: the folders the program was built in, and the folder of recordings."""
+        """What the voice folder holds: the folders the program was built in."""
         voice: Path = self.folder / "voice"
         return sorted(path.name for path in voice.iterdir()) if voice.exists() else []
 
@@ -126,7 +125,6 @@ def stand(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Stand:
         folder=tmp_path,
         builds=tmp_path / "builds.log",
         runs=tmp_path / "runs.log",
-        files=tmp_path / "files.log",
         seen=tmp_path / "seen.log",
         pids=tmp_path / "pids.log",
         control=tmp_path / "control",
@@ -136,9 +134,7 @@ def stand(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Stand:
     )
     made.says("words")
     made.program.write_text(
-        _PROGRAM.format(
-            runs=made.runs, files=made.files, seen=made.seen, control=made.control, pids=made.pids, secret=SECRET_WORD
-        ),
+        _PROGRAM.format(runs=made.runs, seen=made.seen, control=made.control, pids=made.pids, secret=SECRET_WORD),
         encoding="utf-8",
     )
     compiler: Path = tmp_path / "swiftc"
@@ -154,6 +150,34 @@ def stand(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Stand:
 
 def _transcriber(stand: Stand) -> Transcriber:
     return Transcriber(stand.folder / "voice")
+
+
+async def _started(stand: Stand, count: int) -> list[int]:
+    """The process ids of the first ``count`` programs, once each has started (it notes its id as it does)."""
+    for _ in range(100):
+        pids: list[int] = (
+            [int(line) for line in stand.pids.read_text(encoding="utf-8").split()] if stand.pids.exists() else []
+        )
+        if len(pids) >= count:
+            return pids[:count]
+        await asyncio.sleep(0.05)
+    raise AssertionError(f"{count} programs did not start")
+
+
+def _gone(pid: int) -> bool:
+    """Whether the program ``pid`` is no longer running."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    return False
+
+
+async def _write_down(transcriber: Transcriber, language: str) -> str:
+    """The words of a stream in ``language`` of one piece, ended: what a page does from the press to the tick."""
+    name: str = await transcriber.open(language)
+    await transcriber.feed(name, 0, PIECE)
+    return await transcriber.end(name)
 
 
 class Asks:
@@ -198,8 +222,8 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
 
 async def test_the_program_is_built_once_and_writes_a_recording_down_each_time(stand: Stand) -> None:
     transcriber: Transcriber = _transcriber(stand)
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
-    assert await transcriber.transcribe(RECORDING, "en-US") == f"en-US {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
+    assert await _write_down(transcriber, "en-US") == f"en-US {GIVEN_BYTES}"
     assert stand.built() == 1
     # The compiler was given the program's own source, copied into the folder it builds in, and a place for the program.
     program: Path = stand.program_built()
@@ -211,14 +235,14 @@ async def test_the_program_is_built_once_and_writes_a_recording_down_each_time(s
     assert [stand.mode(program.parent), stand.mode(program), stand.mode(stand.folder / "voice")] == [0o700] * 3
 
 
-async def test_the_program_is_started_with_a_path_and_a_language_only_and_a_small_environment(
+async def test_the_program_is_started_with_a_language_only_and_a_small_environment(
     stand: Stand, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-not-for-the-program")
     monkeypatch.setenv("DOT_TEST_SECRET", "nor-this")
     stand.says("environment")
-    await _transcriber(stand).transcribe(RECORDING, "tr-TR")
-    assert stand.ran() == ["2 tr-TR"]
+    await _write_down(_transcriber(stand), "tr-TR")
+    assert stand.ran() == ["1 tr-TR"]
     path, home = stand.seen.read_text(encoding="utf-8").splitlines()[0].split(" ")
     assert path == "PATH=/usr/bin:/bin:/usr/sbin:/sbin"
     assert home == f"HOME={os.environ['HOME']}"
@@ -227,45 +251,88 @@ async def test_the_program_is_started_with_a_path_and_a_language_only_and_a_smal
     assert {"PATH", "HOME"} <= names
 
 
-async def test_the_recording_is_a_file_of_mode_0600_in_a_private_folder_and_is_gone_after_the_words(
+async def test_the_program_is_given_every_piece_in_turn_and_the_silence_after_them_and_no_file_holds_the_sound(
     stand: Stand,
 ) -> None:
     transcriber: Transcriber = _transcriber(stand)
-    # The program reads the mode of the file it is given: 600 (`words` answers it, after the size).
-    assert (await transcriber.transcribe(RECORDING, "tr-TR")).endswith(" 600")
-    given: Path = Path(stand.files.read_text(encoding="utf-8").strip())
-    assert given.parent == stand.folder / "voice" / "recordings"
-    assert stand.mode(given.parent) == 0o700
-    assert given.name.startswith("recording-") and given.suffix == ".wav"
-    assert not stand.exists(given)
-    assert stand.recordings() == []
+    name: str = await transcriber.open("tr-TR")
+    for piece in range(3):
+        await transcriber.feed(name, piece, PIECE)
+    assert await transcriber.end(name) == f"tr-TR {3 * len(PIECE) + GIVEN_BYTES - len(PIECE)}"
+    # The voice folder holds the program's build and nothing else: the sound went through a pipe.
+    assert stand.folders() == [stand.program_built().parent.name]
+    # The stream is over: a piece or an end that comes after it is told that it is no longer open.
+    with pytest.raises(NotFoundError, match="no longer open"):
+        await transcriber.feed(name, 3, PIECE)
+    with pytest.raises(NotFoundError):
+        await transcriber.end(name)
 
 
-@pytest.mark.parametrize("mode", ["language", "audio", "failed", "crash", "garbage", "slow"])
-async def test_no_recording_is_left_after_a_program_that_failed(
-    stand: Stand, monkeypatch: pytest.MonkeyPatch, mode: str
+async def test_a_piece_out_of_turn_or_past_five_minutes_drops_the_stream_and_its_program(
+    stand: Stand, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(helper, "FIRST_RUN_TIMEOUT_S", 1.5 if mode == "slow" else 300.0)
-    stand.says(mode)
-    with pytest.raises(VoiceError):
-        await _transcriber(stand).transcribe(RECORDING, "tr-TR")
-    assert stand.recordings() == []
-    assert len(stand.files.read_text(encoding="utf-8").splitlines()) == 1
+    transcriber: Transcriber = _transcriber(stand)
+    stand.says("late")
+    name: str = await transcriber.open("tr-TR")
+    await _started(stand, 1)
+    await transcriber.feed(name, 0, PIECE)
+    with pytest.raises(InvalidValueError, match="lost on the way") as lost:
+        await transcriber.feed(name, 2, PIECE)
+    assert lost.value.context == {"piece": 2, "expected": 1}
+    with pytest.raises(NotFoundError):
+        await transcriber.end(name)
+    monkeypatch.setattr(helper, "_MOST_STREAM_BYTES", 2 * len(PIECE))
+    longer: str = await transcriber.open("tr-TR")
+    await _started(stand, 2)
+    await transcriber.feed(longer, 0, PIECE)
+    await transcriber.feed(longer, 1, PIECE)
+    with pytest.raises(VoiceError, match="5 minutes long at the most") as long:
+        await transcriber.feed(longer, 2, PIECE)
+    assert long.value.context["code"] == "too-long"
+    # Neither program is left running.
+    assert all(_gone(pid) for pid in await _started(stand, 2))
+
+
+async def test_two_streams_at_once_are_the_most_and_the_cross_frees_one(stand: Stand) -> None:
+    transcriber: Transcriber = _transcriber(stand)
+    stand.says("late")
+    first: str = await transcriber.open("tr-TR")
+    await transcriber.open("en-US")
+    await _started(stand, 2)
+    with pytest.raises(VoiceError, match="two other recordings") as busy:
+        await transcriber.open("tr-TR")
+    assert busy.value.context == {"code": "busy", "open": 2}
+    await transcriber.drop(first)
+    # One dropped, or no longer open, is let be.
+    await transcriber.drop(first)
+    await transcriber.open("tr-TR")
+    # The dropped program is gone and the other runs on (which started first is the system's to say).
+    assert sorted(_gone(pid) for pid in await _started(stand, 2)) == [False, True]
+
+
+async def test_a_stream_no_piece_comes_to_is_dropped_by_itself(stand: Stand, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(helper, "STREAM_IDLE_S", 0.3)
+    monkeypatch.setattr(helper, "_STREAM_WATCH_S", 0.1)
+    transcriber: Transcriber = _transcriber(stand)
+    stand.says("late")
+    with capture_logs() as logs:
+        name: str = await transcriber.open("tr-TR")
+        await transcriber.feed(name, 0, PIECE)
+        await asyncio.sleep(1.0)
+    with pytest.raises(NotFoundError):
+        await transcriber.feed(name, 1, PIECE)
+    assert [entry["reason"] for entry in logs if entry["event"] == "voice_stream_dropped"] == ["idle"]
 
 
 async def test_a_program_that_reports_an_error_says_what_to_do_in_plain_words(stand: Stand) -> None:
     transcriber: Transcriber = _transcriber(stand)
     stand.says("language")
     with pytest.raises(VoiceError, match="This Mac cannot write down xx-YY: choose another language") as language:
-        await transcriber.transcribe(RECORDING, "xx-YY")
+        await _write_down(transcriber, "xx-YY")
     assert language.value.context == {"code": "unsupported-language", "language": "xx-YY"}
-    stand.says("audio")
-    with pytest.raises(VoiceError, match="could not read the recording as sound") as audio:
-        await transcriber.transcribe(RECORDING, "tr-TR")
-    assert audio.value.context["code"] == "no-audio"
     stand.says("failed")
-    with pytest.raises(VoiceError, match="The Mac could not write the recording down") as failed:
-        await transcriber.transcribe(RECORDING, "tr-TR")
+    with pytest.raises(VoiceError, match="The Mac could not write down what you said") as failed:
+        await _write_down(transcriber, "tr-TR")
     assert failed.value.context == {"code": "failed", "detail": "the model broke", "returncode": 1}
 
 
@@ -277,9 +344,9 @@ async def test_a_crash_or_an_answer_that_is_no_json_says_it_failed_and_keeps_the
         stand.says(mode)
         with (
             capture_logs() as logs,
-            pytest.raises(VoiceError, match="The Mac could not write the recording down") as failed,
+            pytest.raises(VoiceError, match="The Mac could not write down what you said") as failed,
         ):
-            await transcriber.transcribe(RECORDING, "tr-TR")
+            await _write_down(transcriber, "tr-TR")
         assert failed.value.context == {"code": "failed", "returncode": returncode}
         assert SECRET_WORD not in repr(failed.value) and SECRET_WORD not in repr(logs)
         # Not chained to pydantic's error, which quotes the answer: a traceback in a log would carry the words.
@@ -289,7 +356,7 @@ async def test_a_crash_or_an_answer_that_is_no_json_says_it_failed_and_keeps_the
 
 async def test_silence_is_no_error_the_words_are_none(stand: Stand) -> None:
     stand.says("silence")
-    assert await _transcriber(stand).transcribe(RECORDING, "tr-TR") == ""
+    assert await _write_down(_transcriber(stand), "tr-TR") == ""
 
 
 async def test_a_program_that_takes_too_long_is_killed_and_the_longer_wait_is_for_a_languages_first_use(
@@ -299,36 +366,33 @@ async def test_a_program_that_takes_too_long_is_killed_and_the_longer_wait_is_fo
     monkeypatch.setattr(helper, "FIRST_RUN_TIMEOUT_S", 1.2)
     monkeypatch.setattr(helper, "RUN_TIMEOUT_S", 0.8)
     transcriber: Transcriber = _transcriber(stand)
-    stand.says("slow")
+    stand.says("late")
     with pytest.raises(VoiceError, match=r"took longer than 1\.2 seconds") as first:
-        await transcriber.transcribe(RECORDING, "tr-TR")
+        await _write_down(transcriber, "tr-TR")
     assert first.value.context == {"code": "timeout", "seconds": 1.2}
     # The program that was started is gone, not left running.
-    pid: int = int(stand.pids.read_text(encoding="utf-8").split()[0])
-    with pytest.raises(ProcessLookupError):
-        os.kill(pid, 0)
-    assert stand.recordings() == []
+    assert _gone((await _started(stand, 1))[0])
     # A language that was written down once in this daemon's life has the shorter wait.
     stand.says("words")
     monkeypatch.setattr(helper, "RUN_TIMEOUT_S", 60.0)
-    await transcriber.transcribe(RECORDING, "tr-TR")
-    stand.says("slow")
+    await _write_down(transcriber, "tr-TR")
+    stand.says("late")
     monkeypatch.setattr(helper, "RUN_TIMEOUT_S", 0.8)
     with pytest.raises(VoiceError) as again:
-        await transcriber.transcribe(RECORDING, "tr-TR")
+        await _write_down(transcriber, "tr-TR")
     assert again.value.context == {"code": "timeout", "seconds": 0.8}
     with pytest.raises(VoiceError) as other:
-        await transcriber.transcribe(RECORDING, "en-US")
+        await _write_down(transcriber, "en-US")
     assert other.value.context == {"code": "timeout", "seconds": 1.2}
 
 
 async def test_a_program_changed_under_the_daemon_is_never_run_and_is_built_again(stand: Stand) -> None:
     transcriber: Transcriber = _transcriber(stand)
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
     first: Path = stand.program_built()
     hacked: Path = stand.folder / "hacked.log"
     stand.write(first, f'#!/bin/sh\necho ran >> "{hacked}"\necho \'{{"text":"hacked"}}\'\n')
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
     assert not stand.exists(hacked), "the program that was changed was run"
     assert stand.built() == 2
     # The folder of the changed program went with it; the program built again is in a folder of its own.
@@ -336,18 +400,18 @@ async def test_a_program_changed_under_the_daemon_is_never_run_and_is_built_agai
     assert second != first and not stand.exists(first.parent)
     # A program that is gone is built again too, and one that is unchanged is not.
     stand.remove(second)
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
     assert stand.built() == 3
 
 
 async def test_callers_at_the_same_moment_wait_for_one_build(stand: Stand) -> None:
     (stand.folder / "delay").write_text("0.4", encoding="utf-8")
     transcriber: Transcriber = _transcriber(stand)
-    answers: list[str] = await asyncio.gather(*(transcriber.transcribe(RECORDING, "tr-TR") for _ in range(5)))
-    assert answers == [f"tr-TR {GIVEN_BYTES} 600"] * 5
+    answers: list[str] = await asyncio.gather(*(_write_down(transcriber, "tr-TR") for _ in range(2)))
+    assert answers == [f"tr-TR {GIVEN_BYTES}"] * 2
     assert stand.built() == 1
-    assert len(stand.ran()) == 5
+    assert len(stand.ran()) == 2
 
 
 async def test_asking_whether_this_mac_can_builds_the_program_in_the_background(stand: Stand) -> None:
@@ -362,7 +426,7 @@ async def test_asking_whether_this_mac_can_builds_the_program_in_the_background(
         await asyncio.sleep(0.05)
     assert stand.built() == 1
     await asyncio.sleep(0.1)
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
     assert stand.built() == 1
     # Built already: nothing more to start.
     transcriber.warm()
@@ -379,7 +443,7 @@ async def test_a_build_that_fails_is_told_and_not_tried_again_for_a_while(
         capture_logs() as logs,
         pytest.raises(VoiceError, match="could not build the program that writes recordings down") as refused,
     ):
-        await transcriber.transcribe(RECORDING, "tr-TR")
+        await _write_down(transcriber, "tr-TR")
     assert refused.value.context["code"] == "failed"
     assert refused.value.context["returncode"] == 1
     assert refused.value.context["stderr"] == "error: the stand-in compiler refuses"
@@ -393,14 +457,14 @@ async def test_a_build_that_fails_is_told_and_not_tried_again_for_a_while(
     said: Ability = await transcriber.ability()
     assert said.transcribe is False and said.why == refused.value.message
     with capture_logs() as again, pytest.raises(VoiceError, match="could not build the program"):
-        await transcriber.transcribe(RECORDING, "tr-TR")
+        await _write_down(transcriber, "tr-TR")
     assert stand.built() == 1
     assert [entry for entry in again if entry["event"] == "voice_program_not_built"] == []
     # Once the wait is over the next recording builds again, and now it works.
     stand.refuse.unlink()
     monkeypatch.setattr(helper, "RETRY_BUILD_AFTER_S", 0.0)
     assert await transcriber.ability() == Ability(transcribe=True, why=None)
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
     assert stand.built() == 2
 
 
@@ -411,7 +475,7 @@ async def test_a_mac_without_a_compiler_cannot_and_says_so_without_building(
     transcriber: Transcriber = _transcriber(stand)
     assert await transcriber.ability() == Ability(transcribe=False, why=NO_COMPILER)
     with pytest.raises(VoiceError, match="This Mac cannot write recordings down") as unavailable:
-        await transcriber.transcribe(RECORDING, "tr-TR")
+        await _write_down(transcriber, "tr-TR")
     assert unavailable.value.context == {"code": "unavailable", "why": NO_COMPILER}
     transcriber.warm()
     await asyncio.sleep(0.1)
@@ -427,13 +491,13 @@ async def test_the_mac_is_asked_what_it_has_to_build_with_once_for_the_daemons_l
     for _ in range(5):
         assert await transcriber.ability() == Ability(transcribe=True, why=None)
     assert asks.count == 1
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
     assert asks.count == 1 and stand.built() == 1
     # Built, the program is there: the Mac is not asked at all, whatever becomes of the tools.
     monkeypatch.setenv("DOT_SWIFTC", str(stand.folder / "gone"))
     for _ in range(3):
         assert await transcriber.ability() == Ability(transcribe=True, why=None)
-    assert await transcriber.transcribe(RECORDING, "en-US") == f"en-US {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "en-US") == f"en-US {GIVEN_BYTES}"
     assert asks.count == 1 and stand.built() == 1
 
 
@@ -444,7 +508,7 @@ async def test_callers_at_the_same_moment_share_one_question_to_a_slow_mac(stand
     assert answers == [Ability(transcribe=True, why=None)] * 6
     assert asks.count == 1
     # A build that begins meanwhile waits for the same answer, and asks nothing more.
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
     assert asks.count == 1
 
 
@@ -456,7 +520,7 @@ async def test_a_mac_without_the_tools_is_remembered_for_a_short_while_and_then_
     for _ in range(4):
         assert await transcriber.ability() == Ability(transcribe=False, why=NO_COMPILER)
     with pytest.raises(VoiceError, match="This Mac cannot write recordings down"):
-        await transcriber.transcribe(RECORDING, "tr-TR")
+        await _write_down(transcriber, "tr-TR")
     assert asks.count == 1
     # The owner installs the tools and reloads the page: for a short while the Mac is remembered as it was...
     monkeypatch.setenv("DOT_SWIFTC", str(stand.folder / "swiftc"))
@@ -467,7 +531,7 @@ async def test_a_mac_without_the_tools_is_remembered_for_a_short_while_and_then_
     clock.now += 1
     assert await transcriber.ability() == Ability(transcribe=True, why=None)
     assert asks.count == 2
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
     assert asks.count == 2 and stand.built() == 1
 
 
@@ -479,7 +543,7 @@ async def test_a_build_that_fails_makes_the_daemon_ask_the_mac_again_what_it_has
     stand.refuse.write_text("yes", encoding="utf-8")
     transcriber: Transcriber = _transcriber(stand)
     with pytest.raises(VoiceError, match="could not build the program"):
-        await transcriber.transcribe(RECORDING, "tr-TR")
+        await _write_down(transcriber, "tr-TR")
     assert asks.count == 1
     # The next ask of a page finds the Mac as it is now, and says the build failed.
     assert (await transcriber.ability()).transcribe is False
@@ -488,7 +552,7 @@ async def test_a_build_that_fails_makes_the_daemon_ask_the_mac_again_what_it_has
     stand.refuse.unlink()
     clock.now += helper.RETRY_BUILD_AFTER_S
     assert await transcriber.ability() == Ability(transcribe=True, why=None)
-    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert await _write_down(transcriber, "tr-TR") == f"tr-TR {GIVEN_BYTES}"
     assert asks.count == 2
 
 
@@ -499,7 +563,7 @@ async def test_a_build_that_fails_makes_the_daemon_ask_the_mac_again_what_it_has
 )  # fmt: skip
 async def test_a_language_that_is_not_a_tag_starts_no_program(stand: Stand, language: str) -> None:
     with pytest.raises(InvalidValueError, match="not a language"):
-        await _transcriber(stand).transcribe(RECORDING, language)
+        await _write_down(_transcriber(stand), language)
     assert stand.built() == 0 and stand.ran() == []
     assert not (stand.folder / "voice").exists()
 
@@ -512,7 +576,7 @@ def test_a_language_is_a_tag_of_two_or_three_letters_and_a_region(language: str)
 async def test_the_log_has_how_long_it_was_and_how_long_it_took_never_the_words(stand: Stand) -> None:
     stand.says("secret")
     with capture_logs() as logs:
-        words: str = await _transcriber(stand).transcribe(RECORDING, "tr-TR")
+        words: str = await _write_down(_transcriber(stand), "tr-TR")
     assert SECRET_WORD in words
     assert SECRET_WORD not in repr(logs)
     written: list[dict[str, object]] = [entry for entry in logs if entry["event"] == "voice_written_down"]
@@ -521,23 +585,13 @@ async def test_the_log_has_how_long_it_was_and_how_long_it_took_never_the_words(
     assert written[0]["language"] == "tr-TR" and written[0]["seconds"] == 0.1
 
 
-def test_recordings_an_earlier_daemon_left_are_removed_when_the_daemon_starts(tmp_path: Path) -> None:
-    kept: Path = tmp_path / "voice" / "recordings"
-    kept.mkdir(parents=True)
-    (kept / "recording-abc123.wav").write_bytes(b"RIFF")
-    (kept / "recording-def456.wav").write_bytes(b"RIFF")
-    (kept / "notes.txt").write_text("not a recording", encoding="utf-8")
-    Transcriber(tmp_path / "voice")
-    assert [path.name for path in kept.iterdir()] == ["notes.txt"]
-
-
 async def test_the_folders_of_earlier_builds_go_with_the_next_build_and_nothing_else_does(stand: Stand) -> None:
     voice: Path = stand.folder / "voice"
     (voice / "build-abcd1234").mkdir(parents=True)
     (voice / "build-abcd1234" / "transcribe").write_text("old", encoding="utf-8")
     (voice / "other-folder").mkdir()
     (voice / "build-notours").mkdir()
-    await _transcriber(stand).transcribe(RECORDING, "tr-TR")
+    await _write_down(_transcriber(stand), "tr-TR")
     assert sorted(name for name in stand.folders() if name.startswith("build-")) == sorted(
         [stand.program_built().parent.name, "build-notours"]
     )

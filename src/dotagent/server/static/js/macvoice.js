@@ -5,12 +5,11 @@
 // its microphone listens (voice.js `listeningWay`) from the answer once it is in: a composer made before it listens the
 // browser's way, and one that is not listening takes the way the answer gives at its next press (microphone.js). The
 // daemon builds the program that writes down in the background meanwhile, so that the first recording does not wait for
-// it. And the calls that have the Mac write a recording down, and show System Settings where Dot.app is allowed the
-// microphone (item 636).
+// it. And the calls of a stream that has the Mac write down what is said as it is said (item 969), and the one that shows
+// System Settings where Dot.app is allowed the microphone (item 636).
 
 import { api } from "./api.js";
 import { macLanguage } from "./recording.js";
-import { base64Of } from "./wav.js";
 
 // What the page believes until the Mac has answered: that it cannot. `known` says whether the answer is in, and `failed`,
 // when the Mac could not be asked at all, why.
@@ -69,17 +68,22 @@ export const onMacVoice = shared.onMacVoice;
 export const loadMacVoice = shared.loadMacVoice;
 
 /**
- * The words of `wav`, a recording, written down by the Mac in the language `tag` (the page's voice, as the Mac takes it).
- * Rejects with the daemon's error, which is words for the owner (`context.code` tells what kind), or with the one of a Mac
- * that could not be reached (`status` 0).
- * @param {string} tag
- * @param {Uint8Array} wav
- * @returns {Promise<string>}
+ * The daemon's calls of a stream of what the owner says (item 969, voicestream.js): `open(tag)` in the language `tag` (the
+ * page's voice, as the Mac takes it) resolves to the stream's name, `feed(name, piece, data)` sends a piece of base64
+ * samples, `end(name)` resolves to the words and `drop(name)` lets it go. Each rejects with the daemon's error, which is
+ * words for the owner (`context.code` tells what kind), or with the one of a Mac that could not be reached (`status` 0).
+ * @type {import("./voicestream.js").MacStream}
  */
-export async function writeDown(tag, wav) {
-  const answer = await api.post("/voice/transcribe", { language: macLanguage(tag), data_b64: base64Of(wav) });
-  return answer.text;
-}
+export const macStream = {
+  open: async (tag) => (await api.post("/voice/streams", { language: macLanguage(tag) })).id,
+  feed: async (name, piece, data) => {
+    await api.post(`/voice/streams/${encodeURIComponent(name)}/audio`, { piece, data_b64: data });
+  },
+  end: async (name) => (await api.post(`/voice/streams/${encodeURIComponent(name)}/end`, {})).text,
+  drop: async (name) => {
+    await api.del(`/voice/streams/${encodeURIComponent(name)}`);
+  },
+};
 
 /**
  * Have the Mac show System Settings at the pane where Dot.app is allowed the microphone (`"microphone"`) or its speech

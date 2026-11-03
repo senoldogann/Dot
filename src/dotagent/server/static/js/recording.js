@@ -1,12 +1,13 @@
-// The composer's microphone when the page records the voice itself (item 626), beside the dictation of voice.js and with
-// the same interface, so that microphone.js takes either. It is for an iPhone or an iPad, where Safari's own speech
-// recognition goes deaf after the first dictation of a page, and for a browser that has none (Firefox): the page opens the
-// microphone (capture.js), keeps what it hears as 16 kHz mono 16-bit samples, and, when the owner ends the recording,
-// sends it to the Mac (POST /api/voice/transcribe), which writes it down with macOS's own dictation, on the device. The
-// words go into the box then, after what it held, as a dictation's do (voice.js `dictated`).
+// The composer's microphone when the page records the voice itself (items 626, 969), beside the dictation of voice.js and
+// with the same interface, so that microphone.js takes either. It is the way of every device whose Mac can write down
+// (voice.js `listeningWay`): the page opens the microphone (capture.js) and, at the same press, a stream to the Mac
+// (voicestream.js), which starts the program that writes down; what the microphone hears goes to the Mac as 16 kHz mono
+// 16-bit samples while the owner speaks, and the Mac writes it down meanwhile with macOS's own dictation, on the device.
+// The owner's tick ends the stream, and the words go into the box a moment after, after what it held, as a dictation's do
+// (voice.js `dictated`). Nothing of the voice goes to Apple's or Google's servers, as a browser's own recognition may.
 //
-// Nothing here knows the browser: the microphone (`capture`) and the call to the Mac (`send`) are given, so that the
-// timing of a recording, what it keeps and where it lets go are the same under a test as in a page.
+// Nothing here knows the browser: the microphone (`capture`) and the Mac's calls (`mac`) are given, so that the timing
+// of a recording, what it sends and where it lets go are the same under a test as in a page.
 
 import {
   PAUSE_MS,
@@ -19,7 +20,8 @@ import {
   stopReading,
   voicePlace,
 } from "./voice.js";
-import { MAX_RECORDING_S, MAX_SAMPLES, createResampler, joinedSamples, loudness, wavOf } from "./wav.js";
+import { openStream } from "./voicestream.js";
+import { MAX_RECORDING_S, MAX_SAMPLES, createResampler, loudness } from "./wav.js";
 
 // How loud a block of the microphone's sound is to count as a sound, as the root of its mean square from 0 to 1 (wav.js
 // `loudness`). Measured with the speech of `say` through the page's own capture, a Web Audio stream standing in for the
@@ -27,7 +29,7 @@ import { MAX_RECORDING_S, MAX_SAMPLES, createResampler, joinedSamples, loudness,
 // where a word begins or ends between 0.003 and 0.03. 0.01 is above a quiet room's noise through the browser's noise
 // suppression (not measured: that wants a microphone) and under the soft ends of a word, and on the side of hearing a
 // quiet voice: a voice missed throws a dictation away, a noise heard only keeps the pause from ending it so soon. The
-// owner's tick sends the recording whether or not a sound was heard.
+// owner's tick has the Mac write the recording down whether or not a sound was heard.
 export const LOUD_LEVEL = 0.01;
 // How long a sound counts after its last loud block, so that the pause between two words is no silence.
 export const HOLD_MS = 400;
@@ -50,13 +52,14 @@ export function macLanguage(tag) {
  * microphone is on, and `problem(words, offer)` why it could not be, with, in Dot.app, the `{ allow: pane }` of a refused
  * microphone (item 636, voice.js `captureOffer`). `began()` says the microphone is open, for the recorder's clock,
  * `sound(loud)` whether it hears a sound now, for its wave, and `writing(on)` that the recording is with the Mac, which
- * writes it down. `capture(onBlock, onEnded)` opens the microphone (capture.js `openCapture`) and `send(language, wav)`
- * sends a recording and gives the words (a promise); both are given.
+ * writes it down. `capture(onBlock, onEnded)` opens the microphone (capture.js `openCapture`) and `mac` is the daemon's
+ * calls of a stream (voicestream.js `MacStream`); both are given.
  *
- * `start()` opens the microphone. `stop()` is the owner's tick (the same when a pause ends it): it lets the microphone go
- * and sends what was recorded, a voice too quiet to count as a sound included (the Mac says when it heard nothing), and
- * the words go into the box when the Mac answers, which `state(false)` then says. Only a tick before the first block of
- * the microphone's sound came in has nothing to send, and is dropped. `abort()` drops everything and sends nothing. One
+ * `start()` opens the microphone and the stream. `stop()` is the owner's tick (the same when a pause ends it): it lets the
+ * microphone go and ends the stream, a voice too quiet to count as a sound included (the Mac says when it heard nothing),
+ * and the words go into the box when the Mac answers, which `state(false)` then says. Only a tick before the first block
+ * of the microphone's sound came in has nothing to write down, and is dropped. `abort()` drops everything, the stream at
+ * the Mac too. One
  * that is not touched ends by itself: `SILENCE_MS` after the microphone opened with no sound at all it says nothing was
  * heard and sends nothing; `PAUSE_MS` after the last sound once there was one it is the owner's tick; the recording ends
  * at the five minutes the Mac takes, as the tick; and with the page put out of sight while it listens it is dropped (the
@@ -74,7 +77,7 @@ export function createRecording({
   sound = (/** @type {boolean} */ _loud) => {},
   writing = (/** @type {boolean} */ _on) => {},
   capture,
-  send,
+  mac,
 }) {
   // What the recording is doing: not at all, opening the microphone (the browser may be asking the owner), listening, or
   // with the Mac.
@@ -87,8 +90,9 @@ export function createRecording({
   let microphone = null;
   /** @type {ReturnType<typeof createResampler> | null} */
   let resampler = null;
-  /** @type {Int16Array[]} */
-  let pieces = [];
+  // The stream to the Mac, from the press until its words came or it was dropped.
+  /** @type {ReturnType<typeof openStream> | null} */
+  let stream = null;
   let kept = 0;
   // Whether a sound was heard, how long the recording is in the microphone's own time, until when a sound counts and
   // whether the wave was told there is one now.
@@ -119,7 +123,6 @@ export function createRecording({
     const open = microphone;
     microphone = null;
     resampler = null;
-    pieces = [];
     kept = 0;
     clearTimeout(timer);
     clearTimeout(limit);
@@ -138,6 +141,8 @@ export function createRecording({
     generation += 1;
     phase = "idle";
     release();
+    stream?.cancel();
+    stream = null;
     if (loud) {
       loud = false;
       sound(false);
@@ -170,7 +175,7 @@ export function createRecording({
       sound(loud);
     }
     const samples = resampler.push(block);
-    pieces.push(samples);
+    stream?.push(samples);
     kept += samples.length;
     if (kept >= MAX_SAMPLES) {
       stop();
@@ -201,11 +206,12 @@ export function createRecording({
     heardMs = 0;
     loudUntil = 0;
     loud = false;
-    pieces = [];
     kept = 0;
     // A microphone that hears the reading of an answer would have it written into the box.
     stopReading();
     state(true);
+    // The program that writes down starts now, while the microphone opens: it is ready by the first word.
+    stream = openStream(mac, language());
     let opening;
     try {
       opening = capture(
@@ -238,7 +244,7 @@ export function createRecording({
     );
   }
 
-  /** The owner's tick: the microphone lets go and the recording goes to the Mac. */
+  /** The owner's tick: the microphone lets go and the stream ends; the Mac has written down all but its last moment. */
   function stop() {
     if (phase === "opening") {
       // Before the microphone opened (the browser still asks) there is nothing recorded: it is dropped.
@@ -249,20 +255,14 @@ export function createRecording({
       return;
     }
     const mine = generation;
-    // A tick before the first block of the microphone's sound came in (it opened a moment ago) has no samples to send: it
-    // is dropped, as one before the microphone opened is. One after quiet blocks alone, a voice that never counted as a
-    // sound, is sent as it is: the owner asked for it, and the Mac says whether it heard anything.
-    if (kept === 0) {
+    // A tick before the first block of the microphone's sound came in (it opened a moment ago) has no samples to write
+    // down: it is dropped, as one before the microphone opened is. One after quiet blocks alone, a voice that never
+    // counted as a sound, is written down as it is: the owner asked for it, and the Mac says whether it heard anything.
+    if (kept === 0 || stream === null) {
       abort();
       return;
     }
-    let wav;
-    try {
-      wav = wavOf(joinedSamples(pieces));
-    } catch (error) {
-      finish(`The recording could not be made: ${error.message}`);
-      return;
-    }
+    const ending = stream;
     phase = "writing";
     release();
     if (loud) {
@@ -270,11 +270,13 @@ export function createRecording({
       sound(false);
     }
     writing(true);
-    send(language(), wav).then(
+    ending.finish().then(
       (words) => {
         if (mine !== generation) {
           return;
         }
+        // The stream ended at the Mac: nothing is left there to drop.
+        stream = null;
         const said = String(words ?? "").trim();
         if (said === "") {
           finish(problemWords("no-speech", place()));

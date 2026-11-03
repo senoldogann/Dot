@@ -99,27 +99,22 @@ export function appleTouch(userAgent, touchPoints) {
 }
 
 /**
- * How the composer's microphone listens on this page (item 626): `"recording"`, the page records the voice itself and the
- * Mac writes it down, `"recognition"`, the browser's own speech recognition does (a dictation), or `null`, no microphone.
- * An iPhone or an iPad records when the Mac can write down, since Safari's recognition there hears the first dictation of a
- * page and at times none after it; where the Mac cannot it keeps the recognition, which is better than no microphone. A
- * browser with no speech recognition (Firefox) records when the Mac can write down, and has no microphone when it cannot.
- * Everywhere else, a Mac's Safari or Chrome and Dot.app, the recognition stays: it shows the words as the owner speaks and
- * does not go deaf there.
- * @param {{ recognition: boolean, recording: boolean, mac: boolean, userAgent: string, touchPoints: number }} where
+ * How the composer's microphone listens on this page (items 626, 969): `"recording"`, the page records the voice itself
+ * and streams it to the Mac, which writes it down as it comes, `"recognition"`, the browser's own speech recognition does
+ * (a dictation), or `null`, no microphone. Every page records when the Mac can write down (item 969, the owner's choice):
+ * the microphone hears from the moment it opens, where a browser's recognition lost the first second or two while its
+ * engine started, the words are there a moment after the tick, and the voice stays on the Mac. Where the Mac cannot, the
+ * recognition stays, which is better than no microphone; a browser with none (Firefox) then has no microphone.
+ * @param {{ recognition: boolean, recording: boolean, mac: boolean }} where
  *   `recognition`, the browser has speech recognition; `recording`, it can record the microphone (capture.js `canRecord`);
  *   `mac`, the Mac says it can write down (`GET /api/voice`)
  * @returns {"recording" | "recognition" | null}
  */
-export function listeningWay({ recognition, recording, mac, userAgent, touchPoints }) {
-  const macWrites = mac && recording;
-  if (appleTouch(userAgent, touchPoints) && macWrites) {
+export function listeningWay({ recognition, recording, mac }) {
+  if (mac && recording) {
     return "recording";
   }
-  if (recognition) {
-    return "recognition";
-  }
-  return macWrites ? "recording" : null;
+  return recognition ? "recognition" : null;
 }
 
 // What a dictation that heard nothing says on an iPhone or an iPad when an earlier one of the page began (item 616).
@@ -281,7 +276,7 @@ export function allowToast(answer, pane) {
 }
 
 // The `context.code` of the failures the Mac says itself, with words written for the owner (`VoiceError`).
-const MAC_SAYS = new Set(["unavailable", "unsupported-language", "no-audio", "timeout", "failed"]);
+const MAC_SAYS = new Set(["unavailable", "unsupported-language", "busy", "too-long", "timeout", "failed"]);
 
 /**
  * What to tell the owner of the error a recording met on its way to the Mac and back, in plain words (item 626): a Mac

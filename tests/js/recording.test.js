@@ -1,6 +1,7 @@
-// The recording of a box (item 626), with a microphone and a Mac of the test's own, and its clock: the silence is counted
-// from the moment the microphone opened, never through the question the browser asks, a sound is told by how loud a
-// block is, the tick sends what was heard and no more, and every end lets the microphone and what it held go.
+// The recording of a box (items 626, 969), with a microphone and a Mac of the test's own, and its clock: the silence is
+// counted from the moment the microphone opened, never through the question the browser asks, a sound is told by how loud
+// a block is, the stream to the Mac opens at the press and is given what was heard and no more, the tick ends it, and
+// every end lets the microphone and what it held go, the stream at the Mac too.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -85,7 +86,7 @@ function recordingOf({ held = "", rate = RATE, userAgent = IPHONE } = {}) {
   freshPage(userAgent);
   const seen = { shown: [], states: [], problems: [], offers: [], began: 0, sounds: [], writing: [], settled: 0 };
   const mic = { calls: [], last: () => mic.calls.at(-1) };
-  const mac = { sent: [], answer: () => {}, refuse: () => {} };
+  const mac = macOf();
   const capture = (onBlock, onEnded) => {
     const call = { stopped: 0, block: onBlock, ended: onEnded };
     mic.calls.push(call);
@@ -100,12 +101,6 @@ function recordingOf({ held = "", rate = RATE, userAgent = IPHONE } = {}) {
       call.fail = reject;
     });
   };
-  const send = (language, wav) =>
-    new Promise((resolve, reject) => {
-      mac.sent.push({ language, wav });
-      mac.answer = resolve;
-      mac.refuse = reject;
-    });
   const recording = createRecording({
     language: () => "tr-TR",
     text: () => held,
@@ -124,9 +119,77 @@ function recordingOf({ held = "", rate = RATE, userAgent = IPHONE } = {}) {
     sound: (loud) => seen.sounds.push(loud),
     writing: (on) => seen.writing.push(on),
     capture,
-    send,
+    mac: mac.calls,
   });
   return { recording, seen, mic, mac };
+}
+
+/**
+ * A Mac of the test's own, which keeps what it was given (voicestream.js `MacStream`): `opened`, the languages of the
+ * streams opened; `sent`, the streams the tick ended, each with its language and every sample it was given, one after
+ * another; `dropped`, the streams let go. `answer(words)` and `refuse(error)` answer the stream the tick ended (an answer
+ * given before the tick's call came is kept for it); `failFeed`, when set, is the error of every piece sent.
+ */
+function macOf() {
+  const mac = { opened: [], sent: [], dropped: [], pieces: new Map(), failFeed: null, answer: () => {}, refuse: () => {} };
+  const languages = new Map();
+  /** @type {{ ok: boolean, value: unknown } | null} */
+  let early = null;
+  /** @type {{ resolve: (words: string) => void, reject: (error: unknown) => void } | null} */
+  let waiting = null;
+  mac.answer = (words) => {
+    if (waiting === null) {
+      early = { ok: true, value: words };
+    } else {
+      waiting.resolve(words);
+    }
+  };
+  mac.refuse = (error) => {
+    if (waiting === null) {
+      early = { ok: false, value: error };
+    } else {
+      waiting.reject(error);
+    }
+  };
+  mac.calls = {
+    open: async (language) => {
+      mac.opened.push(language);
+      const name = `stream-${mac.opened.length}`;
+      languages.set(name, language);
+      mac.pieces.set(name, []);
+      return name;
+    },
+    feed: async (name, piece, data) => {
+      if (mac.failFeed !== null) {
+        throw mac.failFeed;
+      }
+      const bytes = Buffer.from(data, "base64");
+      assert.equal(bytes.length % 2, 0, "a piece is 16-bit samples");
+      assert.equal(piece, mac.pieces.get(name).length, "the pieces come in their order");
+      mac.pieces.get(name).push(new Int16Array(bytes.buffer, bytes.byteOffset, bytes.length / 2));
+    },
+    end: (name) =>
+      new Promise((resolve, reject) => {
+        const pieces = mac.pieces.get(name);
+        const samples = new Int16Array(pieces.reduce((sum, piece) => sum + piece.length, 0));
+        let at = 0;
+        for (const piece of pieces) {
+          samples.set(piece, at);
+          at += piece.length;
+        }
+        mac.sent.push({ name, language: languages.get(name), samples });
+        waiting = { resolve, reject };
+        if (early !== null) {
+          const given = early;
+          early = null;
+          (given.ok ? resolve : reject)(given.value);
+        }
+      }),
+    drop: async (name) => {
+      mac.dropped.push(name);
+    },
+  };
+  return mac;
 }
 
 /** A recording that listens: the microphone asked for has opened. */
@@ -138,22 +201,9 @@ async function listening(options) {
   return made;
 }
 
-/** What a WAV file of the page's says of itself: its header, the samples it holds and the loudest. */
-function readWav(wav) {
-  const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
-  const text = (at, length) => String.fromCharCode(...wav.subarray(at, at + length));
-  const samples = (wav.length - 44) / 2;
-  let peak = 0;
-  for (let index = 0; index < samples; index += 1) {
-    peak = Math.max(peak, Math.abs(view.getInt16(44 + index * 2, true)));
-  }
-  return {
-    head: [text(0, 4), text(8, 8), text(36, 4)],
-    format: [view.getUint16(20, true), view.getUint16(22, true), view.getUint32(24, true), view.getUint16(34, true)],
-    declared: view.getUint32(40, true),
-    samples,
-    peak,
-  };
+/** What a stream the tick ended was given: how many samples, and the loudest. */
+function readSent(sent) {
+  return { samples: sent.samples.length, peak: sent.samples.reduce((most, sample) => Math.max(most, Math.abs(sample)), 0) };
 }
 
 test("the microphone is asked for in the press, and nothing is timed while the browser asks", async (t) => {
@@ -210,6 +260,7 @@ test("a sound, then a pause of fifteen seconds, is the owner's tick: the recordi
   t.mock.timers.tick(PAUSE_MS - 1);
   assert.equal(mac.sent.length, 0);
   t.mock.timers.tick(1);
+  await arrive();
   assert.equal(mac.sent.length, 1);
   mac.answer("merhaba dünya");
   await arrive();
@@ -234,18 +285,19 @@ test("the tick sends what was heard, 16 kHz mono 16-bit, in the language asked, 
   assert.deepEqual(seen.writing, [true]);
   assert.equal(recording.listening(), true);
   assert.deepEqual(seen.states, [true]);
+  await arrive();
+  await arrive();
   assert.equal(mac.sent.length, 1);
   assert.equal(mac.sent[0].language, "tr-TR");
-  const wav = readWav(mac.sent[0].wav);
-  assert.deepEqual(wav.head, ["RIFF", "WAVEfmt ", "data"]);
-  assert.deepEqual(wav.format, [1, 1, RECORDING_RATE, 16]);
+  assert.deepEqual(mac.opened, ["tr-TR"]);
+  const wav = readSent(mac.sent[0]);
   // Fifteen blocks of 2048 samples at 48 kHz are 10240 at 16 kHz.
-  assert.equal(wav.samples, 10240);
-  assert.equal(wav.declared, wav.samples * 2);
+  assert.equal(wav.samples, (15 * BLOCK * RECORDING_RATE) / RATE);
   assert.ok(wav.peak > 0.25 * 32767 && wav.peak <= 0.31 * 32767, `peak ${wav.peak}`);
   // A press while the Mac writes does not send it again, nor does the clock of an end the tick has made.
   recording.toggle();
   recording.stop();
+  await arrive();
   assert.equal(mac.sent.length, 1);
   mac.answer("merhaba");
   await arrive();
@@ -291,10 +343,11 @@ test("a tick after quiet blocks only sends what was recorded, and the Mac's word
   // Never as loud as a sound is: the wave stayed flat and the pause timer was never moved.
   assert.deepEqual(seen.sounds, []);
   recording.stop();
+  await arrive();
   assert.equal(mac.sent.length, 1, "the owner's tick sent nothing");
   assert.equal(mic.last().stopped, 1);
   assert.deepEqual(seen.writing, [true]);
-  const wav = readWav(mac.sent[0].wav);
+  const wav = readSent(mac.sent[0]);
   // Ten blocks of 2048 samples at 48 kHz, brought down to 16 kHz.
   assert.equal(wav.samples, Math.floor((10 * 2048) / 3));
   assert.ok(wav.peak > 0 && wav.peak < 0.01 * 32767, `peak ${wav.peak}`);
@@ -461,7 +514,7 @@ test("a microphone that cannot even be asked for, refused in Dot.app, comes with
     capture() {
       throw Object.assign(new Error("denied"), { name: "NotAllowedError" });
     },
-    send: async () => "",
+    mac: macOf().calls,
   });
   recording.start();
   assert.deepEqual(offers, [{ allow: "microphone" }]);
@@ -481,7 +534,7 @@ test("a microphone that cannot even be asked for says why, and the press leaves 
     capture() {
       throw Object.assign(new Error("no audio here"), { name: "NotSupportedError" });
     },
-    send: async () => "",
+    mac: macOf().calls,
   });
   recording.start();
   assert.deepEqual(problems, ["The microphone could not start: no audio here"]);
@@ -582,10 +635,10 @@ test("a recording ends at the five minutes the Mac takes, as the tick, with no m
   for (let index = 0; index < 3; index += 1) {
     mic.last().block(loud);
   }
+  await arrive();
   assert.equal(mac.sent.length, 1);
-  const wav = readWav(mac.sent[0].wav);
+  const wav = readSent(mac.sent[0]);
   assert.equal(wav.samples, MAX_SAMPLES);
-  assert.equal(wav.declared, MAX_SAMPLES * 2);
   assert.equal(mic.last().stopped, 1);
   assert.deepEqual(seen.writing, [true]);
   mac.answer("done");
@@ -605,6 +658,7 @@ test("the clock ends a recording at five minutes too, when the microphone gives 
   assert.equal(mac.sent.length, 0);
   mic.last().block(block());
   t.mock.timers.tick(1);
+  await arrive();
   assert.equal(mac.sent.length, 1);
 });
 
@@ -613,6 +667,7 @@ test("a microphone the browser takes away is written down if it was heard, and s
   const heard = await listening();
   heard.mic.last().block(block());
   heard.mic.last().ended();
+  await arrive();
   assert.equal(heard.mac.sent.length, 1);
   assert.deepEqual(heard.seen.problems, []);
   const silent = await listening();
@@ -631,6 +686,7 @@ test("end() waits for the Mac as long as it takes, and a press while it writes s
   t.mock.timers.tick(PAUSE_MS * 20);
   assert.equal(recording.listening(), true);
   assert.deepEqual(seen.problems, []);
+  await arrive();
   assert.equal(mac.sent.length, 1);
   mac.answer("at last");
   await arrive();

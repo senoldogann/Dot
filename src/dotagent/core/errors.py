@@ -327,9 +327,10 @@ class ChannelError(DotError):
 
 
 class VoiceError(DotError):
-    """This Mac could not write a recording down (item 626). The message is for the owner, in plain words, and says what
-    to do; ``context["code"]`` is what a page tells it by: ``unavailable`` (this Mac cannot write recordings down),
-    ``unsupported-language``, ``no-audio``, ``timeout`` or ``failed``."""
+    """This Mac could not write down what the owner said (items 626, 969). The message is for the owner, in plain words,
+    and says what to do; ``context["code"]`` is what a page tells it by: ``unavailable`` (this Mac cannot write down),
+    ``unsupported-language``, ``busy`` (two other recordings are being written down), ``too-long``, ``timeout`` or
+    ``failed``."""
 
 
 class RepairError(DotError):

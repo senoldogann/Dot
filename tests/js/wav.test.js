@@ -1,6 +1,6 @@
-// What a recording of the composer's microphone is made of (item 626), read by capture.js and recording.js: how loud a
-// block of the microphone's sound is, how the blocks are brought down to 16 kHz mono 16-bit, and the WAV file the Mac is
-// sent. Pure functions, so they run under Node without a page.
+// What a recording of the composer's microphone is made of (items 626, 969), read by capture.js, recording.js and
+// voicestream.js: how loud a block of the microphone's sound is, how the blocks are brought down to 16 kHz mono 16-bit,
+// and the bytes the Mac is streamed. Pure functions, so they run under Node without a page.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -13,7 +13,7 @@ import {
   createResampler,
   joinedSamples,
   loudness,
-  wavOf,
+  pcmOf,
 } from "../../src/dotagent/server/static/js/wav.js";
 
 /** `count` samples of a sine wave of `frequency` hertz at `rate`, `amplitude` from 0 to 1. */
@@ -39,29 +39,10 @@ test("how loud a block is: nothing for a silence, the wave's height over the roo
   assert.ok(Math.abs(loudness(sine(440, 48000, 48000, 0.02)) - 0.02 / Math.SQRT2) < 0.0005);
 });
 
-test("the WAV file has the standard 44-byte header of 16 kHz mono 16-bit sound, and the samples after it, little-endian", () => {
+test("the bytes the Mac is streamed are the samples alone, 16-bit little-endian, with no header", () => {
   const samples = Int16Array.from([0, 1, -1, 32767, -32768, 258]);
-  const bytes = wavOf(samples);
-  const view = new DataView(bytes.buffer);
-  const text = (at, length) => String.fromCharCode(...bytes.subarray(at, at + length));
-  assert.equal(bytes.length, 44 + samples.length * 2);
-  assert.equal(text(0, 4), "RIFF");
-  assert.equal(view.getUint32(4, true), bytes.length - 8);
-  assert.equal(text(8, 8), "WAVEfmt ");
-  assert.deepEqual(
-    [16, 20, 22, 24, 28, 32, 34].map((at) => (at === 16 || at === 24 || at === 28 ? view.getUint32(at, true) : view.getUint16(at, true))),
-    [16, 1, 1, RECORDING_RATE, RECORDING_RATE * 2, 2, 16],
-  );
-  assert.equal(text(36, 4), "data");
-  assert.equal(view.getUint32(40, true), samples.length * 2);
-  assert.deepEqual([...bytes.subarray(44)], [0, 0, 1, 0, 255, 255, 255, 127, 0, 128, 2, 1]);
-  assert.deepEqual(
-    Array.from({ length: samples.length }, (_, index) => view.getInt16(44 + index * 2, true)),
-    [...samples],
-  );
-  // A header for another rate says it, and a recording of nothing is the header alone.
-  assert.equal(new DataView(wavOf(samples, 8000).buffer).getUint32(24, true), 8000);
-  assert.equal(wavOf(new Int16Array(0)).length, 44);
+  assert.deepEqual([...pcmOf(samples)], [0, 0, 1, 0, 255, 255, 255, 127, 0, 128, 2, 1]);
+  assert.equal(pcmOf(new Int16Array(0)).length, 0);
 });
 
 test("a constant sound stays as loud, a sample in three or in 2.75 is the mean of what falls in its stretch", () => {

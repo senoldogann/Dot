@@ -1,8 +1,9 @@
-// The microphone as the page records it itself (item 626), for where the browser's speech recognition cannot be trusted:
-// Safari on an iPhone hears the first dictation of a page and at times none after it (WebKit bugs 317741 and 321436),
-// while `getUserMedia` and Web Audio work every time. The samples come to the page as blocks from an audio worklet
-// (voicecapture.js, which the page's CSP allows as a script of its own origin); recording.js keeps them, wav.js makes the
-// file the Mac is sent.
+// The microphone as the page records it itself (items 626, 969), wherever the Mac can write down: it hears from the
+// moment it opens, where a browser's speech recognition lost the first second or two while its engine started, and every
+// time, where Safari's on an iPhone hears the first dictation of a page and at times none after it (WebKit bugs 317741
+// and 321436). The samples come to the page as blocks from an audio worklet (voicecapture.js, which the page's CSP allows
+// as a script of its own origin); recording.js brings them down to what the Mac takes and streams them to it
+// (voicestream.js).
 
 // The worklet, beside this file.
 const WORKLET = new URL("./voicecapture.js", import.meta.url).href;

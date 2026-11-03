@@ -1,11 +1,12 @@
-"""Writing recordings down on this Mac with a program the daemon builds (item 626).
+"""Writing down what the owner says on this Mac with a program the daemon builds (items 626, 969).
 
-The program is ``transcribe.swift``: macOS 26's own dictation model, on the device, behind a command line (``<program>
-<WAV file> <language>`` prints one line of JSON). The daemon builds it with the Swift compiler of Apple's developer
-tools (:mod:`dotagent.voice.toolchain`), once in its life, the first time it is needed or a page asks whether this Mac
-can write down (:meth:`Transcriber.warm`), in a folder of mode 0700 under Dot's home that a run's commands may not
-change (``runtime._dot_paths``). It keeps the SHA-256 of what it built in memory and hashes the file again before each
-run: a file that is not the one built is never run, and the program is built anew.
+The program is ``transcribe.swift``: macOS 26's own dictation model, on the device, behind a command line
+(``<program> <language>`` reads 16 kHz mono 16-bit samples on its standard input, writes them down as they come, and
+prints one line of JSON when that input ends). The daemon builds it with the Swift compiler of Apple's developer tools
+(:mod:`dotagent.voice.toolchain`), once in its life, the first time it is needed or a page asks whether this Mac can
+write down (:meth:`Transcriber.warm`), in a folder of mode 0700 under Dot's home that a run's commands may not change
+(``runtime._dot_paths``). It keeps the SHA-256 of what it built in memory and hashes the file again before each run: a
+file that is not the one built is never run, and the program is built anew.
 
 Whether this Mac can write down needs up to three programs of the Mac's (``xcode-select -p`` and two of ``xcrun``, ten
 seconds each at the most), and a page asks at each load. So the daemon asks the Mac once and remembers: a compiler that
@@ -13,16 +14,22 @@ was found for the daemon's life, what was missing for ``MISSING_KEPT_S`` seconds
 without a restart. A build that fails forgets it, since an Xcode that moved leaves a path that is out of date, and once
 the program is built the Mac is not asked at all. One question at a time: the others wait for its answer.
 
-A recording is written to a file of mode 0600 in a private folder, for as long as the program takes to read it, and the
-file is removed whether it worked or not. The recording and the words are never logged and never kept; the log has how
-long the recording was and how long it took to write it down. The program is started with an argument list (never a
-shell), a path and a language tag that is checked first, a small environment and a time limit.
+A page writes down by a stream (item 969): it opens one as the owner presses the microphone (:meth:`Transcriber.open`),
+which starts the program, hands it the sound in pieces as it records (:meth:`Transcriber.feed`), each piece numbered so
+that none is lost or taken twice, and ends it with the owner's tick (:meth:`Transcriber.end`), which gives the program
+``TAIL_SECONDS`` of silence, ends its input and returns the words a moment later; the cross drops it
+(:meth:`Transcriber.drop`). A stream no piece came to for ``STREAM_IDLE_S`` seconds (a page that went away) or that
+outlived the longest recording is dropped by itself, and no more than ``_AT_ONCE`` are open. The sound is never written
+to a file. The words are never logged and never kept; the log has how long the recording was and how long the answer
+took after the tick. The program is started with an argument list (never a shell), a language tag that is checked
+first, a small environment and a time limit.
 """
 
 import asyncio
 import hashlib
 import os
 import re
+import secrets
 import shutil
 import tempfile
 import time
@@ -31,12 +38,12 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from dotagent.core.errors import InvalidValueError, VoiceError
+from dotagent.core.errors import InvalidValueError, NotFoundError, VoiceError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
 from dotagent.voice.toolchain import Toolchain, find_compiler, small_environment
-from dotagent.voice.wav import Recording, canonical_wav
+from dotagent.voice.wav import MAX_RECORDING_SECONDS, RECORDING_RATE, TAIL_SECONDS
 
 log = get_logger(__name__)
 
@@ -45,23 +52,30 @@ _PROGRAM: str = "transcribe"
 _BUILD_PREFIX: str = "build-"
 # The name ``tempfile.mkdtemp`` gives a folder: its prefix and eight characters of its own alphabet.
 _BUILD_FOLDER: re.Pattern[str] = re.compile(rf"{_BUILD_PREFIX}[0-9a-z_]{{8}}")
-_RECORDINGS: str = "recordings"
-_RECORDING_PREFIX: str = "recording-"
-_RECORDING_SUFFIX: str = ".wav"
 _PRIVATE_FOLDER: int = 0o700
 _PRIVATE_PROGRAM: int = 0o700
 # Building with a cold cache of the compiler's modules takes a minute; a warm one, seven seconds.
 BUILD_TIMEOUT_S: float = 180.0
-# Writing a recording down takes about a second; the first of a language in a daemon's life may download its model.
+# How long the program may take to answer after the tick: a moment, as it wrote down while the owner spoke; the first
+# stream of a language in a daemon's life may download its model.
 RUN_TIMEOUT_S: float = 60.0
 FIRST_RUN_TIMEOUT_S: float = 300.0
+# A stream no piece came to for this long is dropped: the page that opened it went away. A page sends a piece about
+# every quarter of a second while it records.
+STREAM_IDLE_S: float = 20.0
+# The most a stream may live, past the longest recording: what is left open longer is dropped.
+STREAM_LIFE_S: float = MAX_RECORDING_SECONDS + 60.0
+_STREAM_WATCH_S: float = 2.0
+_MOST_STREAM_BYTES: int = MAX_RECORDING_SECONDS * RECORDING_RATE * 2
+_TAIL: bytes = bytes(round(TAIL_SECONDS * RECORDING_RATE) * 2)
+_STREAM_ID_BYTES: int = 16
 # A build that failed is not tried again for this long: the page asks at each load, and the compiler is not quick.
 RETRY_BUILD_AFTER_S: float = 600.0
 # A Mac that lacks what it needs to build with (macOS 26, Apple's developer tools, a compiler and an SDK in them) is not
 # asked again for this long: long enough that the page loads of a Mac without them ask nothing, short enough that the
 # owner who installs the tools and reloads the page is not made to restart the daemon.
 MISSING_KEPT_S: float = 30.0
-# Recordings written down at one time; the others wait, as the model is large.
+# Streams open at one time, as the model is large: one more is refused until one ends.
 _AT_ONCE: int = 2
 # A language as the program is given it: ``tr-TR``, ``en-US``, ``yue-CN``, or a bare ``en``.
 LANGUAGE_TAG: re.Pattern[str] = re.compile(r"[a-z]{2,3}(-[A-Z]{2})?")
@@ -70,7 +84,7 @@ _ERROR_CHARS: int = 600
 _COMPLAINT_CHARS: int = 200
 _TAG_CHARS: int = 40
 _TEXT_CHARS: int = 20_000
-UNREADABLE: str = "The Mac could not write the recording down"
+UNREADABLE: str = "The Mac could not write down what you said"
 
 
 class Ability(FrozenModel):
@@ -104,6 +118,20 @@ class _Outcome:
     err: bytes
 
 
+@dataclass
+class _Stream:
+    """A stream open with the program (item 969): the program, the language it writes down, the number the next piece
+    must have, the bytes of sound it was given, and when it opened and last had a piece (the helper's clock)."""
+
+    process: asyncio.subprocess.Process
+    language: str
+    next_piece: int
+    given: int
+    opened: float
+    last: float
+    lock: asyncio.Lock
+
+
 def _digest_of(path: Path) -> str | None:
     """The SHA-256 of the file at ``path``, ``None`` when it cannot be read."""
     try:
@@ -130,12 +158,6 @@ def _private(folder: Path) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     os.chmod(folder, _PRIVATE_FOLDER)
     return folder
-
-
-def _fill(descriptor: int, wav: bytes) -> None:
-    """Write ``wav`` to the open file ``descriptor`` and close it."""
-    with os.fdopen(descriptor, "wb") as handle:
-        handle.write(wav)
 
 
 async def _exec(arguments: list[str], timeout_s: float) -> _Outcome:
@@ -173,13 +195,8 @@ class Transcriber:
         self._asking: asyncio.Lock = asyncio.Lock()
         self._warming: asyncio.Task[None] | None = None
         self._written: set[str] = set()
-        self._slots: asyncio.Semaphore = asyncio.Semaphore(_AT_ONCE)
-        self._sweep()
-
-    def _sweep(self) -> None:
-        """Remove the recordings an earlier daemon left: none is kept, however that daemon ended."""
-        for old in self._folder.glob(f"{_RECORDINGS}/{_RECORDING_PREFIX}*{_RECORDING_SUFFIX}"):
-            old.unlink(missing_ok=True)
+        self._streams: dict[str, _Stream] = {}
+        self._watching: asyncio.Task[None] | None = None
 
     def _recent_failure(self) -> VoiceError | None:
         """The error of the last build when it failed less than ``RETRY_BUILD_AFTER_S`` ago."""
@@ -317,11 +334,6 @@ class Transcriber:
             self._failed = None
             return self._built.program
 
-    def _new_file(self) -> tuple[int, str]:
-        """An open file of mode 0600 for a recording, in a private folder: its descriptor and its path."""
-        folder: Path = _private(_private(self._folder) / _RECORDINGS)
-        return tempfile.mkstemp(prefix=_RECORDING_PREFIX, suffix=_RECORDING_SUFFIX, dir=folder)
-
     def _words(self, outcome: _Outcome, language: str) -> str:
         """The words in the program's answer, or the error it says in the owner's words."""
         context: dict[str, str | int] = {"returncode": outcome.returncode}
@@ -340,52 +352,152 @@ class Transcriber:
                     f"This Mac cannot write down {language}: choose another language in Settings › General › Voice",
                     {"code": "unsupported-language", "language": language},
                 )
-            case "no-audio":
-                raise VoiceError(
-                    "The Mac could not read the recording as sound", {"code": "no-audio", "detail": answer.detail}
-                )
             case _:
                 log.warning("voice_program_failed", code=answer.error, detail=answer.detail)
                 raise VoiceError(UNREADABLE, {"code": "failed", "detail": answer.detail, **context})
 
-    async def _run(self, program: Path, path: Path, language: str) -> _Outcome:
-        """Start the program on the file ``path``: ``VoiceError`` when it cannot start or takes too long."""
-        seconds: float = RUN_TIMEOUT_S if language in self._written else FIRST_RUN_TIMEOUT_S
-        try:
-            return await _exec([str(program), str(path), language], seconds)
-        except TimeoutError as error:
-            raise VoiceError(
-                f"The Mac took longer than {seconds:g} seconds to write the recording down: try a shorter one",
-                {"code": "timeout", "seconds": seconds},
-            ) from error
-        except OSError as error:
-            raise VoiceError(UNREADABLE, {"code": "failed", "error": error.strerror or str(error)}) from error
-
-    async def transcribe(self, recording: Recording, language: str) -> str:
-        """The words of ``recording`` in ``language`` (``tr-TR``), written down by this Mac. ``VoiceError`` says what to
-        do when it cannot (``context["code"]``); ``InvalidValueError`` for a language that is not a tag."""
+    async def open(self, language: str) -> str:
+        """Start the program for a stream in ``language`` (``tr-TR``) and return the stream's name. ``VoiceError`` says
+        what to do when the Mac cannot (``context["code"]``, ``busy`` when ``_AT_ONCE`` are open);
+        ``InvalidValueError`` for a language that is not a tag."""
         if LANGUAGE_TAG.fullmatch(language) is None:
             raise InvalidValueError(
                 "that is not a language: write it as en-US or tr-TR", {"language": language[:_TAG_CHARS]}
             )
         program: Path = await self._program()
-        # Made before the file, so that nothing between making it and writing it can fail and leave it open.
-        wav: bytes = canonical_wav(recording)
-        async with self._slots:
+        if len(self._streams) >= _AT_ONCE:
+            raise VoiceError(
+                "The Mac is already writing down two other recordings: try again in a moment",
+                {"code": "busy", "open": len(self._streams)},
+            )
+        try:
+            process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+                str(program),
+                language,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=small_environment(),
+            )
+        except OSError as error:
+            raise VoiceError(UNREADABLE, {"code": "failed", "error": error.strerror or str(error)}) from error
+        name: str = secrets.token_urlsafe(_STREAM_ID_BYTES)
+        now: float = time.monotonic()
+        self._streams[name] = _Stream(
+            process=process, language=language, next_piece=0, given=0, opened=now, last=now, lock=asyncio.Lock()
+        )
+        if self._watching is None or self._watching.done():
+            self._watching = asyncio.create_task(self._watch())
+        return name
+
+    def _stream(self, name: str) -> _Stream:
+        found: _Stream | None = self._streams.get(name)
+        if found is None:
+            raise NotFoundError(
+                "that recording is no longer open: press the microphone again", {"stream": name[:_TAG_CHARS]}
+            )
+        return found
+
+    async def feed(self, name: str, piece: int, pcm: bytes) -> None:
+        """Hand the stream ``name`` its piece number ``piece`` of sound (16 kHz mono 16-bit samples). A piece out of
+        turn or past the longest recording drops the stream; a program that ended before its input did says why."""
+        stream: _Stream = self._stream(name)
+        async with stream.lock:
+            if piece != stream.next_piece:
+                await self._kill(name)
+                raise InvalidValueError(
+                    "a piece of the recording was lost on the way: press the microphone again",
+                    {"piece": piece, "expected": stream.next_piece},
+                )
+            if stream.given + len(pcm) > _MOST_STREAM_BYTES:
+                await self._kill(name)
+                raise VoiceError(
+                    f"A recording may be {MAX_RECORDING_SECONDS // 60} minutes long at the most",
+                    {"code": "too-long", "seconds": MAX_RECORDING_SECONDS},
+                )
+            stream.next_piece += 1
+            stream.given += len(pcm)
+            stream.last = time.monotonic()
+            await self._write(name, stream, pcm)
+
+    async def _write(self, name: str, stream: _Stream, pcm: bytes) -> None:
+        """Write ``pcm`` to the program's input. A program that ended already (a language it has no dictation of) is
+        not written to again: what it said is raised."""
+        pipe: asyncio.StreamWriter | None = stream.process.stdin
+        if pipe is None:
+            raise VoiceError(UNREADABLE, {"code": "failed", "error": "the program has no input"})
+        try:
+            pipe.write(pcm)
+            await pipe.drain()
+        except (BrokenPipeError, ConnectionResetError) as error:
+            self._streams.pop(name, None)
+            outcome: _Outcome = await self._answer(stream, RUN_TIMEOUT_S)
+            self._words(outcome, stream.language)
+            raise VoiceError(
+                UNREADABLE, {"code": "failed", "error": "the program ended before the recording did"}
+            ) from error
+
+    async def end(self, name: str) -> str:
+        """The owner's tick: the stream ``name`` is given its silence at the end, its input ends, and the words come
+        back (``""`` when nothing was heard). ``VoiceError`` says what to do when the Mac could not write it down."""
+        stream: _Stream = self._stream(name)
+        async with stream.lock:
             started: float = time.monotonic()
-            descriptor, name = await asyncio.to_thread(self._new_file)
-            path: Path = Path(name)
-            try:
-                await asyncio.to_thread(_fill, descriptor, wav)
-                outcome: _Outcome = await self._run(program, path, language)
-            finally:
-                await asyncio.to_thread(path.unlink, missing_ok=True)
-            text: str = self._words(outcome, language)
-        self._written.add(language)
+            await self._write(name, stream, _TAIL)
+            self._streams.pop(name, None)
+            pipe: asyncio.StreamWriter | None = stream.process.stdin
+            if pipe is not None:
+                pipe.close()
+            seconds: float = RUN_TIMEOUT_S if stream.language in self._written else FIRST_RUN_TIMEOUT_S
+            outcome: _Outcome = await self._answer(stream, seconds)
+            text: str = self._words(outcome, stream.language)
+        self._written.add(stream.language)
         log.info(
             "voice_written_down",
-            language=language,
-            seconds=round(recording.seconds, 1),
+            language=stream.language,
+            seconds=round(stream.given / (RECORDING_RATE * 2), 1),
             took_s=round(time.monotonic() - started, 2),
         )
         return text
+
+    async def drop(self, name: str) -> None:
+        """The owner's cross: the stream ``name`` ends and nothing is written down. One that is no longer open is let
+        be."""
+        await self._kill(name)
+
+    async def _kill(self, name: str) -> None:
+        stream: _Stream | None = self._streams.pop(name, None)
+        if stream is not None and stream.process.returncode is None:
+            stream.process.kill()
+            await stream.process.wait()
+
+    async def _answer(self, stream: _Stream, seconds: float) -> _Outcome:
+        """What the program printed once its input ended, waited for ``seconds``: a program that takes longer is
+        killed."""
+        process: asyncio.subprocess.Process = stream.process
+        if process.stdout is None or process.stderr is None:
+            raise VoiceError(UNREADABLE, {"code": "failed", "error": "the program has no output"})
+        try:
+            out, err, _ = await asyncio.wait_for(
+                asyncio.gather(process.stdout.read(), process.stderr.read(), process.wait()), seconds
+            )
+        except TimeoutError as error:
+            process.kill()
+            await process.wait()
+            raise VoiceError(
+                f"The Mac took longer than {seconds:g} seconds to write the recording down: try a shorter one",
+                {"code": "timeout", "seconds": seconds},
+            ) from error
+        return _Outcome(process.returncode if process.returncode is not None else -1, out, err)
+
+    async def _watch(self) -> None:
+        """Drop the streams that no piece came to for ``STREAM_IDLE_S`` seconds or that lived past ``STREAM_LIFE_S``,
+        until none is open."""
+        while self._streams:
+            await asyncio.sleep(_STREAM_WATCH_S)
+            now: float = time.monotonic()
+            for name, stream in list(self._streams.items()):
+                idle: bool = now - stream.last > STREAM_IDLE_S
+                if idle or now - stream.opened > STREAM_LIFE_S:
+                    log.warning("voice_stream_dropped", reason="idle" if idle else "too long", language=stream.language)
+                    await self._kill(name)
