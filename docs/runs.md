@@ -586,7 +586,11 @@ held to the same rule (item 554): a page it was served from a private or local a
 where it landed, is not given back (the request for it may have been sent: a redirect of the page can have made Chrome
 send one, which a plain request would not), and the crawl's reading in the run's own tab holds the page it landed on to
 it likewise. A host that refused a plain request once is remembered for the run, and the next fetch of that host goes to
-the browser first. The plain request itself sends the headers a browser's address bar sends (`Sec-Fetch-*`,
+the browser first. A long document comes in parts, the end of each saying where the next one starts; the run keeps
+the last eight documents it read, and a call with a `start` takes the next part from the text the run was shown, not
+from a new download, whose text may be shorter (a page read in the browser comes back as its JavaScript shell); the
+first line of such a result says so, and a call without `start` reads the document anew (item 953). The plain request
+itself sends the headers a browser's address bar sends (`Sec-Fetch-*`,
 `Upgrade-Insecure-Requests`) with the same user agent. A page that refuses the browser too says that, with both answers,
 and names the next rung in one line: another source, `web_search` with the address as the query for the hosted search's
 snippet, or `browser_open` and Take over for a login wall. A page that is not there (HTTP 404 or 410) is reported with

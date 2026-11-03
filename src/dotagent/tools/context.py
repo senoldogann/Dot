@@ -10,6 +10,7 @@ from dotagent.browser.session import BrowserSession
 from dotagent.policy.sandbox import UNSANDBOXED, Sandbox
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.store.models import RunMode, RunRecord
+from dotagent.web.documents import ReadDocuments
 from dotagent.web.refused import RefusedHosts
 
 if TYPE_CHECKING:
@@ -127,6 +128,8 @@ class ToolContext:
     run_tools: frozenset[str] | None = None
     # The hosts that refused this run's plain requests (item 98); the next fetch of one goes to the browser first.
     refused_hosts: RefusedHosts = field(default_factory=RefusedHosts)
+    # The documents this run's web_fetch read (item 953), which the next part of one is cut from.
+    read_documents: ReadDocuments = field(default_factory=ReadDocuments)
 
 
 def run_sandbox(ctx: ToolContext) -> Sandbox:

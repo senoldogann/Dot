@@ -112,13 +112,23 @@ _REPLIES: dict[str, _Reply] = {
 }
 
 
+# How many times /shrinking was asked for: its first answer is the long page, every later one a short page, as a page
+# read in the browser comes back as its JavaScript shell when downloaded again (item 953).
+_SHRINKING_ASKED: list[int] = [0]
+_SHRUNK: _Reply = _html("<!doctype html><title>Shell</title><p>Loading.</p>")
+
+
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = self.path.split("?", 1)[0]
         port: int = self.server.server_address[1]
+        if path == "/shrinking":
+            _SHRINKING_ASKED[0] += 1
         reply: _Reply = (
             _Reply(302, "text/plain", b"", f"http://127.0.0.1:{port}/article")
             if path == "/hop"
+            else (_REPLIES["/long"] if _SHRINKING_ASKED[0] == 1 else _SHRUNK)
+            if path == "/shrinking"
             else _REPLIES.get(path, _NOT_FOUND)
         )
         self.send_response(reply.status)
@@ -183,7 +193,17 @@ async def runtime(settings: Path, tmp_path_factory: pytest.TempPathFactory) -> A
 
 
 async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:
-    ctx: ToolContext = ToolContext(
+    return await _call_in(_context(runtime), name, arguments)
+
+
+async def _call_in(ctx: ToolContext, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:
+    """``name`` called with ``arguments`` in the run of ``ctx``, whose calls before it it remembers."""
+    prepared = await ctx.runtime.registry.tools[name].prepare(arguments, ctx)
+    return await prepared.run(ctx), prepared.action
+
+
+def _context(runtime: Runtime) -> ToolContext:
+    return ToolContext(
         runtime=runtime,
         browser=runtime.browser,
         run_id="web-test",
@@ -198,8 +218,6 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[Too
         output_chars=runtime.config.agent.tool_output_chars,
         facts=new_facts,
     )
-    prepared = await runtime.registry.tools[name].prepare(arguments, ctx)
-    return await prepared.run(ctx), prepared.action
 
 
 async def test_fetch_gives_clean_text_inside_a_fence(runtime: Runtime, site: str) -> None:
@@ -242,6 +260,28 @@ async def test_long_documents_come_in_parts_that_fit(runtime: Runtime, site: str
     past_the_end, _ = await _call(runtime, "web_fetch", {"url": f"{site}/article", "start": 100000})
     assert past_the_end.is_error
     assert "past the end" in past_the_end.text
+
+
+async def test_the_next_part_of_a_document_is_cut_from_the_text_the_run_read(runtime: Runtime, site: str) -> None:
+    """Item 953: a page that answers shorter when asked again (a JavaScript shell after the browser read it) still
+    gives the part the start of the first result pointed to, and a start past the end is not downloaded again."""
+    ctx: ToolContext = _context(runtime)
+    first, _ = await _call_in(ctx, "web_fetch", {"url": f"{site}/shrinking"})
+    more: re.Match[str] | None = re.search(r"call web_fetch again with start=(\d+)", first.text)
+    assert not first.is_error and more is not None, first.text
+    asked: int = _SHRINKING_ASKED[0]
+    second, _ = await _call_in(ctx, "web_fetch", {"url": f"{site}/shrinking", "start": int(more.group(1))})
+    assert not second.is_error and second.untrusted, second.text
+    assert second.text.startswith("Continued from this run's earlier read of the document;")
+    assert f"showing characters {more.group(1)}-" in second.text and "Paragraph " in second.text
+    past, _ = await _call_in(ctx, "web_fetch", {"url": f"{site}/shrinking", "start": 10**7})
+    assert past.is_error and past.text.startswith("start=10000000 is past the end of the document")
+    assert _SHRINKING_ASKED[0] == asked
+    # Read anew, the page is as it answers now; another run never read it.
+    anew, _ = await _call_in(ctx, "web_fetch", {"url": f"{site}/shrinking"})
+    assert "Loading." in anew.text and _SHRINKING_ASKED[0] == asked + 1
+    elsewhere, _ = await _call(runtime, "web_fetch", {"url": f"{site}/shrinking", "start": 20})
+    assert elsewhere.is_error and "which has 8 characters" in elsewhere.text
 
 
 async def test_pdf_text_is_read(runtime: Runtime, site: str) -> None:
