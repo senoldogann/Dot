@@ -1,7 +1,7 @@
 // Customize › Skills (items 317 and 545), after Codex's page: the head the three tabs of Customize share
 // (customizehead.js) with the search, Personal and System, Save from a chat and Import from other apps, and the skills
-// Dot reads, as cards two a row (one on a phone), each with its mark on a tile of its colour, name, what it is for and
-// that Dot has it. Personal holds the owner's own skills (Dot's skills folder
+// Dot reads, as one list, a row each (item 946), each with its icon in the ink on the quiet tile, name, what it is for
+// and that Dot has it. Personal holds the owner's own skills (Dot's skills folder
 // and the folders of the config), those imported from the Mac's other agents and those Dot and its agents learned from
 // their own work, each with the kind of work, where it acted and how it fared; an agent's is offered to its runs alone
 // until Share, and Drop removes one (item 94). System holds the skills that come with Dot and those of its plugins. A
