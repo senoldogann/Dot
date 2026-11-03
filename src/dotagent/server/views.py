@@ -1773,8 +1773,9 @@ class ScoutFindingView(FrozenModel):
 
 class ScoutCandidateView(FrozenModel):
     """A proposal of the plugin scout (item 712) as Customize › Plugins shows it: a new plugin or an update, where it
-    comes from and how far that is trusted, what the review made of it (in the owner's language), what the scan found,
-    how near it is to the owner's work, and where it stands."""
+    comes from and how far that is trusted, what the review made of it and what its skills need that it does not bring
+    (in the owner's language, item 949), what the scan found, how near it is to the owner's work, and where it
+    stands."""
 
     id: str
     kind: str
@@ -1794,6 +1795,7 @@ class ScoutCandidateView(FrozenModel):
     refuse: bool
     does: str
     why: str
+    needs: str
     fit: float
     findings: tuple[ScoutFindingView, ...]
     previous: str | None

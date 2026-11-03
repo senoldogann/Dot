@@ -64,13 +64,16 @@ class Finding(FrozenModel):
 
 
 class Review(FrozenModel):
-    """What the review model made of a candidate: how risky, whether to refuse it outright, what it does and why the
-    risk is what it is, the last two in the owner's language."""
+    """What the review model made of a candidate: how risky, whether to refuse it outright, what it does, why the risk
+    is what it is and what its skills need that it does not bring (item 949: Desktop Commander's skills call its MCP
+    server, which a plugin of skills does not install; empty for a review written before, or for nothing), the last
+    three in the owner's language."""
 
     risk: Risk
     refuse: bool
     does: str = Field(max_length=200)
     why: str = Field(max_length=300)
+    needs: str = Field(default="", max_length=200)
     model: str
 
 

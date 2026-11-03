@@ -372,6 +372,7 @@ def candidate_view(candidate: Candidate) -> ScoutCandidateView:
         refuse=review is not None and review.refuse,
         does=review.does if review else "",
         why=review.why if review else "",
+        needs=review.needs if review else "",
         fit=round(candidate.fit, 2),
         findings=tuple(
             ScoutFindingView(rule=one.rule, severity=one.severity, path=one.path, detail=one.detail)

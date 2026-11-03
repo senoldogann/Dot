@@ -303,6 +303,8 @@ export function mount(root, ctx) {
         ),
         el("p", { class: "gallery-card-does" }, proposal.does || proposal.name),
         proposal.why ? el("p", { class: "hint scout-why" }, proposal.why) : null,
+        // What its skills need that it does not bring (item 949): installed alone, they would only describe it.
+        proposal.needs ? el("p", { class: "hint scout-needs" }, `Needs: ${proposal.needs}`) : null,
         details,
       ),
       el("div", { class: "gallery-action scout-actions" }, takeButton, skipButton),

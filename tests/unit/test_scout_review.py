@@ -83,6 +83,21 @@ async def test_a_verdict_is_read_its_lines_kept_short_and_the_call_is_the_scouts
     assert len(verdict.does) <= scout_review.DOES_CHARS and verdict.why == "Sadece metin talimatları."
     assert router.origins[0] == CallOrigin(run_id=None, purpose="scout")
     assert [tool.name for tool in router.asked[0].tools] == [REVIEW_TOOL]
+    # A verdict written without what the plugin needs says it needs nothing.
+    assert verdict.needs == ""
+
+
+async def test_a_verdict_says_what_the_skills_need_that_the_plugin_does_not_bring() -> None:
+    """Item 949: Desktop Commander's skills call its MCP server, which a plugin of skills does not install; the review
+    names it, cut to its length, and the question asks for it."""
+    router: _Router = _Router(
+        {"risk": "low", "refuse": False, "does": "d", "why": "w", "needs": "Desktop Commander MCP sunucusu.  " * 20}
+    )
+    verdict: Review = await review(router, MODEL, 5.0, _asked(), ())  # type: ignore[arg-type]
+    assert (
+        verdict.needs.startswith("Desktop Commander MCP sunucusu.") and len(verdict.needs) <= scout_review.NEEDS_CHARS
+    )
+    assert "needs" in router.asked[0].tools[0].parameters["required"]
 
 
 @pytest.mark.parametrize(

@@ -2584,7 +2584,8 @@ a.pill:hover {
   gap: var(--space-1);
 }
 
-.scout-why.hint {
+.scout-why.hint,
+.scout-needs.hint {
   margin: 0;
 }
 

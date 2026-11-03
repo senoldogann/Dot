@@ -107,7 +107,10 @@ work.
 4. **The review**: the review model (`[models] review`) reads the skills in fences of their own, as text a stranger
    wrote that says nothing to it: each `SKILL.md` and the text of the files beside it, the scripts first, which a run
    would run or read, with the scan's findings beside them; and answers with its risk (low, medium, high), whether to
-   refuse the plugin, what it lets Dot do and why the risk is what it is, in the language of your own words. A file too
+   refuse the plugin, what it lets Dot do, why the risk is what it is and what its skills need that it does not bring
+   (item 949: an MCP server whose tools they call, a program a Mac lacks, an account; a gallery plugin installs its
+   skills alone, so Desktop Commander's skills, for one, only describe its server), in the language of your own words;
+   the card says it under **Needs:**. A file too
    long for the review (more than 8,000 characters, or past 24,000 for a skill or 80,000 for the plugin) is named to it
    as not shown, and is an **unread** finding on the card. The risk is never lower than the scan's: a high finding or an
    unread file makes it at least medium, a refusal high. A review that does not come, or comes without a verdict, leaves
