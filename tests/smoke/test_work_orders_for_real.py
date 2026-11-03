@@ -121,9 +121,14 @@ class _Staff(ScriptedProvider):
         self.served: int = 0
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
-        first: str = _first_user(request)
-        if first.startswith("Work order "):
-            number: int = int(re.search(r"This is attempt (\d+) of", first).group(1))  # type: ignore[union-attr]
+        # An agent's attempts go on in its one chat (item 952): the newest order it was given is the one at work.
+        orders: list[str] = [
+            message.content
+            for message in request.messages
+            if message.role == "user" and message.content.startswith("Work order ")
+        ]
+        if orders:
+            number: int = int(re.search(r"This is attempt (\d+) of", orders[-1]).group(1))  # type: ignore[union-attr]
             return await self._attempts[number].complete(request, sink)
         self.served += 1
         return _reply(request, self._lead(request), self.served)
@@ -285,6 +290,9 @@ async def test_assign_returns_at_once_the_order_goes_to_review_and_a_return_star
             second_order: WorkOrderRecord = await runtime.store.get_work_order(order.id)
             second_run: RunRecord = await runtime.store.get_run(second_order.run_ids[1])
             assert second_order.attempts == 2 and second_run.id != first_run.id and second_run.agent_id == agent.id
+            # It goes on in the agent's one chat, named after it, where the first attempt stands (item 952).
+            assert second_run.thread_id == first_run.thread_id
+            assert (await runtime.store.get_thread(second_run.thread_id)).title == agent.name
             for words in (BRIEF, ACCEPTANCE, FIRST_ANSWER, NOTES, "attempt 2 of this order", "<earlier_answer"):
                 assert words in second_run.goal, words
             # 4. It ends too: the lead is told again, accepts it, and the order is closed.

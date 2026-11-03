@@ -227,6 +227,10 @@ _NOBODY_WATCHES: frozenset[str] = UNWATCHED_SOURCES | {NOTICE_SOURCE, REFLECTION
 _APPROVALS_STRICTEST_FIRST: tuple[ApprovalMode, ...] = ("supervised", "ask", "auto", "yolo")
 
 
+# How many of an agent's runs, and of its chat's, are read to find its chat and whether it is at work.
+_AGENT_RUNS_READ: int = 20
+
+
 @dataclass(frozen=True)
 class RunHandle:
     run_id: str
@@ -442,6 +446,8 @@ class RunManager:
         self._releases: set[asyncio.Task[None]] = set()
         # Threads that a run is being launched on and whose handle is not registered yet.
         self._claimed: set[str] = set()
+        # One lock an agent, held while its next work's chat is chosen and claimed (item 952).
+        self._agent_locks: dict[str, asyncio.Lock] = {}
         self._stopping: bool = False
         # Active runs the owner's emergency stop is ending (:meth:`emergency_stop`).
         self._emergency: set[str] = set()
@@ -996,7 +1002,17 @@ class RunManager:
             "standard",
             self._runtime.config.initiative.approvals,
             None,
-            RunOpening(text=opening, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS, tainted=tainted),
+            RunOpening(
+                text=opening,
+                files=(),
+                resumed=None,
+                once=None,
+                # A chat it goes on in (item 952) gives its words to the run: it starts as tainted as its last run
+                # ended.
+                carried=tuple(run.id for run in await self._runtime.store.list_runs(1, thread_id)),
+                picks=NO_PICKS,
+                tainted=tainted,
+            ),
             None,
             None,
         )
@@ -1289,10 +1305,10 @@ class RunManager:
             log.error("campaign_not_forgotten", campaign_id=campaign_id, error=exc.message, context=exc.context)
 
     async def start_session(self, campaign_id: str) -> RunRecord:
-        """Start the next session of an active campaign in a thread of its own, with the brief as its opening message
-        and the campaign's settings; for the scheduler, once the session is due. Refused while a session of the campaign
-        is still working, in this process or another. When the run cannot start, the session is tried again after
-        ``[agent] campaign_gap_minutes``."""
+        """Start the next session of an active campaign in the campaign's one chat (item 952), with the brief as its
+        opening message and the campaign's settings; for the scheduler, once the session is due. Refused while a
+        session of the campaign is still working, in this process or another. When the run cannot start, the session is
+        tried again after ``[agent] campaign_gap_minutes``."""
         runtime: Runtime = self._runtime
         campaign: CampaignRecord = await runtime.store.get_campaign(campaign_id)
         if campaign.status != "active":
@@ -1313,10 +1329,18 @@ class RunManager:
         await runtime.store.set_next_session(campaign.id, following)
         made_thread_id: str | None = None
         try:
-            thread: ThreadRecord = await runtime.store.create_thread(
-                f"{campaign.title} · session {number}", SCHEDULE_SOURCE
+            # The sessions after the first go on in one chat of the campaign's (item 952), not a chat each: the one the
+            # session before this one worked in, when that was not the owner's conversation the campaign began in.
+            before: RunRecord | None = next(
+                (session for session in reversed(sessions) if session.thread_id != campaign.thread_id), None
             )
-            made_thread_id = thread.id
+            kept: str | None = None if before is None else before.thread_id
+            thread: ThreadRecord
+            if kept is None:
+                thread = await runtime.store.create_thread(campaign.title, SCHEDULE_SOURCE)
+                made_thread_id = thread.id
+            else:
+                thread = await runtime.store.get_thread(kept)
             run, _ = await self._launch(
                 campaign.goal,
                 "task",
@@ -1328,7 +1352,15 @@ class RunManager:
                 campaign.speed,
                 campaign.approvals,
                 False,
-                RunOpening(text=brief, files=(), resumed=None, once=campaign.once, carried=(), picks=NO_PICKS),
+                RunOpening(
+                    text=brief,
+                    files=(),
+                    resumed=None,
+                    once=campaign.once,
+                    # The campaign's chat holds the session before's words: this one starts as tainted as it ended.
+                    carried=() if before is None else (before.id,),
+                    picks=NO_PICKS,
+                ),
                 campaign.id,
                 None,
             )
@@ -1418,31 +1450,26 @@ class RunManager:
         # the ones the agent is bound to and its prompt holds the agent's instructions, though its source, its model
         # and its approvals stay a delegation's. With ``agent_id`` (a message to an agent) the run is that agent's.
         helper_of: str | None = parent.agent_id if agent_id is None else agent_id
-        _, handle = await self._launch(
-            goal,
-            mode,
-            own_model if agent is None or agent.model == "" else agent.model,
-            None,
-            DELEGATE_SOURCE if agent is None else TEAM_SOURCE,
-            parent.id,
-            parent.effort if agent is None or agent.effort is None else agent.effort,
-            parent.speed,
-            parent.approvals
-            if agent is None or agent.approvals is None
-            else stricter_approvals(parent.approvals, agent.approvals),
-            False,
-            RunOpening(
-                text=goal if opening is None else opening,
-                files=(),
-                resumed=None,
-                once=None,
-                carried=(),
-                picks=NO_PICKS,
-                tainted=tainted,
-            ),
-            None,
-            helper_of,
+        # The work of an agent goes to its own chat (item 952): one chat each, which its next work continues. The chat
+        # is chosen and claimed under the agent's lock, so that two pieces sent in one step do not both take it; a
+        # helper takes a chat of its own and no lock.
+        lock: asyncio.Lock | nullcontext[None] = (
+            nullcontext() if agent_id is None else self._agent_locks.setdefault(agent_id, asyncio.Lock())
         )
+        async with lock:
+            work_chat: str | None = None if agent is None else await self._agent_chat(agent)
+            carried: tuple[str, ...] = (
+                () if work_chat is None else tuple(run.id for run in await self._runtime.store.list_runs(1, work_chat))
+            )
+            try:
+                _, handle = await self._launch_helper(
+                    goal, mode, own_model, parent, agent, helper_of, work_chat, opening, tainted, carried
+                )
+            except BaseException:
+                # A chat made for this work and left without a run is no chat of the agent's.
+                if work_chat is not None and not carried:
+                    await _uncancelled(self._runtime.store.delete_threads([work_chat]))
+                raise
         # Who started it hears the run's id at once (item 902: the owner's Let it help shows the helper at work).
         if on_start is not None:
             on_start(handle.run_id)
@@ -1462,6 +1489,79 @@ class RunManager:
                 {"run_id": child.id, "stored_status": child.status},
             )
         return DelegateOutcome(run=child, tainted=handle.gate.tainted)
+
+    def at_work_in(self, thread_id: str) -> bool:
+        """Whether a run of this process is claimed for, or works in, the chat ``thread_id`` now, before its record
+        says so."""
+        return thread_id in self._claimed or any(handle.thread_id == thread_id for handle in self._handles.values())
+
+    async def _agent_chat(self, agent: AgentRecord) -> str:
+        """The chat the next work of ``agent`` goes to (item 952): its own, titled with its name, where the work sent to
+        it before stands, so that recurring work is one chat, not one a message (the owner: "sürekli sohbet oluşturmak
+        karışıklığa yol açıyor"). A new one when it has none yet, or while its own has a run at work: two pieces of work
+        sent at once still run side by side."""
+        store: Store = self._runtime.store
+        received: list[RunRecord] = [
+            run for run in await store.agent_messages(agent.id, _AGENT_RUNS_READ) if run.agent_id == agent.id
+        ]
+        # Its chats from the newest it worked in: the first one free, so that a chat made while another was at work is
+        # taken again rather than a third made.
+        seen: set[str] = set()
+        for run in received:
+            if run.thread_id in seen:
+                continue
+            seen.add(run.thread_id)
+            thread: ThreadRecord = await store.get_thread(run.thread_id)
+            if thread.title != agent.name:
+                continue
+            busy: bool = self.at_work_in(thread.id) or any(
+                other.status in WORKING_STATUSES for other in await store.list_runs(_AGENT_RUNS_READ, thread.id)
+            )
+            if not busy:
+                return thread.id
+        return (await store.create_thread(agent.name, TEAM_SOURCE)).id
+
+    async def _launch_helper(
+        self,
+        goal: str,
+        mode: RunMode,
+        own_model: str,
+        parent: RunRecord,
+        agent: AgentRecord | None,
+        helper_of: str | None,
+        thread_id: str | None,
+        opening: str | None,
+        tainted: bool,
+        carried: tuple[str, ...],
+    ) -> tuple[RunRecord, RunHandle]:
+        """Launch the delegated run of :meth:`delegate`: a helper in a chat of its own (``thread_id`` ``None``), or
+        the agent's run in its chat, going on from that chat's last run (``carried``: it reads its words, so it
+        starts as tainted as that run ended, item 952)."""
+        return await self._launch(
+            goal,
+            mode,
+            own_model if agent is None or agent.model == "" else agent.model,
+            thread_id,
+            DELEGATE_SOURCE if agent is None else TEAM_SOURCE,
+            parent.id,
+            parent.effort if agent is None or agent.effort is None else agent.effort,
+            parent.speed,
+            parent.approvals
+            if agent is None or agent.approvals is None
+            else stricter_approvals(parent.approvals, agent.approvals),
+            False,
+            RunOpening(
+                text=goal if opening is None else opening,
+                files=(),
+                resumed=None,
+                once=None,
+                carried=carried,
+                picks=NO_PICKS,
+                tainted=tainted,
+            ),
+            None,
+            helper_of,
+        )
 
     def steer(self, run_id: str, text: str, files: tuple[StoredAttachment, ...]) -> None:
         """Hand the running agent an extra instruction and its attachments; it reads them before its next step, and a
@@ -2732,11 +2832,11 @@ class RunManager:
         before the run's record is made: the chat's last run is the one before it."""
         if opening.tainted:
             return True
-        if parent is not None:
-            return parent.gate.tainted
-        if opening.resumed is not None:
+        if parent is not None and parent.gate.tainted:
+            return True
+        if parent is None and opening.resumed is not None:
             return await self._ended_tainted(opening.resumed.from_run_id)
-        if source == BACKGROUND_SOURCE:
+        if parent is None and source == BACKGROUND_SOURCE:
             # A chat that a rewind emptied cannot say how its last run ended: its notice starts tainted.
             newest_run_id: str | None = await self._newest_run_id(thread_id)
             return newest_run_id is None or await self._ended_tainted(newest_run_id)

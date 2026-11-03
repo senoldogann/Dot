@@ -329,7 +329,8 @@ async def test_a_session_started_by_the_scheduler_reads_the_brief_and_only_an_ac
         chats: list[str] = [chat.id for chat in await runtime.store.list_thread_summaries(50)]
     assert [session.id for session in sessions] == [opening.id, second.id]
     assert (second.status, second.source, second.goal, second.goal_mode) == ("done", SCHEDULE_SOURCE, GOAL, False)
-    assert thread.title == f"{campaign.title} · session 2"
+    # The sessions after the first go on in one chat of the campaign's, named as it is (item 952).
+    assert thread.title == campaign.title
     # The campaign's conversation is a chat; the thread of a later session is listed on the campaign's page only.
     assert opening.thread_id in chats and second.thread_id not in chats
     steps: list[ChatRequest] = model.of(second.thread_id)

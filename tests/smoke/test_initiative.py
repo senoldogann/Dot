@@ -29,7 +29,7 @@ from dotagent.events import Subscription
 from dotagent.llm.router import parse_model_ref
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.proactive import INITIATIVE_SOURCE
-from dotagent.proactive.initiative import Initiative, _listed, _recent_chats, in_peak
+from dotagent.proactive.initiative import LOOK_TITLE, Initiative, _listed, _recent_chats, in_peak
 from dotagent.proactive.todos import OWNER_SOURCE, add_todo, note_look, read_initiative, set_initiative
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server.app import create_app
@@ -234,6 +234,24 @@ async def test_with_nothing_on_the_list_it_looks_for_work_with_a_research_run(lo
         await initiative.tick(10_060.0)
         assert initiative.working()
         assert (await runtime.store.get_todo(found.id)).status == "doing"
+        await initiative.stop()
+
+
+async def test_its_looks_for_work_go_on_in_one_chat(login_env: dict[str, str]) -> None:
+    """Item 952: each look for work opened a chat of its own, four a week; the next look goes on in the chat of the last
+    once no run works there."""
+    async with _dot(login_env, [_finish("Nothing found."), _finish("Nothing found again.")]) as (runtime, manager):
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        first: RunRecord = await initiative._start(LOOK_TITLE, "Look for work.", "Look for work.", "research", False)
+        await manager.wait(first.id)
+        # The first look read a page: the next, in its chat, reads its words and starts tainted (the pre-push review).
+        await runtime.store.add_event(first.id, "tool_result", {"tool": "web_fetch", "ok": True, "tainted": True})
+        second: RunRecord = await initiative._start(LOOK_TITLE, "Look for work.", "Look for work.", "research", False)
+        await manager.wait(second.id)
+        assert second.thread_id == first.thread_id
+        queued = await runtime.store.last_event(second.id, "run_queued")
+        assert queued is not None and queued.data["tainted"] is True
+        assert (await runtime.store.get_thread(first.thread_id)).title == LOOK_TITLE
         await initiative.stop()
 
 

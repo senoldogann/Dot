@@ -49,6 +49,8 @@ from dotagent.store.db import Store
 from dotagent.store.endings import PREFIX_EMERGENCY_STOP, RESULT_SHUTDOWN
 from dotagent.store.models import WORKING_STATUSES, RunMode, RunRecord, TodoRecord
 
+# How many runs of a chat are read to tell whether one works there.
+_RUNS_READ: int = 10
 log = get_logger(__name__)
 
 LOOK_TITLE: str = "Looking for work to do for you"
@@ -586,16 +588,25 @@ class Initiative:
     async def _start(
         self, title: str, goal: str, opening: str, mode: RunMode, tainted: bool, model: str | None = None
     ) -> RunRecord:
-        """Start one of its runs in a new chat named ``title``. A start that fails takes its empty chat with it and
-        holds the next for :data:`_AFTER_A_FAILED_START_S` (the code review of item 715: a start that kept failing made
-        a chat at every tick)."""
+        """Start one of its runs in its chat named ``title``: the one of that name it used last, when no run works there
+        (item 952: its look for work opened a chat each time, four a week), else a new one. A start that fails takes the
+        chat it made with it and holds the next for :data:`_AFTER_A_FAILED_START_S` (the code review of item 715: a
+        start that kept failing made a chat at every tick)."""
         store: Store = self._runtime.store
-        thread = await store.create_thread(thread_title(title), INITIATIVE_SOURCE)
+        titled: str = thread_title(title)
+        kept = await store.latest_thread(INITIATIVE_SOURCE, titled)
+        free: bool = (
+            kept is not None
+            and not self._manager.at_work_in(kept.id)
+            and not any(run.status in WORKING_STATUSES for run in await store.list_runs(_RUNS_READ, kept.id))
+        )
+        thread = kept if kept is not None and free else await store.create_thread(titled, INITIATIVE_SOURCE)
         try:
             return await self._manager.start_own(goal, opening, mode, thread.id, tainted, model)
         except DotError:
             self._failed_at = time.monotonic()
-            await store.delete_threads([thread.id])
+            if thread is not kept:
+                await store.delete_threads([thread.id])
             raise
 
     async def _clean_runs(self) -> frozenset[str]:

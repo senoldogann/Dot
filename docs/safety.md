@@ -569,7 +569,10 @@ run waited for it or went on (item 508), as it answers what the run asked rather
 reaches stays marked, and the run it starts once that run has ended starts as untrusted as that run ended; so does
 your answer to a question of a campaign's session (item 899). Of any answer the review model takes your words alone
 as your instruction, not the question the run wrote, which a page it read may have written (item 899). A delegated
-run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off, and the run that
+run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off, a run that goes on
+in a chat of recurring work (an agent's one chat, a look for work's, a campaign's sessions', item 952) as that chat's
+last run ended, whoever sent it, since it reads that run's words: once such a chat read outside content, its runs stay
+marked until you write in it yourself, and the run that
 tells a chat that its command in the background ended as the chat's last run ended: that message is Dot's, not yours,
 and so is the note that tells a run at work of such an end, which clears nothing. The run a watcher starts for a mail,
 an event or a notification (item 571, see [Dot comes to you](proactive.md#watchers)) starts untrusted whatever it goes

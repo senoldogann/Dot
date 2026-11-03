@@ -2088,6 +2088,14 @@ class Store:
         await self._db.commit()
         return record
 
+    async def latest_thread(self, source: str, title: str) -> ThreadRecord | None:
+        """The newest thread of ``source`` titled ``title``, or ``None``: the chat recurring work of that name goes on
+        in (item 952)."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT * FROM threads WHERE source = ? AND title = ? ORDER BY updated_at DESC LIMIT 1", (source, title)
+        )
+        return None if row is None else _thread(row)
+
     async def get_thread(self, thread_id: str) -> ThreadRecord:
         row: aiosqlite.Row | None = await self._one("SELECT * FROM threads WHERE id = ?", (thread_id,))
         if row is None:

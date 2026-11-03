@@ -319,7 +319,10 @@ answer a message make no agents.
 Agents work together through messages. A run (Dot's or an agent's) sends one with the `message_agent` tool, naming the
 agent and the message; the agent answers in a run of its own (its instructions, its tools, its model, and the stricter
 of its approvals and the sender's, so an agent set to `yolo` asks when a run that asks messages it) that cannot see the
-sender's conversation, and the reply comes back as the tool's result, the way a delegated run's report does. The prompt
+sender's conversation, in the agent's one chat, named after it, which every piece of work sent to it continues, so it
+reads what it did before (item 952: a chat a message filled the list, five a week for Growth Lead); while a run works
+there, the next piece takes a chat of its own, so that two sent at once run side by side; since a run there reads the
+work before it, it starts as untrusted as that work ended (see [Safety](safety.md)), and the reply comes back as the tool's result, the way a delegated run's report does. The prompt
 lists the team by name and role under "Team" whenever there is another agent to message; an agent does not message
 itself, and an answering run messages no one further. The sender's chat shows the exchange as a delegated row wearing
 the agent's face: a line of the conversation, no card, its face in the column of the faces and its words where theirs
@@ -423,7 +426,8 @@ dotx campaign stop|resume|achieved ID
 A campaign is a task that Dot keeps working on until its outcome is verified or you stop it. Switch on **Keep going** in
 the **How Dot works** group of the message box's **Options** menu (it is there for a task of Dot's), or pass `--standing` to `dotx
 run`. The run you start is its first session, in your conversation; the daemon runs the sessions after it, each a run in
-a thread of its own, through restarts and days. A campaign whose first session cannot start is not kept.
+one thread of the campaign's, named after it (item 952; a thread each before it), each starting as untrusted as
+the session before ended, through restarts and days. A campaign whose first session cannot start is not kept.
 
 - **Targets.** The first session records the campaign's targets and how a session verifies them (`campaign_targets`). A
   session that wants to end while the campaign has no targets is sent back once to record them; targets a later session
@@ -472,7 +476,7 @@ emergency stop, `campaign_max_sessions` or `campaign_failed_sessions` (item 724)
   in its ledger that says so and you told (item 724): one was tried again every `campaign_gap_minutes` for ever, its
   page saying when its next session was. A claim of a session still working after your Stop leaves the campaign
   stopped: `campaign_achieved` achieves only an active campaign (item 724), while your own Mark achieved still does.
-- **Deleting one** (`DELETE /api/campaigns/{id}`) deletes its ledger and the threads of its sessions after the first,
+- **Deleting one** (`DELETE /api/campaigns/{id}`) deletes its ledger and the thread of its sessions after the first,
   with all they hold, as deleting those chats would. The conversation it started in stays a chat, with the first
   session as a run of that chat, and the questions its runs left for you expire, as no session reads the answers any
   more. It is refused while the campaign is active, so stop it first, and while a run works in one of its chats.

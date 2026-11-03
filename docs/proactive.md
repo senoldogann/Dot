@@ -211,8 +211,10 @@ way goes on, and the schedules keep their times. A thing you put on the list you
 why (in any case) goes before the older ones and may start while another run works or you use the Mac (item 809); a
 thing a run put on the list, or one that came of content third parties can author (a page, a mail), is never urgent,
 however it is marked. It does the oldest thing to do, in a chat of its own named after it (under **Dot's work** at
-the foot of the sidebar, folded, items 822 and 855); with nothing to do, it looks for work every `look_every_hours` (6)
-with a research run, which reads what it remembers of you, the record the morning brief reads (what waits for you, the
+the foot of the sidebar, folded, items 822 and 855; a thing of the same name goes on in the chat of the last, once no
+run works there, item 952); with nothing to do, it looks for work every `look_every_hours` (6) with a research run (in
+one chat, *Looking for work to do for you*, which each look continues, starting marked when the look before read
+outside content; item 952), which reads what it remembers of you, the record the morning brief reads (what waits for you, the
 runs
 that failed since the last look, the campaigns at work), the titles of your newest chats and the list (a thing let go with why, so that it is not listed again in
 other words; why is quoted only when the run that wrote it read nothing third parties can author, else it says so), and puts at most three things on it: none you said not to do, which it searches its memory for first. That run is a research run: it writes nothing but its list, its notes and Dot's memory, as any

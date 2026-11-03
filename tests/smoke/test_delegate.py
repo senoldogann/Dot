@@ -10,18 +10,21 @@ import subprocess
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
+from types import SimpleNamespace
+from typing import cast
 
 import httpx
 import pytest
 import pytest_asyncio
 from ollama_live import live_with
 
-from dotagent.agent.manager import RunManager
+from dotagent.agent.loop import RunOpening
+from dotagent.agent.manager import RunHandle, RunManager
 from dotagent.config import load_config
 from dotagent.core.errors import RunConflict
 from dotagent.core.paths import workspace_dir
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.store.models import EventRecord, RunMode, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, EventRecord, RunMode, RunRecord, ThreadRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -180,6 +183,54 @@ async def test_a_run_that_has_ended_delegates_nothing(runtime: Runtime, manager:
     assert "has ended" in refused.value.message
     assert manager.active_run_ids() == []
     assert await _children_of(runtime, parent.id) == []
+
+
+async def test_an_agents_work_goes_on_in_its_one_chat_unless_that_chat_is_at_work(
+    runtime: Runtime, manager: RunManager
+) -> None:
+    """Item 952: the work sent to an agent goes to its own chat, named after it, which the next work continues; while
+    a run works there, the next work takes a new chat, so that two pieces sent at once still run side by side."""
+    agent = await runtime.store.create_agent(
+        "Desk", "Answers questions.", "", "", None, None, ("read_file",), None, None
+    )
+    first: str = await manager._agent_chat(agent)
+    assert (await runtime.store.get_thread(first)).title == "Desk"
+    run: RunRecord = await runtime.store.create_run(
+        first, "goal", "task", MODEL_REF, None, "team", "medium", "standard", None, "ask", False, None, agent.id, None
+    )
+    # At work there: the next piece goes to a chat of its own.
+    second: str = await manager._agent_chat(agent)
+    assert second != first and (await runtime.store.get_thread(second)).title == "Desk"
+    # Once it is done, the work continues in the chat the agent last worked in.
+    await runtime.store.finish_run(run.id, "done", "Done.")
+    assert await manager._agent_chat(agent) == first
+    # A chat made while the first was at work is taken again once it is free, not a third one made.
+    newer: RunRecord = await runtime.store.create_run(
+        second, "goal", "task", MODEL_REF, None, "team", "medium", "standard", None, "ask", False, None, agent.id, None
+    )
+    await runtime.store.finish_run(newer.id, "done", "Done.")
+    busy: RunRecord = await runtime.store.create_run(
+        second, "goal", "task", MODEL_REF, None, "team", "medium", "standard", None, "ask", False, None, agent.id, None
+    )
+    assert await manager._agent_chat(agent) == first
+    await runtime.store.finish_run(busy.id, "done", "Done.")
+
+
+async def test_work_that_goes_on_in_a_chat_starts_as_tainted_as_its_last_run_ended(
+    runtime: Runtime, manager: RunManager
+) -> None:
+    """Item 952 (the pre-push review): an agent's chat holds the words its earlier work read; the next piece, sent by a
+    run that read nothing from outside, still starts tainted when the run it goes on from ended so."""
+    earlier: RunRecord = await _stored_run(runtime, "task", None, "team")
+    await runtime.store.add_event(earlier.id, "tool_result", {"tool": "web_fetch", "ok": True, "tainted": True})
+    await runtime.store.finish_run(earlier.id, "done", "Done.")
+    clean = SimpleNamespace(gate=SimpleNamespace(tainted=False))
+    goes_on = RunOpening(text="Go on.", files=(), resumed=None, once=None, carried=(earlier.id,), picks=NO_PICKS)
+    fresh = RunOpening(text="Start.", files=(), resumed=None, once=None, carried=(), picks=NO_PICKS)
+    # A stand-in for the sender's handle, of which only its gate's mark is read: a sender that read nothing.
+    sender = cast(RunHandle, clean)
+    assert await manager._starts_tainted(sender, earlier.thread_id, "team", goes_on)
+    assert not await manager._starts_tainted(sender, earlier.thread_id, "team", fresh)
 
 
 async def test_a_research_run_only_delegates_research(runtime: Runtime, manager: RunManager) -> None:
