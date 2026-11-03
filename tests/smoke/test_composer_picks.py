@@ -278,13 +278,22 @@ async def test_a_picked_server_is_on_from_the_first_step_and_without_the_pick_it
     assert not [spec.name for spec in plain.steps[0].tools if spec.name.startswith(f"{GROUP}__")]
     # The first message is the owner's words, then the pick; the run's goal stays the owner's words.
     assert _opening(picked) == (
-        f"{GOAL}\n\n[Picked in the composer] The owner picked the MCP servers {SERVER} for this message: use their "
-        f"tools ({GROUP}__…) for it where they fit."
+        f"{GOAL}\n\n{_what_the_chips_are(f'the connected app (MCP server) {SERVER}')}\n\n[Picked in the composer] The "
+        f"owner picked the MCP servers {SERVER} for this message: use their tools ({GROUP}__…) for it where they fit."
     )
     assert _opening(plain) == GOAL
     assert picked.record.goal == GOAL
     assert list(picked.picks) == [{"plugins": [SERVER], "skills": [], "plan_first": False, "accounts": []}]
     assert plain.picks == ()
+
+
+def _what_the_chips_are(things: str) -> str:
+    """The line that tells the model what the chips of the message are (item 947)."""
+    return (
+        f"[Picked in the composer] The owner's message carries these picks, shown as chips before its words: {things}. "
+        "When the message says this, these, it or them, or speaks of a plugin, an app, an account or a skill without "
+        "naming it, it means them, whatever it calls them; answer about them."
+    )
 
 
 async def test_a_picked_skill_and_plan_first_follow_the_owners_words_in_the_first_message(
@@ -298,8 +307,9 @@ async def test_a_picked_skill_and_plan_first_follow_the_owners_words_in_the_firs
             )
     assert played.record.status == "done"
     assert played.record.goal == GOAL
-    words, plan, skills, skill = _opening(played).split("\n\n", 3)
+    words, chips, plan, skills, skill = _opening(played).split("\n\n", 4)
     assert words == GOAL
+    assert chips == _what_the_chips_are(f"the skill {SKILL_NAME}")
     assert plan == (
         "[Picked in the composer] Plan first: before you change anything, write your plan with update_plan, then ask "
         "the owner with ask_user, with wait, whether to go ahead, and act only once they agree."

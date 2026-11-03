@@ -2,7 +2,7 @@
 and the MCP servers the owner opened to an agent's run whatever its tools."""
 
 from dotagent.agent.picks import owner_server_groups, picked_groups, picks_problems, with_picks
-from dotagent.store.models import RunPicks
+from dotagent.store.models import NO_PICKS, RunPicks
 from dotagent.tools.groups import ACCOUNTS_GROUP
 
 
@@ -41,4 +41,21 @@ def test_an_account_picked_must_be_signed_in_and_opens_the_mail_and_calendar_too
         "no account me@example.com is signed in (the accounts signed in now: other@example.com); Customize › "
         "Connectors › Accounts signs one in"
     ]
-    assert "me@example.com" in with_picks("Read my mail", picked, ())
+    assert "me@example.com" in with_picks("Read my mail", picked, (), {})
+
+
+def test_the_picks_are_named_as_what_the_owners_words_point_at() -> None:
+    """Item 947: a message picked with a Google and a Microsoft account asked whether "these 2 plugins" work, and the
+    model went looking for plugins. The note says first what the chips are, each account by its provider, and that the
+    message's words mean them."""
+    picked = RunPicks(
+        plugins=("deepwiki",), skills=("brand-check",), plan_first=False, accounts=("a@gmail.com", "b@x.org")
+    )
+    said: str = with_picks("Bu 2 plugin calisiyor mu ?", picked, (), {"a@gmail.com": "Google"})
+    assert said.startswith("Bu 2 plugin calisiyor mu ?\n\n[Picked in the composer] The owner's message carries")
+    assert (
+        "the connected app (MCP server) deepwiki; the Google account a@gmail.com; the account b@x.org; the skill "
+        "brand-check." in said
+    )
+    assert "speaks of a plugin, an app, an account or a skill without naming it, it means them" in said
+    assert with_picks("Hello", NO_PICKS, (), {}) == "Hello"

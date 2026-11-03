@@ -3,7 +3,7 @@ the MCP servers whose tools the run starts with, the accounts signed in whose ma
 496), the skills whose instructions it starts with, and whether it writes its plan and asks before it changes anything.
 Here they are checked against what the run may use and worded for its model, after the owner's own words."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from dotagent.core.types import JsonObject
 from dotagent.mcp.naming import PREFIX
@@ -80,13 +80,37 @@ def picks_problems(
     return problems
 
 
-def with_picks(text: str, picks: RunPicks, skills: Sequence[str]) -> str:
-    """``text``, a run's first message, followed by what the owner picked for it: the servers to use, the plan first,
-    then each picked skill's instructions (``skills``, as the ``skill`` tool gives them). ``text`` as it is without
-    picks."""
+def picked_things(picks: RunPicks, providers: Mapping[str, str]) -> list[str]:
+    """What ``picks`` names, as the owner sees it on the chips of their message (item 947): each MCP server, each
+    account by its provider (``providers``: its address to its provider's name, ``Google``; an address it lacks
+    stands alone) and each skill."""
+    accounts: list[str] = [
+        f"the {providers[address]} account {address}" if address in providers else f"the account {address}"
+        for address in picks.accounts
+    ]
+    return [
+        *(f"the connected app (MCP server) {server}" for server in picks.plugins),
+        *accounts,
+        *(f"the skill {skill}" for skill in picks.skills),
+    ]
+
+
+def with_picks(text: str, picks: RunPicks, skills: Sequence[str], providers: Mapping[str, str]) -> str:
+    """``text``, a run's first message, followed by what the owner picked for it: first what the picks are, the things
+    the owner's words point at (item 947: a message picked with two accounts asked whether "these 2 plugins" work, and
+    the model looked for plugins), then the servers to use, the accounts to read, the plan first, then each picked
+    skill's instructions (``skills``, as the ``skill`` tool gives them). ``providers`` names the provider of each
+    account signed in by its address. ``text`` as it is without picks."""
     if picks == NO_PICKS:
         return text
     lines: list[str] = []
+    things: list[str] = picked_things(picks, providers)
+    if things:
+        lines.append(
+            f"{_HEAD} The owner's message carries these picks, shown as chips before its words: {'; '.join(things)}. "
+            "When the message says this, these, it or them, or speaks of a plugin, an app, an account or a skill "
+            "without naming it, it means them, whatever it calls them; answer about them."
+        )
     if picks.plugins:
         tools: str = ", ".join(f"{plugin_group(server)}__…" for server in picks.plugins)
         lines.append(
@@ -95,9 +119,10 @@ def with_picks(text: str, picks: RunPicks, skills: Sequence[str]) -> str:
         )
     if picks.accounts:
         lines.append(
-            f"{_HEAD} The owner picked the accounts {', '.join(picks.accounts)} for this message: read their mail and "
-            f"calendars with {MAIL_SEARCH_TOOL}, {MAIL_READ_TOOL} and {CALENDAR_EVENTS_TOOL}, the account set to each, "
-            "where they fit."
+            f"{_HEAD} The owner picked the accounts {', '.join(picks.accounts)} for this message, signed in to Dot "
+            f"(Customize › Connectors › Accounts): read their mail and calendars with {MAIL_SEARCH_TOOL}, "
+            f"{MAIL_READ_TOOL} and {CALENDAR_EVENTS_TOOL}, the account set to each, where they fit; asked whether they "
+            "work, try each of them with those tools."
         )
     if picks.plan_first:
         lines.append(

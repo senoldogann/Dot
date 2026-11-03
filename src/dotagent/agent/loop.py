@@ -249,6 +249,7 @@ from dotagent.memory.service import (
     prompt_memories,
     words_only,
 )
+from dotagent.oauth.providers import PROVIDERS
 from dotagent.oauth.tokens import Account
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.runtime import Runtime
@@ -1029,10 +1030,13 @@ def _turned_on(outcomes: Sequence[ToolOutcome], hidden: Mapping[str, str], on: f
     return tuple(dict.fromkeys(group for group in named if group not in on))
 
 
-async def _opening_text(opening: RunOpening, offered: Sequence[Skill], room: int, root: Path | None) -> str:
+async def _opening_text(
+    opening: RunOpening, offered: Sequence[Skill], room: int, root: Path | None, providers: Mapping[str, str]
+) -> str:
     """The run's first message to the model: its opening's text, then what the owner picked for it (item 318), each
     picked skill's instructions within ``room`` characters as the ``skill`` tool gives them, the read of each learned
-    skill dated first (item 585: ``root`` is the playbooks' folder, ``None`` with learned skills off). A picked skill no
+    skill dated first (item 585: ``root`` is the playbooks' folder, ``None`` with learned skills off), each account
+    picked by its provider's name (``providers``, by address; item 947). A picked skill no
     longer ``offered`` to the run (taken away since the message was sent) fails the run, which says why."""
     if opening.picks == NO_PICKS:
         return opening.text
@@ -1045,7 +1049,7 @@ async def _opening_text(opening: RunOpening, offered: Sequence[Skill], room: int
     if root is not None:
         await date_reads(root, [by_name[name] for name in opening.picks.skills], time.time())
     skills: list[str] = [await skill_instructions(by_name[name], room) for name in opening.picks.skills]
-    return with_picks(opening.text, opening.picks, skills)
+    return with_picks(opening.text, opening.picks, skills, providers)
 
 
 async def _goal_query(runtime: Runtime, run: RunRecord) -> str:
@@ -2367,7 +2371,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         runtime,
         run.thread_id,
         run.id,
-        await _opening_text(opening, skills.skills, scaffold.tool_output_chars, playbook_root(runtime.config)),
+        await _opening_text(
+            opening,
+            skills.skills,
+            scaffold.tool_output_chars,
+            playbook_root(runtime.config),
+            {account.address: PROVIDERS[account.provider].name for account in signed_in},
+        ),
         opening.files,
         info.vision,
     )

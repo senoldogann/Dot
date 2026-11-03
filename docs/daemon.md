@@ -398,7 +398,9 @@ task](browser-and-computer-use.md#teaching-a-task)); its tooltip says so: "Add f
 task". The slash menu picks **Plugins** (the MCP servers with tools) and
 **Skills**, as `GET /api/palette` lists them; the at menu picks the plugins and the Google and Microsoft accounts signed
 in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
-model; one that is no longer signed in is refused). A plugin, an account or a skill picked stands under the box as its mark and its name in a
+model; one that is no longer signed in is refused). The model is told first what the chips of the message are, each
+account by its provider (the Google account …), and that the message's words mean them when they say "these" or speak
+of a plugin, an app, an account or a skill without naming it (item 947). A plugin, an account or a skill picked stands under the box as its mark and its name in a
 colour of its name, with no border (item 858), which its × takes away; the chip of a server wears its service's mark as the menus do (item 530: the
 logo, the icon or the letters, in the chip's colour on no tile, item 946), Dot's own icon for a server of no service, and for any
 server until the daemon's palette has named it (a draft kept, a message sent; the plug before item 581); the chip of an
