@@ -3,8 +3,10 @@
 // now, in a few words that change as it goes ("Searching the web", "Reading a page", "Thinking"). Each phrase is of
 // what the run's latest event is: nothing is said that the run is not doing. While the same work goes on, the line
 // turns through the other words for it, so that a long step still reads as alive. The line is a button: pressed, the
-// conversation shows every step again, and pressed again folds them back; once the run is over and has an answer, the
-// way to the steps is the answer's foot (item 842), and the line goes.
+// conversation shows every step again, and pressed again folds them back. While the run works it is its words alone,
+// with no dots and no "Show the steps" beside them (item 971, the owner's ask): the line itself is the way. Once the run
+// is over and has an answer, the way to the steps is the answer's foot (item 842), and the line goes; over with none,
+// the line says "Show the steps", which is then all it says.
 
 import { el, setText } from "./dom.js";
 import { callKind } from "./tools.js";
@@ -39,17 +41,15 @@ const QUIET = new Set(["approval_requested", "question_left"]);
  * `onToggle(shown)` runs when the reader asks for the steps (`shown` true) or folds them back.
  */
 export function createWorkStatus({ rootRunId, active, onToggle, face = null }) {
-  const dots = el("span", { class: "work-status-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span"));
   let words = el("span", { class: "work-status-words" });
   const more = el("span", { class: "work-status-more" });
-  // The face of who works stands first, in the place the answer's face takes (item 843), the words where the words of
-  // the messages start, and the dots after them, at the end of the line (item 884, the owner's ask).
+  // The face of who works stands first, in the place the answer's face takes (item 843), and the words where the words
+  // of the messages start.
   const element = el(
     "button",
     { class: "work-status", type: "button", "aria-pressed": "false" },
     face === null ? null : el("span", { class: "turn-face", "aria-hidden": "true" }, face),
     words,
-    dots,
     more,
   );
   let working = active;
@@ -77,8 +77,10 @@ export function createWorkStatus({ rootRunId, active, onToggle, face = null }) {
       words.replaceWith(fresh);
       words = fresh;
     }
-    setText(more, shown ? "Hide the steps" : "Show the steps");
+    // Said only once the run is over: while it works, the line itself shows and folds the steps.
+    setText(more, working ? "" : shown ? "Hide the steps" : "Show the steps");
     element.setAttribute("aria-pressed", String(shown));
+    element.title = shown ? "Hide the steps" : "Show the steps";
   }
 
   function restart() {

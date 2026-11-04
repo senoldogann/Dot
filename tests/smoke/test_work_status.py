@@ -128,15 +128,18 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 await expect(line).to_have_attribute("data-state", "working")
                 await expect(words).to_have_text(re.compile(_COMMAND_WORDS))
                 # The agent typing (item 843): its face first, in the answer's face's place, the words where the words
-                # of the messages start, 28 px of face and a gap of 8 on, and the dots after them (item 884).
+                # of the messages start, 28 px of face and a gap of 8 on.
                 await expect(line.locator(".turn-face .avatar")).to_have_count(1)
-                face_x, words_x, words_end, dots_x = await line.evaluate(
+                face_x, words_x = await line.evaluate(
                     "(line) => { const box = (part) => line.querySelector(part).getBoundingClientRect();"
-                    " return [box('.turn-face').x, box('.work-status-words').x, box('.work-status-words').right,"
-                    " box('.work-status-dots').x]; }"
+                    " return [box('.turn-face').x, box('.work-status-words').x]; }"
                 )
                 assert words_x - face_x == 36, (face_x, words_x)
-                assert dots_x > words_end, (words_end, dots_x)
+                # Its words alone while the run works (item 971, the owner's ask): no dots, and no "Show the steps"
+                # beside them; the line itself is the way to the steps, as its tooltip says.
+                await expect(line).to_have_text(re.compile(_COMMAND_WORDS))
+                await expect(line.locator(".work-status-more")).to_be_hidden()
+                await expect(line).to_have_attribute("title", "Show the steps")
                 # Under the pointer, the reaction of the message before the line stands under its words, where they
                 # start (item 863), and covers none of the line: a press on the line's face shows the steps (the
                 # pre-push review of item 843).

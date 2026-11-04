@@ -172,28 +172,6 @@
   display: inline-flex;
 }
 
-.work-status-dots {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.work-status-dots > span {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--brand);
-  animation: chat-dot var(--motion-dots) ease-in-out infinite;
-  animation-play-state: var(--endless);
-}
-
-.work-status-dots > span:nth-child(2) {
-  animation-delay: calc(var(--motion-dots) / 8);
-}
-
-.work-status-dots > span:nth-child(3) {
-  animation-delay: calc(var(--motion-dots) / 4);
-}
-
 .work-status-words {
   background: linear-gradient(90deg, var(--muted) 30%, var(--text) 50%, var(--muted) 70%);
   background-size: 200% 100%;
@@ -205,23 +183,21 @@
   animation-play-state: var(--endless);
 }
 
-/* The way to the steps is quiet while the run works and the one thing the line says once it is over. */
+/* While the run works the line is its words alone, which a press opens (item 971); once it is over with no answer,
+   the way to the steps is the one thing it says. */
 .work-status-more {
   font-size: var(--text-xs);
-  opacity: 0;
-  transition: opacity var(--motion-quick) var(--ease);
 }
 
-.work-status:is(:hover, :focus-visible) .work-status-more,
-.work-status[data-state="over"] .work-status-more {
-  opacity: 1;
-}
-
-.work-status[data-state="over"] :is(.work-status-dots, .work-status-words, .turn-face) {
+.work-status-more:empty {
   display: none;
 }
 
-/* The line of the work is the agent typing (item 843): its face in the place the answer's takes, the dots where the
+.work-status[data-state="over"] :is(.work-status-words, .turn-face) {
+  display: none;
+}
+
+/* The line of the work is the agent typing (item 843): its face in the place the answer's takes, its words where the
    words of the messages start, close under the message before it rather than a section's gap away. */
 :root[data-work="status"] .run-thread > .work-status {
   margin-top: var(--space-2);
@@ -233,14 +209,7 @@
   padding-top: 0;
 }
 
-@media (hover: none) {
-  .work-status-more {
-    opacity: 1;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .work-status-dots > span,
   .work-status-words {
     animation: none;
   }
