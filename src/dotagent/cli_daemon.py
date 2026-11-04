@@ -129,13 +129,32 @@ async def probe_daemon(url: str) -> HealthView | None:
         ) from exc
 
 
+async def probe_starting_daemon(url: str) -> tuple[HealthView | None, ServiceError | None]:
+    """One look at the health check of a daemon that is starting: its answer, and the error of the look (``None`` when
+    there was none). A look that failed (another program answered, the answer broke off) is no answer yet (item 970): a
+    program that listens on every address of the port, such as ``python3 -m http.server 8765``, takes the connections
+    to the daemon's address in the moment before the new daemon has bound it, and the daemon wins the address once it
+    has. The caller raises the error of its last look once its time is up."""
+    try:
+        return await probe_daemon(url), None
+    except ServiceError as exc:
+        return None, exc
+
+
 async def wait_for_daemon(url: str, seconds: float) -> HealthView | None:
-    """The first answer of the health check within ``seconds``, or ``None`` when there was none."""
+    """The first answer of the health check within ``seconds``, or ``None`` when nothing answered. An answer of another
+    program counts as none until the time is up (:func:`probe_starting_daemon`), and its error is raised then."""
     deadline: float = time.monotonic() + seconds
+    failed: ServiceError | None = None
     while True:
-        health: HealthView | None = await probe_daemon(url)
-        if health is not None or time.monotonic() >= deadline:
+        health: HealthView | None
+        health, failed = await probe_starting_daemon(url)
+        if health is not None:
             return health
+        if time.monotonic() >= deadline:
+            if failed is not None:
+                raise failed
+            return None
         await asyncio.sleep(_POLL_S)
 
 
@@ -394,7 +413,8 @@ async def restart_service(plist: Path, uid: int, url: str) -> HealthView:
     before does not count.
 
     Raises :class:`ServiceError` when launchd has no job of the service (it is not installed), when launchctl refuses
-    the restart, and when no new process answers within :data:`_START_WAIT_S`.
+    the restart, and when no new process answers within :data:`_START_WAIT_S`; an answer of another program in the
+    meantime is waited past (:func:`probe_starting_daemon`), and raised when it was the last look's.
     """
     before: JobState | None = await inspect_job(uid)
     if before is None:
@@ -402,13 +422,17 @@ async def restart_service(plist: Path, uid: int, url: str) -> HealthView:
     began: datetime = datetime.now()
     await restart_job(plist, uid)
     deadline: float = time.monotonic() + _START_WAIT_S
+    failed: ServiceError | None = None
     while True:
         job: JobState | None = await inspect_job(uid)
         if job is not None and job.pid is not None and job.pid != before.pid:
-            health: HealthView | None = await probe_daemon(url)
+            health: HealthView | None
+            health, failed = await probe_starting_daemon(url)
             if health is not None:
                 return health
         if time.monotonic() >= deadline:
+            if failed is not None:
+                raise failed
             raise await _unanswered(url, uid, began)
         await asyncio.sleep(_POLL_S)
 

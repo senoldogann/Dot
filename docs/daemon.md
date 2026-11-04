@@ -1207,7 +1207,10 @@ dotx service uninstall   # stop the daemon and remove the job
 - `dotx service restart` restarts the daemon without changing the job (item 441): the job is unloaded (`bootout` sends
   the daemon SIGTERM, so it stops as it does at the end of a session, and launchctl waits until it has exited) and
   loaded again from its property list, and the command waits up to 60 seconds for a new process to answer `GET
-  /api/health`, then prints its version. It is the way to take up a change of Dot's code, of `config.toml` or of a key;
+  /api/health`, then prints its version. Another program that answers there meanwhile (one that listens on every
+  address of the port, such as `python3 -m http.server 8765`, takes the connections in the moment before the new
+  daemon binds its own) is waited past, and named in the error only when it still answers at the end (item 970);
+  `service install` waits so too. It is the way to take up a change of Dot's code, of `config.toml` or of a key;
   `service install` is for a change of the job itself (another Python, another `DOT_HOME`). The runs at work are cut
   off, and the daemon's next start resumes them as `[agent] resume` says. When launchd has no job of the service, the
   command says so and names `service install`. In a command a run's tool started (the shell and terminal tools mark
