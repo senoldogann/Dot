@@ -15,9 +15,11 @@ import httpx
 import pytest
 import pytest_asyncio
 from composer_choices import show_choices
+from PIL import Image
 from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
 import dotagent.skills as skills_pkg
+from dotagent.agent.attachments import ATTACHMENTS_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -583,6 +585,72 @@ async def test_a_photo_in_the_box_shows_its_picture_beside_the_files_it_came_wit
             await expect(photos.first).to_have_attribute("title", "sunset.png")
             assert (await photos.first.text_content() or "").strip() == ""
             await expect(photos.first.locator("img.attach-thumb")).to_have_attribute("src", re.compile(r"^blob:"))
+        finally:
+            await browser.close()
+
+
+def _noisy_picture(path: Path) -> int:
+    """Write a picture of noise at ``path`` and give its size in bytes."""
+    Image.effect_noise((3000, 1800), 64).save(path)
+    return path.stat().st_size
+
+
+def _picture_size(path: Path) -> tuple[int, int]:
+    with Image.open(path) as picture:
+        return picture.size
+
+
+@pytest.mark.browser
+async def test_a_large_photo_goes_smaller_and_a_send_while_it_uploads_waits_for_it_once(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 990, the owner's word of 2026-11-05: a phone's photos uploaded slowly, and each press of Send while they did
+    said "Wait until the files are uploaded" once more. A picture past a megabyte and 2048 pixels goes as a JPEG of 2048
+    on its longer side; Send pressed while it uploads says once that the message goes when the files are there, and it
+    goes then, once, with them."""
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    picture: Path = tmp_path / "harbour.png"
+    # A noisy picture, which no PNG makes small: 3000 x 1800, several megabytes.
+    picture_bytes: int = await asyncio.to_thread(_noisy_picture, picture)
+    assert picture_bytes > 1024 * 1024
+    goal: str = "What is in this photo?"
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 390, "height": 844}, reduced_motion="reduce")
+            await page.goto(ui_url(host, port, TOKEN))
+            # The upload takes a while, as on a phone's network.
+            held: asyncio.Event = asyncio.Event()
+
+            async def slow(route: Route) -> None:
+                await held.wait()
+                await route.continue_()
+
+            await page.route("**/api/attachments", slow)
+            await page.locator(".composer input[type=file]").set_input_files(str(picture))
+            await expect(page.locator(".composer .attach-chip.uploading")).to_have_count(1)
+            box: Locator = page.locator(".composer textarea")
+            await box.fill(goal)
+            await box.press("Enter")
+            await box.press("Enter")
+            waits: Locator = page.locator(".toast", has_text="Goes once the files are uploaded")
+            await expect(waits).to_have_count(1)
+            await expect(page.locator(".toast", has_text="Wait until")).to_have_count(0)
+            async with page.expect_response("**/api/attachments") as answered:
+                held.set()
+            stored = await (await answered.value).json()
+            assert (stored["name"], stored["media_type"]) == ("harbour.jpg", "image/jpeg")
+            assert stored["size"] < picture_bytes
+            assert await asyncio.to_thread(_picture_size, Path(stored["path"])) == (2048, 1229)
+            # The message went once the file was there, once, with it (the noisy picture is a large JPEG still, and its
+            # upload takes a while under load).
+            await expect(page).to_have_url(re.compile(r"#/runs/run_"), timeout=20_000)
+            runs = [run for run in await runtime.store.list_runs(20, None) if run.goal == goal]
+            assert len(runs) == 1
+            files = await runtime.store.events_of_kind(runs[0].id, ATTACHMENTS_EVENT, 5)
+            assert [file["id"] for file in files[0].data["files"]] == [stored["id"]]
         finally:
             await browser.close()
 

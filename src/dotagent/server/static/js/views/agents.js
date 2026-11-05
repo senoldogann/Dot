@@ -1219,7 +1219,7 @@ export function startComposer({ name, bounds, owner, ctx, follow }) {
       goal.focus();
       return;
     }
-    if (!readyToSend(attachments)) {
+    if (!(await readyToSend(attachments))) {
       return;
     }
     starting = true;

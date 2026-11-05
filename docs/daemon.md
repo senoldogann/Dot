@@ -184,7 +184,10 @@ stream, so an answer or a run's end moves them at once; `GET /api/activity` carr
 and `due`. The composer is one frame on a 24 px corner with a soft shadow under it, as a messaging app's box (item 833):
 one line of the **+**, the words ("Message Miro", the name you call Dot by; "Follow up" in the box of a run; the box's
 tooltip says that @ opens the apps and / the skills and commands) and the microphone at the right, with the files
-attached and the picks above it; as the words take more lines, the buttons stay at the last. On that line the send
+attached and the picks above it; as the words take more lines, the buttons stay at the last. A file uploads as it
+is attached; a picture past a megabyte and 2048 pixels on its longer side goes as a JPEG of 2048 (its clear parts
+white), as a model reads it at about that size, and a send pressed while files upload says once that the message goes
+when they are there, and sends it then (item 990). On that line the send
 comes beside the microphone once there are words or a file (it stays where the browser cannot listen), and a Stop is
 always in sight. The run's choices wait behind the **+** menu's **Model and options**, which brings them on a bar of
 their own under the words, with the send, and **Hide the model and options** puts them away again; the choice is kept

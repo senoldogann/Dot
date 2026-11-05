@@ -883,7 +883,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
     if (queue.editing() !== null) {
       // The edit's files go as a new message's do: once uploaded, and none that failed (item 376).
-      if (!readyToSend(attachments)) {
+      if (!(await readyToSend(attachments))) {
         return;
       }
       sending = true;
@@ -910,7 +910,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       await startLoop(text, other);
       return;
     }
-    if (!readyToSend(attachments)) {
+    if (!(await readyToSend(attachments))) {
       return;
     }
     const files = attachments.ids();
@@ -939,7 +939,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       input.focus();
       return;
     }
-    if (!readyToSend(attachments)) {
+    if (!(await readyToSend(attachments))) {
       return;
     }
     const message = loop.message;

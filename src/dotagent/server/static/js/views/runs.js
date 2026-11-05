@@ -254,7 +254,7 @@ function buildComposer(ctx, listener) {
       goal.focus();
       return;
     }
-    if (!readyToSend(attachments)) {
+    if (!(await readyToSend(attachments))) {
       return;
     }
     starting = true;

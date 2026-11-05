@@ -5,6 +5,7 @@ import { api, blobUrl } from "./api.js";
 import { clip, el, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { readsAsMarkdown } from "./markdown.js";
+import { smallerPicture } from "./shrink.js";
 import { toast } from "./ui.js";
 
 // The flight of a picture Snapshots brought into its chip (item 414): as wide as this share of the page, at most this
@@ -248,11 +249,13 @@ export function createAttachments({ dropTarget, input, onChange }) {
 
   async function upload(entry) {
     try {
-      if (entry.file.size > MAX_BYTES) {
+      // A large picture goes smaller (item 990): it is what made a phone's message wait.
+      const sent = await smallerPicture(entry.file);
+      if (sent.size > MAX_BYTES) {
         throw new Error(`larger than ${sizeLabel(MAX_BYTES)}`);
       }
-      const data = await readBase64(entry.file);
-      const stored = await api.post("/attachments", { name: entry.file.name, media_type: entry.file.type, data_b64: data });
+      const data = await readBase64(sent);
+      const stored = await api.post("/attachments", { name: sent.name, media_type: sent.type, data_b64: data });
       entry.id = stored.id;
       opens(entry);
       setState(entry, "ready", sizeLabel(stored.size));
@@ -276,7 +279,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
     entry.node = chip(file.name, preview, status, entry);
     entries.push(entry);
     list.append(entry.node);
-    upload(entry);
+    entry.done = upload(entry);
   }
 
   function add(files) {
@@ -460,6 +463,8 @@ export function createAttachments({ dropTarget, input, onChange }) {
     },
     count: () => entries.length,
     busy: () => entries.some((entry) => entry.state === "uploading"),
+    // Once every file listed now has uploaded or failed (item 990).
+    settled: () => Promise.all(entries.map((entry) => entry.done ?? null)),
     failed: () => entries.some((entry) => entry.state === "failed"),
     clear: () => {
       for (const entry of [...entries]) {
@@ -498,11 +503,26 @@ export function messageText(text, attachments) {
   return words === "" && attachments.count() > 0 ? wordsForFiles(attachments) : words;
 }
 
-/** Whether a message may go now; says why not when files are still uploading or failed. */
-export function readyToSend(attachments) {
-  if (attachments.busy()) {
-    toast("error", "Wait until the files are uploaded");
+// The lists whose message waits for its files (item 990): a second press meanwhile sends nothing more.
+const waiting = new WeakSet();
+
+/**
+ * Whether a message may go: while its files upload, once they have (item 990: a press of Send while they uploaded was
+ * refused with a toast, one more at each press, and the owner pressed again and again); a press while one waits sends
+ * nothing more. Says why not when a file failed.
+ */
+export async function readyToSend(attachments) {
+  if (waiting.has(attachments)) {
     return false;
+  }
+  if (attachments.busy()) {
+    waiting.add(attachments);
+    toast("ok", "Goes once the files are uploaded");
+    try {
+      await attachments.settled();
+    } finally {
+      waiting.delete(attachments);
+    }
   }
   if (attachments.failed()) {
     toast("error", "Remove the files that failed to upload, or attach them again");

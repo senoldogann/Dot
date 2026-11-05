@@ -516,7 +516,8 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
                 await expect(chips.first.locator(".attach-remove")).to_be_visible()
                 assert (await chips.first.text_content() or "").strip() == ""
                 await page.locator(".dock").screenshot(path=str(tmp_path / "queue-edit-files.png"))
-                # A file added while its upload is held: Save says to wait, and the edit and its files stay.
+                # A file added while its upload is held: Save says the edit goes once the files are there, and the
+                # edit and its files stay until then (item 990: it said to wait, and the owner had to press again).
                 uploaded: asyncio.Event = asyncio.Event()
 
                 async def held(route: Route) -> None:
@@ -531,18 +532,17 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
                 every_chip: Locator = page.locator(".dock .attach-chip")
                 await expect(every_chip).to_have_count(3)
                 await page.locator(".dock .btn.send").click()
-                await expect(page.get_by_text("Wait until the files are uploaded")).to_be_visible()
+                await expect(page.get_by_text("Goes once the files are uploaded")).to_be_visible()
                 await expect(every_chip).to_have_count(3)
                 kept: list[str] = await page.evaluate(
                     "Object.keys(localStorage).filter((key) => key.startsWith('dot.draft.'))"
                     ".map((key) => localStorage.getItem(key))"
                 )
                 assert not any(SHORT_SUMMARY in draft or "notes.txt" in draft for draft in kept), kept
+                # The upload done, the edit is saved with no other press.
                 uploaded.set()
-                await expect(page.locator(".dock .attach-chip.ready")).to_have_count(3)
-                await page.unroute_all(behavior="ignoreErrors")
-                await page.locator(".dock .btn.send").click()
                 await expect(chips).to_have_count(0)
+                await page.unroute_all(behavior="ignoreErrors")
                 await expect(row).to_have_count(1)
                 # The draft's photo is back as it was, its own picture on its chip.
                 await expect(every_chip).to_have_count(1)
