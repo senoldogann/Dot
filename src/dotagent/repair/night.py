@@ -166,6 +166,14 @@ PROTECTED: tuple[str, ...] = (
     ".github/",
     "src/dotagent/repair/",
     "src/dotagent/scheduler/runner.py",
+    # What marks and fences content third parties can author, and the gate on what Dot learns: a session that fixes a
+    # problem a page could have shaped never changes them alone (item 983, the review of the self-improvement rebuild).
+    "src/dotagent/core/learned_text.py",
+    "src/dotagent/core/text.py",
+    "src/dotagent/harness/",
+    "src/dotagent/agent/executor.py",
+    "src/dotagent/agent/gate.py",
+    "src/dotagent/tools/base.py",
     # What Dot installs and runs with: a dependency changed by its lock alone is the owner's to take (the seventh
     # review; REVIEW.md names "pyproject.toml dependencies").
     "pyproject.toml",
