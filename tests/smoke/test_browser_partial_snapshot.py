@@ -5,12 +5,12 @@ does on Slack or LinkedIn, and the part is read for real: the script that names 
 work afterwards.
 """
 
-import time
+import asyncio
 from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright
+from playwright.async_api import Browser, ConsoleMessage, Page, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from dotagent.browser.driver import capture_page
@@ -64,22 +64,44 @@ async def test_a_page_whose_whole_snapshot_times_out_gives_a_part_with_refs_that
     assert (await capture_page(page, 60_000, True)).partial == ""
 
 
-_HEAVY_ITEMS: int = 60_000
-_HEAVY_PAGE: str = (
-    "<!doctype html><title>Heavier</title><main><ul>"
-    + "".join(f"<li><a href='#h{n}'>Row {n}</a></li>" for n in range(_HEAVY_ITEMS))
-    + "</ul></main>"
-)
+# How long the page's main thread is held: a whole snapshot that timed out is not stopped in the page but runs on to
+# its end, and everything asked of the page waits behind it (item 923). The page is held for a known time rather than
+# for the time a snapshot of it happens to take: a loaded runner took up to half again the time the test measured, which
+# put this read at the waiting bound and lost it twice (#756's CI, 2026-11-02; #785's CI, 2026-11-05).
+_HELD_MS: int = 7000
+# The page says so before it blocks, so that the hold has the page before the read asks anything of it.
+_HELD_SCRIPT: str = """(ms) => {
+  console.log('held');
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    // The page's main thread is held, as the snapshot that timed out holds it.
+  }
+}"""
 
 
 async def test_a_whole_snapshot_that_really_times_out_still_gives_a_part(page: Page) -> None:
     """The whole snapshot that timed out runs on in the page (item 923); the part waits for it rather than failing."""
-    await page.set_content(_HEAVY_PAGE)
-    started: float = time.monotonic()
-    await page.aria_snapshot(mode="ai", boxes=True, timeout=120_000)
-    whole_ms: int = round((time.monotonic() - started) * 1000)
-    # Half the time the whole takes: it times out for real, and the page stays busy as long again, inside the twice its
-    # time the part waits (a third was the bound itself, which a slow runner missed: #756's CI, 2026-11-02).
-    read = await capture_page(page, whole_ms // 2, True)
-    assert read.partial.startswith("Partial view: the page was too heavy to read whole")
-    assert "Row" in render_lines(read.lines)
+    # The light page of the test above: what waits behind the hold is the snapshot this read left running, so a page
+    # whose own snapshot takes seconds would put the wait at its bound again.
+    await page.set_content(_PAGE)
+    timeout_ms: int = 3000
+    held_at = asyncio.Event()
+
+    def note(message: ConsoleMessage) -> None:
+        if message.text == "held":
+            held_at.set()
+
+    page.on("console", note)
+    held = asyncio.create_task(page.evaluate(_HELD_SCRIPT, _HELD_MS))
+    try:
+        await asyncio.wait_for(held_at.wait(), _HELD_MS / 1000)
+        read = await capture_page(page, timeout_ms, True)
+    finally:
+        # A read that gave up holds nothing: the page is left to finish the hold before the next test asks for it.
+        page.remove_listener("console", note)
+        await held
+    # The snapshot waited out its own time, and the naming of the part waited for the page: the hold is longer than the
+    # whole's timeout and, with a page this light, shorter than the three times it the naming waits (3 s + 2 x 3 s),
+    # which the old wait of the whole's own time (3 s + 3 s) fails.
+    assert read.partial.startswith(f"Partial view: the page was too heavy to read whole in {timeout_ms / 1000:g} s")
+    assert "Item" in render_lines(read.lines)
