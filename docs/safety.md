@@ -421,7 +421,9 @@ trading off.
    rules (`GET /api/rules/usage`, item 473): how many steps it fits, how many it decides (as the first rule to fit, or
    as a hand-off wherever it stands), how many of those ran in yolo runs or were settled before any rule, and which
    rules decide the others. Before a rule is added it is tried on the steps of past runs (`POST /api/rules/preview`,
-   item 469), as the policy matches rules, and nothing is written: a line says how many of the things Dot did in the
+   item 469), as the policy matches rules, but on the step's summary and target alone (a past page script's record
+   keeps its start, not the whole script the policy reads, item 985), and nothing is written: a line says how many of
+   the things Dot did in the
    last 30 days it fits, and under the draft's Details **Test on the last 30 days** gives the whole of it, again once a
    part is changed: how many steps it fits and which earlier rules
    decide some of them first. Of the rest, it counts apart the steps of yolo runs, which ask nothing whatever the rules

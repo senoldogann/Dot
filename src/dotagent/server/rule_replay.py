@@ -66,7 +66,9 @@ def candidate_rule(behavior: Behavior, tool_glob: str, match_regex: str, existin
 
 def _action(step: StepRow) -> ActionInfo | None:
     """The step as the policy matched rules on it: its tool, summary and target; a step of a kind or risk this Dot does
-    not know is passed over. In a chat where a login was filled, the policy matched the step as written and only its
+    not know is passed over. A page's script was matched whole as well (``ActionInfo.body``, item 985), which the
+    step's record does not keep: a rule against a part of it past its start fits it here only where the summary shows
+    that part. In a chat where a login was filled, the policy matched the step as written and only its
     masked record was kept (item 621), so a rule tried here on such a step can count otherwise than the live decision
     did: the password is not stored to be matched again."""
     if step.kind not in _KINDS or step.risk not in _RISKS:
