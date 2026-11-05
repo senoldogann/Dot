@@ -1532,7 +1532,7 @@ a.pill:hover {
   position: absolute;
   width: 1px;
   height: 1px;
-  margin: -var(--space-half);
+  margin: calc(-1 * var(--space-half));
   padding: 0;
   overflow: hidden;
   clip-path: inset(50%);

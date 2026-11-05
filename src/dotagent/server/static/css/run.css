@@ -126,8 +126,8 @@
 
 /* With "What it is doing" chosen, the steps and the thoughts of a run fold out of the conversation until the reader
    asks for them, and so do the changes of the memory (item 830); the approvals, questions, other notes and messages
-   stay. One line under the conversation says what the run does now: three of Dot's dots and a few words that shimmer
-   and change; once the run is over it offers the steps. */
+   stay. One line under the conversation says what the run does now: a few words that shimmer and change, which a
+   press opens (item 971); once the run is over it offers the steps. */
 .work-status {
   display: none;
 }
@@ -187,10 +187,6 @@
    the way to the steps is the one thing it says. */
 .work-status-more {
   font-size: var(--text-xs);
-}
-
-.work-status-more:empty {
-  display: none;
 }
 
 .work-status[data-state="over"] :is(.work-status-words, .turn-face) {

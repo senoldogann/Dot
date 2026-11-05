@@ -77,8 +77,10 @@ export function createWorkStatus({ rootRunId, active, onToggle, face = null }) {
       words.replaceWith(fresh);
       words = fresh;
     }
-    // Said only once the run is over: while it works, the line itself shows and folds the steps.
-    setText(more, working ? "" : shown ? "Hide the steps" : "Show the steps");
+    // Shown only once the run is over: while it works the line itself shows and folds the steps, and the words stay
+    // in its name for a screen reader, out of sight (item 977), as its tooltip says them to the pointer.
+    setText(more, shown ? "Hide the steps" : "Show the steps");
+    more.classList.toggle("visually-hidden", working);
     element.setAttribute("aria-pressed", String(shown));
     element.title = shown ? "Hide the steps" : "Show the steps";
   }

@@ -136,10 +136,13 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 )
                 assert words_x - face_x == 36, (face_x, words_x)
                 # Its words alone while the run works (item 971, the owner's ask): no dots, and no "Show the steps"
-                # beside them; the line itself is the way to the steps, as its tooltip says.
-                await expect(line).to_have_text(re.compile(_COMMAND_WORDS))
-                await expect(line.locator(".work-status-more")).to_be_hidden()
+                # beside them; the line itself is the way to the steps, as its tooltip says, and its name to a screen
+                # reader too (item 977).
+                await expect(line.locator(".work-status-dots")).to_have_count(0)
                 await expect(line).to_have_attribute("title", "Show the steps")
+                await expect(line).to_have_accessible_name(re.compile(r"Show the steps$"))
+                more_box = await line.locator(".work-status-more").bounding_box()
+                assert more_box is not None and more_box["width"] <= 1 and more_box["height"] <= 1, more_box
                 # Under the pointer, the reaction of the message before the line stands under its words, where they
                 # start (item 863), and covers none of the line: a press on the line's face shows the steps (the
                 # pre-push review of item 843).
