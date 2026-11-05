@@ -575,6 +575,11 @@ every mode but `yolo` (item 433).
 - Return presses the button that has the keyboard and the default button of the window (item 555): a `key` step of
   Return, Enter or Space, and a `type` text with a line break, are judged by the names of those buttons as a click on
   them is, so Return on a Pay, a Send or a Delete asks as the click does.
+- A drag is judged where it lets go as well as where it takes (item 982): a drop on a password manager, Dot's own window
+  or Chrome's remote-debugging grant is refused or asks as a click there does, a drop into System Settings (an
+  application into its Login Items) changes a setting as a click there does, and something dragged out of Finder into
+  another application is an upload (a page's drop zone takes it as `browser_upload`'s file input does), which a run
+  that read outside content asks about.
 - A click at coordinates is judged by the control accessibility finds under the point and by the title of that
   control's own window, so that Dot's own window is known behind another one whether or not macOS lets Dot see the
   screen (item 555). An application that does not say what is there (busy, or not answering) gets no click: the step

@@ -9,7 +9,7 @@ that moves the pointer or presses keys.
 import threading
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from math import hypot
 from pathlib import Path
@@ -69,6 +69,8 @@ class Inspection:
     context: StepContext
     target: str
     pid: int = 0
+    # The application a drag lets go on (item 982), 0 for none.
+    drop_pid: int = 0
 
 
 # What a step does at a secure text field, on the worker thread: called with the step's inspection and what the step
@@ -469,6 +471,8 @@ def refuse_secrets(context: StepContext) -> None:
     application is never controlled."""
     if context.role == "secrets":
         raise DesktopError(f"{context.app} holds passwords or keys; it is never controlled", {"app": context.app})
+    if context.drop is not None:
+        refuse_secrets(context.drop)
 
 
 def _presses_return(step: Step) -> bool:
@@ -491,7 +495,11 @@ def inspect_step(env: StepEnv, step: Step, lines: Mapping[str, str]) -> Inspecti
         case "click" | "double_click" | "right_click" | "hover" | "scroll":
             return _inspection(env, lines, _peek(env, step.ref, step.x, step.y))
         case "drag":
-            return _inspection(env, lines, _peek(env, step.ref, step.x, step.y))
+            # Where it lets go is read too (item 982): what is dropped there is judged with what was taken.
+            taken: Inspection = _inspection(env, lines, _peek(env, step.ref, step.x, step.y))
+            landing: Target = _peek(env, step.to_ref, step.to_x, step.to_y)
+            drop: StepContext = _context(landing, lines)
+            return replace(taken, context=taken.context.model_copy(update={"drop": drop}), drop_pid=landing.owner.pid)
         case "press" | "focus" | "set_value":
             return _inspection(env, lines, _peek_ref(env, _required(step.ref, "ref")))
         case "type" | "paste":
@@ -861,18 +869,23 @@ def _activate(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
 
 def _changed_since(reviewed: Inspection, fresh: Inspection) -> bool:
     """Whether a step would touch something else than the review judged: another application, kind of window, control
-    or label, a default button that is another, or a field that turned secret (the command line a terminal holds is
-    not compared: the review reads it from what Dot typed, the step does not)."""
+    or label, a default button that is another, a field that turned secret, or for a drag another place it lets go
+    (item 982; the command line a terminal holds is not compared: the review reads it from what Dot typed, the step
+    does not)."""
     before: StepContext = reviewed.context
     after: StepContext = fresh.context
-    return (reviewed.pid, before.role, before.app, before.element, before.secure, before.default_button) != (
-        fresh.pid,
-        after.role,
-        after.app,
-        after.element,
-        after.secure,
-        after.default_button,
+    return _seen(reviewed.pid, reviewed.drop_pid, before) != _seen(fresh.pid, fresh.drop_pid, after)
+
+
+def _seen(pid: int, drop_pid: int, context: StepContext) -> tuple[object, ...]:
+    """What of a step's context is compared before it runs (:func:`_changed_since`), the place a drag lets go
+    included, by its application's process as the start is."""
+    drop: tuple[object, ...] = (
+        ()
+        if context.drop is None
+        else (drop_pid, context.drop.role, context.drop.app, context.drop.element, context.drop.secure)
     )
+    return (pid, context.role, context.app, context.element, context.secure, context.default_button, drop)
 
 
 def execute_step(env: StepEnv, step: Step, reviewed: Inspection) -> Effect:
