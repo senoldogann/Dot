@@ -724,6 +724,46 @@ class MemoryScore(FrozenModel):
     failed: int
 
 
+class ToolOutcome(FrozenModel):
+    """A tool's result in a run, as the night's digest of real runs reads it (item 987): the run, its chat, where it
+    came from (``source``) and when the result came; whether it went well and, when not, the start of what it said
+    (``error``, the first :data:`dotagent.store.db.OUTCOME_ERROR_CHARS` characters, masked as the event keeps it); the
+    site it acted on, and whether the run had read what others can author before it."""
+
+    run_id: str
+    thread_id: str | None
+    source: str
+    at: float
+    tool: str
+    ok: bool
+    error: str
+    site: str
+    tainted: bool
+
+
+class RunTally(FrozenModel):
+    """How many of the runs that ended in a span ended done and failed, and how many of each had a lesson handed to them
+    (item 987): what tells whether the lessons Dot learned help."""
+
+    ended: int
+    done: int
+    failed: int
+    with_lesson: int
+    with_lesson_done: int
+
+
+# The half of a trial of the harness a run is in (item 988).
+type TrialArm = Literal["candidate", "in_use"]
+
+
+class TrialRun(FrozenModel):
+    """A run that took part in a trial of the harness (item 988) and ended: the half it was in and how it ended."""
+
+    run_id: str
+    arm: TrialArm
+    status: str
+
+
 class ScheduleOptions(FrozenModel):
     """How the runs of a schedule are started. ``None`` takes what the configuration says when the schedule fires:
     the main model, its default reasoning level, the standard speed, the configured approvals, no goal mode, the

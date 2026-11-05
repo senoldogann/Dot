@@ -22,6 +22,7 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.harness.digest import night_digest
 from dotagent.harness.schedule import STEP_TIME_KEY
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -296,6 +297,8 @@ async def test_the_version_in_use_reads_as_two_lists_and_the_nights_as_a_card(
     for days, state in ((2, "keep"), (1, "done")):
         step = await runtime.store.create_harness_step(now - days * 86400, None, None)
         await runtime.store.finish_harness_step(step.id, now - days * 86400 + 60, state, "{}", None)
+    # A night that read the real runs of its day (item 987), the oldest of the three.
+    await night_digest(runtime.store, runtime.config.harness, now - 3 * 86400, runtime.schedule_zone)
     page: Page = await _open(browser, nightly_client, 1280)
     try:
         # What Dot follows now: the two texts as lists, a line a point, the words between backticks in code type.
@@ -310,14 +313,17 @@ async def test_the_version_in_use_reads_as_two_lists_and_the_nights_as_a_card(
         overview: Locator = page.get_by_role("group", name="Overview")
         await expect(overview).to_contain_text("Learning nights")
         await expect(overview).to_contain_text("· done")
-        await expect(overview.locator(".night-strip .night-cell")).to_have_count(2)
+        await expect(overview.locator(".night-strip .night-cell")).to_have_count(3)
         # The nightly learning says when it runs and what comes next, and lists its nights under that.
         nightly: Locator = _section(page, "Nightly learning")
         await expect(nightly).to_contain_text("Every night at 04:00")
         await expect(nightly.locator(".night-next")).to_have_text(
             re.compile(r"^Next: (tonight|today|tomorrow), 04:00$")
         )
-        await expect(nightly.locator("[data-step]")).to_have_count(2)
+        await expect(nightly.locator("[data-step]")).to_have_count(3)
+        digest: Locator = nightly.locator("[data-step]").filter(has_text="a digest of the day's real runs")
+        await expect(digest).to_contain_text(re.compile(r"\d+ runs? ended, \d+ done and \d+ failed"))
+        await expect(digest).not_to_contain_text("proposed")
         await expect(nightly.locator(".night-legend")).to_contain_text("a change")
         # A version's texts and notes open under its row, and shut again.
         # The earlier tests of this home left versions of their own: this one is the one in use, and the first.
@@ -543,13 +549,14 @@ async def test_the_nightly_learning_is_switched_on_and_timed_on_the_page(
     try:
         nightly: Locator = _section(page, "Nightly learning")
         await expect(nightly).to_contain_text("The nightly learning is off")
-        await expect(nightly).to_contain_text(f"with its main model, {SCRIPTED_MODEL}: up to 8 million pieces of text")
+        # A night reads the day's real runs and calls no model (item 987).
+        await expect(nightly).to_contain_text("calls no model. Once a week")
         switch: Locator = nightly.get_by_role("switch", name="Nightly learning on")
         await expect(switch).to_have_attribute("aria-checked", "false")
         await switch.click()
         dialog: Locator = page.get_by_role("dialog")
         await expect(dialog).to_contain_text("Switch the nightly learning on?")
-        await expect(dialog).to_contain_text("million pieces of text")
+        await expect(dialog).to_contain_text("calls no model")
         await dialog.get_by_role("button", name="Switch on").click()
         await expect(nightly).to_contain_text("Every night at 04:00")
         await expect(switch).to_have_attribute("aria-checked", "true")

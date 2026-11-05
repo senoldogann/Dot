@@ -208,7 +208,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import agent_folder
 from dotagent.core.text import CHARS_PER_TOKEN, redact_known, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.harness.service import adopted_text
+from dotagent.harness.seat import TRIAL_EVENT, text_for_run
 from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_in_order
 from dotagent.help.meaning import HelpVectorsCold
 from dotagent.llm.calls import CallOrigin
@@ -2260,9 +2260,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # 621); a text that holds one reaches the prompt with it masked (``given_text``, ``owner_prompt_lines``).
     held_at_start: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     # The adopted version of the harness (item 389): its texts go into the prompt, and the run records which it took.
-    harness_text, harness_version = await adopted_text(runtime.store, held_at_start)
+    # While a version is tried on real runs (item 988), half the runs take it, by their id, and record their half.
+    harness_text, harness_version, seat = await text_for_run(runtime.store, run.id, held_at_start, time.time())
     if harness_version is not None:
         await runtime.store.set_run_harness(run.id, harness_version)
+    if seat is not None:
+        await runtime.store.add_event(run.id, TRIAL_EVENT, {"version": seat.version, "arm": seat.arm})
     remembered: tuple[MemoryRecord, ...] = recalled.records
     if remembered:
         handed: list[str] = [record.id for record in remembered]

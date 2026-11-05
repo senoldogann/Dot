@@ -25,9 +25,8 @@ from dotagent.core.errors import DotError, NotFoundError, RunConflict, StoreErro
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
-from dotagent.harness.probe import probe_apart
 from dotagent.harness.schedule import schedule_of
-from dotagent.harness.step import run_step
+from dotagent.harness.weekly import night as harness_night
 from dotagent.llm.types import Speed
 from dotagent.plugins import scout_service
 from dotagent.plugins.scout import ScoutStopped
@@ -452,10 +451,9 @@ class Scheduler:
         await command(restart_argv(sys.executable), Path.home(), self._runtime.shell_env)
 
     async def _step_if_due(self, now: float) -> None:
-        """Start the step of the harness (item 391) in a task when its daily time has passed since the last one (or the
-        last attempt); never while one is under way, and never with ``[harness] step_time`` off. While the emergency
-        stop is engaged none starts, and one under way is cancelled, which ends its probe's process and the commands
-        it started (item 683)."""
+        """Start the night of the harness (the digest of the day's real runs, item 987) in a task when its daily time
+        has passed since the last one (or the last attempt); never while one is under way, and never with ``[harness]
+        step_time`` off. While the emergency stop is engaged none starts, and one under way is cancelled (item 683)."""
         if await _emergency_stop_engaged():
             if self.stepping() and self._stepping is not None:
                 self._stepping.cancel()
@@ -518,10 +516,12 @@ class Scheduler:
             log.info("scout_fired", summary=state.last_summary)
 
     async def _step(self, now: float) -> None:
-        """Task body of a step of the harness, and the one place its errors end: its outcome is logged and kept in the
-        record of how learning fares, as the reflection's is; the probes run in processes of their own."""
+        """Task body of the night of the harness, and the one place its errors end: its outcome is logged and kept in
+        the record of how learning fares, as the reflection's is. The night is the digest of the day's real runs (item
+        987), which calls no model, and once a week the proposal and the trial of a version on real runs (item 988); the
+        step that plays synthetic tasks (item 391) runs only when asked (``dotx harness step``)."""
         try:
-            step: HarnessStep = await run_step(self._runtime, now, None, probe_apart, False)
+            step: HarnessStep = await harness_night(self._runtime, now)
         except DotError as exc:
             log.error("harness_step_failed", error=exc.message, context=exc.context)
             outcome: LearningOutcome = failed_with(exc.message)

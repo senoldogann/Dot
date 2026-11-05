@@ -1219,11 +1219,12 @@ async def test_the_nightly_step_starts_at_the_time_the_page_set_over_the_setting
     kept from the page holds it, whatever the file says."""
     steps: list[float] = []
 
-    async def step(given: Runtime, now: float, from_run: str | None, prober: object, scripted: bool) -> HarnessStep:
+    async def step(given: Runtime, now: float) -> HarnessStep:
         steps.append(now)
         return await given.store.create_harness_step(now, None, None)
 
-    monkeypatch.setattr(scheduler_runner, "run_step", step)
+    # The night is the digest of the day's real runs and the week's word (items 987 and 988).
+    monkeypatch.setattr(scheduler_runner, "harness_night", step)
     scheduler: Scheduler = Scheduler(runtime, _Starts(runtime))
     zone = runtime.schedule_zone
     day: datetime = datetime(2026, 10, 27, tzinfo=zone)
