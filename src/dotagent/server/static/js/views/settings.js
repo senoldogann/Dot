@@ -1,7 +1,7 @@
 // The settings. In a Mac's window the sidebar is their nav (settingsnav.js, item 562) and the page is the open tab alone: its
 // section's name, the row of its tabs when it has more than one (item 845), a line that says what the tab is for and what
-// it holds, in a column of its own; on a phone, a list of the seven sections whose rows open each as a page of its own
-// (item 330). Each tab is drawn by the module that owns it.
+// it holds, in a column of its own; on a phone, one sheet of rows in groups, a row a tab that opens as a page of its own
+// (items 330 and 995). Each tab is drawn by the module that owns it.
 
 import { api, query } from "../api.js";
 import { el } from "../dom.js";
@@ -120,7 +120,7 @@ function mountList(root, ctx) {
   };
 }
 
-/** Draw the settings of the route. On a phone `#/settings` is the list of the sections; in a wider window it leads to
+/** Draw the settings of the route. On a phone `#/settings` is the sheet of the tabs (item 995); in a wider window it leads to
  * General, and so does an unknown tab. `#/settings/<tab>` draws that tab, under the head of its section (its name, and
  * the row of its tabs): the tab is given `ctx.head`, to say what it is for (`setLead`), what it holds (`setMeta`) and the
  * buttons that belong to the whole page (`setActions`). */
