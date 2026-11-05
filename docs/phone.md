@@ -191,7 +191,8 @@ without asking, which would outlast its removal (item 678, 403): add a connected
 command at each start of the daemon), or one another agent of the Mac set up, switch Dot's safe box for commands or its
 extra checker (the typed judge) off, switch free mode on (item 922), add or switch on a rule that lets steps through
 (allow, pre-approved), delete or
-switch off a rule that asks, or move any rule; what narrows (a rule that asks, the safe box on) it still does. What is
+switch off a rule that asks, delete or switch off an allow rule that a pre-approved rule after it would stand in for
+(an allow rule asks of a run that read outside content where a pre-approved one does not; item 981), or move any rule; what narrows (a rule that asks, the safe box on) it still does. What is
 shown or connected on the Mac alone (the eye of the vault, 1Password, a sign-in of Google or Microsoft, the microphone's
 pane of System Settings) answers the installation's token alone, never a phone's key, whatever address a phone's request
 names. `yolo`, which asks nothing but a payment, a message or mail and a public post in a chat you opened (item 860), is

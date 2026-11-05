@@ -219,6 +219,29 @@ async def test_a_phone_key_cannot_loosen_the_rules_but_keeps_yolo_in_reach(own_h
         # The extra checker is switched off on the Mac alone.
         assert (await client.put("/judge", json={"provider": "none"}, headers=phone)).status_code == 403
         assert (await client.delete(f"/rules/{rule_id}", headers=mac)).status_code == 200
+        # An allow rule above a preapproved one asks of a run that read a page where the preapproved one does not: a
+        # phone may not take it away (item 981, the security audit of 2026-11-05), and may take away one with none
+        # after it.
+        preapproved: httpx.Response = await client.post(
+            "/rules",
+            json={"behavior": "preapproved", "tool_glob": "shell", "match_regex": "git", "description": ""},
+            headers=mac,
+        )
+        narrow: httpx.Response = await client.post(
+            "/rules",
+            json={"behavior": "allow", "tool_glob": "shell", "match_regex": "git push", "description": ""},
+            headers=mac,
+        )
+        narrow_id: str = narrow.json()["id"]
+        assert (await client.post(f"/rules/{narrow_id}/move", json={"direction": "up"}, headers=mac)).status_code == 200
+        uncovering: list[httpx.Response] = [
+            await client.patch(f"/rules/{narrow_id}", json={"enabled": False}, headers=phone),
+            await client.delete(f"/rules/{narrow_id}", headers=phone),
+        ]
+        assert [answer.status_code for answer in uncovering] == [403, 403], [answer.text for answer in uncovering]
+        assert (await client.delete(f"/rules/{preapproved.json()['id']}", headers=mac)).status_code == 200
+        assert (await client.patch(f"/rules/{narrow_id}", json={"enabled": False}, headers=phone)).status_code == 200
+        assert (await client.delete(f"/rules/{narrow_id}", headers=phone)).status_code == 200
 
 
 async def test_a_phone_key_makes_the_loop_of_a_chat_in_yolo(own_home: Path) -> None:
