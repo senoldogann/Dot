@@ -125,6 +125,14 @@ const SHAPES = {
     ["path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" }],
   ],
   plus: [["path", { d: "M5 12h14" }], ["path", { d: "M12 5v14" }]],
+  // Three tiles and a plus: the apps Dot connects to (item 991).
+  appsGrid: [
+    ["rect", { x: 3, y: 3, width: 7, height: 7, rx: 1.5 }],
+    ["rect", { x: 14, y: 3, width: 7, height: 7, rx: 1.5 }],
+    ["rect", { x: 3, y: 14, width: 7, height: 7, rx: 1.5 }],
+    ["path", { d: "M17.5 14v7" }],
+    ["path", { d: "M14 17.5h7" }],
+  ],
   download: [["path", { d: "M12 15V3" }], ["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }], ["path", { d: "m7 10 5 5 5-5" }]],
   upload: [["path", { d: "M12 3v12" }], ["path", { d: "m17 8-5-5-5 5" }], ["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }]],
   ellipsis: [["circle", { cx: 12, cy: 12, r: 1 }], ["circle", { cx: 19, cy: 12, r: 1 }], ["circle", { cx: 5, cy: 12, r: 1 }]],

@@ -457,9 +457,9 @@ async def test_the_bar_the_sidebar_the_composer_and_the_panel_keep_out_of_the_sa
 
             await page.get_by_role("button", name="Show sidebar").click()
             head: FloatRect = await _box(page.locator(".side-head"))
-            settings: FloatRect = await _box(page.locator(".side-foot .side-link"))
+            apps: FloatRect = await _box(page.locator(".side-foot .side-connect"))
             assert head["y"] >= _SAFE_TOP_PX - 0.5, head
-            assert settings["y"] + settings["height"] <= height - _SAFE_BOTTOM_PX + 0.5, (settings, height)
+            assert apps["y"] + apps["height"] <= height - _SAFE_BOTTOM_PX + 0.5, (apps, height)
             await page.screenshot(path=str(tmp_path / "safe-sidebar.png"))
             await _swipe_closed(page)
 

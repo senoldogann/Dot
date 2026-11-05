@@ -722,6 +722,14 @@
   }
 }
 
+/* Your initials and Dot's large face are a phone's home's alone (item 991). */
+@media (min-width: 720.02px) {
+  .side-owner,
+  .side-dot-hero {
+    display: none;
+  }
+}
+
 /* The way to the agents while the owner has none of their own, under the search (item 95); with their faces at the top
    it holds nothing and takes no room (item 855). */
 .side-links {
@@ -1143,18 +1151,53 @@
     padding: 8px 16px 4px 8px;
   }
 
+  /* The list is the phone's home (item 991): its head holds your initials at the left, the pages and the "+" at the
+     right, and Dot's name stands under its large face in the body rather than in the head. */
   .side-title {
-    display: block;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--text);
-    font-size: var(--text-2xl);
-    line-height: var(--leading-2xl);
-    font-weight: var(--weight-title);
-    letter-spacing: var(--tracking-title);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none;
   }
+
+  .side-head > .side-pages {
+    margin-left: auto;
+  }
+
+  .side-owner {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text-2);
+    font-size: var(--text-md);
+    font-weight: var(--weight-title);
+    text-decoration: none;
+  }
+
+  .side-head > .side-compose {
+    margin-left: 4px;
+  }
+
+  /* Dot's own face, large, its name under it, over the faces of the other agents. */
+  .side-dot-hero {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4) 0 var(--space-3);
+    color: var(--text);
+    font-size: var(--text-md);
+    text-decoration: none;
+  }
+
+  .side-dot-hero > .avatar {
+    width: 112px;
+    height: 112px;
+  }
+
 
   .side-body {
     padding: 8px 12px 12px;
@@ -1223,6 +1266,30 @@
   .side-foot .icon {
     width: 20px;
     height: 20px;
+  }
+
+  /* Settings is your initials at the top (item 991): the cog leaves the foot, which holds the apps and the search. */
+  .side-foot > .side-link.side-settings {
+    display: none;
+  }
+
+  .side-owner,
+  .side-owner:hover,
+  .side-dot-hero,
+  .side-dot-hero:hover {
+    text-decoration: none;
+  }
+
+  /* The other agents' faces stand centred under Dot's, as many as there are, rather than in four columns from the
+     left. */
+  .side-agent-faces {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-4);
+  }
+
+  .side-agent-faces > .side-agent-face {
+    width: 72px;
   }
 }
 

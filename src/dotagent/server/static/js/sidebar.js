@@ -17,6 +17,7 @@ import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, 
 import { icon } from "./icons.js";
 import { actorFace, DOT_ID, lookOf, teamDuo } from "./actors.js";
 import { onAssistant } from "./assistant.js";
+import { shownOwner } from "./presence.js";
 import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
@@ -630,6 +631,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // pointer on one stays (the pre-push review).
   let facesDrawn = null;
   function paintFaces(found) {
+    // Dot's own face on a phone's home wears the look it was given (item 991).
+    const dot = found.find(({ record }) => record.id === DOT_ID);
+    if (dot !== undefined) {
+      dotHero.firstElementChild.replaceWith(actorFace(DOT_ID, "idle", dot.record.look));
+    }
     // As many as the sidebar holds whole beside All (item 855: the row scrolled, and a face cut at its edge looked
     // broken): the agents that worked last first.
     const worked = (summary) => summary.latest?.created_at ?? summary.record.created_at;
@@ -1584,6 +1590,24 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
   paintConnected();
   const foot = el("div", { class: "side-foot" }, settingsLink, connectButton);
+  // On a phone the list is the home (item 991, the owner's ask of 2026-11-05 for a plain home): your initials at the top
+  // left lead to the settings, the "+" at the right starts a chat, Dot's own face stands large over the faces of the
+  // other agents, and the foot holds the apps and the search.
+  const ownerInitials = el("span", { class: "side-owner-initials", "aria-hidden": "true" });
+  const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate }, ownerInitials);
+  function paintOwner() {
+    const words = shownOwner().split(/\s+/).filter((word) => word !== "");
+    const initials = words.slice(0, 2).map((word) => word[0].toLocaleUpperCase()).join("");
+    ownerInitials.replaceChildren(initials === "" ? icon("user") : initials);
+  }
+  paintOwner();
+  const heroName = el("span", { class: "side-dot-name" }, dotName());
+  const dotHero = el(
+    "a",
+    { class: "side-dot-hero", href: `#/agents/${DOT_ID}`, onclick: onNavigate },
+    actorFace(DOT_ID, "idle", null),
+    heroName,
+  );
   const sideHead = el(
     "div",
     { class: "side-head", "data-tauri-drag-region": "" },
@@ -1593,12 +1617,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
+    connectButton.firstElementChild.replaceWith(icon(PHONE.matches ? "appsGrid" : "plug"));
+    sideHead.append(compose);
     if (PHONE.matches) {
+      close.after(ownerLink);
       connectButton.after(searchBox);
-      foot.append(compose);
+      facesNav.before(dotHero);
     } else {
+      ownerLink.remove();
+      dotHero.remove();
       body.prepend(searchBox);
-      sideHead.append(compose);
     }
   }
   placeForWidth();
@@ -1625,7 +1653,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
   PHONE.addEventListener("change", paintMode);
   // The name the owner calls Dot by, as it changes (item 420).
-  onAssistant((names) => setText(element.querySelector(".side-title"), names.name));
+  onAssistant((names) => {
+    setText(element.querySelector(".side-title"), names.name);
+    setText(heroName, names.name);
+    paintOwner();
+  });
   const workTicker = setInterval(() => {
     for (const node of element.querySelectorAll(".side-working-time")) {
       setText(node, workingFor(Number(node.dataset.since)));

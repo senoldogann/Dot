@@ -243,8 +243,9 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await expect(full).to_have_count(0)
                     await expect(page.locator("#inspector-panel-screen .computer")).to_have_count(1)
 
-                    # The sidebar is the list of chats over the whole screen, with the search and a new chat at its
-                    # foot.
+                    # The sidebar is the list of chats over the whole screen, the phone's home (item 991): your
+                    # initials and a new chat at its head, Dot's face over the other agents', the apps and the search
+                    # at its foot.
                     await bar.get_by_role("button", name="Show sidebar").click()
                     sidebar: Locator = page.get_by_role("complementary", name="Sidebar")
                     await expect(sidebar.locator(".side-title")).to_have_text("Dot")
@@ -252,10 +253,14 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     assert round((await _box(sidebar))["width"]) == width
                     foot: Locator = sidebar.locator(".side-foot")
                     await expect(foot.get_by_role("searchbox", name="Search chats")).to_be_visible()
-                    await expect(foot.get_by_role("link", name="New chat")).to_be_visible()
-                    # The "+" of a new chat is the foot's, at the thumb, and the head has none (item 834).
-                    await expect(sidebar.locator(".side-head .side-compose")).to_have_count(0)
-                    await expect(foot.get_by_role("link", name="Settings")).to_be_visible()
+                    await expect(foot.get_by_role("button", name="Connect apps")).to_be_visible()
+                    # The "+" of a new chat stands at the head's right and the settings are your initials at its left
+                    # (item 991, the owner's ask for a plain home: they were at the foot, item 834).
+                    head: Locator = sidebar.locator(".side-head")
+                    await expect(head.get_by_role("link", name="New chat")).to_be_visible()
+                    await expect(head.get_by_role("link", name="Settings")).to_be_visible()
+                    await expect(foot.get_by_role("link", name="Settings")).to_be_hidden()
+                    await expect(sidebar.locator(".side-dot-hero")).to_be_visible()
                     await page.screenshot(path=str(tmp_path / f"chats-{scheme}.png"))
                     await context.close()
 

@@ -69,7 +69,7 @@ pinned stays under Pinned.
 Above the list: a search over the titles (⌘K or `/`) and, while you have no agent of your own, the way to **Agents**;
 **Campaigns** and **Schedules** (a page of its own since item 401) are icons at the right of the sidebar's head
 (item 855: they were rows of their own), before the **+** of a new chat (⇧⌘O; item 834, where a row under the search
-said New chat), which on a phone is the round **+** of the foot. Under the search your agents stand as faces (item
+said New chat). Under the search your agents stand as faces (item
 835), as a messaging app's people: the three that worked last, each its face over its name on one line, to its page,
 where a message to it starts, the one whose page is open marked, and **All**, the page of every agent and team, in
 four columns the sidebar holds whole (item 855: the row scrolled sideways and cut a face at its edge); an agent made,
@@ -94,7 +94,11 @@ its loop (item 635): tick chats (or Select all) and **Delete** asks once, then r
 and approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to
 end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a
 drawer. On a touch screen of a phone's width it has no X (item 888): a chat you choose closes it, and so does a swipe
-to the left; a narrow window of the Mac keeps its button. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
+to the left; a narrow window of the Mac keeps its button. On a phone the list is the home (item 991, the owner's
+ask of 2026-11-05 for a plain one): your initials at the head's left open the settings and the **+** of a new chat
+stands at its right, after Campaigns and Schedules; Dot's own face stands large with its name under it, over the faces
+of the other agents, centred; the foot holds the apps (Connect apps, a grid of tiles) and the search, the cog of the
+settings having moved to your initials. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
 deleted under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only
 when the page comes to another chat (item 204).
 
