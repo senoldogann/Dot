@@ -14,7 +14,7 @@ Görünür özerkliği bugün sınırlayan dört şey:
 
 1. **Goal mode varsayılanı kapalı** (`[agent] goal_mode = false`). Bitirme denetçisi, plan kanıtı ve “daha iyi sonuç varsa devam” ancak koşu bu bayrakla açıldıysa çalışır (`run.goal_mode`, `agent/loop.py`).
 2. **Plan bir sözleşme değil, bir anımsatmadır.** Açık adımlar `finish` öncesinde yalnızca bir kez hatırlatılır (`plan_reminded`); sonra bitiş sürer.
-3. **MCP bağlanır, platform olmaz.** Kurulum, OAuth, `list_tools` ve çağrı vardır. Kaynak (`resources`) ve istem (`prompts`) yoktur. Galeri yalnızca beceri kurar. Eklentinin MCP süreçleri daemon yeniden başlayınca ayağa kalkar. Şeması düzleştirilemeyen araç sessizce düşer.
+3. **MCP bağlanır, platform olmaz.** Kurulum, OAuth, `list_tools` ve çağrı vardır. Kaynak (`resources`) ve istem (`prompts`) yoktur. Galeri yalnızca beceri kurar. Eklentinin MCP süreçleri daemon yeniden başlayınca ayağa kalkar. Şeması düzleştirilemeyen tek araç günlükte vardır, ekranda yoktur: `usable_tools` `mcp_tool_left_out` yazar; `dotx doctor` ve arayüz bu satırı göstermez. “Left out” bütün sunucu düşünce görünür.
 4. **Bellek nottur, bölüm (episode) değildir.** Kısa vadeli bağlam sıkıştırılır ve bir defter (`RunLedger`) ile sabitlenir. Uzun vadeli bellek etiketli notlardır. Geçmiş koşuların özetleri anlama göre aranmaz. Beceriler `SKILL.md` metnidir; çalışan bir iş akışı motoru yoktur.
 
 Güvenlik katmanı bu dört maddeden daha olgundur. Özerklik, `yolo` açarak veya politika motorunu incelterek değil, mevcut döngünün varsayılanını ve sözleşmesini sıkılaştırarak büyür.
@@ -119,7 +119,7 @@ Boşluk: kod işlerinde “taze bir test komutu defterde yoksa bitiş yok” diy
 
 ### Toparlanma
 
-Sağlananlar: daemon `recover()` yarım koşuları ve bayat onayları kapatır; ölü `dotx` süreçleri `watch_commands`; model kotasında bekleme ve yedek model; adım ortasında yönlendirme çağrıyı keser; acil STOP dosyası; `dotx undo` ve rewind; onayda koşu `blocked`.
+Sağlananlar: daemon `recover()` yarım koşuları ve bayat onayları kapatır; ölü `dotx` süreçleri `watch_commands`; model kotasında bekleme ve yedek model; adım ortasında yönlendirme çağrıyı keser; acil STOP dosyası; `dotx undo` ve rewind; onayda koşu `blocked`. Daemon yeniden başlayınca veya kapanınca kesilen koşu `src/dotagent/agent/resume.py` ile aynı ipliğe döner: `resume_note` hedefi, kesilen adımdaki çağrıları ve planı yeni koşunun ilk mesajına koyar. Bu not `blocked`, başarısız biten veya sahibin “devam” dediği koşuyu kapsamaz (`can_resume` yalnızca `cut_off_by` ile kesileni alır).
 
 `[policy] unanswered = "refuse"`. Kimsenin bakmadığı koşuda (takvim, `yolo`, eval) `ask_user` varsayılan olarak beklemeyi `leave` ile geçer veya reddedilir; `park` ancak ayar değişince (`agent/parking.py`). Takvimli bir soru, sahip dönene kadar saklanmaz.
 
@@ -142,7 +142,7 @@ Sıkıştırma `RunLedger` ile hedefi, son araçları ve kimlikleri nota gömer 
 - **Keşif** (`plugins/scout.py`): gece önerir, kurmaz. Lisans, yaş, yıldız, tarama, inceleme modeli. ClawHub okunmaz. MCP sunucuları aranmaz; `docs/extending.md` bunu açık yazar (sunucu bu Mac’te program çalıştırır).
 - **PluginShelf** (`plugins/catalog.py`, yaklaşık 210–213): beceriler daemon ayaktayken yenilenir. Eklentinin MCP sunucuları “Dot yeniden başlayana kadar” kalkmaz.
 - **Katalog**: `MCP_SERVICES` içinde 142 `McpService` (`mcp/catalogue.py`). Bağlayıcı sayfası `PLUGINS` içinde 156 `PluginListing` (`connections/directory.py`). Liste, hepsinin tek tıkla eklenebildiği anlamına gelmez; katalog başı bilinçli dışlamaları yazar.
-- **Bağlantı** (`mcp/hub.py`, `mcp/connection.py`): stdio, streamable HTTP, SSE. `list_tools` sayfalar. `select_tools` (`allow`). `usable_tools` şeması düzleşmeyen aracı düşürür.
+- **Bağlantı** (`mcp/hub.py`, `mcp/connection.py`): stdio, streamable HTTP, SSE. `list_tools` sayfalar. `select_tools` (`allow`). `usable_tools` şeması düzleşmeyen aracı tek başına bırakır ve `mcp_tool_left_out` ile günlüğe yazar; sunucunun diğer araçları durur. `allow` listesindeki bir araç veya kullanılabilir aracı kalmayan sunucu bütün sunucuyu düşürür.
 - **Kimlik**: uzak `oauth: true` sunucularda OAuth 2.1 + PKCE (`mcp/signin.py`), sahip bağlayıcı sayfasında. Koşu içi etkileşimli giriş yok (`kept_sign_in`). stdio sırları Keychain ve ortam (`mcp/launch.py`). Google ve Microsoft resmi jetonları ayrı paket: `oauth/`.
 - **Çağrı**: `McpHub.call` → araç sonucu çitlenir, büyük yanıt çalışma alanına yazılır (`tools/mcp_result.py`, `tools/third_party.py` `mcp-results/`). Politika `classify_mcp_call` (`tools/mcp.py`): okuma ile yazma, yıkıcı, dışarı gönderim. İleti gönderen ad, sunucu “readOnly” dese de gönderim sayılır.
 - **Sıcak yenileme**: bağlayıcı eklenince `routes_mcp.py` hub’ı günceller ve `refresh_mcp_tools` kayıt defterini yeniler. Bu, **eklenti dizininden** gelen MCP için geçerli değildir (yukarıdaki shelf).
@@ -154,7 +154,7 @@ Sıkıştırma `RunLedger` ile hedefi, son araçları ve kimlikleri nota gömer 
 
 1. Galeriden veya ajanın kendi kararıyla keyfi MCP paketi kurulmaz. Katalog `npx` / `uvx` pinler.
 2. Eklenti MCP’si beceriyle birlikte sıcak kalkmaz.
-3. Düşen araç sahip ekranında ve `dotx doctor` çıktısında birinci sınıf bir satır değildir (hub düşürür; sessizlik modeli “araç yok” sanır).
+3. Şeması yüzünden bırakılan tek araç günlükte vardır, ekranda yoktur. `usable_tools` `mcp_tool_left_out` yazar (`mcp/hub.py`). `dotx doctor` (`doctor.py` `mcp_checks`) sunucunun komutunu ve sırlarını yoklar, bu aracı listelemez; sunucuya da bağlanmaz. Arayüzdeki “Left out” (`routes_mcp.py` içinde `state = "left_out"`, `js/views/connectors.js`) bütün sunucu `hub.connected()` dışında kalınca görünür, tek araç için değil. Bırakılan aracın adı hizmetin araç listesinde de yoktur: liste yalnızca kalan araçları sayar.
 4. Kaynak ve istem protokolleri yok. Birçok sunucunun asıl değeri araçtan çok kaynaktadır.
 5. Çok sunucu bağlanınca `tool_surface = full` araç listesini her adıma koyar. Gruplama kodu vardır, eşik yoktur.
 6. Koşu, OAuth bitiremez. Sunucu imzasızsa koşu onu yok sayar; sahip bağlayıcıya dönmelidir. Bu doğrudur. Eksik olan, koşunun “bu sunucu imzasız” diye tek bir yapılandırılmış durması ve sonraki oturumun imzadan sonra aynı hedefe devam etmesidir (bölüm 2’deki el değiştirme ile birlikte).
@@ -189,7 +189,7 @@ Harness politika, araç şeması veya çekirdek istemi yazmaz. Geceyi açmak öz
 
 - Süreklilik notlarını (ve kampanya `carried` özetlerini) bellek gömmesiyle aranabilir yapmak. Ayrı vektör veritabanı gerekmez; not tablosunun yanına bölüm kaydı yeter.
 - `skill` okununca, becerideki kontrol listesi varsa mevcut `update_plan` ile yazılsın. Yürütme yine döngü ve politika.
-- Çok günlük plan, koşu bitince ipliğe yapılandırılmış devir notu olarak konulsun (aşağıdaki P0-C). Kampanya bunu kısmen yapar; sıradan görev yapmaz.
+- Çok günlük plan için yeni bir devir yazılmaz. `resume.py` içindeki `resume_note` kesilen koşuya hedefi, son adımdaki çağrıları ve planı zaten geri verir; P0-C bu notu `blocked`, başarısız ve sahibin “devam” dediği hallere, bir de sıkıştırma sonrasına uzatır. Kampanya `carried` yolunu bozmaz.
 
 Varlık grafı (kişi, proje, dosya ilişkisi) ikinci önceliktir. Not etiketleri ve mağaza kimlikleri bugünkü sorguların çoğunu taşır. Graf, bölüm araması yokken erken bir soyutlamadır.
 
@@ -204,7 +204,7 @@ Varlık grafı (kişi, proje, dosya ilişkisi) ikinci önceliktir. Not etiketler
 | Web | `web_fetch`, `web_search`, `web_crawl`, `web_extract`; gömülü `web-research` MCP (`mcp/builtin.py`) | Kirli içerik işareti doğru. Kaynak MCP ile karışmamalı |
 | Posta ve takvim | `tools/mail_calendar.py`, `connectors/google.py`, `connectors/graph.py`, `oauth/` | Gönderim politika sorusudur. Yeni sağlayıcı ancak sahip isteyince |
 | Sohbet kanalı | Yalnızca iMessage (`channels/types.py`, `channels/router.py`) | Onay ve soru kanaldan yanıtlanmaz. İkinci kanal, MCP mesajlaşması yetmezse |
-| Kaynak kontrolü | `shell`. GitHub katalog bağlayıcısı. `repair/night.py` Dot’un kendi deposuna, izole checkout’ta, Claude Code ile PR açar | Genel “PR aç” aracı yoktur. İlk ihtiyaç GitHub MCP’nin düşmeden bağlanmasıdır (P0-D), özel bir git çerçevesi değil |
+| Kaynak kontrolü | `shell`. GitHub katalog bağlayıcısı. `repair/night.py` Dot’un kendi deposuna, izole checkout’ta, Claude Code ile PR açar | Genel “PR aç” aracı yoktur. İlk ihtiyaç, şeması düzleşmeyen aracın günlükteki `mcp_tool_left_out` satırının doctor ve hizmet durumunda da görünmesidir (P0-D), özel bir git çerçevesi değil |
 | Ofis | `tools/office.py`, `office.py` | Word ve Excel becerileri `skills/builtin/`. Özerklik kapısı değil |
 | Ticaret | `src/dotagent/trading/`, `tools/trading.py` | Ayrı sınırlar (`docs/trading.md`). Bu incelemenin yolu değil |
 | Ses | `src/dotagent/voice/` | Kabuk ve metin döngüsüne ek |
@@ -277,23 +277,23 @@ Döngü, sohbet dışında, `open_steps` boşalmadan `finish` ile çıkmasın. A
 
 Başarı: birim testi, açık adım varken koşunun bitmediğini, adımlar kapanınca bittiğini gösterir. Goal mode kapalı bir görevde de açık adım tek başına bitişi geçirmez (denetçi uyusa bile).
 
-**P0-C. Sonraki koşu, sıkıştırmadan sonra da defteri ve açık planı görsün.** Karmaşıklık **M**.
+**P0-C. Kesilen koşunun devir notu, tıkanan, başarısız olan ve sahibin “devam” dediği koşuya da gelsin.** Karmaşıklık **M** (yeni defter yok; `resume.py` genişler).
 
-Dokunulacaklar: `agent/continuity.py` (`RunLedger`), koşu kapanırken ipliğe yazılan not (`agent/loop.py` veya `agent/manager.py` kuyruk ve `resume`), kampanyadaki `carried` ile aynı fikir, ikinci bir depo değil.
+`src/dotagent/agent/resume.py` bunu daemon yeniden başlayınca, kapanınca veya `dotx` süreci kesilince zaten yapar. `resume_note` hedefi, kesilen adımdaki çağrıları (`interrupted_calls`) ve planı (`plan_lines`) yeni koşunun ilk mesajına koyar. `can_resume` yalnızca `cut_off_by` ile kesilen koşuyu alır (`daemon_restarted`, `daemon_shutdown`, `process_ended`, `process_died`). `blocked`, başarısız biten ve sahibin “devam” dediği koşu bu kapının dışındadır. Sıkıştırma sonrası kimlikler ayrı durur: `agent/continuity.py` içindeki `RunLedger`.
 
-Koşu `blocked`, başarısız, `scheduled` veya sahip “devam” dediğinde yeni koşu, özetin kaybettiği açık adımları, son hataları ve ledger kimliklerini `turn_note` olarak alır. Sistem isteminin baytları değişmez (önbellek korunsun).
+İş, sıfırdan bir el değiştirme veya ikinci bir depo yazmak değildir. `resume_note` / `Resumption` aynı iplikte şu hallere uzanır: koşu `blocked` veya başarısız bitti, sahip “devam” dedi. Sıkıştırmadan sonra açık plan ve ledger kimlikleri bu notta kalır. Sistem isteminin baytları değişmez. Kampanyanın `carried` yolu bozulmaz. `scheduled`, kampanyanın kendi oturumuna bırakılır; bu dilim ona ikinci bir not eklemez.
 
-Başarı: mesajlar sıkıştırılmış bir iplikte yeni kullanıcı mesajı, model görmeden önce nota açık planı koyar. Bunu bir birim testi sabitler. Kampanya oturumu mevcut `carried` davranışını bozmaz.
+Başarı: birim testi bugünkü kesilme notunu olduğu gibi korur. Aynı test, `blocked`, başarısız ve “devam” için notun hedefi, son adımdaki çağrıları ve planı taşıdığını gösterir. Sıkıştırılmış iplikte bu not modelden önce durur.
 
-**P0-D. Düşen MCP aracı görünsün.** Karmaşıklık **S**.
+**P0-D. Günlükte bırakılan MCP aracı, doctor ve hizmet durumunda da görünsün.** Karmaşıklık **S**.
 
-Dokunulacaklar: `mcp/hub.py` `usable_tools`, `cli_doctor.py` / `doctor.py`, bağlayıcı API’si (`server/routes_mcp.py` ve `connections` durumu). Varsa arayüzde hizmet sayfasında bir satır (`server/static`, `js/views` bağlayıcı).
+Bugün günlükte var, ekranda yok. `usable_tools` (`mcp/hub.py`) şeması düzleşmeyen aracı tek başına bırakır ve `log.warning("mcp_tool_left_out", ...)` yazar; sunucunun diğer araçları hizmete devam eder. `allow` listesindeki araç veya hiç kullanılamayan sunucu zaten bütün sunucuyu düşürür; o halde arayüz “Left out” der. Tek araç için bu rozet yoktur (`routes_mcp.py`: `left_out`, sunucu `hub.connected()` dışında kalınca). `doctor.py` `mcp_checks` komut ve sırlara bakar, araç adına bakmaz.
 
-Şeması düzleşmediği için düşen her aracın adı ve nedeni doctor çıktısında ve hizmet durumunda durur. Modelin sistemine sahte bir araç eklenmez.
+Dokunulacaklar: doctor satırı (`doctor.py`, `cli_doctor.py`) ve hizmet durumu (`server/routes_mcp.py`, bağlayıcı görünümü `server/static/js/views/connectors.js`). `usable_tools` yeniden yazılmaz; günlük satırı ekrana taşınır. Modelin sistemine sahte bir araç eklenmez.
 
-Başarı: düzleşmeyen bir şema ile sahte sunucu, doctor’da adıyla görünür ve kayıt defterinde yoktur. Sağlam araçlar çağrılmaya devam eder.
+Başarı: düzleşmeyen şemalı bir araç kayıt defterinde yoktur, `mcp_tool_left_out` günlüğe yazılmaya devam eder, ve aynı ad ile neden `dotx doctor` çıktısında ve hizmet durumunda durur. Sağlam araçlar çağrılmaya devam eder. Bütün sunucunun “Left out” hali olduğu gibi kalır.
 
-P0 sırası: A ve B birlikte bir koşunun “bitirmeden önce işi sürdür” hali. C takip mesajını özerk kılar. D, sahip MCP bağlayınca kaybolan yeteneği görünür kılar. Dördü de politika kipini değiştirmez.
+P0 sırası: A ve B birlikte bir koşunun “bitirmeden önce işi sürdür” hali. C, `resume.py` notunu kesilme dışındaki devam hallerine uzatır. D, sahip MCP bağlayınca günlükte kalan aracı doctor ve hizmet durumunda görünür kılar. Dördü de politika kipini değiştirmez.
 
 ### P1 — bağlandıktan sonra güç
 
@@ -324,8 +324,8 @@ En küçük yol üç davranış değişikliği ve bir görünürlük düzeltmesi
 
 1. Görev goal mode ile başlar (P0-A). Bitirme denetçisi uyanır. Test, derleme ve dokunulmamış yol kanıtı bugün kodda durur; kapalı bayrağın arkasındadır.
 2. Açık plan adımı iş bitmiş sayılmaz (P0-B). Model plan yazdığı anda sözleşme başlar.
-3. Aynı sohbette “devam” defteri görür (P0-C). Çok adımlı iş, tek bağlam penceresine sıkışmaz.
-4. Bağlanan MCP aracı düşerse sahip görür (P0-D). Bağlayıcı sayısı 142 şablon ve 156 karttır; sessiz düşüş, “MCP yok” sanısını üretir.
+3. Sahibin “devam” dediği, tıkanan veya başarısız biten koşu, kesilen koşunun gördüğü notu görür (P0-C). Not `resume.py` içindedir; sıfırdan yazılmaz. Sıkıştırmadan sonra da açık plan bu notta kalır.
+4. Şeması yüzünden bırakılan MCP aracı günlükte vardır, ekranda yoktur (P0-D). Aynı ad doctor çıktısına ve hizmet durumuna gelir. Bağlayıcı sayısı 142 şablon ve 156 karttır. “Left out” bütün sunucu içindir; tek araç ona karışmaz.
 
 Bunlar oturunca ilk güçlendirme bölüm araması (P1-A) ve eklenti MCP’sinin sıcak kalkmasıdır (P1-B). İkisi de mevcut hub ve bellek gömmesini kullanır.
 
@@ -339,7 +339,7 @@ Yapılmayacaklar:
 - Araç yüzeyi, kum havuzu ve kabuk korumasını “daha çok iş yapsın” diye gevşetmek. Sınırlar `docs/limits.md` ve `docs/safety.md` içindedir.
 - Ofis, ticaret, ses veya üç boyutlu ofis arayüzünü bu yola bağlamak.
 
-İlk uygulama dilimi, bir sahip görevinde ölçülür: goal mode anahtarına basmadan verilen bir `task`, erken `finish` ile kapanmaz; açık plan adımı varken kapanmaz; MCP şeması bozuk bir sunucu doctor’da adıyla görünür. Bu üçü geçmeden P1’e geçilmez.
+İlk uygulama dilimi, bir sahip görevinde ölçülür: goal mode anahtarına basmadan verilen bir `task`, erken `finish` ile kapanmaz; açık plan adımı varken kapanmaz; şeması düzleşmeyen MCP aracı doctor’da ve hizmet durumunda adıyla durur (günlük satırı durur). Bu üçü geçmeden P1’e geçilmez.
 
 ## Ek: giriş noktaları
 
@@ -352,6 +352,7 @@ Yapılmayacaklar:
 | Goal check | `src/dotagent/agent/review.py` |
 | İlerleme | `src/dotagent/agent/progress.py` |
 | Süreklilik | `src/dotagent/agent/continuity.py`, `agent/compact.py` |
+| Kesilen koşunun devri | `src/dotagent/agent/resume.py` (`resume_note`, `can_resume`) |
 | Onay | `src/dotagent/agent/approvals.py`, `agent/parking.py` |
 | Politika | `src/dotagent/policy/engine.py` (`decide`) |
 | Araç kaydı | `src/dotagent/tools/registry.py`, `tools/base.py` |
