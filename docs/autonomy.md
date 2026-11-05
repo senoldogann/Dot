@@ -334,8 +334,10 @@ Its first message tells the model how that run stopped and how each call of that
 finished (with the start of its result), cut off while it ran, or not started, and the goal and the plan. A call that was cut off may have changed
 something unless it only reads, and the model is told to check before it runs it again. The plan of that run is the plan
 of the new one. After a compaction, the note also keeps the open plan and the ids of Dot's records the ledger named,
-in that message, not in the system prompt. A session of a campaign and a scheduled run are not given a second note:
-the campaign's next session, and the schedule's own firing, already carry what they need. Only the newest run of a chat can be resumed, and never a run that you stopped or that another run
+in that message, not in the system prompt. A session of a campaign is not given that note: its next session
+already carries what it needs. A scheduled run is not given a second note on the next message in its chat, because
+the schedule's own firing already carries the goal; one that was cut off can still be resumed by hand, and a blocked
+or failed firing is left to the schedule's next session. Only the newest run of a chat can be resumed, and never a run that you stopped or that another run
 started. After a shutdown, the chat's queue goes on once the new run ends done; after a crash or a restart, it waits
 until you resume it. The daemon still resumes on its own only a run that was cut off, not one that failed or is blocked.
 

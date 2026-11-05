@@ -63,7 +63,8 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 @asynccontextmanager
 async def _served(home: Path) -> AsyncIterator[tuple[RunManager, Runtime, str, int]]:
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false\nreflection_time = "off"',
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]'
+        '\ngoal_mode = false\nreflection_time = "off"',
         encoding="utf-8",
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))

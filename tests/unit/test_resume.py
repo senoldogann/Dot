@@ -92,7 +92,8 @@ def test_only_the_newest_run_of_a_thread_that_the_daemon_cut_off_can_be_resumed(
     assert can_resume(RESTARTED, "run_1")
     assert can_resume(SHUT_DOWN, "run_1")
     # A blocked run and one that failed can be resumed too. The thread went on after it, another run started it, or
-    # the owner stopped it: those cannot. A campaign session and a scheduled run keep their own follow-up.
+    # the owner stopped it: those cannot. A campaign session keeps its own follow-up. A scheduled firing can be
+    # resumed by hand when it was cut off, and a blocked or failed firing cannot; the daemon does not resume either.
     blocked: RunRecord = _run("blocked", "", UI_SOURCE, None)
     failed: RunRecord = _run("failed", "the report was not written", UI_SOURCE, None)
     assert handoff_of(blocked) == "blocked" and can_resume(blocked, "run_1")
@@ -102,9 +103,12 @@ def test_only_the_newest_run_of_a_thread_that_the_daemon_cut_off_can_be_resumed(
     assert not can_resume(_run("failed", RESULT_RESTARTED, UI_SOURCE, "run_0"), "run_1")
     assert not can_resume(_run("cancelled", RESULT_STOPPED, UI_SOURCE, None), "run_1")
     campaign: RunRecord = _run("failed", "no", UI_SOURCE, None).model_copy(update={"campaign_id": "cmp_1"})
-    scheduled: RunRecord = _run("failed", "no", SCHEDULE_SOURCE, None)
+    scheduled_failed: RunRecord = _run("failed", "no", SCHEDULE_SOURCE, None)
+    scheduled_cut: RunRecord = _run("failed", RESULT_RESTARTED, SCHEDULE_SOURCE, None)
     assert handoff_of(campaign) is None and not can_resume(campaign, "run_1")
-    assert handoff_of(scheduled) is None and not can_resume(scheduled, "run_1")
+    assert handoff_of(scheduled_failed) is None and not can_resume(scheduled_failed, "run_1")
+    assert handoff_of(scheduled_cut) == "daemon_restarted" and can_resume(scheduled_cut, "run_1")
+    assert not resumes_on_start(scheduled_cut, "run_1", [])
 
 
 def test_the_daemon_resumes_on_its_own_only_runs_of_the_web_ui_whose_calls_cut_off_while_they_ran_only_read() -> None:

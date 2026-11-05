@@ -275,7 +275,7 @@ async def served(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Serv
     patch.setattr(mac, "installed_app", lambda bundle_id: Path("/Applications") / f"{bundle_id}.app")
     patch.setattr(perms, "responsible_program", lambda: Path("/Users/someone/Library/Application Support/Dot/Dot.app"))
     (home / "config.toml").write_text(
-        f"[browser]\nheadless = true\n\n[memory]\nembed_enabled = false\n\n"
+        "[browser]\nheadless = true\n\n[memory]\nembed_enabled = false\n\n"
         f'[models]\nmain = "{SCRIPTED_MODEL}"\nreview = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false',
         encoding="utf-8",
     )

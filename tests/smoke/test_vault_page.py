@@ -59,7 +59,9 @@ async def parts(
     """A runtime in a home of its own whose vault keeps its secrets in a dictionary."""
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[memory]\nembed_enabled = false\n\n[agent]\ngoal_mode = false',
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"'
+        "\n\n[memory]\nembed_enabled = false\n\n[agent]"
+        "\ngoal_mode = false",
         encoding="utf-8",
     )
     monkeypatch.setenv("DOT_HOME", str(home))

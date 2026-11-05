@@ -29,10 +29,15 @@ _PLAN: ScriptedTurn = _call(
 )
 
 
-async def _play(turns: list[ScriptedTurn], *, goal_mode: bool) -> tuple[RunRecord, list[EventRecord]]:
+async def _play(
+    turns: list[ScriptedTurn], *, goal_mode: bool, review: str | None = None
+) -> tuple[RunRecord, list[EventRecord]]:
     recording: ScriptedProvider = ScriptedProvider(_PROVIDER, turns)
     base: AppConfig = eval_config(load_default_config())
-    config: AppConfig = base.model_copy(update={"shell": base.shell.model_copy(update={"sandbox": False})})
+    models = base.models if review is None else base.models.model_copy(update={"review": review})
+    config: AppConfig = base.model_copy(
+        update={"shell": base.shell.model_copy(update={"sandbox": False}), "models": models}
+    )
     assert config.agent.goal_mode is False
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(config, {})
@@ -80,3 +85,20 @@ async def test_open_steps_stop_the_run_instead_of_finishing_once_the_reminders_a
     assert ended.result.startswith(PREFIX_STALLED)
     assert "still open" in ended.result
     assert len(reminders) == 4
+
+
+@pytest.mark.asyncio
+async def test_goal_mode_hands_an_open_plan_to_the_checker_once_the_reminders_are_spent() -> None:
+    """After stall_limit reminders the finish is the checker's, not a progress stop."""
+    verdict: ScriptedTurn = _call("goal_verdict", decision="achieved", reason="The note is written.", unproven_steps=[])
+    ended, events = await _play(
+        [_PLAN, *(_finish(f"Still open {n}.") for n in range(5)), verdict],
+        goal_mode=True,
+        review=SCRIPTED_MODEL,
+    )
+    checks: list[EventRecord] = [event for event in events if event.kind == "goal_check"]
+    reminders: list[EventRecord] = [event for event in events if event.kind == "plan_reminder"]
+    assert ended.status == "done"
+    assert not ended.result.startswith(PREFIX_STALLED)
+    assert len(reminders) == 4
+    assert [check.data["decision"] for check in checks] == ["achieved"]

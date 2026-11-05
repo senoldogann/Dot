@@ -116,7 +116,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory, lister: Lister) -> A
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{OPUS}"\n\n[scheduler]\ntick_s = 0.2\n\n'
         # A tick past the nightly reflection's time would start it, and drain() would wait on a model the test lacks.
-        '[agent]\nreflection_time = "off"\n',
+        '[agent]\ngoal_mode = false\nreflection_time = "off"\n',
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()

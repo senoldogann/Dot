@@ -93,7 +93,9 @@ async def world(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[_Worl
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n'
-        f'[[mcp]]\nname = "fixture"\ncommand = {json.dumps(sys.executable)}\nargs = [{json.dumps(str(FIXTURE))}]\n\n[agent]\ngoal_mode = false',
+        f'[[mcp]]\nname = "fixture"\ncommand = {json.dumps(sys.executable)}\nargs = [{json.dumps(str(FIXTURE))}]'
+        "\n\n[agent]"
+        "\ngoal_mode = false",
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()

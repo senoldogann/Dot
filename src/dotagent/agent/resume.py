@@ -147,13 +147,16 @@ def cut_off_by(run: RunRecord) -> CutOff | None:
 
 def handoff_of(run: RunRecord) -> HandOff | None:
     """Why a new run on ``run``'s thread is handed its goal, its last step and its plan: it was cut off, it is blocked,
-    or it failed. ``None`` for a run the owner stopped, one that ended done, a session of a campaign (the campaign's
-    next session carries that) and a scheduled run (its firing is the schedule's own session)."""
-    if run.parent_run_id is not None or run.campaign_id is not None or run.source == SCHEDULE_SOURCE:
+    or it failed. ``None`` for a run the owner stopped, one that ended done, or a session of a campaign (the campaign's
+    next session carries that). A scheduled run is handed off only when it was cut off, so it can be resumed by hand;
+    a blocked or failed firing is the schedule's own next session, not this note."""
+    if run.parent_run_id is not None or run.campaign_id is not None:
         return None
     cut: CutOff | None = cut_off_by(run)
     if cut is not None:
         return cut
+    if run.source == SCHEDULE_SOURCE:
+        return None
     if run.status == "blocked":
         return "blocked"
     if run.status == "failed":
@@ -162,10 +165,10 @@ def handoff_of(run: RunRecord) -> HandOff | None:
 
 
 def can_resume(run: RunRecord, newest_run_id: str | None) -> bool:
-    """Whether ``run`` may be resumed: it was cut off, it is blocked, or it failed (:func:`handoff_of`), no other run
-    started it, and it is the newest run still in its thread (``newest_run_id``, ``None`` once a rewind took them all
-    out), so nothing went on after it there. A run the owner stopped is never resumed, nor is a session of a campaign
-    or a scheduled run."""
+    """Whether ``run`` may be resumed: it was cut off (any source, a schedule's firing included), or it is blocked or
+    failed and is not a scheduled run (:func:`handoff_of`), no other run started it, and it is the newest run still in
+    its thread (``newest_run_id``, ``None`` once a rewind took them all out), so nothing went on after it there. A run
+    the owner stopped is never resumed, nor is a session of a campaign."""
     return run.id == newest_run_id and handoff_of(run) is not None
 
 

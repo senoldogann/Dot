@@ -2748,7 +2748,9 @@ class RunManager:
         if not newest:
             return None
         old: RunRecord = newest[0]
-        if handoff_of(old) is None:
+        # A scheduled firing is resumed by hand when it was cut off. The next message in its chat is not given a
+        # second note: the schedule's own session already carries the goal.
+        if old.source == SCHEDULE_SOURCE or handoff_of(old) is None:
             return None
         resumption: Resumption = await self._resumption(
             old, "continued", await interrupted_calls(self._runtime, old), False
