@@ -108,7 +108,7 @@ refuses now (one a Dot wrote before the gate was as strict, or whose row a hand 
 (`dotx harness retire`, or **Set aside**), and ask nothing: not even `--yes` adopts it; the step with `adopt = "auto"`
 never adopts one. When a prompt is built, a component of the version in use that the gate refuses is left out of it and
 logged once (`harness_component_left_out`), and the page marks the version *Refused* and says that its part is left out
-of every run. What the nightly step plays and shows is taken the same way: a stored text reaches a model, a probe or a
+of every run. What the step plays and shows (`dotx harness step`, item 987) is taken the same way: a stored text reaches a model, a probe or a
 role through one function (`given_text`; `adopted_text` is it for the version in use), so the version in use as the base
 and again as `confirm-base`, each candidate, the composed version, the texts the composer is shown and the final set
 (`dotx harness final`) are played as a run would take them, and a new version is measured against the text the runs
@@ -180,7 +180,8 @@ You write a version yourself with `dotx harness set` (a component from a file or
 adopted version, `--adopt` to take it at once) or `POST /api/harness`, and manage them with `dotx harness list`, `show`,
 `diff`, `adopt` and `retire`, or `GET /api/harness`, `GET /api/harness/{id}`, `POST /api/harness/{id}/adopt` and
 `POST /api/harness/{id}/retire`. The daemon reads the adopted version as each run starts: no restart. `PUT
-/api/harness/schedule` with `{"step_time": "04:00"}` (or `"off"`) sets when the nightly step runs, as the page's switch
+/api/harness/schedule` with `{"step_time": "04:00"}` (or `"off"`) sets when the night runs (its digest of real runs,
+item 987), as the page's switch
 does (item 721); anything but a time of day or `off` is refused (422).
 
 ## The scoring set is the owner's

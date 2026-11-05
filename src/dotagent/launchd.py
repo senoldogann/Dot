@@ -41,8 +41,8 @@ WATCHDOG_INTERVAL_S: int = 60
 # How often that job looks at the runs, and how long it waits before it gives up without restarting.
 RESTART_POLL_S: float = 5.0
 RESTART_WAIT_LIMIT_S: float = 2 * 60 * 60
-# How long it waits besides for the night's learning under way (item 815): a step of the harness takes up to
-# [harness] step_minutes (90 by default), the reflection and the plugin scout's night less. A repair night (item 921)
+# How long it waits besides for the night's learning under way (item 815): the harness's night reads Dot's record in
+# seconds (item 987), the reflection and the plugin scout's night take longer. A repair night (item 921)
 # may take longer, a session after another; it ends after the first change it merges (asking for the restart when it
 # pulled it).
 RESTART_NIGHT_LIMIT_S: float = 3 * 60 * 60

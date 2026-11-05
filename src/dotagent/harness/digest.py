@@ -14,14 +14,16 @@ from collections import defaultdict
 from collections.abc import Sequence
 from datetime import datetime, tzinfo
 
+from dotagent.core.errors import DotError
 from dotagent.core.types import FrozenModel
+from dotagent.evals import EVAL_SOURCE
 from dotagent.repair.problems import first_sentence
 from dotagent.store.db import Store
 from dotagent.store.models import HarnessStep, RunTally, ToolOutcome
 
 DAY_S: float = 86_400.0
 # The runs a digest leaves out: the evaluation's, which play tasks, not the owner's work.
-SOURCES_OUT: tuple[str, ...] = ("eval",)
+SOURCES_OUT: tuple[str, ...] = (EVAL_SOURCE,)
 # How many signatures a digest keeps, the most widespread first, and how many sites and sources of each.
 ROWS_KEPT: int = 20
 SITES_KEPT: int = 5
@@ -141,8 +143,13 @@ async def night_digest(store: Store, now: float, zone: tzinfo) -> HarnessStep:
     base: str | None = await store.adopted_harness_id()
     step: HarnessStep = await store.create_harness_step(now, None, base)
     since: float = now - DAY_S
-    outcomes: list[ToolOutcome] = await store.tool_outcomes(since, now, SOURCES_OUT)
-    tally: RunTally = await store.run_tally(since, now, SOURCES_OUT)
+    try:
+        outcomes: list[ToolOutcome] = await store.tool_outcomes(since, now, SOURCES_OUT)
+        tally: RunTally = await store.run_tally(since, now, SOURCES_OUT)
+    except DotError as error:
+        # The night says why it failed, not that a stop cut it off (the record's state until it ends).
+        await store.finish_harness_step(step.id, now, "failed", "{}", error.message)
+        raise
     digest: Digest = digest_of(outcomes, tally, since, now, zone)
     record: str = json.dumps({"decision": digest_words(digest), "digest": digest.model_dump(mode="json")})
     return await store.finish_harness_step(step.id, now, "keep", record, None)
