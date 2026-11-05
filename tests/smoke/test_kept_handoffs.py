@@ -35,6 +35,7 @@ from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
 from dotagent.policy.types import ApprovalMode
+from dotagent.repair.problems import run_sightings
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
@@ -198,6 +199,9 @@ async def test_a_hand_off_nobody_answers_is_kept_and_i_did_it_carries_the_work_o
         assert f"so this step was kept for the user ({kept_second.id})" in ran[1], ran
         assert f"This step waits for the user already ({kept_first.id})" in ran[2], ran
         assert _results(events, "write_file")[0].startswith("Not allowed:")
+        # A step kept for the owner is their say, no defect the repair night hands on (item 972).
+        assert all(text.startswith("Nothing was done: ") for text in ran), ran
+        assert run_sightings(run.id, events) == [], events
         assert [event.data["approval_id"] for event in events if event.kind == QUESTION_LEFT_EVENT] == [
             kept_first.id,
             kept_second.id,

@@ -41,7 +41,8 @@ Dot reads its record since the last night (the week before, the first time). Fou
 
 Some failures do not count, because they are the run's own doing, the world's, or your decision:
 
-- An approval refused or expired.
+- An approval refused or expired, and a step kept for your yes or for you to do (its result opens with "Nothing was
+  done:", item 972).
 - A tool in use by another run.
 - A page that is not there, or a host name that does not resolve (most often an address the model guessed; the first
   night's session found it, item 932). This takes every such failure of the DNS, a resolver down for a while among

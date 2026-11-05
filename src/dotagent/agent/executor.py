@@ -133,8 +133,9 @@ def _describe_failure(exc: Exception, tool: RegisteredTool) -> str:
     if isinstance(exc, ToolInputError):
         return exc.message
     if isinstance(exc, ApprovalParked):
-        # Kept for the owner (item 482): its words say it did not happen, that it waits, and how to go on.
-        return exc.message
+        # Kept for the owner (item 482): its words say it did not happen, that it waits, and how to go on. It opens as
+        # the owner's say does, which the repair night does not take for a defect of Dot's (item 972).
+        return f"Nothing was done: {exc.message}"
     if isinstance(exc, PolicyDenied | ApprovalRejected):
         return f"Not allowed: {exc.message}. Do not retry this action or look for a way around it."
     if isinstance(exc, HandedOff):
