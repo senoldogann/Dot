@@ -260,7 +260,8 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await expect(head.get_by_role("link", name="New chat")).to_be_visible()
                     await expect(head.get_by_role("link", name="Settings")).to_be_visible()
                     await expect(foot.get_by_role("link", name="Settings")).to_be_hidden()
-                    await expect(sidebar.locator(".side-dot-hero")).to_be_visible()
+                    # Dot's face starts a chat with Dot, as every way to Dot does: it has no agent page.
+                    await expect(sidebar.locator(".side-dot-hero")).to_have_attribute("href", "#/runs")
                     await page.screenshot(path=str(tmp_path / f"chats-{scheme}.png"))
                     await context.close()
 

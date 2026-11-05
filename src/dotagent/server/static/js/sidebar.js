@@ -631,10 +631,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // What the tiles show, as last drawn: the same agents read again leave them standing, so that the focus or the
   // pointer on one stays (the pre-push review).
   let facesDrawn = null;
+  // Dot's look as its large face on a phone last wore it (item 991).
+  let heroLook = null;
   function paintFaces(found) {
     // Dot's own face on a phone's home wears the look it was given (item 991).
+    // Drawn again only when its look changed, as the other tiles are.
     const dot = found.find(({ record }) => record.id === DOT_ID);
-    if (dot !== undefined) {
+    const look = dot === undefined ? null : JSON.stringify(dot.record.look);
+    if (dot !== undefined && look !== heroLook) {
+      heroLook = look;
       dotHero.firstElementChild.replaceWith(actorFace(DOT_ID, "idle", dot.record.look));
     }
     // As many as the sidebar holds whole beside All (item 855: the row scrolled, and a face cut at its edge looked
@@ -1598,14 +1603,17 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate }, ownerInitials);
   function paintOwner() {
     const words = shownOwner().split(/\s+/).filter((word) => word !== "");
-    const initials = words.slice(0, 2).map((word) => word[0].toLocaleUpperCase()).join("");
+    // A word's first character whole, a letter outside the Basic Multilingual Plane too.
+    const initials = words.slice(0, 2).map((word) => [...word][0].toLocaleUpperCase()).join("");
     ownerInitials.replaceChildren(initials === "" ? icon("user") : initials);
   }
   paintOwner();
   const heroName = el("span", { class: "side-dot-name" }, dotName());
   const dotHero = el(
     "a",
-    { class: "side-dot-hero", href: `#/agents/${DOT_ID}`, onclick: onNavigate },
+    // A chat with Dot starts from its face, as every other way to Dot leads to New chat (views/agents.js): Dot has no
+    // agent page of its own.
+    { class: "side-dot-hero", href: homeHref, onclick: onNavigate },
     actorFace(DOT_ID, "idle", null),
     heroName,
   );
