@@ -46,6 +46,16 @@ export function settingFold(key, lead = "In the settings file:") {
  * `run()` (item 616: Reload, for a microphone that Safari stopped hearing). `details` are the program's own words for an
  * error, in a fold of their own under the sentence, which stays long enough to be opened (item 625). */
 export function toast(kind, text, action = null, details = "") {
+  // The same plain words shown again while they show are not shown twice (item 990: each press of Send while files
+  // uploaded stacked one more "Wait until the files are uploaded"): the one there stays, for its whole time again.
+  const plain = action === null && details === "";
+  const key = `${kind}\n${text}`;
+  const shown = plain ? showing.get(key) : undefined;
+  if (shown !== undefined && shown.node.isConnected) {
+    clearTimeout(shown.timer);
+    shown.timer = setTimeout(() => shown.node.remove(), kind === "error" ? ERROR_TOAST_MS : TOAST_MS);
+    return;
+  }
   const fold = detailsFold(details);
   const node = el("div", { class: `toast ${kind}` }, icon(kind === "error" ? "alert" : "check"), el("span", null, text, fold));
   if (action !== null) {
@@ -57,8 +67,14 @@ export function toast(kind, text, action = null, details = "") {
     }
   });
   toastRegion().append(node);
-  setTimeout(() => node.remove(), action !== null || fold !== null ? ACTION_TOAST_MS : kind === "error" ? ERROR_TOAST_MS : TOAST_MS);
+  const timer = setTimeout(() => node.remove(), action !== null || fold !== null ? ACTION_TOAST_MS : kind === "error" ? ERROR_TOAST_MS : TOAST_MS);
+  if (plain) {
+    showing.set(key, { node, timer });
+  }
 }
+
+// The plain toasts shown, by their kind and words, with the timer that takes each away.
+const showing = new Map();
 
 /** Tell in a toast what `error` came to, in words a person reads, and its Details apart (item 625). */
 export function toastError(error) {

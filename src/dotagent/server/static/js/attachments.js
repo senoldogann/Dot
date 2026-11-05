@@ -279,7 +279,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
     entry.node = chip(file.name, preview, status, entry);
     entries.push(entry);
     list.append(entry.node);
-    entry.done = upload(entry);
+    upload(entry);
   }
 
   function add(files) {
@@ -463,8 +463,6 @@ export function createAttachments({ dropTarget, input, onChange }) {
     },
     count: () => entries.length,
     busy: () => entries.some((entry) => entry.state === "uploading"),
-    // Once every file listed now has uploaded or failed (item 990).
-    settled: () => Promise.all(entries.map((entry) => entry.done ?? null)),
     failed: () => entries.some((entry) => entry.state === "failed"),
     clear: () => {
       for (const entry of [...entries]) {
@@ -501,34 +499,6 @@ function wordsForFiles(attachments) {
 export function messageText(text, attachments) {
   const words = text.trim();
   return words === "" && attachments.count() > 0 ? wordsForFiles(attachments) : words;
-}
-
-// The lists whose message waits for its files (item 990): a second press meanwhile sends nothing more.
-const waiting = new WeakSet();
-
-/**
- * Whether the message of a box may be read and sent now, once the files listed have uploaded (item 990: a press of Send
- * while they uploaded was refused with a toast, one more at each press, and the owner pressed again and again): says
- * once that the message goes when they are there, and waits for them, those added meanwhile too. A press while one
- * waits gets false and sends nothing. The caller reads the box only after it, so that words typed and files added while
- * it waited go with the message.
- */
-export async function filesUploaded(attachments) {
-  if (waiting.has(attachments)) {
-    return false;
-  }
-  if (attachments.busy()) {
-    waiting.add(attachments);
-    toast("ok", "Goes once the files are uploaded");
-    try {
-      while (attachments.busy()) {
-        await attachments.settled();
-      }
-    } finally {
-      waiting.delete(attachments);
-    }
-  }
-  return true;
 }
 
 /** Whether a message may go now; says why not when files are still uploading or failed. */

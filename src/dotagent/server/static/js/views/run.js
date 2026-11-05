@@ -8,7 +8,7 @@ import { api, eventNotShown, follow, query, sse } from "../api.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAsksDock } from "../asksdock.js";
-import { filesUploaded, messageText, readyToSend } from "../attachments.js";
+import { messageText, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { createCapsule } from "../capsule.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
@@ -873,12 +873,6 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // `other` sends the message the other way than the send does (⌘⇧Enter): see `steers`.
   async function submit(other) {
     if (sending) {
-      return;
-    }
-    // Files still uploading are waited for before the box is read (item 990). An edit of a queued message opened or
-    // closed meanwhile swapped what the box holds: what was pressed is gone, and nothing goes (the pre-push review).
-    const editing = queue.editing();
-    if (!(await filesUploaded(attachments)) || queue.editing() !== editing) {
       return;
     }
     // A message of files alone goes too (item 445): a pasted text or a picture sent without a word typed.
