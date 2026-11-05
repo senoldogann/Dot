@@ -1354,6 +1354,16 @@ def touched_dot(
     return None
 
 
+async def _read_outside(runtime: "Runtime", run: RunRecord) -> bool:
+    """Whether the steps of ``run`` may carry content third parties can author: it read such content itself, or a run of
+    its chat ever did, whose words its history holds and the run read (item 980, the security audit of 2026-11-05).
+    The owner's "go on" after a page clears a run's mark, not the page's words, as :mod:`dotagent.tools.skill_save`
+    reads it too."""
+    if await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS)):
+        return True
+    return await runtime.store.chat_ever_tainted(run.thread_id)
+
+
 async def _refused(runtime: "Runtime", run: RunRecord) -> str | None:
     """Why ``run`` gives no skill whatever the review model says of it (item 585): it is a chat-mode run, which only
     talks, or it changed Dot itself (:func:`touched_dot`, over every step of the run and of the runs it delegated).
@@ -1522,7 +1532,7 @@ async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) 
         log.info("playbook_skipped", run_id=run.id, reason=refused)
         return SKIPPED
     host: str = main_site(events) or NO_SITE
-    tainted: bool = await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS))
+    tainted: bool = await _read_outside(runtime, run)
     try:
         reply: PlaybookReply = await _ask_writer(runtime, run, steps, host, tainted)
         if not reply.recurs:
@@ -1582,7 +1592,7 @@ async def save_playbook(runtime: "Runtime", run: RunRecord) -> tuple[str, bool]:
     if why is not None:
         raise InvalidValueError(f"this run cannot be saved as a skill: {why}", {"run_id": run.id})
     host: str = main_site(events) or NO_SITE
-    tainted: bool = await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS))
+    tainted: bool = await _read_outside(runtime, run)
     # The owner asked for it: whether the steps will recur is theirs to say, so the model's answer to it is not read.
     written: PlaybookReply = await _ask_writer(runtime, run, steps, host, tainted)
     file, name, updated = await _write_reply(runtime, run, steps, host, tainted, written)

@@ -353,3 +353,33 @@ async def test_skill_work_that_fails_is_counted_and_work_that_goes_well_clears_i
             shown = (await client.get("/api/memories/learning")).json()
             assert shown["health"]["playbooks"]["failures_in_row"] == 0
             assert shown["health"]["playbooks"]["last_error"] == failed.playbooks.last_error
+
+
+async def test_a_run_of_a_chat_that_read_a_page_writes_a_skill_marked_so_though_it_read_none_itself(
+    login_env: dict[str, str],
+) -> None:
+    """Item 980, the security audit of 2026-11-05: the owner's "go on" after a page starts the next run clean, while the
+    chat's history it reads holds the page's words; a skill learned from that run was marked clean and offered whole."""
+    turns: list[ScriptedTurn] = [
+        # The first run reads a page and ends: one step is short of a skill.
+        _turn(ScriptedCall(tool="web_fetch", arguments={"url": "http://127.0.0.1:9/notes"})),
+        FINISH,
+        # The owner's next message: three acting steps, then done; then the skill writer's answer.
+        _turn(_write()),
+        _turn(_read()),
+        _turn(_read()),
+        FINISH,
+        TAINTED_SKILL,
+    ]
+    async with _home(login_env, turns) as home:
+        first: RunRecord = await _run(home)
+        assert first.status == "done"
+        follow: RunRecord = await home.manager.start(
+            "Go on.", "task", SCRIPTED_MODEL, first.thread_id, SOURCE, None, None, "standard", None, "ask", False, ()
+        )
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            assert (await home.manager.wait(follow.id)).status == "done"
+            await home.manager.distilled(follow.id)
+        assert not await home.runtime.store.read_outside(follow.id, ("network",), ("web", "browser"))
+        meta: PlaybookMeta = read_meta(playbooks_dir() / SKILL_NAME)
+        assert meta.tainted is True
