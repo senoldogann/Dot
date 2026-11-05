@@ -75,18 +75,18 @@ _HEAVY_PAGE: str = (
 async def test_a_whole_snapshot_that_really_times_out_still_gives_a_part(page: Page) -> None:
     """The whole snapshot that timed out runs on in the page (item 923); the part waits for it rather than failing."""
     await page.set_content(_HEAVY_PAGE)
-    # The whole read twice, the slower kept: a runner's second read was slower than its first, past the bound's room
-    # (#781, #785 and #800's CI, item 994).
+    # The whole read three times: the first, cold, is slower than the reads after it, and is left out; the two warm
+    # ones are what the read under test is like (item 994: one read timed was sometimes slower, sometimes faster, than
+    # the read it bounded, on #781, #785, #800 and #801's CI).
     takes: list[int] = []
-    for _ in range(2):
+    for _ in range(3):
         started: float = time.monotonic()
         await page.aria_snapshot(mode="ai", boxes=True, timeout=120_000)
         takes.append(round((time.monotonic() - started) * 1000))
-    whole_ms: int = max(takes)
+    whole_ms: int = round((takes[1] + takes[2]) / 2)
     # Six tenths of the time the whole takes: it times out for real while a read up to four tenths faster still does,
     # and the page stays busy until the whole ends, inside the twice the bound the part waits, a read up to a fifth
-    # slower too (half was the bound before, which a runner's slower read missed; a third before that, #756's CI,
-    # 2026-11-02).
+    # slower too.
     read = await capture_page(page, round(whole_ms * 0.6), True)
     assert read.partial.startswith("Partial view: the page was too heavy to read whole")
     assert "Row" in render_lines(read.lines)
