@@ -41,8 +41,12 @@ from dotagent.store.models import DraftRecord, EventRecord, PushSubscription, Ru
 
 log = structlog.get_logger(__name__)
 
-# The claim a push service sees in the signed header; the daemon has no address of its own.
-_SUBJECT: str = "mailto:dot@localhost"
+# The claim a push service sees in the signed header: a way to reach whoever runs the sender, as an https: address or a
+# mailto: one (RFC 8292). Apple's service refuses a subject it cannot reach (403 BadJwtToken): "mailto:dot@localhost"
+# had every push to an iPhone refused (item 992; 253 of 253 in the owner's log), so it is the project's own page.
+SUBJECT: str = "https://github.com/senoldogann/Dot"
+# How much of a refusing push service's answer is kept: Apple says why in it ({"reason": "BadJwtToken"}).
+_ANSWER_CHARS: int = 300
 _TTL_S: int = 600
 _SEND_TIMEOUT_S: float = 10.0
 _WAIT_S: float = 1.0
@@ -247,15 +251,16 @@ def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) 
             },
             data=json.dumps(message.model_dump()),
             vapid_private_key=Vapid.from_pem(keys.private_pem.encode("ascii")),
-            vapid_claims={"sub": _SUBJECT},
+            vapid_claims={"sub": SUBJECT},
             ttl=_TTL_S,
             timeout=_SEND_TIMEOUT_S,
         )
     except WebPushException as exc:
         status: int | None = None if exc.response is None else int(exc.response.status_code)
+        answer: str = "" if exc.response is None else str(exc.response.text)[:_ANSWER_CHARS]
         raise PushError(
             "the push service did not take the message",
-            {"endpoint": subscription.endpoint, "status": status, "detail": str(exc)},
+            {"endpoint": subscription.endpoint, "status": status, "answer": answer, "detail": str(exc)},
         ) from exc
     except OSError as exc:
         # The network failed on the way (requests raises its errors as OSError): the service never answered.
@@ -311,7 +316,13 @@ async def _push_to(store: Store, keys: PushKeys, subscription: PushSubscription,
             await store.delete_push_subscription(subscription.endpoint)
             log.info("push_subscription_gone", endpoint=subscription.endpoint, status=error.context.get("status"))
             return "removed"
-        log.warning("push_failed", endpoint=subscription.endpoint, status=error.context.get("status"))
+        # What the service answered says why (item 992: Apple's reason was never logged, and a 403 hid for days).
+        log.warning(
+            "push_failed",
+            endpoint=subscription.endpoint,
+            status=error.context.get("status"),
+            answer=error.context.get("answer"),
+        )
         return "failed"
     return "sent"
 

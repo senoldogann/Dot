@@ -404,3 +404,30 @@ def test_the_end_of_a_schedules_run_is_its_schedules_to_tell_but_a_campaigns_ses
     assert push_message(ended, session) == PushMessage(
         title="A task failed", body="The site moved.", route="#/runs/run-1", state="failed"
     )
+
+
+@pytest.mark.asyncio
+async def test_a_push_is_signed_with_a_subject_apple_takes_and_a_refusal_keeps_its_answer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 992: every push to an iPhone was refused with 403 (253 of 253 in the owner's log), and only the status was
+    kept. Apple refuses a VAPID subject it cannot reach (BadJwtToken), as "mailto:dot@localhost" was; the subject is an
+    https: address now, and a refusal keeps what the service answered (pywebpush is a fake here)."""
+    claims: list[object] = []
+
+    def webpush(subscription_info: dict[str, str], data: str, **signing: object) -> None:
+        claims.append(signing["vapid_claims"])
+        raise WebPushException("Push failed", response=_Answer(403))
+
+    monkeypatch.setattr(pywebpush, "webpush", webpush)
+    keys: PushKeys = read_or_create_keys(tmp_path / "vapid-key.pem")
+    p256dh, auth = _usable_keys()
+    subscription: PushSubscription = PushSubscription(
+        endpoint="https://web.push.apple.com/a", p256dh=p256dh, auth=auth, created_at=_NOW
+    )
+    message: PushMessage = PushMessage(title="t", body="b", route="#/runs", state="failed")
+    with pytest.raises(PushError) as refused:
+        await push.send_push(keys, subscription, message)
+    assert claims == [{"sub": push.SUBJECT}]
+    assert push.SUBJECT.startswith("https://") and "localhost" not in push.SUBJECT
+    assert (refused.value.context["status"], refused.value.context["answer"]) == (403, "MARKER-answer-403")
