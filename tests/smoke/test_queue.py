@@ -549,6 +549,35 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
                 await expect(every_chip.locator("img.attach-thumb")).to_have_attribute("src", re.compile(r"^blob:"))
                 saved: QueuedMessage = (await runtime.store.list_queued(first.thread_id))[0]
                 assert (saved.text, len(saved.attachments)) == (SHORT_SUMMARY, 3)
+                # Saved while a file uploads, then cancelled before it is there: nothing goes, neither the edit nor the
+                # draft that comes back into the box (the pre-push review of item 990).
+                again: asyncio.Event = asyncio.Event()
+
+                async def held_again(route: Route) -> None:
+                    await again.wait()
+                    await route.continue_()
+
+                steered: int = len(await runtime.store.events_of_kind(first.id, "steer", 50))
+                await row.get_by_role("button", name="Edit queued message").click()
+                await expect(chips).to_have_count(3)
+                await page.route("**/api/attachments", held_again)
+                await page.locator(".dock input[type=file]").set_input_files(
+                    {"name": "late.txt", "mimeType": "text/plain", "buffer": b"late\n"}
+                )
+                await page.locator(".dock textarea").fill("A changed summary")
+                await page.locator(".dock .btn.send").click()
+                await expect(page.get_by_text("Goes once the files are uploaded").first).to_be_visible()
+                await page.get_by_role("button", name="Cancel editing queued message").click()
+                await expect(chips).to_have_count(0)
+                async with page.expect_response("**/api/attachments"):
+                    again.set()
+                await page.unroute_all(behavior="ignoreErrors")
+                # The page has read the upload's answer and done what it does with it: a send would have gone by now.
+                await page.wait_for_timeout(1500)
+                await expect(every_chip).to_have_count(1)
+                queued: list[QueuedMessage] = await runtime.store.list_queued(first.thread_id)
+                assert [(one.text, len(one.attachments)) for one in queued] == [(SHORT_SUMMARY, 3)]
+                assert len(await runtime.store.events_of_kind(first.id, "steer", 50)) == steered
             finally:
                 await browser.close()
         await model.release()

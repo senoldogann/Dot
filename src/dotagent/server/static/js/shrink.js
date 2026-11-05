@@ -34,7 +34,8 @@ export async function smallerPicture(file) {
   if (!SHRINKS.has(file.type) || file.size < SHRINK_FROM_BYTES) {
     return file;
   }
-  const bitmap = await createImageBitmap(file);
+  // A phone's photo stands as it was taken: the drawing drops its EXIF, so its turn is taken from it here.
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   try {
     const size = fitWithin(bitmap.width, bitmap.height, SHRINK_EDGE);
     // A picture within the edge goes as it is, whatever its weight: a screenshot's text stays sharp, and a PNG clear.

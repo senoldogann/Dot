@@ -875,8 +875,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     if (sending) {
       return;
     }
-    // Files still uploading are waited for before the box is read (item 990).
-    if (!(await filesUploaded(attachments))) {
+    // Files still uploading are waited for before the box is read (item 990). An edit of a queued message opened or
+    // closed meanwhile swapped what the box holds: what was pressed is gone, and nothing goes (the pre-push review).
+    const editing = queue.editing();
+    if (!(await filesUploaded(attachments)) || queue.editing() !== editing) {
       return;
     }
     // A message of files alone goes too (item 445): a pasted text or a picture sent without a word typed.
