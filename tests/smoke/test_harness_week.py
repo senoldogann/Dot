@@ -120,12 +120,17 @@ async def test_a_pattern_of_a_week_is_proposed_for_and_tried_half_and_half(login
         version: HarnessVersion = await runtime.store.get_harness_version(trial.version_id)
         assert (version.state, version.habits) == ("candidate", HABIT)
         # A run takes the candidate or the version in use by its id, and says which half it is in.
-        candidate_text, candidate_version, seat = await text_for_run(runtime.store, _id_in("candidate")(1), ())
+        candidate_text, candidate_version, seat = await text_for_run(runtime.store, _id_in("candidate")(1), (), now)
         assert (candidate_text.habits, candidate_version) == (HABIT, version.id)
         assert seat is not None and (seat.version, seat.arm) == (version.id, "candidate")
-        in_use_text, in_use_version, other = await text_for_run(runtime.store, _id_in("in_use")(1), ())
+        in_use_text, in_use_version, other = await text_for_run(runtime.store, _id_in("in_use")(1), (), now)
         assert (in_use_text.habits, in_use_version) == ("", None)
         assert other is not None and other.arm == "in_use"
+        # Past its 21 days no run takes the candidate, though no night ended the trial (the learning switched off).
+        late_text, late_version, late_seat = await text_for_run(
+            runtime.store, _id_in("candidate")(1), (), now + 21 * DAY_S
+        )
+        assert (late_text.habits, late_version, late_seat) == ("", None, None)
         # Twenty runs a half, the candidate's ending done far less often: the trial stops as worse, and the candidate is
         # set aside; the version in use was never replaced.
         for arm, done in (("candidate", 10), ("in_use", 20)):

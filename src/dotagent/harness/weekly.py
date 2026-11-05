@@ -29,6 +29,7 @@ from dotagent.harness.trial import (
     judge,
     pattern_lines,
     patterns_of,
+    shown_signature,
     steering_words,
 )
 from dotagent.notify.owner import tell_owner
@@ -103,7 +104,7 @@ async def _propose(runtime: Runtime, patterns: Sequence[FailureRow], now: float)
         await retire(runtime.store, version.id, now)
         log.info("harness_week_steering", version=version.id, words=list(steering))
         return f"a proposal named {', '.join(steering)}, which a habit must not steer runs to: set aside unused"
-    signatures: tuple[str, ...] = tuple(line.split(" — ", 1)[0] for line in lines)
+    signatures: tuple[str, ...] = tuple(shown_signature(row) for row in patterns)
     trial: Trial = Trial(version_id=version.id, started_at=now, signatures=signatures, in_use=parent)
     await runtime.store.kv_set(TRIAL_KEY, trial.model_dump_json())
     said: str = f"trying “{version.summary}” on half of the runs, for {'; '.join(signatures)}"

@@ -46,8 +46,10 @@ _CLASSES: tuple[tuple[FailureClass, re.Pattern[str]], ...] = (
     ),
 )
 # What a candidate's text must not name: a habit that steers runs toward a tool with fewer guards or around a question.
+# A word is matched at its start and with whatever follows it, so a tool's name (``terminal_send``, ``shell``) is
+# caught as the word is.
 _STEERING: re.Pattern[str] = re.compile(
-    r"\b(?:shell|terminal|bash|zsh|osascript|apple ?script|approv\w*|permission\w*|yolo|ask(?:s|ing)?|confirm\w*)\b",
+    r"(?<![A-Za-z0-9])(?:shell|terminal|bash|zsh|osascript|apple[ _]?script|approv|permission|yolo|ask|confirm)\w*",
     re.IGNORECASE,
 )
 

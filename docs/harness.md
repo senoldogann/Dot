@@ -429,8 +429,8 @@ step's record (`week`) and said under its row:
   seen only in runs that read what others can author is shown as its tool and a class from a closed list (*timed out*,
   *not found*, *refused*, *invalid arguments*, *page did not load*, *other*), since a third party's error may be quoted
   in its first sentence. The proposal is written as a candidate through the gate of every text Dot learns (above); one
-  whose text names the shell, the terminal, AppleScript, an approval, a permission, yolo, asking or confirming is set
-  aside unused, since a habit must not steer runs to a tool with fewer guards, or around a question.
+  whose text names the shell, the terminal, AppleScript, an approval, a permission, yolo, asking or confirming (as a
+  word or as the start of a tool's name, `terminal_send`) is set aside unused, since a habit must not steer runs to a tool with fewer guards, or around a question.
 - **A trial on real runs, half and half.** The candidate's trial begins at once, and you are told. Each run of Dot's own
   agent that starts while it is under way takes the candidate or the version in use by its id (the first byte of its
   SHA-256, odd or even), and records which (a `harness_trial` event); the version in use stays in use. A run on one of
@@ -440,7 +440,8 @@ step's record (`week`) and said under its row:
   proposed for failed, and the share that ended done. With at least twenty runs a half it stops at once as *worse* when
   the candidate's runs end done less than three quarters as often as the others'. With at least forty runs a half it is
   *better* when its share of failing runs is lower with p < 0.1 (a one-sided test of two proportions) and its done runs
-  are not fewer by a quarter. After 21 days without a decision it is *unclear*. A better candidate waits for you, as
+  are not fewer by a quarter. After 21 days without a decision it is *unclear*, and from then no run takes the candidate, even when no night
+  ends the trial (the nightly learning switched off). A better candidate waits for you, as
   *tried* (**Use** puts it in use), or with `adopt = "auto"` is put in use if the version in use is still the one the
   trial began with; a worse or unclear one, or one you set aside on the page meanwhile, is set aside and the trial
   ends; you are told how it came out. The version in use is never replaced unless the trial says better. At the

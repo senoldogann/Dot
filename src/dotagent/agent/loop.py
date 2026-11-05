@@ -2261,7 +2261,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     held_at_start: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     # The adopted version of the harness (item 389): its texts go into the prompt, and the run records which it took.
     # While a version is tried on real runs (item 988), half the runs take it, by their id, and record their half.
-    harness_text, harness_version, seat = await text_for_run(runtime.store, run.id, held_at_start)
+    harness_text, harness_version, seat = await text_for_run(runtime.store, run.id, held_at_start, time.time())
     if harness_version is not None:
         await runtime.store.set_run_harness(run.id, harness_version)
     if seat is not None:

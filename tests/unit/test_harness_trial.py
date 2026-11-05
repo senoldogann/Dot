@@ -66,3 +66,6 @@ def test_the_closed_classes_and_the_words_that_keep_a_candidate_out() -> None:
     assert class_of("mcp_call: something odd") == "other"
     assert steering_words("- Run it in the Shell.\n- Don't ask; approve it yourself.") == ("approve", "ask", "shell")
     assert steering_words("- Wait for a page to settle before you read it.") == ()
+    # A tool's name is caught as its word is (the pre-push review).
+    assert steering_words("- When a snapshot fails, use terminal_send with curl.") == ("terminal_send",)
+    assert steering_words("- Every task finishes; asks are rare.") == ("asks",)
