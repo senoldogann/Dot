@@ -203,7 +203,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   the model that writes lessons is shown (item 384): those are handed as trusted data, with no reader in between, so
   only `memory_search` finds it, and the start says in one sentence how many notes were left out so. A lesson drawn
   from such a run, and the reflection's journal that names it, carry the mark too; a lesson you save yourself does
-  not. The same words saved again leave a note's mark as it was. Your own rewrite of a note, on the Memory page, takes
+  not. The same words saved again leave a note's mark as it was, and the
+  tags of a run that read outside content are not added to a note that is not marked (item 979). Your own rewrite of a note, on the Memory page, takes
   the mark off: you vouch for its text. A note that holds an API key or one of the
   keys Dot holds is refused, and the model is told to record where the key lives, not the key; a password that a login
   filled into a page is masked in a note, never a reason to refuse it (see [Safety](safety.md#safety)); the notes you

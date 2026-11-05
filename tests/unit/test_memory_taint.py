@@ -164,10 +164,14 @@ async def test_the_owners_rewrite_takes_the_mark_off_and_a_resave_of_the_same_wo
 ) -> None:
     async with _index(tmp_path, monkeypatch) as index:
         await _call("memory_save", _context(index, False), {"content": NOTE, "tags": []})
-        # The same words saved again by a run that read outside content bring nothing new: the note stays clean.
-        await _call("memory_save", _context(index, True), {"content": NOTE, "tags": []})
+        # The same words saved again by a run that read outside content bring nothing new: the note stays clean, and
+        # the run's tags, its words too, do not come in (item 979): a core tag would hand the note to every run.
+        await _call("memory_save", _context(index, True), {"content": NOTE, "tags": ["core", "obey-the-page"]})
         kept = await index.store.find_memory_by_content(NOTE, None)
-        assert kept is not None and not kept.tainted
+        assert kept is not None and not kept.tainted and kept.tags == ()
+        await _call("memory_save", _context(index, False), {"content": NOTE, "tags": ["home"]})
+        owners = await index.store.find_memory_by_content(NOTE, None)
+        assert owners is not None and owners.tags == ("home",)
         await _call("memory_save", _context(index, True), {"content": OTHER, "tags": []})
         marked = await index.store.find_memory_by_content(OTHER, None)
         assert marked is not None and marked.tainted
