@@ -222,6 +222,15 @@ async def test_a_message_sent_on_one_screen_shows_at_once_on_the_other(
             other_cards: Locator = other.get_by_label("Dot asked you").locator(".approval")
             await expect(cards).to_have_count(2)
             await expect(other_cards).to_have_count(2)
+            # Both stand in one panel at the composer's place, which counts them and scrolls in itself, never taller
+            # than half the window (item 973).
+            for page in (questions, other):
+                await expect(page.get_by_label("Dot asked you").locator(".asks-count")).to_have_text("2")
+                overflow, room, window = await page.evaluate(
+                    "() => { const list = document.querySelector('.asks-list');"
+                    " return [getComputedStyle(list).overflowY, list.getBoundingClientRect().height, innerHeight]; }"
+                )
+                assert overflow == "auto" and room <= window / 2 + 1, (overflow, room, window)
             await cards.first.get_by_label("Your answer").fill("The north coast.")
             await cards.first.get_by_role("button", name="Send answer").click()
             first_answer: RunRecord = await _newest(runtime, asked.thread_id, {asked.id})

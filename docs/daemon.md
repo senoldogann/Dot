@@ -392,10 +392,14 @@ Customize tile and its chip too); and a skill wears the puzzle piece, here and a
 of an imported skill, the brain of a learned one; the daemon's palette says which server is of which service). An `@`
 inside a word, as in an address, opens nothing. On a phone either menu takes the room the keyboard leaves above the
 composer and scrolls inside it. A run that waits for your approval is listed under Waits for you, below the composer,
-and leads to its chat: the card stands there alone (item 434), with no line above it that says the same (item 871),
-wherever that line stood, a step's row between them too (item 891); a refusal, which comes with no card, keeps its
-line. Once you allow it, the card leaves the chat, as the
-page opens again too; refused, it stays and says so, and a question keeps its answer. A step settled (refused, or not
+and leads to its chat. While it waits the card stands at the composer's place, in one panel headed "Your answer is
+needed" (item 973, after another agent app's), on a phone and a computer alike: the panel takes the composer's place while it is
+open, counts its cards when there are several and scrolls inside itself, never taller than half the window, and its
+chevron folds it to its head, which gives the composer back; a question the run left waits there too. In the chat the
+card keeps its place (item 434), with no line above it that says the same (item 871), wherever that line stood, a
+step's row between them too (item 891); a refusal, which comes with no card, keeps its line. Once you allow it, the
+card leaves the chat, as the page opens again too; refused, it goes back to its place in the chat and says so, and a
+question keeps its answer there. A step settled (refused, or not
 answered in time; a question with its answer) is one quiet line, not a card (item 891, the owner's word on an expired card:
 "this looks very ugly"): what it was ("Run"), its command on one line, cut at the width, and how it ended ("Expired",
 "Denied"); its note under it; under **Details** the whole command, what the step does and a reason of its own,

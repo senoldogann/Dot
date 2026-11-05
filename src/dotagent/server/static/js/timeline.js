@@ -407,9 +407,11 @@ function buildFlock() {
  * (item 318); null where the page shows no goal, and they stand in the timeline. `reactions` are the page's reactions of
  * the chat (reactions.js), whose button and chips stand in the foot of each message of the run's own, its answer and what
  * it said in its steps (item 586); null where the timeline shows none. `onReactionHold(held)` says that the owner holds
- * the run with a ✋, which waits for what they write next, or that the hold is over.
+ * the run with a ✋, which waits for what they write next, or that the hold is over. `onAsk(node)` takes a card that waits
+ * for the owner's answer once it stands in its place, and `onAnswered(node)` gives it back to that place once it is
+ * answered (item 973: the page holds it at the composer's place meanwhile).
  */
-export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere, onDotReaction = (/** @type {string} */ _reaction) => undefined, reactions = null, onReactionHold = (/** @type {boolean} */ _held) => undefined }) {
+export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere, onAsk, onAnswered, onDotReaction = (/** @type {string} */ _reaction) => undefined, reactions = null, onReactionHold = (/** @type {boolean} */ _held) => undefined }) {
   const element = el("div", { class: "timeline" });
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
@@ -1299,6 +1301,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       scope.policyLine = null;
       cards.set(record.data.approval_id, { card, scope, severity: record.data.severity });
       place(scope, card.node, record.ts);
+      // While it waits, the card stands at the composer's place (item 973); its place here is kept for its answer.
+      onAsk(card.node);
       reveal(scope);
       markWaiting(scope, true, record.ts);
     },
@@ -1323,6 +1327,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const entry = cards.get(record.data.approval_id);
       if (entry !== undefined) {
         cards.delete(record.data.approval_id);
+        // Answered, the card goes back to its place in the conversation, where what was decided is kept (item 973).
+        onAnswered(entry.card.node);
         // An action allowed, or a step the reader did, leaves the chat, live and when the chat opens again (item 434):
         // the run goes on with it. A refusal stays, and so does a question with its answer.
         if (record.data.status === "approved" && entry.severity !== "question") {

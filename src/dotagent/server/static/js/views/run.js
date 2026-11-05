@@ -7,6 +7,7 @@ import { agentPanel } from "../agentpanel.js";
 import { api, eventNotShown, follow, query, sse } from "../api.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
+import { createAsksDock } from "../asksdock.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { createCapsule } from "../capsule.js";
@@ -615,7 +616,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // this conversation: into this run while it works, else into a new run on the thread, which the page opens once no
   // other question of this run is open here. A skip, or a decision the daemon refused, refreshes the page; once the
   // last question open here has closed, the page goes on at the chat's newer run if one started meanwhile (item 451).
-  const questionsList = el("div", { class: "stack tight", hidden: true, "aria-label": "Dot asked you" });
+  // What Dot asks of the owner stands at the composer's place (item 973): the cards of the conversation that wait for
+  // an answer and the questions the run left. While the panel is open it takes the composer's place.
+  const asks = createAsksDock();
   const questionCards = new Map();
 
   async function questionDecided(decided) {
@@ -636,7 +639,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     const open = new Set(questions.map((question) => question.id));
     for (const [id, node] of questionCards) {
       if (!open.has(id)) {
-        node.remove();
+        asks.drop(node);
         questionCards.delete(id);
       }
     }
@@ -650,10 +653,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
           onUseHere: null,
         });
         questionCards.set(question.id, card.node);
-        questionsList.append(card.node);
+        asks.add(card.node);
       }
     }
-    questionsList.hidden = questionCards.size === 0;
     // The last question open here closed, answered here or on another screen or skipped: the page goes on at the
     // chat's newer run if one started meanwhile (item 451), which it did not while a question stood.
     if (wereOpen > 0 && questionCards.size === 0) {
@@ -796,7 +798,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     },
   });
   const statusBar = el("div", { class: "status-bar", hidden: true }, capsule.element);
-  const dock = el("div", { class: "dock" }, statusBar, resumeLine, queue.element, loops.element, background.element, frame.element, foot);
+  const dock = el("div", { class: "dock" }, statusBar, resumeLine, queue.element, loops.element, background.element, asks.element, frame.element, foot);
   // The plan over the composer (item 644): its part in the capsule opens it as a bubble above the dock.
   bubble = planBubble({ anchor: capsule.plan, frame: dock, onOpenTab: () => inspector.openTab("plan") });
   bubble.paint(planNow.steps, planNow.targets);
@@ -1568,6 +1570,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
     // A hand-off of a browser step offers to use the page from this screen (item 475).
     onUseHere: () => computer.useHere(),
+    onAsk: (node) => asks.hold(node),
+    onAnswered: (node) => asks.release(node),
     onHeld: (held) => {
       computer.setHeld(held);
       if (held) {
@@ -1662,7 +1666,6 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     timeline.element,
     workStatus.element,
     waitingList,
-    questionsList,
     lessonsPlace,
   );
   paintWorking();

@@ -192,14 +192,29 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                         if width < 860:
                             await page.keyboard.press("Escape")
                         await page.goto(f"{address}/#/runs/{run.id}")
-                        card: Locator = page.locator(".timeline .approval")
+                        # While it waits the card stands at the composer's place, in the panel of what Dot asked,
+                        # which takes the composer's place until it is folded (item 973).
+                        asked: Locator = page.get_by_label("Dot asked you")
+                        card: Locator = asked.locator(".approval")
                         await expect(card).to_have_count(1)
+                        await expect(page.locator(".timeline .approval")).to_have_count(0)
+                        composer: Locator = page.locator(".dock .composer")
+                        await expect(composer).to_be_hidden()
+                        await asked.get_by_role("button", name="Fold what Dot asked").click()
+                        await expect(card).to_be_hidden()
+                        await expect(composer).to_be_visible()
+                        await asked.get_by_role("button", name="Show what Dot asked").click()
+                        await expect(composer).to_be_hidden()
+                        await page.screenshot(path=str(tmp_path / f"asking-{width}-{approved}.png"))
                         # The card stands alone: the line that asked said what it says (item 871).
                         await expect(page.locator(".timeline .note", has_text="Needs approval")).to_have_count(0)
                         await card.get_by_role("button", name="Approve" if approved else "Deny").click()
                         async with asyncio.timeout(WAIT_S):
                             assert (await manager.wait(run.id)).status == "done"
                         await _decided_shows(page, approved)
+                        # Answered, the panel goes and the composer is back.
+                        await expect(asked).to_be_hidden()
+                        await expect(composer).to_be_visible()
                         await page.screenshot(path=str(tmp_path / f"decided-{width}-{approved}.png"))
                         # The chat opened again reads the same.
                         await page.reload()
@@ -236,7 +251,7 @@ async def test_the_bell_leads_to_the_chat_that_asks_and_not_to_the_list_of_chats
                     await expect(bell).to_be_visible()
                     await bell.click()
                     await expect(page).to_have_url(re.compile(rf"#/runs/{older.id}$"))
-                    card: Locator = page.locator(".timeline .approval")
+                    card: Locator = page.get_by_label("Dot asked you").locator(".approval")
                     await expect(card).to_have_count(1)
                     await card.get_by_role("button", name="Deny").click()
                     async with asyncio.timeout(WAIT_S):
