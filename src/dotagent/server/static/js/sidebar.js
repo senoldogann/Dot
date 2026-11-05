@@ -606,7 +606,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // Campaigns and Schedules are icons in the head, beside the "+" (item 855, the owner's ask: two rows of their own
   // before the chats).
   const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: "Campaigns", "aria-label": "Campaigns", onclick: onNavigate }, icon("target"));
-  // Settings is its cog at the foot, beside Connect apps (item 492); its name stays for a reader of the screen.
+  // Settings is its cog at the foot, beside Connect apps (item 492), on a Mac; on a phone your initials at the head
+  // (item 991). Its name stays for a reader of the screen.
   const settingsLink = el(
     "a",
     { class: "side-link side-settings", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate },
@@ -1510,11 +1511,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   load();
   loadFaces();
 
-  // On a phone the sidebar is the list of chats over the whole screen (item 294): Dot's name
-  // at its head beside the close, and at its foot, under the thumb, Settings, the search and a new chat. The search
-  // moves between the head of the list and the foot as the width changes; there is one box. A new chat is a "+" (item
-  // 834), as a messaging app's: at the right of the head on a desk, where the "New chat" row under the search was, and
-  // in the foot on a phone.
+  // On a phone the sidebar is the list of chats over the whole screen (item 294), the phone's home (item 991): your
+  // initials and a new chat at its head, the apps and the search at its foot, under the thumb. The search moves between
+  // the head of the list and the foot as the width changes; there is one box. A new chat is a "+" (item 834), as a
+  // messaging app's, at the right of the head, where the "New chat" row under the search was.
   const searchBox = el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K"));
   const compose = el(
     "a",
@@ -1541,7 +1541,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   // Connect apps (items 492 and 545): at the foot, right of the cog of Settings, the way to Customize › Connectors, the
   // page of the services Dot works with, with the marks of the MCP servers it is connected to; the list of pages no
-  // longer names Customize. On a phone, a round button of its own.
+  // longer names Customize. On a phone, a round button of its own that wears a grid of tiles, the cog having moved to
+  // your initials at the head (item 991).
   const connectMarks = el("span", { class: "side-connect-marks", "aria-hidden": "true" });
   const connectButton = el(
     "button",

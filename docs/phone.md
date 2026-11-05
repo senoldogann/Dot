@@ -122,8 +122,9 @@ home's Today strip keeps its facts to one line that fades where it runs out of r
 brings messages there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
-list of chats over the whole screen, Dot's name at its head, and the cog of Settings, Connect apps (item 492), the search and the **+** of a new chat at its foot, under
-the thumb. A chat's bar has a way back to that list, the chat's title over the agent and the model, and its tools
+list of chats over the whole screen, the phone's home (item 991): your initials at its head's left open the settings
+and the **+** of a new chat stands at its right; Dot's face stands large with its name over the faces of the other
+agents; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, the chat's title over the agent and the model, and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
