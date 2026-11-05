@@ -26,6 +26,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, close_runtime, open_runtime
+from dotagent.scheduler.plans import UNSET_OPTIONS, ScheduleRequest, create_schedule
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
@@ -176,6 +177,23 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                     await page.goto(ui_url(host, port, TOKEN))
                     for approved in (True, False):
                         run, _ = await _asking(runtime, manager, f"Write the shelves ({width}, {approved})")
+                        # The chat has a loop: its sheet gives way to the panel while Dot asks (the owner's word of
+                        # 2026-11-05, whose screenshot showed the sheet over the panel's head), and comes back after.
+                        await create_schedule(
+                            runtime.store,
+                            runtime.config.scheduler,
+                            runtime.schedule_zone,
+                            ScheduleRequest(
+                                name="Check the shelves",
+                                goal="Check the shelves.",
+                                cron="0 9 * * 5",
+                                at=None,
+                                mode="task",
+                                options=UNSET_OPTIONS,
+                            ),
+                            time.time(),
+                            run.thread_id,
+                        )
                         # The home says something waits, without the card; the sidebar lists the run under Waiting
                         # for you (the sections moved there from the home, item 577).
                         await page.goto(f"{address}/#/")
@@ -199,6 +217,11 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                         card: Locator = asked.locator(".approval")
                         await expect(card).to_have_count(1)
                         await expect(page.locator(".timeline .approval")).to_have_count(0)
+                        # Read and shown by the strip (no hidden of its own), yet not seen.
+                        loops: Locator = page.locator(".chat-loops")
+                        await expect(loops).not_to_have_attribute("hidden", "")
+                        await expect(loops.locator(".chat-loops-count")).to_have_text("1")
+                        await expect(loops).to_be_hidden()
                         composer: Locator = page.locator(".dock .composer")
                         await expect(composer).to_be_visible()
                         await expect(composer.get_by_role("button", name="Stop")).to_be_visible()
@@ -213,9 +236,10 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                         async with asyncio.timeout(WAIT_S):
                             assert (await manager.wait(run.id)).status == "done"
                         await _decided_shows(page, approved)
-                        # Answered, the panel goes and the composer is back.
+                        # Answered, the panel goes and the composer and the loops are back.
                         await expect(asked).to_be_hidden()
                         await expect(composer).to_be_visible()
+                        await expect(loops).to_be_visible()
                         await page.screenshot(path=str(tmp_path / f"decided-{width}-{approved}.png"))
                         # The chat opened again reads the same.
                         await page.reload()

@@ -395,7 +395,9 @@ composer and scrolls inside it. A run that waits for your approval is listed und
 and leads to its chat. While it waits the card stands at the composer's place, in one panel headed "Your answer is
 needed" (item 973, after another agent app's), on a phone and a computer alike: the panel takes the composer's place while it is
 open (but for a run at work, whose composer holds its Stop and stays under it), counts its cards when there are several and scrolls inside itself, never taller than half the window, and its
-chevron folds it to its head, which gives the composer back; a question the run left waits there too. In the chat the
+chevron folds it to its head, which gives the composer back; a question the run left waits there too. While it is
+there the sheets of the chat's loops and of its commands at work give way to it, and come back once nothing is asked
+(item 989). In the chat the
 card keeps its place (item 434), with no line above it that says the same (item 871), wherever that line stood, a
 step's row between them too (item 891); a refusal, which comes with no card, keeps its line. Once you allow it, the
 card leaves the chat, as the page opens again too; refused, it goes back to its place in the chat and says so, and a
