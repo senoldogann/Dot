@@ -190,8 +190,15 @@ class Session:
         return await self.manager.start_alert(GOAL, f"{GOAL}\n\n(a mail)", thread_id)
 
     async def ended(self, run_id: str) -> RunRecord:
+        """The run once it is over. A run is stored queued before the manager holds it, and ``wait`` returns at once for
+        one it does not hold: a follow-up run found right after it was stored is waited for until its record says it
+        ended (CI's runners found one still ``queued``)."""
         async with asyncio.timeout(WAIT_S):
-            return await self.manager.wait(run_id)
+            while True:
+                run: RunRecord = await self.manager.wait(run_id)
+                if run.status not in ("queued", "running"):
+                    return run
+                await asyncio.sleep(0.02)
 
     async def events(self, run_id: str, kind: str) -> list[EventRecord]:
         return await self.runtime.store.events_of_kind(run_id, kind, 50)
