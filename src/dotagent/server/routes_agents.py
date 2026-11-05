@@ -31,7 +31,7 @@ from dotagent.agent.templates import (
     with_answers,
 )
 from dotagent.agent.welcome import WELCOME_SOURCE, welcome_goal
-from dotagent.core.errors import InvalidValueError, RunConflict
+from dotagent.core.errors import DotError, InvalidValueError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
@@ -617,22 +617,27 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         if await store.agent_runs(agent_id, 1):
             raise RunConflict("the agent has met you already: it has a chat", {"agent_id": agent_id})
         # The chat is named after the agent, not after Dot's words for the meeting (the pre-push review).
+        # A chat made for a meeting that did not start goes, as a watcher's does: none is left empty in the list.
         thread: ThreadRecord = await store.create_thread(agent.name, UI_SOURCE, None)
-        return await ctx.manager.start_for_agent(
-            agent,
-            welcome_goal(agent, request.language),
-            "chat",
-            None,
-            thread.id,
-            WELCOME_SOURCE,
-            None,
-            "standard",
-            None,
-            None,
-            None,
-            (),
-            NO_PICKS,
-        )
+        try:
+            return await ctx.manager.start_for_agent(
+                agent,
+                welcome_goal(agent, request.language),
+                "chat",
+                None,
+                thread.id,
+                WELCOME_SOURCE,
+                None,
+                "standard",
+                None,
+                None,
+                None,
+                (),
+                NO_PICKS,
+            )
+        except DotError:
+            await store.delete_threads([thread.id])
+            raise
 
     @router.delete("/agents/{agent_id}", status_code=204)
     async def delete_agent(agent_id: str) -> None:

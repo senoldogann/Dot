@@ -621,10 +621,19 @@ function ownerLanguage() {
   return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;
 }
 
-/** Start the first meeting of the agent `record` just made, and open its chat (item 993). */
+/**
+ * Start the first meeting of the agent `record` just made, and open its chat (item 993). The agent is made whatever the
+ * meeting comes to: one that could not start says why and opens the agent's page, so that the form is not pressed
+ * again for a second agent of the same name (the pre-push review).
+ */
 async function meet(record, ctx) {
-  const run = await api.post(`/agents/${encodeURIComponent(record.id)}/welcome`, { language: ownerLanguage() });
-  ctx.navigate(`/runs/${run.id}`);
+  try {
+    const run = await api.post(`/agents/${encodeURIComponent(record.id)}/welcome`, { language: ownerLanguage() });
+    ctx.navigate(`/runs/${run.id}`);
+  } catch (error) {
+    ctx.navigate(`/agents/${record.id}`);
+    throw error;
+  }
 }
 
 function mountList(root, ctx) {
