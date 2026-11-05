@@ -573,7 +573,8 @@ learned* the newest experiences, a step with the run it learned from and what it
 (the final set), who chooses, and the limits; the test tasks are the guards and the tasks the version in use still
 fails, or, while too few are known, how many of the pool a step run by hand has tried to find them (item 719). A step
 that only tried tasks reads *trying tasks*, and its row says it tried test tasks; one that found every task known says
-it tried no test task (item 762). On a phone the page is a tab of *Rules and memory* in the settings list (item 845).
+it tried no test task (item 762). On a phone the page is a row of its own in the settings' sheet, in the group Dot
+(item 995).
 
 ## What is built so far
 

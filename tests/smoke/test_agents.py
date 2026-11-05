@@ -185,6 +185,12 @@ async def _finished(client: httpx.AsyncClient, manager: RunManager, body: dict[s
     return run_id
 
 
+async def _agent_menu(page: Page, item: str) -> None:
+    """Choose ``item`` of the "…" of an agent's page, which holds Edit, Export, Pause and Delete (item 993)."""
+    await page.locator(".stage-tools").get_by_role("button", name=re.compile(r"^More for ")).click()
+    await page.get_by_role("menuitem", name=item).click()
+
+
 def _agent(tools: list[str] | None) -> dict[str, object]:
     return {
         "name": "Scout",
@@ -441,7 +447,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             # The editor's Look field: a moving preview and the shapes, expressions and colours as faces.
             await page_ui.goto(f"http://{host}:{port}/#/agents/{agent_id}")
             await page_ui.wait_for_timeout(_SETTLE_MS)
-            await page_ui.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await _agent_menu(page_ui, "Edit")
             # The editor opens at the top of the page, not down where the greeting stood (item 437); Cancel puts the
             # greeting back in the middle.
             editor_box: FloatRect | None = await page_ui.locator(".agent-editor").bounding_box()
@@ -513,7 +519,7 @@ async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_lev
             await page.route("**/api/tools", held)
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"http://{host}:{port}/#/agents/{agent_id}")
-            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await _agent_menu(page, "Edit")
             save = page.get_by_role("button", name="Save changes")
             await expect(save).to_be_disabled()
             listed.set()
@@ -525,7 +531,7 @@ async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_lev
             await page.unroute("**/api/tools")
             await page.route("**/api/tools", failed)
             await page.reload()
-            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await _agent_menu(page, "Edit")
             await expect(page.get_by_text("The actions could not be listed")).to_be_visible()
             await expect(page.get_by_role("button", name="Save changes")).to_be_disabled()
             await context.close()
@@ -557,7 +563,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             await show_choices(page)
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"http://{host}:{port}/#/agents/{agent_id}")
-            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await _agent_menu(page, "Edit")
             every: Locator = page.get_by_role("checkbox", name="All actions")
             boxes: Locator = page.locator(".tool-picks input")
             await expect(every).not_to_be_checked()
@@ -569,7 +575,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == []
             # Opened again, the agent with every tool has every box ticked; none ticked is refused, and nothing changes.
             await page.reload()
-            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await _agent_menu(page, "Edit")
             await expect(every).to_be_checked()
             await every.uncheck()
             await page.get_by_role("button", name="Save changes").click()
@@ -579,7 +585,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             named = await client.put(f"/api/agents/{agent_id}", json=_agent(listed))
             assert named.status_code == 200, named.text
             await page.reload()
-            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await _agent_menu(page, "Edit")
             await expect(every).to_be_checked()
             await expect(page.locator(".tool-picks-count")).to_have_text(f"{len(listed)} of {len(listed)}")
             await page.get_by_role("button", name="Save changes").click()
@@ -587,7 +593,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == listed
             # Ticked by the owner, All tools gives that agent every tool, any added later too.
             await page.reload()
-            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await _agent_menu(page, "Edit")
             await every.uncheck()
             await every.check()
             await expect(page.locator(".tool-picks-count")).to_have_text("every action, and any added later")
@@ -618,3 +624,66 @@ async def test_an_agent_may_be_given_a_tool_that_joined_the_registry_after_the_d
         del runtime.registry.tools[name]
     assert name not in (await client.get("/api/tools")).json()
     assert (await client.post("/api/agents", json=_agent([name]))).status_code == 422
+
+
+async def test_an_agent_just_made_meets_the_owner_in_its_first_chat_once(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """Item 993, the owner's word of 2026-11-05 on another agent app: an agent named and opened greets the owner in its
+    role and asks what they want from it. Its first meeting is a chat run of the agent, in the owner's language, whose
+    goal the conversation does not draw as the owner's; an agent that has a chat has met them, and Dot has its own
+    first conversation."""
+    made = await client.post("/api/agents", json=_agent(None))
+    assert made.status_code == 201, made.text
+    agent_id: str = made.json()["id"]
+    MODEL.script = ScriptedProvider(_PROVIDER, [FINISH])
+    met = await client.post(f"/api/agents/{agent_id}/welcome", json={"language": "Turkish"})
+    assert met.status_code == 201, met.text
+    run = met.json()
+    assert (run["agent_id"], run["source"], run["mode"]) == (agent_id, "welcome", "chat")
+    assert "Scout, Finds and checks sources" in run["goal"] and "in Turkish" in run["goal"]
+    assert "ask_user" in run["goal"]
+    # Dot's words around a name and a role a run may have written are no instruction of the owner's (the pre-push
+    # review), and the chat is named after the agent.
+    assert run["goal"] not in manager.instructions_of(run["id"])
+    assert (await runtime.store.get_thread(run["thread_id"])).title == "Scout"
+    async with asyncio.timeout(_RUN_WAIT_S):
+        await manager.wait(run["id"])
+    again = await client.post(f"/api/agents/{agent_id}/welcome", json={"language": "Turkish"})
+    assert again.status_code == 409, again.text
+    assert (await client.post("/api/agents/dot/welcome", json={"language": "Turkish"})).status_code == 422
+    assert (await client.post(f"/api/agents/{agent_id}/welcome", json={"language": ""})).status_code == 422
+    assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204
+
+
+@pytest.mark.browser
+async def test_an_agent_made_on_the_page_opens_its_first_chat_where_it_speaks_first(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """Item 993: Create agent opens the agent's first chat, where it greets the owner; the goal Dot gave that meeting is
+    not drawn as a message of the owner's, which they never wrote."""
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    # A chat's answer is its text; the run may also name a title for its chat first.
+    greeting: ScriptedTurn = ScriptedTurn(text="Merhaba, ben Reklamcı!", calls=())
+    MODEL.script = ScriptedProvider(_PROVIDER, [greeting, greeting, greeting])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 390, "height": 844}, locale="tr-TR")
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"http://{host}:{port}/#/agents")
+            await page.get_by_role("button", name="New agent").first.click()
+            await page.get_by_role("textbox", name="Name").fill("Reklamcı")
+            await page.get_by_role("button", name="Create agent").click()
+            await expect(page).to_have_url(re.compile(r"#/runs/run_"))
+            await expect(page.locator(".timeline")).to_contain_text("Merhaba, ben Reklamcı!")
+            await expect(page.locator(".bubble.user")).to_have_count(0)
+            run_id: str = page.url.rpartition("/")[2]
+            run = await runtime.store.get_run(run_id)
+            assert run.source == "welcome" and "in Turkish" in run.goal
+        finally:
+            await browser.close()
+    made = [agent for agent in await runtime.store.list_agents() if agent.name == "Reklamcı"]
+    assert (await client.delete(f"/api/agents/{made[0].id}")).status_code == 204

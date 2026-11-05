@@ -36,6 +36,51 @@ export const SECTIONS = [
   { id: "system", label: "System", icon: "monitor", tabs: ["system"], value: null },
 ];
 
+// The phone's sheet of the settings (item 995, the owner's ask of 2026-11-05 for one plain sheet): groups of rows, a row
+// one tab (or Connect apps) with a line under its name that says what it holds, so that a setting is found without
+// knowing its section. `value` names the row whose count or state shows at its right.
+export const PHONE_GROUPS = [
+  {
+    title: null,
+    rows: [
+      { tab: "general", line: "Names, notifications, voice and messages" },
+      { tab: "vault", line: "Logins, cards and contacts Dot can use", value: "vault" },
+    ],
+  },
+  {
+    title: null,
+    rows: [{ href: "#/customize/connectors", label: "Connect apps", icon: "appsGrid", line: "Apps, plugins and skills" }],
+  },
+  {
+    title: "Dot",
+    rows: [
+      { tab: "rules", line: "What Dot does without asking you" },
+      { tab: "memory", line: "What Dot remembers", value: "memory" },
+      { tab: "models", line: "The models Dot thinks with" },
+      { tab: "keys", line: "The keys of the AI services" },
+      { tab: "websearch", line: "How Dot searches the web" },
+      { tab: "browser", line: "Dot's own Chrome" },
+      { tab: "harness", line: "What Dot learns from its tasks" },
+      { tab: "repair", line: "Dot mends its own problems" },
+    ],
+  },
+  {
+    title: "Phones and channels",
+    rows: [
+      { tab: "phone", line: "Dot on your phones" },
+      { tab: "channels", line: "iMessage and the other ways to reach Dot" },
+    ],
+  },
+  {
+    title: "App",
+    rows: [
+      { tab: "appearance", line: "Themes, type and colours", value: "appearance" },
+      { tab: "snapshots", line: "Pictures of your screen for Dot" },
+      { tab: "system", line: "The daemon, its version and diagnostics" },
+    ],
+  },
+];
+
 /** The section the tab `id` stands in, or null for a tab in none (Trading). */
 export function sectionOf(id) {
   return SECTIONS.find((section) => section.tabs.includes(id)) ?? null;

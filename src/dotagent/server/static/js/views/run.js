@@ -20,7 +20,7 @@ import { createContextMeter } from "../contextmeter.js";
 import { createContextPanel } from "../contextpanelview.js";
 import { clip, debounce, duration, el, modelName, OPEN_FILE_EVENT, plural, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
-import { BACKGROUND_SOURCE, backgroundNote, earlierTurns, followsReaction, loadHistory, RESUME_SOURCE } from "../history.js";
+import { BACKGROUND_SOURCE, RESUME_SOURCE, WELCOME_SOURCE, backgroundNote, earlierTurns, followsReaction, loadHistory } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
@@ -1440,7 +1440,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // run that tells of a command in the background is Dot's note (item 229). A run that follows up a reaction of yours
   // has no message of yours: the reaction's chip on the message reacted to says it (item 844).
   const goalMessage =
-    followsReaction(run) || run.source === RESUME_SOURCE
+    followsReaction(run) || run.source === RESUME_SOURCE || run.source === WELCOME_SOURCE
       ? null
       : run.source === BACKGROUND_SOURCE
         ? backgroundNote(run.goal)

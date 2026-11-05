@@ -111,12 +111,16 @@ file's panel keeps the room for the file's name, and Open on the Mac is its icon
 have space between them; a ready team the owner has already says so under its words, which have the card's width; and
 the name of a plugin is not cut by an ellipsis while there is room for it, which WebKit did to every name of two words.
 
-On a phone the settings open on a list of their seven sections (items 330 and 845): General, Appearance, Models, Rules
-and memory, Browser and Vault, Phone and channels and System, each row a section's name and what it holds (the theme on
-screen, how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its
-section on its own, the bar naming it and the row of the section's tabs under it, and a card's name stands over the
+On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-05 for one plain sheet; before, a list
+of seven sections, items 330 and 845), which your initials at the top of the home lead to: General and Vault, then
+Connect apps, then the groups Dot (Rules, Memory, Models, AI services, Web search, Browser, Self-improvement,
+Self-repair), Phones and channels (Phone, Channels) and App (Appearance, Snapshots, System), and under them the first
+steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
+A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
+how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its
+own, the bar naming the tab, with no row of the section's tabs over it, and a card's name stands over the
 card, as a section's title does on the redrawn tabs (item 576); a card that folds keeps its name on its ground. In a
-Mac's window the sidebar is the settings' nav while they are open, the same seven sections (item 562); see
+Mac's window the sidebar is the settings' nav while they are open, the seven sections of item 845 (item 562); see
 [the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
 Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px
 (item 331). A service's page of Customize › Connectors and an agent's editor name their cards the same way, a row of the
@@ -124,8 +128,9 @@ home's Today strip keeps its facts to one line that fades where it runs out of r
 brings messages there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
-list of chats over the whole screen, Dot's name at its head, and the cog of Settings, Connect apps (item 492), the search and the **+** of a new chat at its foot, under
-the thumb. A chat's bar has a way back to that list, the chat's title over the agent and the model, and its tools
+list of chats over the whole screen, the phone's home (item 991): your initials at its head's left open the settings
+and the **+** of a new chat stands at its right; Dot's face stands large with its name over the faces of the other
+agents; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, the chat's title over the agent and the model, and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right

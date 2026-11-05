@@ -17,6 +17,7 @@ import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, 
 import { icon } from "./icons.js";
 import { actorFace, DOT_ID, lookOf, teamDuo } from "./actors.js";
 import { onAssistant } from "./assistant.js";
+import { shownOwner } from "./presence.js";
 import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
@@ -29,6 +30,14 @@ import { buildSettingsNav } from "./settingsnav.js";
 import { requestCompose } from "./shortcuts.js";
 import { onLifecycle, onStreamBack, readFailed } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
+
+// What a reader sees as a word's first character: a letter with its marks, an emoji made of several (item 991).
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** The first character of `word` as a reader sees it. */
+function firstGrapheme(word) {
+  return GRAPHEMES.segment(word)[Symbol.iterator]().next().value?.segment ?? "";
+}
 
 // The chats listed at first, the step by which "Show older chats" lists more, and the most the API lists at once.
 const LIST_LIMIT = 200;
@@ -605,7 +614,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // Campaigns and Schedules are icons in the head, beside the "+" (item 855, the owner's ask: two rows of their own
   // before the chats).
   const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: "Campaigns", "aria-label": "Campaigns", onclick: onNavigate }, icon("target"));
-  // Settings is its cog at the foot, beside Connect apps (item 492); its name stays for a reader of the screen.
+  // Settings is its cog at the foot, beside Connect apps (item 492), on a Mac; on a phone your initials at the head
+  // (item 991). Its name stays for a reader of the screen.
   const settingsLink = el(
     "a",
     { class: "side-link side-settings", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate },
@@ -629,7 +639,17 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // What the tiles show, as last drawn: the same agents read again leave them standing, so that the focus or the
   // pointer on one stays (the pre-push review).
   let facesDrawn = null;
+  // Dot's look as its large face on a phone last wore it (item 991).
+  let heroLook = null;
   function paintFaces(found) {
+    // Dot's own face on a phone's home wears the look it was given (item 991).
+    // Drawn again only when its look changed, as the other tiles are.
+    const dot = found.find(({ record }) => record.id === DOT_ID);
+    const look = dot === undefined ? null : JSON.stringify(dot.record.look);
+    if (dot !== undefined && look !== heroLook) {
+      heroLook = look;
+      dotHero.firstElementChild.replaceWith(actorFace(DOT_ID, "idle", dot.record.look));
+    }
     // As many as the sidebar holds whole beside All (item 855: the row scrolled, and a face cut at its edge looked
     // broken): the agents that worked last first.
     const worked = (summary) => summary.latest?.created_at ?? summary.record.created_at;
@@ -1504,11 +1524,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   load();
   loadFaces();
 
-  // On a phone the sidebar is the list of chats over the whole screen (item 294): Dot's name
-  // at its head beside the close, and at its foot, under the thumb, Settings, the search and a new chat. The search
-  // moves between the head of the list and the foot as the width changes; there is one box. A new chat is a "+" (item
-  // 834), as a messaging app's: at the right of the head on a desk, where the "New chat" row under the search was, and
-  // in the foot on a phone.
+  // On a phone the sidebar is the list of chats over the whole screen (item 294), the phone's home (item 991): your
+  // initials and a new chat at its head, the apps and the search at its foot, under the thumb. The search moves between
+  // the head of the list and the foot as the width changes; there is one box. A new chat is a "+" (item 834), as a
+  // messaging app's, at the right of the head, where the "New chat" row under the search was.
   const searchBox = el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K"));
   const compose = el(
     "a",
@@ -1535,7 +1554,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   // Connect apps (items 492 and 545): at the foot, right of the cog of Settings, the way to Customize › Connectors, the
   // page of the services Dot works with, with the marks of the MCP servers it is connected to; the list of pages no
-  // longer names Customize. On a phone, a round button of its own.
+  // longer names Customize. On a phone, a round button of its own that wears a grid of tiles, the cog having moved to
+  // your initials at the head (item 991).
   const connectMarks = el("span", { class: "side-connect-marks", "aria-hidden": "true" });
   const connectButton = el(
     "button",
@@ -1584,6 +1604,38 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
   paintConnected();
   const foot = el("div", { class: "side-foot" }, settingsLink, connectButton);
+  // On a phone the list is the home (item 991, the owner's ask of 2026-11-05 for a plain home): your initials at the top
+  // left lead to the settings, the "+" at the right starts a chat, Dot's own face stands large over the faces of the
+  // other agents, and the foot holds the apps and the search.
+  const ownerInitials = el("span", { class: "side-owner-initials", "aria-hidden": "true" });
+  const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate }, ownerInitials);
+  function paintOwner() {
+    const words = shownOwner().split(/\s+/).filter((word) => word !== "");
+    // A word's first character whole, a letter outside the Basic Multilingual Plane too.
+    const initials = words
+      .slice(0, 2)
+      .map((word) => firstGrapheme(word).toLocaleUpperCase())
+      .join("");
+    ownerInitials.replaceChildren(initials === "" ? icon("user") : initials);
+  }
+  paintOwner();
+  const heroName = el("span", { class: "side-dot-name" }, dotName());
+  const dotHero = el(
+    "a",
+    // A chat with Dot starts from its face, as every other way to Dot leads to New chat (views/agents.js): Dot has no
+    // agent page of its own.
+    {
+      class: "side-dot-hero",
+      href: homeHref,
+      // As the "+": the composer takes the focus, on the home already too (the pre-push review of item 991).
+      onclick: () => {
+        requestCompose();
+        onNavigate();
+      },
+    },
+    actorFace(DOT_ID, "idle", null),
+    heroName,
+  );
   const sideHead = el(
     "div",
     { class: "side-head", "data-tauri-drag-region": "" },
@@ -1593,12 +1645,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
+    connectButton.firstElementChild.replaceWith(icon(PHONE.matches ? "appsGrid" : "plug"));
+    sideHead.append(compose);
     if (PHONE.matches) {
+      close.after(ownerLink);
       connectButton.after(searchBox);
-      foot.append(compose);
+      facesNav.before(dotHero);
     } else {
+      ownerLink.remove();
+      dotHero.remove();
       body.prepend(searchBox);
-      sideHead.append(compose);
     }
   }
   placeForWidth();
@@ -1625,7 +1681,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
   PHONE.addEventListener("change", paintMode);
   // The name the owner calls Dot by, as it changes (item 420).
-  onAssistant((names) => setText(element.querySelector(".side-title"), names.name));
+  onAssistant((names) => {
+    setText(element.querySelector(".side-title"), names.name);
+    setText(heroName, names.name);
+    paintOwner();
+  });
   const workTicker = setInterval(() => {
     for (const node of element.querySelectorAll(".side-working-time")) {
       setText(node, workingFor(Number(node.dataset.since)));

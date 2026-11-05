@@ -30,11 +30,13 @@ from dotagent.agent.templates import (
     find_template,
     with_answers,
 )
-from dotagent.core.errors import InvalidValueError, RunConflict
+from dotagent.agent.welcome import WELCOME_SOURCE, welcome_goal
+from dotagent.core.errors import DotError, InvalidValueError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.secrets import known_secrets
+from dotagent.server import UI_SOURCE
 from dotagent.server.activity import start_of_today
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_system import learned_skill_view
@@ -44,6 +46,7 @@ from dotagent.server.views import (
     AgentRequest,
     AgentSummary,
     AgentUsage,
+    AgentWelcomeRequest,
     TeamMessage,
     TeamUse,
     TeamView,
@@ -54,6 +57,7 @@ from dotagent.store.db import Store
 from dotagent.store.models import (
     DOT_AGENT,
     DOT_AGENT_ID,
+    NO_PICKS,
     OPEN_WORK_ORDERS,
     AgentLook,
     AgentRecord,
@@ -63,6 +67,7 @@ from dotagent.store.models import (
     RunMode,
     RunRecord,
     TeamRecord,
+    ThreadRecord,
     WorkOrderRecord,
 )
 from dotagent.tools.base import ToolResult
@@ -600,6 +605,39 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         if agent_id == DOT_AGENT_ID:
             raise InvalidValueError("Dot is not an agent to resume", {"agent_id": agent_id})
         return await store.set_agent_paused(agent_id, None)
+
+    @router.post("/agents/{agent_id}/welcome", status_code=201)
+    async def welcome_agent(agent_id: str, request: AgentWelcomeRequest) -> RunRecord:
+        """Start the first meeting of an agent the owner has just made (item 993): it greets them in its role, in their
+        language, and asks what they want from it. An agent that has had a chat already has met them (409), and Dot
+        has its own first conversation (item 420)."""
+        if agent_id == DOT_AGENT_ID:
+            raise InvalidValueError("Dot has a first conversation of its own", {"agent_id": agent_id})
+        agent: AgentRecord = await store.get_agent(agent_id)
+        if await store.agent_runs(agent_id, 1):
+            raise RunConflict("the agent has met you already: it has a chat", {"agent_id": agent_id})
+        # The chat is named after the agent, not after Dot's words for the meeting (the pre-push review).
+        # A chat made for a meeting that did not start goes, as a watcher's does: none is left empty in the list.
+        thread: ThreadRecord = await store.create_thread(agent.name, UI_SOURCE, None)
+        try:
+            return await ctx.manager.start_for_agent(
+                agent,
+                welcome_goal(agent, request.language),
+                "chat",
+                None,
+                thread.id,
+                WELCOME_SOURCE,
+                None,
+                "standard",
+                None,
+                None,
+                None,
+                (),
+                NO_PICKS,
+            )
+        except DotError:
+            await store.delete_threads([thread.id])
+            raise
 
     @router.delete("/agents/{agent_id}", status_code=204)
     async def delete_agent(agent_id: str) -> None:

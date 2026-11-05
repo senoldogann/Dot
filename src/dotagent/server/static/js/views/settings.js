@@ -1,17 +1,18 @@
 // The settings. In a Mac's window the sidebar is their nav (settingsnav.js, item 562) and the page is the open tab alone: its
 // section's name, the row of its tabs when it has more than one (item 845), a line that says what the tab is for and what
-// it holds, in a column of its own; on a phone, a list of the seven sections whose rows open each as a page of its own
-// (item 330). Each tab is drawn by the module that owns it.
+// it holds, in a column of its own; on a phone, one sheet of rows in groups, a row a tab that opens as a page of its own
+// (items 330 and 995). Each tab is drawn by the module that owns it.
 
 import { api, query } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { PHONE } from "../layout.js";
 import { settingsHead } from "../panels.js";
-import { DEFAULT_TAB, SECTIONS, sectionOf, TABS } from "../settingstabs.js";
+import { DEFAULT_TAB, PHONE_GROUPS, sectionOf, TABS } from "../settingstabs.js";
 import { setStageTitle } from "../stage.js";
 import { findTheme, onSchemeChange, onThemeChange, shownScheme, themePicks } from "../theme.js";
 import { attempt } from "../ui.js";
+import { buildFirstSteps } from "../firststeps.js";
 import * as appearance from "./appearance.js";
 import * as channels from "./channels.js";
 import * as harness from "./harness.js";
@@ -46,14 +47,16 @@ const MOUNTS = {
 };
 const SYSTEM_DARK = window.matchMedia("(prefers-color-scheme: dark)");
 
-/** A row of the phone's list: the section's mark and name, `value` (what it holds, or nothing) and an arrow; it opens the
- * section's first tab. */
-function listRow(section, value) {
+/** A row of the phone's sheet (item 995): its mark, its name over the line that says what it holds, `value` (what it
+ * holds, or nothing) and an arrow; it opens its tab, or the page it names. */
+function listRow(row, value) {
+  const tab = row.tab === undefined ? null : TABS.find((candidate) => candidate.id === row.tab);
+  const label = tab === null ? row.label : tab.label;
   return el(
     "a",
-    { class: "settings-row", href: `#/settings/${section.tabs[0]}` },
-    icon(section.icon),
-    el("span", { class: "settings-row-label" }, section.label),
+    { class: "settings-row", href: tab === null ? row.href : `#/settings/${tab.id}` },
+    icon(tab === null ? row.icon : tab.icon),
+    el("span", { class: "settings-row-words" }, el("span", { class: "settings-row-label" }, label), el("span", { class: "settings-row-line" }, row.line)),
     value ?? null,
     icon("chevron"),
   );
@@ -74,18 +77,24 @@ function partsRow(section, open) {
   );
 }
 
-/** The phone's list of the settings' sections. Appearance tells the theme on screen, Rules and
- * memory how many notes Dot keeps and Browser and Vault how many entries the Vault holds. */
+/** The phone's sheet of the settings (item 995): the groups of rows, then the first steps while one is left.
+ * Appearance tells the theme on screen, Memory how many notes Dot keeps and Vault how many entries it holds. */
 function mountList(root, ctx) {
   ctx.setTitle("Settings");
   const values = new Map(TABS.map((tab) => [tab.id, el("span", { class: "settings-row-value" })]));
-  root.append(
+  const groups = PHONE_GROUPS.map((group) =>
     el(
-      "nav",
-      { class: "settings-list", "aria-label": "Settings" },
-      el("section", { class: "settings-group" }, el("div", { class: "card" }, SECTIONS.map((section) => listRow(section, section.value === null ? null : values.get(section.value))))),
+      "section",
+      { class: "settings-group", "aria-label": group.title ?? null },
+      group.title === null ? null : el("h2", { class: "settings-group-title" }, group.title),
+      el("div", { class: "card" }, group.rows.map((row) => listRow(row, row.value === undefined ? null : values.get(row.value)))),
     ),
   );
+  const sheet = el("nav", { class: "settings-list", "aria-label": "Settings" }, ...groups);
+  root.append(sheet);
+  // What a Dot that started afresh has to set up (item 811) stands under the sheet while a step is left: it comes once
+  // the daemon answers, and over the rows it pushed them down under a finger on its way to one (item 996, main's CI).
+  const steps = buildFirstSteps((card) => sheet.after(card));
   setStageTitle(el("h1", { class: "stage-h1" }, "Settings"));
 
   function paintTheme() {
@@ -104,6 +113,7 @@ function mountList(root, ctx) {
     values.get("vault").textContent = held === 0 ? "" : String(held);
   });
   return () => {
+    steps.dispose();
     SYSTEM_DARK.removeEventListener("change", paintTheme);
     for (const stop of stops) {
       stop();
@@ -111,7 +121,7 @@ function mountList(root, ctx) {
   };
 }
 
-/** Draw the settings of the route. On a phone `#/settings` is the list of the sections; in a wider window it leads to
+/** Draw the settings of the route. On a phone `#/settings` is the sheet of the tabs (item 995); in a wider window it leads to
  * General, and so does an unknown tab. `#/settings/<tab>` draws that tab, under the head of its section (its name, and
  * the row of its tabs): the tab is given `ctx.head`, to say what it is for (`setLead`), what it holds (`setMeta`) and the
  * buttons that belong to the whole page (`setActions`). */
@@ -140,6 +150,7 @@ export function mount(root, ctx) {
   // always there and the width alone shows one or the other (settings.css), as the page's own name is hidden: two
   // choices made apart, one by the script as the page was drawn and one by the style, showed both a moment after a
   // phone turned (item 966).
-  setStageTitle(el("h1", { class: "stage-h1 set-phone-title" }, name));
+  // On a phone the page is the tab its row named (item 995): the bar names the tab, not its section.
+  setStageTitle(el("h1", { class: "stage-h1 set-phone-title" }, tab.label));
   return dispose;
 }

@@ -13,6 +13,7 @@ from dotagent.agent.resume import CutOff
 from dotagent.agent.skill_history import VersionDetail
 from dotagent.agent.skill_proposals import ProposalView
 from dotagent.agent.templates import MOST_TEMPLATE_QUESTIONS, TEMPLATE_ANSWER_CHARS
+from dotagent.agent.welcome import LANGUAGE_CHARS
 from dotagent.browser.look import PageLook
 from dotagent.browser.profiles import ProfileKind, ProfileView
 from dotagent.config import (
@@ -162,6 +163,12 @@ class SnapshotsClaimed(FrozenModel):
 
     files: list[SnapshotTaken]
     animations: bool
+
+
+class AgentWelcomeRequest(FrozenModel):
+    """``POST /api/agents/{id}/welcome`` (item 993): the language the owner reads, as the page names it ("Turkish")."""
+
+    language: str = Field(min_length=1, max_length=LANGUAGE_CHARS)
 
 
 class AssistantRequest(FrozenModel):

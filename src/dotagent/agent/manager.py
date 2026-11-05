@@ -98,6 +98,7 @@ from dotagent.agent.resume import (
     resumes_on_start,
 )
 from dotagent.agent.review import reviewer_for, shorten_reason
+from dotagent.agent.welcome import WELCOME_SOURCE
 from dotagent.browser.attach import read_debug_endpoint
 from dotagent.browser.remote_input import NO_INPUT, InputBatch, InputResult, InputTally, MouseButton, ScreenHold
 from dotagent.browser.session import BrowserSession
@@ -221,8 +222,11 @@ _THREAD_INSTRUCTION_RUNS: int = 30
 # The sources of runs whose goals are not the owner's words, which no reviewer takes as an instruction, in the run or in
 # a later run of its chat: the notice of a command in the background (item 229), a run of Dot's own initiative (item
 # 715), and a resumed run, whose goal is the goal of the run it resumes, which counts or not as that run's does (the
-# code review of item 715: a resume of Dot's own run made its words the owner's).
-_NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset({BACKGROUND_SOURCE, INITIATIVE_SOURCE, RESUME_SOURCE, REPLY_SOURCE})
+# code review of item 715: a resume of Dot's own run made its words the owner's), and an agent's first meeting with the
+# owner, whose goal is Dot's words around the agent's name and role, which a run may have written (item 993).
+_NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset(
+    {BACKGROUND_SOURCE, INITIATIVE_SOURCE, RESUME_SOURCE, REPLY_SOURCE, WELCOME_SOURCE}
+)
 # The sources of runs and chats nobody watches or that are Dot's own (item 860): a chat one of them opened is not the
 # owner's, and a run one of them started in the owner's chat has no owner there to answer. Not the run that tells a
 # chat its command in the background ended (``BACKGROUND_SOURCE``): it goes on with the owner's chat, under their eyes
