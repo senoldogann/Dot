@@ -413,7 +413,8 @@ class Transcriber:
         found: _Stream | None = self._streams.get(name)
         if found is None or found.ending:
             raise NotFoundError(
-                "that recording is no longer open: press the microphone again", {"stream": name[:_TAG_CHARS]}
+                "that recording is no longer open: press the microphone again",
+                {"code": "gone", "stream": name[:_TAG_CHARS]},
             )
         return found
 
@@ -454,7 +455,7 @@ class Transcriber:
             if self._streams.get(name) is not stream:
                 # The cross, or the watch, dropped it while the piece was on its way: nothing is to be said of its
                 # program, which was killed (item 976).
-                raise NotFoundError("that recording was dropped", {}) from error
+                raise NotFoundError("that recording was dropped", {"code": "gone"}) from error
             self._streams.pop(name, None)
             outcome: _Outcome = await self._answer(stream, RUN_TIMEOUT_S)
             self._words(outcome, stream.language)
@@ -468,7 +469,7 @@ class Transcriber:
         stream: _Stream = self._stream(name)
         async with stream.lock:
             if stream.ending or self._streams.get(name) is not stream:
-                raise NotFoundError("that recording is no longer open: press the microphone again", {})
+                raise NotFoundError("that recording is no longer open: press the microphone again", {"code": "gone"})
             stream.ending = True
             started: float = time.monotonic()
             try:
@@ -480,7 +481,7 @@ class Transcriber:
                 outcome: _Outcome = await self._answer(stream, seconds)
                 # The cross while the words were awaited: the program was killed, and nothing is said of it.
                 if self._streams.get(name) is not stream:
-                    raise NotFoundError("that recording was dropped", {})
+                    raise NotFoundError("that recording was dropped", {"code": "gone"})
                 text: str = self._words(outcome, stream.language)
             finally:
                 if self._streams.get(name) is stream:

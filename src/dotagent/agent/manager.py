@@ -1601,7 +1601,6 @@ class RunManager:
         reaction: ReactionAct | None,
         owner_text: str = "",
         files: tuple[StoredAttachment, ...] = (),
-        taints: bool = False,
     ) -> None:
         """Hand the running agent a note about a reaction of the owner (item 586), which it reads before its next
         step as it reads a steer; the note says what the owner did and what that asks. It is Dot's words, not the
@@ -1622,7 +1621,6 @@ class RunManager:
                     said="",
                     reaction=reaction,
                     owner_text=owner_text,
-                    taints=taints,
                 )
             )
         except asyncio.QueueShutDown as exc:

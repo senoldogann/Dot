@@ -276,7 +276,7 @@ export function allowToast(answer, pane) {
 }
 
 // The `context.code` of the failures the Mac says itself, with words written for the owner (`VoiceError`).
-const MAC_SAYS = new Set(["unavailable", "unsupported-language", "busy", "too-long", "timeout", "failed"]);
+const MAC_SAYS = new Set(["unavailable", "unsupported-language", "busy", "too-long", "timeout", "failed", "gone"]);
 
 /**
  * What to tell the owner of the error a recording met on its way to the Mac and back, in plain words (item 626): a Mac
@@ -293,11 +293,6 @@ export function sendProblem(error) {
     return "The Mac cannot write down this language. Choose another in Settings › General › Voice.";
   }
   if (MAC_SAYS.has(error?.context?.code ?? "") && typeof error?.message === "string" && error.message !== "") {
-    return error.message;
-  }
-  // A recording the Mac no longer holds (it dropped it after a silence, or a piece was lost): its own words say to
-  // press the microphone again (item 976).
-  if (error?.status === 404 && typeof error?.message === "string" && error.message !== "") {
     return error.message;
   }
   return "The Mac could not write down what you said.";

@@ -192,19 +192,20 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                         if width < 860:
                             await page.keyboard.press("Escape")
                         await page.goto(f"{address}/#/runs/{run.id}")
-                        # While it waits the card stands at the composer's place, in the panel of what Dot asked,
-                        # which takes the composer's place until it is folded (item 973).
+                        # While it waits the card stands at the composer's place, in the panel of what Dot asked
+                        # (item 973). The run is at work: its composer, and the Stop in it, stay under the panel, so
+                        # that it is stopped at once whatever it asks (the pre-push review of item 973).
                         asked: Locator = page.get_by_label("Dot asked you")
                         card: Locator = asked.locator(".approval")
                         await expect(card).to_have_count(1)
                         await expect(page.locator(".timeline .approval")).to_have_count(0)
                         composer: Locator = page.locator(".dock .composer")
-                        await expect(composer).to_be_hidden()
+                        await expect(composer).to_be_visible()
+                        await expect(composer.get_by_role("button", name="Stop")).to_be_visible()
                         await asked.get_by_role("button", name="Fold what Dot asked").click()
                         await expect(card).to_be_hidden()
-                        await expect(composer).to_be_visible()
                         await asked.get_by_role("button", name="Show what Dot asked").click()
-                        await expect(composer).to_be_hidden()
+                        await expect(card).to_be_visible()
                         await page.screenshot(path=str(tmp_path / f"asking-{width}-{approved}.png"))
                         # The card stands alone: the line that asked said what it says (item 871).
                         await expect(page.locator(".timeline .note", has_text="Needs approval")).to_have_count(0)

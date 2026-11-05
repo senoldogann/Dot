@@ -223,8 +223,9 @@ async def test_a_message_sent_on_one_screen_shows_at_once_on_the_other(
             await expect(cards).to_have_count(2)
             await expect(other_cards).to_have_count(2)
             # Both stand in one panel at the composer's place, which counts them and scrolls in itself, never taller
-            # than half the window (item 973).
+            # than half the window, and takes the composer's place, the run that left them being over (item 973).
             for page in (questions, other):
+                await expect(page.locator(".dock .composer")).to_be_hidden()
                 await expect(page.get_by_label("Dot asked you").locator(".asks-count")).to_have_text("2")
                 overflow, room, window = await page.evaluate(
                     "() => { const list = document.querySelector('.asks-list');"

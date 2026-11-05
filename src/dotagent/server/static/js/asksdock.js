@@ -1,8 +1,9 @@
 // What Dot asks of the owner, at the composer's place (item 973, the owner's ask after another agent app's "User input needed"):
 // the cards that wait for an answer (a question, an approval, a step handed over, a question the run left) stand in one
 // panel at the foot of the chat rather than in the conversation, on a phone and on a computer alike. While it is open the
-// panel takes the composer's place, as the cards are where the answer is given; its fold folds it to its head, and the
-// composer is back. Several cards scroll inside the panel, which is never taller than half the window.
+// panel takes the composer's place, as the cards are where the answer is given, but for a run at work, whose composer
+// holds its Stop and stays under the panel; its fold folds it to its head, and the composer is back. Several cards
+// scroll inside the panel, which is never taller than half the window.
 //
 // A card of the conversation (timeline.js) is held here while it waits: a mark keeps its place in the conversation,
 // and once it is answered it goes back to that place, where the conversation keeps what was decided. A question the run

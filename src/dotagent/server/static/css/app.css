@@ -7306,7 +7306,9 @@ summary:has(> .chev)::-webkit-details-marker {
 
 /* What Dot asks of the owner (item 973, after another agent app's "User input needed"): one panel at the composer's place, its
    cards scrolling inside it, never taller than half the window. Unfolded with a card in it, it takes the composer's
-   place, as the cards are where the answer is given; folded to its head, the composer is back under it. */
+   place, as the cards are where the answer is given, but for a run at work, whose composer holds its Stop and stays
+   under it: a run is stopped at once, whatever it asks (the pre-push review of item 973). Folded to its head, the
+   composer is back under it. */
 .asks {
   display: flex;
   flex-direction: column;
@@ -7380,7 +7382,7 @@ summary:has(> .chev)::-webkit-details-marker {
   background: var(--bg);
 }
 
-.dock:has(> .asks:not([hidden], [data-folded])) > .composer {
+.dock:not(.at-work):has(> .asks:not([hidden], [data-folded])) > .composer {
   display: none;
 }
 

@@ -176,8 +176,8 @@ there the same way.
 **Questions nobody answers during the run.** In a `yolo`, scheduled or eval run nobody answers the agent's own questions
 (`ask_user`) while it works, and `[agent] questions` decides what they do. With `leave` (the default) the question is
 stored as `left`, the timeline shows it where it was asked, and the run goes on with what does not depend on the answer,
-or ends and says what it needs; its status never turns `blocked`. The run's page lists its open questions under "Dot
-asked you", during the run and after it, and `dotx run` prints each one when it is left and lists the open ones after
+or ends and says what it needs; its status never turns `blocked`. The run's page shows its open questions in the panel at the
+composer's place ([The daemon](daemon.md), item 973), during the run and after it, and `dotx run` prints each one when it is left and lists the open ones after
 the answer. Your answer (`POST /api/approvals/{id}/decision`) goes to the conversation as your message, "Answer to your
 question “…”: …": into the run working there, or else as a new run on it, whose goal is the goal of the run that asked
 with your answer under it (so its goal check and its title keep the task), with the mode, model, reasoning level,

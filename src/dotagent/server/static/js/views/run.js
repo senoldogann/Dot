@@ -1083,6 +1083,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     // The word in the box arms a choice for one message only where the send can carry it (item 259).
     choices.setWords(!editing && !(active && steers(false)));
     footStop.hidden = !active;
+    // A run at work keeps its composer, and the Stop in it, under the panel of what it asks (item 973; app.css).
+    dock.classList.toggle("at-work", active);
     // Short enough for one line of a phone's composer, which holds about thirty characters (items 111 and 437).
     const working = holding
       ? narrowOr("Write to let it go on", "The task is on hold: write to let it go on")
