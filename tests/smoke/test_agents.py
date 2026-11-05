@@ -641,6 +641,10 @@ async def test_an_agent_just_made_meets_the_owner_in_its_first_chat_once(
     assert (run["agent_id"], run["source"], run["mode"]) == (agent_id, "welcome", "chat")
     assert "Scout, Finds and checks sources" in run["goal"] and "in Turkish" in run["goal"]
     assert "ask_user" in run["goal"]
+    # Dot's words around a name and a role a run may have written are no instruction of the owner's (the pre-push
+    # review), and the chat is named after the agent.
+    assert run["goal"] not in manager.instructions_of(run["id"])
+    assert (await runtime.store.get_thread(run["thread_id"])).title == "Scout"
     async with asyncio.timeout(_RUN_WAIT_S):
         await manager.wait(run["id"])
     again = await client.post(f"/api/agents/{agent_id}/welcome", json={"language": "Turkish"})

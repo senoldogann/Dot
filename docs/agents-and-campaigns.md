@@ -91,8 +91,9 @@ mode and goal mode are the home's own, shared with it in this browser: the agent
 on there turns it on in the home's box too. The home composer offers an Agent menu once an agent exists, Dot by default. An agent made with **Create agent** meets
 you at once (item 993, `POST /api/agents/<id>/welcome` with the language your browser reads): its first chat opens,
 where it greets you in one sentence in its role and in your language and asks you, with a few choices and room for
-your own words, what you want from it most; the goal Dot gives that meeting (a run of source `welcome`) is not drawn
-as a message of yours. An agent that has had a chat has met you already (409), and Dot has its own first conversation
+your own words, what you want from it most; the goal Dot gives that meeting (a run of source `welcome`, in a chat named
+after the agent) is not drawn as a message of yours, nor taken as your instruction by a reviewer, in that run or a later
+one of its chat, since it holds the agent's name and role, which a run may have written. An agent that has had a chat has met you already (409), and Dot has its own first conversation
 (item 420).
 A run of an agent opens its system prompt with the agent's own section ("You are Scout, an agent the owner made: ..."
 and your instructions), ahead of Dot's rules, which still hold; its tools are the ones the agent names plus finishing,

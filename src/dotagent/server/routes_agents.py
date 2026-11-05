@@ -36,6 +36,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.secrets import known_secrets
+from dotagent.server import UI_SOURCE
 from dotagent.server.activity import start_of_today
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_system import learned_skill_view
@@ -66,6 +67,7 @@ from dotagent.store.models import (
     RunMode,
     RunRecord,
     TeamRecord,
+    ThreadRecord,
     WorkOrderRecord,
 )
 from dotagent.tools.base import ToolResult
@@ -614,12 +616,14 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         agent: AgentRecord = await store.get_agent(agent_id)
         if await store.agent_runs(agent_id, 1):
             raise RunConflict("the agent has met you already: it has a chat", {"agent_id": agent_id})
+        # The chat is named after the agent, not after Dot's words for the meeting (the pre-push review).
+        thread: ThreadRecord = await store.create_thread(agent.name, UI_SOURCE, None)
         return await ctx.manager.start_for_agent(
             agent,
             welcome_goal(agent, request.language),
             "chat",
             None,
-            None,
+            thread.id,
             WELCOME_SOURCE,
             None,
             "standard",
