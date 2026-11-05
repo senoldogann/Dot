@@ -63,6 +63,8 @@ def test_the_fingerprint_is_the_step_as_its_card_showed_it() -> None:
         {"amount": Amount(value=120.0, currency="EUR")},
         {"changes": ("/Users/me/invoices/1042.txt",)},
         {"bundle": "/Applications/Bank.app"},
+        # What it runs, whole (item 985): two page scripts whose folded start is one.
+        {"body": "(()=>{return\n1})()"},
     ):
         assert kept_digest(_PAY.model_copy(update=changed)) != kept_digest(_PAY), changed
 

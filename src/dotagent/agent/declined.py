@@ -44,7 +44,9 @@ def declined_key(info: ActionInfo) -> str | None:
     if info.kind in _UNBOUND_KINDS or _PARTIAL.search(info.summary) or _PARTIAL.search(info.target):
         return None
     amount: str = "" if info.amount is None else render_amount(info.amount)
-    return "\n".join((info.tool, info.summary, info.target, amount))
+    # What the step runs, whole, which the card shows too (a page's script, item 985): the summary shows its start with
+    # its whitespace folded, which two different scripts may share.
+    return "\n".join((info.tool, info.summary, info.target, amount, *((info.body,) if info.body else ())))
 
 
 def still_declined(declined: Mapping[str, Declined], key: str | None, spoken: int) -> Declined | None:

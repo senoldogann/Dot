@@ -25,6 +25,11 @@ def test_an_action_is_kept_as_its_card_showed_it() -> None:
     # An element keeps its ref while its role and name stay the same: another Reply button is another action.
     assert declined_key(CLICK.model_copy(update={"summary": "click e14 'Reply'"})) != declined_key(CLICK)
     assert declined_key(CLICK.model_copy(update={"target": "https://mail.example/sent"})) != declined_key(CLICK)
+    # Two page scripts whose summary folds their whitespace into the same start are two (item 985).
+    script: ActionInfo = CLICK.model_copy(update={"summary": "Run a script in the page: (()=>{return 1})()"})
+    assert declined_key(script.model_copy(update={"body": "(()=>{return\n1})()"})) != declined_key(
+        script.model_copy(update={"body": "(()=>{return 1})()"})
+    )
     paying: ActionInfo = CLICK.model_copy(update={"amount": Amount(value=40.0, currency="EUR")})
     assert declined_key(paying) != declined_key(
         paying.model_copy(update={"amount": Amount(value=400.0, currency="EUR")})

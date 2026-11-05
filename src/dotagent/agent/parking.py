@@ -101,6 +101,8 @@ def kept_digest(info: ActionInfo) -> str | None:
             ",".join(sorted(info.flags)),
             ",".join(info.changes),
             info.bundle or "",
+            # What the step runs, whole, as the card shows it (a page's script, item 985).
+            *((info.body,) if info.body else ()),
         )
     )
     return hashlib.blake2b(parts.encode(), digest_size=16).hexdigest()
