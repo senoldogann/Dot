@@ -77,7 +77,7 @@ function partsRow(section, open) {
   );
 }
 
-/** The phone's sheet of the settings (item 995): the first steps while one is left, then the groups of rows.
+/** The phone's sheet of the settings (item 995): the groups of rows, then the first steps while one is left.
  * Appearance tells the theme on screen, Memory how many notes Dot keeps and Vault how many entries it holds. */
 function mountList(root, ctx) {
   ctx.setTitle("Settings");
@@ -92,8 +92,9 @@ function mountList(root, ctx) {
   );
   const sheet = el("nav", { class: "settings-list", "aria-label": "Settings" }, ...groups);
   root.append(sheet);
-  // What a Dot that started afresh has to set up (item 811) heads the sheet while a step is left.
-  const steps = buildFirstSteps((card) => sheet.before(card));
+  // What a Dot that started afresh has to set up (item 811) stands under the sheet while a step is left: it comes once
+  // the daemon answers, and over the rows it pushed them down under a finger on its way to one (item 996, main's CI).
+  const steps = buildFirstSteps((card) => sheet.after(card));
   setStageTitle(el("h1", { class: "stage-h1" }, "Settings"));
 
   function paintTheme() {

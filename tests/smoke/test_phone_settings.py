@@ -197,6 +197,9 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                     )
                     await (expect(held).to_have_text(value) if value else expect(held).to_have_count(0))
                 await expect(page.locator("h1.stage-h1")).to_have_text("Settings")
+                # The first steps, which come once the daemon answers, never stand over the rows (item 996: over them
+                # they pushed a row from under a finger).
+                await expect(page.locator(".first-steps + .settings-list")).to_have_count(0)
                 faults += await _fits(page, f"{device} list")
 
                 for tab, name in _TABS.items():

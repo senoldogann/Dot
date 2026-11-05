@@ -1261,8 +1261,8 @@
   }
 }
 
-/* The first steps head the sheet while one is left (item 995). */
-.first-steps + .settings-list {
+/* The first steps stand under the sheet while one is left (items 995 and 996). */
+.settings-list + .first-steps {
   margin-top: 24px;
 }
 

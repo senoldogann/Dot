@@ -112,9 +112,10 @@ have space between them; a ready team the owner has already says so under its wo
 the name of a plugin is not cut by an ellipsis while there is room for it, which WebKit did to every name of two words.
 
 On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-05 for one plain sheet; before, a list
-of seven sections, items 330 and 845), which your initials at the top of the home lead to: the first steps while one is
-left, then General and Vault, then Connect apps, then the groups Dot (Rules, Memory, Models, AI services, Web search,
-Browser, Self-improvement, Self-repair), Phones and channels (Phone, Channels) and App (Appearance, Snapshots, System).
+of seven sections, items 330 and 845), which your initials at the top of the home lead to: General and Vault, then
+Connect apps, then the groups Dot (Rules, Memory, Models, AI services, Web search, Browser, Self-improvement,
+Self-repair), Phones and channels (Phone, Channels) and App (Appearance, Snapshots, System), and under them the first
+steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
 A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
 how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its
 own, the bar naming the tab, with no row of the section's tabs over it, and a card's name stands over the
