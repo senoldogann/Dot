@@ -212,8 +212,9 @@ def trade_guard(info: ActionInfo) -> Decision | None:
 
 
 def haystack_of(info: ActionInfo) -> str:
-    """What a rule's regular expression is searched in for the action: its summary, a line break and its target."""
-    return f"{info.summary}\n{info.target}"
+    """What a rule's regular expression is searched in for the action: its summary, a line break and its target, and
+    the whole of what it runs when the summary shows its start alone (a page's script, item 985)."""
+    return f"{info.summary}\n{info.target}" + (f"\n{info.body}" if info.body else "")
 
 
 def rule_fits(rule: RuleRecord, tool: str, haystack: str) -> bool:

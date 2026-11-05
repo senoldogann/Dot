@@ -14,8 +14,10 @@ from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.calls import ModelCall
 from dotagent.llm.router import ModelRouter
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
+from dotagent.policy.engine import decide
 from dotagent.policy.types import ActionInfo
 from dotagent.secrets import resolve_secret
+from dotagent.store.models import RuleRecord
 
 _APPROVE: ScriptedTurn = ScriptedTurn(
     text="",
@@ -93,3 +95,44 @@ async def test_the_reviewer_reads_no_secret_of_the_action(monkeypatch: pytest.Mo
     )
     assert "sk-proj-abcdefghijklmnopqrstuvwx1234" not in read and "plain-value-9f3k2m7q" not in read
     assert "https://api.example.com/upload" in read
+
+
+async def _review_script(script: str) -> tuple[ReviewVerdict, list[str]]:
+    """How the review decides a page script of ``script`` run on a page, and what the review model was sent of it."""
+    provider: ReadProvider = ReadProvider()
+    router: ModelRouter = ModelRouter(load_default_config(), _ignore, {})
+    await router.register("ollama", provider)
+    review: Reviewer = reviewer_for(router, "ollama:scripted", 30.0, "review:test", None)
+    action: ActionInfo = ActionInfo(
+        tool="browser_eval",
+        kind="browser_click",
+        risk="medium",
+        summary=f"Run a script in the page: {script[:159]}…",
+        target="https://shop.example/",
+        flags=(),
+        body=script,
+    )
+    verdict: ReviewVerdict = await review(
+        ReviewRequest(instructions=("Read the order.",), action=action, reason="the preset asks", tainted=True)
+    )
+    return verdict, provider.read
+
+
+async def test_a_page_script_is_reviewed_and_ruled_on_whole_not_by_its_start() -> None:
+    """Item 985, the security audit of 2026-11-05: browser_eval's action held the first 159 characters of the script
+    and the page's address; the owner's rules and the review judged that while the whole script ran."""
+    script: str = "(() => { /*" + "x" * 200 + "*/ document.forms[0].submit(); })()"
+    verdict, read = await _review_script(script)
+    assert verdict.decision == "approve" and "document.forms[0].submit()" in read[0]
+    longer: str = "/*" + "x" * 13_000 + "*/ fetch('/pay', {method: 'POST'})"
+    verdict, read = await _review_script(longer)
+    assert verdict.decision == "escalate" and read == []
+    held: ActionInfo = ActionInfo(
+        tool="browser_eval", kind="browser_click", risk="medium", summary="Run a script in the page: (() => { /*xx…",
+        target="https://shop.example/", flags=(), body=script,
+    )  # fmt: skip
+    rule: RuleRecord = RuleRecord(
+        id="rule-1", position=0, enabled=True, behavior="handoff", tool_glob="browser_eval", match_regex=r"submit\(",
+        description="", created_at=0.0,
+    )  # fmt: skip
+    assert decide(held, "normal", False, "aggressive", [rule], None).verdict == "handoff"

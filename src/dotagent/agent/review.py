@@ -1336,6 +1336,7 @@ def _render_action(action: ActionInfo) -> str:
             f"flags: {', '.join(action.flags) if action.flags else 'none'}",
             f"summary: {truncate_middle(action.summary, _FIELD_CHARS)}",
             f"target: {truncate_middle(action.target, _TARGET_CHARS)}",
+            *((f"runs: {truncate_middle(action.body, _TARGET_CHARS)}",) if action.body else ()),
         )
     )
 
@@ -1842,12 +1843,11 @@ def reviewer_for(
     ``review_model``; the model reference is read when the first question comes."""
 
     async def review(request: ReviewRequest) -> ReviewVerdict:
-        if len(request.action.target) > _TARGET_CHARS:
+        longest: int = max(len(request.action.target), len(request.action.body))
+        if longest > _TARGET_CHARS:
             # The model would read its beginning and its end alone, and what is cut out of the middle is what it would
-            # approve unseen (item 680): the owner decides, who sees it whole.
-            return ReviewVerdict(
-                decision="escalate", reason=_TOO_LONG_TO_REVIEW.format(chars=len(request.action.target))
-            )
+            # approve unseen (item 680), a page's script among it (item 985): the owner decides, who sees it whole.
+            return ReviewVerdict(decision="escalate", reason=_TOO_LONG_TO_REVIEW.format(chars=longest))
         nonce: str = secrets.token_hex(6)
         question: _Question[ReviewVerdict] = _Question(
             router=router,

@@ -177,7 +177,9 @@ class ActionInfo(FrozenModel):
     305), which the runs at work at the same time keep to; only the lines of a shell, a terminal and a script name
     such files, so the default is none. ``bundle`` is the path an application resolves to now, when the tool resolved
     one (item 418): a call that names an application is checked again as it starts, and the application it found is the
-    one it opens, not another put in its place meanwhile."""
+    one it opens, not another put in its place meanwhile. ``body`` is the whole of what the step runs when the summary
+    shows its start alone and the target is where it runs, not what (a page's script, item 985): the owner's rules and
+    the review read it whole; every other action has none."""
 
     tool: str
     kind: ActionKind
@@ -188,6 +190,7 @@ class ActionInfo(FrozenModel):
     amount: Amount | None = None
     changes: tuple[str, ...] = ()
     bundle: str | None = None
+    body: str = ""
 
 
 class Decision(FrozenModel):

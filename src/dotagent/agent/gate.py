@@ -113,6 +113,7 @@ def _describe(info: ActionInfo) -> JsonObject:
         "target": info.target,
         "amount": None if info.amount is None else render_amount(info.amount),
         "flags": list(info.flags),
+        **({"body": info.body} if info.body else {}),
     }
 
 
@@ -121,7 +122,11 @@ def masked_action(info: ActionInfo, known: Sequence[str]) -> ActionInfo:
     of it): the secrets Dot holds (``known``) and keys of a known form masked in its summary and its target, as they are
     in the arguments of its call (item 551). The policy and the review model weigh the step as it is."""
     return info.model_copy(
-        update={"summary": redact_known(info.summary, known), "target": redact_known(info.target, known)}
+        update={
+            "summary": redact_known(info.summary, known),
+            "target": redact_known(info.target, known),
+            "body": redact_known(info.body, known),
+        }
     )
 
 

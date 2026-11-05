@@ -750,7 +750,11 @@ def _eval_tool() -> RegisteredTool:
         if args.selector:
             on = f" on selector {_clip(args.selector, 80)}"
         summary: str = f"Run a script in the page{on}: {_clip(args.script, _SCRIPT_SUMMARY_CHARS)}"
-        return _action("browser_eval", "browser_click", "medium", summary, target, ())
+        # The summary shows the script's start; the rules and the review read the whole of it (item 985, the security
+        # audit of 2026-11-05): a part past the start was approved unseen.
+        return _action("browser_eval", "browser_click", "medium", summary, target, ()).model_copy(
+            update={"body": args.script}
+        )
 
     async def run(args: EvalArgs, ctx: ToolContext) -> ToolResult:
         waited_s: float = args.timeout_s or _DEFAULT_SCRIPT_S
