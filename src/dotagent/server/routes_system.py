@@ -83,7 +83,7 @@ from dotagent.desktop.perms import (
     responsible_program,
 )
 from dotagent.desktop.types import Permissions
-from dotagent.doctor import CheckResult, run_quick_checks
+from dotagent.doctor import CheckResult, left_out_checks, run_quick_checks
 from dotagent.help.added import (
     AddedServers,
     add_server,
@@ -693,7 +693,11 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
     async def doctor() -> list[CheckResult]:
         # The models and the judge as they stand now, not as the config file said at start.
         judge_config: JudgeConfig = config.judge.model_copy(update={"provider": ctx.runtime.judge.provider})
-        return await run_quick_checks(config.model_copy(update={"models": models_now(), "judge": judge_config}))
+        checks: list[CheckResult] = await run_quick_checks(
+            config.model_copy(update={"models": models_now(), "judge": judge_config})
+        )
+        # Tools the hub already left out (mcp_tool_left_out): the same warn rows dotx doctor prints.
+        return [*checks, *left_out_checks(ctx.runtime.mcp.omitted)]
 
     async def _service() -> tuple[bool, str | None]:
         """Whether this daemon is the service's own process (launchd's job runs Dot.app's launcher, the daemon's

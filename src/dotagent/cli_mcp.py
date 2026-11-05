@@ -66,7 +66,8 @@ def render_report(report: ServerReport, built_in: bool = False) -> str:
     if report.error is not None:
         return "\n".join([f"{name}: FAILED", *_failure_lines(report)])
     header: str = f"{name}: ready, {len(report.tools)} of {report.listed} tools offered to the model"
-    return "\n".join([header, *(render_tool(tool) for tool in report.tools), f"  server log: {report.log}"])
+    dropped: list[str] = [f"  left out {item.tool}: {item.reason}" for item in report.omitted]
+    return "\n".join([header, *(render_tool(tool) for tool in report.tools), *dropped, f"  server log: {report.log}"])
 
 
 async def cmd_mcp_list(command: McpListCommand) -> int:

@@ -109,7 +109,7 @@ async def _served(home: Path, site: str) -> AsyncIterator[tuple[Runtime, RunMana
     """A daemon on the Dot home ``home`` whose main model is the scripted one and whose browser is headless: its
     runtime, its run manager and its address."""
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false', encoding="utf-8"
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _turns(site)))

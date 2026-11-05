@@ -231,7 +231,7 @@ async def test_the_goal_checker_sends_the_agent_back_for_what_the_digest_does_no
 async def test_a_yolo_run_does_what_it_is_told_without_asking(runtime: Runtime, manager: RunManager) -> None:
     path: Path = runtime.workspace / f"yolo-{secrets.token_hex(3)}.txt"
     run: RunRecord = await manager.start(
-        _touch_goal(path), "task", None, None, "test", None, None, "standard", None, "yolo", None, ()
+        _touch_goal(path), "task", None, None, "test", None, None, "standard", None, "yolo", False, ()
     )
     finished: RunRecord = await _run_to_the_end(manager, run)
     events: list[EventRecord] = await _events(runtime, run.id)
@@ -251,7 +251,7 @@ async def test_an_auto_run_has_the_review_model_answer_what_the_policy_asks(
 ) -> None:
     path: Path = runtime.workspace / f"auto-{secrets.token_hex(3)}.txt"
     run: RunRecord = await manager.start(
-        _touch_goal(path), "task", None, None, "test", None, None, "standard", None, "auto", None, ()
+        _touch_goal(path), "task", None, None, "test", None, None, "standard", None, "auto", False, ()
     )
     finished: RunRecord = await _run_to_the_end(manager, run)
     events: list[EventRecord] = await _events(runtime, run.id)

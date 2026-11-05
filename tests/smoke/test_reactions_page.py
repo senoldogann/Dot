@@ -78,7 +78,7 @@ async def stage() -> Stage:
 async def served(tmp_path_factory: pytest.TempPathFactory, stage: Stage) -> AsyncIterator[Served]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\nlessons = "off"\n'
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false\nlessons = "off"\n'
         "playbooks = false\n\n[memory]\nembed_enabled = false\n\n[skills]\nelsewhere = false\n",
         encoding="utf-8",
     )

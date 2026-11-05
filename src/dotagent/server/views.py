@@ -1842,6 +1842,13 @@ type McpOrigin = Literal["config", "plugin", "elsewhere", "connected", "builtin"
 type McpServerState = Literal["ready", "left_out", "disabled", "trying", "signing_in"]
 
 
+class McpLeftOut(FrozenModel):
+    """A tool of a connected server that Dot did not register, and why (the ``mcp_tool_left_out`` log line)."""
+
+    name: str
+    reason: str
+
+
 class McpServerView(FrozenModel):
     """One MCP server Dot has, as Customize › Connectors shows it (item 279). ``origin`` is where it is set up: Dot's
     config, a plugin (``plugin`` names it), another agent of the Mac (Customize › Skills › Found on this Mac), the
@@ -1868,6 +1875,9 @@ class McpServerView(FrozenModel):
     mark: ServiceMark | None
     picks_tools: bool
     plugin: str | None
+    # Tools of a server that is up whose schema Dot could not hand to the model. Empty when none were dropped.
+    # The server's state stays ``ready``: the whole server is ``left_out`` only when it is not connected.
+    left_out: tuple[McpLeftOut, ...] = ()
 
 
 class McpOfferedTool(FrozenModel):

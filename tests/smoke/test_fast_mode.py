@@ -186,7 +186,7 @@ async def claude() -> Claude:
 async def runtime(tmp_path_factory: pytest.TempPathFactory, claude: Claude) -> AsyncIterator[Runtime]:
     """A runtime in a throw-away home whose default model is Opus 5.5, served by the stand-in."""
     home: Path = tmp_path_factory.mktemp("home")
-    (home / "config.toml").write_text(f'[browser]\nheadless = true\n\n[models]\nmain = "{OPUS}"\n', encoding="utf-8")
+    (home / "config.toml").write_text(f'[browser]\nheadless = true\n\n[models]\nmain = "{OPUS}"\n\n[agent]\ngoal_mode = false', encoding="utf-8")
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))

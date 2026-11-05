@@ -319,7 +319,7 @@ async def runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncItera
     monkeypatch.setenv("DOT_CHROME_DIR", str(tmp_path / "chrome"))
     ensure_layout()
     (home / "config.toml").write_text(
-        '[browser]\nheadless = true\n\n[agent]\nlessons = "off"\nplaybooks = false\n\n'
+        '[browser]\nheadless = true\n\n[agent]\ngoal_mode = false\nlessons = "off"\nplaybooks = false\n\n'
         f'[models]\nmain = "{SCRIPTED_MODEL}"'
         "\n\n[memory]\nembed_enabled = false\n\n[policy]\nyolo_taint_check = false\n",
         encoding="utf-8",

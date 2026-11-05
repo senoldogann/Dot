@@ -318,7 +318,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{OPUS}"\nfast = "{OPUS}"\nreview = "{OPUS}"\n\n'
-        '[scheduler]\ntimezone = "Europe/Istanbul"\n\n[agent]\nreflection_time = "off"\n\n'
+        '[scheduler]\ntimezone = "Europe/Istanbul"\n\n[agent]\ngoal_mode = false\nreflection_time = "off"\n\n'
         "[watchers]\ntick_s = 0.2\ntells_per_hour = 3\nruns_per_hour = 2\njudged_per_look = 4\n",
         encoding="utf-8",
     )

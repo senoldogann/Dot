@@ -63,7 +63,7 @@ requires_model = live_with(model_is_listed(), f"needs the local Ollama server wi
 def home(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path: Path = tmp_path_factory.mktemp("home")
     (path / "config.toml").write_text(
-        f'[models]\nmain = "{MODEL_REF}"\n\n[agent]\nmax_concurrent_runs = 1\n', encoding="utf-8"
+        f'[models]\nmain = "{MODEL_REF}"\n\n[agent]\ngoal_mode = false\nmax_concurrent_runs = 1', encoding="utf-8"
     )
     return path
 
@@ -391,7 +391,7 @@ async def test_the_delegate_tool_is_known_to_every_mode_and_classified_as_safe(r
 async def test_a_run_reads_a_file_through_a_delegated_run(runtime: Runtime, manager: RunManager) -> None:
     path, token = _secret_file()
     parent: RunRecord = await manager.start(
-        _delegating_goal(path), "task", None, None, "test", None, None, "standard", None, None, None, ()
+        _delegating_goal(path), "task", None, None, "test", None, None, "standard", None, None, False, ()
     )
     finished: RunRecord = await asyncio.wait_for(manager.wait(parent.id), RUN_TIMEOUT_S)
     children: list[RunRecord] = await _children_of(runtime, parent.id)
@@ -418,7 +418,7 @@ async def test_a_delegated_run_starts_as_untrusted_as_its_parent(runtime: Runtim
         f"{_delegating_goal(path)}"
     )
     parent: RunRecord = await manager.start(
-        goal, "task", None, None, "test", None, None, "standard", None, None, None, ()
+        goal, "task", None, None, "test", None, None, "standard", None, None, False, ()
     )
     finished: RunRecord = await asyncio.wait_for(manager.wait(parent.id), RUN_TIMEOUT_S)
     assert finished.status == "done", finished

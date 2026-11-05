@@ -86,11 +86,13 @@ from dotagent.agent.reflection import reflect
 from dotagent.agent.reflection_record import Reflection
 from dotagent.agent.resume import (
     RESUME_SOURCE,
-    CutOff,
+    HandOff,
     InterruptedCall,
     Resumption,
     can_resume,
     cut_off_by,
+    handoff_of,
+    identities_of,
     interrupted_calls,
     resume_note,
     resumes_on_start,
@@ -836,9 +838,14 @@ class RunManager:
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],
         picks: RunPicks,
+        *,
+        model_text: str | None = None,
+        resumed: Resumption | None = None,
     ) -> RunRecord:
         """Queue a run as :meth:`start` does, with what the owner picked in the composer for its message (item 318),
-        which are refused unless the run can start with them (:meth:`_check_picks`)."""
+        which are refused unless the run can start with them (:meth:`_check_picks`). ``model_text`` is the first
+        message when it is not the goal (a handoff note in front of the owner's words); ``resumed`` carries the plan
+        of the run it goes on from."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_speed(ref, speed)
         if effort is not None:
@@ -855,7 +862,14 @@ class RunManager:
             speed,
             approvals,
             goal_mode_asked(goal, mode, goal_mode),
-            RunOpening(text=goal, files=files, resumed=None, once=once, carried=(), picks=picks),
+            RunOpening(
+                text=goal if model_text is None else model_text,
+                files=files,
+                resumed=resumed,
+                once=once,
+                carried=(),
+                picks=picks,
+            ),
             None,
             None,
         )
@@ -1154,6 +1168,9 @@ class RunManager:
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],
         picks: RunPicks,
+        *,
+        model_text: str | None = None,
+        resumed: Resumption | None = None,
     ) -> RunRecord:
         """Queue a run of ``agent`` (item 86): what the request leaves out, the agent's own bounds fill in (its model,
         effort and approvals, :func:`agent_bounds`), and what the agent leaves out, the configured ones; the run carries
@@ -1176,7 +1193,14 @@ class RunManager:
             speed,
             bounds.approvals,
             goal_mode_asked(goal, mode, goal_mode),
-            RunOpening(text=goal, files=files, resumed=None, once=once, carried=(), picks=picks),
+            RunOpening(
+                text=goal if model_text is None else model_text,
+                files=files,
+                resumed=resumed,
+                once=once,
+                carried=(),
+                picks=picks,
+            ),
             None,
             agent.id,
         )
@@ -2015,8 +2039,8 @@ class RunManager:
         newest_run_id: str | None = await self._newest_run_id(old.thread_id)
         if not can_resume(old, newest_run_id):
             raise RunConflict(
-                "only the newest run of a thread that was cut off, by the daemon or by the end of its dotx command, "
-                "and that no other run started, can be resumed",
+                "only the newest run of a thread that was cut off, blocked or failed, and that no other run started, "
+                "can be resumed",
                 {
                     "run_id": old.id,
                     "status": old.status,
@@ -2697,22 +2721,50 @@ class RunManager:
             patience=self._runtime.config.agent.campaign_patience_sessions,
         )
 
+    async def _ledger_ids(self, thread_id: str) -> tuple[str, ...]:
+        """The ledger ids the thread's newest continuity note kept, so a handoff after a compaction still names them."""
+        messages = await self._runtime.store.load_messages(thread_id, 0)
+        return identities_of([message.content for message in messages])
+
+    async def _resumption(
+        self, old: RunRecord, reason: HandOff, calls: tuple[InterruptedCall, ...], automatic: bool
+    ) -> Resumption:
+        """What a run that goes on from ``old`` is handed: the reason, the calls, the newest plan and the ledger ids."""
+        plan: EventRecord | None = await self._runtime.store.last_event(old.id, PLAN_EVENT)
+        return Resumption(
+            from_run_id=old.id,
+            cut_off=reason,
+            automatic=automatic,
+            calls=calls,
+            plan=EMPTY_PLAN if plan is None else plan_from_event(plan),
+            identities=await self._ledger_ids(old.thread_id),
+        )
+
+    async def _continuation(self, thread_id: str) -> tuple[str, Resumption] | None:
+        """The handoff note for the next run of ``thread_id`` when its newest run was blocked, failed or cut off, and
+        the owner is continuing it. ``None`` when that run ended done, the owner stopped it, it is a campaign session
+        or a scheduled run: those keep the path they already have."""
+        newest: list[RunRecord] = await self._runtime.store.list_runs(1, thread_id)
+        if not newest:
+            return None
+        old: RunRecord = newest[0]
+        if handoff_of(old) is None:
+            return None
+        resumption: Resumption = await self._resumption(
+            old, "continued", await interrupted_calls(self._runtime, old), False
+        )
+        return resume_note(old.goal, resumption), resumption
+
     async def _resume(self, old: RunRecord, calls: tuple[InterruptedCall, ...], automatic: bool) -> RunRecord:
         """Launch the run that resumes ``old`` on its thread, with its settings and its newest plan: its first message
         is the note of :func:`dotagent.agent.resume.resume_note`. ``automatic`` is recorded in the ``resumed`` event.
         A run of one of the owner's agents goes on as that agent, within its bounds (item 462); deleting an agent
         clears the runs' ``agent_id``, so the one kept here is an agent that is there."""
-        cut_off: CutOff | None = cut_off_by(old)
-        if cut_off is None:
-            raise RunConflict("this run was not cut off", {"run_id": old.id, "status": old.status})
-        plan: EventRecord | None = await self._runtime.store.last_event(old.id, PLAN_EVENT)
-        resumption: Resumption = Resumption(
-            from_run_id=old.id,
-            cut_off=cut_off,
-            automatic=automatic,
-            calls=calls,
-            plan=EMPTY_PLAN if plan is None else plan_from_event(plan),
-        )
+        reason: HandOff | None = handoff_of(old)
+        if reason is None:
+            raise RunConflict("this run cannot be resumed", {"run_id": old.id, "status": old.status})
+        resumption: Resumption = await self._resumption(old, reason, calls, automatic)
+        cut_off: HandOff = reason
         run, _ = await self._launch(
             old.goal,
             old.mode,
@@ -3606,13 +3658,47 @@ class RunManager:
             return await self._start_follow_up(
                 thread_id, text, files, mode, model, effort, speed, approvals, goal_mode, agent_id, source, follow_up
             )
+        # A campaign session and a scheduled run are not handed a second note (handoff_of). A follow-up of a reaction
+        # keeps its own context. The owner's next message after a blocked, failed or cut-off run gets the same note a
+        # resume does, in front of their words, which stay the goal.
+        continued: tuple[str, Resumption] | None = await self._continuation(thread_id)
+        model_text: str | None = None if continued is None else f"{continued[0]}\n\n{text}"
+        resumed: Resumption | None = None if continued is None else continued[1]
         if agent_id is not None:
             agent: AgentRecord = await self._runtime.store.get_agent(agent_id)
             return await self.start_for_agent(
-                agent, text, mode, model, thread_id, source, effort, speed, once, approvals, goal_mode, files, picks
+                agent,
+                text,
+                mode,
+                model,
+                thread_id,
+                source,
+                effort,
+                speed,
+                once,
+                approvals,
+                goal_mode,
+                files,
+                picks,
+                model_text=model_text,
+                resumed=resumed,
             )
         return await self.start_picked(
-            text, mode, model, thread_id, source, None, effort, speed, once, approvals, goal_mode, files, picks
+            text,
+            mode,
+            model,
+            thread_id,
+            source,
+            None,
+            effort,
+            speed,
+            once,
+            approvals,
+            goal_mode,
+            files,
+            picks,
+            model_text=model_text,
+            resumed=resumed,
         )
 
     async def follow_up_reaction(self, thread_id: str, goal: str, follow_up: FollowUpOf) -> FollowedUp:

@@ -120,7 +120,7 @@ async def test_the_agent_fills_in_and_submits_a_form_in_the_browser(runtime: Run
     )
     try:
         run: RunRecord = await manager.start(
-            goal, "task", None, None, "test", None, None, "standard", None, None, None, ()
+            goal, "task", None, None, "test", None, None, "standard", None, None, False, ()
         )
         finished: RunRecord = await asyncio.wait_for(manager.wait(run.id), RUN_TIMEOUT_S)
     finally:

@@ -6,12 +6,14 @@ other, so every mix works. Each has a default in the configuration, and a single
 | Switch    | Values                              | Default | Configuration                        | One run                                                                                  |
 | --------- | ----------------------------------- | ------- | ------------------------------------ | ---------------------------------------------------------------------------------------- |
 | Approvals | `supervised`, `ask`, `auto`, `yolo` | `ask`   | `[policy] approvals`                 | `--approvals`, `--auto-approve`, `--yolo`; `approvals` of `POST /api/runs`; the composer |
-| Goal mode | on, off                             | off     | `[agent] goal_mode`, `goal_patience` | `--goal-mode`, `--no-goal-mode`; `goal_mode` of `POST /api/runs`; the composer           |
+| Goal mode | on, off                             | on for a task or research run, off for a chat | `[agent] goal_mode`, `goal_patience` (4) | `--goal-mode`, `--no-goal-mode`; `goal_mode` of `POST /api/runs`; the composer |
 
 `GET /api/status` reports the configured defaults. A run keeps the values it was started with; the run page and the
 facts under More on its side panel's Task tab show them. The composer of the web UI sends nothing for a picker you did
-not touch, so the daemon applies its current default. The YOLO choice is remembered by the browser, and the run page
-carries a chip for it.
+not touch, so the daemon applies its current default. A task or research run starts in goal mode unless you turn it
+off (`--no-goal-mode`, `goal_mode: false`, or the composer switch). A chat never has goal mode. Approvals stay `ask`
+unless you choose otherwise, and a run is sent back at most `goal_patience` times (4). The YOLO choice is remembered
+by the browser, and the run page carries a chip for it.
 
 **Approvals** decide who answers a question of the [policy](safety.md#safety), the `ask` outcome of its decision order,
 strictest first (item 398). The composer's Options menu lists them with their icons, under the names in brackets:
@@ -254,6 +256,13 @@ on from its goal in its chat (tainted as any of the runs it goes on from ended),
 delegate it again. A session of a campaign keeps its steps for the campaign, shared by its sessions (item 484,
 [Campaigns](agents-and-campaigns.md#campaigns)).
 
+**An open plan step is not a finish.** Outside a chat, `finish` does not end the run while the plan still has a step
+that is not done, failed or skipped. Each such finish is sent back, up to `stall_limit` times, telling the run to
+close the steps with `mark_plan_step` (done needs evidence; failed or skipped is how a step is abandoned, with the
+reason in `evidence`). After that many reminders the goal check takes the finish when goal mode is on, and otherwise
+the progress stop ends the run, so the reminders cannot spin. Closing the steps, then calling `finish`, ends the run
+as it asks. One reminder is not enough to let an open plan through, including when goal mode is off.
+
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
 still fails after its retries and the wait for a model out of reach (see [Models and providers](models.md#models-and-providers));
 in goal mode by the goal check giving up; at a limit of minutes or tokens you set; or when you stop it. With
@@ -313,18 +322,22 @@ of 130 to 230 tool calls ran on, one for an hour until it was stopped by hand. G
 and keep an eye on the token count of a long one (`--verbose`, or the facts under More on the side panel's Task tab).
 
 **Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off, or a run of
-`dotx run` whose terminal was closed (or that got SIGTERM) or whose command died, can go on where it stopped: Continue
-on the run's page, `dotx resume RUN_ID` (in this terminal, like `dotx run`), or `POST /api/runs/{id}/resume`. A new run
+`dotx run` whose terminal was closed (or that got SIGTERM) or whose command died, and a run that is blocked or that
+failed, can go on where it stopped: Continue
+on the run's page, `dotx resume RUN_ID` (in this terminal, like `dotx run`), or `POST /api/runs/{id}/resume`. The next
+message you send in that chat, after a blocked, failed or cut-off run, is handed the same note. A new run
 starts in the same chat, with the goal, model, reasoning level, approval mode and goal mode of the run it resumes, as
 the same agent when it was one of yours (item 462), and the conversation so far, where a shutdown or a restart of the
 daemon, or a closed terminal, keeps the results of the calls of the step it was in that had ended (a crash keeps none),
 also when it came as their images were being described for a model that cannot see (item 879).
-Its first message tells the model how that run was cut off and how each call of that step without a result ended:
-finished (with the start of its result), cut off while it ran, or not started. A call that was cut off may have changed
+Its first message tells the model how that run stopped and how each call of that step without a result ended:
+finished (with the start of its result), cut off while it ran, or not started, and the goal and the plan. A call that was cut off may have changed
 something unless it only reads, and the model is told to check before it runs it again. The plan of that run is the plan
-of the new one. Only the newest run of a chat can be resumed, and never a run that you stopped or that another run
+of the new one. After a compaction, the note also keeps the open plan and the ids of Dot's records the ledger named,
+in that message, not in the system prompt. A session of a campaign and a scheduled run are not given a second note:
+the campaign's next session, and the schedule's own firing, already carry what they need. Only the newest run of a chat can be resumed, and never a run that you stopped or that another run
 started. After a shutdown, the chat's queue goes on once the new run ends done; after a crash or a restart, it waits
-until you resume it.
+until you resume it. The daemon still resumes on its own only a run that was cut off, not one that failed or is blocked.
 
 By default (`resume = "safe"` in `[agent]`, item 248) the daemon also resumes runs on its own when it starts: runs of
 the web UI, cut off at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a

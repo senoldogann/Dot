@@ -34,6 +34,15 @@ class McpPurpose(FrozenModel):
     claimed: bool
 
 
+class LeftOutTool(FrozenModel):
+    """One tool ``usable_tools`` did not hand to the model: its name on the server and why. The server's other tools
+    still serve. This is the ``mcp_tool_left_out`` log line, kept so doctor and the connector page can say it."""
+
+    server: str
+    tool: str
+    reason: str
+
+
 class McpFailure(FrozenModel):
     """An enabled server that Dot left out because it could not start: why, the error's context, and the file its
     stderr goes to. Its tools are not offered until Dot starts again."""

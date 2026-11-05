@@ -167,6 +167,28 @@ def identifiers(text: str) -> set[str]:
     return {match.rstrip(_TRAILING_PUNCTUATION) for match in _IDENTIFIER.findall(text)}
 
 
+_IDS_HEADING: str = "Ids of Dot's records named so far"
+
+
+def named_ids(note: str) -> tuple[str, ...]:
+    """The ledger ids a continuity note lists under its ids heading, newest last. Empty when ``note`` is not that
+    note or lists none. A handoff reads them back so a compaction does not drop the ids the run named."""
+    if _IDS_HEADING not in note:
+        return ()
+    after: str = note.split(_IDS_HEADING, 1)[1]
+    body: str = ""
+    for line in (line.strip() for line in after.splitlines()):
+        if not line or line.startswith("#") or line.startswith("(") or "read one back" in line:
+            if body:
+                break
+            continue
+        body = line
+        break
+    if not body:
+        return ()
+    return tuple(part.strip() for part in body.split(",") if _DOT_ID.fullmatch(part.strip()))
+
+
 def _abbreviated(name: str) -> bool:
     """Whether ``name`` is written as a model shortens a value (:data:`_ABBREVIATION_MARKS`): it stands for no one
     path or address, so no history is expected to hold it."""

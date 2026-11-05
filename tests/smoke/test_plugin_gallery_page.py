@@ -68,7 +68,7 @@ def _home(home: Path) -> None:
         json.dumps({"name": "by-hand", "description": "Put here by hand."}), encoding="utf-8"
     )
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false', encoding="utf-8"
     )
 
 

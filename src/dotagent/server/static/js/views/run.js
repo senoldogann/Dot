@@ -70,6 +70,7 @@ const CUT_OFF_LINES = {
   process_ended: "Its Terminal command was told to end while this task worked.",
   process_died: "Its Terminal command stopped suddenly while this task worked.",
 };
+const RESUME_WITHOUT_CUT = "This task stopped before it was done. Continue picks it up.";
 // Edit from here (item 282): the dialog's line and the owner's two ways of rewinding.
 const REWIND_MESSAGE = "Take this chat back to before this message. Your message and its files go back in the message box.";
 const REWIND_CHOICES = [
@@ -1069,7 +1070,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
 
   function syncControls() {
     resumeLine.hidden = active || !resumable;
-    resumeWords.textContent = cutOff === null ? "" : CUT_OFF_LINES[cutOff];
+    resumeWords.textContent = cutOff === null ? (resumable ? RESUME_WITHOUT_CUT : "") : CUT_OFF_LINES[cutOff];
     // A delegated run is not steered: its dock keeps the arrow down (item 96) and its pill, whose Stop stops it.
     const delegated = run.parent_run_id !== null;
     frame.element.hidden = delegated;

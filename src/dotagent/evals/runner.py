@@ -67,7 +67,8 @@ def eval_config(config: AppConfig) -> AppConfig:
     measure, the user's limits of a run (a task's own time and token limits cut its runs) and the checkpoints of a long
     run, whose judge is the review model (item 909); the browser is Dot's own Chrome, whatever the owner's mode, so that
     a measurement never touches the owner's (item 579: a campaign follows the mode), and headless, since nobody watches
-    an attempt."""
+    an attempt. Goal mode stays off except for a task that opts in: the product default is on for an owner's task, and
+    a reference written without a verdict would otherwise call a review model the script does not play."""
     return config.model_copy(
         update={
             "browser": config.browser.model_copy(update={"headless": True, "mode": "own"}),
@@ -84,6 +85,10 @@ def eval_config(config: AppConfig) -> AppConfig:
                     # A message sent while a run works asks the fast model whether it stands on its own (item 915):
                     # an attempt sends none, and a test of the queue means the queue.
                     "busy_parallel": False,
+                    # The catalog opts into goal mode per task. The product default (on for an owner's task) must not
+                    # turn every reference on: eval check plays the script, and a task that does not opt in has no
+                    # verdict in that script.
+                    "goal_mode": False,
                 }
             ),
             "mcp": [],

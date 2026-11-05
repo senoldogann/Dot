@@ -173,7 +173,10 @@ async def cmd_eval_run(command: EvalRunCommand) -> int:
     model: str = command.model if command.model is not None else config.models.main
     parse_model_ref(model)
     tasks: tuple[EvalTask, ...] = select_tasks(command.tasks)
-    needed: tuple[str, ...] = required_models(config, model, tasks)
+    # Attempts run under eval_config, which keeps goal mode off unless a task opts in. The review model is required
+    # for that, not because the owner's task default is on.
+    run_config: AppConfig = eval_config(config)
+    needed: tuple[str, ...] = required_models(run_config, model, tasks)
     secrets: dict[str, str] = await asyncio.to_thread(
         lookup_secrets, secret_names(config, reached_models(config, model))
     )
@@ -187,7 +190,6 @@ async def cmd_eval_run(command: EvalRunCommand) -> int:
             },
         )
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
-    run_config: AppConfig = eval_config(config)
     ceiling: int = command.repeat * sum(task.token_budget for task in tasks)
     longest: float = max(task.time_limit_s for task in tasks)
     sys.stdout.write(
@@ -205,8 +207,8 @@ async def cmd_eval_run(command: EvalRunCommand) -> int:
     async for outcome in play(run_config, login_env, secrets, model, tasks, command.repeat, NO_HARNESS, False):
         outcomes.append(outcome)
         sys.stdout.write(_progress_line(outcome) + "\n")
-        await asyncio.to_thread(save_report, evals_dir(), _report_of(config, model, started_at, outcomes))
-    report: EvalReport = _report_of(config, model, started_at, outcomes)
+        await asyncio.to_thread(save_report, evals_dir(), _report_of(run_config, model, started_at, outcomes))
+    report: EvalReport = _report_of(run_config, model, started_at, outcomes)
     path: Path = await asyncio.to_thread(save_report, evals_dir(), report)
     _write(["", *render_scorecard(score_report(report)), "", f"Saved: {path}"])
     return 0

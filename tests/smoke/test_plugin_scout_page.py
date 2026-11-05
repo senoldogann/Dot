@@ -105,7 +105,7 @@ async def world(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[tuple
     )  # fmt: skip
     files: str = files_hash(probe / "skills")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false', encoding="utf-8"
     )
 
     async def fetch(entry: GalleryEntry, folder: Path) -> Path:

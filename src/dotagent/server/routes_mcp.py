@@ -46,6 +46,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.guard import origin_is_local, refuse_from_a_phone
 from dotagent.server.views import (
     McpAllow,
+    McpLeftOut,
     McpOfferedTool,
     McpOfferedView,
     McpOrigin,
@@ -356,6 +357,9 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             # have the list chosen again (it names a tool the server no longer offers, or one whose schema Dot cannot
             # use). The others keep their tools where they were set up.
             picks_tools=origin == "connected" and (state == "ready" or (state == "left_out" and bool(config.allow))),
+            left_out=tuple(
+                McpLeftOut(name=item.tool, reason=item.reason) for item in hub.omitted if item.server == config.name
+            ),
         )
 
     async def listing() -> McpServersView:

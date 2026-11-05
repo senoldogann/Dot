@@ -61,7 +61,7 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 async def _served(home: Path) -> AsyncIterator[tuple[RunManager, str, int]]:
     """A daemon whose scripted model reacts and answers, then answers a follow-up: its run manager, address and port."""
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false', encoding="utf-8"
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, list(_TURNS)))

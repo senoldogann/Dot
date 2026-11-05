@@ -190,7 +190,7 @@ async def _served(home: Path) -> AsyncIterator[tuple[RunManager, str, int]]:
     """A daemon whose scripted model writes a plan of two steps and then waits in a command: its run manager, its
     address and its port."""
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false', encoding="utf-8"
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     plan: ScriptedTurn = ScriptedTurn(

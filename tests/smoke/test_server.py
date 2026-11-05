@@ -665,7 +665,7 @@ async def test_the_status_the_models_and_the_checks_describe_this_installation(c
     body: JsonObject = status.json()
     assert body["port"] == PORT
     assert body["preset"] == "cautious"
-    assert (body["approvals"], body["goal_mode"]) == ("ask", False)
+    assert (body["approvals"], body["goal_mode"]) == ("ask", True)
     assert body["scheduler_running"] is False
     assert body["night_work"] == []
     assert body["models"]["main"] == MODEL_REF
@@ -1255,7 +1255,9 @@ async def test_a_run_started_in_yolo_mode_is_never_asked_what_the_cautious_prese
 ) -> None:
     path: Path = runtime.workspace / f"yolo-{secrets.token_hex(3)}.txt"
     goal: str = f"Run exactly this shell command: touch {path}  Then call finish with the answer done."
-    answer: httpx.Response = await client.post("/api/runs", json={"goal": goal, "approvals": "yolo"})
+    answer: httpx.Response = await client.post(
+        "/api/runs", json={"goal": goal, "approvals": "yolo", "goal_mode": False}
+    )
     assert answer.status_code == 201, answer.text
     started: RunRecord = RunRecord.model_validate(answer.json())
     assert (started.approvals, started.goal_mode) == ("yolo", False)

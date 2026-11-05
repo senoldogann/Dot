@@ -103,7 +103,7 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 async def _served(home: Path, model: Writer) -> AsyncIterator[tuple[RunManager, str]]:
     """A daemon on the Dot home ``home`` whose main model is ``model``: its run manager and the address it is at."""
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[agent]\nplaybooks = false\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n'
+        f'[browser]\nheadless = true\n\n[agent]\ngoal_mode = false\nplaybooks = false\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n'
         "[memory]\nembed_enabled = false\n",
         encoding="utf-8",
     )

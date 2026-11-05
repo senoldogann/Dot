@@ -23,7 +23,7 @@ from dotagent.mcp.masking import masked_context
 from dotagent.mcp.naming import PREFIX, require_distinct_names
 from dotagent.mcp.purpose import READ_CHARS, purpose_of
 from dotagent.mcp.signin import kept_sign_in
-from dotagent.mcp.types import McpFailure, McpPurpose, McpTool
+from dotagent.mcp.types import LeftOutTool, McpFailure, McpPurpose, McpTool
 from dotagent.secrets import known_secrets
 from dotagent.tools.schema import flatten_json_schema
 
@@ -41,6 +41,7 @@ class _Connected:
     listed: int
     tools: tuple[McpTool, ...]
     instructions: str
+    omitted: tuple[LeftOutTool, ...] = ()
 
 
 class ServerReport(FrozenModel):
@@ -53,6 +54,7 @@ class ServerReport(FrozenModel):
     error: str | None
     detail: JsonObject
     log: str
+    omitted: tuple[LeftOutTool, ...] = ()
 
 
 def server_log_path(config: McpServerConfig) -> Path:
@@ -92,11 +94,14 @@ def tool_parameters(tool: McpTool) -> JsonObject:
         ) from exc
 
 
-def usable_tools(config: McpServerConfig, tools: tuple[McpTool, ...]) -> tuple[McpTool, ...]:
+def usable_tools(
+    config: McpServerConfig, tools: tuple[McpTool, ...], left_out: list[LeftOutTool] | None = None
+) -> tuple[McpTool, ...]:
     """``tools`` but those whose schema no model takes (:func:`tool_parameters`), each left out alone and logged: the
     server's other tools serve (item 671; before, one such tool left its whole server out). A tool the ``allow`` list
     names, which the owner asked for, leaves its server out with the reason instead, and so does a server left with no
-    tool: neither would serve as the owner set it up."""
+    tool: neither would serve as the owner set it up. ``left_out``, when given, receives each tool this drops, with
+    the reason the log line already carries. Nothing here is registered as a tool of the model."""
     kept: list[McpTool] = []
     for tool in tools:
         try:
@@ -107,6 +112,15 @@ def usable_tools(config: McpServerConfig, tools: tuple[McpTool, ...]) -> tuple[M
             log.warning(
                 "mcp_tool_left_out", server=tool.server, tool=tool.remote_name, error=error.context.get("error")
             )
+            if left_out is not None:
+                reason: object = error.context.get("error")
+                left_out.append(
+                    LeftOutTool(
+                        server=tool.server,
+                        tool=tool.remote_name,
+                        reason=reason if isinstance(reason, str) and reason else error.message,
+                    )
+                )
             continue
         kept.append(tool)
     if tools and not kept:
@@ -144,12 +158,15 @@ async def _connect_server(
     async with AsyncExitStack() as cleanup:
         cleanup.push_async_callback(connection.close)
         listed: tuple[McpTool, ...] = await connection.list_tools()
-        tools: tuple[McpTool, ...] = usable_tools(config, select_tools(config, listed))
+        omitted: list[LeftOutTool] = []
+        tools: tuple[McpTool, ...] = usable_tools(config, select_tools(config, listed), omitted)
         require_distinct_names(tools)
         instructions: str = (connection.instructions() or "")[:READ_CHARS]
         cleanup.pop_all()
     log.info("mcp_server_ready", server=config.name, tools=len(tools), offered=len(listed))
-    return _Connected(connection=connection, listed=len(listed), tools=tools, instructions=instructions)
+    return _Connected(
+        connection=connection, listed=len(listed), tools=tools, instructions=instructions, omitted=tuple(omitted)
+    )
 
 
 async def _connect_kept(config: McpServerConfig, login_env: Mapping[str, str]) -> _Connected:
@@ -188,10 +205,12 @@ class McpHub:
         configs: Mapping[str, McpServerConfig],
         login_env: Mapping[str, str],
         instructions: Mapping[str, str],
+        omitted: tuple[LeftOutTool, ...] = (),
     ) -> None:
         self._connections: dict[str, McpConnection] = dict(connections)
         self.tools: tuple[McpTool, ...] = tools
         self.failures: tuple[McpFailure, ...] = failures
+        self.omitted: tuple[LeftOutTool, ...] = omitted
         self._configs: dict[str, McpServerConfig] = dict(configs)
         self._login_env: dict[str, str] = dict(login_env)
         self._instructions: dict[str, str] = dict(instructions)
@@ -261,6 +280,10 @@ class McpHub:
             self._instructions[config.name] = done.instructions
             self.tools = (*(tool for tool in self.tools if tool.server != config.name), *done.tools)
             self.failures = tuple(failure for failure in self.failures if failure.server != config.name)
+            self.omitted = (
+                *(item for item in self.omitted if item.server != config.name),
+                *done.omitted,
+            )
         if previous is not None:
             await previous.close()
         return done.tools
@@ -273,6 +296,7 @@ class McpHub:
             self._instructions.pop(server, None)
             self.tools = tuple(tool for tool in self.tools if tool.server != server)
             self.failures = tuple(failure for failure in self.failures if failure.server != server)
+            self.omitted = tuple(item for item in self.omitted if item.server != server)
         if connection is not None:
             await connection.close()
 
@@ -331,6 +355,7 @@ async def open_hub(configs: Sequence[McpServerConfig], login_env: Mapping[str, s
         if isinstance(outcome, Exception)
     )
     tools: tuple[McpTool, ...] = tuple(tool for done in connected.values() for tool in done.tools)
+    omitted: tuple[LeftOutTool, ...] = tuple(item for done in connected.values() for item in done.omitted)
     return McpHub(
         {name: done.connection for name, done in connected.items()},
         tools,
@@ -338,6 +363,7 @@ async def open_hub(configs: Sequence[McpServerConfig], login_env: Mapping[str, s
         {config.name: config for config in enabled},
         login_env,
         {name: done.instructions for name, done in connected.items()},
+        omitted,
     )
 
 
@@ -368,6 +394,7 @@ async def _inspect(config: McpServerConfig, login_env: Mapping[str, str]) -> Ser
         error=None,
         detail={},
         log=log_file,
+        omitted=connected.omitted,
     )
 
 

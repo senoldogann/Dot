@@ -262,6 +262,9 @@ const CUT_OFFS = {
   daemon_shutdown: { after: "Dot was shut down", how: "Dot was shut down while the task before this one worked." },
   process_ended: { after: "its Terminal command was told to end", how: "The Terminal command that drove the task before this one was told to end while it worked." },
   process_died: { after: "its Terminal command stopped suddenly", how: "The Terminal command that drove the task before this one stopped suddenly while it worked." },
+  blocked: { after: "it was blocked", how: "The task before this one was blocked." },
+  failed: { after: "it failed", how: "The task before this one failed." },
+  continued: { after: "you said to continue", how: "You said to continue the task before this one." },
 };
 
 /** One call of the step a resumed run was in, as "what it did: how it ended". */
@@ -1508,7 +1511,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // the step it was in ended, and the way to that run.
     resumed(scope, record) {
       const data = record.data;
-      const cutOff = CUT_OFFS[data.cut_off];
+      const cutOff = CUT_OFFS[data.cut_off] ?? { after: data.cut_off, how: String(data.cut_off) };
       const restarted = data.automatic && (data.cut_off === "daemon_restarted" || data.cut_off === "daemon_shutdown");
       const head = el(
         "summary",

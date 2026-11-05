@@ -63,7 +63,7 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     ensure_layout()
     # An owner whose yolo runs wait for their questions, so the stop cuts the runs off while they wait.
     (home / "config.toml").write_text(
-        f'[agent]\nquestions = "wait"\nresume = "safe"\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[agent]\ngoal_mode = false\nquestions = "wait"\nresume = "safe"\n\n[models]\nmain = "{SCRIPTED_MODEL}"', encoding="utf-8"
     )
     return home
 

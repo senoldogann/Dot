@@ -1,8 +1,12 @@
 """Resuming a run that the daemon cut off: the calls of the step it was in, which runs may be resumed by hand and which
 the daemon resumes on its own, and what the resumed run is told."""
 
+from datetime import UTC, datetime
+
 from dotagent.agent.compact import pending_calls
+from dotagent.agent.continuity import continuity_note, named_ids, new_ledger, with_actions
 from dotagent.agent.plan import EMPTY_PLAN, PlanItem, PlanPayload
+from dotagent.agent.prompt import turn_note
 from dotagent.agent.resume import (
     REPEATABLE_META_TOOLS,
     RESUME_SOURCE,
@@ -11,6 +15,8 @@ from dotagent.agent.resume import (
     Resumption,
     can_resume,
     cut_off_by,
+    handoff_of,
+    identities_of,
     resume_note,
     resumed_event_data,
     resumes_on_start,
@@ -85,10 +91,20 @@ def test_only_the_newest_run_of_a_thread_that_the_daemon_cut_off_can_be_resumed(
     assert cut_off_by(_run("running", "", UI_SOURCE, None)) is None
     assert can_resume(RESTARTED, "run_1")
     assert can_resume(SHUT_DOWN, "run_1")
-    # The thread went on after it, another run started it, or the owner stopped it.
+    # A blocked run and one that failed can be resumed too. The thread went on after it, another run started it, or
+    # the owner stopped it: those cannot. A campaign session and a scheduled run keep their own follow-up.
+    blocked: RunRecord = _run("blocked", "", UI_SOURCE, None)
+    failed: RunRecord = _run("failed", "the report was not written", UI_SOURCE, None)
+    assert handoff_of(blocked) == "blocked" and can_resume(blocked, "run_1")
+    assert handoff_of(failed) == "failed" and can_resume(failed, "run_1")
+    assert not resumes_on_start(failed, "run_1", [])
     assert not can_resume(RESTARTED, "run_2")
     assert not can_resume(_run("failed", RESULT_RESTARTED, UI_SOURCE, "run_0"), "run_1")
     assert not can_resume(_run("cancelled", RESULT_STOPPED, UI_SOURCE, None), "run_1")
+    campaign: RunRecord = _run("failed", "no", UI_SOURCE, None).model_copy(update={"campaign_id": "cmp_1"})
+    scheduled: RunRecord = _run("failed", "no", SCHEDULE_SOURCE, None)
+    assert handoff_of(campaign) is None and not can_resume(campaign, "run_1")
+    assert handoff_of(scheduled) is None and not can_resume(scheduled, "run_1")
 
 
 def test_the_daemon_resumes_on_its_own_only_runs_of_the_web_ui_whose_calls_cut_off_while_they_ran_only_read() -> None:
@@ -198,3 +214,47 @@ def test_a_run_cut_off_between_steps_is_told_only_its_goal_and_to_go_on() -> Non
         f"on with it; the conversation above holds every step it took. Its goal:\n{GOAL}\n\nPick up where it left off: "
         "do not redo what is done, check what a call that was cut off may have changed, and finish the goal."
     )
+
+
+_OPEN: PlanPayload = PlanPayload(
+    steps=(PlanItem(text="Write the report", status="in_progress"),),
+    targets="report.md holds every row",
+)
+
+
+def test_a_blocked_failed_or_continued_run_is_handed_its_goal_its_calls_and_its_plan() -> None:
+    calls: tuple[InterruptedCall, ...] = (_call("read_file", "read", "succeeded", "a,b"),)
+    for reason in ("blocked", "failed", "continued"):
+        note: str = resume_note(
+            GOAL,
+            Resumption(from_run_id="run_1", cut_off=reason, automatic=False, calls=calls, plan=_OPEN),
+        )
+        assert GOAL in note, reason
+        assert "read_file {}: it finished and succeeded. Its result began: a,b" in note, reason
+        assert "Its plan, which is your plan now:\n1. [in_progress] Write the report" in note, reason
+        assert note.endswith("finish the goal."), reason
+
+
+def test_after_a_compaction_the_handoff_keeps_the_open_plan_and_the_ledger_ids() -> None:
+    """The note stands in front of the model as the opening message. The per-message turn note, which keeps the system
+    prompt's bytes stable, does not carry it."""
+    named: str = "run_abc123_wxyz"
+    ledger = with_actions(new_ledger(GOAL), [(WRITE, True, f"wrote {named}")])
+    compacted: str = continuity_note(ledger, _OPEN, 4000, "NEXT: write the report.", "the fast model", None)
+    ids: tuple[str, ...] = named_ids(compacted)
+    assert ids == (named,)
+    assert identities_of(["an older message", compacted]) == ids
+    note: str = resume_note(
+        GOAL,
+        Resumption(
+            from_run_id="run_1",
+            cut_off="continued",
+            automatic=False,
+            calls=(_call("read_file", "read", "cut_off", ""),),
+            plan=_OPEN,
+            identities=ids,
+        ),
+    )
+    assert named in note and "[in_progress] Write the report" in note and GOAL in note
+    now: datetime = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+    assert named not in turn_note(now, [], 0, [], [])

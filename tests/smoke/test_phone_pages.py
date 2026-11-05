@@ -109,7 +109,7 @@ def _finish() -> ScriptedTurn:
 @asynccontextmanager
 async def _served(home: Path) -> AsyncIterator[tuple[RunManager, str]]:
     """A daemon on the Dot home ``home`` whose main model offers levels: its run manager and the address it is at."""
-    (home / "config.toml").write_text(f'[browser]\nheadless = true\n\n[models]\nmain = "{THINKER}"\n', encoding="utf-8")
+    (home / "config.toml").write_text(f'[browser]\nheadless = true\n\n[models]\nmain = "{THINKER}"\n\n[agent]\ngoal_mode = false', encoding="utf-8")
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register(_PROVIDER, Thinker(ScriptedProvider(_PROVIDER, [_finish()])))
     manager: RunManager = RunManager(runtime)

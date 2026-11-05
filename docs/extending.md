@@ -597,7 +597,10 @@ to a loose schema of its kind (an object, a list of objects or the scalar its de
 whose description says that its parts nest deeper than shown, and the service checks what the model sends there; the
 tool's other parameters stay whole. A schema that grows past 5,000 parts as it is written out, or past 32,000
 characters once flattened, is refused, as one whose arguments are no object at all: such a tool is left out alone, with
-`mcp_tool_left_out` in the log, and the server's other tools serve. A tool the server's `allow` list names, which the
+`mcp_tool_left_out` in the log, and the server's other tools serve. The same name and reason are a warn row of `dotx
+doctor` when the running daemon's doctor is asked (`GET /api/doctor`, Settings › System), and a row on the connector's
+page (Not offered). The tool is not registered for the model. A server that fails as a whole still shows Left out for
+the server, not for one tool. A tool the server's `allow` list names, which the
 owner asked for, leaves the server out with the reason instead, and so does a server none of whose tools can be used.
 Before, any of these left the whole server out. Plugins add their
 servers too (see [Skills and plugins](#skills-and-plugins)); their names become `<plugin>-<server>`. MCP results are

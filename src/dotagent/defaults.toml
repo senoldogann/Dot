@@ -213,8 +213,9 @@ draft_check_threshold = 0.5
 [agent]
 # A run has no step limit: it ends by finishing, by the progress watchdog (below), at a limit below or by the stop button.
 # Goal mode: a reviewer model checks the answer of a task or research run against the goal and sends the run back to work
-# until the goal is reached; a run is sent back to work at most goal_patience times, then it ends as failed.
-goal_mode = false
+# until the goal is reached; a run is sent back to work at most goal_patience times, then it ends as failed. On for a
+# task or research run that does not say otherwise; a chat has none. --no-goal-mode and the composer switch turn it off.
+goal_mode = true
 goal_patience = 4
 # The limits of a task or research run: minutes of wall time (waits for the user included), and tokens of every model
 # call of the run and of the runs it delegated to. Checked between steps: at the first step past one, the run is told to

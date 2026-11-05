@@ -240,7 +240,7 @@ async def test_a_run_on_an_openrouter_model_carries_its_reasoning_back(
             "standard",
             None,
             "yolo",
-            None,
+            False,
             (),
         )
         async with asyncio.timeout(_RUN_WAIT_S):

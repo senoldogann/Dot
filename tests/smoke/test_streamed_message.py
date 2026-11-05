@@ -178,7 +178,7 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 async def _served(home: Path, model: Streamer) -> AsyncIterator[tuple[RunManager, str]]:
     """A daemon on the Dot home ``home`` whose main model is ``model``: its run manager and the address it is at."""
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{STREAMER}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{STREAMER}"\n\n[agent]\ngoal_mode = false', encoding="utf-8"
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register(_PROVIDER, model)

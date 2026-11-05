@@ -171,7 +171,7 @@ async def test_the_names_are_kept_in_the_config_file_and_said_to_the_model(tmp_p
         written: str = _written()
         assert 'name = "Miro"' in written and 'owner = "Ada"' in written and "introduced = true" in written, written
         run: RunRecord = await manager.start(
-            "Say hello.", "task", None, None, "test", None, None, "standard", None, None, None, ()
+            "Say hello.", "task", None, None, "test", None, None, "standard", None, None, False, ()
         )
         done: RunRecord = await asyncio.wait_for(manager.wait(run.id), _RUN_TIMEOUT_S)
         assert done.status == "done", done.result
@@ -267,7 +267,7 @@ async def test_a_home_with_a_chat_never_shows_the_first_conversation(tmp_path: P
     ):
         # A chat is one a person started a run in: Dot has had no first conversation, but the owner has used it.
         earlier: RunRecord = await manager.start(
-            "Say hello.", "task", None, None, "test", None, None, "standard", None, None, None, ()
+            "Say hello.", "task", None, None, "test", None, None, "standard", None, None, False, ()
         )
         assert (await asyncio.wait_for(manager.wait(earlier.id), _RUN_TIMEOUT_S)).status == "done"
         chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
@@ -352,7 +352,7 @@ async def test_the_first_steps_say_what_is_done_and_a_dot_used_for_long_is_not_f
             ("chat", False),
         ]
         run: RunRecord = await manager.start(
-            "Say hello.", "task", None, None, "ui", None, None, "standard", None, None, None, ()
+            "Say hello.", "task", None, None, "ui", None, None, "standard", None, None, False, ()
         )
         await asyncio.wait_for(manager.wait(run.id), _RUN_TIMEOUT_S)
         after: dict[str, object] = (await client.get("/assistant/first-steps")).json()
@@ -441,7 +441,7 @@ async def test_a_chat_dot_opened_at_and_deleted_since_says_not_found(tmp_path: P
         async_playwright() as playwright,
     ):
         run: RunRecord = await manager.start(
-            "Say hello.", "task", None, None, "ui", None, None, "standard", None, None, None, ()
+            "Say hello.", "task", None, None, "ui", None, None, "standard", None, None, False, ()
         )
         await asyncio.wait_for(manager.wait(run.id), _RUN_TIMEOUT_S)
         chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)

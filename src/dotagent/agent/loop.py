@@ -2487,7 +2487,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     noted_replies: list[tuple[int, str]] = []
     sent_back: int = 0
     used_tools: bool = False
-    plan_reminded: bool = False
+    # How many times a finish was sent back because the plan still had open steps. It is not one reminder: the finish
+    # does not end the run while steps are open, until stall_limit reminders, and then the goal check or the progress
+    # stop does.
+    plan_reminders: int = 0
+    plan_handed: bool = False
     failure_reminded: bool = False
     targets_reminded: bool = False
     paths_reminded: bool = False
@@ -3087,9 +3091,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             )
             return _run_end(agent, history, goal, _with_restated(restating, at_limit), facts)
         # Otherwise a finish that came in the reply of a call that did not work is sent back once, to read what
-        # happened (item 552); so is a plan with open steps, so the plan the user sees matches the work, a session of a
-        # campaign that has no targets yet, and, with verify_answer_paths, an answer that names paths that do not
-        # exist; then goal mode lets the checker decide whether the goal is really reached.
+        # happened (item 552). Outside a chat, a plan with open steps does not end the run: each finish is sent back
+        # until the steps are closed or abandoned (done, failed or skipped), and at most stall_limit times, after
+        # which goal mode's checker decides or the progress stop ends the run, so the reminders cannot spin. A
+        # session of a campaign that has no targets yet is reminded once, and, with verify_answer_paths, an answer
+        # that names paths that do not exist is sent back once; then goal mode lets the checker decide.
         if unread and not failure_reminded:
             failure_reminded = True
             nudges = 0
@@ -3098,14 +3104,41 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 run.id, FINISH_AFTER_FAILURE_EVENT, {"calls": [outcome.call.name for outcome in unread]}, True
             )
             continue
-        if not plan_reminded and run.mode != "chat":
+        if run.mode != "chat":
             unclosed: tuple[int, ...] = open_steps((await _current_plan(agent)).steps)
-            if unclosed:
-                plan_reminded = True
+            if unclosed and plan_reminders < config.stall_limit:
+                plan_reminders += 1
                 nudges = 0
                 history.append(await _stored_note(agent, _plan_note(unclosed)))
                 await runtime.bus.emit(run.id, "plan_reminder", {"open_steps": list(unclosed)}, True)
                 continue
+            if unclosed and checker is not None and not plan_handed:
+                # The reminder bound is spent. Goal mode's checker takes the finish; an open plan still blocks a
+                # finish the checker does not accept, and one more finish with steps open reaches the progress stop.
+                plan_handed = True
+                plan_verdict: RunOutcome | SendBack = await _check_goal(
+                    agent, checker, history, goal, ended, sent_back, facts
+                )
+                if isinstance(plan_verdict, RunOutcome):
+                    if not agent.inbox.asks():
+                        return _run_end(agent, history, goal, _with_restated(restating, plan_verdict), facts)
+                    continue
+                sent_back += 1
+                nudges = 0
+                watch = clear_window(watch)
+                history.append(await _stored_note(agent, plan_verdict.note))
+                continue
+            if unclosed:
+                # No checker (goal mode off), or it already had this finish. Open steps alone do not pass finish:
+                # the progress stop ends the run, the same words a stall uses.
+                stopped_plan: str = stop_result(
+                    "finish was called while plan step(s) "
+                    + ", ".join(str(number) for number in unclosed)
+                    + " were still open",
+                    ledger,
+                    plan_lines(await _current_plan(agent)),
+                )
+                return _run_end(agent, history, goal, RunOutcome(status="failed", result=stopped_plan, needs=""), facts)
         if (
             run.campaign_id is not None
             and not targets_reminded

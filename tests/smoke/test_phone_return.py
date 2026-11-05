@@ -303,7 +303,7 @@ async def _served(home: Path) -> AsyncIterator[tuple[Runtime, RunManager, Proxy,
     through: its runtime, its run manager, the proxy, the files of the pages asked of it, and the name of the build it
     answers as once a test puts one in (:class:`RenamedBuild`)."""
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false', encoding="utf-8"
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _turns()))

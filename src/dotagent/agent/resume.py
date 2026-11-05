@@ -1,11 +1,13 @@
-"""Resuming a run that a restart or a shutdown of the daemon cut off, or the end of the ``dotx`` command that drove it.
+"""Resuming a run that a restart or a shutdown of the daemon cut off, or the end of the ``dotx`` command that drove it,
+and handing the same note to a run that was blocked or failed, or that the owner said to continue.
 
 A resumed run is a new run on the same thread, of source :data:`RESUME_SOURCE`, with the goal, mode, model, reasoning
 effort, approval mode and goal mode of the run it resumes. Its first message to the model is a note
-(:func:`resume_note`): how that run was cut off, its goal, the calls of the step it was in, and its plan, which the
-resumed run takes over. Each call of that step is told apart by how it ended, from the run's events (it finished, it was
-cut off while it ran, or it had not started), and by its policy kind, from its tool's ``prepare``, which classifies a
-call and runs nothing: a call whose tool only reads may run again, any other may have changed something.
+(:func:`resume_note`): how that run stopped, its goal, the calls of the step it was in, and its plan, which the
+resumed run takes over. The note is that message, not a change to the system prompt. Each call of that step is told
+apart by how it ended, from the run's events (it finished, it was cut off while it ran, or it had not started), and by
+its policy kind, from its tool's ``prepare``, which classifies a call and runs nothing: a call whose tool only reads
+may run again, any other may have changed something.
 
 By hand, any run that :func:`can_resume` allows can be resumed. With ``[agent] resume = "safe"`` the daemon also resumes
 on its own, when it starts, the runs that :func:`resumes_on_start` allows. Every function here is pure except
@@ -19,6 +21,7 @@ from typing import Literal
 from pydantic import JsonValue
 
 from dotagent.agent.compact import pending_calls
+from dotagent.agent.continuity import named_ids
 from dotagent.agent.plan import PlanPayload, plan_lines
 from dotagent.agent.progress import can_ask_user, question_mode
 from dotagent.agent.verify import new_facts
@@ -30,6 +33,7 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import ToolCall
 from dotagent.policy.types import READ_ONLY_KINDS, ActionInfo, ActionKind
 from dotagent.runtime import Runtime
+from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
 from dotagent.skills.types import SKILL_TOOL
 from dotagent.store.endings import classify_ending
@@ -70,6 +74,16 @@ _ARGUMENTS_CHARS: int = 200
 _RESULT_CHARS: int = 300
 
 type CutOff = Literal["daemon_restarted", "daemon_shutdown", "process_ended", "process_died"]
+# A run the owner can go on from: a cut-off, one that is blocked, one that failed, or one they said to continue.
+type HandOff = Literal[
+    "daemon_restarted",
+    "daemon_shutdown",
+    "process_ended",
+    "process_died",
+    "blocked",
+    "failed",
+    "continued",
+]
 type CallEnd = Literal["succeeded", "failed", "cut_off", "not_started"]
 
 _CUT_OFF_TEXT: dict[CutOff, str] = {
@@ -79,6 +93,11 @@ _CUT_OFF_TEXT: dict[CutOff, str] = {
         "the dotx command that drove it was told to end while it ran (its terminal was closed, or it got SIGTERM)"
     ),
     "process_died": "the dotx command that drove it died while it ran (it was killed, or it crashed)",
+}
+_HANDOFF_TEXT: dict[HandOff, str] = {
+    "blocked": "The run that worked on this goal is blocked.",
+    "failed": "The run that worked on this goal failed.",
+    "continued": "The owner said to continue the run that worked on this goal.",
 }
 
 
@@ -96,14 +115,16 @@ class InterruptedCall(FrozenModel):
 
 
 class Resumption(FrozenModel):
-    """What a resumed run takes over from the run it resumes: how that run was cut off, the calls of the step it was in
-    and its plan with its targets. ``automatic`` is true when the daemon resumed it on its own."""
+    """What a resumed run takes over from the run it resumes: how that run stopped (a cut-off, or blocked, failed or
+    continued), the calls of the step it was in and its plan with its targets. ``automatic`` is true when the daemon
+    resumed it on its own. ``identities`` are the ledger ids a compaction kept, empty when the thread has none."""
 
     from_run_id: str
-    cut_off: CutOff
+    cut_off: HandOff
     automatic: bool
     calls: tuple[InterruptedCall, ...]
     plan: PlanPayload
+    identities: tuple[str, ...] = ()
 
 
 def cut_off_by(run: RunRecord) -> CutOff | None:
@@ -124,18 +145,28 @@ def cut_off_by(run: RunRecord) -> CutOff | None:
             return None
 
 
+def handoff_of(run: RunRecord) -> HandOff | None:
+    """Why a new run on ``run``'s thread is handed its goal, its last step and its plan: it was cut off, it is blocked,
+    or it failed. ``None`` for a run the owner stopped, one that ended done, a session of a campaign (the campaign's
+    next session carries that) and a scheduled run (its firing is the schedule's own session)."""
+    if run.parent_run_id is not None or run.campaign_id is not None or run.source == SCHEDULE_SOURCE:
+        return None
+    cut: CutOff | None = cut_off_by(run)
+    if cut is not None:
+        return cut
+    if run.status == "blocked":
+        return "blocked"
+    if run.status == "failed":
+        return "failed"
+    return None
+
+
 def can_resume(run: RunRecord, newest_run_id: str | None) -> bool:
-    """Whether ``run`` may be resumed: it was cut off (:func:`cut_off_by`), no other run started it, and it is the
-    newest run still in its thread (``newest_run_id``, ``None`` once a rewind took them all out), so nothing went on
-    after it there. A run the owner stopped is never
-    resumed, nor is a
-    session of a campaign: the campaign goes on with its next session, whose brief says that this one was cut off."""
-    return (
-        run.parent_run_id is None
-        and run.campaign_id is None
-        and run.id == newest_run_id
-        and cut_off_by(run) is not None
-    )
+    """Whether ``run`` may be resumed: it was cut off, it is blocked, or it failed (:func:`handoff_of`), no other run
+    started it, and it is the newest run still in its thread (``newest_run_id``, ``None`` once a rewind took them all
+    out), so nothing went on after it there. A run the owner stopped is never resumed, nor is a session of a campaign
+    or a scheduled run."""
+    return run.id == newest_run_id and handoff_of(run) is not None
 
 
 def repeatable(call: InterruptedCall) -> bool:
@@ -156,6 +187,7 @@ def resumes_on_start(run: RunRecord, newest_run_id: str | None, calls: Sequence[
     for the owner, and so does a resumed run: a run that brings the daemon down is not resumed again and again."""
     return (
         run.source == UI_SOURCE
+        and cut_off_by(run) is not None
         and can_resume(run, newest_run_id)
         and all(repeatable(call) for call in calls if call.end == "cut_off")
     )
@@ -180,12 +212,20 @@ def _call_line(call: InterruptedCall) -> str:
 
 
 def resume_note(goal: str, resumption: Resumption) -> str:
-    """The first message of a resumed run: how the run it resumes was cut off, its goal, the calls of the step it was in
-    and its plan, and to go on from where it stopped."""
-    parts: list[str] = [
-        f"[system note] The run that worked on this goal was cut off: {_CUT_OFF_TEXT[resumption.cut_off]}. You go on "
-        f"with it; the conversation above holds every step it took. Its goal:\n{goal}"
-    ]
+    """The first message of a resumed run: how the run it resumes stopped, its goal, the calls of the step it was in
+    and its plan, the ledger ids a compaction kept, and to go on from where it stopped. A cut-off uses the words it
+    always has. The note is the opening message, not part of the system prompt."""
+    if resumption.cut_off in _CUT_OFF_TEXT:
+        lead: str = (
+            f"[system note] The run that worked on this goal was cut off: {_CUT_OFF_TEXT[resumption.cut_off]}. You go "
+            f"on with it; the conversation above holds every step it took. Its goal:\n{goal}"
+        )
+    else:
+        lead = (
+            f"[system note] {_HANDOFF_TEXT[resumption.cut_off]} You go on with it; the conversation above holds every "
+            f"step it took. Its goal:\n{goal}"
+        )
+    parts: list[str] = [lead]
     if resumption.calls:
         parts.append(
             "The calls of the step it was in, which the conversation shows as interrupted:\n"
@@ -193,11 +233,27 @@ def resume_note(goal: str, resumption: Resumption) -> str:
         )
     if resumption.plan.steps:
         parts.append(f"Its plan, which is your plan now:\n{plan_lines(resumption.plan)}")
+    if resumption.identities:
+        parts.append(
+            "Ids of Dot's records named so far, which a compaction keeps (read one back with recall): "
+            + ", ".join(resumption.identities)
+        )
     parts.append(
         "Pick up where it left off: do not redo what is done, check what a call that was cut off may have changed, and "
         "finish the goal."
     )
     return "\n\n".join(parts)
+
+
+def identities_of(messages: Sequence[str]) -> tuple[str, ...]:
+    """The ledger ids of the newest continuity note among ``messages`` (newest last in the thread, so the last note
+    wins). Empty when the thread was not compacted, or the note names none."""
+    found: tuple[str, ...] = ()
+    for text in messages:
+        named: tuple[str, ...] = named_ids(text)
+        if named:
+            found = named
+    return found
 
 
 def resumed_event_data(resumption: Resumption) -> JsonObject:

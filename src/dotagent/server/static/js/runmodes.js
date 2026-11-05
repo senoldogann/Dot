@@ -1,9 +1,10 @@
 // The two choices of a run besides its goal: who answers the questions the safety policy raises (approvals) and whether a
-// checker keeps the run working until its goal is really reached (goal mode). The daemon has a default for both. A choice
-// made on the home page is kept per browser and goes with every run started from there until it is changed again; a person
-// who never chose anything leaves both to the daemon. On a chat's page the choices start from the open run's and are held
-// by the page for the next follow-up (item 133). A third switch makes a task a campaign (Keep going until done); it is
-// chosen for one goal, so it is never kept.
+// checker keeps the run working until its goal is really reached (goal mode). The daemon has a default for both. Goal
+// mode's packaged default is on for a task or research run and off for a chat. A choice made on the home page is kept
+// per browser and goes with every run started from there until it is changed again; a person who never chose anything
+// leaves both to the daemon. On a chat's page the choices start from the open run's and are held by the page for the
+// next follow-up (item 133). A third switch makes a task a campaign (Keep going until done); it is chosen for one goal,
+// so it is never kept.
 
 import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
@@ -12,6 +13,10 @@ import { getSnapshot } from "./state.js";
 
 const APPROVALS_KEY = "dot.approvals";
 const GOAL_MODE_KEY = "dot.goalMode";
+// What the switch shows before the daemon's status arrives, and what a task or research run uses when this browser
+// never chose: the packaged default. A chat hides the switch. The value sent with a run stays null until a person
+// toggles it, so a later change of the daemon's default still applies.
+const GOAL_MODE_DEFAULT = true;
 
 // The approval modes, strictest first (item 398), each with its name, the shorter one the Options pill wears, what it
 // does and its icon. "ask" keeps its id, so the choices kept under it hold as they were.
@@ -229,8 +234,15 @@ export function standingPicker(onToggle) {
  */
 export function goalModePicker(kept) {
   function shown() {
+    const chosen = kept.read();
+    if (chosen !== null && chosen !== undefined) {
+      return chosen;
+    }
     const { status } = getSnapshot();
-    return kept.read() ?? status?.goal_mode === true;
+    if (status == null) {
+      return GOAL_MODE_DEFAULT;
+    }
+    return status.goal_mode === true;
   }
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Goal mode" });
   const element = switchRow(pick("Goal mode", toggle, "Keep working until the goal is reached"), toggle);

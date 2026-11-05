@@ -48,7 +48,7 @@ _AGENT: dict[str, object] = {
 async def served(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[tuple[RunManager, httpx.AsyncClient]]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        '[browser]\nheadless = true\n\n[agent]\nlessons = "off"\nplaybooks = false\n\n'
+        '[browser]\nheadless = true\n\n[agent]\ngoal_mode = false\nlessons = "off"\nplaybooks = false\n\n'
         f'[models]\nmain = "{SCRIPTED_MODEL}"'
         "\n\n[memory]\nembed_enabled = false\n",
         encoding="utf-8",

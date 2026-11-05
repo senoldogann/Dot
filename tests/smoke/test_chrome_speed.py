@@ -237,7 +237,7 @@ def _task_home(tmp_path: Path) -> Path:
     home.mkdir()
     (home / "config.toml").write_text(
         f'[browser]\nmode = "attach"\nheadless = true\nattach_timeout_s = 20.0\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n'
-        '\n[memory]\nembed_enabled = false\n\n[agent]\nlessons = "off"\nplaybooks = false\n',
+        '\n[memory]\nembed_enabled = false\n\n[agent]\ngoal_mode = false\nlessons = "off"\nplaybooks = false\n',
         encoding="utf-8",
     )
     return home
@@ -288,7 +288,7 @@ async def test_a_task_of_ten_steps_through_the_loop(chrome: ScratchChrome, site:
                     "standard",
                     None,
                     "yolo",
-                    None,
+                    False,
                     (),
                 )
                 async with asyncio.timeout(_RUN_WAIT_S):

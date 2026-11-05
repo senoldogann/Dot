@@ -114,7 +114,7 @@ def replies(the_replies: Replies) -> Replies:
 async def runtime(tmp_path_factory: pytest.TempPathFactory, the_replies: Replies) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\nlessons = "off"\n'
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false\nlessons = "off"\n'
         "playbooks = false\n\n[memory]\nembed_enabled = false\n",
         encoding="utf-8",
     )
@@ -470,7 +470,7 @@ async def test_a_run_of_another_chat_is_not_told_on_the_channel(
     replies.push(finish("Typed in the web UI."))
     before: int = len(wired.channel.sent)
     run: RunRecord = await manager.start(
-        "a goal typed in the page", "task", None, None, "ui", None, None, "standard", None, None, None, ()
+        "a goal typed in the page", "task", None, None, "ui", None, None, "standard", None, None, False, ()
     )
     await manager.wait(run.id)
     await asyncio.sleep(0.3)
@@ -1349,10 +1349,10 @@ async def test_a_run_typed_in_the_page_or_in_another_chat_tells_no_progress(
     replies.push(finish("Typed in the page."), finish("In another chat."))
     replies.gate = asyncio.Event()
     typed: RunRecord = await manager.start(
-        "typed in the chat of the channel", "task", None, thread.id, "ui", None, None, "standard", None, None, None, ()
+        "typed in the chat of the channel", "task", None, thread.id, "ui", None, None, "standard", None, None, False, ()
     )
     other: RunRecord = await manager.start(
-        "typed in another chat", "task", None, None, "ui", None, None, "standard", None, None, None, ()
+        "typed in another chat", "task", None, None, "ui", None, None, "standard", None, None, False, ()
     )
     await _quiet_for_a_moment()
     clock.now = 7016.0

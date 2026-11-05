@@ -60,6 +60,7 @@ from dotagent.llm.types import ChatProvider, ModelInfo
 from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
 from dotagent.mcp.builtin import builtin_servers, switch_of, web_research_installed
 from dotagent.mcp.launch import referenced_secrets
+from dotagent.mcp.types import LeftOutTool
 from dotagent.memory.embedder import OpenAIEmbedder, build_openai_embedder
 from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import PluginCatalog, PluginProblem
@@ -751,6 +752,21 @@ async def mcp_checks(
     return list(
         await asyncio.gather(*(_mcp_server_row(server, login_path, server.name in built_in) for server in servers))
     )
+
+
+def left_out_checks(omitted: Sequence[LeftOutTool]) -> list[CheckResult]:
+    """One warn row per tool ``usable_tools`` dropped, by its name and the reason the log already carries. The running
+    daemon's doctor (``GET /api/doctor``) adds these rows from the hub, and ``check_line`` is how ``dotx doctor``
+    prints a row. ``dotx doctor`` itself does not start servers. The tool is not added to the model registry."""
+    return [
+        _result(
+            f"mcp {item.server}/{item.tool}",
+            False,
+            False,
+            f"left out {item.tool}: {item.reason}",
+        )
+        for item in omitted
+    ]
 
 
 def _left_out(problems: Sequence[PluginProblem] | Sequence[SkillProblem]) -> str:

@@ -251,11 +251,12 @@ function wayRow(catalogue, way) {
  * way with its step; the tools of its servers; and where its data goes.
  */
 function serviceParts(catalogue, plugin) {
-  const tools = plugin.ways
+  const mcpServers = plugin.ways
     .filter((way) => way.kind === "mcp")
     .map((way) => catalogue.wayNow(way).server)
-    .filter((server) => server !== null && server.tools.length > 0)
-    .flatMap((server) => server.tools);
+    .filter((server) => server !== null);
+  const tools = mcpServers.filter((server) => server.tools.length > 0).flatMap((server) => server.tools);
+  const leftOut = mcpServers.flatMap((server) => server.left_out ?? []);
   const does = [...new Set(plugin.ways.map((way) => way.does).filter((line) => line !== null))];
   const data = plugin.ways.filter((way) => way.data !== null);
   const named = (way, text) => (data.length > 1 ? `${WAY_NAMES[way.kind]}: ${text}` : text);
@@ -271,6 +272,18 @@ function serviceParts(catalogue, plugin) {
     does.length < 2 ? null : card("does", "What Dot does with it", "sparkle", el("ul", { class: "plugin-list" }, does.map((line) => el("li", null, line)))),
     card("ways", "How it connects", "link", plugin.ways.map((way) => wayRow(catalogue, way))),
     tools.length === 0 ? null : card("tools", "Actions", "bolt", el("ul", { class: "plugin-list plugin-tools mono" }, tools.map((name) => el("li", null, name)))),
+    leftOut.length === 0
+      ? null
+      : card(
+          "left-out",
+          "Not offered",
+          "alert",
+          el(
+            "ul",
+            { class: "plugin-list" },
+            leftOut.map((item) => el("li", null, el("span", { class: "mono" }, item.name), `: ${item.reason}`)),
+          ),
+        ),
     data.length === 0 ? null : card("data", "Where its data goes", "shield", el("ul", { class: "plugin-list" }, data.map((way) => el("li", null, named(way, way.data))))),
   ];
   return parts.filter((part) => part !== null);

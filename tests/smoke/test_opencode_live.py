@@ -115,7 +115,7 @@ async def _run(
     runtime: Runtime, manager: RunManager, goal: str, model: str, thread_id: str | None, approve: bool
 ) -> tuple[RunRecord, list[ApprovalRecord], list[EventRecord]]:
     run: RunRecord = await manager.start(
-        goal, "task", model, thread_id, "test", None, None, "standard", None, "ask", None, ()
+        goal, "task", model, thread_id, "test", None, None, "standard", None, "ask", False, ()
     )
     asked: list[ApprovalRecord] = []
     answering: asyncio.Task[None] = asyncio.create_task(_answer_each_question(runtime, run.id, approve, asked))
@@ -293,7 +293,7 @@ async def test_a_message_reaches_the_agent_at_work_and_stop_stops_it(
         "standard",
         None,
         "ask",
-        None,
+        False,
         (),
     )
     asked: ApprovalRecord = await _asked_of_the_owner(runtime, run.id)
@@ -316,7 +316,7 @@ async def test_a_message_reaches_the_agent_at_work_and_stop_stops_it(
         "standard",
         None,
         "ask",
-        None,
+        False,
         (),
     )
     await _asked_of_the_owner(runtime, stopped.id)

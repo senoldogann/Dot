@@ -105,7 +105,7 @@ async def _served(home: Path, openai: str) -> AsyncIterator[str]:
         f'organization_env = "{UNSET}"\nproject_env = "{UNSET}"\n\n'
         f'[providers.anthropic]\napi_key_env = "{UNSET}"\n\n'
         f'[providers.opencode_go]\napi_key_env = "{UNSET}"\n\n'
-        f'[providers.ollama]\napi_key_env = "{UNSET}"\n',
+        f'[providers.ollama]\napi_key_env = "{UNSET}"\n\n[agent]\ngoal_mode = false',
         encoding="utf-8",
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))

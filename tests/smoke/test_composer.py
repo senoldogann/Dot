@@ -96,7 +96,7 @@ _HARBOUR_PNG: str = (
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false', encoding="utf-8"
     )
     (home / "skills" / "scan-catalogue").mkdir(parents=True)
     (home / "skills" / "scan-catalogue" / "SKILL.md").write_text(SKILL, encoding="utf-8")
