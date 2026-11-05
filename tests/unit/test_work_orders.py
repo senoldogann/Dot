@@ -92,7 +92,7 @@ class _Runs:
             if not end.done():
                 await self.finish(run_id, "cancelled", "Stopped.")
 
-    def tell(self, run_id: str, text: str, reaction: str | None, *, taints: bool = False) -> None:
+    def note(self, run_id: str, text: str, taints: bool) -> None:
         self.told.append((run_id, text, taints))
 
     def active_run_ids(self) -> list[str]:
