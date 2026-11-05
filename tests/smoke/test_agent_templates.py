@@ -67,6 +67,11 @@ IMPORT_TITLE: str = "Make an agent from a file exported from Dot"
 EXPORT_TITLE: str = "Save the agent as a file, to import into another Dot"
 
 
+async def _more(page: Page) -> None:
+    """Open the "…" of an agent's page, which holds Export among its choices (item 993)."""
+    await page.locator(".stage-tools").get_by_role("button", name=re.compile(r"^More for ")).click()
+
+
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def login_env() -> dict[str, str]:
     return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
@@ -338,6 +343,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await page.goto(f"{address}/#/agents/{outbound.id}")
                 await expect(page.locator(".agent-who .home-name")).to_have_text("Sales Outbound")
                 async with page.expect_download() as downloading:
+                    await _more(page)
                     await page.get_by_title(EXPORT_TITLE).click()
                 download: Download = await downloading.value
                 assert download.suggested_filename == "sales-outbound.dot-agent.json"
@@ -362,6 +368,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 page.on("download", kept)
                 await page.goto(f"{address}/#/agents/{secret_agents['Keyed']}")
                 await expect(page.locator(".agent-who .home-name")).to_have_text("Keyed")
+                await _more(page)
                 await page.get_by_title(EXPORT_TITLE).click()
                 await expect(_toast(page, "error", "looks like a secret; take it out")).to_be_visible()
                 await page.wait_for_timeout(500)
@@ -407,9 +414,10 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 assert _profile(imported) == profile
                 assert imported.id == phone.url.rpartition("/")[2]
                 assert imported.made_by is None
-                # The bar of the agent's page keeps Edit, Export and Delete inside a phone's width.
+                # The bar of the agent's page keeps its "…" (Edit, Export, Pause and Delete, item 993) inside a phone's
+                # width.
                 tools_bar: Locator = phone.locator(".stage-tools")
-                await expect(tools_bar.get_by_title(EXPORT_TITLE)).to_be_visible()
+                await expect(tools_bar.get_by_role("button", name=re.compile(r"^More for "))).to_be_visible()
                 bar = await tools_bar.bounding_box()
                 assert bar is not None and bar["x"] + bar["width"] <= 390
                 assert await _overflow(phone) <= 0

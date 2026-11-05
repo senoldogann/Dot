@@ -30,6 +30,7 @@ from dotagent.agent.templates import (
     find_template,
     with_answers,
 )
+from dotagent.agent.welcome import WELCOME_SOURCE, welcome_goal
 from dotagent.core.errors import InvalidValueError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
@@ -44,6 +45,7 @@ from dotagent.server.views import (
     AgentRequest,
     AgentSummary,
     AgentUsage,
+    AgentWelcomeRequest,
     TeamMessage,
     TeamUse,
     TeamView,
@@ -54,6 +56,7 @@ from dotagent.store.db import Store
 from dotagent.store.models import (
     DOT_AGENT,
     DOT_AGENT_ID,
+    NO_PICKS,
     OPEN_WORK_ORDERS,
     AgentLook,
     AgentRecord,
@@ -600,6 +603,32 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         if agent_id == DOT_AGENT_ID:
             raise InvalidValueError("Dot is not an agent to resume", {"agent_id": agent_id})
         return await store.set_agent_paused(agent_id, None)
+
+    @router.post("/agents/{agent_id}/welcome", status_code=201)
+    async def welcome_agent(agent_id: str, request: AgentWelcomeRequest) -> RunRecord:
+        """Start the first meeting of an agent the owner has just made (item 993): it greets them in its role, in their
+        language, and asks what they want from it. An agent that has had a chat already has met them (409), and Dot
+        has its own first conversation (item 420)."""
+        if agent_id == DOT_AGENT_ID:
+            raise InvalidValueError("Dot has a first conversation of its own", {"agent_id": agent_id})
+        agent: AgentRecord = await store.get_agent(agent_id)
+        if await store.agent_runs(agent_id, 1):
+            raise RunConflict("the agent has met you already: it has a chat", {"agent_id": agent_id})
+        return await ctx.manager.start_for_agent(
+            agent,
+            welcome_goal(agent, request.language),
+            "chat",
+            None,
+            None,
+            WELCOME_SOURCE,
+            None,
+            "standard",
+            None,
+            None,
+            None,
+            (),
+            NO_PICKS,
+        )
 
     @router.delete("/agents/{agent_id}", status_code=204)
     async def delete_agent(agent_id: str) -> None:

@@ -34,6 +34,9 @@ const FINISHED = new Set(["done", "failed", "cancelled"]);
 export const RESUME_SOURCE = "resume";
 // The source of a run that tells the chat that its command in the background ended (item 229).
 export const BACKGROUND_SOURCE = "background";
+// The source of an agent's first meeting with the owner (item 993, agent/welcome.py): its goal is Dot's words for that
+// meeting, not the owner's, so the conversation draws none.
+export const WELCOME_SOURCE = "welcome";
 
 /** Whether `run` follows up a reaction of yours (item 844): its goal is Dot's words for the reaction, which stands as a
  * chip on the message reacted to, so the conversation draws no message of yours for it, as a messaging app sends none.
@@ -376,7 +379,7 @@ function turn(past, editFromHereOf, known, signal, reactions) {
   const answer = ended
     ? answerMessage({ actorId: past.agent_id ?? "dot", status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href: null, reactions, runId: past.id })
     : el("div", { class: "note" }, icon("clock"), el("span", null, "This task is still going."), el("a", { class: "small", href }, "Open task"));
-  const asked = followsReaction(past)
+  const asked = followsReaction(past) || past.source === WELCOME_SOURCE
     ? null
     : past.source === RESUME_SOURCE
       ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, "Continued where the task above was cut off"))

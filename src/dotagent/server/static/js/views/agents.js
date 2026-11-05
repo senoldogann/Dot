@@ -17,6 +17,7 @@ import { ago, clip, compact, el, modelName, plural, setText, switchRow } from ".
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
+import { openMenu } from "../menu.js";
 import { mountOffice } from "../office/office.js";
 import { readFolds, readPref, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
@@ -614,6 +615,18 @@ export function agentForm({ record, onSaved, onCancel }) {
 // while the app is open.
 let shownPane = "teams";
 
+/** The language the owner reads, named in English for the agent ("Turkish"): the browser's own. */
+function ownerLanguage() {
+  const code = (navigator.language || "en").split("-")[0];
+  return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;
+}
+
+/** Start the first meeting of the agent `record` just made, and open its chat (item 993). */
+async function meet(record, ctx) {
+  const run = await api.post(`/agents/${encodeURIComponent(record.id)}/welcome`, { language: ownerLanguage() });
+  ctx.navigate(`/runs/${run.id}`);
+}
+
 function mountList(root, ctx) {
   let disposed = false;
   let ticket = 0;
@@ -954,7 +967,9 @@ function mountList(root, ctx) {
     closeEditor();
     editor = agentForm({
       record: null,
-      onSaved: (saved) => ctx.navigate(`/agents/${saved.id}`),
+      // An agent just made meets you at once in its first chat (item 993): it greets you in its role and asks what you
+      // want from it.
+      onSaved: (saved) => attempt(() => meet(saved, ctx)),
       onCancel: closeEditor,
     });
     editorSlot.replaceChildren(editor.element);
@@ -1526,23 +1541,33 @@ function mountPage(root, ctx, agentId) {
     setStageTools(
       // The Trader's page opens the trading desk (item 847).
       isTrader(record) ? el("a", { class: "btn ghost sm", href: TRADING_DESK, title: "Open the trading desk" }, icon("trendingUp"), el("span", { class: "label" }, "Trading desk")) : null,
-      el("button", { class: "btn ghost sm", type: "button", title: "Edit the agent", onclick: () => edit(record) }, icon("pencil"), el("span", { class: "label" }, "Edit")),
-      el("button", { class: "btn ghost sm", type: "button", title: "Save the agent as a file, to import into another Dot", onclick: () => attempt(() => exportAgent(record)) }, icon("download"), el("span", { class: "label" }, "Export")),
-      record.paused_at === null
-        ? el(
-            "button",
-            { class: "btn ghost sm", type: "button", title: "Pause the agent: its schedules start nothing by themselves until you resume it", onclick: () => attempt(() => setPaused(record, true)) },
-            icon("pause"),
-            el("span", { class: "label" }, "Pause"),
-          )
-        : el(
-            "button",
-            { class: "btn ghost sm", type: "button", title: "Resume the agent: its schedules start again", onclick: () => attempt(() => setPaused(record, false)) },
-            icon("play"),
-            el("span", { class: "label" }, "Resume"),
-          ),
-      el("button", { class: "btn ghost sm", type: "button", title: "Delete the agent", onclick: () => attempt(() => remove(record)) }, icon("trash"), el("span", { class: "label" }, "Delete")),
+      // What the agent's page can do of it stands in one "…" (item 993, the owner's ask for a plain page): four buttons
+      // of a row were a toolbar on a phone.
+      agentMenuButton(record),
     );
+  }
+
+  function agentMenuButton(record) {
+    const button = el("button", { class: "icon-btn", type: "button", title: `More for ${record.name}`, "aria-label": `More for ${record.name}`, "aria-haspopup": "menu" }, icon("ellipsis"));
+    button.addEventListener("click", () => {
+      const box = button.getBoundingClientRect();
+      openMenu({
+        label: `More for ${record.name}`,
+        at: { x: box.right - 200, y: box.bottom + 4 },
+        back: button,
+        button,
+        items: [
+          { label: "Edit", icon: "pencil", run: () => edit(record) },
+          { label: "Export", icon: "download", title: "Save the agent as a file, to import into another Dot", run: () => attempt(() => exportAgent(record)) },
+          record.paused_at === null
+            ? { label: "Pause", icon: "pause", title: "Its schedules start nothing by themselves until you resume it", run: () => attempt(() => setPaused(record, true)) }
+            : { label: "Resume", icon: "play", title: "Its schedules start again", run: () => attempt(() => setPaused(record, false)) },
+          "separator",
+          { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => remove(record)) },
+        ],
+      });
+    });
+    return button;
   }
 
   /** Pause the agent or resume it (item 465), then show the page as the daemon has it. */

@@ -88,7 +88,12 @@ browser has chosen for the home's box; the mode starts on Auto, as the home's do
 `/auto`, `/task`, `/chat` and `/research` name one (item 513); the mode, model, reasoning level and approvals chosen
 there go with that message, in place of the agent's own for that run, and leave the home's choices as they were. Fast
 mode and goal mode are the home's own, shared with it in this browser: the agent has no bounds for them, and turning one
-on there turns it on in the home's box too. The home composer offers an Agent menu once an agent exists, Dot by default.
+on there turns it on in the home's box too. The home composer offers an Agent menu once an agent exists, Dot by default. An agent made with **Create agent** meets
+you at once (item 993, `POST /api/agents/<id>/welcome` with the language your browser reads): its first chat opens,
+where it greets you in one sentence in its role and in your language and asks you, with a few choices and room for
+your own words, what you want from it most; the goal Dot gives that meeting (a run of source `welcome`) is not drawn
+as a message of yours. An agent that has had a chat has met you already (409), and Dot has its own first conversation
+(item 420).
 A run of an agent opens its system prompt with the agent's own section ("You are Scout, an agent the owner made: ..."
 and your instructions), ahead of Dot's rules, which still hold; its tools are the ones the agent names plus finishing,
 asking you and turning tool groups on, and the tools of an MCP server you pick for its message, or picked for an earlier
@@ -106,8 +111,9 @@ in its form. The dialog says how many of them it switches off: the ones on. A me
 (item 899): it would start as Dot. No agent takes Dot's name, made by you or by a run, nor is a run's agent made with
 a secret Dot holds in its words: they are masked (item 899), and the card that asks you whether to make one shows its
 tools, its model, what it never does and its instructions, not its name and role alone. The bar of an agent's page names the agent
-as the page's heading, as the tab does ("Scout · Agents · Dot"), and Edit opens the editor at the top of the page, not
-where the greeting stood. **Pause** in the bar (item 465; `POST /api/agents/<id>/pause`, and `/resume`) keeps the
+as the page's heading, as the tab does ("Scout · Agents · Dot"), and holds one **…** (item 993) with **Edit**,
+**Export**, **Pause** (or **Resume**) and **Delete**. Edit opens the editor at the top of the page, not
+where the greeting stood. **Pause** (item 465; `POST /api/agents/<id>/pause`, and `/resume`) keeps the
 agent's schedules from starting anything by themselves until **Resume**: the list and the page say "Paused", and its
 schedules' rows "<name> is paused" (see [Memory and schedules](memory-and-schedules.md)). What you send the agent, **Run
 now** of one of its schedules and the messages of other agents still reach it, and runs already working go on, each with
@@ -158,7 +164,7 @@ card is drawn with it off again. An agent's page lists the schedules its runs ru
 goal in full, when it runs and its switch, and **Edit** on the Schedules page; an agent with the name of a template that
 suggests a schedule, and without that schedule (made before, kept by Use team, or its schedule deleted), is offered it
 there, **Suggested by its template** with **Add it**, which adds it switched off (item 722). An agent's page has
-**Export** in its bar: a file `<name>.dot-agent.json` with the agent's name, role, instructions, what it never does,
+**Export** in its **…**: a file `<name>.dot-agent.json` with the agent's name, role, instructions, what it never does,
 model, reasoning level, approvals, tools and look (`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An
 agent whose name, role or instructions hold a secret is not exported, and the page says to take it out first: a value
 Dot holds (any value of the home's `.env`, and a key the daemon has read from the Keychain), or a key, a token or a

@@ -4,6 +4,7 @@ due, and fires once the agent is resumed; Run now and the owner's own messages s
 cannot be read fires nothing; the pause is kept by the editor's Save; and the agents and schedules pages say it."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
@@ -343,8 +344,11 @@ async def test_the_pages_say_an_agent_is_paused_and_pause_turns_into_resume(
                 )
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"http://127.0.0.1:{port}/#/agents/{resting.id}")
-                await page.get_by_role("button", name="Pause").click()
-                await expect(page.get_by_role("button", name="Resume")).to_be_visible()
+                # Pause and Resume stand in the "…" of the agent's page (item 993).
+                more: Locator = page.locator(".stage-tools").get_by_role("button", name=re.compile(r"^More for "))
+                await more.click()
+                await page.get_by_role("menuitem", name="Pause").click()
+                await expect(page.locator(".agent-paused")).to_be_visible()
                 await expect(page.locator(".agent-paused")).to_contain_text("your messages here still go through")
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"paused-{width}-{scheme}.png"), full_page=True)
@@ -355,8 +359,12 @@ async def test_the_pages_say_an_agent_is_paused_and_pause_turns_into_resume(
                 scheduled: Locator = page.locator(f'[data-schedule="{schedule.id}"]')
                 await expect(scheduled.locator(".badge", has_text="Rester is paused")).to_be_visible()
                 await page.goto(f"http://127.0.0.1:{port}/#/agents/{resting.id}")
-                await page.get_by_role("button", name="Resume").click()
-                await expect(page.get_by_role("button", name="Pause")).to_be_visible()
+                await more.click()
+                await page.get_by_role("menuitem", name="Resume").click()
+                await expect(page.locator(".agent-paused")).to_have_count(0)
+                await more.click()
+                await expect(page.get_by_role("menuitem", name="Pause")).to_be_visible()
+                await page.keyboard.press("Escape")
                 await expect(page.locator(".agent-paused")).to_have_count(0)
                 await page.close()
         finally:

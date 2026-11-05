@@ -1145,7 +1145,8 @@
     box-shadow: none;
   }
 
-  /* Its head: the close where the bar's way back stands, then Dot's name in large type. */
+  /* Its head: the close where the bar's way back stands (on a touch screen none), your initials, the pages and the "+"
+     (item 991). */
   .side-head {
     gap: 12px;
     padding: 8px 16px 4px 8px;
@@ -1213,7 +1214,7 @@
     border-top: 1px solid var(--border);
   }
 
-  /* The foot under the thumb: Settings and a new chat in round buttons either side of the search, a pill. */
+  /* The foot under the thumb: the apps in a round button beside the search, a pill (item 991). */
   .side-foot {
     flex-wrap: nowrap;
     gap: 8px;

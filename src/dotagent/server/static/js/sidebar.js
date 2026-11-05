@@ -31,6 +31,14 @@ import { requestCompose } from "./shortcuts.js";
 import { onLifecycle, onStreamBack, readFailed } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
 
+// What a reader sees as a word's first character: a letter with its marks, an emoji made of several (item 991).
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** The first character of `word` as a reader sees it. */
+function firstGrapheme(word) {
+  return GRAPHEMES.segment(word)[Symbol.iterator]().next().value?.segment ?? "";
+}
+
 // The chats listed at first, the step by which "Show older chats" lists more, and the most the API lists at once.
 const LIST_LIMIT = 200;
 const LIST_CAP = 500;
@@ -1604,7 +1612,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function paintOwner() {
     const words = shownOwner().split(/\s+/).filter((word) => word !== "");
     // A word's first character whole, a letter outside the Basic Multilingual Plane too.
-    const initials = words.slice(0, 2).map((word) => [...word][0].toLocaleUpperCase()).join("");
+    const initials = words
+      .slice(0, 2)
+      .map((word) => firstGrapheme(word).toLocaleUpperCase())
+      .join("");
     ownerInitials.replaceChildren(initials === "" ? icon("user") : initials);
   }
   paintOwner();
@@ -1613,7 +1624,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     "a",
     // A chat with Dot starts from its face, as every other way to Dot leads to New chat (views/agents.js): Dot has no
     // agent page of its own.
-    { class: "side-dot-hero", href: homeHref, onclick: onNavigate },
+    {
+      class: "side-dot-hero",
+      href: homeHref,
+      // As the "+": the composer takes the focus, on the home already too (the pre-push review of item 991).
+      onclick: () => {
+        requestCompose();
+        onNavigate();
+      },
+    },
     actorFace(DOT_ID, "idle", null),
     heroName,
   );
