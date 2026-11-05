@@ -243,6 +243,8 @@ function stepRow(step) {
           ...joined(stepMeta(step, facts, candidates, digest)),
         ),
         said === "" ? null : el("div", { class: "harness-said" }, said),
+        // The week's word (item 988): a proposal from the week's patterns, its trial on real runs, or how it ended.
+        typeof facts.week === "string" ? el("div", { class: "harness-said" }, facts.week) : null,
         // The test the night made of the owner's run (item 904): the one it kept, or why it kept none.
         typeof facts.task === "string" ? el("div", { class: "harness-said muted" }, `Own test: ${facts.task}`) : null,
       ),
@@ -430,10 +432,10 @@ function scheduleControl(view, onSchedule) {
 
 /**
  * What a night costs, in the words the page says it before the learning is switched on (item 721): since item 987 a
- * night reads Dot's own record of the day's real runs, and calls no model.
+ * night reads Dot's own record of the day's real runs, and calls no model; once a week, the proposer (item 988).
  */
 function nightCost() {
-  return "A night reads Dot's own record of the day's runs and calls no model: it costs nothing.";
+  return "A night reads Dot's own record of the day's runs and calls no model. Once a week, when a tool failed again and again across chats and days, Dot asks its proposer model (`[harness] proposer`, or the review model) for one new version and tries it on half of its real tasks; the version in use stays unless the trial shows the new one better.";
 }
 
 // The nights the page shows before "Show all" (item 938).

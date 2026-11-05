@@ -64,6 +64,7 @@ from dotagent.harness.service import (
     given_text,
     notes_of,
     notes_with,
+    prune_records,
     step_facts,
 )
 from dotagent.llm.opencode import OPENCODE_PROVIDER
@@ -72,7 +73,7 @@ from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import HarnessPruned, HarnessStep, HarnessStepState, HarnessVersion, RunRecord
+from dotagent.store.models import HarnessStep, HarnessStepState, HarnessVersion, RunRecord
 
 log = get_logger(__name__)
 
@@ -83,7 +84,6 @@ _OWNER_WORDS: dict[str, str] = {"adopted": "in use", "retired": "set aside"}
 # How far back the step looks for a run to learn from at most: from the last step that took one, or this far when none
 # did since (item 719: nights that only try the pool take none, and the runs meanwhile wait for the next that proposes).
 _LOOKBACK_S: float = 7 * 24 * 3600.0
-_DAY_S: float = 86400.0
 _SESSION: str = "harness:step"
 # What the roles answer under `dotx harness step --scripted` (:func:`scripted_role_turns`): the proposer proposes this
 # habit in the first scope and keeps in the others, the experience writer saw no effect, and the composer is never
@@ -782,22 +782,6 @@ async def _since_last_step(store: Store, now: float) -> float:
         if facts.get("scripted") is not True and facts.get("no_signal") is not True:
             return earlier.started_at
     return oldest
-
-
-async def prune_records(store: Store, config: HarnessConfig, now: float) -> None:
-    """Delete the loop's own records older than ``[harness] keep_days`` days before ``now``, but for the adopted version
-    and its lineage (:meth:`Store.prune_harness`, item 589): what a step or a night writes is bounded here, where it
-    grows (item 987). A store that refuses the deletion is logged and tried again by the next step or night, as nothing
-    else waits on it."""
-    if config.keep_days == 0:
-        return
-    try:
-        gone: HarnessPruned = await store.prune_harness(now - config.keep_days * _DAY_S)
-    except DotError as exc:
-        log.warning("harness_prune_failed", error=exc.message, context=exc.context)
-        return
-    if gone.versions or gone.steps or gone.probes or gone.experiences:
-        log.info("harness_pruned", keep_days=config.keep_days, **gone.model_dump())
 
 
 async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: Prober, scripted: bool) -> HarnessStep:

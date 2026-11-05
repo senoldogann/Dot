@@ -301,7 +301,7 @@ command line and the API read it; drawing it on the page is left for later).
 ### Tasks made of your own runs
 
 The pool is passed by a capable model under any text: from 2026-10-29 to 11-01 the probes passed 32 attempts of 34,
-and the candidate of each night, written to answer the run that went worst (a page on a local port it could not open,
+and the candidate of each step, written to answer the run that went worst (a page on a local port it could not open,
 an agent that failed and was left), came out the same as the base on tasks that had nothing to do with that run. So the
 step also makes a run of yours into a task of its own (item 904, `harness/tasks.py`, `harness/own.py`), as the
 evaluation guides advise: start from real failures. The run is the worst of those that read only what is Dot's and
@@ -321,33 +321,33 @@ yours (item 931, below), most often not the one the candidates answer.
   with why, as any role's answer. Then three plays through the scripted
   model, in throw-away homes and at no model's cost, prove it fair: its reference passes it, and both a run that does
   nothing and says it is done and one that does nothing and gives up fail it. A task that fails a play is not kept, and
-  the night's record says which play (`no task: a run that does nothing and claims it is done passes it`).
+  the step's record says which play (`no task: a run that does nothing and claims it is done passes it`).
 - **The task is written from the worst run that read only what is Dot's and the owner's** (item 931), not from the run
   the step learns from: of the runs a step weighs, the one that went worst among those that read no content third
   parties can author and that gave no task yet. A run that read such content is made into no task, and the writer is
   not asked about it: what it read could shape a task that a model then plays with a run's rights. On the owner's Mac
   80 of 97 runs of a week had read a page or a mail, the run the step learns from always among them, so the step had
   never written a task. A run is asked about once: a task refused or found unfair is not drafted and played again on a
-  later night.
-- **A night with nothing to tell a better text from luck proposes and plays nothing** (item 931): no task was written
-  tonight, none the loop wrote has headroom, and no task of the pool is *hard* (failed in more than a quarter of its
+  later step.
+- **A step with nothing to tell a better text from luck proposes and plays nothing** (item 931): no task was written
+  by the step, none the loop wrote has headroom, and no task of the pool is *hard* (failed in more than a quarter of its
   attempts: one failed once in six is as often a slip of the model's). On the owner's Mac every task scored on passed
   2/2 under the base and both candidates, two nights running, at 1.6 and 2.5 million tokens a night. The step is
   recorded `keep`, and its decision says why. It takes no run: the next step that proposes still learns from the run
   that went worst before it.
-- **A role's malformed answer after the probes is a warning, not the night's failure** (item 931): the experience
+- **A role's malformed answer after the probes is a warning, not the step's failure** (item 931): the experience
   writer's answer that is no verdict (on 2026-11-02 its entry came as a sentence, twice) leaves the step as the probes
   decided it, with the warning in its record (`warnings`).
 - **A task of the loop is played under the balanced preset at least**, whatever yours is: a write or a command outside
   the workspace asks, and an attempt declines what it asks. A model wrote the task, so what it steers a run to do is kept
   to the scratch workspace; a task of the catalog, which a developer wrote, plays as your preset says.
-- **Where it is played.** The task made tonight is scored on first, by the base and every candidate, so a candidate is
+- **Where it is played.** The task made by the step is scored on first, by the base and every candidate, so a candidate is
   judged where a run of yours went wrong. The tasks kept (the newest 24) join the pool, so the base tries one it does
-  not know yet, and one it fails sometimes has headroom and is scored on, as a task of the catalog is. A night with too
+  not know yet, and one it fails sometimes has headroom and is scored on, as a task of the catalog is. A step with too
   few tasks with headroom to judge a candidate still makes the worst run that read only what is Dot's and yours into a
-  task and tries it, without taking the run the next night that proposes learns from, so that a pool passed in full
+  task and tries it, without taking the run the next step that proposes learns from, so that a pool passed in full
   never leaves the loop with nothing to learn on.
-- **What you see.** The night's row on the page says `Own test:` and the task it kept (`own-1a2b3c4d tests: Count what the
+- **What you see.** The step's row on the page says `Own test:` and the task it kept (`own-1a2b3c4d tests: Count what the
   file holds before writing the number`) or why it kept none. The step's record holds it as `task`.
 
 ## The roles
@@ -414,8 +414,37 @@ the evaluation's, and keeps as the night's step (*no change*, since it changes n
   most widespread are kept, the most runs first.
 
 Its row on the page reads *a digest of the day's real runs* and says how the runs ended, how the lessons fared and the
-three ways a tool failed in the most runs. A digest proposes no version: what it gathers is what a proposal will be
-made from.
+three ways a tool failed in the most runs.
+
+## The week: a version proposed from real runs and tried on them
+
+After its digest the night has a word on the week (item 988, `harness/weekly.py`, `harness/trial.py`), kept in the
+step's record (`week`) and said under its row:
+
+- **A proposal, once a week, from a pattern.** With no trial under way and a week since the last proposal, the night
+  reads the last seven days as it reads one, and keeps the ways a tool failed that are a *pattern*: in at least three
+  runs, in at least two chats, on at least three days. One run, one chat or one bad day proposes nothing, and the night
+  says so. For the five most widespread patterns the proposer (`[harness] proposer`, or the review model) is shown the
+  lines of the patterns and their counts, and the habits and tool guidance in use; never a run's own text. A pattern
+  seen only in runs that read what others can author is shown as its tool and a class from a closed list (*timed out*,
+  *not found*, *refused*, *invalid arguments*, *page did not load*, *other*), since a third party's error may be quoted
+  in its first sentence. The proposal is written as a candidate through the gate of every text Dot learns (above); one
+  whose text names the shell, the terminal, AppleScript, an approval, a permission, yolo, asking or confirming is set
+  aside unused, since a habit must not steer runs to a tool with fewer guards, or around a question.
+- **A trial on real runs, half and half.** The candidate's trial begins at once, and you are told. Each run of Dot's own
+  agent that starts while it is under way takes the candidate or the version in use by its id (the first byte of its
+  SHA-256, odd or even), and records which (a `harness_trial` event); the version in use stays in use. A run on one of
+  Zen's free models takes no harness and is in neither half. One trial at a time, and no proposal while one is under
+  way.
+- **How it ends.** Each night weighs it: the share of the ended runs of each half in which one of the patterns it was
+  proposed for failed, and the share that ended done. With at least twenty runs a half it stops at once as *worse* when
+  the candidate's runs end done less than three quarters as often as the others'. With at least forty runs a half it is
+  *better* when its share of failing runs is lower with p < 0.1 (a one-sided test of two proportions) and its done runs
+  are not fewer by a quarter. After 21 days without a decision it is *unclear*. A better candidate waits for you, as
+  *tried* (**Use** puts it in use), or with `adopt = "auto"` is put in use if the version in use is still the one the
+  trial began with; a worse or unclear one, or one you set aside on the page meanwhile, is set aside and the trial
+  ends; you are told how it came out. The version in use is never replaced unless the trial says better. At the
+  owner's pace of runs, a decision takes about three weeks.
 
 ## The step, as built
 
@@ -549,5 +578,5 @@ it tried no test task (item 762). On a phone the page is a tab of *Rules and mem
 Item 389 built the versions, their components, the prompt's reading of the adopted one, the command line and the API.
 Item 390 built the roles and `dotx harness propose`. Item 391 built the probe, the step and its schedule. Item 392
 built the provenance graph, the lineage and the library's reading. Item 393 built the page. Item 987 made the night a
-digest of real runs. Left for later: a run of
+digest of real runs, and item 988 added the week's proposal and its trial on real runs. Left for later: a run of
 yours kept as a test of the scoring set from its page, the step started from the page, and the graph drawn on it.

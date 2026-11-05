@@ -19,7 +19,7 @@ from dotagent.config import HarnessConfig
 from dotagent.core.errors import DotError
 from dotagent.core.types import FrozenModel
 from dotagent.evals import EVAL_SOURCE
-from dotagent.harness.step import prune_records
+from dotagent.harness.service import prune_records
 from dotagent.repair.problems import first_sentence
 from dotagent.store.db import Store
 from dotagent.store.models import HarnessStep, RunTally, ToolOutcome

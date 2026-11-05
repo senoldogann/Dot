@@ -9,7 +9,7 @@ from collections.abc import Iterator, Sequence
 from pydantic import JsonValue
 
 from dotagent.config import HarnessConfig
-from dotagent.core.errors import InvalidValueError, NotFoundError
+from dotagent.core.errors import DotError, InvalidValueError, NotFoundError
 from dotagent.core.learned_text import gate
 from dotagent.core.logs import get_logger
 from dotagent.harness.components import (
@@ -24,7 +24,7 @@ from dotagent.harness.components import (
 )
 from dotagent.secrets import mask_filled
 from dotagent.store.db import Store
-from dotagent.store.models import HarnessStep, HarnessVersion
+from dotagent.store.models import HarnessPruned, HarnessStep, HarnessVersion
 
 log = get_logger(__name__)
 # A version's summary: one line of at most this many characters (what the API's HarnessRequest bounds it to).
@@ -357,3 +357,23 @@ def step_facts(step: HarnessStep) -> dict[str, JsonValue]:
     if not isinstance(facts, dict):
         raise InvalidValueError("a step's outcome is not a JSON object", {"step": step.id})
     return facts
+
+
+# A day, which [harness] keep_days counts in.
+PRUNE_DAY_S: float = 86_400.0
+
+
+async def prune_records(store: Store, config: HarnessConfig, now: float) -> None:
+    """Delete the loop's own records older than ``[harness] keep_days`` days before ``now``, but for the adopted version
+    and its lineage (:meth:`Store.prune_harness`, item 589): what a step or a night writes is bounded here, where it
+    grows (item 987). A store that refuses the deletion is logged and tried again by the next step or night, as nothing
+    else waits on it."""
+    if config.keep_days == 0:
+        return
+    try:
+        gone: HarnessPruned = await store.prune_harness(now - config.keep_days * PRUNE_DAY_S)
+    except DotError as exc:
+        log.warning("harness_prune_failed", error=exc.message, context=exc.context)
+        return
+    if gone.versions or gone.steps or gone.probes or gone.experiences:
+        log.info("harness_pruned", keep_days=config.keep_days, **gone.model_dump())

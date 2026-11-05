@@ -25,8 +25,8 @@ from dotagent.core.errors import DotError, NotFoundError, RunConflict, StoreErro
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
-from dotagent.harness.digest import night_digest
 from dotagent.harness.schedule import schedule_of
+from dotagent.harness.weekly import night as harness_night
 from dotagent.llm.types import Speed
 from dotagent.plugins import scout_service
 from dotagent.plugins.scout import ScoutStopped
@@ -518,12 +518,10 @@ class Scheduler:
     async def _step(self, now: float) -> None:
         """Task body of the night of the harness, and the one place its errors end: its outcome is logged and kept in
         the record of how learning fares, as the reflection's is. The night is the digest of the day's real runs (item
-        987), which calls no model; the step that plays synthetic tasks (item 391) runs only when asked
-        (``dotx harness step``)."""
+        987), which calls no model, and once a week the proposal and the trial of a version on real runs (item 988); the
+        step that plays synthetic tasks (item 391) runs only when asked (``dotx harness step``)."""
         try:
-            step: HarnessStep = await night_digest(
-                self._runtime.store, self._runtime.config.harness, now, self._runtime.schedule_zone
-            )
+            step: HarnessStep = await harness_night(self._runtime, now)
         except DotError as exc:
             log.error("harness_step_failed", error=exc.message, context=exc.context)
             outcome: LearningOutcome = failed_with(exc.message)

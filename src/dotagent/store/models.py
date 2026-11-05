@@ -752,6 +752,15 @@ class RunTally(FrozenModel):
     with_lesson_done: int
 
 
+class TrialRun(FrozenModel):
+    """A run that took part in a trial of the harness (item 988) and ended: the half it was in (``candidate`` or
+    ``in_use``) and how it ended."""
+
+    run_id: str
+    arm: str
+    status: str
+
+
 class ScheduleOptions(FrozenModel):
     """How the runs of a schedule are started. ``None`` takes what the configuration says when the schedule fires:
     the main model, its default reasoning level, the standard speed, the configured approvals, no goal mode, the

@@ -1,6 +1,7 @@
-"""When the nightly step runs (item 721, docs/harness.md): a time of day, or "off", set on the Self-improvement page and
-kept in Dot's store, which wins over ``[harness] step_time`` of the settings file; with none set on the page, the
-setting is read as it was. The page said "set a time of day in the settings file", and nothing on it could."""
+"""When the night of the harness runs (item 721, docs/harness.md; its digest and its week, items 987 and 988): a time
+of day, or "off", set on the Self-improvement page and kept in Dot's store, which wins over ``[harness] step_time`` of
+the settings file; with none set on the page, the setting is read as it was. The page said "set a time of day in the
+settings file", and nothing on it could."""
 
 from typing import Literal
 
@@ -17,13 +18,13 @@ STEP_TIME_PATTERN: str = r"^(?:off|(?:[01]\d|2[0-3]):[0-5]\d)$"
 
 
 class StepTimeRequest(FrozenModel):
-    """``PUT /api/harness/schedule``: when the nightly step runs, a time of day ("04:10") or "off"."""
+    """``PUT /api/harness/schedule``: when the night runs, a time of day ("04:10") or "off"."""
 
     step_time: str = Field(pattern=STEP_TIME_PATTERN)
 
 
 class StepSchedule(FrozenModel):
-    """When the nightly step runs, and whether the page set it (``page``) or the settings file did (``settings``)."""
+    """When the night runs, and whether the page set it (``page``) or the settings file did (``settings``)."""
 
     step_time: str
     source: Literal["page", "settings"]

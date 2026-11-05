@@ -103,6 +103,7 @@ from dotagent.store.models import (
     TradingExitRecord,
     TradingOrderRecord,
     TrashedMemory,
+    TrialRun,
     UnattendedCount,
     UnattendedRun,
     VaultRecord,
@@ -336,11 +337,11 @@ _EXTENSIONS: dict[str, str] = {
 }
 
 
-# The events that say a lesson is the owner's (item 556): ``owner_saved_memory_ids`` reads them, so a prune leaves them.
-# An event stored before ``by`` was written is the owner's (``_SavedData``).
 # How much of a failed tool's text the night's digest of real runs reads (item 987): its first sentence is what it
 # keeps.
 OUTCOME_ERROR_CHARS: int = 400
+# The events that say a lesson is the owner's (item 556): ``owner_saved_memory_ids`` reads them, so a prune leaves them.
+# An event stored before ``by`` was written is the owner's (``_SavedData``).
 _OWNER_SAVED_LESSON: str = "kind = 'lesson_saved' AND coalesce(json_extract(data, '$.by'), 'owner') = 'owner'"
 
 
@@ -5827,6 +5828,18 @@ class Store:
             with_lesson=int(row["with_lesson"]),
             with_lesson_done=int(row["with_lesson_done"]),
         )
+
+    async def trial_runs(self, version_id: str) -> list[TrialRun]:
+        """The runs that ended of those that took part in the trial of the version ``version_id`` (item 988): each
+        recorded its half in a ``harness_trial`` event as it started."""
+        rows = await self._all(
+            "SELECT e.run_id, COALESCE(json_extract(e.data, '$.arm'), '') AS arm, r.status"
+            " FROM events AS e JOIN runs AS r ON r.id = e.run_id"
+            " WHERE e.kind = 'harness_trial' AND json_extract(e.data, '$.version') = ? AND r.finished_at IS NOT NULL"
+            " ORDER BY e.id",
+            (version_id,),
+        )
+        return [TrialRun(run_id=row["run_id"], arm=str(row["arm"]), status=str(row["status"])) for row in rows]
 
     @_writing
     async def clear_memory_vectors(self) -> None:

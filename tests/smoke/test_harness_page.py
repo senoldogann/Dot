@@ -550,7 +550,7 @@ async def test_the_nightly_learning_is_switched_on_and_timed_on_the_page(
         nightly: Locator = _section(page, "Nightly learning")
         await expect(nightly).to_contain_text("The nightly learning is off")
         # A night reads the day's real runs and calls no model (item 987).
-        await expect(nightly).to_contain_text("calls no model: it costs nothing")
+        await expect(nightly).to_contain_text("calls no model. Once a week")
         switch: Locator = nightly.get_by_role("switch", name="Nightly learning on")
         await expect(switch).to_have_attribute("aria-checked", "false")
         await switch.click()

@@ -523,6 +523,8 @@ _HOLD_STORED_VERSIONS: frozenset[str] = frozenset(
         "cli_harness.py",  # shows them to the owner, starts the owner's own from one, plays the final set by given_text
         "harness/graph.py",  # their ancestry, from their summaries and notes
         "harness/propose.py",  # the proposer is shown adopted_text; the proposal is written through create_version
+        "harness/seat.py",  # a run of a trial takes its candidate by given_text (item 988)
+        "harness/weekly.py",  # the week's proposal, written through create_version, and the trial's end (item 988)
         "harness/service.py",  # raw_text_of, given_text, adopted_text and the gate
         "harness/step.py",  # plays, and shows its roles, only what given_text made
         "server/routes_harness.py",  # the page and the API show them to the owner, flagged
