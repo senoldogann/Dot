@@ -333,7 +333,7 @@ class WorkDesk:
             log.info("work_order_lead_not_told", order_id=order.id, why="no run of its chat is at work")
             return False
         try:
-            self._manager.tell(live, text, "note", taints=taints)
+            self._manager.note(live, text, taints)
         except RunConflict:
             log.info("work_order_lead_not_told", order_id=order.id, why="its run is ending")
             return False

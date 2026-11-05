@@ -2297,8 +2297,8 @@ class Store:
             "  AND (e.kind != 'steer' OR json_type(e.data, '$.vouches') = 'false'))) FROM runs AS r"
             f" WHERE r.id IN (SELECT id FROM doomed) AND r.thread_id NOT IN ({marks}) AND ("
             " EXISTS (SELECT 1 FROM run_taints AS t WHERE t.run_id = r.id)"
-            " OR EXISTS (SELECT 1 FROM events AS e WHERE e.run_id = r.id AND e.kind IN ('tool_result', 'run_queued')"
-            "  AND json_extract(e.data, '$.tainted') = 1))"
+            " OR EXISTS (SELECT 1 FROM events AS e WHERE e.run_id = r.id"
+            "  AND e.kind IN ('tool_result', 'run_queued', 'steer') AND json_extract(e.data, '$.tainted') = 1))"
             " GROUP BY r.thread_id"
             " ON CONFLICT(thread_id) DO UPDATE SET ended = MAX(thread_taints.ended, excluded.ended)",
             (*named, *TAINT_EVENTS, *named),
@@ -2513,12 +2513,13 @@ class Store:
 
     async def chat_ever_tainted(self, thread_id: str) -> bool:
         """Whether a run of the chat ``thread_id`` ever read content third parties can author: an event of one of its
-        runs says it was tainted (a step's result, its start), or ``dotx prune`` recorded that one ended so (item 556).
+        runs says it was tainted (a step's result, its start, a note of Dot's that carried such content: item 974), or
+        ``dotx prune`` recorded that one ended so (item 556).
         The owner's later words clear a run's taint, not what it read, which the chat's history keeps (item 893), nor
         the mark the chat kept of a run deleted since whose words it holds (item 952)."""
         row = await self._one(
             "SELECT 1 FROM events JOIN runs ON runs.id = events.run_id"
-            " WHERE runs.thread_id = ? AND events.kind IN ('tool_result', 'run_queued')"
+            " WHERE runs.thread_id = ? AND events.kind IN ('tool_result', 'run_queued', 'steer')"
             " AND json_extract(events.data, '$.tainted') = 1"
             " UNION ALL SELECT 1 FROM run_taints JOIN runs ON runs.id = run_taints.run_id WHERE runs.thread_id = ?"
             " UNION ALL SELECT 1 FROM thread_taints WHERE thread_id = ?"

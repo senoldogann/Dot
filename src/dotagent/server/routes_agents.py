@@ -348,7 +348,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         try:
             # Fenced in the note, and the run that reads it is marked as having read what a page wrote, as a reply
             # through message_agent marks it (the pre-push review).
-            ctx.manager.tell(target.id, help_answer_note(answered.text), "note", taints=outcome.tainted)
+            ctx.manager.note(target.id, help_answer_note(answered.text), outcome.tainted)
         except RunConflict:
             log.info("help_answer_not_passed", helper_run=outcome.run.id, target_run=target.id, why="the run is ending")
             return
@@ -391,7 +391,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             raise RunConflict("the helper did not start", {"agent_id": helper.id})
         helper_run: RunRecord = await store.get_run(started.result())
         try:
-            ctx.manager.tell(target.id, help_note(helper), "note")
+            ctx.manager.note(target.id, help_note(helper), False)
         except RunConflict:
             ctx.manager.cancel(helper_run.id)
             raise

@@ -153,6 +153,13 @@ async def test_the_store_says_a_chat_read_such_content_once_any_of_its_runs_did(
         await store.add_event(later.id, "steer", {"text": "go on", "tainted": False})
         assert await store.chat_ever_tainted(chat.id)
         assert not await store.chat_ever_tainted(other.id)
+        # A note of Dot's that carried such content marks the run that read it, with no step after it (item 974).
+        noted: ThreadRecord = await store.create_thread("v", "test")
+        reader: RunRecord = await store.create_run(
+            noted.id, "goal", "chat", "ollama:m", None, "test", None, "standard", None, "ask", False, None, None, None
+        )
+        await store.add_event(reader.id, "steer", {"text": "a note", "vouches": False, "tainted": True})
+        assert await store.chat_ever_tainted(noted.id)
     finally:
         await store.close()
 

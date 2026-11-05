@@ -103,6 +103,9 @@ class UserInput(FrozenModel):
     # A note of Dot's that carries words of content third parties can author (item 902: the answer of a helper that
     # read a page), which taints the run that reads it, as a tool's untrusted result does.
     taints: bool = False
+    # A note of Dot's from another run (a chat's note, a work order, a helper's answer: item 974), which is no sign that
+    # the owner is there, as their own message, answer or reaction is.
+    of_dot: bool = False
 
 
 class RunInbox(asyncio.Queue[UserInput]):

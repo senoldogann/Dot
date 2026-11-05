@@ -25,7 +25,6 @@ from collections.abc import Sequence
 
 from pydantic import Field
 
-from dotagent.agent.gate import TAINT_EVENTS, tainted_after
 from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.text import redact_known, truncate_tail, unclosing
 from dotagent.llm.types import Message
@@ -75,17 +74,8 @@ _GOAL_CHARS: int = 160
 _MESSAGE_CHARS: int = 700
 _TOOL_CHARS: int = 240
 _MOST_MESSAGES: int = 40
-_RUNS_READ: int = 20
 _NONCE_BYTES: int = 8
 _WORKING: frozenset[str] = frozenset({"queued", "running"})
-
-
-async def run_tainted(store: Store, run_id: str) -> bool:
-    """Whether the run ``run_id`` is (or ended) tainted, from its events, or what pruning kept of them (item 556)."""
-    found: list[EventRecord] = [
-        event for kind in TAINT_EVENTS if (event := await store.last_event(run_id, kind)) is not None
-    ]
-    return tainted_after(found) if found else await store.pruned_run_tainted(run_id)
 
 
 async def goal_tainted(store: Store, run_id: str) -> bool:
@@ -137,12 +127,10 @@ async def read_thread(store: Store, newest: RunRecord, name: str, messages: int)
     """The newest ``messages`` messages of the chat of ``newest`` (its newest run), headed by what ``name`` does now:
     fenced and marked untrusted when one of its runs read content third parties can author (item 243), the secrets
     Dot holds masked. ``read_agent_chat`` and ``read_chat`` (item 953) read a chat so."""
-    runs: list[RunRecord] = await store.list_runs(_RUNS_READ, newest.thread_id)
-    # A chat may hold the words of a run deleted since with the chat it came from, which marked it (item 952): they
-    # stay in what is read, whatever the owner wrote there since.
-    tainted: bool = await store.thread_keeps_marked_words(newest.thread_id) or any(
-        [await run_tainted(store, run.id) for run in runs]
-    )
+    # Whether a run of the chat ever read such content, not whether one ended so (item 974): the owner's later words
+    # clear a run's taint, not what it read, which the chat's history keeps and a reader takes; nor do the words of a
+    # run deleted since with the chat it came from (item 952), nor those of a run older than the newest twenty.
+    tainted: bool = await store.chat_ever_tainted(newest.thread_id)
     loaded: list[Message] = await store.load_messages(newest.thread_id, 0)
     rendered: list[str] = [line for line in map(render_message, loaded) if line is not None]
     shown: list[str] = rendered[-messages:]

@@ -306,9 +306,11 @@ class RunGate:
     def take(self, sent: "UserInput") -> None:
         """What a message that reached the run while it works does to its trust, in one place for every loop that reads
         its inbox (Dot's own and OpenCode's; the pre-push review of item 902: OpenCode's had missed a mark): the owner
-        is there; their own words clear the mark of content others can write; a note of Dot's that carries such content
-        sets it; and what the owner said is an instruction the reviewer reads."""
-        self.heard_from_owner()
+        is there, but for a note of Dot's from another run (a chat's note, a work order, a helper's answer: item 974),
+        which is no sign of them; their own words clear the mark of content others can write; a note of Dot's that
+        carries such content sets it; and what the owner said is an instruction the reviewer reads."""
+        if not sent.of_dot:
+            self.heard_from_owner()
         if sent.vouches:
             self.clear_taint()
         if sent.taints:

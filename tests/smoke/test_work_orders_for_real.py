@@ -15,6 +15,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.gate import TAINT_EVENTS, tainted_after
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -29,7 +30,7 @@ from dotagent.server.context import ServerContext
 from dotagent.store.models import AgentRecord, EventRecord, RunRecord, WorkOrderRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.objectives import OBJECTIVE_ADD_TOOL, OBJECTIVE_UPDATE_TOOL, OBJECTIVES_TOOL
-from dotagent.tools.office import READ_AGENT_CHAT_TOOL, goal_tainted, run_tainted
+from dotagent.tools.office import READ_AGENT_CHAT_TOOL, goal_tainted
 from dotagent.tools.shell import read_login_env
 from dotagent.tools.waits import WAIT_UNTIL_TOOL
 from dotagent.tools.work_orders import ASSIGN_WORK_TOOL, REVIEW_WORK_TOOL, WORK_ORDERS_TOOL
@@ -491,7 +492,8 @@ async def test_a_clean_lead_that_returns_a_tainted_order_starts_a_tainted_attemp
             assert "<earlier_answer nonce=" in second.goal and injected in second.goal
             assert second.goal.index("<earlier_answer") < second.goal.index(injected)
             # The lead's run read the order's words: it is marked, though it read no page itself.
-            assert await run_tainted(runtime.store, started.id)
+            marks = [event for kind in TAINT_EVENTS if (event := await runtime.store.last_event(started.id, kind))]
+            assert tainted_after(marks)
         finally:
             await manager.shutdown()
             await close_runtime(runtime)

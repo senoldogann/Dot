@@ -7319,10 +7319,6 @@ summary:has(> .chev)::-webkit-details-marker {
   animation: asks-rise var(--motion-base) var(--ease);
 }
 
-.asks[hidden] {
-  display: none;
-}
-
 .asks-head {
   display: flex;
   align-items: center;

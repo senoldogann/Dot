@@ -15,7 +15,10 @@ from typing import cast
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.attachments import UserInput
+from dotagent.agent.gate import RunGate
 from dotagent.agent.manager import CHAT_NOTE_EVENT, RunHandle, RunManager
+from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_default_config
 from dotagent.core.errors import PolicyDenied, ToolInputError
@@ -245,3 +248,48 @@ async def test_no_note_goes_to_a_run_that_asks_less_than_its_sender(runtime: Run
     # The one note it took is the initiative's, marked as every note is.
     steers: list[EventRecord] = await runtime.store.events_of_kind(working.id, "steer", 10)
     assert [(steer.data["text"], steer.data["tainted"]) for steer in steers] == [("Look again.", True)]
+
+
+async def _reviewed_by_nobody(request: ReviewRequest) -> ReviewVerdict:
+    raise AssertionError(f"the review model must not be asked about this: {request.action.summary}")
+
+
+async def test_a_note_from_another_run_is_no_sign_that_the_owner_is_there(runtime: Runtime) -> None:
+    """Item 974, the deep review of 2026-11-05: a run whose kept step the owner left unanswered keeps the next one at
+    once (item 482); a note of another chat's run, Dot's words, made it wait the whole time again, as the owner's own
+    message rightly does."""
+    run: RunRecord = await _stored_run(runtime, "Write the launch post")
+    gate: RunGate = RunGate(
+        runtime.store,
+        runtime.bus,
+        runtime.approvals,
+        run.id,
+        "task",
+        "aggressive",
+        runtime.config.policy.pace,
+        runtime.config.policy.spend,
+        "ask",
+        _reviewed_by_nobody,
+        ("Write the launch post",),
+        runtime.site_locks,
+    )
+    gate._owner_away = True
+    note: UserInput = UserInput(
+        text="The launch moved.",
+        files=(),
+        question_id=None,
+        vouches=False,
+        said="",
+        reaction="note",
+        taints=True,
+        of_dot=True,
+    )
+    gate.take(note)
+    assert gate._owner_away and gate.tainted
+    # The owner's own 👎 on a message of the run comes as a note too, of their press: they are there (the pre-push
+    # review of item 974).
+    gate.take(UserInput(text="Disliked.", files=(), question_id=None, vouches=False, said="", reaction="note"))
+    assert not gate._owner_away and gate.tainted
+    gate._owner_away = True
+    gate.take(UserInput(text="Go on.", files=(), question_id=None, vouches=True, said="Go on."))
+    assert not gate._owner_away and not gate.tainted

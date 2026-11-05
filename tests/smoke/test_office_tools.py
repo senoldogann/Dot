@@ -161,6 +161,13 @@ async def test_an_agent_sees_the_others_and_reads_one_s_chat_tainted_as_that_cha
     assert "agent: Looking at the failing test. [called read_file]" in read.text
     assert "  read_file -> def main(): return 1" in read.text
 
+    # The owner wrote to the Engineer's run and its next step read nothing of a stranger's: its taint is cleared, not
+    # the page its chat keeps, which a reader takes still fenced (item 974, the deep review of 2026-11-05).
+    await runtime.store.add_event(working.id, "steer", {"text": "Go on", "files": []})
+    await runtime.store.add_event(working.id, "tool_result", {"tool": "read_file", "ok": True, "tainted": False})
+    again: ToolResult = await _call(runtime, mine, writer.id, READ_AGENT_CHAT_TOOL, {"agent": "engineer"})
+    assert again.untrusted and "<agent_chat nonce=" in again.text
+
     # The Writer's chat read nothing of a stranger's: the Engineer reads it plain.
     back: ToolResult = await _call(runtime, working, engineer.id, READ_AGENT_CHAT_TOOL, {"agent": "Writer"})
     assert not back.untrusted and "<agent_chat" not in back.text and "owner: Write the notes of 2.1" in back.text
