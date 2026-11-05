@@ -205,8 +205,11 @@ def with_sightings(book: Book, sightings: Sequence[Sighting], now: float, runnin
                 "last_at": max(before.last_at, sighting.at),
                 "status": "open" if back else before.status,
                 "note": f"Seen again after it was {before.status}." if back else before.note,
-                # Its merged pull request did not hold: what GitHub said of it is no word on it now (item 958).
+                # Its merged pull request did not hold: what GitHub said of it is no word on it now (item 958), nor is
+                # the pull request itself, which a later session that opens none would otherwise be settled by, read
+                # merged again (item 975).
                 "pr_state": None if back else before.pr_state,
+                "pr_url": "" if back else before.pr_url,
             }
         )
     problems: list[Problem] = sorted(found.values(), key=lambda problem: problem.last_at, reverse=True)

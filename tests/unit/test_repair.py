@@ -741,7 +741,13 @@ def test_a_pull_request_merged_or_closed_on_github_settles_its_problem_and_its_s
     assert still.problems[0].status == "waiting"
     # Its fix did not hold: seen again by code that holds it, it is open, and no longer reads merged.
     again = with_sightings(merged, [Sighting(kind="daemon", words="x: y", evidence="e", at=9.0)], 9.0, 6.0)
-    assert (again.problems[0].status, again.problems[0].pr_state) == ("open", None)
+    assert (again.problems[0].status, again.problems[0].pr_state, again.problems[0].pr_url) == ("open", None, "")
+    # A session of it that opens no pull request and leaves it to the owner is not settled by the old one (item 975,
+    # the deep review of 2026-11-05): it was read merged, and the problem was put down as fixed again.
+    spent = with_problem(again, again.problems[0].model_copy(update={"status": "waiting"}))
+    bare = left.model_copy(update={"pr_url": "", "started_at": 10.0, "ended_at": 11.0})
+    settled, _ = with_pr_states(spent, (left, bare), {url: Standing(state="merged", at=12.0)})
+    assert (settled.problems[0].status, settled.problems[0].pr_state) == ("waiting", None)
     # A problem that does not wait on it keeps no state of it: the pull request may be an older session's.
     reopened, _ = with_pr_states(again, (left,), {url: Standing(state="closed", at=10.0)})
     assert (reopened.problems[0].status, reopened.problems[0].pr_state) == ("open", None)
