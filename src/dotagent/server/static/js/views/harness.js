@@ -737,7 +737,7 @@ export function mount(root, ctx) {
     if (switchingOn) {
       const confirmed = await confirmDialog({
         title: "Switch the nightly learning on?",
-        message: `${nightCost()} It runs at ${stepTime}, and you choose the version Dot follows.`,
+        message: `${nightCost()} It runs at ${stepTime}, and you choose the version Dot keeps in use.`,
         confirmLabel: "Switch on",
         danger: false,
         focusCancel: false,

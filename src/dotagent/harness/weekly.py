@@ -58,13 +58,13 @@ async def week(runtime: Runtime, now: float) -> str:
     kept: str | None = await runtime.store.kv_get(PROPOSED_KEY)
     if kept and now - float(kept) < PROPOSAL_EVERY_S:
         return ""
-    await runtime.store.kv_set(PROPOSED_KEY, repr(now))
     since: float = now - PROPOSAL_EVERY_S
     outcomes: list[ToolOutcome] = await runtime.store.tool_outcomes(since, now, SOURCES_OUT)
     tally: RunTally = await runtime.store.run_tally(since, now, SOURCES_OUT)
     digest: Digest = digest_of(outcomes, tally, since, now, runtime.schedule_zone)
     patterns: tuple[FailureRow, ...] = patterns_of(digest)
     if not patterns:
+        await runtime.store.kv_set(PROPOSED_KEY, repr(now))
         return "no way a tool failed recurred across chats and days this week: nothing proposed"
     return await _propose(runtime, patterns, now)
 
@@ -86,6 +86,8 @@ async def _propose(runtime: Runtime, patterns: Sequence[FailureRow], now: float)
         bounds=bounds_of(runtime.config.harness),
     )
     proposal: HarnessProposal = await proposer_of(runtime, "harness:week", None)(request)
+    # The week is spent once the proposer answered: one that failed (a network error) is asked again the next night.
+    await runtime.store.kv_set(PROPOSED_KEY, repr(now))
     if proposal.keep:
         return "the proposer kept the habits as they are for this week's failures"
     text: HarnessText = HarnessText(

@@ -397,7 +397,7 @@ is kept in Dot's store (`harness:step_time`) and wins over the settings file, fo
 learning fares.
 
 Since item 987 a night is a digest of the day's real runs (`harness/digest.py`), read from Dot's record with SQL alone:
-it calls no model and costs nothing. The nightly step that played synthetic tasks (below) learned nothing in its weeks:
+it calls no model (once a week the proposer is asked for a version, below, item 988). The nightly step that played synthetic tasks (below) learned nothing in its weeks:
 Dot passed almost every test task, so no version could do better on them, and the runs that went wrong were left out as
 soon as they had read a page. The digest reads every tool's result of the 24 hours before the night, of every run but
 the evaluation's, and keeps as the night's step (*no change*, since it changes no text):
@@ -424,7 +424,7 @@ step's record (`week`) and said under its row:
 - **A proposal, once a week, from a pattern.** With no trial under way and a week since the last proposal, the night
   reads the last seven days as it reads one, and keeps the ways a tool failed that are a *pattern*: in at least three
   runs, in at least two chats, on at least three days. One run, one chat or one bad day proposes nothing, and the night
-  says so. For the five most widespread patterns the proposer (`[harness] proposer`, or the review model) is shown the
+  says so; a proposer that failed (a network error) is asked again the next night. For the five most widespread patterns the proposer (`[harness] proposer`, or the review model) is shown the
   lines of the patterns and their counts, and the habits and tool guidance in use; never a run's own text. A pattern
   seen only in runs that read what others can author is shown as its tool and a class from a closed list (*timed out*,
   *not found*, *refused*, *invalid arguments*, *page did not load*, *other*), since a third party's error may be quoted
@@ -565,7 +565,8 @@ is about and the moments of the run it answers, the trial's contrast, the decisi
 notes*, **Use** on each version not in use (it asks first for one from outside content) and **Set aside** on a new or
 tried one; the version in use is set aside from *What Dot follows now*, and setting a version aside asks first. *Nightly
 learning* opens with when the night runs (every night at its time, with the next one, or that it is
-off), what it does and that it costs nothing, as it calls no model (item 987),
+off), what it does: a night calls no model (item 987), and once a week the proposer may write a version that is tried
+on half of the real tasks (item 988),
 and a switch and a time of day (item 721): switching it on asks first and says so again, a time is kept as it
 is chosen, and off needs no question; it lists the newest three steps (**Show all** the rest, item 938) and *Lessons
 learned* the newest experiences, a step with the run it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and the final check
