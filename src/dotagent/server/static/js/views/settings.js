@@ -8,10 +8,11 @@ import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { PHONE } from "../layout.js";
 import { settingsHead } from "../panels.js";
-import { DEFAULT_TAB, SECTIONS, sectionOf, TABS } from "../settingstabs.js";
+import { DEFAULT_TAB, PHONE_GROUPS, sectionOf, TABS } from "../settingstabs.js";
 import { setStageTitle } from "../stage.js";
 import { findTheme, onSchemeChange, onThemeChange, shownScheme, themePicks } from "../theme.js";
 import { attempt } from "../ui.js";
+import { buildFirstSteps } from "../firststeps.js";
 import * as appearance from "./appearance.js";
 import * as channels from "./channels.js";
 import * as harness from "./harness.js";
@@ -46,14 +47,16 @@ const MOUNTS = {
 };
 const SYSTEM_DARK = window.matchMedia("(prefers-color-scheme: dark)");
 
-/** A row of the phone's list: the section's mark and name, `value` (what it holds, or nothing) and an arrow; it opens the
- * section's first tab. */
-function listRow(section, value) {
+/** A row of the phone's sheet (item 995): its mark, its name over the line that says what it holds, `value` (what it
+ * holds, or nothing) and an arrow; it opens its tab, or the page it names. */
+function listRow(row, value) {
+  const tab = row.tab === undefined ? null : TABS.find((candidate) => candidate.id === row.tab);
+  const label = tab === null ? row.label : tab.label;
   return el(
     "a",
-    { class: "settings-row", href: `#/settings/${section.tabs[0]}` },
-    icon(section.icon),
-    el("span", { class: "settings-row-label" }, section.label),
+    { class: "settings-row", href: tab === null ? row.href : `#/settings/${tab.id}` },
+    icon(tab === null ? row.icon : tab.icon),
+    el("span", { class: "settings-row-words" }, el("span", { class: "settings-row-label" }, label), el("span", { class: "settings-row-line" }, row.line)),
     value ?? null,
     icon("chevron"),
   );
@@ -74,18 +77,23 @@ function partsRow(section, open) {
   );
 }
 
-/** The phone's list of the settings' sections. Appearance tells the theme on screen, Rules and
- * memory how many notes Dot keeps and Browser and Vault how many entries the Vault holds. */
+/** The phone's sheet of the settings (item 995): the first steps while one is left, then the groups of rows.
+ * Appearance tells the theme on screen, Memory how many notes Dot keeps and Vault how many entries it holds. */
 function mountList(root, ctx) {
   ctx.setTitle("Settings");
   const values = new Map(TABS.map((tab) => [tab.id, el("span", { class: "settings-row-value" })]));
-  root.append(
+  const groups = PHONE_GROUPS.map((group) =>
     el(
-      "nav",
-      { class: "settings-list", "aria-label": "Settings" },
-      el("section", { class: "settings-group" }, el("div", { class: "card" }, SECTIONS.map((section) => listRow(section, section.value === null ? null : values.get(section.value))))),
+      "section",
+      { class: "settings-group", "aria-label": group.title ?? null },
+      group.title === null ? null : el("h2", { class: "settings-group-title" }, group.title),
+      el("div", { class: "card" }, group.rows.map((row) => listRow(row, row.value === undefined ? null : values.get(row.value)))),
     ),
   );
+  const sheet = el("nav", { class: "settings-list", "aria-label": "Settings" }, ...groups);
+  root.append(sheet);
+  // What a Dot that started afresh has to set up (item 811) heads the sheet while a step is left.
+  const steps = buildFirstSteps((card) => sheet.before(card));
   setStageTitle(el("h1", { class: "stage-h1" }, "Settings"));
 
   function paintTheme() {
@@ -104,6 +112,7 @@ function mountList(root, ctx) {
     values.get("vault").textContent = held === 0 ? "" : String(held);
   });
   return () => {
+    steps.dispose();
     SYSTEM_DARK.removeEventListener("change", paintTheme);
     for (const stop of stops) {
       stop();
@@ -140,6 +149,7 @@ export function mount(root, ctx) {
   // always there and the width alone shows one or the other (settings.css), as the page's own name is hidden: two
   // choices made apart, one by the script as the page was drawn and one by the style, showed both a moment after a
   // phone turned (item 966).
-  setStageTitle(el("h1", { class: "stage-h1 set-phone-title" }, name));
+  // On a phone the page is the tab its row named (item 995): the bar names the tab, not its section.
+  setStageTitle(el("h1", { class: "stage-h1 set-phone-title" }, tab.label));
   return dispose;
 }

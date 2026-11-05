@@ -862,7 +862,8 @@ whether the
 daemon answers and the emergency stop are the page's, as on every page. The page is the open tab alone, in a column of
 920 px under its section's name, the row of the section's tabs (a section of one tab has none) and the line that says
 what the tab is for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is
-in the drawer. On a phone they are a list of the seven sections whose rows open each as a page of its own (item 330,
+in the drawer. On a phone they are one sheet of rows, a row a tab, in groups (item 995), each opening its tab as a page
+of its own (item 330,
 under [Dot on the phone](phone.md#dot-on-the-phone)). Trading is in no section: it is the Trader agent's (item 847, see
 [Settings › Trading](#settings--trading)). The addresses of the tabs are as they were (`#/settings/keys` opens AI
 services in Models). The earlier addresses of the memory, rules and system pages lead to their tabs, and

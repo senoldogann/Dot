@@ -254,15 +254,13 @@ async def test_the_phone_lists_self_improvement_among_how_dot_works(
         host, port = _address(client)
         await page.goto(ui_url(host, port, TOKEN))
         await page.goto(f"http://{host}:{port}/#/settings")
-        # The list's row is the section Rules and memory (item 845); the tab is in the row of its tabs.
-        row = page.get_by_role("link", name="Rules and memory", exact=False)
+        # The sheet's row is the tab itself (item 995; it was its section, Rules and memory, item 845), and the bar
+        # names it.
+        row = page.get_by_role("navigation", name="Settings").locator(".settings-row", has_text="Self-improvement")
         await expect(row).to_be_visible()
         await row.click()
-        await (
-            page.get_by_role("navigation", name="Rules and memory").get_by_role("link", name="Self-improvement").click()
-        )
         await expect(page).to_have_url(re.compile(r"#/settings/harness$"))
-        await expect(page.get_by_role("heading", name="Rules and memory", exact=True)).to_be_visible()
+        await expect(page.locator("h1.stage-h1")).to_have_text("Self-improvement")
         await expect(_section(page, "What Dot follows now")).to_be_visible()
         # The overview's tiles go two to a row on a phone, and nothing reaches past the screen's edge: not on this
         # phone, nor on an iPhone mini (375 points wide) or the first iPhone SE (320).

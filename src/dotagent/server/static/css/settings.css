@@ -1232,6 +1232,40 @@
   flex: none;
 }
 
+/* A row's name over the line that says what it holds (item 995), the line in the muted ink, clipped to one line. */
+.settings-row-words {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.settings-row-line {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-row-words + .settings-row-value {
+  flex: none;
+  max-width: 40%;
+}
+
+/* On a phone each row opens its own tab (item 995): the row of a section's tabs over it is the sheet's already. */
+@media (max-width: 720px) {
+  .settings-parts {
+    display: none;
+  }
+}
+
+/* The first steps head the sheet while one is left (item 995). */
+.first-steps + .settings-list {
+  margin-top: 24px;
+}
+
 .settings-row-value {
   flex: 1 1 auto;
   min-width: 0;

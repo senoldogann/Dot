@@ -3,10 +3,11 @@ wide) and as a small one (320 px), on a served daemon with three notes and the O
 
 On a phone:
 
-- `#/settings` is one card of seven rows, one a section (item 845, after four groups of fifteen tabs): Appearance tells
-  the theme on screen and Rules and memory how many notes Dot keeps (Models no model's name, item 852);
-- a row opens its section's first tab as a page of its own: the bar names the section, its Back at the top left (item
-  338) is the one way back and no rail shows, only the row of the section's tabs; Back leads to the list;
+- `#/settings` is one sheet of groups of rows, a row a tab with a line that says what it holds (item 995, the owner's
+  ask for one plain sheet; before, seven rows of sections, item 845): Appearance tells the theme on screen and Memory
+  how many notes Dot keeps (Models no model's name, item 852), and Connect apps stands among them;
+- a row opens its tab as a page of its own: the bar names the tab, its Back at the top left (item 338) is the one way
+  back and neither a rail nor the row of the section's tabs shows; Back leads to the sheet;
 - a card's name stands over the card, out of its surface;
 - neither the list nor any tab runs wider than the screen.
 
@@ -43,17 +44,35 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 TOKEN: str = "phone-settings-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _PHONES: tuple[str, ...] = ("iPhone 17 Pro Max", "iPhone SE")
-# The list's groups and their rows, in order.
-# The list's rows, in order, by the tab each opens.
+# The sheet's rows that open a tab, in order, by the tab each opens (item 995); Connect apps stands second.
 _TABS: dict[str, str] = {
     "general": "General",
-    "appearance": "Appearance",
+    "vault": "Vault",
+    "rules": "Rules",
+    "memory": "Memory",
     "models": "Models",
-    "rules": "Rules and memory",
-    "browser": "Browser and Vault",
-    "phone": "Phone and channels",
+    "keys": "AI services",
+    "websearch": "Web search",
+    "browser": "Browser",
+    "harness": "Self-improvement",
+    "repair": "Self-repair",
+    "phone": "Phone",
+    "channels": "Channels",
+    "appearance": "Appearance",
+    "snapshots": "Snapshots",
     "system": "System",
 }
+_ROWS: list[str] = [*list(_TABS.values())[:2], "Connect apps", *list(_TABS.values())[2:]]
+# The sections of a Mac's nav (item 845), which the sheet does not change.
+_SECTIONS: tuple[str, ...] = (
+    "General",
+    "Appearance",
+    "Models",
+    "Rules and memory",
+    "Browser and Vault",
+    "Phone and channels",
+    "System",
+)
 _NOTES: tuple[str, ...] = (
     "Prefers window seats and morning flights.",
     "The team stand-up is at 09:30 on weekdays.",
@@ -64,7 +83,7 @@ _NOTES: tuple[str, ...] = (
 _VALUES: dict[str, str] = {
     "Appearance": "Ocean",
     "Models": "",
-    "Rules and memory": str(len(_NOTES)),
+    "Memory": str(len(_NOTES)),
 }
 # How far past the screen's edge the page may reach: none, but the rounding of a fraction.
 _OVER_PX: int = 1
@@ -168,17 +187,25 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/settings")
                 listed: Locator = page.get_by_role("navigation", name="Settings")
-                await expect(listed.get_by_role("heading")).to_have_count(0)
+                await expect(listed.get_by_role("heading")).to_have_text(["Dot", "Phones and channels", "App"])
                 rows: Locator = listed.get_by_role("link")
-                await expect(rows.locator(".settings-row-label")).to_have_text(list(_TABS.values()))
+                await expect(rows.locator(".settings-row-label")).to_have_text(_ROWS)
+                await expect(rows.filter(has_text="Connect apps")).to_have_attribute("href", "#/customize/connectors")
                 for name, value in _VALUES.items():
-                    held: Locator = rows.filter(has_text=name).locator(".settings-row-value")
+                    held: Locator = rows.filter(has=page.locator(".settings-row-label", has_text=name)).locator(
+                        ".settings-row-value"
+                    )
                     await (expect(held).to_have_text(value) if value else expect(held).to_have_count(0))
                 await expect(page.locator("h1.stage-h1")).to_have_text("Settings")
                 faults += await _fits(page, f"{device} list")
 
                 for tab, name in _TABS.items():
-                    await page.get_by_role("navigation", name="Settings").get_by_role("link", name=name).click()
+                    await (
+                        page.get_by_role("navigation", name="Settings")
+                        .locator(".settings-row")
+                        .filter(has=page.locator(".settings-row-label", has_text=name))
+                        .first.click()
+                    )
                     await expect(page).to_have_url(f"{address}/#/settings/{tab}")
                     await expect(page.locator("h1.stage-h1")).to_have_text(name)
                     # The one way back is the bar's button at the top left (item 338).
@@ -186,12 +213,13 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                     await expect(back).to_be_visible()
                     await expect(page.locator("main .back")).to_have_count(0)
                     await expect(page.locator(".settings-side")).to_be_hidden()
+                    await expect(page.locator(".settings-parts")).to_be_hidden()
                     await expect(page.locator(".settings-pane")).not_to_be_empty()
                     faults += await _fits(page, f"{device} {tab}")
                     await back.click()
                     await expect(page).to_have_url(f"{address}/#/settings")
                     await expect(page.get_by_role("navigation", name="Settings").get_by_role("link")).to_have_count(
-                        len(_TABS)
+                        len(_ROWS)
                     )
 
                 # A card's name stands over the card, and the card's ground is its parts'.
@@ -219,7 +247,7 @@ async def test_a_macs_window_opens_the_settings_on_general_with_the_nav_in_the_s
             await page.get_by_role("complementary", name="Sidebar").get_by_role("link", name="Settings").click()
             await expect(page).to_have_url(f"{address}/#/settings/general")
             nav: Locator = page.get_by_role("navigation", name="Settings")
-            await expect(nav.locator(".settings-nav-label")).to_have_text(list(_TABS.values()))
+            await expect(nav.locator(".settings-nav-label")).to_have_text(list(_SECTIONS))
             await expect(nav.locator("[aria-current='page']")).to_contain_text("General")
             await expect(page.get_by_role("heading", level=1)).to_have_text("General")
             # The bar's name of the tab is drawn for a phone only, by the width (item 966).
