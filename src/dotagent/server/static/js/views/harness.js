@@ -201,11 +201,31 @@ function stepFacts(step) {
   }
 }
 
+/** What a night's row says under its date: what it read and how many versions it proposed. */
+function stepMeta(step, facts, candidates, digest) {
+  if (digest) {
+    return ["a digest of the day's real runs"];
+  }
+  return [
+    // A night that only worked on the pool (its record names what has headroom) takes no task, whatever it came
+    // to: tried, failed or nothing left to learn, and the words say which (items 719, 762).
+    // A night with nothing to tell a better text from luck (item 931) took no run either: it is left for later.
+    facts.no_signal === true
+      ? "nothing to tell a better text from luck"
+      : step.from_run === null
+        ? (poolNightWords(step.state, facts) ?? "no task to learn from")
+        : el("a", { href: `#/runs/${step.from_run}` }, "the task it learned from"),
+    `${plural(candidates, "version", "versions")} proposed`,
+  ];
+}
+
 /** A night of learning as a row: how it ended, when, the run it learned from and what it decided. */
 function stepRow(step) {
   const facts = stepFacts(step);
   const said = step.error ?? facts.unreadable ?? facts.decision ?? facts.reason ?? "";
   const candidates = Array.isArray(facts.candidates) ? facts.candidates.length : 0;
+  // A night that read the day's real runs (item 987) proposes nothing: its line says what went wrong in them.
+  const digest = typeof facts.digest === "object" && facts.digest !== null;
   return el(
     "div",
     { class: "set-row", dataset: { step: step.id } },
@@ -220,17 +240,7 @@ function stepRow(step) {
         el(
           "div",
           { class: "harness-meta" },
-          ...joined([
-            // A night that only worked on the pool (its record names what has headroom) takes no task, whatever it came
-            // to: tried, failed or nothing left to learn, and the words say which (items 719, 762).
-            // A night with nothing to tell a better text from luck (item 931) took no run either: it is left for later.
-            facts.no_signal === true
-              ? "nothing to tell a better text from luck"
-              : step.from_run === null
-                ? (poolNightWords(step.state, facts) ?? "no task to learn from")
-                : el("a", { href: `#/runs/${step.from_run}` }, "the task it learned from"),
-            `${plural(candidates, "version", "versions")} proposed`,
-          ]),
+          ...joined(stepMeta(step, facts, candidates, digest)),
         ),
         said === "" ? null : el("div", { class: "harness-said" }, said),
         // The test the night made of the owner's run (item 904): the one it kept, or why it kept none.
@@ -341,7 +351,7 @@ function followBody(view, handlers, textsOpen, onTexts) {
     return setCard(
       setRow({
         title: "Dot's built-in instructions alone: no version is in use.",
-        lead: "Versions appear below when the nightly learning proposes one; you can also write one.",
+        lead: "Versions appear below when you write one, or when a step run by hand proposes one.",
       }),
     );
   }
@@ -418,9 +428,12 @@ function scheduleControl(view, onSchedule) {
   return el("span", { class: "night-controls" }, time, toggle);
 }
 
-/** What a night costs, in the words the page says it before the learning is switched on (item 721). */
-function nightCost(view) {
-  return `Each night Dot tries new versions on test tasks with its main model, ${view.main_model}: up to ${Math.round(view.step_tokens / 1e6)} million pieces of text read and written, as AI services count them, and ${plural(Math.round(view.step_minutes), "minute", "minutes")}.`;
+/**
+ * What a night costs, in the words the page says it before the learning is switched on (item 721): since item 987 a
+ * night reads Dot's own record of the day's real runs, and calls no model.
+ */
+function nightCost() {
+  return "A night reads Dot's own record of the day's runs and calls no model: it costs nothing.";
 }
 
 // The nights the page shows before "Show all" (item 938).
@@ -438,9 +451,9 @@ function nightlyBody(view, steps, onSchedule, showAll, onShowAll) {
       ? el(
           "span",
           null,
-          `Dot reads the task that went worst since the night before and tries versions by itself; you never have to write one. ${nightCost(view)}`,
+          `Dot reads how the day's real runs went and keeps what went wrong in them: which tool failed, in how many runs and chats. ${nightCost()}`,
         )
-      : el("span", null, `Switch it on, and Dot learns once a night. ${nightCost(view)}`),
+      : el("span", null, `Switch it on, and Dot learns once a night. ${nightCost()}`),
     control: el(
       "span",
       { class: "night-when" },
@@ -545,11 +558,11 @@ function buildForm(view) {
     summary.value = EXAMPLE_SUMMARY;
     habits.focus();
   });
-  // What the form is for, in plain words: writing a version is optional, the nightly learning writes them (item 412).
+  // What the form is for, in plain words, and what the nights do (items 412 and 987).
   const nightly =
     view.step_time === "off"
-      ? "Once a time of day is set for the nightly learning in the settings file, Dot reads what its tasks did each night and proposes versions by itself."
-      : `Each night at ${view.step_time} Dot reads what its tasks did and proposes versions by itself.`;
+      ? "Once a time of day is set for the nightly learning, Dot reads each night how its real tasks went and keeps what went wrong in them."
+      : `Each night at ${view.step_time} Dot reads how its real tasks went and keeps what went wrong in them.`;
   const intro = el(
     "p",
     { class: "hint harness-intro" },
@@ -610,7 +623,7 @@ export function mount(root, ctx) {
     );
     if (listed.length === 0) {
       return setCard(
-        emptyPanel("squarePen", "No version yet", "Every task follows Dot's built-in instructions. A version appears here when the nightly learning proposes one, or when you write one."),
+        emptyPanel("squarePen", "No version yet", "Every task follows Dot's built-in instructions. A version appears here when you write one, or when a step run by hand proposes one."),
       );
     }
     // The version in use, when it is older than the page, is listed already and is not one of the older ones left.
@@ -722,7 +735,7 @@ export function mount(root, ctx) {
     if (switchingOn) {
       const confirmed = await confirmDialog({
         title: "Switch the nightly learning on?",
-        message: `${nightCost(view)} It runs at ${stepTime}, and you choose the version Dot follows.`,
+        message: `${nightCost()} It runs at ${stepTime}, and you choose the version Dot follows.`,
         confirmLabel: "Switch on",
         danger: false,
         focusCancel: false,
@@ -815,7 +828,7 @@ export function mount(root, ctx) {
   }
 
   ctx.head.setLead(
-    "Dot learns from its own tasks how to work better on this Mac. Each night it can suggest new habits and tips, test them on practice tasks first, and you choose the version it follows.",
+    "Dot learns from its own tasks how to work better on this Mac. Each night it reads how its real tasks went and keeps what went wrong in them; you choose the version of habits and tips it follows.",
   );
   root.append(holder);
   attempt(reload);

@@ -293,8 +293,7 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    and its confidence. Experiences go to a library the proposer reads first next time; a step whose evidence shows no
    reusable contrast writes none.
 
-The step runs once a night at the time set on its page (or `[harness] step_time`), under its own health record, and by
-hand with `dotx harness step`. Its provenance (version ← probe ← run, experience → version, the decisions of each step)
+The step runs by hand with `dotx harness step`; the night runs the digest of real runs instead (below, item 987). Its provenance (version ← probe ← run, experience → version, the decisions of each step)
 is a graph the loop keeps, so that what Dot changed about itself, when, and on what evidence, can always be read (the
 command line and the API read it; drawing it on the page is left for later).
 
@@ -389,12 +388,36 @@ schemas still ask for every field.
 `dotx harness propose RUN_ID [--scope invariant|domain]` asks the proposer about one run by hand and writes its
 candidate, whose notes keep the scope and the moments; `keep` writes nothing.
 
-## The step, as built
+## The night: a digest of real runs
 
 The switch and the time of *Nightly learning* on the page (item 721), or `[harness] step_time` (a time of day; `off` by
-default) until the page sets one, have the daemon run one step a night: what the page sets is kept in Dot's store
-(`harness:step_time`) and wins over the settings file, for the scheduler, the page and how learning fares. `dotx harness
-step [--run ID] [--scripted]` runs one by hand. The step reads one run of yours that ended since the last step that took
+default) until the page sets one, have the daemon run one night a day, under its own health record: what the page sets
+is kept in Dot's store (`harness:step_time`) and wins over the settings file, for the scheduler, the page and how
+learning fares.
+
+Since item 987 a night is a digest of the day's real runs (`harness/digest.py`), read from Dot's record with SQL alone:
+it calls no model and costs nothing. The nightly step that played synthetic tasks (below) learned nothing in its weeks:
+Dot passed almost every test task, so no version could do better on them, and the runs that went wrong were left out as
+soon as they had read a page. The digest reads every tool's result of the 24 hours before the night, of every run but
+the evaluation's, and keeps as the night's step (*no change*, since it changes no text):
+
+- how many runs ended, done and failed, and how many of those handed a lesson (a note tagged `lesson`) ended done
+  beside the others;
+- each way a tool failed, its *signature*: the tool and the first sentence of what it said, with ids, numbers, quoted
+  words, paths and addresses taken out, as the repair night names a problem (`repair/problems.py`). A run that read
+  what others can author is counted like any other, since the signature keeps Dot's own words and not the page's; how
+  many such runs it failed in is kept apart;
+- for each, how many results failed, in how many runs of the runs that used the tool, in how many chats, on how many
+  days, from which sources (a chat, a schedule, Dot's own initiative) and on which sites (five at most); the twenty
+  most widespread are kept, the most runs first.
+
+Its row on the page reads *a digest of the day's real runs* and says how the runs ended, how the lessons fared and the
+three ways a tool failed in the most runs. A digest proposes no version: what it gathers is what a proposal will be
+made from.
+
+## The step, as built
+
+`dotx harness step [--run ID] [--scripted]` runs one by hand. The step reads one run of yours that ended since the last step that took
 one (a week back at most, item 719): a task or research run of its own, as the reflection reads them, that Dot's own
 agent worked (a run on one of Zen's free models goes whole to OpenCode's own agent, which takes no habits, tool
 guidance, notes or skills, so a step does not learn from it and a version never changes what it does; the reflection
@@ -477,8 +500,8 @@ shows fifty at a time under a button for the older ones, the version in use firs
 
 Settings › *Self-improvement* is the harness's page, in plain words (item 503): it opens by saying that Dot learns
 from its own runs how to work better on this Mac, that every run follows two short texts besides Dot's built-in
-instructions, that each night Dot can propose a new version and try it on test tasks first, and that you choose the
-version it follows and never have to write one. Its words for the states are *new* (`candidate`), *tried* (`probed`),
+instructions, that each night Dot reads how its real tasks went and keeps what went wrong in them (item 987), and that
+you choose the version it follows. Its words for the states are *new* (`candidate`), *tried* (`probed`),
 *in use* (`adopted`) and *set aside* (`retired`); **Use** adopts and **Set aside** retires. A version Dot wrote after
 a run that read content others can write, or that a version it was combined from came from, wears a *From outside
 content* pill, in its row and in the card of the version in use, with why on a hover, and **Use** asks first and says
@@ -500,9 +523,7 @@ tips they hold; opened (and kept open while the page is drawn again), they stand
 enough (*Habits · how to work*, *Tips · what this Mac and its apps want*), or that Dot's built-in instructions alone are
 in use. **Write your own**, at the head of *Versions* (item 566),
 opens the form in a dialog (item 615), so that the page keeps its size; it takes habits and tips (the tool guidance; prefilled
-from the adopted version) and a summary, and says what each takes (item 412): that writing one is optional since the
-nightly learning proposes
-versions, what a habit and a line of tool guidance are, the limits a version keeps and what each button does, with
+from the adopted version) and a summary, and says what each takes (item 412): what the nights do (item 987), what a habit and a line of tool guidance are, the limits a version keeps and what each button does, with
 examples in the empty fields and **Start from an example**, which puts them in; **Save for later** keeps it as a
 candidate and **Save and use** adopts it at once; what cannot be a component is refused with why. *Versions* lists the
 versions, fifty at a time (a button under them shows the older ones), the one in use first and the others the newest
@@ -510,9 +531,9 @@ first, with its state, who made it (you, or Dot's proposer or composer) and when
 is about and the moments of the run it answers, the trial's contrast, the decisions of a composition) under *Full text and
 notes*, **Use** on each version not in use (it asks first for one from outside content) and **Set aside** on a new or
 tried one; the version in use is set aside from *What Dot follows now*, and setting a version aside asks first. *Nightly
-learning* opens with when the step runs (every night at its time, with the next one, or that it is
-off), what a night costs (up to `step_tokens` tokens of the main model, which it names, and `step_minutes` minutes),
-and a switch and a time of day (item 721): switching it on asks first and says that cost again, a time is kept as it
+learning* opens with when the night runs (every night at its time, with the next one, or that it is
+off), what it does and that it costs nothing, as it calls no model (item 987),
+and a switch and a time of day (item 721): switching it on asks first and says so again, a time is kept as it
 is chosen, and off needs no question; it lists the newest three steps (**Show all** the rest, item 938) and *Lessons
 learned* the newest experiences, a step with the run it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and the final check
 (the final set), who chooses, and the limits; the test tasks are the guards and the tasks the version in use still
@@ -524,5 +545,6 @@ test task (item 762). On a phone the page is a tab of *Rules and memory* in the 
 
 Item 389 built the versions, their components, the prompt's reading of the adopted one, the command line and the API.
 Item 390 built the roles and `dotx harness propose`. Item 391 built the probe, the step and its schedule. Item 392
-built the provenance graph, the lineage and the library's reading. Item 393 built the page. Left for later: a run of
+built the provenance graph, the lineage and the library's reading. Item 393 built the page. Item 987 made the night a
+digest of real runs. Left for later: a run of
 yours kept as a test of the scoring set from its page, the step started from the page, and the graph drawn on it.

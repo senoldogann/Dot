@@ -25,9 +25,8 @@ from dotagent.core.errors import DotError, NotFoundError, RunConflict, StoreErro
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
-from dotagent.harness.probe import probe_apart
+from dotagent.harness.digest import night_digest
 from dotagent.harness.schedule import schedule_of
-from dotagent.harness.step import run_step
 from dotagent.llm.types import Speed
 from dotagent.plugins import scout_service
 from dotagent.plugins.scout import ScoutStopped
@@ -518,10 +517,12 @@ class Scheduler:
             log.info("scout_fired", summary=state.last_summary)
 
     async def _step(self, now: float) -> None:
-        """Task body of a step of the harness, and the one place its errors end: its outcome is logged and kept in the
-        record of how learning fares, as the reflection's is; the probes run in processes of their own."""
+        """Task body of the night of the harness, and the one place its errors end: its outcome is logged and kept in
+        the record of how learning fares, as the reflection's is. The night is the digest of the day's real runs (item
+        987), which calls no model; the step that plays synthetic tasks (item 391) runs only when asked
+        (``dotx harness step``)."""
         try:
-            step: HarnessStep = await run_step(self._runtime, now, None, probe_apart, False)
+            step: HarnessStep = await night_digest(self._runtime.store, now, self._runtime.schedule_zone)
         except DotError as exc:
             log.error("harness_step_failed", error=exc.message, context=exc.context)
             outcome: LearningOutcome = failed_with(exc.message)

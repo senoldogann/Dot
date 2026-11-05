@@ -10,7 +10,7 @@ import dataclasses
 import re
 import time
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import datetime, tzinfo
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -55,6 +55,7 @@ from dotagent.scheduler.plans import (
 )
 from dotagent.scheduler.runner import FAILED_TICKS_TO_END, Scheduler
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
+from dotagent.store.db import Store
 from dotagent.store.models import (
     NO_PICKS,
     CampaignRecord,
@@ -1219,11 +1220,12 @@ async def test_the_nightly_step_starts_at_the_time_the_page_set_over_the_setting
     kept from the page holds it, whatever the file says."""
     steps: list[float] = []
 
-    async def step(given: Runtime, now: float, from_run: str | None, prober: object, scripted: bool) -> HarnessStep:
+    async def step(store: Store, now: float, zone: tzinfo) -> HarnessStep:
         steps.append(now)
-        return await given.store.create_harness_step(now, None, None)
+        return await store.create_harness_step(now, None, None)
 
-    monkeypatch.setattr(scheduler_runner, "run_step", step)
+    # The night is the digest of the day's real runs (item 987).
+    monkeypatch.setattr(scheduler_runner, "night_digest", step)
     scheduler: Scheduler = Scheduler(runtime, _Starts(runtime))
     zone = runtime.schedule_zone
     day: datetime = datetime(2026, 10, 27, tzinfo=zone)
