@@ -5839,7 +5839,10 @@ class Store:
             " ORDER BY e.id",
             (version_id,),
         )
-        return [TrialRun(run_id=row["run_id"], arm=str(row["arm"]), status=str(row["status"])) for row in rows]
+        return [
+            TrialRun.model_validate({"run_id": row["run_id"], "arm": row["arm"], "status": row["status"]})
+            for row in rows
+        ]
 
     @_writing
     async def clear_memory_vectors(self) -> None:

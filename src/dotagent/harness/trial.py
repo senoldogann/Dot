@@ -10,7 +10,7 @@ from typing import Literal
 
 from dotagent.core.types import FrozenModel
 from dotagent.harness.digest import Digest, FailureRow, signature_of
-from dotagent.store.models import ToolOutcome, TrialRun
+from dotagent.store.models import ToolOutcome, TrialArm, TrialRun
 
 # The kv key of the trial under way.
 TRIAL_KEY: str = "harness:trial"
@@ -53,7 +53,7 @@ _STEERING: re.Pattern[str] = re.compile(
     re.IGNORECASE,
 )
 
-type Arm = Literal["candidate", "in_use"]
+type Arm = TrialArm
 type Verdict = Literal["going", "better", "worse", "unclear"]
 
 

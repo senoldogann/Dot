@@ -19,7 +19,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment,
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.harness.seat import TRIAL_EVENT, text_for_run, trial_of
-from dotagent.harness.trial import DAY_S, PROPOSED_KEY, Trial, arm_of
+from dotagent.harness.trial import DAY_S, PROPOSED_KEY, TRIAL_KEY, Trial, arm_of
 from dotagent.harness.weekly import night
 from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, close_runtime, open_runtime
@@ -178,3 +178,9 @@ async def test_a_version_that_names_the_shell_is_never_tried_and_a_quiet_week_pr
         versions: list[HarnessVersion] = await runtime.store.list_harness_versions(10)
         assert [one.state for one in versions] == ["retired"]
         assert float(await runtime.store.kv_get(PROPOSED_KEY) or 0) == now + 8 * DAY_S
+        # A trial whose version is gone ends at the next night, rather than fail every night after it.
+        gone: Trial = Trial(version_id="hrn_gone", started_at=now, signatures=(SNAPSHOT,), in_use=None)
+        await runtime.store.kv_set(TRIAL_KEY, gone.model_dump_json())
+        ended: HarnessStep = await night(runtime, now + 9 * DAY_S)
+        assert (ended.state, json.loads(ended.outcome)["week"]) == ("keep", "the trial ended: its version is gone")
+        assert await trial_of(runtime.store) is None

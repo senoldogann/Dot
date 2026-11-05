@@ -752,12 +752,15 @@ class RunTally(FrozenModel):
     with_lesson_done: int
 
 
+# The half of a trial of the harness a run is in (item 988).
+type TrialArm = Literal["candidate", "in_use"]
+
+
 class TrialRun(FrozenModel):
-    """A run that took part in a trial of the harness (item 988) and ended: the half it was in (``candidate`` or
-    ``in_use``) and how it ended."""
+    """A run that took part in a trial of the harness (item 988) and ended: the half it was in and how it ended."""
 
     run_id: str
-    arm: str
+    arm: TrialArm
     status: str
 
 

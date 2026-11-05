@@ -7,7 +7,7 @@ import json
 from collections.abc import Sequence
 
 from dotagent.agent.review import HarnessProposal, ProposalRequest
-from dotagent.core.errors import DotError
+from dotagent.core.errors import DotError, NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.harness.components import HarnessText
@@ -117,7 +117,12 @@ async def _propose(runtime: Runtime, patterns: Sequence[FailureRow], now: float)
 
 async def _weigh(runtime: Runtime, trial: Trial, now: float) -> str:
     store: Store = runtime.store
-    version: HarnessVersion = await store.get_harness_version(trial.version_id)
+    try:
+        version: HarnessVersion = await store.get_harness_version(trial.version_id)
+    except NotFoundError:
+        # Its version was deleted: the trial is over, or every night after would fail on it.
+        await store.kv_delete(TRIAL_KEY)
+        return "the trial ended: its version is gone"
     if version.state not in ("candidate", "probed"):
         await store.kv_delete(TRIAL_KEY)
         return f"the trial of “{version.summary}” ended: the version was {version.state}"
