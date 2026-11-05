@@ -521,7 +521,9 @@ class Scheduler:
         987), which calls no model; the step that plays synthetic tasks (item 391) runs only when asked
         (``dotx harness step``)."""
         try:
-            step: HarnessStep = await night_digest(self._runtime.store, now, self._runtime.schedule_zone)
+            step: HarnessStep = await night_digest(
+                self._runtime.store, self._runtime.config.harness, now, self._runtime.schedule_zone
+            )
         except DotError as exc:
             log.error("harness_step_failed", error=exc.message, context=exc.context)
             outcome: LearningOutcome = failed_with(exc.message)

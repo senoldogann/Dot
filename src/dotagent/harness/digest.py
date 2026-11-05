@@ -7,16 +7,19 @@ each way a tool failed (its *signature*: the tool and the first sentence of what
 words, paths and addresses taken out, :func:`dotagent.repair.problems.first_sentence`), how many runs it failed in, how
 many runs used the tool, in how many chats and on how many days, from which sources and on which sites; and how the runs
 that were handed a lesson ended beside those that were not. A run that read what others can author is counted like any
-other: the signature keeps Dot's own words, not the page's."""
+other. The first sentence is most often Dot's own words; a tool whose error is a third party's (an MCP server, a
+command's output) may carry its words into it, so a signature is shown as plain text and handed to no model."""
 
 import json
 from collections import defaultdict
 from collections.abc import Sequence
 from datetime import datetime, tzinfo
 
+from dotagent.config import HarnessConfig
 from dotagent.core.errors import DotError
 from dotagent.core.types import FrozenModel
 from dotagent.evals import EVAL_SOURCE
+from dotagent.harness.step import prune_records
 from dotagent.repair.problems import first_sentence
 from dotagent.store.db import Store
 from dotagent.store.models import HarnessStep, RunTally, ToolOutcome
@@ -136,12 +139,13 @@ def digest_words(digest: Digest) -> str:
     return "; ".join(parts) + "."
 
 
-async def night_digest(store: Store, now: float, zone: tzinfo) -> HarnessStep:
+async def night_digest(store: Store, config: HarnessConfig, now: float, zone: tzinfo) -> HarnessStep:
     """Read the runs of the day before ``now`` and keep their digest as the night's step: ``keep``, since it changes
-    no text, with the line (``decision``) and the digest in its record."""
-    # The version in use while the runs worked, by its id alone: the digest reads no text of it.
-    base: str | None = await store.adopted_harness_id()
-    step: HarnessStep = await store.create_harness_step(now, None, base)
+    no text, with the line (``decision``), the digest and the version in use (``in_use``, by its id alone: the digest
+    reads no text of it) in its record; then delete the loop's records older than ``[harness] keep_days``. The step
+    names no base version: it tried none, and a step that names one is kept with that version's lineage."""
+    in_use: str | None = await store.adopted_harness_id()
+    step: HarnessStep = await store.create_harness_step(now, None, None)
     since: float = now - DAY_S
     try:
         outcomes: list[ToolOutcome] = await store.tool_outcomes(since, now, SOURCES_OUT)
@@ -151,5 +155,9 @@ async def night_digest(store: Store, now: float, zone: tzinfo) -> HarnessStep:
         await store.finish_harness_step(step.id, now, "failed", "{}", error.message)
         raise
     digest: Digest = digest_of(outcomes, tally, since, now, zone)
-    record: str = json.dumps({"decision": digest_words(digest), "digest": digest.model_dump(mode="json")})
-    return await store.finish_harness_step(step.id, now, "keep", record, None)
+    record: str = json.dumps(
+        {"decision": digest_words(digest), "digest": digest.model_dump(mode="json"), "in_use": in_use}
+    )
+    ended: HarnessStep = await store.finish_harness_step(step.id, now, "keep", record, None)
+    await prune_records(store, config, now)
+    return ended

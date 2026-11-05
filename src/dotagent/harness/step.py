@@ -784,10 +784,11 @@ async def _since_last_step(store: Store, now: float) -> float:
     return oldest
 
 
-async def _prune(store: Store, config: HarnessConfig, now: float) -> None:
+async def prune_records(store: Store, config: HarnessConfig, now: float) -> None:
     """Delete the loop's own records older than ``[harness] keep_days`` days before ``now``, but for the adopted version
-    and its lineage (:meth:`Store.prune_harness`, item 589): what a step writes every night is bounded here, where it
-    grows. A store that refuses the deletion is logged and tried again by the next step, as nothing else waits on it."""
+    and its lineage (:meth:`Store.prune_harness`, item 589): what a step or a night writes is bounded here, where it
+    grows (item 987). A store that refuses the deletion is logged and tried again by the next step or night, as nothing
+    else waits on it."""
     if config.keep_days == 0:
         return
     try:
@@ -858,5 +859,5 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
         json.dumps(facts, ensure_ascii=False),
         outcome.error,
     )
-    await _prune(store, runtime.config.harness, now)
+    await prune_records(store, runtime.config.harness, now)
     return finished

@@ -25,7 +25,7 @@ from dotagent.agent.reflection_record import REFLECTION_KEY
 from dotagent.agent.verify import new_facts
 from dotagent.cli_commands import StatsCommand
 from dotagent.cli_stats import cmd_stats
-from dotagent.config import ModelsConfig, load_config
+from dotagent.config import HarnessConfig, ModelsConfig, load_config
 from dotagent.core.errors import ConfigError, RunConflict, StoreError, ToolExecutionError, ToolInputError
 from dotagent.core.paths import db_path, failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
@@ -1220,7 +1220,7 @@ async def test_the_nightly_step_starts_at_the_time_the_page_set_over_the_setting
     kept from the page holds it, whatever the file says."""
     steps: list[float] = []
 
-    async def step(store: Store, now: float, zone: tzinfo) -> HarnessStep:
+    async def step(store: Store, config: HarnessConfig, now: float, zone: tzinfo) -> HarnessStep:
         steps.append(now)
         return await store.create_harness_step(now, None, None)
 

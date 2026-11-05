@@ -406,8 +406,9 @@ the evaluation's, and keeps as the night's step (*no change*, since it changes n
   beside the others;
 - each way a tool failed, its *signature*: the tool and the first sentence of what it said, with ids, numbers, quoted
   words, paths and addresses taken out, as the repair night names a problem (`repair/problems.py`). A run that read
-  what others can author is counted like any other, since the signature keeps Dot's own words and not the page's; how
-  many such runs it failed in is kept apart;
+  what others can author is counted like any other, and how many such runs it failed in is kept apart. The first
+  sentence is most often Dot's own words; a tool whose error is a third party's (an MCP server, a command's output)
+  may carry its words, so a signature is shown as plain text and handed to no model;
 - for each, how many results failed, in how many runs of the runs that used the tool, in how many chats, on how many
   days, from which sources (a chat, a schedule, Dot's own initiative) and on which sites (five at most); the twenty
   most widespread are kept, the most runs first.
@@ -485,7 +486,8 @@ confidence, before it writes a candidate. An experience written in a step that l
 third parties can author is kept marked (`tainted`, said on the page) and never shown to the proposer, as a tainted note
 is never shown to the lesson writer: its words cannot pass into a clean run's candidate unmarked.
 
-What the loop keeps is bounded (item 589). When a step ends it deletes the records older than `[harness] keep_days`
+What the loop keeps is bounded (item 589). When a step or a night ends (item 987) it deletes the records older than
+`[harness] keep_days`
 days (180; 0 keeps them for ever): the versions you set aside, the steps and the attempts of their probes, and the
 experiences, but for the adopted version and its lineage (the versions it was made from and composed of, the steps
 that touched them and the experiences about them); a version that is new or tried waits for you and is never deleted

@@ -61,7 +61,7 @@ marks the server `built-in`, and an eval run leaves it out. See [MCP servers](ex
 
 Deleting a chat deletes the screenshot files that only it named, and the daemon thins its copies of the database
 (below). Nothing else is removed by itself, but the notes you forgot (the nightly reflection deletes them from the trash
-after `[memory] trash_days`, 30) and the loop's own records (a step deletes the versions you set aside, its nights,
+after `[memory] trash_days`, 30) and the loop's own records (each night deletes the versions you set aside, its nights,
 their trials and its experiences after `[harness] keep_days`, 180, but for the version in use and the ones it came from;
 [The harness](harness.md)): old runs and their events stay until their chats are deleted or `dotx prune --apply` finds
 them old, and the journals of file changes until it finds them old. `dotx prune` lists the events of the runs that ended

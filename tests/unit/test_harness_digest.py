@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from dotagent.config import load_default_config
 from dotagent.harness.digest import Digest, digest_of, digest_words, night_digest
 from dotagent.store.db import Store
 from dotagent.store.models import HarnessStep, MemoryRecord, RunRecord, RunTally
@@ -56,9 +57,10 @@ async def test_a_night_counts_how_the_real_runs_tools_failed_and_how_lessons_far
         taught: RunRecord = await _run(store, "ui", [("browser_open", True, "Opened.", "shop.example", False)], "x")
         await store.mark_memories_used(taught.id, [lesson.id], time.time(), "start")
 
-        step: HarnessStep = await night_digest(store, time.time() + 1, ZONE)
-        assert (step.state, step.from_run, step.error) == ("keep", None, None)
+        step: HarnessStep = await night_digest(store, load_default_config().harness, time.time() + 1, ZONE)
+        assert (step.state, step.from_run, step.base_version, step.error) == ("keep", None, None, None)
         record = json.loads(step.outcome)
+        assert record["in_use"] is None
         digest: Digest = Digest.model_validate(record["digest"])
         assert digest.tally == RunTally(ended=4, done=2, failed=2, with_lesson=1, with_lesson_done=0)
         first, second = digest.rows

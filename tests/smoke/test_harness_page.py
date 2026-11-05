@@ -298,7 +298,7 @@ async def test_the_version_in_use_reads_as_two_lists_and_the_nights_as_a_card(
         step = await runtime.store.create_harness_step(now - days * 86400, None, None)
         await runtime.store.finish_harness_step(step.id, now - days * 86400 + 60, state, "{}", None)
     # A night that read the real runs of its day (item 987), the oldest of the three.
-    await night_digest(runtime.store, now - 3 * 86400, runtime.schedule_zone)
+    await night_digest(runtime.store, runtime.config.harness, now - 3 * 86400, runtime.schedule_zone)
     page: Page = await _open(browser, nightly_client, 1280)
     try:
         # What Dot follows now: the two texts as lists, a line a point, the words between backticks in code type.
