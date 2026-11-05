@@ -354,6 +354,11 @@ test("what a recording met on its way to the Mac is said in plain words: unreach
     "The Mac cannot write down this language. Choose another in Settings › General › Voice.",
   );
   assert.equal(sendProblem({ status: 422, message: "The Mac took longer than 60 seconds", context: { code: "timeout" } }), "The Mac took longer than 60 seconds");
+  // A recording the Mac no longer holds says so in the Mac's words, which say to press the microphone again (item 976).
+  assert.equal(
+    sendProblem({ status: 404, message: "that recording is no longer open: press the microphone again" }),
+    "that recording is no longer open: press the microphone again",
+  );
   for (const code of ["unavailable", "busy", "too-long", "failed"]) {
     assert.equal(sendProblem({ status: 422, message: `words for the owner of ${code}`, context: { code } }), `words for the owner of ${code}`);
   }

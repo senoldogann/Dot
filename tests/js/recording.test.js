@@ -87,6 +87,8 @@ function recordingOf({ held = "", rate = RATE, userAgent = IPHONE } = {}) {
   const seen = { shown: [], states: [], problems: [], offers: [], began: 0, sounds: [], writing: [], settled: 0 };
   const mic = { calls: [], last: () => mic.calls.at(-1) };
   const mac = macOf();
+  // The box, which a test may change while the Mac writes the words down.
+  const box = { value: held };
   const capture = (onBlock, onEnded) => {
     const call = { stopped: 0, block: onBlock, ended: onEnded };
     mic.calls.push(call);
@@ -103,7 +105,7 @@ function recordingOf({ held = "", rate = RATE, userAgent = IPHONE } = {}) {
   };
   const recording = createRecording({
     language: () => "tr-TR",
-    text: () => held,
+    text: () => box.value,
     show: (value, interimFrom) => seen.shown.push([value, interimFrom]),
     settled: () => {
       seen.settled += 1;
@@ -121,7 +123,7 @@ function recordingOf({ held = "", rate = RATE, userAgent = IPHONE } = {}) {
     capture,
     mac: mac.calls,
   });
-  return { recording, seen, mic, mac };
+  return { recording, seen, mic, mac, box };
 }
 
 /**
@@ -314,6 +316,19 @@ test("the words go into the box after what it held", async (t) => {
   mac.answer("  thanks for the plan \n");
   await arrive();
   assert.deepEqual(seen.shown, [["Dear Ada, thanks for the plan", null]]);
+});
+
+test("words the Mac answers go after what the box holds then, which a choice tapped meanwhile may have changed", async (t) => {
+  // Item 976, the deep review of 2026-11-05: the words were put after what the box held at the press, and what a page's
+  // choice wrote into it while the Mac wrote them down was lost.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { recording, seen, mic, mac, box } = await listening({ held: "Dear Ada," });
+  mic.last().block(block());
+  recording.stop();
+  box.value = "Dear Ada, Monday works.";
+  mac.answer("thanks for the plan");
+  await arrive();
+  assert.deepEqual(seen.shown, [["Dear Ada, Monday works. thanks for the plan", null]]);
 });
 
 test("a tick before the first block of sound came in has nothing to send: it is dropped, says nothing and lets the microphone go", async (t) => {

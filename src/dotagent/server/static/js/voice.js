@@ -295,6 +295,11 @@ export function sendProblem(error) {
   if (MAC_SAYS.has(error?.context?.code ?? "") && typeof error?.message === "string" && error.message !== "") {
     return error.message;
   }
+  // A recording the Mac no longer holds (it dropped it after a silence, or a piece was lost): its own words say to
+  // press the microphone again (item 976).
+  if (error?.status === 404 && typeof error?.message === "string" && error.message !== "") {
+    return error.message;
+  }
   return "The Mac could not write down what you said.";
 }
 

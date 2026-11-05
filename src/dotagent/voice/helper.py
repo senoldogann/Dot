@@ -451,6 +451,10 @@ class Transcriber:
             pipe.write(pcm)
             await pipe.drain()
         except (BrokenPipeError, ConnectionResetError) as error:
+            if self._streams.get(name) is not stream:
+                # The cross, or the watch, dropped it while the piece was on its way: nothing is to be said of its
+                # program, which was killed (item 976).
+                raise NotFoundError("that recording was dropped", {}) from error
             self._streams.pop(name, None)
             outcome: _Outcome = await self._answer(stream, RUN_TIMEOUT_S)
             self._words(outcome, stream.language)

@@ -316,14 +316,14 @@ in has nothing to write down, and drops it. A pause of fifteen seconds after a s
 too; six seconds with no sound at all end it by themselves, saying nothing was heard, and drop it. The Mac wrote down
 what was said while it was said, so its words come a moment after the tick (0.04 s to 0.11 s measured on this Mac after
 a sentence of Turkish or English); the recorder says **Writing down what you said…** in the wave's place, quietly, until
-they come, with the cross to give up waiting, and the words go into the box after what it held. Every end (the tick, the
-cross, typing, a message sent, the page out of sight, an error) lets the microphone go at once: its tracks end, which
-puts an iPhone's microphone light out, the audio context closes and what waited to be sent is dropped; every end but the
-tick drops the stream at the Mac too (`DELETE /api/voice/streams/<id>`), and a press while the browser still asks drops
-it. A piece that could not be sent loses the recording (the Mac would write down one with a hole in it): the recording
-ends at once and says why, not at the tick. A failure says what to do in plain words, and the box keeps its words: the
-Mac could not be reached, it cannot write down this language (choose another in Settings › General › Voice), it is
-writing down two other recordings, nothing was heard.
+they come, with the cross to give up waiting, and the words go into the box after what it holds then (item 976). Every
+end (the tick, the cross, typing, a message sent, the page out of sight, an error) lets the microphone go at once: its
+tracks end, which puts an iPhone's microphone light out, the audio context closes and what waited to be sent is dropped;
+every end but the tick drops the stream at the Mac too (`DELETE /api/voice/streams/<id>`), and a press while the browser
+still asks drops it. A piece that could not be sent loses the recording (the Mac would write down one with a hole in
+it): the recording ends at once and says why, not at the tick. A failure says what to do in plain words, and the box
+keeps its words: the Mac could not be reached, it cannot write down this language (choose another in Settings › General
+› Voice), it is writing down two other recordings, nothing was heard.
 
 The Mac writes it down with macOS 26's own dictation, on the device, through a small program the daemon builds with the
 Swift compiler of Apple's developer tools the first time it is needed (`src/dotagent/voice`). `GET /api/voice` says

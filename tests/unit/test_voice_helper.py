@@ -362,6 +362,9 @@ async def test_a_stream_the_tick_ended_counts_until_its_words_come_and_the_cross
     stand.says("late")
     first: str = await transcriber.open("tr-TR")
     await transcriber.open("en-US")
+    # Both programs have started before one is killed: a loaded Mac may start one late, and a program killed before it
+    # ran leaves no id to look for.
+    started: list[int] = await _started(stand, 2)
     await transcriber.feed(first, 0, PIECE)
     ending: asyncio.Task[str] = asyncio.create_task(transcriber.end(first))
     await asyncio.sleep(0.3)
@@ -375,7 +378,7 @@ async def test_a_stream_the_tick_ended_counts_until_its_words_come_and_the_cross
     await transcriber.drop(first)
     with pytest.raises(NotFoundError, match="dropped"):
         await ending
-    assert sorted(_gone(pid) for pid in await _started(stand, 2)) == [False, True]
+    assert sorted(_gone(pid) for pid in started) == [False, True]
 
 
 async def test_a_program_slow_to_take_its_sound_is_no_silence_of_the_pages(
@@ -392,9 +395,13 @@ async def test_a_program_slow_to_take_its_sound_is_no_silence_of_the_pages(
     feeding: asyncio.Task[None] = asyncio.create_task(transcriber.feed(name, 0, bytes(512 * 1024)))
     await asyncio.sleep(1.0)
     assert not feeding.done()
-    await transcriber.drop(name)
-    with pytest.raises((VoiceError, NotFoundError)):
-        await feeding
+    with capture_logs() as logs:
+        await transcriber.drop(name)
+        # Dropped while the piece was on its way: said as a recording no longer held, with no word of its program,
+        # which was killed (item 976).
+        with pytest.raises(NotFoundError, match="dropped"):
+            await feeding
+    assert not [entry for entry in logs if entry["event"] == "voice_answer_unreadable"]
 
 
 async def test_a_program_that_reports_an_error_says_what_to_do_in_plain_words(stand: Stand) -> None:

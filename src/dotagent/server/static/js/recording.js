@@ -85,7 +85,6 @@ export function createRecording({
   // Which recording this is, counted at each start and each end: what a recording that was left behind still has on its
   // way (the microphone opening, the Mac's answer) is ignored by the next.
   let generation = 0;
-  let base = "";
   /** @type {{ rate: number, stop: () => Promise<void> } | null} */
   let microphone = null;
   /** @type {ReturnType<typeof createResampler> | null} */
@@ -201,7 +200,6 @@ export function createRecording({
     generation += 1;
     const mine = generation;
     phase = "opening";
-    base = text();
     heard = false;
     heardMs = 0;
     loudUntil = 0;
@@ -292,7 +290,9 @@ export function createRecording({
           finish(problemWords("no-speech", place()));
           return;
         }
-        const next = dictated(base, said, "");
+        // After what the box holds now, which a choice tapped in a page may have changed while the Mac wrote it
+        // down (item 976): typing while it listens drops the recording, and nothing else may be lost.
+        const next = dictated(text(), said, "");
         show(next.value, next.interimFrom);
         finish(null);
       },
