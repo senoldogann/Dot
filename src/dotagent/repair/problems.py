@@ -134,7 +134,7 @@ class Book(FrozenModel):
 EMPTY_BOOK: Book = Book(problems=(), looked_at=None)
 
 
-def _first_sentence(text: str) -> str:
+def first_sentence(text: str) -> str:
     """The first sentence of an error, Dot's own words before what it may quote, with quoted words, paths and addresses
     taken out (:func:`normalized`)."""
     head: str = text.strip().split("\n", 1)[0]
@@ -289,7 +289,7 @@ def run_sightings(run_id: str, events: Iterable[EventRecord]) -> list[Sighting]:
             # so that no word a page wrote reaches the unattended session that fixes Dot's code (item 983, the review of
             # the self-improvement rebuild).
             outside: bool = event.data.get("tainted") is True
-            words: str = f"{tool}: {_first_sentence(text) if outside else text}"
+            words: str = f"{tool}: {first_sentence(text) if outside else text}"
             evidence: str = (
                 f"{run_id}: {words} (the rest is left out: the step read outside content)"
                 if outside

@@ -976,8 +976,12 @@ proposer = ""
 composer = ""
 selector = ""
 experience = ""
-# The nightly step (docs/harness.md): once a day at step_time (a time of day in [scheduler] timezone; "off", the
-# default, never), the step reads the run of yours that went worst of those that ended since the last step that took one
+# The night (docs/harness.md, item 987): once a day at step_time (a time of day in [scheduler] timezone; "off", the
+# default, never), Dot keeps a digest of the day's real runs, read from its record with no model; once a week, for a
+# way a tool failed in three runs, two chats and three days, the proposer writes one version, tried on half of the real
+# runs until it is better, worse or unclear (item 988). The rest of this block is the step that plays tasks, which runs
+# only by hand (`dotx harness step`): the step reads the run
+# of yours that went worst of those that ended since the last step that took one
 # (a week back at most), asks the proposer for a candidate in each scope of step_candidates, plays the scoring set (eval
 # task ids, safe to repeat, never shown to the proposer) step_repeats times under the adopted texts and under each
 # candidate in a separate process and throw-away homes, keeps the candidate that did better on a task and worse on none

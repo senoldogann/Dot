@@ -86,6 +86,7 @@ from dotagent.store.models import (
     RunPicks,
     RunRecord,
     RunStatus,
+    RunTally,
     ScheduleFiring,
     ScheduleOptions,
     ScheduleRecord,
@@ -97,10 +98,12 @@ from dotagent.store.models import (
     ThreadSummary,
     TodoRecord,
     TodoStatus,
+    ToolOutcome,
     ToolStep,
     TradingExitRecord,
     TradingOrderRecord,
     TrashedMemory,
+    TrialRun,
     UnattendedCount,
     UnattendedRun,
     VaultRecord,
@@ -334,6 +337,9 @@ _EXTENSIONS: dict[str, str] = {
 }
 
 
+# How much of a failed tool's text the night's digest of real runs reads (item 987): its first sentence is what it
+# keeps.
+OUTCOME_ERROR_CHARS: int = 400
 # The events that say a lesson is the owner's (item 556): ``owner_saved_memory_ids`` reads them, so a prune leaves them.
 # An event stored before ``by`` was written is the owner's (``_SavedData``).
 _OWNER_SAVED_LESSON: str = "kind = 'lesson_saved' AND coalesce(json_extract(data, '$.by'), 'owner') = 'owner'"
@@ -5766,6 +5772,77 @@ class Store:
             )
             for row in rows
         }
+
+    async def tool_outcomes(self, since: float, until: float, sources_out: Sequence[str]) -> list[ToolOutcome]:
+        """The tools' results from ``since`` up to, not with, ``until`` (item 987), oldest first, of the runs whose
+        source is not among ``sources_out``: SQLite reads the fields out of each event's JSON, and of a failure the
+        start of its text alone."""
+        marks: str = ", ".join("?" for _ in sources_out)
+        rows = await self._all(
+            "SELECT e.run_id, r.thread_id, COALESCE(r.source, '') AS source, e.ts,"
+            " COALESCE(json_extract(e.data, '$.tool'), '') AS tool, COALESCE(json_extract(e.data, '$.ok'), 0) AS ok,"
+            " CASE WHEN COALESCE(json_extract(e.data, '$.ok'), 0) = 0"
+            " THEN substr(COALESCE(json_extract(e.data, '$.text'), ''), 1, ?) ELSE '' END AS error,"
+            " COALESCE(json_extract(e.data, '$.site'), '') AS site,"
+            " COALESCE(json_type(e.data, '$.tainted') = 'true', 0) AS tainted"
+            " FROM events AS e JOIN runs AS r ON r.id = e.run_id"
+            f" WHERE e.kind = 'tool_result' AND e.ts >= ? AND e.ts < ? AND COALESCE(r.source, '') NOT IN ({marks})"
+            " ORDER BY e.id",
+            (OUTCOME_ERROR_CHARS, since, until, *sources_out),
+        )
+        return [
+            ToolOutcome(
+                run_id=row["run_id"],
+                thread_id=row["thread_id"],
+                source=row["source"],
+                at=row["ts"],
+                tool=str(row["tool"]),
+                ok=bool(row["ok"]),
+                error=str(row["error"]),
+                site=str(row["site"]),
+                tainted=bool(row["tainted"]),
+            )
+            for row in rows
+        ]
+
+    async def run_tally(self, since: float, until: float, sources_out: Sequence[str]) -> RunTally:
+        """How the runs ended that finished from ``since`` up to, not with, ``until``, of a source not among
+        ``sources_out``, and how those ended that were handed a lesson (a note tagged ``lesson``, item 987)."""
+        marks: str = ", ".join("?" for _ in sources_out)
+        rows = await self._all(
+            "SELECT COUNT(*) AS ended, COUNT(CASE WHEN r.status = 'done' THEN 1 END) AS done,"
+            " COUNT(CASE WHEN r.status = 'failed' THEN 1 END) AS failed,"
+            " COUNT(CASE WHEN l.run_id IS NOT NULL THEN 1 END) AS with_lesson,"
+            " COUNT(CASE WHEN l.run_id IS NOT NULL AND r.status = 'done' THEN 1 END) AS with_lesson_done"
+            " FROM runs AS r LEFT JOIN (SELECT DISTINCT u.run_id FROM memory_uses AS u JOIN memories AS m"
+            " ON m.id = u.memory_id WHERE (',' || m.tags || ',') LIKE '%,lesson,%') AS l ON l.run_id = r.id"
+            " WHERE r.finished_at >= ? AND r.finished_at < ?"
+            f" AND COALESCE(r.source, '') NOT IN ({marks})",
+            (since, until, *sources_out),
+        )
+        row = rows[0]
+        return RunTally(
+            ended=int(row["ended"]),
+            done=int(row["done"]),
+            failed=int(row["failed"]),
+            with_lesson=int(row["with_lesson"]),
+            with_lesson_done=int(row["with_lesson_done"]),
+        )
+
+    async def trial_runs(self, version_id: str) -> list[TrialRun]:
+        """The runs that ended of those that took part in the trial of the version ``version_id`` (item 988): each
+        recorded its half in a ``harness_trial`` event as it started."""
+        rows = await self._all(
+            "SELECT e.run_id, COALESCE(json_extract(e.data, '$.arm'), '') AS arm, r.status"
+            " FROM events AS e JOIN runs AS r ON r.id = e.run_id"
+            " WHERE e.kind = 'harness_trial' AND json_extract(e.data, '$.version') = ? AND r.finished_at IS NOT NULL"
+            " ORDER BY e.id",
+            (version_id,),
+        )
+        return [
+            TrialRun.model_validate({"run_id": row["run_id"], "arm": row["arm"], "status": row["status"]})
+            for row in rows
+        ]
 
     @_writing
     async def clear_memory_vectors(self) -> None:

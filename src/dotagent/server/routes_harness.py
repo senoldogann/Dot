@@ -97,7 +97,7 @@ def harness_router(ctx: ServerContext) -> APIRouter:
     @router.get("/harness")
     async def get_harness(query: Annotated[HarnessQuery, Query()]) -> HarnessView:
         """The adopted version, a page of the versions (the newest first: ``limit``, ``offset``) with how many there
-        are in all and in each state, and how the nightly step is set."""
+        are in all and in each state, and how the night is set."""
         return await view(query)
 
     # The fixed places first: a version id never reads "graph", "steps" or "experiences".
@@ -152,7 +152,7 @@ def harness_router(ctx: ServerContext) -> APIRouter:
 
     @router.put("/harness/schedule")
     async def put_schedule(request: StepTimeRequest) -> HarnessView:
-        """When the nightly step runs (item 721): a time of day ("04:10") or "off", kept in the store, which wins over
+        """When the night runs (item 721): a time of day ("04:10") or "off", kept in the store, which wins over
         ``[harness] step_time``; the view as it is now."""
         await set_schedule(store, ctx.runtime.config.harness, request.step_time)
         return await view(HarnessQuery())

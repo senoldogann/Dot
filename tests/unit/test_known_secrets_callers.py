@@ -77,6 +77,9 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/reflection.py:_describe_owner": (False,),
     "harness/propose.py:propose_from_run": (False,),
     "harness/step.py:_carry_out": (False,),
+    # The week's proposal and a better trial's adoption (item 988), as the step's.
+    "harness/weekly.py:_keep_better": (False,),
+    "harness/weekly.py:_propose": (False,),
     # Whether a review model's line past its bound may be cut: refused when, whole, it holds a value (item 840).
     "agent/review.py:_refused_values": (False,),
     "agent/review.py:harness_proposer_for.propose": (False,),

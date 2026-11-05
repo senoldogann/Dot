@@ -108,7 +108,7 @@ refuses now (one a Dot wrote before the gate was as strict, or whose row a hand 
 (`dotx harness retire`, or **Set aside**), and ask nothing: not even `--yes` adopts it; the step with `adopt = "auto"`
 never adopts one. When a prompt is built, a component of the version in use that the gate refuses is left out of it and
 logged once (`harness_component_left_out`), and the page marks the version *Refused* and says that its part is left out
-of every run. What the nightly step plays and shows is taken the same way: a stored text reaches a model, a probe or a
+of every run. What the step plays and shows (`dotx harness step`, item 987) is taken the same way: a stored text reaches a model, a probe or a
 role through one function (`given_text`; `adopted_text` is it for the version in use), so the version in use as the base
 and again as `confirm-base`, each candidate, the composed version, the texts the composer is shown and the final set
 (`dotx harness final`) are played as a run would take them, and a new version is measured against the text the runs
@@ -180,7 +180,8 @@ You write a version yourself with `dotx harness set` (a component from a file or
 adopted version, `--adopt` to take it at once) or `POST /api/harness`, and manage them with `dotx harness list`, `show`,
 `diff`, `adopt` and `retire`, or `GET /api/harness`, `GET /api/harness/{id}`, `POST /api/harness/{id}/adopt` and
 `POST /api/harness/{id}/retire`. The daemon reads the adopted version as each run starts: no restart. `PUT
-/api/harness/schedule` with `{"step_time": "04:00"}` (or `"off"`) sets when the nightly step runs, as the page's switch
+/api/harness/schedule` with `{"step_time": "04:00"}` (or `"off"`) sets when the night runs (its digest of real runs,
+item 987), as the page's switch
 does (item 721); anything but a time of day or `off` is refused (422).
 
 ## The scoring set is the owner's
@@ -293,15 +294,14 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    and its confidence. Experiences go to a library the proposer reads first next time; a step whose evidence shows no
    reusable contrast writes none.
 
-The step runs once a night at the time set on its page (or `[harness] step_time`), under its own health record, and by
-hand with `dotx harness step`. Its provenance (version ← probe ← run, experience → version, the decisions of each step)
+The step runs by hand with `dotx harness step`; the night runs the digest of real runs instead (below, item 987). Its provenance (version ← probe ← run, experience → version, the decisions of each step)
 is a graph the loop keeps, so that what Dot changed about itself, when, and on what evidence, can always be read (the
 command line and the API read it; drawing it on the page is left for later).
 
 ### Tasks made of your own runs
 
 The pool is passed by a capable model under any text: from 2026-10-29 to 11-01 the probes passed 32 attempts of 34,
-and the candidate of each night, written to answer the run that went worst (a page on a local port it could not open,
+and the candidate of each step, written to answer the run that went worst (a page on a local port it could not open,
 an agent that failed and was left), came out the same as the base on tasks that had nothing to do with that run. So the
 step also makes a run of yours into a task of its own (item 904, `harness/tasks.py`, `harness/own.py`), as the
 evaluation guides advise: start from real failures. The run is the worst of those that read only what is Dot's and
@@ -321,33 +321,33 @@ yours (item 931, below), most often not the one the candidates answer.
   with why, as any role's answer. Then three plays through the scripted
   model, in throw-away homes and at no model's cost, prove it fair: its reference passes it, and both a run that does
   nothing and says it is done and one that does nothing and gives up fail it. A task that fails a play is not kept, and
-  the night's record says which play (`no task: a run that does nothing and claims it is done passes it`).
+  the step's record says which play (`no task: a run that does nothing and claims it is done passes it`).
 - **The task is written from the worst run that read only what is Dot's and the owner's** (item 931), not from the run
   the step learns from: of the runs a step weighs, the one that went worst among those that read no content third
   parties can author and that gave no task yet. A run that read such content is made into no task, and the writer is
   not asked about it: what it read could shape a task that a model then plays with a run's rights. On the owner's Mac
   80 of 97 runs of a week had read a page or a mail, the run the step learns from always among them, so the step had
   never written a task. A run is asked about once: a task refused or found unfair is not drafted and played again on a
-  later night.
-- **A night with nothing to tell a better text from luck proposes and plays nothing** (item 931): no task was written
-  tonight, none the loop wrote has headroom, and no task of the pool is *hard* (failed in more than a quarter of its
+  later step.
+- **A step with nothing to tell a better text from luck proposes and plays nothing** (item 931): no task was written
+  by the step, none the loop wrote has headroom, and no task of the pool is *hard* (failed in more than a quarter of its
   attempts: one failed once in six is as often a slip of the model's). On the owner's Mac every task scored on passed
   2/2 under the base and both candidates, two nights running, at 1.6 and 2.5 million tokens a night. The step is
   recorded `keep`, and its decision says why. It takes no run: the next step that proposes still learns from the run
   that went worst before it.
-- **A role's malformed answer after the probes is a warning, not the night's failure** (item 931): the experience
+- **A role's malformed answer after the probes is a warning, not the step's failure** (item 931): the experience
   writer's answer that is no verdict (on 2026-11-02 its entry came as a sentence, twice) leaves the step as the probes
   decided it, with the warning in its record (`warnings`).
 - **A task of the loop is played under the balanced preset at least**, whatever yours is: a write or a command outside
   the workspace asks, and an attempt declines what it asks. A model wrote the task, so what it steers a run to do is kept
   to the scratch workspace; a task of the catalog, which a developer wrote, plays as your preset says.
-- **Where it is played.** The task made tonight is scored on first, by the base and every candidate, so a candidate is
+- **Where it is played.** The task made by the step is scored on first, by the base and every candidate, so a candidate is
   judged where a run of yours went wrong. The tasks kept (the newest 24) join the pool, so the base tries one it does
-  not know yet, and one it fails sometimes has headroom and is scored on, as a task of the catalog is. A night with too
+  not know yet, and one it fails sometimes has headroom and is scored on, as a task of the catalog is. A step with too
   few tasks with headroom to judge a candidate still makes the worst run that read only what is Dot's and yours into a
-  task and tries it, without taking the run the next night that proposes learns from, so that a pool passed in full
+  task and tries it, without taking the run the next step that proposes learns from, so that a pool passed in full
   never leaves the loop with nothing to learn on.
-- **What you see.** The night's row on the page says `Own test:` and the task it kept (`own-1a2b3c4d tests: Count what the
+- **What you see.** The step's row on the page says `Own test:` and the task it kept (`own-1a2b3c4d tests: Count what the
   file holds before writing the number`) or why it kept none. The step's record holds it as `task`.
 
 ## The roles
@@ -389,12 +389,67 @@ schemas still ask for every field.
 `dotx harness propose RUN_ID [--scope invariant|domain]` asks the proposer about one run by hand and writes its
 candidate, whose notes keep the scope and the moments; `keep` writes nothing.
 
-## The step, as built
+## The night: a digest of real runs
 
 The switch and the time of *Nightly learning* on the page (item 721), or `[harness] step_time` (a time of day; `off` by
-default) until the page sets one, have the daemon run one step a night: what the page sets is kept in Dot's store
-(`harness:step_time`) and wins over the settings file, for the scheduler, the page and how learning fares. `dotx harness
-step [--run ID] [--scripted]` runs one by hand. The step reads one run of yours that ended since the last step that took
+default) until the page sets one, have the daemon run one night a day, under its own health record: what the page sets
+is kept in Dot's store (`harness:step_time`) and wins over the settings file, for the scheduler, the page and how
+learning fares.
+
+Since item 987 a night is a digest of the day's real runs (`harness/digest.py`), read from Dot's record with SQL alone:
+it calls no model (once a week the proposer is asked for a version, below, item 988). The nightly step that played synthetic tasks (below) learned nothing in its weeks:
+Dot passed almost every test task, so no version could do better on them, and the runs that went wrong were left out as
+soon as they had read a page. The digest reads every tool's result of the 24 hours before the night, of every run but
+the evaluation's, and keeps as the night's step (*no change*, since it changes no text):
+
+- how many runs ended, done and failed, and how many of those handed a lesson (a note tagged `lesson`) ended done
+  beside the others;
+- each way a tool failed, its *signature*: the tool and the first sentence of what it said, with ids, numbers, quoted
+  words, paths and addresses taken out, as the repair night names a problem (`repair/problems.py`). A run that read
+  what others can author is counted like any other, and how many such runs it failed in is kept apart. The first
+  sentence is most often Dot's own words; a tool whose error is a third party's (an MCP server, a command's output)
+  may carry its words, so a signature is shown as plain text and handed to no model;
+- for each, how many results failed, in how many runs of the runs that used the tool, in how many chats, on how many
+  days, from which sources (a chat, a schedule, Dot's own initiative) and on which sites (five at most); the twenty
+  most widespread are kept, the most runs first.
+
+Its row on the page reads *a digest of the day's real runs* and says how the runs ended, how the lessons fared and the
+three ways a tool failed in the most runs.
+
+## The week: a version proposed from real runs and tried on them
+
+After its digest the night has a word on the week (item 988, `harness/weekly.py`, `harness/trial.py`), kept in the
+step's record (`week`) and said under its row:
+
+- **A proposal, once a week, from a pattern.** With no trial under way and a week since the last proposal, the night
+  reads the last seven days as it reads one, and keeps the ways a tool failed that are a *pattern*: in at least three
+  runs, in at least two chats, on at least three days. One run, one chat or one bad day proposes nothing, and the night
+  says so; a proposer that failed (a network error) is asked again the next night. For the five most widespread patterns the proposer (`[harness] proposer`, or the review model) is shown the
+  lines of the patterns and their counts, and the habits and tool guidance in use; never a run's own text. A pattern
+  seen only in runs that read what others can author is shown as its tool and a class from a closed list (*timed out*,
+  *not found*, *refused*, *invalid arguments*, *page did not load*, *other*), since a third party's error may be quoted
+  in its first sentence. The proposal is written as a candidate through the gate of every text Dot learns (above); one
+  whose text names the shell, the terminal, AppleScript, an approval, a permission, yolo, asking or confirming (as a
+  word or as the start of a tool's name, `terminal_send`) is set aside unused, since a habit must not steer runs to a tool with fewer guards, or around a question.
+- **A trial on real runs, half and half.** The candidate's trial begins at once, and you are told. Each run of Dot's own
+  agent that starts while it is under way takes the candidate or the version in use by its id (the first byte of its
+  SHA-256, odd or even), and records which (a `harness_trial` event); the version in use stays in use. A run on one of
+  Zen's free models takes no harness and is in neither half. One trial at a time, and no proposal while one is under
+  way.
+- **How it ends.** Each night weighs it: the share of the ended runs of each half in which one of the patterns it was
+  proposed for failed, and the share that ended done. With at least twenty runs a half it stops at once as *worse* when
+  the candidate's runs end done less than three quarters as often as the others'. With at least forty runs a half it is
+  *better* when its share of failing runs is lower with p < 0.1 (a one-sided test of two proportions) and its done runs
+  are not fewer by a quarter. After 21 days without a decision it is *unclear*, and from then no run takes the candidate, even when no night
+  ends the trial (the nightly learning switched off). A better candidate waits for you, as
+  *tried* (**Use** puts it in use), or with `adopt = "auto"` is put in use if the version in use is still the one the
+  trial began with; a worse or unclear one, or one you set aside on the page meanwhile, is set aside and the trial
+  ends; you are told how it came out. The version in use is never replaced unless the trial says better. At the
+  owner's pace of runs, a decision takes about three weeks.
+
+## The step, as built
+
+`dotx harness step [--run ID] [--scripted]` runs one by hand. The step reads one run of yours that ended since the last step that took
 one (a week back at most, item 719): a task or research run of its own, as the reflection reads them, that Dot's own
 agent worked (a run on one of Zen's free models goes whole to OpenCode's own agent, which takes no habits, tool
 guidance, notes or skills, so a step does not learn from it and a version never changes what it does; the reflection
@@ -461,7 +516,8 @@ confidence, before it writes a candidate. An experience written in a step that l
 third parties can author is kept marked (`tainted`, said on the page) and never shown to the proposer, as a tainted note
 is never shown to the lesson writer: its words cannot pass into a clean run's candidate unmarked.
 
-What the loop keeps is bounded (item 589). When a step ends it deletes the records older than `[harness] keep_days`
+What the loop keeps is bounded (item 589). When a step or a night ends (item 987) it deletes the records older than
+`[harness] keep_days`
 days (180; 0 keeps them for ever): the versions you set aside, the steps and the attempts of their probes, and the
 experiences, but for the adopted version and its lineage (the versions it was made from and composed of, the steps
 that touched them and the experiences about them); a version that is new or tried waits for you and is never deleted
@@ -477,8 +533,8 @@ shows fifty at a time under a button for the older ones, the version in use firs
 
 Settings › *Self-improvement* is the harness's page, in plain words (item 503): it opens by saying that Dot learns
 from its own runs how to work better on this Mac, that every run follows two short texts besides Dot's built-in
-instructions, that each night Dot can propose a new version and try it on test tasks first, and that you choose the
-version it follows and never have to write one. Its words for the states are *new* (`candidate`), *tried* (`probed`),
+instructions, that each night Dot reads how its real tasks went and keeps what went wrong in them (item 987), and that
+you choose the version it follows. Its words for the states are *new* (`candidate`), *tried* (`probed`),
 *in use* (`adopted`) and *set aside* (`retired`); **Use** adopts and **Set aside** retires. A version Dot wrote after
 a run that read content others can write, or that a version it was combined from came from, wears a *From outside
 content* pill, in its row and in the card of the version in use, with why on a hover, and **Use** asks first and says
@@ -500,9 +556,7 @@ tips they hold; opened (and kept open while the page is drawn again), they stand
 enough (*Habits · how to work*, *Tips · what this Mac and its apps want*), or that Dot's built-in instructions alone are
 in use. **Write your own**, at the head of *Versions* (item 566),
 opens the form in a dialog (item 615), so that the page keeps its size; it takes habits and tips (the tool guidance; prefilled
-from the adopted version) and a summary, and says what each takes (item 412): that writing one is optional since the
-nightly learning proposes
-versions, what a habit and a line of tool guidance are, the limits a version keeps and what each button does, with
+from the adopted version) and a summary, and says what each takes (item 412): what the nights do (item 987), what a habit and a line of tool guidance are, the limits a version keeps and what each button does, with
 examples in the empty fields and **Start from an example**, which puts them in; **Save for later** keeps it as a
 candidate and **Save and use** adopts it at once; what cannot be a component is refused with why. *Versions* lists the
 versions, fifty at a time (a button under them shows the older ones), the one in use first and the others the newest
@@ -510,19 +564,21 @@ first, with its state, who made it (you, or Dot's proposer or composer) and when
 is about and the moments of the run it answers, the trial's contrast, the decisions of a composition) under *Full text and
 notes*, **Use** on each version not in use (it asks first for one from outside content) and **Set aside** on a new or
 tried one; the version in use is set aside from *What Dot follows now*, and setting a version aside asks first. *Nightly
-learning* opens with when the step runs (every night at its time, with the next one, or that it is
-off), what a night costs (up to `step_tokens` tokens of the main model, which it names, and `step_minutes` minutes),
-and a switch and a time of day (item 721): switching it on asks first and says that cost again, a time is kept as it
+learning* opens with when the night runs (every night at its time, with the next one, or that it is
+off), what it does: a night calls no model (item 987), and once a week the proposer may write a version that is tried
+on half of the real tasks (item 988),
+and a switch and a time of day (item 721): switching it on asks first and says so again, a time is kept as it
 is chosen, and off needs no question; it lists the newest three steps (**Show all** the rest, item 938) and *Lessons
 learned* the newest experiences, a step with the run it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and the final check
 (the final set), who chooses, and the limits; the test tasks are the guards and the tasks the version in use still
-fails, or, while too few are known, how many of the pool Dot has tried to find them (item 719). A night that only tried
-tasks reads *trying tasks*, and its row says it tried test tasks; one that found every task known says it tried no
-test task (item 762). On a phone the page is a tab of *Rules and memory* in the settings list (item 845).
+fails, or, while too few are known, how many of the pool a step run by hand has tried to find them (item 719). A step
+that only tried tasks reads *trying tasks*, and its row says it tried test tasks; one that found every task known says
+it tried no test task (item 762). On a phone the page is a tab of *Rules and memory* in the settings list (item 845).
 
 ## What is built so far
 
 Item 389 built the versions, their components, the prompt's reading of the adopted one, the command line and the API.
 Item 390 built the roles and `dotx harness propose`. Item 391 built the probe, the step and its schedule. Item 392
-built the provenance graph, the lineage and the library's reading. Item 393 built the page. Left for later: a run of
+built the provenance graph, the lineage and the library's reading. Item 393 built the page. Item 987 made the night a
+digest of real runs, and item 988 added the week's proposal and its trial on real runs. Left for later: a run of
 yours kept as a test of the scoring set from its page, the step started from the page, and the graph drawn on it.

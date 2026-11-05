@@ -642,7 +642,8 @@ class HarnessConfig(FrozenModel):
     composer: str
     selector: str
     experience: str
-    # The nightly step (item 391): when it runs (HH:MM in [scheduler] timezone, or "off"), the scoring set and the
+    # When the night runs (HH:MM in [scheduler] timezone, or "off"; a digest of real runs since item 987), and for the
+    # step run by hand (item 391, `dotx harness step`) the scoring set and the
     # final set (eval task ids, no task in both: item 589), how many times each task is played, how many passes more
     # than the base a candidate needs over the whole scoring set to count as better (item 589: one lucky attempt is no
     # evidence), which scopes are proposed (each once), and its budget of minutes and tokens; who adopts a version the
