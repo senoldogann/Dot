@@ -33,9 +33,13 @@ starts none while a night is under way) and gives them.
 
 Dot reads its record since the last night (the week before, the first time). Four things count as a problem:
 
-- **A tool error seen in several runs.** A tool that failed with the same error, counted once a run.
+- **A tool error seen in several runs.** A tool that failed with the same error, counted once a run. An error of a
+  step that read outside content (a page, a mail, an MCP answer) keeps Dot's own first sentence alone, with quoted
+  words, paths and addresses taken out, as its title and evidence: what follows may quote the page, and the session
+  that fixes Dot's code reads it unattended (item 983).
 - **A progress watchdog alert.** Grouped by its pattern and detail.
-- **A failed step of the improvement loop.**
+- **A failed step of the improvement loop.** Not a refusal of the gate on what Dot learns (a text or a task that
+  "cannot be kept"): that is the gate at work, and a session asked to fix it would loosen it (item 983).
 - **An error in the daemon's log.** A line of level `error` or `critical` in `dotx.log` or the log before it
   (`dotx.log.1`), grouped by its event.
 
@@ -131,9 +135,10 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   - a path REVIEW.md lists under "Always needs a human", as `main` holds REVIEW.md on GitHub, never a checkout's copy
     a session could change (if REVIEW.md lists none there, every path counts);
   - the sources of the rules a session is held to and the gate's own code, by Dot's code whatever REVIEW.md says
-    (`PROTECTED`): REVIEW.md, CLAUDE.md, AGENTS.md, CONTRIBUTING.md, `.claude/`, `.github/`, `src/dotagent/repair/` and
-    the scheduler that starts the night. A change merged without you could otherwise loosen the gate for the nights
-    after it;
+    (`PROTECTED`): REVIEW.md, CLAUDE.md, AGENTS.md, CONTRIBUTING.md, `.claude/`, `.github/`, `src/dotagent/repair/`,
+    the scheduler that starts the night, and what marks and fences content third parties can author and the gate on
+    what Dot learns (`core/learned_text.py`, `core/text.py`, `tools/base.py`, `agent/executor.py`, `agent/gate.py`,
+    `harness/`; item 983). A change merged without you could otherwise loosen the gate for the nights after it;
   - what Dot installs and runs with: `pyproject.toml`, `uv.lock`, the `package.json` and `package-lock.json` files and
     the desktop app's `Cargo.toml` and `Cargo.lock`, so that a dependency changed by its lock alone is yours to take.
 - **Review.** Dot pushes the session's commit through the repository's pre-push hook, from your checkout of Dot, never

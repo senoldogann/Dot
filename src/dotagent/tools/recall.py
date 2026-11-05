@@ -110,7 +110,9 @@ async def _schedule(store: Store, record_id: str) -> _Recalled:
         + ("" if schedule.thread_id is None else f", chat {schedule.thread_id}"),
         f"Goal: {_clip(schedule.goal, _GOAL_CHARS)}",
     ]
-    return _Recalled(lines, False)
+    # A schedule a run made after it read outside content may hold those words in its name and goal, as its firings
+    # start marked for (item 978, the security audit of 2026-11-05).
+    return _Recalled(lines, schedule.options.from_outside)
 
 
 async def _approval(store: Store, record_id: str) -> _Recalled:

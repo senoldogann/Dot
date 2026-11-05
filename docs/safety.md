@@ -586,7 +586,9 @@ and so is the note that tells a run at work of such an end, which clears nothing
 an event or a notification (item 571, see [Dot comes to you](proactive.md#watchers)) starts untrusted whatever it goes
 on from, since what a stranger wrote set it off: its goal is your own words and the item stands in its first message, in
 a fence. So does every firing of a schedule a run made after it had read outside content (`schedule_create`, item
-899): its goal may hold those words; a change of yours in its form keeps the mark, and a schedule you make is yours. The run a move of the market starts (item 772) starts unmarked, as its schedule's firing does: what its first
+899): its goal may hold those words; a change of yours in its form keeps the mark, and a schedule you make is yours.
+`recall` of such a schedule gives its name and goal in a fence and marks the run that reads them, and `schedule_list`
+marks the run when it lists one and names it (item 978). The run a move of the market starts (item 772) starts unmarked, as its schedule's firing does: what its first
 message adds is product ids Dot checked against the form of an id and numbers it read from Coinbase's list, no one's
 words. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`),
 as does one it saved after your message cleared its mark, since your words clear the run's mark, not the page's

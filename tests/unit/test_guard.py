@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.desktop.safety import StepContext, assess_step
+from dotagent.core.errors import DesktopError
+from dotagent.desktop.actions import Inspection, _changed_since, refuse_secrets
+from dotagent.desktop.safety import AppRole, StepContext, assess_step
 from dotagent.desktop.types import Step
 from dotagent.policy.elements import Element, assessment_for, naming_reasons
 from dotagent.policy.engine import auto_review, decide, decide_past_review, route_for, waived_in_yolo
@@ -435,3 +437,39 @@ def test_a_name_javascript_writes_with_escapes_is_read_as_the_letters_it_stands_
     """JXA's escapes were read for the clipboard's names alone: ``m["s\\x65nd"]`` is ``m["send"]`` to the guard too."""
     for script in ('m["s\\x65nd"]("hi")', 'm["\\u0073end"]("hi")', 'm["\\u{73}end"]("hi")'):
         assert "message_send" in assess_applescript(script, _HOME, _HOME, (), ()).flags, script
+
+
+def test_a_drag_is_judged_where_it_lets_go_as_well_as_where_it_takes() -> None:
+    """Item 982, the security audit of 2026-11-05: a drag was judged at its start alone, so a file of Finder dropped on
+    a page, a password manager or Dot's own window went with no flag and no refusal."""
+    drag: Step = Step(action="drag", x=10, y=10, to_x=500, to_y=400)
+
+    def at(role: AppRole, app: str) -> StepContext:
+        return StepContext(role=role, app=app, element=None, secure=False, line=None)
+
+    finder: StepContext = at("finder", "Finder")
+    to_page: StepContext = finder.model_copy(update={"drop": at("other", "Google Chrome")})
+    given = assess_step(drag, to_page, _HOME, (), ())
+    assert "upload" in given.flags and given.risk == "medium"
+    refused: tuple[AppRole, ...] = ("secrets", "dot", "chrome_grant")
+    for role in refused:
+        onto = assess_step(drag, finder.model_copy(update={"drop": at(role, "x")}), _HOME, (), ())
+        assert onto.risk == "high" and "secret_access" in onto.flags, role
+    # A password manager is never controlled, where a drag ends either.
+    with pytest.raises(DesktopError, match="never controlled"):
+        refuse_secrets(finder.model_copy(update={"drop": at("secrets", "1Password")}))
+    # A drop that is another place when the drag runs than the one judged stops it, as another control under a click
+    # does (the pre-push review of item 982).
+    judged: Inspection = Inspection(context=to_page, target="a file", pid=1)
+    moved: Inspection = Inspection(context=finder.model_copy(update={"drop": at("dot", "Dot")}), target="a file", pid=1)
+    assert _changed_since(judged, moved) and not _changed_since(judged, judged)
+    other_copy: Inspection = Inspection(context=to_page, target="a file", pid=1, drop_pid=2)
+    assert _changed_since(judged, other_copy)
+    # An application dropped into System Settings (its Login Items) changes a setting.
+    settings = assess_step(
+        drag, finder.model_copy(update={"drop": at("system_settings", "System Settings")}), _HOME, (), ()
+    )
+    assert settings.risk == "high" and "system_settings" in settings.flags
+    # Within Finder, a file moved from one folder to another, is no upload.
+    inside = assess_step(drag, finder.model_copy(update={"drop": at("finder", "Finder")}), _HOME, (), ())
+    assert "upload" not in inside.flags

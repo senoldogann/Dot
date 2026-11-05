@@ -186,6 +186,11 @@ _DOT_ASSESSMENT: StepAssessment = StepAssessment(
     flags=("secret_access",),
     reasons=("works in Dot's own window, where its approvals, rules and settings are",),
 )
+# A file of Finder dragged onto another application gives it the file, as an upload does (item 982, the security audit
+# of 2026-11-05): a page's drop zone takes it as browser_upload's file input does.
+_FILE_OUT_ASSESSMENT: StepAssessment = StepAssessment(
+    risk="medium", flags=("upload",), reasons=("drags something out of Finder into another application",)
+)
 _SHELL_HOST_ASSESSMENT: StepAssessment = StepAssessment(
     risk="high",
     flags=("privilege",),
@@ -202,7 +207,8 @@ class StepContext(FrozenModel):
     """What a step acts upon, read from the machine right before the step: the application, the control, its secrecy,
     and in a terminal the command line as far as Dot typed it since the line was last empty (``None`` when that cannot
     be told, and outside a terminal). ``default_button`` is the button Return presses in the window the keyboard is in,
-    read for a step that presses Return (item 555); ``None`` for any other step and for a window with none."""
+    read for a step that presses Return (item 555); ``None`` for any other step and for a window with none. ``drop`` is
+    what a drag lets go on, read at its end point (item 982); ``None`` for any other step."""
 
     role: AppRole
     app: str
@@ -210,6 +216,7 @@ class StepContext(FrozenModel):
     secure: bool
     line: str | None
     default_button: Element | None = None
+    drop: "StepContext | None" = None
 
 
 def _key(text: str) -> str:
@@ -537,6 +544,10 @@ def assess_step(
         return _DOT_ASSESSMENT
     if context.role == "chrome_grant" and step.action != "wait":
         return _CHROME_GRANT_ASSESSMENT
+    # A drag acts where it lets go too (item 982): a drop on a password manager, Dot's window or Chrome's grant is
+    # judged as a click there, and something taken out of Finder into another application is given to it.
+    if step.action == "drag" and context.drop is not None and context.drop.role in ("secrets", "dot", "chrome_grant"):
+        return assess_step(step, context.drop, workspace, protected, dot_paths)
     parts: list[StepAssessment] = [quiet_assessment() if step.action in _QUIET_ACTIONS else assessment_for([])]
     if context.role == "system_settings" and step.has_side_effects():
         parts.append(_SETTINGS_ASSESSMENT)
@@ -544,6 +555,14 @@ def assess_step(
         parts.extend(_typing_parts(step, context))
     if step.action in _CLICK_ACTIONS:
         parts.append(assessment_for(clicking_reasons(context.element, DESKTOP_CLICKABLE_ROLES)))
+    if step.action == "drag" and context.drop is not None:
+        parts.append(assessment_for(clicking_reasons(context.drop.element, DESKTOP_CLICKABLE_ROLES)))
+        # Dropped into System Settings (an application into its Login Items) changes a setting as a click there does
+        # (the pre-push review of item 982).
+        if context.drop.role == "system_settings":
+            parts.append(_SETTINGS_ASSESSMENT)
+        if context.role == "finder" and context.drop.role != "finder":
+            parts.append(_FILE_OUT_ASSESSMENT)
     if step.action == "key" and step.key is not None:
         parts.extend(_chord_parts(parse_chord(step.key), context))
     if step.action == "menu" and step.path:

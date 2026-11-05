@@ -809,7 +809,8 @@ that lies reads as a strange step in the panel, not as something withheld later.
 and no secret field's name, which the recorder leaves out before the draft is written. A review model that
 fails, or a folder that cannot be written, leaves a `playbook_failed` event on the run; a written or updated one a
 `playbook_written` event and a retired one a `playbook_retired` event. A run that read content third parties can author
-(a web page, a message, a result of an MCP server) is distilled from its own steps alone: the model sees each call and
+(a web page, a message, a result of an MCP server), or whose chat holds such content an earlier run of it read (the
+owner's "go on" clears a run's mark, not the page's words: item 980), is distilled from its own steps alone: the model sees each call and
 whether it worked, never what it returned nor the run's answer, so nothing a page says reaches the skill as a step. The
 skill's record says where it comes from (`tainted`, and the runs in `tainted_runs`, which `dotx playbooks show` and
 the API show), and it is offered with some of its lines withheld, as below. The model is told never to put a secret, a

@@ -134,6 +134,19 @@ class Book(FrozenModel):
 EMPTY_BOOK: Book = Book(problems=(), looked_at=None)
 
 
+def _first_sentence(text: str) -> str:
+    """The first sentence of an error, Dot's own words before what it may quote, with quoted words, paths and addresses
+    taken out (:func:`normalized`)."""
+    head: str = text.strip().split("\n", 1)[0]
+    for end in (". ", ": "):
+        head = head.split(end, 1)[0]
+    return normalized(head)
+
+
+# The words of a refusal of the gate on what Dot learns (harness/service.py, agent/review.py), as they start.
+_GATE_REFUSALS: tuple[str, ...] = ("this text cannot be kept (", "the task cannot be kept:")
+
+
 def normalized(words: str) -> str:
     """``words`` with what differs between two sightings of one problem taken out (ids, numbers, quoted words, paths,
     addresses), cut at its first line and to :data:`TITLE_CHARS`."""
@@ -271,10 +284,20 @@ def run_sightings(run_id: str, events: Iterable[EventRecord]) -> list[Sighting]:
                 continue
             if tool in _COMMAND_TOOLS and text.lstrip().startswith(_COMMAND_ENDS):
                 continue
-            words: str = f"{tool}: {text}"
+            # An error of a step that read outside content may quote it after Dot's own first words (a page's
+            # snapshot, the address it was at, the error a page threw): the problem keeps that first sentence alone,
+            # so that no word a page wrote reaches the unattended session that fixes Dot's code (item 983, the review of
+            # the self-improvement rebuild).
+            outside: bool = event.data.get("tainted") is True
+            words: str = f"{tool}: {_first_sentence(text) if outside else text}"
+            evidence: str = (
+                f"{run_id}: {words} (the rest is left out: the step read outside content)"
+                if outside
+                else f"{run_id}: {words}"
+            )
             sightings.setdefault(
                 fingerprint("tool_error", normalized(words)),
-                Sighting(kind="tool_error", words=words, evidence=f"{run_id}: {words}", at=event.ts),
+                Sighting(kind="tool_error", words=words, evidence=evidence, at=event.ts),
             )
         elif event.kind == "stall":
             reason: object = event.data.get("reason")
@@ -288,11 +311,15 @@ def run_sightings(run_id: str, events: Iterable[EventRecord]) -> list[Sighting]:
 
 
 def step_sightings(steps: Iterable[HarnessStep], since: float) -> list[Sighting]:
-    """The steps of the improvement loop that failed at or after ``since``."""
+    """The steps of the improvement loop that failed at or after ``since``, but for the learned-text gate's refusals:
+    a text it refused is the gate at work, and a session asked to fix it would loosen the gate (item 983)."""
     return [
         Sighting(kind="harness", words=step.error, evidence=f"{step.id}: {step.error}", at=step.started_at)
         for step in steps
-        if step.state == "failed" and step.error and step.started_at >= since
+        if step.state == "failed"
+        and step.error
+        and step.started_at >= since
+        and not any(refusal in step.error for refusal in _GATE_REFUSALS)
     ]
 
 

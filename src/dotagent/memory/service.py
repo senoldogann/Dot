@@ -204,13 +204,14 @@ async def save_memory(
     it holds is the latest save's), saved one after the other or at once, as long as the saver is handed the note that
     has it (another agent's note is not merged into); a resting note saved again is awake. A run that had read content
     third parties can author saves a tainted note (``tainted``): a note keeps where it came from. A note that had the
-    text already keeps the mark it had, since the same words bring nothing new in. A new note comes back with the
+    text already keeps the mark it had, since the same words bring nothing new in; nor do the tags of such a run, which
+    are its words too, come into an unmarked note (item 979). A new note comes back with the
     existing notes the saver is handed that are nearly the same, so the caller can retire the ones that are outdated."""
     text: str = _checked_text(content, index.config.max_chars)
     clean_tags: tuple[str, ...] = normalize_tags(tags)
     existing: MemoryRecord | None = await index.store.find_memory_by_content(text, agent_id)
     if existing is not None:
-        return await _saved_again(index.store, existing, clean_tags, expires_at)
+        return await _saved_again(index.store, existing, clean_tags, expires_at, tainted)
     vector: Vector | None = None
     similar: tuple[MemoryHit, ...] = ()
     if index.embedder is not None:
@@ -220,8 +221,15 @@ async def save_memory(
     record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector, expires_at, tainted)
     if not created:
         # Another save of the text, by another run or process, added it meanwhile.
-        return await _saved_again(index.store, record, clean_tags, expires_at)
+        return await _saved_again(index.store, record, clean_tags, expires_at, tainted)
     return SavedMemory(record=record, created=True, similar=similar)
+
+
+def _tags_taken(existing: MemoryRecord, tags: tuple[str, ...], tainted: bool) -> tuple[str, ...]:
+    """The tags of a save of ``existing``'s text that it takes: none from a run that read content third parties can
+    author into a note that is not marked so (item 979, the security audit of 2026-11-05). Its tags are its words, and
+    an unmarked note is handed to every run as trusted; a ``core`` tag would hand an owner's note to every run."""
+    return () if tainted and not existing.tainted else tags
 
 
 def _merged_tags(own: Sequence[str], saved: Sequence[str]) -> tuple[str, ...]:
@@ -236,6 +244,7 @@ async def _saved_again(
     existing: MemoryRecord,
     tags: tuple[str, ...],
     expires_at: float | None,
+    tainted: bool,
 ) -> SavedMemory:
     """The note ``existing``, whose text was saved again with ``tags``, holding until ``expires_at``: the tags are
     merged into its own, and a note the reflection rested (tagged ``rest``), or whose time ran out or changes, is
@@ -244,7 +253,9 @@ async def _saved_again(
     if existing.merged_into is not None:
         standing: list[MemoryRecord] = await store.get_memories([existing.merged_into])
         existing = standing[0] if standing else existing
-    merged: tuple[str, ...] = _merged_tags(existing.tags, tags)
+    # Judged on the note that takes the tags, the one a merge put the saved words into (the pre-push review of item
+    # 979).
+    merged: tuple[str, ...] = _merged_tags(existing.tags, _tags_taken(existing, tags, tainted))
     # The owner's note or a pinned one keeps its time: a run that saves its words again with a few days' validity does
     # not make a note that never rests run out (the review of 2026-11-01).
     if existing.pinned_at is not None or existing.source_run is None:

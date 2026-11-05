@@ -130,6 +130,17 @@ async def _rule(store: Store, rule_id: str) -> RuleRecord:
 _INPUT_MOMENT: str = "%Y-%m-%dT%H:%M"
 # What a rule may answer that lets a step through unasked: such a rule is added or switched on on the Mac (item 678).
 _WIDENING: frozenset[Behavior] = frozenset({"allow", "preapproved"})
+
+
+def uncovers_preapproved(rule: RuleRecord, rules: list[RuleRecord]) -> bool:
+    """Whether taking ``rule`` away (switched off or deleted) may hand its steps to a preapproved rule after it (item
+    981, the security audit of 2026-11-05): the first rule that fits decides, and an allow rule asks of a run that read
+    outside content where a preapproved one does not, so an allow rule above a preapproved one narrows what it fits."""
+    return rule.behavior == "allow" and any(
+        other.enabled and other.behavior == "preapproved" and other.position > rule.position for other in rules
+    )
+
+
 # Tells the pages that a rule was added, switched or deleted (a live event of the lifecycle stream), so that every page
 # that shows the rules reads them again.
 RULES_CHANGED_EVENT: str = "rules_changed"
@@ -219,8 +230,11 @@ def rules_router(ctx: ServerContext) -> APIRouter:
     @router.patch("/rules/{rule_id}")
     async def set_rule_enabled(rule_id: str, request: RuleEnabledRequest, http: Request) -> RuleRecord:
         rule: RuleRecord = await _rule(store, rule_id)
-        # Switching on a rule that lets steps through, or off one that asks, widens what runs do unasked.
-        if request.enabled == (rule.behavior in _WIDENING):
+        # Switching on a rule that lets steps through, or off one that asks, widens what runs do unasked; so does
+        # switching off an allow rule above a preapproved one (item 981).
+        if request.enabled == (rule.behavior in _WIDENING) or (
+            not request.enabled and uncovers_preapproved(rule, await store.list_rules())
+        ):
             refuse_from_a_phone(http.scope, "switch a rule so that steps go through unasked")
         await store.set_rule_enabled(rule_id, request.enabled)
         await tell_rules_changed()
@@ -240,6 +254,8 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         rule: RuleRecord = await _rule(store, rule_id)
         if rule.behavior not in _WIDENING:
             refuse_from_a_phone(http.scope, "delete a rule that asks")
+        if uncovers_preapproved(rule, await store.list_rules()):
+            refuse_from_a_phone(http.scope, "delete an allow rule that a preapproved rule after it would stand in for")
         await store.delete_rule(rule_id)
         await tell_rules_changed()
         return rule

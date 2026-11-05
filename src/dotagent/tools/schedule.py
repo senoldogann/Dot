@@ -36,6 +36,7 @@ from dotagent.tools.base import (
     ToolResult,
     make_live_tool,
     make_tool,
+    mark_untrusted,
     ok,
 )
 from dotagent.tools.context import ToolContext
@@ -221,7 +222,15 @@ def _list_tool() -> RegisteredTool:
             return ok(f"No schedules. {DAEMON_NOTE}")
         lines: list[str] = [render_schedule_header(len(records), zone)]
         lines.extend([render_schedule_entry(record, await schedule_zone(record.options, zone)) for record in records])
-        return ok("\n".join(lines))
+        # A schedule a run made after it read outside content may hold those words in its name and goal: the list
+        # that shows them marks the reader as a page would (item 978, the security audit of 2026-11-05).
+        outside: list[str] = [record.id for record in records if record.options.from_outside]
+        if not outside:
+            return ok("\n".join(lines))
+        lines.append(
+            f"The schedules {', '.join(outside)} were made by a run that read content third parties can author."
+        )
+        return mark_untrusted(ok("\n".join(lines)))
 
     return make_tool(
         name="schedule_list",
