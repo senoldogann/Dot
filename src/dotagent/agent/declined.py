@@ -38,9 +38,10 @@ _PARTIAL: re.Pattern[str] = re.compile(r"…|\[\d+ chars omitted\]|\[\d+ more ch
 
 
 def declined_key(info: ActionInfo) -> str | None:
-    """The action as its card showed it, exactly (a browser element keeps its ref while its role and name stay the
-    same, so another Reply button is another action); None for a kind that says not what it writes, and for a card that
-    shows less than the whole action (:data:`_PARTIAL`), in its summary or its target."""
+    """The action as its card showed it, exactly, with what it runs whole (a page's script, item 985; a browser
+    element keeps its ref while its role and name stay the same, so another Reply button is another action); None for
+    a kind that says not what it writes, and for a card that shows less than the whole action (:data:`_PARTIAL`), in its
+    summary or its target."""
     if info.kind in _UNBOUND_KINDS or _PARTIAL.search(info.summary) or _PARTIAL.search(info.target):
         return None
     amount: str = "" if info.amount is None else render_amount(info.amount)

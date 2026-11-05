@@ -215,7 +215,8 @@ command as the card showed it, not the files it reads. [Proactive](proactive.md)
 is told that the step did not happen and waits for you, and goes on with what does not depend on it, or ends and says
 what waits for you; its later hand-offs are kept at once, with no new wait, until you write to it or do a step it kept.
 A kept step is a `left` record with the fingerprint of its action (tool, kind, summary, target, amount, flags, the files
-it changes and the application it opens; none when its card shows less than all of it, a write's text or a cut summary)
+it changes, the application it opens and, for a page's script, the whole script it runs, item 985; none when its card
+shows less than all of it, a write's text or a cut summary)
 and the time it lapses, `[policy] parked_hours` (72) on: the run's page lists it as "Kept for you" with the questions it
 left, the timeline says so where it was asked, the Activity list shows it among what waits, `dotx run` prints it, and
 your phone is told when it is kept. The same step, by its fingerprint, is kept once in a chat (the run is told it waits
