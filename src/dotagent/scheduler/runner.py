@@ -451,10 +451,9 @@ class Scheduler:
         await command(restart_argv(sys.executable), Path.home(), self._runtime.shell_env)
 
     async def _step_if_due(self, now: float) -> None:
-        """Start the step of the harness (item 391) in a task when its daily time has passed since the last one (or the
-        last attempt); never while one is under way, and never with ``[harness] step_time`` off. While the emergency
-        stop is engaged none starts, and one under way is cancelled, which ends its probe's process and the commands
-        it started (item 683)."""
+        """Start the night of the harness (the digest of the day's real runs, item 987) in a task when its daily time
+        has passed since the last one (or the last attempt); never while one is under way, and never with ``[harness]
+        step_time`` off. While the emergency stop is engaged none starts, and one under way is cancelled (item 683)."""
         if await _emergency_stop_engaged():
             if self.stepping() and self._stepping is not None:
                 self._stepping.cancel()

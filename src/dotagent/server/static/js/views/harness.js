@@ -405,7 +405,7 @@ function testTasks(view) {
     return `the ones the version in use still fails sometimes: ${view.headroom.join(", ")} (${each}; ${tried}), and a few it passes, so that a version that breaks them loses`;
   }
   const found = view.headroom.length === 0 ? "none so far" : `so far ${view.headroom.join(", ")}`;
-  return `none yet. Dot tries a few tasks of its pool a night, ${each}, to find ${view.headroom_least} the version in use fails sometimes (${found}; ${tried}): nothing is proposed until then, since no version could be better on tasks that pass already`;
+  return `none yet. A step run by hand tries a few tasks of its pool, ${each}, to find ${view.headroom_least} the version in use fails sometimes (${found}; ${tried}): it proposes nothing until then, since no version could be better on tasks that pass already`;
 }
 
 /** The time the nightly learning is offered at when it is switched on, a quiet hour of most nights. */
@@ -492,11 +492,11 @@ function fact(term, words) {
 
 /** How the learning is set (the folded section): the test tasks, the final check, who chooses and the limits. */
 function howItLearns(view) {
-  // The night puts a version in use only with the test tasks played at least twice, as docs/harness.md says.
+  // A step run by hand puts a version in use only with the test tasks played at least twice, as docs/harness.md says.
   const once = view.step_repeats >= 2 ? "" : " (they are played once now, so it puts nothing in use until they are played twice)";
   const adopts =
     view.adopt === "auto"
-      ? `Dot itself, when the test showed a version better and worse on no task with the test tasks played twice${once}, and the test played again on new attempts showed it better again; never over a version you chose since the night began`
+      ? `Dot itself, in a step run by hand, when the test showed a version better and worse on no task with the test tasks played twice${once}, and the test played again on new attempts showed it better again; never over a version you chose since the step began`
       : "you, from the versions above";
   const kept =
     view.keep_days === 0
@@ -566,7 +566,7 @@ function buildForm(view) {
   const intro = el(
     "p",
     { class: "hint harness-intro" },
-    `Optional: you need not write anything here. ${nightly} They appear under Versions for you to use. Write one yourself only when you want every task to keep a way of working you choose.`,
+    `Optional: you need not write anything here. ${nightly} Write one yourself when you want every task to keep a way of working you choose.`,
   );
   const bounds = el(
     "p",

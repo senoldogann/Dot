@@ -1000,8 +1000,9 @@ class HarnessView(FrozenModel):
     author and why (``from_outside``, by version id: the notes of a version and of the ones it was composed of, item
     588) and which hold a text the gate for learned texts refuses now (``refused``, by version id, in words: such a
     version is not adopted and a prompt leaves the component out, item 587), the bounds a component keeps to, and how
-    the nightly step is set (item 393): when it runs ("off" never; ``step_time_set_on`` says whether the page set it or
-    the settings file, item 721), its budget of minutes and tokens of the main model it names, the scoring set (the
+    the learning is set (item 393): when the night runs ("off" never; ``step_time_set_on`` says whether the page set it
+    or the settings file, item 721; a digest of real runs, item 987), and for the step run by hand its budget of minutes
+    and tokens of the main model it names, the scoring set (the
     guards, item 719), how many tasks the pool holds, which of them the version in use still fails (``headroom``) and
     how many it has not tried (``untried``), how many tasks with headroom a candidate needs to be judged, the final set,
     the repeats, the margin of passes a candidate needs to count as better, who adopts a version the probe showed better

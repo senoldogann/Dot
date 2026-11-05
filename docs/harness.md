@@ -538,9 +538,9 @@ and a switch and a time of day (item 721): switching it on asks first and says s
 is chosen, and off needs no question; it lists the newest three steps (**Show all** the rest, item 938) and *Lessons
 learned* the newest experiences, a step with the run it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and the final check
 (the final set), who chooses, and the limits; the test tasks are the guards and the tasks the version in use still
-fails, or, while too few are known, how many of the pool Dot has tried to find them (item 719). A night that only tried
-tasks reads *trying tasks*, and its row says it tried test tasks; one that found every task known says it tried no
-test task (item 762). On a phone the page is a tab of *Rules and memory* in the settings list (item 845).
+fails, or, while too few are known, how many of the pool a step run by hand has tried to find them (item 719). A step
+that only tried tasks reads *trying tasks*, and its row says it tried test tasks; one that found every task known says
+it tried no test task (item 762). On a phone the page is a tab of *Rules and memory* in the settings list (item 845).
 
 ## What is built so far
 
