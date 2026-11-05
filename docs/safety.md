@@ -386,8 +386,8 @@ trading off.
    summary (a shell command's starts with `Run: ` and names the folder it runs in when the call names one, item 483,
    so an expression can fit that folder too), a line break and its target (the command, the path, the address), and
    for a page's script (`browser_eval`), whose summary shows its start and whose target is the page, a line break and
-   the whole script, which the review model of `auto` reads whole too, or hands to you past 12,000 characters (item
-   985);
+   the whole script, which the review model of `auto` reads whole too, or hands to you past 12,000 characters, the
+   card of the approval showing it whole under Script (item 985);
    one that takes longer than 0.25 s to match is stopped and the action refused, as for a rule that cannot be read, so
    that a pattern that backtracks for long cannot hold the daemon (item 387). A rule
    reads as a sentence in Settings › Rules, "When Dot wants to run a command that mentions “git push”, it asks you

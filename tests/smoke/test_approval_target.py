@@ -51,6 +51,12 @@ _TURNS: list[ScriptedTurn] = [
     ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": COMMAND}),)),
     ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Left.", "success": True}),)),
 ] * len(_SHOTS)
+# A page's script whose part past what its summary shows is what it does (item 985).
+SCRIPT: str = "/* " + "a long note " * 40 + "*/ document.title = 'sent';"
+_SCRIPT_TURNS: list[ScriptedTurn] = [
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="browser_eval", arguments={"script": SCRIPT}),)),
+    ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Left.", "success": True}),)),
+] * 2
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -59,14 +65,16 @@ async def login_env() -> dict[str, str]:
 
 
 @asynccontextmanager
-async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, RunManager, str]]:
+async def _daemon(
+    login_env: dict[str, str], turns: list[ScriptedTurn]
+) -> AsyncIterator[tuple[Runtime, RunManager, str]]:
     """The daemon in the home of the environment, under the cautious preset (it asks before any command), whose model
-    plays ``_TURNS``, served at the address it yields."""
+    plays ``turns``, served at the address it yields."""
     config: AppConfig = eval_config(load_default_config())
     cautious: AppConfig = config.model_copy(update={"policy": config.policy.model_copy(update={"preset": "cautious"})})
     runtime: Runtime = await open_runtime(cautious, login_env)
     try:
-        await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _TURNS))
+        await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, turns))
         manager: RunManager = RunManager(runtime)
         stopping: asyncio.Event = asyncio.Event()
         listener = bind_listener("127.0.0.1", 0)
@@ -116,7 +124,7 @@ async def test_an_approval_card_shows_a_long_command_whole_wrapped_in_a_box_that
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
     with scratch_home() as home, eval_environment(home, {}):
-        async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
+        async with _daemon(login_env, _TURNS) as (runtime, manager, address), async_playwright() as playwright:
             host, port = "127.0.0.1", int(address.rpartition(":")[2])
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
@@ -146,6 +154,39 @@ async def test_an_approval_card_shows_a_long_command_whole_wrapped_in_a_box_that
                 await browser.close()
 
 
+@pytest.mark.browser
+async def test_an_approval_card_shows_a_page_script_whole(login_env: dict[str, str], tmp_path: Path) -> None:
+    """A page's script asks with its target the page and its summary the script's start (item 985): the card shows the
+    script whole, as the owner answers for what it runs, wide and on a phone."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env, _SCRIPT_TURNS) as (runtime, manager, address), async_playwright() as playwright:
+            host, port = "127.0.0.1", int(address.rpartition(":")[2])
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                for width in (1280, 390):
+                    page: Page = await browser.new_page(
+                        viewport={"width": width, "height": 900}, reduced_motion="reduce"
+                    )
+                    await page.goto(ui_url(host, port, TOKEN))
+                    run, approval = await _asking(runtime, manager, f"Run the page's script ({width})")
+                    assert approval.tool == "browser_eval"
+                    assert SCRIPT not in approval.summary
+                    await page.goto(f"{address}/#/runs/{run.id}")
+                    card: Locator = page.locator(".approval").filter(has=page.get_by_role("button", name="Deny"))
+                    script: Locator = card.get_by_label("What the action runs")
+                    await script.wait_for()
+                    assert await script.text_content() == SCRIPT
+                    assert await card.evaluate("(card) => card.getBoundingClientRect().right <= window.innerWidth")
+                    await card.scroll_into_view_if_needed()
+                    await page.screenshot(path=str(tmp_path / f"script-{width}.png"))
+                    await card.get_by_role("button", name="Deny").click()
+                    async with asyncio.timeout(WAIT_S):
+                        assert (await manager.wait(run.id)).status == "done"
+                    await page.close()
+            finally:
+                await browser.close()
+
+
 async def _decided_shows(page: Page, approved: bool) -> None:
     """What the chat of a run that ended shows of its approval: nothing when it was allowed (item 434), else the refused
     card, alone: the line that asked said what it says (item 871)."""
@@ -165,7 +206,7 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
     with scratch_home() as home, eval_environment(home, {}):
-        async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
+        async with _daemon(login_env, _TURNS) as (runtime, manager, address), async_playwright() as playwright:
             host, port = "127.0.0.1", int(address.rpartition(":")[2])
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
@@ -232,7 +273,7 @@ async def test_the_bell_leads_to_the_chat_that_asks_and_not_to_the_list_of_chats
     """The owner's word of 2026-10-20: the bell of the header leads to the chat whose approval waits, its card there,
     and not to the home's list — wide and on a phone."""
     with scratch_home() as home, eval_environment(home, {}):
-        async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
+        async with _daemon(login_env, _TURNS) as (runtime, manager, address), async_playwright() as playwright:
             host, port = "127.0.0.1", int(address.rpartition(":")[2])
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:

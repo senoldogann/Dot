@@ -250,24 +250,28 @@ function technicalDetails(args, said) {
   const fresh = new Set(unsaid(named.map(([, words]) => words), said));
   const chips = named.filter(([, words]) => fresh.has(words)).map(([title, words]) => el("span", { class: "chip", title }, words));
   const target = typeof args.target === "string" && args.target !== "" ? args.target : null;
-  if (chips.length === 0 && target === null) {
+  // What the step runs where its target says only where (a page's script, item 985): asked of the owner because the
+  // review did not read it whole, so the card shows it whole.
+  const body = typeof args.body === "string" && args.body !== "" ? args.body : null;
+  if (chips.length === 0 && target === null && body === null) {
     return null;
   }
   return el(
     "div",
     { class: "stack tight" },
     chips.length > 0 ? el("div", { class: "cluster" }, chips) : null,
-    target === null ? null : targetBlock(target, args.kind === "shell" ? "Command" : "Target"),
+    target === null ? null : targetBlock(target, args.kind === "shell" ? "Command" : "Target", "What the action acts on"),
+    body === null ? null : targetBlock(body, "Script", "What the action runs"),
   );
 }
 
 // The whole target, as the action would act on it (item 242): a long command wraps, and scrolls within the card past a
 // dozen lines. It is the box of code a chat shows everywhere else (item 537), so the owner can copy what is asked.
-function targetBlock(target, label) {
+function targetBlock(target, label, name) {
   const block = codeBlock({ text: target, label, wrapped: true, className: "approval-target" });
   const text = block.querySelector("pre");
   text.tabIndex = 0;
-  text.setAttribute("aria-label", "What the action acts on");
+  text.setAttribute("aria-label", name);
   return block;
 }
 
