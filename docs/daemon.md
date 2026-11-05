@@ -186,8 +186,9 @@ one line of the **+**, the words ("Message Miro", the name you call Dot by; "Fol
 tooltip says that @ opens the apps and / the skills and commands) and the microphone at the right, with the files
 attached and the picks above it; as the words take more lines, the buttons stay at the last. A file uploads as it
 is attached; a picture past a megabyte and 2048 pixels on its longer side goes as a JPEG of 2048 (its clear parts
-white), as a model reads it at about that size, and a send pressed while files upload says once that the message goes
-when they are there, and sends it then (item 990). On that line the send
+white), as a model reads it at about that size (one the browser cannot read fails on its chip, with the browser's
+words); a send pressed while files upload says once that the message goes when they are there, and sends it then,
+with the words in the box and the files listed by then (item 990). On that line the send
 comes beside the microphone once there are words or a file (it stays where the browser cannot listen), and a Stop is
 always in sight. The run's choices wait behind the **+** menu's **Model and options**, which brings them on a bar of
 their own under the words, with the send, and **Hide the model and options** puts them away again; the choice is kept

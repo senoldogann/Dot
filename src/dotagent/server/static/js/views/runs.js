@@ -6,7 +6,7 @@
 import { actorFace, DOT_ID } from "../actors.js";
 import { api } from "../api.js";
 import { assistant, loadAssistant, onAssistant } from "../assistant.js";
-import { messageText, readyToSend } from "../attachments.js";
+import { filesUploaded, messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
 import { el, modelName } from "../dom.js";
@@ -240,6 +240,10 @@ function buildComposer(ctx, listener) {
     if (starting) {
       return;
     }
+    // Files still uploading are waited for before the box is read (item 990).
+    if (!(await filesUploaded(attachments))) {
+      return;
+    }
     // A message of files alone goes too (item 445): a pasted text or a picture sent without a word typed.
     const text = messageText(goal.value, attachments);
     if (text === "") {
@@ -254,7 +258,7 @@ function buildComposer(ctx, listener) {
       goal.focus();
       return;
     }
-    if (!(await readyToSend(attachments))) {
+    if (!readyToSend(attachments)) {
       return;
     }
     starting = true;

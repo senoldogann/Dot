@@ -27,7 +27,8 @@ export function jpegName(name) {
 
 /**
  * `file`, or a smaller JPEG of it when it is a picture past SHRINK_FROM_BYTES and SHRINK_EDGE pixels and the JPEG is
- * smaller. A transparent picture's clear parts turn white, as a JPEG has none.
+ * smaller. A transparent picture's clear parts turn white, as a JPEG has none. A picture the browser cannot read fails
+ * its upload with the browser's error, on its chip.
  */
 export async function smallerPicture(file) {
   if (!SHRINKS.has(file.type) || file.size < SHRINK_FROM_BYTES) {
@@ -36,7 +37,8 @@ export async function smallerPicture(file) {
   const bitmap = await createImageBitmap(file);
   try {
     const size = fitWithin(bitmap.width, bitmap.height, SHRINK_EDGE);
-    if (size.width === bitmap.width && size.height === bitmap.height && file.type === "image/jpeg") {
+    // A picture within the edge goes as it is, whatever its weight: a screenshot's text stays sharp, and a PNG clear.
+    if (size.width === bitmap.width && size.height === bitmap.height) {
       return file;
     }
     const canvas = document.createElement("canvas");

@@ -10,7 +10,7 @@ import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } f
 import { isTrader, TRADING_DESK } from "../agentpanel.js";
 import { api } from "../api.js";
 import { BUSY_SEND, settingValue } from "../appearance/settings.js";
-import { messageText, readyToSend } from "../attachments.js";
+import { filesUploaded, messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
 import { ago, clip, compact, el, modelName, plural, setText, switchRow } from "../dom.js";
@@ -1213,13 +1213,17 @@ export function startComposer({ name, bounds, owner, ctx, follow }) {
   const keys = messageKeys();
 
   async function submit() {
+    // Files still uploading are waited for before the box is read (item 990).
+    if (starting || !(await filesUploaded(attachments))) {
+      return;
+    }
     // A message of files alone goes too (item 445): a pasted text or a picture sent without a word typed.
     const text = messageText(goal.value, attachments);
     if (starting || text === "") {
       goal.focus();
       return;
     }
-    if (!(await readyToSend(attachments))) {
+    if (!readyToSend(attachments)) {
       return;
     }
     starting = true;

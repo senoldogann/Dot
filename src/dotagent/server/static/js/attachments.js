@@ -507,11 +507,13 @@ export function messageText(text, attachments) {
 const waiting = new WeakSet();
 
 /**
- * Whether a message may go: while its files upload, once they have (item 990: a press of Send while they uploaded was
- * refused with a toast, one more at each press, and the owner pressed again and again); a press while one waits sends
- * nothing more. Says why not when a file failed.
+ * Whether the message of a box may be read and sent now, once the files listed have uploaded (item 990: a press of Send
+ * while they uploaded was refused with a toast, one more at each press, and the owner pressed again and again): says
+ * once that the message goes when they are there, and waits for them, those added meanwhile too. A press while one
+ * waits gets false and sends nothing. The caller reads the box only after it, so that words typed and files added while
+ * it waited go with the message.
  */
-export async function readyToSend(attachments) {
+export async function filesUploaded(attachments) {
   if (waiting.has(attachments)) {
     return false;
   }
@@ -519,10 +521,21 @@ export async function readyToSend(attachments) {
     waiting.add(attachments);
     toast("ok", "Goes once the files are uploaded");
     try {
-      await attachments.settled();
+      while (attachments.busy()) {
+        await attachments.settled();
+      }
     } finally {
       waiting.delete(attachments);
     }
+  }
+  return true;
+}
+
+/** Whether a message may go now; says why not when files are still uploading or failed. */
+export function readyToSend(attachments) {
+  if (attachments.busy()) {
+    toast("error", "Wait until the files are uploaded");
+    return false;
   }
   if (attachments.failed()) {
     toast("error", "Remove the files that failed to upload, or attach them again");

@@ -8,7 +8,7 @@ import { api, eventNotShown, follow, query, sse } from "../api.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAsksDock } from "../asksdock.js";
-import { messageText, readyToSend } from "../attachments.js";
+import { filesUploaded, messageText, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { createCapsule } from "../capsule.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
@@ -875,6 +875,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     if (sending) {
       return;
     }
+    // Files still uploading are waited for before the box is read (item 990).
+    if (!(await filesUploaded(attachments))) {
+      return;
+    }
     // A message of files alone goes too (item 445): a pasted text or a picture sent without a word typed.
     const text = messageText(input.value, attachments);
     if (text === "") {
@@ -883,7 +887,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
     if (queue.editing() !== null) {
       // The edit's files go as a new message's do: once uploaded, and none that failed (item 376).
-      if (!(await readyToSend(attachments))) {
+      if (!readyToSend(attachments)) {
         return;
       }
       sending = true;
@@ -910,7 +914,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       await startLoop(text, other);
       return;
     }
-    if (!(await readyToSend(attachments))) {
+    if (!readyToSend(attachments)) {
       return;
     }
     const files = attachments.ids();
@@ -939,7 +943,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       input.focus();
       return;
     }
-    if (!(await readyToSend(attachments))) {
+    if (!readyToSend(attachments)) {
       return;
     }
     const message = loop.message;

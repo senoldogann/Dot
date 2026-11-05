@@ -607,7 +607,7 @@ async def test_a_large_photo_goes_smaller_and_a_send_while_it_uploads_waits_for_
     """Item 990, the owner's word of 2026-11-05: a phone's photos uploaded slowly, and each press of Send while they did
     said "Wait until the files are uploaded" once more. A picture past a megabyte and 2048 pixels goes as a JPEG of 2048
     on its longer side; Send pressed while it uploads says once that the message goes when the files are there, and it
-    goes then, once, with them."""
+    goes then, once, with them and with the words in the box by then."""
     host: str = client.base_url.host
     port: int | None = client.base_url.port
     assert port is not None
@@ -632,12 +632,14 @@ async def test_a_large_photo_goes_smaller_and_a_send_while_it_uploads_waits_for_
             await page.locator(".composer input[type=file]").set_input_files(str(picture))
             await expect(page.locator(".composer .attach-chip.uploading")).to_have_count(1)
             box: Locator = page.locator(".composer textarea")
-            await box.fill(goal)
+            await box.fill("What is in")
             await box.press("Enter")
             await box.press("Enter")
             waits: Locator = page.locator(".toast", has_text="Goes once the files are uploaded")
             await expect(waits).to_have_count(1)
             await expect(page.locator(".toast", has_text="Wait until")).to_have_count(0)
+            # The words typed while it waits go with the message (the pre-push review: the box was read at the press).
+            await box.fill(goal)
             async with page.expect_response("**/api/attachments") as answered:
                 held.set()
             stored = await (await answered.value).json()
