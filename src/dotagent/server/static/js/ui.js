@@ -50,10 +50,11 @@ export function toast(kind, text, action = null, details = "") {
   // uploaded stacked one more "Wait until the files are uploaded"): the one there stays, for its whole time again.
   const plain = action === null && details === "";
   const key = `${kind}\n${text}`;
+  const lasts = kind === "error" ? ERROR_TOAST_MS : TOAST_MS;
   const shown = plain ? showing.get(key) : undefined;
-  if (shown !== undefined && shown.node.isConnected) {
+  if (shown !== undefined) {
     clearTimeout(shown.timer);
-    shown.timer = setTimeout(() => shown.node.remove(), kind === "error" ? ERROR_TOAST_MS : TOAST_MS);
+    shown.timer = setTimeout(shown.gone, lasts);
     return;
   }
   const fold = detailsFold(details);
@@ -61,15 +62,22 @@ export function toast(kind, text, action = null, details = "") {
   if (action !== null) {
     node.append(el("button", { class: "btn sm toast-action", type: "button", onclick: action.run }, action.label));
   }
+  // Taken away, it is no longer one that shows.
+  const gone = () => {
+    node.remove();
+    if (showing.get(key)?.node === node) {
+      showing.delete(key);
+    }
+  };
   node.addEventListener("click", (event) => {
     if (fold === null || !fold.contains(event.target)) {
-      node.remove();
+      gone();
     }
   });
   toastRegion().append(node);
-  const timer = setTimeout(() => node.remove(), action !== null || fold !== null ? ACTION_TOAST_MS : kind === "error" ? ERROR_TOAST_MS : TOAST_MS);
+  const timer = setTimeout(gone, action !== null || fold !== null ? ACTION_TOAST_MS : lasts);
   if (plain) {
-    showing.set(key, { node, timer });
+    showing.set(key, { node, timer, gone });
   }
 }
 

@@ -4,7 +4,7 @@
 
 // The longer side a picture is brought down to, and the size from which it is.
 export const SHRINK_EDGE = 2048;
-export const SHRINK_FROM_BYTES = 1024 * 1024;
+const SHRINK_FROM_BYTES = 1024 * 1024;
 const QUALITY = 0.88;
 // What a browser decodes everywhere; HEIC is not among them (Chrome on a Mac does not), and a GIF may move.
 const SHRINKS = new Set(["image/jpeg", "image/png", "image/webp"]);
