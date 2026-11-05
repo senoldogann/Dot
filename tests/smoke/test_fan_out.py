@@ -21,7 +21,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import AgentRecord, EventRecord, RunPicks, RunRecord
 from dotagent.tools.fan_out import ready_steps
-from dotagent.tools.meta import FINISH_TOOL, UPDATE_PLAN_TOOL
+from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
 
 pytestmark = pytest.mark.asyncio
 
@@ -31,6 +31,20 @@ _RUN_WAIT_S: float = 60.0
 
 def _finish(answer: str) -> ScriptedTurn:
     return ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": True}),))
+
+
+def _close(step: int, evidence: str, answer: str) -> ScriptedTurn:
+    """Mark ``step`` done, then finish, in one reply: an open step sends finish back until it is closed."""
+    return ScriptedTurn(
+        text="",
+        calls=(
+            ScriptedCall(
+                tool=MARK_PLAN_STEP_TOOL,
+                arguments={"step": step, "status": "done", "evidence": evidence},
+            ),
+            ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": True}),
+        ),
+    )
 
 
 def _plan(steps: list[dict[str, object]]) -> ScriptedTurn:
@@ -89,13 +103,14 @@ async def test_two_independent_steps_with_a_brief_run_at_once_as_helpers_and_com
         },
         {"text": "Add the two counts", "status": "pending", "depends_on": [1, 2]},
     ]
-    # The plan's own step stays open, so the run's first finish is sent back once (an open plan), the second ends it.
+    # The helpers finish first. The parent's own step stays open, so that finish is sent back; closing the step
+    # and finishing again ends the run. Fan-out itself leaves the own step pending.
     turns: list[ScriptedTurn] = [
         _plan(steps),
         _finish("12 lines."),
         _finish("30 lines."),
         _finish("42 in all."),
-        _finish("42 in all."),
+        _close(3, "12 and 30 are 42", "42 in all."),
     ]
     await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, turns))
     manager: RunManager = RunManager(runtime)
@@ -114,9 +129,15 @@ async def test_two_independent_steps_with_a_brief_run_at_once_as_helpers_and_com
             "Count the lines of a.txt; answer the number.",
             "Count the lines of b.txt; answer the number.",
         ]
-        plan: PlanPayload = await _last_plan(runtime, run.id)
-        assert [step.status for step in plan.steps] == ["done", "done", "pending"]
-        assert all("Report:" in step.evidence for step in plan.steps[:2])
+        plans: list[PlanPayload] = [
+            plan_from_event(event) for event in await runtime.store.events_of_kinds(run.id, (PLAN_EVENT,), 20)
+        ]
+        assert [[step.status for step in plan.steps] for plan in plans] == [
+            ["in_progress", "in_progress", "pending"],
+            ["done", "done", "pending"],
+            ["done", "done", "done"],
+        ]
+        assert all("Report:" in step.evidence for step in plans[1].steps[:2])
         # The plan's call carries its own limit, by which the watchdog reads the run as busy while its helpers work.
         [call] = [
             event
