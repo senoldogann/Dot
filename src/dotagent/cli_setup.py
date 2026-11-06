@@ -196,8 +196,8 @@ async def _keep_notes_working(config: AppConfig, provider: str, ollama: tuple[st
 
 def _models_lines(config: AppConfig, ref: ModelRef, roles: Sequence[ModelRole], ollama_down: bool) -> str:
     """What setup says of the models: the main one, and for each role the model it has now. A role that is not written
-    keeps the model it had, with why and, where that model cannot do the work (one of Zen's, or one of an Ollama that
-    does not answer on this Mac), where to choose another (item 558)."""
+    keeps the model it had, with why and, where that model cannot do the work (one that answers only as its own agent,
+    Zen's or Claude Code's, or one of an Ollama that does not answer on this Mac), where to choose another (item 558)."""
     kept: dict[ModelRole, str] = {
         "fast": config.models.fast,
         "review": config.models.review,
