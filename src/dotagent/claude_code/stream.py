@@ -124,15 +124,20 @@ def _int(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
 
 
-# How the init line marks a plugin that comes inside the program itself, which every install has and no flag turns
-# off (`--safe-mode` lists them too): measured on 2.1.318, with `--tools ""` and `--setting-sources ""` they give the
-# model no tool, slash command or skill, and no CLAUDE.md or AGENTS.md reached it (item 1013's first real run).
+# The plugins the program comes with, which every install has and no flag turns off (`--safe-mode` lists them too):
+# measured on 2.1.318, with `--tools ""` and `--setting-sources ""` they gave the model no tool, slash command or
+# skill, and no CLAUDE.md or AGENTS.md reached it (item 1013's first real run). Only these pass, by name: one a later
+# version brings (it could carry hooks or skills) ends the run until it is measured and added here.
 _BUILT_IN: str = "builtin"
+MEASURED_BUILT_INS: frozenset[str] = frozenset(
+    {"cc-plugin-sec-default", "cc-plugin-agents-md", "cc-plugin-privacy", "cc-plugin-plugin-authoring"}
+)
 
 
 def _added_plugins(value: object) -> tuple[str, ...]:
-    """The plugins of the init line that the program does not come with: one the owner or a project installed, which
-    could bring hooks, agents or skills of its own and so ends the run (:func:`init_problem`)."""
+    """The plugins of the init line but the measured ones the program comes with (:data:`MEASURED_BUILT_INS`): one the
+    owner or a project installed, or a built-in of a later version, could bring hooks, agents or skills of its own and
+    so ends the run (:func:`init_problem`)."""
     if not isinstance(value, list):
         return ()
     added: list[object] = [
@@ -141,7 +146,8 @@ def _added_plugins(value: object) -> tuple[str, ...]:
         if not (
             isinstance(item, dict)
             and item.get("path") == _BUILT_IN
-            and _str(item.get("source")).endswith(f"@{_BUILT_IN}")
+            and _str(item.get("name")) in MEASURED_BUILT_INS
+            and _str(item.get("source")) == f"{_str(item.get('name'))}@{_BUILT_IN}"
         )
     ]
     return _names(added)

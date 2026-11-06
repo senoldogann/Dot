@@ -9,7 +9,15 @@ import stat
 from pathlib import Path
 
 from dotagent.agent.limits import LimitReached, RunLimits
-from dotagent.claude_code.run import claude_argv, claude_env, ended_clean, mcp_config, system_prompt, write_mcp_config
+from dotagent.claude_code.run import (
+    answered_all,
+    claude_argv,
+    claude_env,
+    ended_clean,
+    mcp_config,
+    system_prompt,
+    write_mcp_config,
+)
 from dotagent.claude_code.stream import (
     BlockBegan,
     Delta,
@@ -268,3 +276,20 @@ def test_a_message_the_program_took_in_is_read_and_a_tool_result_is_not() -> Non
     assert read_line(json.dumps(replay)) == Taken()
     tool_result: dict[str, object] = {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result"}]}}
     assert read_line(json.dumps(tool_result)) is None
+
+
+def test_a_result_answers_the_messages_taken_before_its_last_step_and_not_one_taken_after() -> None:
+    """The pre-push review of item 1013: a message taken while a tool worked is answered by the next step of the turn,
+    one result for both (measured); one taken while the last step streamed waits for a turn of its own."""
+    assert answered_all(taken=1, sent=1, taken_since_step=False)
+    assert answered_all(taken=2, sent=2, taken_since_step=False)
+    assert not answered_all(taken=2, sent=2, taken_since_step=True)
+    assert not answered_all(taken=1, sent=2, taken_since_step=False)
+
+
+def test_only_the_measured_built_in_plugins_pass() -> None:
+    later: dict[str, str] = {"name": "cc-plugin-new", "path": "builtin", "source": "cc-plugin-new@builtin"}
+    own: list[str] = [f"mcp__{DOOR}__notify"]
+    connected: list[dict[str, str]] = [{"name": DOOR, "status": "connected"}]
+    refused: str | None = init_problem(_init(own, connected, {"plugins": [later]}), DOOR)
+    assert refused is not None and "cc-plugin-new" in refused

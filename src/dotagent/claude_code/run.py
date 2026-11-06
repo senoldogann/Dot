@@ -18,14 +18,15 @@ The program's environment is Self-repair's worker's (:func:`dotagent.repair.clau
 is billed, no secret-named variable) without Dot's or git's own variables, with its updater, telemetry and error
 reports off. Dot never reads Claude Code's credentials.
 
-Dot shows what the model does as its own runs show theirs: its text and thinking as they come, each step with its
-tools, its tokens and the plan's window. The owner's messages go to the program on its input while it works, and a stop
-of the run ends it. The run ends done with the model's answer once each message sent has its result, and failed when
-the session fails, when the plan's window is used up (with when it resets: nothing moves the run to another model),
-when the program says nothing for ``[providers.claude_code] silence_s`` while none of Dot's tools works for it, when its
-last reply was cut short, and when it goes on past the run's limits (``run_max_minutes``, ``run_max_tokens``), which it
-is told of once. A run here has none of the rest of what Dot's own runs bring (the memory recalled at the start, the
-checks of a finish, the lessons and playbooks)."""
+Dot shows what the model does as its own runs show theirs: its text and thinking as they come, each step with its tools,
+its tokens and the plan's window. The owner's messages go to the program on its input while it works, and a stop of the
+run ends it. The run ends done with the model's answer at a result once the program has taken in each message sent and
+answered it (a message taken after the turn's last step began waits for a turn of its own: :func:`answered_all`), and
+failed when the session fails, when the plan's window is used up (with when it resets: nothing moves the run to another
+model), when the program says nothing for ``[providers.claude_code] silence_s`` while none of Dot's tools works for it,
+when its last reply was cut short, and when it goes on past the run's limits (``run_max_minutes``, ``run_max_tokens``),
+which it is told of once. A run here has none of the rest of what Dot's own runs bring (the memory recalled at the
+start, the checks of a finish, the lessons and playbooks)."""
 
 import asyncio
 import base64
@@ -355,8 +356,10 @@ class _Follow:
     over: LimitReached | None = None
     steps: int = 0
     sent: int = 0
-    # The messages the program said it took in: the run is over at a result once it took each one sent.
+    # The messages the program said it took in, and whether one came after the turn's last step began (taken then, it
+    # waits for a turn of its own; one taken before a step is that step's to answer).
     taken: int = 0
+    taken_since_step: bool = False
     answer: str = ""
     session_id: str = ""
     inited: bool = False
@@ -439,6 +442,7 @@ class _Follow:
                     )
             case Taken():
                 self.taken += 1
+                self.taken_since_step = True
                 return False
             case Result():
                 return await self.result(event)
@@ -454,6 +458,7 @@ class _Follow:
     async def reply(self, event: StepBegan | BlockBegan | Delta | StepFinished | StepClosed) -> None:
         match event:
             case StepBegan():
+                self.taken_since_step = False
                 self.stream.begin(await asyncio.to_thread(known_secrets, filled=True))
                 self.step = _Step(
                     started=time.monotonic(), input_tokens=event.input_tokens, cached_tokens=event.cached_tokens
@@ -520,7 +525,7 @@ class _Follow:
         self.session_id = event.session_id or self.session_id
         if event.text.strip():
             self.answer = event.text.strip()
-        return self.taken >= self.sent
+        return answered_all(self.taken, self.sent, self.taken_since_step)
 
     async def keep_to_limits(self) -> None:
         """Read the run's limits after a step that the model goes on from, as the loop reads them between its steps
@@ -678,6 +683,14 @@ async def _prompt_of(agent: AgentRun, door: Door) -> str:
         datetime.now().astimezone().strftime("%A %Y-%m-%d, time zone %Z (UTC%z)"),
         known,
     )
+
+
+def answered_all(taken: int, sent: int, taken_since_step: bool) -> bool:
+    """Whether a result answers every message sent: the program took each one in (``taken``, by
+    ``--replay-user-messages``), and none was taken after the turn's last step began (``taken_since_step``). Measured
+    on 2.1.318: a message sent while a tool worked was taken in and the next step of the same turn answered it, one
+    result for both; one taken while the last step streamed waits for a turn of its own, which a step begins."""
+    return taken >= sent and not taken_since_step
 
 
 def ended_clean(over: LimitReached | None, finish: str) -> bool:

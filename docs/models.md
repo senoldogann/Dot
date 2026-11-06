@@ -280,7 +280,10 @@ answer keeps its words, Ollama's too.
   (`--setting-sources ""`: no hook runs, no `CLAUDE.md` or `AGENTS.md` is read), no MCP server but the door
   (`--strict-mcp-config`), no slash command, and a permission mode that refuses whatever the door does not name
   (`dontAsk` with `--allowedTools mcp__<door>`); its first line says what the model has, and a run whose model has any
-  tool, MCP server, slash command, skill or plugin besides the door's is ended failed at once. The door's secret is in a
+  tool, MCP server, slash command, skill or plugin besides the door's is ended failed at once, but the four plugins the
+  program comes with (`cc-plugin-sec-default`, `-agents-md`, `-privacy`, `-plugin-authoring`, by name: measured on
+  2.1.318 with the flags above, they gave the model no tool, command or skill, and no `CLAUDE.md` or `AGENTS.md` reached
+  it; a built-in a later version brings ends the run until it is measured). The door's secret is in a
   file only you can read in a folder of the run's own, removed as the run ends, never in the program's arguments. The
   timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
   window; your messages reach it while it works, and Stop ends the program. A chat keeps its Claude Code session from
