@@ -28,6 +28,7 @@ from dotagent.core.types import JsonObject
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.harness.components import length_fix, problem_fix, words_within
+from dotagent.harness.step import keep_reason
 from dotagent.llm.router import ModelRouter
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
 from dotagent.tools.meta import FINISH_TOOL
@@ -212,3 +213,10 @@ async def test_an_answer_the_checks_refuse_is_unusable_and_a_broken_wire_is_not(
     with pytest.raises(ProviderProtocolError) as broken:
         await _asked(BrokenWireProvider([]))
     assert not isinstance(broken.value, UnusableAnswer)
+
+
+def test_a_steps_reason_names_what_befell_the_proposer_alone() -> None:
+    """Item 1015's pre-push review: a task writer that failed is the step's error, not the proposer's reason."""
+    assert keep_reason(0, 0) == "the proposer kept the harness"
+    assert keep_reason(0, 2) == "the proposer's answer was unusable"
+    assert keep_reason(1, 1) == "the proposer failed"

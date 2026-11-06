@@ -243,6 +243,17 @@ def state_of(outcome: _Outcome) -> HarnessStepState:
     return outcome.state
 
 
+def keep_reason(failed: int, unusable: int) -> str:
+    """Why a step proposed no candidate, by what befell the proposer alone (item 1015): a scope it failed in on the
+    wire, else one whose answer was unusable, else it kept the harness. What befell the task writer is the step's
+    error, never the proposer's reason."""
+    if failed:
+        return "the proposer failed"
+    if unusable:
+        return "the proposer's answer was unusable"
+    return "the proposer kept the harness"
+
+
 def _unusable(answer: str, error: UnusableAnswer) -> str:
     """How the record says that ``answer`` (``the task writer's answer``) stayed unusable after its attempts (item
     1015), and why."""
@@ -414,6 +425,7 @@ async def _carry_out(
     # step records the answer as unusable (item 1015) and adopts nothing on its own.
     candidates: list[HarnessVersion] = []
     proposals_unusable: int = 0
+    proposals_failed: int = 0
     for scope in plan.scopes:
         try:
             candidate: HarnessVersion | None = await propose_from_run(runtime, from_run, scope)
@@ -427,17 +439,12 @@ async def _carry_out(
             # are still proposed (item 718).
             log.warning("harness_proposal_failed", step=step.id, scope=scope, error=exc.message)
             errors.append(f"the proposer failed in the {scope} scope: {exc.message}")
+            proposals_failed += 1
             continue
         if candidate is not None:
             candidates.append(candidate)
     if not candidates:
-        reason: str = (
-            "the proposer failed"
-            if errors
-            else "the proposer's answer was unusable"
-            if proposals_unusable
-            else "the proposer kept the harness"
-        )
+        reason: str = keep_reason(proposals_failed, proposals_unusable)
         return _Outcome(
             state="keep",
             facts={"from_run": from_run, "reason": reason, "task": learned_note, "unusable": list(unusable)},
