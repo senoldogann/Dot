@@ -87,4 +87,4 @@ that it found none, and what it tried.
 - `desktop/tools.lock` (the programs the app carries, pinned by hash)
 - `desktop/fetch-tools.sh` (how those programs are fetched, checked and signed)
 - `desktop/release.sh` (what a release builds, signs and publishes, and in what order)
-- `.github/workflows/`, `pyproject.toml` dependencies
+- `pyproject.toml` dependencies
