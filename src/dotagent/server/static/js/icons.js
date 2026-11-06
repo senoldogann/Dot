@@ -312,7 +312,7 @@ const SHAPES = {
     ["line", { x1: 10, x2: 14, y1: 8, y2: 8 }],
     ["line", { x1: 18, x2: 22, y1: 16, y2: 16 }],
   ],
-  // The settings' cog (item 492), which the foot of the sidebar wears in place of the word.
+  // The settings' cog (item 492).
   settings: [
     [
       "path",

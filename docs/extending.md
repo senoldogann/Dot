@@ -230,8 +230,8 @@ same way (`args = ["-y", "some-mcp-server@1.2.3"]`).
 
 ### Connect apps
 
-**Connect apps** (items 492 and 545), at the foot of the sidebar right of the cog of Settings, on the sidebar's own
-ground as the cog is, opens Customize › Connectors, which it stands for while it is open, wearing the logos of four
+**Connect apps** (items 492 and 545), at the foot of the sidebar over your account's row (item 999), on the sidebar's
+own ground, opens Customize › Connectors, which it stands for while it is open, wearing the logos of four
 services (three until item 959): those whose servers are ready, the first by name and each service once, the same ones
 while they stay connected (item 853; item 509 turned them every few seconds), only a service's own logo, not the icon
 or the plug of a server with none, nor Dot's own; and while fewer are ready, the services most connect first (Google,

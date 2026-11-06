@@ -120,7 +120,7 @@ A row is one tab, its name over a line that says what it holds, with what it hol
 how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its
 own, the bar naming the tab, with no row of the section's tabs over it, and a card's name stands over the
 card, as a section's title does on the redrawn tabs (item 576); a card that folds keeps its name on its ground. In a
-Mac's window the sidebar is the settings' nav while they are open, the seven sections of item 845 (item 562); see
+Mac's window the sidebar is the settings' nav while they are open, the same rows by their names (items 562 and 999); see
 [the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
 Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px
 (item 331). A service's page of Customize › Connectors and an agent's editor name their cards the same way, a row of the

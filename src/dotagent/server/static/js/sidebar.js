@@ -1555,10 +1555,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav),
   );
-  // Connect apps (items 492 and 545): at the foot, right of the cog of Settings, the way to Customize › Connectors, the
-  // page of the services Dot works with, with the marks of the MCP servers it is connected to; the list of pages no
-  // longer names Customize. On a phone, a round button of its own that wears a grid of tiles, the cog having moved to
-  // your initials at the head (item 991).
+  // Connect apps (items 492 and 545): at the foot, over your account's row (item 999), the way to Customize ›
+  // Connectors, the page of the services Dot works with, with the marks of the MCP servers it is connected to; the list
+  // of pages no longer names Customize. On a phone, a round button of its own that wears a grid of tiles, the account
+  // having moved to your initials at the head (item 991).
   const connectMarks = el("span", { class: "side-connect-marks", "aria-hidden": "true" });
   const connectButton = el(
     "button",

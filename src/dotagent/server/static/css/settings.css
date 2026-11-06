@@ -1160,9 +1160,9 @@
   }
 }
 
-/* On a phone the settings open on a list of their seven sections (items 330 and 845): a card of rows, a row the
-   section's mark, its name, what it holds and an arrow. A row opens its section as a page of its own, whose way back to
-   the list is the bar's Back at the top left (item 338). */
+/* On a phone the settings open on one sheet of their groups of rows (items 330 and 995): a card of rows, a row the
+   tab's mark, its name over its line, what it holds and an arrow. A row opens its tab as a page of its own, whose way
+   back to the sheet is the bar's Back at the top left (item 338). */
 .settings-list {
   display: flex;
   flex-direction: column;

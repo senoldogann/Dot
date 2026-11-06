@@ -1277,7 +1277,8 @@
     height: 20px;
   }
 
-  /* Settings is your initials at the top (item 991): the cog leaves the foot, which holds the apps and the search. */
+  /* Settings is your initials at the top (item 991): the account's row leaves the foot, which holds the apps and the
+     search. */
   .side-foot > .side-link.side-settings {
     display: none;
   }

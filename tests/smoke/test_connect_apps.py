@@ -154,14 +154,14 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             page: Page = await _page(browser, address, 1280, "light")
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
-            # The button stands right of the cog of Settings, on its row and in sight, and wears the mark of the
-            # server that is ready; the list of pages names Customize no more.
+            # The button stands over your account's row, which opens the settings (item 999), level with it and in
+            # sight, and wears the mark of the server that is ready; the list of pages names Customize no more.
             button: Locator = page.locator("#sidebar .side-foot").get_by_role("button", name="Connect apps")
             await expect(button).to_be_visible()
             settings: FloatRect = await _box(page.locator("#sidebar .side-foot").get_by_role("link", name="Settings"))
             at: FloatRect = await _box(button)
-            assert at["x"] >= settings["x"] + settings["width"] and at["y"] + at["height"] <= 860, (at, settings)
-            assert abs((at["y"] + at["height"] / 2) - (settings["y"] + settings["height"] / 2)) <= 1, (at, settings)
+            assert at["y"] + at["height"] <= settings["y"] and settings["y"] + settings["height"] <= 860, (at, settings)
+            assert abs(at["x"] - settings["x"]) <= 1, (at, settings)
             # The pages are Agents' row (while there is no agent of one's own) and the head's icons (item 855).
             await expect(page.locator("#sidebar nav.side-links a.side-link")).to_have_text(["Agents"])
             heads: list[str] = await page.locator("#sidebar .side-head nav.side-pages a").evaluate_all(
