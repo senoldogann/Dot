@@ -74,12 +74,27 @@ export function setToken(value, keep = true) {
  * the message from the daemon's own page alone; the installation's token is never passed on.
  */
 export function tellPhoneApp() {
-  const handler = /** @type {{webkit?: {messageHandlers?: {dot?: {postMessage(message: object): void}}}}} */ (window).webkit
-    ?.messageHandlers?.dot;
+  const handler = phoneApp();
   if (handler === undefined || token === null || !token.startsWith(PHONE_KEY_PREFIX)) {
     return;
   }
   handler.postMessage({ type: "paired", key: token });
+}
+
+/** The `dot` message handler of Dot's iPhone app, or undefined in a browser (item 997). */
+function phoneApp() {
+  return /** @type {{webkit?: {messageHandlers?: {dot?: {postMessage(message: object): void}}}}} */ (window).webkit?.messageHandlers?.dot;
+}
+
+/** Whether the page is Dot's iPhone app's (item 1005): its web view names it in the user agent, and its notifications
+ * are the app's own (APNs), not the browser's. */
+export function inPhoneApp() {
+  return navigator.userAgent.includes("DotPhone/") && phoneApp() !== undefined;
+}
+
+/** Open the app's page of the iPhone's Settings, where its notifications are switched (item 1005). */
+export function openPhoneAppSettings() {
+  phoneApp()?.postMessage({ type: "openSettings" });
 }
 
 export function clearToken() {

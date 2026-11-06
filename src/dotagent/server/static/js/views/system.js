@@ -1,7 +1,7 @@
 // The system page: how the daemon is doing, the emergency stop, the health checks and the models each provider offers.
 
 import { DOT_ID, lookOf, rememberLook } from "../actors.js";
-import { api, clearToken } from "../api.js";
+import { api, clearToken, inPhoneApp, openPhoneAppSettings } from "../api.js";
 import {
   AUTO_COMPUTER,
   AUTO_LINES,
@@ -158,8 +158,30 @@ function statusFacts(status) {
   return [groups, el("dl", { class: "kv kv-wide-rows" }, wideEntry("Connected apps left out", leftOutServers(status.mcp_failures)))];
 }
 
+/** Notifications in Dot's iPhone app (item 1005): the app's own, through APNs, switched in the iPhone's Settings; the
+ * browser's switches would do nothing there, as its web view has no web push. */
+function buildAppNotifications() {
+  return section(
+    "Notifications",
+    null,
+    el(
+      "div",
+      { class: "card-pad stack" },
+      el(
+        "p",
+        { class: "hint" },
+        "The Dot app tells you when a task ends or Dot needs you, and shows the task at work on the lock screen and in the Dynamic Island. Switch them in the iPhone's Settings › Dot › Notifications.",
+      ),
+      el("button", { class: "btn", type: "button", onclick: openPhoneAppSettings }, icon("settings"), "Open iPhone Settings"),
+    ),
+  );
+}
+
 /** Notifications, on the desktop and on the phone: the one setting that also depends on what the browser allows. */
 function buildNotifications() {
+  if (inPhoneApp()) {
+    return buildAppNotifications();
+  }
   const setting = switchSetting({
     label: "Notifications",
     hint: "",

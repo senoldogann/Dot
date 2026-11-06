@@ -59,6 +59,8 @@ enum BridgeRejection: Error, Equatable {
 enum BridgeMessage: Equatable, Sendable {
     /// The page was paired with the daemon and hands over the phone's key.
     case paired(key: String)
+    /// The page asks for the app's page of the iPhone's Settings, where its notifications are switched (item 1005).
+    case openSettings
 }
 
 /// The origin of the frame that sent a message, as WebKit reports it.
@@ -96,6 +98,9 @@ func readBridgeMessage(body: Any, origin: MessageOrigin, host: DaemonHost) -> Re
     }
     guard let object: NSDictionary = body as? NSDictionary, let type: String = object["type"] as? String else {
         return .failure(.notAnObject)
+    }
+    if type == "openSettings" {
+        return .success(.openSettings)
     }
     guard type == "paired" else {
         return .failure(.unknownType(type))
