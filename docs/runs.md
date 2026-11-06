@@ -661,7 +661,9 @@ ECharts or Chart.js for charts, Mermaid for diagrams, D3 for a drawing of the ru
 page the run made in its workspace (an `.html`, `.htm`, `.xhtml` or `.svg` file) is shown by its path instead of its
 HTML (item 598): the file must lie in the workspace once its links are followed and not among the pages a crawl or an
 MCP answer kept there, and the call is judged as a read of it, as `read_file`'s is. The files beside it that it names
-are written into it, since a shown page loads nothing of this Mac (item 600): a style sheet becomes a style block, a
+are written into it, since a shown page loads nothing of this Mac (item 600), and so are the workspace's files a page
+given as HTML names by a relative path, as if it stood in the workspace (item 1007: a picture Dot made, named
+`cv/shot.png`, left the page empty): a style sheet becomes a style block, a
 script its text, and a picture, a sound, a video or a font of the page, of its styles or of a tag's `style` a `data:`
 address, each when it is one `read_file` reads without a question (in the workspace, not protected, not Dot's own, not a
 crawl's or an MCP answer's) and the page with it stays one page (500,000 characters): a file that would not fit is
