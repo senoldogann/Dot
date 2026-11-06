@@ -338,7 +338,9 @@ of such a run on a model with fast mode asks for it (`speed: "fast"` with the be
 preview models need
 and Opus 5.5 takes without effect); a step on another model (a routed step, a standby model) runs at the standard speed,
 as do helpers on a model without it. Dot never falls back by itself: a refusal (an organization not let into a preview
-model's fast mode, fast mode's own rate limit, once retried) is the run's error, as Anthropic says it. Fast mode for a
+model's fast mode, fast mode's own rate limit, once retried) is the run's error, as Anthropic says it. Opus on your
+Claude plan (`claude_code:opus`) has fast mode too, which Claude Code runs off on a plan without extra usage: there the
+run goes at the standard speed and its answer says so (item 1014, above). Fast mode for a
 model without it is refused (a 422 over HTTP). Switching the speed of a chat starts the prompt cache again.
 
 **Ultrathink and Ultracode.** The Reasoning menu has two choices for one message, under This message only (item 251).

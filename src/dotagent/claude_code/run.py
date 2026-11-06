@@ -101,7 +101,8 @@ from dotagent.core.paths import claude_code_dir
 from dotagent.core.text import redact_known, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.claude_code import EFFORTS, FAST_SETTINGS, ClaudeCodeProvider
-from dotagent.llm.router import ModelRef, parse_model_ref
+from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
+from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
     ChatProvider,
     Effort,
@@ -234,20 +235,19 @@ def write_mcp_config(folder: Path, config: JsonObject) -> Path:
 def claude_argv(
     program: str,
     model: str,
-    effort: Effort | None,
+    effort: Effort,
     speed: Speed,
     prompt: str,
     config_file: Path,
     door: str,
     resume: str | None,
 ) -> tuple[str, ...]:
-    """The command of a run: ``model`` (Claude Code's alias) at ``effort`` (``--effort``, one of
-    :data:`~dotagent.llm.claude_code.EFFORTS`; Claude Code's own for any other) and ``speed`` (fast mode through
-    ``--settings``, the one settings source a run reads, item 1014), with ``prompt`` after Claude Code's own system
+    """The command of a run: ``model`` (Claude Code's alias) at ``effort`` (``--effort``, a level of
+    :data:`~dotagent.llm.claude_code.EFFORTS`, :func:`run_effort`) and ``speed`` (fast mode through ``--settings``, the
+    one settings source a run reads, item 1014; :func:`run_speed`), with ``prompt`` after Claude Code's own system
     prompt, the door ``door`` of ``config_file`` as its only MCP server and its tools as the only ones, in the session
     ``resume`` names or a new one; its input and output are lines of JSON."""
     again: tuple[str, ...] = () if resume is None else ("--resume", resume)
-    level: tuple[str, ...] = ("--effort", effort) if effort in EFFORTS else ()
     fast: tuple[str, ...] = ("--settings", FAST_SETTINGS) if speed == "fast" else ()
     return (
         program,
@@ -261,7 +261,8 @@ def claude_argv(
         "--verbose",
         "--model",
         model,
-        *level,
+        "--effort",
+        effort,
         *fast,
         "--append-system-prompt",
         prompt,
@@ -726,6 +727,20 @@ def fast_off_words(why: str) -> str:
     return f"Fast mode was off for this run: {_FAST_OFF_WORDS.get(why, why)}; it went at the standard speed."
 
 
+def run_effort(chosen: Effort | None, configured: Effort) -> Effort:
+    """The level a run of the plan thinks at (item 1014): the run's own, else the configured default, rounded to the
+    nearest of Claude Code's (``off`` and ``minimal`` to the lowest, ``max`` the highest), as Dot's own loop rounds a
+    level to a model's (:func:`dotagent.llm.traits.effective_effort`); what the composer shows is what goes."""
+    level: Effort | None = effective_effort(EFFORTS, configured if chosen is None else chosen)
+    return EFFORTS[0] if level is None else level
+
+
+def run_speed(ref: ModelRef, speed: Speed) -> Speed:
+    """The speed a run asks the program for: fast only on a model with fast mode (:func:`offers_fast_mode`), as Dot's
+    own loop asks it of a step, so a chat's fast speed carried to another model asks for none."""
+    return speed if offers_fast_mode(ref) else "standard"
+
+
 def answered_all(taken: int, sent: int, taken_since_step: bool) -> bool:
     """Whether a result answers every message sent: the program took each one in (``taken``, by
     ``--replay-user-messages``), and none was taken after the turn's last step began (``taken_since_step``). Measured
@@ -792,8 +807,8 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
             argv: tuple[str, ...] = claude_argv(
                 str(program),
                 ref.model,
-                run.effort,
-                run.speed,
+                run_effort(run.effort, runtime.config.models.effort),
+                run_speed(ref, run.speed),
                 prompt,
                 config_file,
                 door.name,
