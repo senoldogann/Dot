@@ -16,13 +16,36 @@ import { codeText } from "./memory.js";
 const STATE_TONE = { adopted: "b-ok", probed: "b-warn", candidate: "b-info", retired: "b-muted" };
 // A version's state and a night's outcome in the words of the page; the API's own words stay in the docs.
 const STATE_WORDS = { adopted: "in use", probed: "tried", candidate: "new", retired: "set aside" };
-const STEP_TONE = { done: "b-ok", keep: "b-muted", skipped: "b-muted", failed: "b-bad", calibrating: "b-info" };
-// A night that tried test tasks to find the ones a version can do better on, and proposed nothing (item 719).
-const STEP_WORDS = { done: "done", keep: "no change", skipped: "skipped", failed: "failed", calibrating: "trying tasks" };
+const STEP_TONE = {
+  done: "b-ok",
+  keep: "b-muted",
+  skipped: "b-muted",
+  failed: "b-bad",
+  calibrating: "b-info",
+  unusable: "b-warn",
+};
+// A night that tried test tasks to find the ones a version can do better on, and proposed nothing (item 719). A night
+// that went on without a model's answer it could not use after asking three times (item 1015).
+const STEP_WORDS = {
+  done: "done",
+  keep: "no change",
+  skipped: "skipped",
+  failed: "failed",
+  calibrating: "trying tasks",
+  unusable: "answer unusable",
+};
 // The nights the strip of the overview shows, the newest at its right end.
 const STRIP_STEPS = 14;
-// A night's cell in the strip, by its outcome: a change made, none, or a failure; each is named in the legend too.
-const STRIP_KIND = { done: "done", keep: "quiet", skipped: "quiet", failed: "failed", calibrating: "quiet" };
+// A night's cell in the strip, by its outcome: a change made, none, an answer it could not use, or a failure; each is
+// named in the legend too.
+const STRIP_KIND = {
+  done: "done",
+  keep: "quiet",
+  skipped: "quiet",
+  failed: "failed",
+  calibrating: "quiet",
+  unusable: "unusable",
+};
 const MADE_BY = { owner: "written by you", proposer: "proposed by Dot", composer: "combined by Dot" };
 const SUMMARY_CHARS = 200;
 // How many versions the list shows at first and each time **Show older versions** is pressed (the daemon pages them).
@@ -245,6 +268,10 @@ function stepRow(step) {
         said === "" ? null : el("div", { class: "harness-said" }, said),
         // The week's word (item 988): a proposal from the week's patterns, its trial on real runs, or how it ended.
         typeof facts.week === "string" ? el("div", { class: "harness-said" }, facts.week) : null,
+        // The answers of a model the night went on without (item 1015), each with why, but the week's, said above.
+        ...(Array.isArray(facts.unusable) ? facts.unusable : [])
+          .filter((why) => typeof why === "string" && why !== facts.week)
+          .map((why) => el("div", { class: "harness-said" }, capital(why))),
         // The test the night made of the owner's run (item 904): the one it kept, or why it kept none.
         typeof facts.task === "string" ? el("div", { class: "harness-said muted" }, `Own test: ${facts.task}`) : null,
       ),
@@ -303,7 +330,14 @@ function nightStrip(steps) {
 /** What the cells of the strip mean: it stands over the list of the nights, which names each night's outcome in words. */
 function nightLegend() {
   const key = (kind, words) => el("span", { class: "night-key" }, el("span", { class: `night-cell ${kind}`, "aria-hidden": "true" }), words);
-  return el("div", { class: "night-legend" }, key("done", "a change"), key("quiet", "no change"), key("failed", "failed"));
+  return el(
+    "div",
+    { class: "night-legend" },
+    key("done", "a change"),
+    key("quiet", "no change"),
+    key("unusable", "an answer unusable"),
+    key("failed", "failed"),
+  );
 }
 
 /** The overview above the sections: the version in use, the versions, the nights of learning and the lessons, counted in

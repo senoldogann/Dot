@@ -3996,8 +3996,9 @@
   line-height: var(--leading-sm);
 }
 
-/* The newest nights of learning, one cell each, oldest at the left: green a change, the surface's own grey none, red a
-   failure; the legend over the list of nights names each, and a cell names its night on a hover. */
+/* The newest nights of learning, one cell each, oldest at the left: green a change, the surface's own grey none, amber an
+   answer the night could not use (item 1015), red a failure; the legend over the list of nights names each, and a cell
+   names its night on a hover. */
 .night-strip {
   display: inline-flex;
   flex-wrap: wrap;
@@ -4014,6 +4015,10 @@
 
 .night-cell.done {
   background: var(--fine);
+}
+
+.night-cell.unusable {
+  background: var(--warn);
 }
 
 .night-cell.failed {

@@ -211,7 +211,7 @@ the guards, a step scores on at most `headroom_tasks` tasks with headroom (6, th
 `pool_tasks`: the eval tasks safe to repeat that read nothing of the web, never one of the final set or a guard. With
 fewer than `headroom_least` tasks with headroom known (2), nothing is proposed, which spends no proposer and writes no
 candidate that nothing could judge: the base alone tries `calibrate_tasks` tasks of the pool it does not know yet (6,
-the untried first), the step is recorded `calibrating`, and its decision says how many tasks have headroom and how many
+the untried first), the step is recorded `calibrating` (or `unusable`, when the task writer's answer was, below), and its decision says how many tasks have headroom and how many
 are left to try. Such a step learns from no run and takes none, whatever it comes to (tried, failed, nothing to learn),
 not even the run named with `--run`: the window of runs the next step reads opens at the last step that took a run, and
 a week back at most, so the run that went worst meanwhile is still there for it. A new version in use starts its own
@@ -239,7 +239,7 @@ which tasks nor how each went; the task by task contrast (`write-todo-note: bett
 version's notes and in the step's record, for you to read on the page and with `dotx harness show`. The proposer reads
 the experience library, and so an experience that names a task of the scoring set or of the final set (by its id as the
 catalog writes it, `bump-version`, in any case; the words of its description, `bump version`, name nothing) is
-refused: the writer is asked again, without being told which task, and a writer that names one again fails the step.
+refused: the writer is asked again, without being told which task, and a writer that names one again leaves the step `unusable` (item 1015), its reason recorded.
 An experience stored before is left out of what the proposer reads, as is one written from a run that read content
 third parties can author, and both are left out before the newest twelve are taken, so that twelve such nights in a
 row do not hide the experience before them.
@@ -252,8 +252,8 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    the current harness and the index of earlier experience, and writes at most two candidates: one about *how the
    agent works* (planning, tool use, context, delegation), one about *what a practitioner knows* (the knowledge, the
    procedures, the checks of the domain). The second usually becomes a learned skill rather than a habit. Every edit
-   names the moment of the run that motivates it; a change that names none is refused, and the proposer is asked once
-   more with what was wrong (the step fails if it names none again): `keep`, the answer that changes nothing, is a
+   names the moment of the run that motivates it; a change that names none is refused, and the proposer is asked again
+   with what was wrong (an answer still unusable is recorded so, below): `keep`, the answer that changes nothing, is a
    different answer and needs no moment.
 2. **Probe.** Each candidate runs the same work as the current harness: the eval tasks that are safe to repeat, in a
    throwaway home with the exclusions of an eval (no MCP servers, no desktop, Dot's own Chrome headless, no learning),
@@ -335,9 +335,9 @@ yours (item 931, below), most often not the one the candidates answer.
   2/2 under the base and both candidates, two nights running, at 1.6 and 2.5 million tokens a night. The step is
   recorded `keep`, and its decision says why. It takes no run: the next step that proposes still learns from the run
   that went worst before it.
-- **A role's malformed answer after the probes is a warning, not the step's failure** (item 931): the experience
-  writer's answer that is no verdict (on 2026-11-02 its entry came as a sentence, twice) leaves the step as the probes
-  decided it, with the warning in its record (`warnings`).
+- **A role's answer that stays unusable is not the step's failure** (items 931 and 1015): the experience writer's
+  answer that is no verdict (on 2026-11-02 its entry came as a sentence, twice) leaves the step as the probes decided
+  it, with the reason in its record (`unusable`; *When an answer stays unusable*, below).
 - **A task of the loop is played under the balanced preset at least**, whatever yours is: a write or a command outside
   the workspace asks, and an attempt declines what it asks. A model wrote the task, so what it steers a run to do is kept
   to the scratch workspace; a task of the catalog, which a developer wrote, plays as your preset says.
@@ -364,8 +364,7 @@ base kept), the **selector** (`select_answer`: the best of anonymous answers to 
 conformance, fidelity, consistency, fitness and finish, never on length) and the **experience writer**
 (`write_experience`: what each edit did, and an experience only when an edit helped or hurt with evidence). An answer
 that breaks its rules (a habits or tool guidance text past the bounds, a change with no moment, an experience with no
-effect behind it) is asked once more with what was wrong (the fields and their problems, never a key the model made
-up, as the step says them when it fails), then the step fails and says so. An answer whose only fault is a line past
+effect behind it) is asked again with what was wrong and what to fix (*When an answer stays unusable*, below). An answer whose only fault is a line past
 its bound (a summary's 120 characters, an edit's or a cue's 200, a moment's, a piece of evidence's or a lesson's 300,
 and so a skill's description's 200) is read with the line cut there with an ellipsis, when each such line, whole,
 passes the strictest gate of what is learned (no secret, of the values Dot holds or of a known form, no e-mail
@@ -386,6 +385,36 @@ For the composer, keeping the base needs no texts, decisions or summary. For the
 is none. What a change cannot do without is still asked again: its summary, and a composition's texts. The tools'
 schemas still ask for every field.
 `[harness] proposer`, `composer`, `selector` and `experience` name a model for each; "" is `[models] review`.
+
+### When an answer stays unusable
+
+From 2026-10-28 to 11-06, 7 nights of 10 failed, each on one answer of a weak proposer model (Kimi K3) that its checks
+refused after one more try: a tool guidance of 1749 characters against 1500, a task's habit past 120, a line that
+imitated a heading in a task's file, an experience's entry given as a sentence, a link in the only moment, fields left
+out, a summary past 120. The checks were right; the one answer lost the whole night, and no lesson was ever kept.
+Since item 1015:
+
+- **Three attempts, each told what to fix.** The proposer, the composer, the selector, the task writer and the
+  experience writer are asked three times (Dot's other questions to the review model, twice). The note that asks again
+  says what was wrong and what to change: for a text past its bound, its length, the bound and about how many words
+  that is (`the tool guidance has 1749 characters; it must be at most 1500: about 210 words; cut it`); for a verdict
+  that is not valid, each field's path and what to do (`the field entry must be a JSON object of its own fields, not
+  text`; never a key the model made up); for a refusal of the gate, where and what to take out (`the task cannot be
+  kept: a line that imitates a heading of the prompt, in the text of file 1` with `write no line that starts with #`).
+  Each role's prompt states the bounds of its own fields, in characters and in words, besides its tool's schema.
+- **The rest of the night goes on.** An answer still unusable after the third attempt is recorded with its reason, in
+  the step's record (`unusable`, a line each: `the proposer's answer in the invariant scope was unusable: ...`) and
+  under its row on the Self-improvement page; never silently. What does not depend on it goes on: the other scope is
+  proposed and played, the best candidate stands without the composer, a step tries the pool without the task writer's
+  task, a night keeps its digest without the week's proposal. A step with such an answer adopts nothing on its own.
+- **Its own state.** A night or a step that made no change and lost an answer so is recorded `unusable` (*answer
+  unusable* on the page, an amber cell in the strip, named in its legend), neither `failed` nor *no change*; one that
+  still probed a version is `done`, its record naming the answer. Something that failed (a probe that did not start, a
+  role that could not be reached, a provider's broken reply such as a body that is no JSON) is `failed` as before, and only `failed` counts as a failure of learning and is
+  handed to the repair night: an answer the checks refuse is the checks at work.
+- **The week's proposal.** One that stays unusable makes the week's word `the proposal was unusable: <why>`, and the
+  week is not spent: the next night asks again, as after a network error. A weak model's answer says nothing of the
+  week's patterns, and asking costs three questions a night.
 `dotx harness propose RUN_ID [--scope invariant|domain]` asks the proposer about one run by hand and writes its
 candidate, whose notes keep the scope and the moments; `keep` writes nothing.
 
@@ -424,7 +453,8 @@ step's record (`week`) and said under its row:
 - **A proposal, once a week, from a pattern.** With no trial under way and a week since the last proposal, the night
   reads the last seven days as it reads one, and keeps the ways a tool failed that are a *pattern*: in at least three
   runs, in at least two chats, on at least three days. One run, one chat or one bad day proposes nothing, and the night
-  says so; a proposer that failed (a network error) is asked again the next night. For the five most widespread patterns the proposer (`[harness] proposer`, or the review model) is shown the
+  says so; a proposer that failed (a network error), or whose answer stayed unusable (above, item 1015), is asked again
+  the next night. For the five most widespread patterns the proposer (`[harness] proposer`, or the review model) is shown the
   lines of the patterns and their counts, and the habits and tool guidance in use; never a run's own text. A pattern
   seen only in runs that read what others can author is shown as its tool and a class from a closed list (*timed out*,
   *not found*, *refused*, *invalid arguments*, *page did not load*, *other*), since a third party's error may be quoted
@@ -478,13 +508,12 @@ harness step` prints it), and counts in how learning fares with the reflection. 
 its own when it did better (above) with `step_repeats` of at least 2 and was confirmed on new attempts (`step_repeats` ×
 2 attempts of each task, for the base and for the survivor, under the labels `confirm-base` and `confirm-<id>`; the
 survivor's notes, the step's record and its decision hold the confirmation), and never from a run that had read content
-third parties can author; `"owner"`, the default, leaves it to you. A role that fails after the probes (the composer)
-leaves the step `failed` with the error, the survivor probed all the same and adopted by nobody; the experience
-writer's failure is a warning instead (item 931), which leaves the step as the probes decided it but adopts nothing
-on its own either,
-and so does a proposer whose answer is no proposal in one scope, asked twice: the other scopes are still proposed and
-played (item 718),
-whatever `adopt` says (the decision says it was left to you), and how learning fares counts the failure; a scripted
+third parties can author; `"owner"`, the default, leaves it to you. A role that fails after the probes (the composer
+could not be reached) leaves the step `failed` with the error, the survivor probed all the same and adopted by nobody;
+the experience writer's failure of that kind is a warning instead (item 931), which leaves the step as the probes
+decided it but adopts nothing on its own either, and so does a role whose answer stayed unusable after its three
+attempts (item 1015, above), a proposer's in one scope among them: the other scopes are still proposed and played
+(item 718), whatever `adopt` says (the decision says it was left to you), and how learning fares counts a failure; a scripted
 check is recorded and marked `scripted`, and does not move the window the next step learns from. `--scripted` plays the
 references through the scripted model and has the roles answer from a script (the proposer proposes one habit and keeps
 the other scopes, the experience writer saw no effect): the whole step, at no model's cost, as a check of the loop.

@@ -52,9 +52,14 @@ CALLS_MAX: int = 6
 TIME_LIMIT_S: float = 300.0
 TOKEN_BUDGET: int = 200_000
 
-_Path = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
-_Line = Annotated[str, StringConstraints(min_length=1, max_length=600)]
-_Short = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+# The longest goal, habit and path of a task, which the writer's prompt says too (item 1015).
+GOAL_CHARS: int = 600
+HABIT_CHARS: int = 120
+PATH_CHARS: int = 120
+
+_Path = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=PATH_CHARS)]
+_Line = Annotated[str, StringConstraints(min_length=1, max_length=GOAL_CHARS)]
+_Short = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=HABIT_CHARS)]
 
 
 class DraftFile(FrozenModel):
@@ -164,18 +169,23 @@ def draft_problem(draft: TaskDraft, held: Sequence[str]) -> str | None:
         return "the reference's last turn calls finish alone"
     if any(call.tool == FINISH_TOOL for turn in draft.reference[:-1] for call in turn.calls):
         return "the reference calls finish before its last turn"
-    texts: list[str] = [draft.goal, draft.habit, *(seed.content for seed in draft.files), *paths]
-    for check in draft.checks:
-        texts += _texts_of(check.model_dump(mode="json"))
+    # Each text with where it is, which the problem names (item 1015: the writer asked again is told where to change
+    # it; on 2026-11-03 it was told only that a line imitated a heading, and wrote one again). A place is named by its
+    # number, never by the model's own words.
+    texts: list[tuple[str, str]] = [("the goal", draft.goal), ("the habit", draft.habit)]
+    texts += [(f"the text of file {number}", seed.content) for number, seed in enumerate(draft.files, start=1)]
+    texts += [("a path", path) for path in paths]
+    for number, check in enumerate(draft.checks, start=1):
+        texts += [(f"check {number}", text) for text in _texts_of(check.model_dump(mode="json"))]
     for call in calls:
-        texts += _texts_of(call.arguments)
-    for text in texts:
+        texts += [("the reference's arguments", text) for text in _texts_of(call.arguments)]
+    for where, text in texts:
         problem: str | None = gate(text, held)
         if problem is not None:
-            return problem
+            return f"{problem}, in {where}"
         leaving: re.Match[str] | None = _LEAVES.search(text)
         if leaving is not None:
-            return f"a path that leaves the workspace ({leaving.group(0)!r})"
+            return f"a path that leaves the workspace ({leaving.group(0)!r}), in {where}"
     return None
 
 

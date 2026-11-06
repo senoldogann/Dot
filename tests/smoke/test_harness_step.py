@@ -341,7 +341,7 @@ async def test_a_step_whose_budget_is_spent_plays_nothing_and_keeps_the_base(log
         assert candidate.state == "retired" and "In all unclear" in str(json.loads(candidate.notes)["contrast"])
 
 
-async def test_a_composer_that_fails_leaves_the_step_failed_and_the_best_candidate_probed(
+async def test_a_composer_whose_answer_stays_unusable_leaves_the_best_candidate_probed(
     login_env: dict[str, str],
 ) -> None:
     bad_composition: ScriptedTurn = _turn(
@@ -370,7 +370,9 @@ async def test_a_composer_that_fails_leaves_the_step_failed_and_the_best_candida
                 "summary": "Port in config",
             },
         ),
-        # Asked once more with what was wrong, the composer answers wrongly again, and its error is the step's.
+        # Asked twice more with what was wrong (item 1015), the composer answers wrongly again: the step records its
+        # answer as unusable, and the best candidate stands.
+        bad_composition,
         bad_composition,
         bad_composition,
         _turn(
@@ -387,15 +389,17 @@ async def test_a_composer_that_fails_leaves_the_step_failed_and_the_best_candida
     async with _session(login_env, turns, {"step_repeats": 2}) as (runtime, manager):
         run: RunRecord = await _run(manager)
         step: HarnessStep = await run_step(runtime, 1.0, run.id, _scored(frozenset(TASKS)), True)
-        assert step.state == "failed" and step.error is not None and step.error.startswith("the composer failed")
+        assert step.state == "done" and step.error is None, step
         facts: dict[str, object] = json.loads(step.outcome)
         versions: dict[str, HarnessVersion] = {v.id: v for v in await runtime.store.list_harness_versions()}
         probed: HarnessVersion = versions[str(facts["probed"])]
-        assert probed.state == "probed" and "the composer failed, so the best candidate stands" in str(
+        assert probed.state == "probed" and "the composer's answer was unusable, so the best candidate stands" in str(
             facts["decision"]
         )
         assert len(versions) == 2 and all(v.state == "retired" for v in versions.values() if v.id != probed.id)
-        assert len(list(facts["errors"])) == 1 and facts["tainted"] is False  # type: ignore[call-overload]
+        assert facts["errors"] == [] and facts["tainted"] is False
+        unusable: list[str] = list(facts["unusable"])  # type: ignore[call-overload]  # a JSON list of the record
+        assert len(unusable) == 1 and unusable[0].startswith("the composer's answer was unusable: keep_base is true")
 
 
 # --------------------------------------------------------- the owner's choices while a step runs (item 588)
@@ -720,21 +724,26 @@ _PROSE: ScriptedTurn = ScriptedTurn(text="I would add a habit about reading file
 
 async def test_a_proposer_that_fails_in_one_scope_leaves_the_other_scope_played(login_env: dict[str, str]) -> None:
     """2026-10-24: the review model answered the proposer in words, twice, and the night was lost (item 718). The other
-    scope is still proposed and played; the step is failed with the error and adopts nothing."""
-    turns: list[ScriptedTurn] = [_FINISH, _PROSE, _PROSE, _guidance(), _effects(1)]
+    scope is still proposed and played; the step records the answer as unusable (item 1015) and adopts nothing."""
+    turns: list[ScriptedTurn] = [_FINISH, _PROSE, _PROSE, _PROSE, _guidance(), _effects(1)]
     async with _session(login_env, turns, {"adopt": "auto", "step_repeats": 2}) as (runtime, manager):
         run: RunRecord = await _run(manager)
         step: HarnessStep = await run_step(runtime, 1.0, run.id, _scored(frozenset(TASKS)), True)
-        assert step.state == "failed", step
-        assert step.error is not None and step.error.startswith("the proposer failed in the invariant scope")
+        assert step.state == "done" and step.error is None, step
         facts: dict[str, object] = json.loads(step.outcome)
         assert len(facts["candidates"]) == 1 and "probed" in facts
+        assert facts["unusable"] == [
+            "the proposer's answer in the invariant scope was unusable: the review model did not call propose_harness"
+        ]
+        assert "left to you: the proposer's answer in the invariant scope was unusable" in str(facts["decision"])
         assert await adopted(runtime.store) is None
-    # Failing in every scope, the step says the proposer failed.
-    async with _session(login_env, [_FINISH, _PROSE, _PROSE, _PROSE, _PROSE], {}) as (runtime, manager):
+    # Unusable in every scope, the night made no change and is recorded so: not failed, and not a keep either.
+    async with _session(login_env, [_FINISH, *([_PROSE] * 6)], {}) as (runtime, manager):
         run = await _run(manager)
         step = await run_step(runtime, 1.0, run.id, _scored(frozenset()), True)
-        assert step.state == "failed" and json.loads(step.outcome)["reason"] == "the proposer failed"
+        assert step.state == "unusable" and step.error is None, step
+        assert json.loads(step.outcome)["reason"] == "the proposer's answer was unusable"
+        assert len(json.loads(step.outcome)["unusable"]) == 2
 
 
 _POOL: list[str] = ["bump-version", "sum-column", "count-errors", "sorted-unique-names"]
@@ -841,23 +850,23 @@ async def test_a_pool_known_whole_with_too_little_headroom_says_there_is_nothing
         assert str(json.loads(last.outcome)["decision"]).startswith("nothing to learn on the pool")
 
 
-async def test_a_step_recorded_as_failed_adopts_nothing(login_env: dict[str, str]) -> None:
-    """A composer that fails after the probes leaves the step failed with the error and the best candidate probed; with
-    `adopt = "auto"` it must not have put that candidate in use."""
+async def test_a_step_with_an_unusable_answer_adopts_nothing(login_env: dict[str, str]) -> None:
+    """A composer whose answer stays unusable after the probes leaves the best candidate probed (item 1015); with
+    `adopt = "auto"` it must not have put that candidate in use, as a step that failed does not."""
     bad: ScriptedTurn = _turn(
         COMPOSE_TOOL,
         {"keep_base": True, "habits": "- not the base", "tool_guidance": "", "decisions": [], "summary": "x"},
     )
-    turns: list[ScriptedTurn] = [_FINISH, _habit(), _guidance(), bad, bad, _effects(2)]
+    turns: list[ScriptedTurn] = [_FINISH, _habit(), _guidance(), bad, bad, bad, _effects(2)]
     async with _session(login_env, turns, {"step_repeats": 2, "adopt": "auto"}) as (runtime, manager):
         run: RunRecord = await _run(manager)
         step: HarnessStep = await run_step(runtime, 1.0, run.id, _scored(frozenset(TASKS)), True)
-        assert step.state == "failed" and step.error is not None and step.error.startswith("the composer failed")
-        assert await adopted(runtime.store) is None, "a step recorded as failed put its survivor in use"
+        assert step.state == "done" and step.error is None, step
+        assert await adopted(runtime.store) is None, "a step with an unusable answer put its survivor in use"
         facts: dict[str, object] = json.loads(step.outcome)
         probed: HarnessVersion = await runtime.store.get_harness_version(str(facts["probed"]))
         assert probed.state == "probed" and "adopted" not in facts
-        assert "left to you: the step failed after the probes" in str(facts["decision"])
+        assert "left to you: the composer's answer was unusable" in str(facts["decision"])
 
 
 async def test_a_version_composed_of_tainted_candidates_is_marked_tainted_and_left_to_the_owner(

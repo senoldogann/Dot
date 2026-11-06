@@ -293,9 +293,14 @@ async def test_the_version_in_use_reads_as_two_lists_and_the_nights_as_a_card(
     )
     assert written.status_code == 200, written.text
     now: float = time.time()
-    for days, state in ((2, "keep"), (1, "done")):
-        step = await runtime.store.create_harness_step(now - days * 86400, None, None)
-        await runtime.store.finish_harness_step(step.id, now - days * 86400 + 60, state, "{}", None)
+    step = await runtime.store.create_harness_step(now - 86400, None, None)
+    await runtime.store.finish_harness_step(step.id, now - 86400 + 60, "done", "{}", None)
+    # A night that went on without a model's answer it could not use (item 1015).
+    unusable = await runtime.store.create_harness_step(now - 2 * 86400, None, None)
+    why: str = "the task writer's answer was unusable: the task cannot be kept: a link, in the goal"
+    await runtime.store.finish_harness_step(
+        unusable.id, now - 2 * 86400 + 60, "unusable", json.dumps({"reason": "r", "unusable": [why]}), None
+    )
     # A night that read the real runs of its day (item 987), the oldest of the three.
     await night_digest(runtime.store, runtime.config.harness, now - 3 * 86400, runtime.schedule_zone)
     page: Page = await _open(browser, nightly_client, 1280)
@@ -313,6 +318,7 @@ async def test_the_version_in_use_reads_as_two_lists_and_the_nights_as_a_card(
         await expect(overview).to_contain_text("Learning nights")
         await expect(overview).to_contain_text("· done")
         await expect(overview.locator(".night-strip .night-cell")).to_have_count(3)
+        await expect(overview.locator(".night-strip .night-cell.unusable")).to_have_count(1)
         # The nightly learning says when it runs and what comes next, and lists its nights under that.
         nightly: Locator = _section(page, "Nightly learning")
         await expect(nightly).to_contain_text("Every night at 04:00")
@@ -320,10 +326,14 @@ async def test_the_version_in_use_reads_as_two_lists_and_the_nights_as_a_card(
             re.compile(r"^Next: (tonight|today|tomorrow), 04:00$")
         )
         await expect(nightly.locator("[data-step]")).to_have_count(3)
+        lost: Locator = nightly.locator(f'[data-step="{unusable.id}"]')
+        await expect(lost.locator(".badge")).to_have_text("Answer unusable")
+        await expect(lost).to_contain_text("The task writer's answer was unusable: the task cannot be kept: a link")
         digest: Locator = nightly.locator("[data-step]").filter(has_text="a digest of the day's real runs")
         await expect(digest).to_contain_text(re.compile(r"\d+ runs? ended, \d+ done and \d+ failed"))
         await expect(digest).not_to_contain_text("proposed")
         await expect(nightly.locator(".night-legend")).to_contain_text("a change")
+        await expect(nightly.locator(".night-legend")).to_contain_text("an answer unusable")
         # A version's texts and notes open under its row, and shut again.
         # The earlier tests of this home left versions of their own: this one is the one in use, and the first.
         row: Locator = page.locator("[data-version]").filter(has_text="Pipes and reads")

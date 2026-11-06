@@ -184,3 +184,44 @@ async def test_a_version_that_names_the_shell_is_never_tried_and_a_quiet_week_pr
         ended: HarnessStep = await night(runtime, now + 9 * DAY_S)
         assert (ended.state, json.loads(ended.outcome)["week"]) == ("keep", "the trial ended: its version is gone")
         assert await trial_of(runtime.store) is None
+
+
+async def test_a_proposal_that_stays_unusable_keeps_the_digest_and_the_next_night_asks_again(
+    login_env: dict[str, str],
+) -> None:
+    """Item 1015: on 2026-11-06 the proposer wrote a tool guidance of 1749 characters against 1500, and the whole night
+    was failed. The proposer is asked three times, each time told the length, the bound and about how many words; an
+    answer still past it leaves the night ``unusable`` with its digest and why, not ``failed``, and the week unspent."""
+    limit: int = _config().harness.tool_guidance_chars
+    long_guidance: str = "\n".join(["- Wait for the page to settle before you read it again."] * (limit // 50 + 1))
+    too_long: ScriptedTurn = ScriptedTurn(
+        text="",
+        calls=(
+            ScriptedCall(
+                tool=PROPOSE_TOOL,
+                arguments={
+                    "keep": False,
+                    "habits": None,
+                    "tool_guidance": long_guidance,
+                    "moments": ["the snapshot failed in three chats"],
+                    "summary": "Wait for pages",
+                },
+            ),
+        ),
+    )
+    async with _session(login_env, [too_long, too_long, too_long, _propose(HABIT)]) as runtime:
+        now: float = time.time()
+        for day in (1, 2, 3):
+            await _failing_run(runtime, now - day * DAY_S, False)
+        step: HarnessStep = await night(runtime, now)
+        assert (step.state, step.error) == ("unusable", None), step
+        record = json.loads(step.outcome)
+        assert "digest" in record and record["decision"]
+        why: str = f"the tool guidance cannot be a component of the harness: too long: {len(long_guidance)} characters"
+        assert record["week"].startswith(f"the proposal was unusable: {why}"), record["week"]
+        assert record["unusable"] == [record["week"]]
+        assert await runtime.store.kv_get(PROPOSED_KEY) is None and await trial_of(runtime.store) is None
+        # The next night asks again, and a proposal that fits is tried.
+        again: HarnessStep = await night(runtime, now + 3600.0)
+        assert again.state == "keep" and json.loads(again.outcome)["week"].startswith("trying “Wait for pages”")
+        assert await runtime.store.kv_get(PROPOSED_KEY) is not None
