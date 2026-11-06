@@ -42,8 +42,9 @@ LIVE_REGISTERED_EVENT: str = "live_activity_registered"
 APNS_KINDS: frozenset[str] = frozenset({*PUSH_KINDS, "run_started", "approval_decided", LIVE_REGISTERED_EVENT})
 # What makes a run wait for the owner: an approval or a question it asks. A question it leaves for later does not.
 _WAITS: frozenset[str] = frozenset({"approval_requested"})
-_ENDED: dict[str, LiveStatus] = {"done": "done", "failed": "failed", "cancelled": "failed", "blocked": "failed"}
-_ENDED_LINE: dict[str, str] = {"done": "Done", "failed": "Failed", "cancelled": "Stopped", "blocked": "Blocked"}
+_ENDED: dict[str, LiveStatus] = {"done": "done", "failed": "failed", "cancelled": "failed"}
+_ENDED_LINE: dict[str, str] = {"done": "Done", "failed": "Failed", "cancelled": "Stopped"}
+_WAITING_LINE: str = "Waiting for you"
 _WAIT_S: float = 1.0
 _DOT: str = "Dot"
 # The title of an alert of a message Dot wrote to the owner.
@@ -137,9 +138,7 @@ class ApnsWatch:
     async def on_event(self, event: EventRecord, now: float) -> None:
         """Send what ``event`` says: an alert as Web Push would, and the run's Live Activity's change."""
         if event.kind == LIVE_REGISTERED_EVENT:
-            registered: RunRecord = await self._store.get_run(str(event.data.get("run_id", "")))
-            if registered.status not in WORKING_STATUSES:
-                await self.end(registered, registered.status, now)
+            await self.catch_up(await self._store.get_run(str(event.data.get("run_id", ""))), now)
             return
         if event.run_id == SYSTEM_RUN_ID:
             notice: PushMessage | None = notice_message(event)
@@ -155,11 +154,19 @@ class ApnsWatch:
         if event.kind == "run_started":
             await self.start(run, now)
         elif event.kind in _WAITS:
-            await self._to_activities(run, "waiting", "Waiting for you", now, False)
+            await self._to_activities(run, "waiting", _WAITING_LINE, now, False)
         elif event.kind == "approval_decided":
             await self._to_activities(run, "working", "Working", now, False)
         elif event.kind == "run_finished":
             await self.end(run, str(event.data.get("status", run.status)), now)
+
+    async def catch_up(self, run: RunRecord, now: float) -> None:
+        """Bring the Live Activities of ``run`` to where it stands now: whatever happened before the app's token came
+        (an approval asked, the end) went to no activity, so the one just registered is told the run's state."""
+        if run.status == "blocked":
+            await self._to_activities(run, "waiting", _WAITING_LINE, now, False)
+        elif run.status not in WORKING_STATUSES:
+            await self.end(run, run.status, now)
 
     async def end(self, run: RunRecord, status: str, now: float) -> None:
         """End the Live Activities of ``run``, which ended with ``status``, and forget them."""

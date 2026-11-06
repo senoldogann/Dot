@@ -22,6 +22,7 @@ from typing import Literal, Protocol
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+from pydantic import BaseModel, ValidationError
 
 from dotagent.config import ApnsConfig
 from dotagent.core.errors import ConfigError, DotError
@@ -70,6 +71,12 @@ class ApnsReply(FrozenModel):
     """What APNs answered: its status and, when it refused, its reason (``BadDeviceToken``)."""
 
     status: int
+    reason: str
+
+
+class ApnsRefusal(BaseModel):
+    """What APNs answers when it refuses a push: ``{"reason": "BadDeviceToken"}`` (and, for a gone token, when)."""
+
     reason: str
 
 
@@ -179,13 +186,16 @@ class HttpTransport:
             answer: httpx.Response = await self._client.post(url, headers=dict(headers), content=body)
         except httpx.HTTPError as error:
             raise ApnsError("APNs could not be reached", {"url": url, "error": str(error)}) from error
-        reason: str = ""
-        if answer.status_code != 200:
-            try:
-                reason = str(answer.json().get("reason", ""))
-            except ValueError:
-                reason = answer.text[:200]
-        return ApnsReply(status=answer.status_code, reason=reason)
+        if answer.status_code == 200:
+            return ApnsReply(status=200, reason="")
+        try:
+            refusal: ApnsRefusal = ApnsRefusal.model_validate_json(answer.content)
+        except ValidationError as error:
+            raise ApnsError(
+                "APNs refused a push with an answer that is not its own",
+                {"url": url, "status": answer.status_code, "body": answer.text[:200]},
+            ) from error
+        return ApnsReply(status=answer.status_code, reason=refusal.reason)
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -229,8 +239,11 @@ class ApnsSender:
         return reply
 
 
-def sender_of(config: ApnsConfig, transport: ApnsTransport) -> ApnsSender | None:
-    """The sender of ``config``, or ``None`` when no key is set (the app gets no pushes)."""
-    if config.key_path == "" or config.key_id == "" or config.team_id == "":
-        return None
-    return ApnsSender(config, load_key(Path(config.key_path).expanduser()), transport)
+def read_key(config: ApnsConfig) -> ec.EllipticCurvePrivateKey:
+    """The APNs key of ``config``'s ``key_path`` (see :func:`load_key`)."""
+    return load_key(Path(config.key_path).expanduser())
+
+
+def apns_set(config: ApnsConfig) -> bool:
+    """Whether ``config`` names a key: without one the app gets no pushes, and no connection to Apple is made."""
+    return config.key_path != "" and config.key_id != "" and config.team_id != ""

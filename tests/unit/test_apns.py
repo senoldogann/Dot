@@ -23,10 +23,10 @@ from dotagent.notify.apns import (
     ApnsSender,
     LiveState,
     alert_payload,
+    apns_set,
     live_start_payload,
     load_key,
     provider_token,
-    sender_of,
     short_title,
 )
 from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT, TOLD_TITLE, ApnsWatch, follows_live
@@ -84,7 +84,7 @@ def test_a_key_that_is_missing_or_not_p256_is_named_by_its_path_alone(tmp_path: 
     )
     with pytest.raises(ConfigError, match="P-256"):
         load_key(other)
-    assert sender_of(_CONFIG.model_copy(update={"key_path": ""}), _Apple({})) is None
+    assert apns_set(_CONFIG) and not apns_set(_CONFIG.model_copy(update={"key_path": ""}))
 
 
 def test_an_alert_carries_its_title_and_a_fixed_line_and_a_live_activity_a_short_title() -> None:
@@ -210,6 +210,14 @@ async def test_an_activity_whose_token_comes_after_its_run_ended_is_ended_at_onc
             EventRecord(id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=LIVE_REGISTERED_EVENT, data={"run_id": run.id}), _NOW
         )
         assert all(not url.endswith(_ACTIVITY) for url, _, _ in apple.posted)
+        registered = EventRecord(
+            id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=LIVE_REGISTERED_EVENT, data={"run_id": run.id}
+        )
+        # A run that asked for approval before the token came is shown waiting once it comes.
+        await store.set_run_status(run.id, "blocked")
+        await watch.on_event(registered, _NOW)
+        assert apple.posted[-1][0].endswith(_ACTIVITY)
+        assert apple.posted[-1][2]["aps"]["content-state"]["status"] == "waiting"  # type: ignore[index]  # a JSON payload read back
         await store.finish_run(run.id, "done", "Ten leads")
         await watch.on_event(
             EventRecord(id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=LIVE_REGISTERED_EVENT, data={"run_id": run.id}), _NOW
