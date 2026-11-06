@@ -86,7 +86,11 @@ code** takes its place. The same by hand:
    which the app sends as the app's page does (`POST /api/approvals/{id}/decision` with the phone's key, no note, no
    "don't ask again"); a step of high risk (money, a message or a post sent for you, a credential), a question, a
    secret and a handoff open Dot, where you see what is asked. An answer that does not reach the daemon is said in a
-   notification of its own ("Dot did not get your answer"); one the daemon no longer waits for is let go. A run of yours
+   notification of its own ("Dot did not get your answer"); one the daemon no longer waits for is let go. Another
+   app's Share sheet has Dot (item 1009): a page's address, a text or up to four pictures (sent as JPEG, 2,048 px on the
+   longer side at most) go to Dot as a new chat, with the words you add of what to do with it ("Look at this." when you
+   add none), through `POST /api/attachments` and `POST /api/runs` with the phone's key; the share sheet reads the
+   app's address and key, and sends nothing until you tap Send. A run of yours
    (not a helper's, a schedule's, a watcher's or Dot's own) starts a Live Activity on each phone that gave a
    push-to-start token: its chat's title (40 characters at most) and agent, and what it does now (item 1004), each with
    a mark of its own that turns into the next as the run moves on: "Thinking", "Browsing the web", "Searching the web",

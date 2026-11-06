@@ -41,6 +41,30 @@ struct ApprovalDecision: Encodable, Sendable, Equatable {
     let remember: Bool
 }
 
+/// A file for a message to come, as `POST /api/attachments` takes it (item 1009).
+struct AttachmentUpload: Encodable, Sendable {
+    let name: String
+    let mediaType: String
+    let dataB64: String
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case mediaType = "media_type"
+        case dataB64 = "data_b64"
+    }
+}
+
+/// The id of a kept file, all the share sheet reads of the daemon's answer.
+struct StoredAttachmentId: Decodable, Sendable {
+    let id: String
+}
+
+/// A new chat, as `POST /api/runs` takes it from the share sheet: its goal and the files kept for it (item 1009).
+struct ChatStart: Encodable, Sendable {
+    let goal: String
+    let attachments: [String]
+}
+
 /// A request to the daemon that did not succeed.
 enum DaemonRequestError: Error, CustomStringConvertible {
     /// The daemon answered with a status other than 2xx.
@@ -100,7 +124,19 @@ struct DaemonClient: Sendable {
             body: ApprovalDecision(approve: approve, note: "", remember: false), host: host, key: key)
     }
 
-    private func post(path: String, body: some Encodable & Sendable, host: DaemonHost, key: String) async throws {
+    /// Keeps a file for the message to come (`POST /api/attachments`) and returns its id (item 1009).
+    func uploadAttachment(_ upload: AttachmentUpload, host: DaemonHost, key: String) async throws -> String {
+        let data: Data = try await post(path: "/api/attachments", body: upload, host: host, key: key)
+        return try JSONDecoder().decode(StoredAttachmentId.self, from: data).id
+    }
+
+    /// Starts a chat with `goal` and the files kept for it (`POST /api/runs`), as the app's page does (item 1009).
+    func startChat(_ start: ChatStart, host: DaemonHost, key: String) async throws {
+        _ = try await post(path: "/api/runs", body: start, host: host, key: key)
+    }
+
+    @discardableResult
+    private func post(path: String, body: some Encodable & Sendable, host: DaemonHost, key: String) async throws -> Data {
         var request: URLRequest = URLRequest(url: host.url(path: path))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -111,9 +147,9 @@ struct DaemonClient: Sendable {
         var attempt: Int = 1
         while true {
             do {
-                try await send(request, path: path)
+                let answer: Data = try await send(request, path: path)
                 logger.info("posted \(path, privacy: .public) on attempt \(attempt)")
-                return
+                return answer
             } catch {
                 logger.warning(
                     "post failed: path=\(path, privacy: .public) attempt=\(attempt) of=\(maxAttempts) error=\(error.description, privacy: .public)"
@@ -127,7 +163,7 @@ struct DaemonClient: Sendable {
         }
     }
 
-    private func send(_ request: URLRequest, path: String) async throws(DaemonRequestError) {
+    private func send(_ request: URLRequest, path: String) async throws(DaemonRequestError) -> Data {
         let data: Data
         let response: URLResponse
         do {
@@ -143,5 +179,6 @@ struct DaemonClient: Sendable {
         guard (200..<300).contains(http.statusCode) else {
             throw .status(path: path, code: http.statusCode, body: String(decoding: data, as: UTF8.self))
         }
+        return data
     }
 }

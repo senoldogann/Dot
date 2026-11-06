@@ -1,20 +1,38 @@
 import Foundation
 import Security
 
-/// Keeps the daemon's host in UserDefaults. The host is not a secret; the phone key is kept in the Keychain.
+/// The app group the app and its extensions share (the share sheet reads the host from it, item 1009).
+let appGroup: String = "group.dev.dotagent.phone"
+
+/// Keeps the daemon's host in the app group's UserDefaults, which the share extension reads too. The host is not a
+/// secret; the phone key is kept in the Keychain.
 struct HostStore: Sendable {
     private static let defaultsKey: String = "daemonHost"
 
-    /// The host saved before, or `nil` when none is (or what is saved no longer parses).
+    private func shared() -> UserDefaults? {
+        UserDefaults(suiteName: appGroup)
+    }
+
+    /// The host saved before, or `nil` when none is (or what is saved no longer parses). A host an install before item
+    /// 1009 kept in the app's own defaults is moved to the group's once.
     func load(buildHost: String?) -> DaemonHost? {
-        guard let saved: String = UserDefaults.standard.string(forKey: Self.defaultsKey) else {
+        guard let defaults: UserDefaults = shared() else {
+            return nil
+        }
+        if defaults.string(forKey: Self.defaultsKey) == nil,
+            let before: String = UserDefaults.standard.string(forKey: Self.defaultsKey)
+        {
+            defaults.set(before, forKey: Self.defaultsKey)
+            UserDefaults.standard.removeObject(forKey: Self.defaultsKey)
+        }
+        guard let saved: String = defaults.string(forKey: Self.defaultsKey) else {
             return nil
         }
         return try? parseDaemonHost(saved, buildHost: buildHost).get()
     }
 
     func save(_ host: DaemonHost) {
-        UserDefaults.standard.set(host.name, forKey: Self.defaultsKey)
+        shared()?.set(host.name, forKey: Self.defaultsKey)
     }
 }
 

@@ -7,6 +7,8 @@ in the Dynamic Island.
 - `Dot/`: the app (`dev.dotagent.phone`). `Core/` holds the pure rules (address parsing, navigation policy, bridge
   validation), `Adapters/` the Keychain, UserDefaults and the daemon's HTTP API, `Push/` the token registration.
 - `DotLiveActivity/`: the widget extension (`dev.dotagent.phone.live`) that draws the Live Activity.
+- `DotShare/`: the share extension (`dev.dotagent.phone.share`, item 1009): what another app shares goes to Dot as a
+  new chat. It reads the host from the app group's defaults and the key from the shared Keychain access group.
 - `Shared/DotRunAttributes.swift`: the activity's attributes, compiled into both targets.
 - `project.yml`: the XcodeGen spec. `Dot.xcodeproj` is generated from it and is not committed.
 
