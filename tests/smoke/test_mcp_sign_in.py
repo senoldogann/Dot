@@ -576,6 +576,8 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
             await page.goto(f"{world.dot}/#/customize/connectors")
+            # The page opens on Popular (item 1000); All lists every service.
+            await page.locator("[data-chip='all']").click()
             fixture: Locator = _server_row(page, "fixture")
             # The fixture server is a Python process of its own, which a busy runner may take longer than 5 s to start.
             await expect(fixture.locator(".badge")).to_have_text("Ready", timeout=30_000)

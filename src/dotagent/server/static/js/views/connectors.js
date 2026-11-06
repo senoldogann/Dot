@@ -1,8 +1,8 @@
 // Customize › Connectors (items 316, 542 and 545): every service Dot works with, where Connect apps at the foot of the
 // sidebar leads. The head the three tabs share (customizehead.js) with the search, Connected and All and Check again;
 // the accounts; the sections as chips, one showing its section alone; and the services in sections (Popular, which
-// leads as Plugins' New & noteworthy does, Code, Design, Data, Research, Communication, Productivity, Business,
-// Support, This Mac): each a card with its mark, what Dot does with it and how it connects, and its first step in words
+// the page opens on, its chip pressed, until All, another chip, a search or Connected lists the rest, item 1000; Code, Design, Data, Research,
+// Communication, Productivity, Business, Support, This Mac): each a card with its mark, what Dot does with it and how it connects, and its first step in words
 // (Add, Allow, Sign in), or where it stands once it is connected. A card opens the service's own page: what Dot does
 // with it, each way it connects with where it stands and its step, its tools, where its data goes. The services, where
 // they stand and their steps are catalogue.js's; a service Dot has no way to reach is not listed (item 542). A service's
@@ -34,6 +34,8 @@ const SECTIONS = [
   { id: "support", title: "Support" },
   { id: "mac", title: "This Mac" },
 ];
+// The chip the page opens on (item 1000).
+const POPULAR = "popular";
 const MCP_ORIGIN_WORDS = {
   config: "Set up in Dot's settings file; remove it there.",
   plugin: "Comes with one of Dot's plugins; Remove plugin takes the plugin out.",
@@ -440,8 +442,9 @@ export function mount(root, ctx) {
     controls: [tabs.element, recheck],
   });
   head.element.hidden = pluginId !== undefined;
-  // The sections as chips (item 545, as Connect apps' dialog had them): one shows its section alone, All every one.
-  let chosen = "all";
+  // The sections as chips (item 545, as Connect apps' dialog had them): one shows its section alone, All every one;
+  // the page opens on Popular (item 1000).
+  let chosen = POPULAR;
   const chipButtons = [{ id: "all", title: "All" }, ...SECTIONS].map(({ id, title }) =>
     el(
       "button",
@@ -470,8 +473,20 @@ export function mount(root, ctx) {
     allButton.textContent = `All ${catalogue.plugins.length}`;
   }
 
+  // The page opens on its Popular chip (item 1000, the owner's ask of 2026-11-05 for a plain page: every section at
+  // once was 43,000 px on a phone); All, another chip, a search (which looks in every section) or Connected lists the
+  // rest.
+  function browsing() {
+    return chosen === POPULAR && words === "" && shown === "all";
+  }
+
+  /** Whether every section is listed: All, a search or Connected. */
+  function everySection() {
+    return chosen === "all" || words !== "" || shown === "connected";
+  }
+
   function sections(list) {
-    return SECTIONS.filter(({ id }) => chosen === "all" || id === chosen).map(({ id, title }) => {
+    return SECTIONS.filter(({ id }) => everySection() || id === chosen).map(({ id, title }) => {
       const members = list.filter((plugin) => plugin.section === id);
       return members.length === 0
         ? null
@@ -489,8 +504,12 @@ export function mount(root, ctx) {
     const showing = catalogue.plugins.filter((plugin) => (shown === "all" || catalogue.connected(plugin)) && matches(plugin));
     const others = catalogue.servers.servers.filter((server) => server.service === null && (words === "" || foldSearch(`${server.name} ${server.address}`).includes(words)));
     const parts = sections(showing);
+    if (browsing()) {
+      const rest = showing.filter((plugin) => plugin.section !== "popular").length;
+      parts.push(el("p", { class: "hint connect-browse" }, `${plural(rest, "more app", "more apps")}: choose All or a section above, or search.`));
+    }
     // The servers of no service belong to no section: a chip that shows one section alone leaves them out.
-    if (others.length > 0 && chosen === "all" && (shown === "connected" || words !== "")) {
+    if (others.length > 0 && (shown === "connected" || words !== "")) {
       parts.push(
         el(
           "section",
@@ -502,11 +521,11 @@ export function mount(root, ctx) {
     }
     // Nothing drawn, whatever left it out (the search, Connected, a chip): the page says so rather than stand empty.
     if (parts.every((part) => part === null)) {
-      const everywhere = chosen === "all" ? "" : "The chip All looks in every section.";
+      const everywhere = everySection() ? "" : "The chip All looks in every section.";
       parts.push(
         words !== ""
           ? emptyPanel("search", "No connector matches the search", everywhere)
-          : emptyPanel("plug", chosen === "all" ? "Dot is connected to nothing yet" : "Dot is connected to nothing in this section", "All lists what it works with."),
+          : emptyPanel("plug", everySection() ? "Dot is connected to nothing yet" : "Dot is connected to nothing in this section", "All lists what it works with."),
       );
     }
     parts.push(

@@ -166,7 +166,9 @@ installed without you.
 **Connectors** lists 156 services with a search, **Connected** and **All** (each with its count) and **Check again** in
 its head, the accounts under it, and the sections as chips (item 545), one showing its section alone: Popular, Password
 managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item
-492), each titled with its count. Popular stands up as Plugins' New & noteworthy does, four cards a row (two on a
+492), each titled with its count. The page opens on the Popular chip (item 1000: every section at once ran to 43,000
+px on a phone), with a line under it that counts the rest; the chip All, another chip, a search (which looks in every
+section) or Connected lists them. Popular stands up as Plugins' New & noteworthy does, four cards a row (two on a
 narrower window); on a phone its cards are rows as the other sections' are, the mark beside the words (item 604). Each
 card has the service's mark, what Dot does with it, how it connects (Sign in, Key, Open to all, On this Mac, On this Mac · Key; and by Connected app,
 Mac app, Dot's browser, Synced folder or 1Password), where it stands, and its first step

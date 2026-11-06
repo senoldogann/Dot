@@ -186,6 +186,11 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await expect(button).to_have_attribute("aria-current", "page")
             await expect(page.locator(".customize-hero-title")).to_have_text("Connect your apps")
             titles: Locator = page.locator(".plugin-section-title")
+            # The page opens on Popular alone, a line saying how to see the rest (item 1000); All lists every section.
+            await expect(titles).to_have_text(["Popular"])
+            await expect(page.locator(".connect-browse")).to_contain_text("choose All or a section above, or search")
+            await page.locator("[data-chip='all']").click()
+            await expect(page.locator(".connect-browse")).to_have_count(0)
             await expect(titles).to_have_text([_TITLES[section] for section in shown_sections])
             # Popular stands up as Plugins' New & noteworthy does; a section's title counts its cards.
             popular: Locator = page.locator(".plugin-section[data-section='popular'] .plugin-tile").first
@@ -200,9 +205,12 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await expect(page.locator(".plugin-section[data-section='code'] .plugin-tile")).to_have_count(
                 members["code"]
             )
-            # A chip and a search that find nothing together say so, rather than leave the page empty.
+            # A search looks in every section whatever chip is pressed (item 1000), and one that finds nothing says so,
+            # rather than leave the page empty.
             search: Locator = page.get_by_role("searchbox", name="Search connectors")
             await search.fill("linear")
+            await expect(page.locator(".plugin-tile[data-plugin]")).to_have_count(1)
+            await search.fill("no-such-service-anywhere")
             await expect(page.locator(".plugin-section[data-section]")).to_have_count(0)
             await expect(page.locator(".empty-state")).to_contain_text("No connector matches the search")
             await search.fill("")
