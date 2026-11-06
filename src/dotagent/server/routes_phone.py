@@ -16,7 +16,8 @@ from dotagent.config_edit import set_setting
 from dotagent.core.errors import ConfigError, NotFoundError, PairingRefused, PhoneOnly, PhoneSetupError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path
-from dotagent.notify.apns_watch import follows_live
+from dotagent.events import SYSTEM_RUN_ID
+from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT, follows_live
 from dotagent.qr import qr_png
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import PHONE_STATE
@@ -201,6 +202,8 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         if not follows_live(run):
             raise NotFoundError("that run has no Live Activity", {"run_id": registration.run_id})
         await ctx.runtime.store.set_live_activity(run.id, phone_id, registration.token, time.time())
+        # A run that ended before the token came has its activity ended now (notify/apns_watch.py).
+        await ctx.runtime.bus.emit(SYSTEM_RUN_ID, LIVE_REGISTERED_EVENT, {"run_id": run.id}, False)
         return Response(status_code=204)
 
     return router

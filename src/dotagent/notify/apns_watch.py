@@ -9,7 +9,6 @@ again once answered, and ends done, failed or stopped."""
 import asyncio
 import time
 
-from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.core.errors import DotError
 from dotagent.core.logs import get_logger
 from dotagent.evals import EVAL_SOURCE
@@ -30,13 +29,19 @@ from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.notify.push import PUSH_KINDS, PushMessage, notice_message, push_message
 from dotagent.proactive import UNWATCHED_SOURCES
 from dotagent.store.db import Store
-from dotagent.store.models import ApnsDevice, EventRecord, RunRecord
+from dotagent.store.models import WORKING_STATUSES, ApnsDevice, EventRecord, RunRecord
 
 log = get_logger(__name__)
 
-# What the app hears: the alerts of Web Push, a run's start, and an answer that lets a waiting run work again.
-APNS_KINDS: frozenset[str] = frozenset({*PUSH_KINDS, "run_started", "approval_decided"})
-_WAITS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
+# The app gave the token of a run's Live Activity (``POST /api/phone/apns/activity``), a live event of Dot's own whose
+# ``run_id`` names the run: a run that ended before it came has its activity ended at once, or it would stand at
+# "Working" until it went stale.
+LIVE_REGISTERED_EVENT: str = "live_activity_registered"
+# What the app hears: the alerts of Web Push, a run's start, an answer that lets a waiting run work again, and a Live
+# Activity's token.
+APNS_KINDS: frozenset[str] = frozenset({*PUSH_KINDS, "run_started", "approval_decided", LIVE_REGISTERED_EVENT})
+# What makes a run wait for the owner: an approval or a question it asks. A question it leaves for later does not.
+_WAITS: frozenset[str] = frozenset({"approval_requested"})
 _ENDED: dict[str, LiveStatus] = {"done": "done", "failed": "failed", "cancelled": "failed", "blocked": "failed"}
 _ENDED_LINE: dict[str, str] = {"done": "Done", "failed": "Failed", "cancelled": "Stopped", "blocked": "Blocked"}
 _WAIT_S: float = 1.0
@@ -102,7 +107,13 @@ class ApnsWatch:
             except DotError as error:
                 log.warning("apns_live_start_failed", phone=device.phone_id, error=error.message)
                 continue
-            await self._forget_if_gone(device, reply)
+            # A start token that is gone leaves the device's alerts as they are: only the token is forgotten, until
+            # the app gives a new one.
+            if gone(reply):
+                await self._store.set_apns_device(
+                    device.phone_id, device.device_token, None, device.environment, device.updated_at
+                )
+                log.info("apns_start_token_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
 
     async def _to_activities(self, run: RunRecord, status: LiveStatus, line: str, now: float, ended: bool) -> None:
         activities = await self._store.live_activities_of(run.id)
@@ -125,6 +136,11 @@ class ApnsWatch:
 
     async def on_event(self, event: EventRecord, now: float) -> None:
         """Send what ``event`` says: an alert as Web Push would, and the run's Live Activity's change."""
+        if event.kind == LIVE_REGISTERED_EVENT:
+            registered: RunRecord = await self._store.get_run(str(event.data.get("run_id", "")))
+            if registered.status not in WORKING_STATUSES:
+                await self.end(registered, registered.status, now)
+            return
         if event.run_id == SYSTEM_RUN_ID:
             notice: PushMessage | None = notice_message(event)
             if notice is not None:
@@ -143,8 +159,11 @@ class ApnsWatch:
         elif event.kind == "approval_decided":
             await self._to_activities(run, "working", "Working", now, False)
         elif event.kind == "run_finished":
-            status: str = str(event.data.get("status", run.status))
-            await self._to_activities(run, _ENDED.get(status, "failed"), _ENDED_LINE.get(status, "Ended"), now, True)
+            await self.end(run, str(event.data.get("status", run.status)), now)
+
+    async def end(self, run: RunRecord, status: str, now: float) -> None:
+        """End the Live Activities of ``run``, which ended with ``status``, and forget them."""
+        await self._to_activities(run, _ENDED.get(status, "failed"), _ENDED_LINE.get(status, "Ended"), now, True)
 
 
 async def watch_apns(watch: ApnsWatch, feed: Subscription, stopping: asyncio.Event) -> None:

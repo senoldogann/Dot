@@ -1000,8 +1000,10 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   Dashlane keep on this Mac, the keys that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them) and the
   shell's history (`[policy] protected_paths`; a list of your own replaces this one), the data and caches of your
   browsers (Chrome and its Beta, Dev and Canary, Chromium, Safari, Firefox, Brave, Edge, Arc, Vivaldi and Opera), their
-  cookies, Messages and Mail (`[policy] sealed_paths`, which the sandbox below closes to a command as well, item 531; a
-  list of your own replaces this one too), nor Dot's own key file, token, what signing in to an MCP server gave it,
+  cookies, Messages and Mail, and the folder of Dot's APNs key (`~/Library/Application Support/Dot-keys`, item 997)
+  (`[policy] sealed_paths`, which the sandbox below closes to a command as well, item 531; a list of your own replaces
+  this one too), nor Dot's own key file, token, APNs key (`[apns] key_path`, whatever that list says), what signing in
+  to an MCP server gave it,
   browser profiles, configuration, database, the copies of the database (`[store] backup_dir`, and
   `<home>/backups-partial` while one is made, item 526) and journals of file changes. The configuration holds the policy
   and the MCP servers, the database the rules, a copy all of the database and what you go back to, the journals what
@@ -1063,9 +1065,9 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   the lines that name an address, run a command or reach a path withheld, as before.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
-  files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals)
-  and the stores no program has any use for (`[policy] sealed_paths`: the data and caches of your browsers, their
-  cookies, Messages and Mail, item 531), nor change what Dot loads and runs, nor rename a folder above any of them,
+  files above (its key file, token, push key, APNs key, MCP sign-ins, browser profiles, configuration, database and
+  journals) and the stores no program has any use for (`[policy] sealed_paths`: the data and caches of your browsers,
+  their cookies, Messages and Mail, the folder of the APNs key, item 531), nor change what Dot loads and runs, nor rename a folder above any of them,
   nor make, change or remove anything in Dot's home or its logs folder but in the workspace, nor remove, move or
   replace the workspace itself (item 676: the daemon opens and writes files there with your rights, its pid file at
   each start among them, so a link a command left in their place would have it write where the command may not),

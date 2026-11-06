@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
+from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.config import ApnsConfig, AppConfig, load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
@@ -28,7 +29,7 @@ from dotagent.notify.apns import (
     sender_of,
     short_title,
 )
-from dotagent.notify.apns_watch import TOLD_TITLE, ApnsWatch, follows_live
+from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT, TOLD_TITLE, ApnsWatch, follows_live
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.runtime import _guarded_files
 from dotagent.store.db import Store
@@ -142,10 +143,17 @@ async def test_a_run_of_the_owners_starts_updates_and_ends_its_live_activity(tmp
         await store.close()
 
 
-async def test_a_helpers_or_a_schedules_run_has_no_live_activity_and_a_gone_device_is_forgotten(tmp_path: Path) -> None:
+async def test_a_helpers_or_a_schedules_run_has_no_live_activity_and_a_gone_token_is_forgotten(tmp_path: Path) -> None:
+    """A start token APNs calls gone is forgotten and the device's alerts stay; a device token that is gone takes the
+    device."""
     store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
     try:
-        apple = _Apple({_START: ApnsReply(status=410, reason="Unregistered")})
+        apple = _Apple(
+            {
+                _START: ApnsReply(status=410, reason="Unregistered"),
+                _DEVICE: ApnsReply(status=400, reason="BadDeviceToken"),
+            }
+        )
         watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
         await store.set_apns_device("p1", _DEVICE, _START, "sandbox", _NOW)
         parent: RunRecord = await _run(store, "chat", None)
@@ -154,6 +162,9 @@ async def test_a_helpers_or_a_schedules_run_has_no_live_activity_and_a_gone_devi
             await watch.on_event(_event(run.id, "run_started", {}), _NOW)
         assert apple.posted == []
         await watch.on_event(_event(parent.id, "run_started", {}), _NOW)
+        [device] = await store.list_apns_devices()
+        assert device.start_token is None and device.device_token == _DEVICE
+        await watch.on_event(_event(parent.id, "run_finished", {"status": "done", "result": "x"}), _NOW)
         assert await store.list_apns_devices() == []
     finally:
         await store.close()
@@ -182,3 +193,29 @@ def test_the_apns_key_is_guarded_from_the_runs_once_it_is_set() -> None:
     with_key: AppConfig = config.model_copy(update={"apns": config.apns.model_copy(update={"key_path": str(key)})})
     assert key.expanduser() in _guarded_files(with_key)
     assert all(path.suffix != ".p8" for path in _guarded_files(config))
+
+
+async def test_an_activity_whose_token_comes_after_its_run_ended_is_ended_at_once(tmp_path: Path) -> None:
+    """A short run ends before the app sends its activity's token: the activity is ended when the token comes, not left
+    at "Working" until it goes stale. A question left for later does not make a working run wait."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, _START, "sandbox", _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        await store.set_live_activity(run.id, "p1", _ACTIVITY, _NOW)
+        await watch.on_event(_event(run.id, QUESTION_LEFT_EVENT, {}), _NOW)
+        await watch.on_event(
+            EventRecord(id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=LIVE_REGISTERED_EVENT, data={"run_id": run.id}), _NOW
+        )
+        assert all(not url.endswith(_ACTIVITY) for url, _, _ in apple.posted)
+        await store.finish_run(run.id, "done", "Ten leads")
+        await watch.on_event(
+            EventRecord(id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=LIVE_REGISTERED_EVENT, data={"run_id": run.id}), _NOW
+        )
+        url, _, ended = apple.posted[-1]
+        assert url.endswith(_ACTIVITY) and ended["aps"]["event"] == "end"  # type: ignore[index]  # a JSON payload read back
+        assert await store.live_activities_of(run.id) == []
+    finally:
+        await store.close()
