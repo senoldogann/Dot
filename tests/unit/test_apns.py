@@ -29,7 +29,8 @@ from dotagent.notify.apns import (
     provider_token,
     short_title,
 )
-from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT, TOLD_TITLE, ApnsWatch, follows_live
+from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT, PROGRESS_EVERY_S, TOLD_TITLE, ApnsWatch, follows_live
+from dotagent.notify.live_now import LiveNow, tool_now
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.runtime import _guarded_files
 from dotagent.store.db import Store
@@ -94,7 +95,7 @@ def test_an_alert_carries_its_title_and_a_fixed_line_and_a_live_activity_a_short
     }
     assert short_title("  Find   ten leads\nfor the launch ") == "Find ten leads for the launch"
     assert short_title("x" * 80) == "x" * 39 + "…"
-    state = LiveState(title="Leads", status="working", line="Working", startedAt=_NOW)
+    state = LiveState(title="Leads", status="working", kind="thinking", line="Thinking", startedAt=_NOW)
     aps: object = live_start_payload("run-1", "Dot", state, _NOW)["aps"]
     assert isinstance(aps, dict)
     assert aps["event"] == "start" and aps["attributes-type"] == "DotRunAttributes"
@@ -209,7 +210,9 @@ async def test_an_activity_whose_token_comes_after_its_run_ended_is_ended_at_onc
         await watch.on_event(
             EventRecord(id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=LIVE_REGISTERED_EVENT, data={"run_id": run.id}), _NOW
         )
-        assert all(not url.endswith(_ACTIVITY) for url, _, _ in apple.posted)
+        # A run at work is told what it does now as its token comes (item 1004), not waiting.
+        assert apple.posted[-1][0].endswith(_ACTIVITY)
+        assert apple.posted[-1][2]["aps"]["content-state"]["status"] == "working"  # type: ignore[index]  # a JSON payload read back
         registered = EventRecord(
             id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=LIVE_REGISTERED_EVENT, data={"run_id": run.id}
         )
@@ -227,3 +230,53 @@ async def test_an_activity_whose_token_comes_after_its_run_ended_is_ended_at_onc
         assert await store.live_activities_of(run.id) == []
     finally:
         await store.close()
+
+
+async def test_a_runs_steps_reach_its_live_activity_as_what_it_does_now_at_most_every_few_seconds(
+    tmp_path: Path,
+) -> None:
+    """Item 1004: a step says what the run does now (a kind and a fixed line, never what the step was about), sent at
+    once when the last push is old enough and kept for later otherwise, the latest winning; a wait is told at once."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, _START, "sandbox", _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        await watch.on_event(_event(run.id, "run_started", {}), _NOW)
+        started: JsonObject = apple.posted[-1][2]
+        assert started["aps"]["content-state"]["kind"] == "thinking"  # type: ignore[index]  # a JSON payload read back
+        await store.set_live_activity(run.id, "p1", _ACTIVITY, _NOW)
+        before: int = len(apple.posted)
+        secret_url: dict[str, object] = {"tool": "browser_open", "args": {"url": "https://bank.example/account/42"}}
+        await watch.on_event(_event(run.id, "tool_call", secret_url), _NOW + 1)
+        await watch.on_event(
+            _event(run.id, "tool_call", {"tool": "shell", "args": {"command": "cat secrets"}}), _NOW + 2
+        )
+        assert len(apple.posted) == before
+        await watch.flush(_NOW + 3)
+        assert len(apple.posted) == before
+        await watch.flush(_NOW + PROGRESS_EVERY_S)
+        url, headers, update = apple.posted[-1]
+        assert url.endswith(_ACTIVITY) and headers["apns-priority"] == "5"
+        assert update["aps"]["content-state"]["kind"] == "command"  # type: ignore[index]  # a JSON payload read back
+        assert update["aps"]["content-state"]["line"] == "Running a command"  # type: ignore[index]  # a JSON payload read back
+        assert "bank.example" not in json.dumps(update) and "secrets" not in json.dumps(update)
+        await watch.on_event(_event(run.id, "tool_result", {"tool": "shell"}), _NOW + PROGRESS_EVERY_S * 2)
+        assert apple.posted[-1][2]["aps"]["content-state"]["line"] == "Thinking"  # type: ignore[index]  # a JSON payload read back
+        await watch.on_event(
+            _event(run.id, "approval_requested", {"severity": "approval"}), _NOW + PROGRESS_EVERY_S * 2 + 1
+        )
+        waiting_url, waiting_headers, waiting = apple.posted[-1]
+        assert waiting_url.endswith(_ACTIVITY) and waiting_headers["apns-priority"] == "10"
+        assert waiting["aps"]["content-state"]["kind"] == "waiting"  # type: ignore[index]  # a JSON payload read back
+    finally:
+        await store.close()
+
+
+def test_each_tool_says_what_the_run_does_in_a_fixed_line() -> None:
+    assert tool_now("web_search") == LiveNow(kind="searching", line="Searching the web")
+    assert tool_now("browser_act") == LiveNow(kind="browsing", line="Browsing the web")
+    assert tool_now("mcp__google-workspace__gmail_send") == LiveNow(kind="app", line="Using Google Workspace")
+    assert tool_now("finish") is None and tool_now("update_plan") is None
+    assert tool_now("something_new") == LiveNow(kind="working", line="Working")

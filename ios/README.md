@@ -54,6 +54,8 @@ enforce it: `scripts/app_bound_domains.sh` writes the host as the only `WKAppBou
   `window.webkit.messageHandlers.dot.postMessage({type: "paired", key: "<phone key>"})`. The app accepts it only from
   the main frame of `https://<host>` and only a key shaped `phone.<id>.<secret>`. The page can tell it runs in the app
   by `DotPhone/<version>` in its user agent.
+- The page's Notifications card posts `{type: "openSettings"}` (no data, item 1005), from the same main frame: the app
+  opens its page of the iPhone's Settings, where its notifications are switched.
 - `POST /api/phone/apns` with `Authorization: Bearer <phone key>` and
   `{"device_token": "<hex>", "start_token": "<hex>" | null, "environment": "sandbox" | "production"}`, sent again
   whenever either token changes.

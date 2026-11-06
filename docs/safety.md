@@ -62,8 +62,9 @@ run needs, sent where the configuration points:
   others among it, so it may repeat what a sender wrote.
 - **To Dot's iPhone app through Apple's push service (APNs), once you set `[apns]`: titles.** Apple reads what APNs
   carries, unlike Web Push: an alert carries one of Dot's fixed titles ("A task is done", "Dot has a message for you")
-  and "Open Dot to see it."; a run's Live Activity carries up to 40 characters of its chat's title, its agent's name and
-  its state (item 997, see [Dot on the phone](phone.md#dot-on-the-phone)).
+  and "Open Dot to see it."; a run's Live Activity carries up to 40 characters of its chat's title, its agent's name, its
+  state and a fixed line of what it does now ("Browsing the web", "Using Gmail": a connected app by its server's name
+  alone; items 997 and 1004, see [Dot on the phone](phone.md#dot-on-the-phone)).
 - **To your own devices through Apple, once you switch iMessage on: Dot's answers, and what it tells you on its own.**
   Each answer (masked of the secrets Dot holds, cut to about 2,000 characters), the line that says a run waits for you,
   the notices a message of yours earns, and what Dot tells you on its own (item 582: the first line of the morning

@@ -31,7 +31,10 @@ private struct WebScreen: View {
             host: host, model: model, reloadCount: reloadCount,
             onLoadError: { (message: String?) in loadError = message }
         )
-        .ignoresSafeArea(.container, edges: .bottom)
+        // The page runs under the status bar and the Dynamic Island as it does added to the Home Screen
+        // (viewport-fit=cover): its own ground fills the top in the theme's colour and its bar keeps out of the island
+        // by env(safe-area-inset-top). Kept to the safe area, the band above the page was the app's white.
+        .ignoresSafeArea(.container, edges: .all)
         .overlay {
             if let loadError {
                 LoadErrorView(
