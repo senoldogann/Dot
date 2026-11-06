@@ -272,3 +272,33 @@ async def test_a_phone_key_makes_the_loop_of_a_chat_in_yolo(own_home: Path) -> N
         )
         assert made.status_code == 201, made.text
         assert made.json()["options"]["approvals"] == "yolo"
+
+
+async def test_only_a_phones_own_key_registers_its_app_for_apns_and_its_removal_forgets_it(own_home: Path) -> None:
+    """Item 997: the iPhone app registers its APNs tokens with its phone's key, never the Mac's token; a Live Activity's
+    token is taken for a run that has one; removing the phone forgets them."""
+    async with _served(own_home) as (client, _, runtime):
+        key: str = await _phone_key(client)
+        phone: dict[str, str] = {"Authorization": f"Bearer {key}"}
+        mac: dict[str, str] = {"Authorization": f"Bearer {TOKEN}"}
+        tokens: dict[str, object] = {"device_token": "ab" * 32, "start_token": "cd" * 40, "environment": "sandbox"}
+        refused: httpx.Response = await client.post("/phone/apns", json=tokens, headers=mac)
+        assert refused.status_code == 403, refused.text
+        assert (
+            await client.post("/phone/apns", json={**tokens, "device_token": "x"}, headers=phone)
+        ).status_code == 422
+        assert (await client.post("/phone/apns", json=tokens, headers=phone)).status_code == 204
+        [device] = await runtime.store.list_apns_devices()
+        assert device.start_token == "cd" * 40 and device.environment == "sandbox"
+        thread = await runtime.store.create_thread("Leads", "chat")
+        run = await runtime.store.create_run(
+            thread.id, "goal", "task", "m:m", None, "chat", "medium", "standard", None, "ask", False, None, None, None
+        )
+        activity: dict[str, str] = {"run_id": run.id, "token": "ef" * 40}
+        assert (await client.post("/phone/apns/activity", json=activity, headers=phone)).status_code == 204
+        assert [kept.token for kept in await runtime.store.live_activities_of(run.id)] == ["ef" * 40]
+        unknown: dict[str, str] = {"run_id": "run_none", "token": "ef" * 40}
+        assert (await client.post("/phone/apns/activity", json=unknown, headers=phone)).status_code == 404
+        assert (await client.delete(f"/phone/phones/{device.phone_id}", headers=mac)).status_code == 204
+        assert await runtime.store.list_apns_devices() == []
+        assert await runtime.store.live_activities_of(run.id) == []

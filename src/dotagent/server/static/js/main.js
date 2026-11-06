@@ -2,7 +2,7 @@
 
 import { isAway, onAway } from "./infront.js";
 import { loadLooks } from "./actors.js";
-import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken } from "./api.js";
+import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken, tellPhoneApp } from "./api.js";
 import { loadOwnThemes } from "./appearance/own.js";
 import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
@@ -717,6 +717,7 @@ async function connect() {
   if (snapshot.outdated && reloadForBuild(snapshot.status.pages)) {
     return;
   }
+  tellPhoneApp();
   beginSession();
 }
 

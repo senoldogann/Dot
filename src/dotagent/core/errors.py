@@ -306,6 +306,10 @@ class PhoneRefused(DotError):
     good what runs may do without asking, which would outlast the phone's removal."""
 
 
+class PhoneOnly(DotError):
+    """What only a paired phone's own key asks (item 997): registering its app for APNs pushes."""
+
+
 class VaultRefused(DotError):
     """Dot's vault shows a secret to this Mac's own page alone (item 621): a request that came another way, a phone's
     over Tailscale, is refused."""

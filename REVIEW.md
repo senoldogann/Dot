@@ -29,6 +29,8 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/unit/test_apns.py::test_the_apns_key_is_guarded_from_the_runs_once_it_is_set` — the APNs key of
+  `[apns] key_path` was said to be sealed from the runs and was not (item 997).
 - `tests/smoke/test_secret_fields.py::test_ask_mode_types_a_one_time_code_the_user_gave` — a one-time code the user
   gave is typed and the form submits, while a code found on the page is refused (`test_ask_mode_refuses_to_type_a_one_time_code`).
 - `tests/unit/test_ask_user_notify.py::test_a_left_question_notifies_the_user` — a question left for the user sends a

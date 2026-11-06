@@ -42,6 +42,8 @@ from dotagent.store.models import (
     AgentLook,
     AgentRecord,
     AgentToolUse,
+    ApnsDevice,
+    ApnsEnvironment,
     ApprovalRecord,
     ApprovalStatus,
     AutoDecisionCount,
@@ -67,6 +69,7 @@ from dotagent.store.models import (
     HarnessStepState,
     HarnessTask,
     HarnessVersion,
+    LiveActivity,
     MemoryOrder,
     MemoryRecord,
     MemoryScore,
@@ -230,6 +233,14 @@ CREATE TABLE IF NOT EXISTS correspondents (
 );
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS apns_devices (
+    phone_id TEXT PRIMARY KEY, device_token TEXT NOT NULL, start_token TEXT, environment TEXT NOT NULL,
+    updated_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS live_activities (
+    run_id TEXT NOT NULL, phone_id TEXT NOT NULL, token TEXT NOT NULL, created_at REAL NOT NULL,
+    PRIMARY KEY (run_id, phone_id)
 );
 CREATE TABLE IF NOT EXISTS memories (
     id TEXT PRIMARY KEY, content TEXT NOT NULL, tags TEXT NOT NULL,
@@ -5070,6 +5081,62 @@ class Store:
     @_writing
     async def delete_push_subscription(self, endpoint: str) -> None:
         await self._db.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+        await self._db.commit()
+
+    # ----- the iPhone app's APNs (item 997) ---------------------------------------------------
+
+    @_writing
+    async def set_apns_device(
+        self, phone_id: str, device_token: str, start_token: str | None, environment: ApnsEnvironment, now: float
+    ) -> ApnsDevice:
+        """Keep what the app of the phone ``phone_id`` got from APNs; the same phone again takes the new tokens."""
+        record: ApnsDevice = ApnsDevice(
+            phone_id=phone_id,
+            device_token=device_token,
+            start_token=start_token,
+            environment=environment,
+            updated_at=now,
+        )
+        await self._db.execute(
+            "INSERT INTO apns_devices (phone_id, device_token, start_token, environment, updated_at)"
+            " VALUES (?, ?, ?, ?, ?) ON CONFLICT(phone_id) DO UPDATE SET device_token = excluded.device_token,"
+            " start_token = excluded.start_token, environment = excluded.environment, updated_at = excluded.updated_at",
+            (phone_id, device_token, start_token, environment, now),
+        )
+        await self._db.commit()
+        return record
+
+    async def list_apns_devices(self) -> list[ApnsDevice]:
+        rows = await self._all("SELECT * FROM apns_devices ORDER BY updated_at", ())
+        return [ApnsDevice.model_validate(dict(row)) for row in rows]
+
+    @_writing
+    async def delete_apns_device(self, phone_id: str) -> None:
+        """Forget the app of the phone ``phone_id`` and its Live Activities: the phone was removed, or APNs said its
+        token is gone."""
+        await self._db.execute("DELETE FROM apns_devices WHERE phone_id = ?", (phone_id,))
+        await self._db.execute("DELETE FROM live_activities WHERE phone_id = ?", (phone_id,))
+        await self._db.commit()
+
+    @_writing
+    async def set_live_activity(self, run_id: str, phone_id: str, token: str, now: float) -> LiveActivity:
+        """Keep the token of the Live Activity of the run ``run_id`` on the phone ``phone_id``."""
+        await self._db.execute(
+            "INSERT INTO live_activities (run_id, phone_id, token, created_at) VALUES (?, ?, ?, ?)"
+            " ON CONFLICT(run_id, phone_id) DO UPDATE SET token = excluded.token",
+            (run_id, phone_id, token, now),
+        )
+        await self._db.commit()
+        return LiveActivity(run_id=run_id, phone_id=phone_id, token=token, created_at=now)
+
+    async def live_activities_of(self, run_id: str) -> list[LiveActivity]:
+        rows = await self._all("SELECT * FROM live_activities WHERE run_id = ? ORDER BY created_at", (run_id,))
+        return [LiveActivity.model_validate(dict(row)) for row in rows]
+
+    @_writing
+    async def delete_live_activities(self, run_id: str) -> None:
+        """Forget the Live Activities of the run ``run_id``, which ended."""
+        await self._db.execute("DELETE FROM live_activities WHERE run_id = ?", (run_id,))
         await self._db.commit()
 
     # ----- memories --------------------------------------------------------------------------

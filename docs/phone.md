@@ -69,6 +69,23 @@ code** takes its place. The same by hand:
    (422), and one stored before that check is dropped with a warning while the others still get theirs. Settings ›
    General › Notifications off drops the subscription.
 
+4. Dot's iPhone app (item 997, `ios/`, installed from Xcode for now) is the same web UI in a native shell, which adds
+   what a page on iOS cannot have: the run at work on the lock screen and in the Dynamic Island (a Live Activity). The
+   app asks once for the tailnet address (`https://<mac>.<tailnet>.ts.net`; it loads nothing else) and is signed in
+   with a code as a browser is. Once the daemon has proven the phone's own key, the page hands it to the app (one
+   `dot.paired` message, taken from the daemon's own page alone), which keeps it in its Keychain and registers what
+   Apple gives it with it: `POST /api/phone/apns` (the device token, the token that starts a Live Activity, the
+   environment) and, for each Live Activity started, `POST /api/phone/apns/activity`. Only a phone's own key registers
+   (403 for the Mac's token). The daemon pushes through APNs with the key of `[apns]` (`key_path`, a `.p8` file
+   outside Dot's home, never logged; `key_id`, `team_id`, `topic`), and pushes nothing through it while they are
+   empty. An alert says the title Web Push says and a fixed line ("Open Dot to see it."), never the question, the
+   draft or the result, since Apple reads what APNs carries; a message Dot wrote to you goes as "Dot has a message for
+   you". A run of yours (not a helper's, a schedule's, a watcher's or Dot's own) starts a Live Activity on each phone
+   that gave a push-to-start token: its chat's title (40 characters at most) and agent, "Working", "Waiting for you"
+   while an approval or a question waits, and its end (done, failed, stopped), which stays 15 minutes on the lock
+   screen; one whose end never came is marked stale after four hours. A token APNs calls gone (410, `Unregistered`,
+   `BadDeviceToken`, `DeviceTokenNotForTopic`) is forgotten, and so are a phone's tokens when it is removed.
+
 On a phone the page holds still (item 275). Every page fits the screen's width: a long link, path or word breaks, and
 code and tables scroll in their own frame. No page lets the phone zoom into the field that gets the focus: on an iPhone
 and an iPad the viewport allows no scale past the first, so a field has the size it has on the Mac (item 311), and on

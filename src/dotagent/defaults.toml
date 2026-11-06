@@ -534,6 +534,8 @@ protected_paths = [
 # your own replaces this one; add a browser you use that is not here.
 sealed_paths = [
   "~/Library/Messages",
+  # Where the APNs key of [apns] is kept (item 997); the key_path itself is guarded whatever this list says.
+  "~/Library/Application Support/Dot-keys",
   "~/Library/Mail",
   "~/Library/Cookies",
   "~/Library/Safari",
@@ -1164,6 +1166,16 @@ leave_room = 0.8
 session_minutes = 90
 checks_minutes = 45
 merge = "ask"
+
+[apns]
+# Dot's iPhone app (docs/phone.md, item 997): the APNs key from Apple Developer › Keys that Dot signs the app's pushes
+# with (the .p8 file, kept outside Dot's home; empty: the app gets no pushes), Apple's ids of the key and of the team,
+# and the app's bundle id. The Live Activity of a task at work and the alerts of the web app's Web Push reach the app
+# through it; an alert carries its title alone, since Apple reads what APNs carries.
+key_path = ""
+key_id = ""
+team_id = ""
+topic = "dev.dotagent.phone"
 
 [scout]
 # The plugin scout (docs/extending.md): each night, at time (HH:MM in [scheduler] timezone, or "off"), it looks for plugins

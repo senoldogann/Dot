@@ -945,6 +945,18 @@ class SkillsConfig(FrozenModel):
     builtin: bool = True
 
 
+class ApnsConfig(FrozenModel):
+    """Dot's iPhone app (item 997, docs/phone.md): the APNs key Dot signs its pushes with, from Apple Developer › Keys,
+    and whose app they are for. ``key_path`` is the .p8 file, kept outside Dot's home, which no run reads; empty,
+    the app gets no pushes (the web app's Web Push is apart). ``key_id`` and ``team_id`` are Apple's ids of the key and
+    the team, ``topic`` the app's bundle id."""
+
+    key_path: str
+    key_id: str = Field(pattern=r"^([A-Z0-9]{10})?$")
+    team_id: str = Field(pattern=r"^([A-Z0-9]{10})?$")
+    topic: str = Field(min_length=1)
+
+
 class ScoutConfig(FrozenModel):
     """The plugin scout (item 711, docs/extending.md): when it looks each night for plugins worth proposing and for
     updates of those installed, and how much one night may read. It installs nothing: each proposal waits for the
@@ -1177,6 +1189,7 @@ class AppConfig(FrozenModel):
     skills: SkillsConfig
     plugins: PluginsConfig
     scout: ScoutConfig
+    apns: ApnsConfig
     repair: RepairConfig
     recon: ReconConfig
     trading: TradingConfig

@@ -908,6 +908,29 @@ class CampaignRecord(FrozenModel):
     browser: BrowserMode | None
 
 
+type ApnsEnvironment = Literal["sandbox", "production"]
+
+
+class ApnsDevice(FrozenModel):
+    """A phone's app as APNs knows it (item 997): the paired phone it is, its device token (alerts), its token that
+    starts a Live Activity (``None`` before iOS gives one), and the APNs environment both belong to."""
+
+    phone_id: str
+    device_token: str
+    start_token: str | None
+    environment: ApnsEnvironment
+    updated_at: float
+
+
+class LiveActivity(FrozenModel):
+    """A Live Activity of a run on a phone (item 997): the token APNs updates and ends it with."""
+
+    run_id: str
+    phone_id: str
+    token: str
+    created_at: float
+
+
 class PushSubscription(FrozenModel):
     """A browser's web push subscription (item 52): the push service's endpoint and the keys the message is encrypted
     with, as ``PushSubscription.toJSON()`` gives them."""
