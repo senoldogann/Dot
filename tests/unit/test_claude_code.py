@@ -16,6 +16,8 @@ from dotagent.claude_code.run import (
     ended_clean,
     fast_off_words,
     mcp_config,
+    run_effort,
+    run_speed,
     system_prompt,
     write_mcp_config,
 )
@@ -65,7 +67,7 @@ def _value(argv: tuple[str, ...], flag: str) -> str:
 def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() -> None:
     door: Door = _door()
     argv: tuple[str, ...] = claude_argv(
-        "/usr/local/bin/claude", "opus", None, "standard", "You are Dot.", CONFIG, door.name, None
+        "/usr/local/bin/claude", "opus", "medium", "standard", "You are Dot.", CONFIG, door.name, None
     )
     assert argv[:2] == ("/usr/local/bin/claude", "-p")
     assert _value(argv, "--input-format") == "stream-json"
@@ -93,7 +95,7 @@ def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() ->
 
 
 def test_a_chat_with_a_session_resumes_it() -> None:
-    argv: tuple[str, ...] = claude_argv("claude", "sonnet", None, "standard", "p", CONFIG, DOOR, "ses-1")
+    argv: tuple[str, ...] = claude_argv("claude", "sonnet", "medium", "standard", "p", CONFIG, DOOR, "ses-1")
     assert _value(argv, "--resume") == "ses-1"
     # The allowed tools stay the last words, so that nothing after them is read as one.
     assert argv[-2:] == ("--allowedTools", f"mcp__{DOOR}")
@@ -306,8 +308,15 @@ def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     argv: tuple[str, ...] = claude_argv("claude", "opus", "xhigh", "fast", "p", CONFIG, DOOR, None)
     assert argv[argv.index("--effort") + 1] == "xhigh"
     assert json.loads(argv[argv.index("--settings") + 1]) == {"fastMode": True}
-    plain: tuple[str, ...] = claude_argv("claude", "sonnet", "minimal", "standard", "p", CONFIG, DOOR, None)
-    assert "--effort" not in plain and "--settings" not in plain
+    plain: tuple[str, ...] = claude_argv("claude", "sonnet", "low", "standard", "p", CONFIG, DOOR, None)
+    assert "--settings" not in plain
+    # The configured default goes when the run chose none, rounded to Claude Code's levels, as the composer shows it.
+    assert run_effort(None, "medium") == "medium"
+    assert run_effort("minimal", "medium") == "low" and run_effort("off", "high") == "low"
+    assert run_effort("max", "medium") == "max"
+    # Fast mode goes to a model that has it alone.
+    assert run_speed(ModelRef(provider="claude_code", model="sonnet"), "fast") == "standard"
+    assert run_speed(ModelRef(provider="claude_code", model="opus"), "fast") == "fast"
     assert offers_fast_mode(ModelRef(provider="claude_code", model="opus"))
     assert not offers_fast_mode(ModelRef(provider="claude_code", model="sonnet"))
     assert model_info_of("fable").efforts == ("low", "medium", "high", "xhigh", "max")
