@@ -158,14 +158,14 @@ private func doingColor(_ state: DotRunAttributes.ContentState) -> Color {
     }
 }
 
-/// The mark of what the run does now; it pulses while the run works.
+/// The mark of what the run does now. A Live Activity plays no repeating animation, only the change from one update to
+/// the next, so the mark turns into the next one as the run moves on.
 private struct DoingMark: View {
     let state: DotRunAttributes.ContentState
 
     var body: some View {
         Image(systemName: doingSymbol(state))
             .foregroundStyle(doingColor(state))
-            .symbolEffect(.pulse, options: .repeating, isActive: RunStatus(rawValue: state.status) == .working)
             .contentTransition(.symbolEffect(.replace))
             .accessibilityHidden(true)
     }
