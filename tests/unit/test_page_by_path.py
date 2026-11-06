@@ -150,3 +150,21 @@ async def test_a_link_moved_after_the_call_was_judged_is_not_followed(tmp_path: 
     with pytest.raises(ToolExecutionError, match="what it names changed while it waited"):
         await prepared.run(ctx)  # type: ignore[arg-type]
     assert ctx.runtime.store.kept == {}
+
+
+async def test_a_page_given_as_html_has_the_workspaces_pictures_it_names_written_in(tmp_path: Path) -> None:
+    """Item 1007: a page given as HTML that names a picture Dot made in the workspace (the owner's CV screenshot) shows
+    it, written in as a page by its path has its files; one outside the workspace or protected is left out and said."""
+    home: Path = _home(tmp_path)
+    (home / "workspace" / "cv").mkdir()
+    (home / "workspace" / "cv" / "shot.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
+    (home / "workspace" / "keys").mkdir()
+    (home / "workspace" / "keys" / "secret.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    ctx: SimpleNamespace = _context(home, protected=(home / "workspace" / "keys",))
+    html: str = '<img src="cv/shot.png" alt="CV"><img src="keys/secret.png"><img src="https://example.com/a.png">'
+    result: ToolResult = await _shown(ctx, {"title": "CV", "html": html})
+    kept: str = ctx.runtime.store.kept["CV"]
+    assert 'src="data:image/png;base64,' in kept
+    assert "keys/secret.png" in kept and "https://example.com/a.png" in kept
+    assert "Written into it: cv/shot.png." in result.text
+    assert "keys/secret.png" in result.text

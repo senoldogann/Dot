@@ -61,6 +61,10 @@ _DESCRIPTION: str = (
 )
 
 
+# Where a page given as html stands for the files it names: in the workspace, its relative paths resolving there.
+_INLINE_PAGE: str = "shown-page.html"
+
+
 class ShowPageArgs(ToolArgs):
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=PAGE_TITLE_MAX_CHARS)] = (
         Field(description="A few words that name the page.")
@@ -132,8 +136,8 @@ def whole_page_file(path: Path, workspace: Path, protected: tuple[Path, ...], do
 
 def shown_words(page: ShownPage, address: str, files: PageFiles | None) -> str:
     """What show_page tells the run: the page is shown, at ``address`` on this Mac, which its browser may open to see
-    it as the owner does (item 601), and, for a page by its path, the files written into it and those left out (item
-    600)."""
+    it as the owner does (item 601), and the workspace's files written into it and those left out (items 600 and
+    1007)."""
     words: str = (
         f"The page “{page.title}” is shown to the user in the conversation. It is at {address}, which your browser may "
         "open to see it as they do."
@@ -194,7 +198,18 @@ def _show_page_tool() -> RegisteredTool:
             )
             html: str = files.html
         elif args.html is not None:
-            html = args.html
+            # A page given as html names the workspace's files as a page there would (item 1007): a picture Dot made
+            # (`<img src="cv/shot.png">`) is written in as the files of a page by its path are, under the same rules,
+            # since a shown page is sandboxed and loads nothing of this Mac; before, it stood empty.
+            files = await asyncio.to_thread(
+                with_its_files,
+                args.html,
+                ctx.workspace / _INLINE_PAGE,
+                ctx.workspace,
+                ctx.runtime.protected,
+                ctx.runtime.dot_paths,
+            )
+            html = files.html
         else:
             raise ToolInputError("give the page as html or by its path", {})
         page: ShownPage = await ctx.runtime.store.add_shown_page(ctx.run_id, args.title, html)
