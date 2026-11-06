@@ -217,7 +217,7 @@ answer keeps its words, Ollama's too.
   from one run of a chat to the next: the system prompt is the same bytes from one message of a chat to the next (it
   names the day and the time zone; the time of day, the notes recalled for the message and the skills that fit it go in
   a note under the message, item 404), so the cache holds the instructions and the history up to the message. A
-  question Dot asks once (the review model's, a summary, a recap, a consult) is not cached (item 1003): writing the
+  question Dot asks once (the review model's, a summary, a recap, a consult) is not cached (item 1010): writing the
   cache costs a quarter more than reading the prompt, and nothing would read it back. A request may use the model's
   whole output limit. The thinking of earlier steps is sent back; a block whose earlier context has
   changed since (a run drops an old screenshot, a compaction folds the history, a new day changes the instructions) is

@@ -150,7 +150,7 @@ def test_old_output_is_shortened_once_and_then_left_as_it_is() -> None:
 
 
 def test_a_question_asked_once_writes_no_cache_and_a_step_does() -> None:
-    # A review or a summary is asked once: a cache written for it is paid for and never read (item 1003).
+    # A review or a summary is asked once: a cache written for it is paid for and never read (item 1010).
     history: list[Message] = [user_message("Is this step what the owner asked for?", ())]
     step: ChatRequest = _request(history)
     once: ChatRequest = step.model_copy(update={"prompt_reuse": "single", "cache_mark": None})
