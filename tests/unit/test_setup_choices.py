@@ -71,7 +71,7 @@ def test_setup_says_which_roles_keep_their_models_and_where_one_cannot_do_the_wo
     fast, review, vision = (
         line for line in said.splitlines() if line.lstrip().startswith(("fast", "review", "vision"))
     )
-    assert "Zen's free models answer only as OpenCode's own agent" in fast and "choose another" in fast
+    assert "opencode:big-pickle answers only as its own agent" in fast and "choose another" in fast
     # The review and vision models are Ollama's by default: setup says that this Mac has none to run them.
     assert "does not answer on this Mac" in review and "does not answer on this Mac" in vision
     # A model that sees no images leaves the vision model, and the others are written.

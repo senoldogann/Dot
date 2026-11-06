@@ -757,9 +757,10 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
             try:
                 answer: str = await follow.follow()
             except ClaudeCodeError as error:
-                if chat is not None and not follow.inited:
-                    # The program could not go on with the chat's session (gone from its transcripts): the next run
-                    # starts a new one, which hears the chat with its first message.
+                if chat is not None:
+                    # Either the program could not go on with the chat's session (gone from its transcripts), or it
+                    # took this run's messages into it before the run failed: a count of what it saw would be wrong
+                    # either way. The next run starts a new session, which hears the chat with its first message.
                     await asyncio.to_thread(forget_chat, run.thread_id)
                 error.context["stderr"] = await _stderr_now(tail, process)
                 raise
@@ -784,6 +785,10 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
             chat_path(run.thread_id),
             ChatSession(session_id=follow.session_id, seen=len(earlier) + 2 + follow.added),
         )
+    elif chat is not None:
+        # A run cut at its limits took its goal into the session and left it there: the next run starts a new session
+        # rather than resume one whose count of what it saw is behind (the pre-push review).
+        await asyncio.to_thread(forget_chat, run.thread_id)
     log.info("claude_code_run_ended", run_id=run.id, session=follow.session_id, steps=follow.steps, clean=clean)
     return RunEnd(outcome=_outcome(follow, answer, run.goal), lessons=None)
 
