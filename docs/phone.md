@@ -81,9 +81,13 @@ code** takes its place. The same by hand:
    empty. An alert says the title Web Push says and a fixed line ("Open Dot to see it."), never the question, the
    draft or the result, since Apple reads what APNs carries; a message Dot wrote to you goes as "Dot has a message for
    you". A run of yours (not a helper's, a schedule's, a watcher's or Dot's own) starts a Live Activity on each phone
-   that gave a push-to-start token: its chat's title (40 characters at most) and agent, "Working", "Waiting for you"
-   while an approval or a question waits, and its end (done, failed, stopped), which stays 15 minutes on the lock
-   screen; one whose end never came is marked stale after four hours. A token APNs calls gone (410, `Unregistered`,
+   that gave a push-to-start token: its chat's title (40 characters at most) and agent, and what it does now (item
+   1004), each with a mark of its own that pulses while it works: "Thinking", "Browsing the web", "Searching the web",
+   "Running a command", "Reading files", "Writing files", "Using your Mac", "Using <app>" for a connected app, "Working
+   with helpers", "Writing the answer"; never what the step was about (no address, file, command or words of the
+   model). A step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery;
+   "Waiting for you" while an approval or a question waits, and the end (done, failed, stopped), go at once and the
+   end stays 15 minutes on the lock screen; one whose end never came is marked stale after four hours. A token APNs calls gone (410, `Unregistered`,
    `BadDeviceToken`, `DeviceTokenNotForTopic`) is forgotten, and so are a phone's tokens when it is removed.
 
 On a phone the page holds still (item 275). Every page fits the screen's width: a long link, path or word breaks, and

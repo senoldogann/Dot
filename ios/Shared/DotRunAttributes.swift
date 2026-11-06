@@ -11,6 +11,9 @@ struct DotRunAttributes: ActivityAttributes {
         var title: String
         /// `working`, `waiting`, `done` or `failed`.
         var status: String
+        /// What the run does now (item 1004): `thinking`, `browsing`, `command`… which picks the mark beside `line`;
+        /// `nil` from a daemon older than that.
+        var kind: String?
         /// The run's current status line (the step, or what it waits for).
         var line: String
         /// When the run started, in epoch seconds.

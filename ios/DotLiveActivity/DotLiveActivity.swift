@@ -27,42 +27,42 @@ struct DotRunLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 6) {
-                        LiveDotGlyph(size: 18)
+                    HStack(spacing: 8) {
+                        LiveDotGlyph(size: 22)
                         Text(context.attributes.agentName)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.headline)
                             .lineLimit(1)
                     }
+                    .padding(.leading, 6)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     StatusTrailing(state: context.state)
                         .font(.subheadline)
+                        .padding(.trailing, 6)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text(context.state.title)
-                            .font(.subheadline.weight(.medium))
+                            .font(.subheadline.weight(.semibold))
                             .lineLimit(1)
-                        Text(lineText(context.state))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                        DoingRow(state: context.state)
+                            .font(.subheadline)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    // Kept off the island's rounded lower corners, which cut the line's first letter.
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
                 }
             } compactLeading: {
-                LiveDotGlyph(size: 16)
+                LiveDotGlyph(size: 18)
+                    .padding(.leading, 2)
             } compactTrailing: {
-                StatusTrailing(state: context.state)
-                    .font(.caption.monospacedDigit())
-                    .frame(maxWidth: 52)
+                DoingMark(state: context.state)
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(.trailing, 2)
             } minimal: {
-                LiveDotGlyph(size: 16)
-                    .overlay(alignment: .bottomTrailing) {
-                        if RunStatus(rawValue: context.state.status) == .waiting {
-                            Circle().fill(.orange).frame(width: 6, height: 6)
-                        }
-                    }
+                DoingMark(state: context.state)
+                    .font(.system(size: 13, weight: .semibold))
             }
             .keylineTint(.yellow)
         }
@@ -88,10 +88,8 @@ private struct LockScreenView: View {
                 Text(state.title)
                     .font(.body.weight(.medium))
                     .lineLimit(1)
-                Text(lineText(state))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                DoingRow(state: state)
+                    .font(.subheadline)
             }
         }
         .padding(16)
@@ -126,6 +124,69 @@ private struct StatusTrailing: View {
     }
 }
 
+/// What the run does now as the daemon names it (item 1004), and the SF Symbol drawn for it.
+private func doingSymbol(_ state: DotRunAttributes.ContentState) -> String {
+    switch state.kind ?? state.status {
+    case "thinking": "brain"
+    case "answering": "text.cursor"
+    case "browsing": "globe"
+    case "searching": "magnifyingglass"
+    case "command": "terminal"
+    case "reading": "doc.text.magnifyingglass"
+    case "writing": "square.and.pencil"
+    case "mac": "macbook"
+    case "mail": "envelope"
+    case "calendar": "calendar"
+    case "memory": "books.vertical"
+    case "helpers": "person.2"
+    case "app": "square.grid.2x2"
+    case "trading": "chart.line.uptrend.xyaxis"
+    case "waiting": "hand.raised.fill"
+    case "done": "checkmark.circle.fill"
+    case "failed": "xmark.octagon.fill"
+    default: "ellipsis"
+    }
+}
+
+/// The colour of the mark: Dot's yellow at work, orange while it waits, green done, red failed.
+private func doingColor(_ state: DotRunAttributes.ContentState) -> Color {
+    switch RunStatus(rawValue: state.status) {
+    case .waiting: .orange
+    case .done: .green
+    case .failed: .red
+    case .working, nil: Color(red: 1.0, green: 0.78, blue: 0.22)
+    }
+}
+
+/// The mark of what the run does now; it pulses while the run works.
+private struct DoingMark: View {
+    let state: DotRunAttributes.ContentState
+
+    var body: some View {
+        Image(systemName: doingSymbol(state))
+            .foregroundStyle(doingColor(state))
+            .symbolEffect(.pulse, options: .repeating, isActive: RunStatus(rawValue: state.status) == .working)
+            .contentTransition(.symbolEffect(.replace))
+            .accessibilityHidden(true)
+    }
+}
+
+/// The mark and the line of what the run does now, side by side.
+private struct DoingRow: View {
+    let state: DotRunAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 8) {
+            DoingMark(state: state)
+                .frame(width: 18)
+            Text(lineText(state))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .contentTransition(.opacity)
+        }
+    }
+}
+
 /// The status line, or "Waiting for you" when the run waits and the daemon sent no line.
 private func lineText(_ state: DotRunAttributes.ContentState) -> String {
     if RunStatus(rawValue: state.status) == .waiting && state.line.isEmpty {
@@ -156,12 +217,12 @@ private struct LiveDotGlyph: View {
     DotRunLiveActivity()
 } contentStates: {
     DotRunAttributes.ContentState(
-        title: "Compare three flights to Izmir", status: "working", line: "Reading the second airline's page",
+        title: "Compare three flights to Izmir", status: "working", kind: "browsing", line: "Browsing the web",
         startedAt: Date().addingTimeInterval(-95).timeIntervalSince1970)
     DotRunAttributes.ContentState(
-        title: "Compare three flights to Izmir", status: "waiting", line: "",
+        title: "Compare three flights to Izmir", status: "waiting", kind: "waiting", line: "",
         startedAt: Date().addingTimeInterval(-300).timeIntervalSince1970)
     DotRunAttributes.ContentState(
-        title: "Compare three flights to Izmir", status: "done", line: "The cheapest is on Friday morning",
+        title: "Compare three flights to Izmir", status: "done", kind: "done", line: "Done",
         startedAt: Date().addingTimeInterval(-600).timeIntervalSince1970)
 }

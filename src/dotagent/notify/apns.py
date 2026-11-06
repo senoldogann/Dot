@@ -28,6 +28,7 @@ from dotagent.config import ApnsConfig
 from dotagent.core.errors import ConfigError, DotError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.notify.live_now import LiveKind
 from dotagent.store.models import ApnsEnvironment
 
 log = get_logger(__name__)
@@ -56,6 +57,9 @@ _JWT_PARTS: int = 32
 
 type LiveStatus = Literal["working", "waiting", "done", "failed"]
 type PushType = Literal["alert", "liveactivity"]
+# How soon APNs delivers a push: at once (10, an alert, a start, a wait, an end), or when it suits the phone's battery
+# (5, a step of a run at work, which comes often; Apple limits the pushes of priority 10 a Live Activity takes).
+type PushPriority = Literal["10", "5"]
 
 
 class LiveState(FrozenModel):
@@ -63,6 +67,7 @@ class LiveState(FrozenModel):
 
     title: str
     status: LiveStatus
+    kind: LiveKind
     line: str
     startedAt: float
 
@@ -221,15 +226,20 @@ class ApnsSender:
             return self._token
 
     async def send(
-        self, environment: ApnsEnvironment, device_token: str, push_type: PushType, payload: JsonObject
+        self,
+        environment: ApnsEnvironment,
+        device_token: str,
+        push_type: PushType,
+        priority: PushPriority,
+        payload: JsonObject,
     ) -> ApnsReply:
-        """Post ``payload`` to the device of ``device_token``; an alert at once, a Live Activity's at its own topic."""
+        """Post ``payload`` to the device of ``device_token`` at ``priority``; a Live Activity's at its own topic."""
         topic: str = self._config.topic if push_type == "alert" else f"{self._config.topic}.push-type.liveactivity"
         headers: dict[str, str] = {
             "authorization": f"bearer {await self._bearer()}",
             "apns-topic": topic,
             "apns-push-type": push_type,
-            "apns-priority": "10",
+            "apns-priority": priority,
         }
         reply: ApnsReply = await self._transport.post(
             f"{HOSTS[environment]}/3/device/{device_token}", headers, json.dumps(payload).encode("utf-8")
