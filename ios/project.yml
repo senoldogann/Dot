@@ -76,6 +76,7 @@ targets:
           - group.dev.dotagent.phone
     dependencies:
       - target: DotLiveActivity
+      - target: DotShare
     # After the extension is embedded: processing the Info.plist waits for the embedded extension.
     postBuildScripts:
       - name: App-bound domain from DOT_HOST
@@ -109,6 +110,43 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
       path: DotLiveActivity/DotLiveActivity.entitlements
+      properties:
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)dev.dotagent.phone
+        com.apple.security.application-groups:
+          - group.dev.dotagent.phone
+
+  # The share sheet's Dot (item 1009): what another app shares goes to Dot as a new chat, with the app's host and key.
+  DotShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: DotShare
+      - path: Dot/Adapters/Stores.swift
+      - path: Dot/Adapters/DaemonClient.swift
+      - path: Dot/Core/DaemonHost.swift
+      - path: Dot/Core/Policy.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.share
+        PRODUCT_NAME: DotShare
+        SKIP_INSTALL: YES
+    info:
+      path: DotShare/Info.plist
+      properties:
+        CFBundleDisplayName: Dot
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsImageWithMaxCount: 4
+    entitlements:
+      path: DotShare/DotShare.entitlements
       properties:
         keychain-access-groups:
           - $(AppIdentifierPrefix)dev.dotagent.phone
