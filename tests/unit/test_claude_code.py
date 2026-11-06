@@ -20,6 +20,7 @@ from dotagent.claude_code.stream import (
     StepBegan,
     StepClosed,
     StepFinished,
+    Taken,
     init_problem,
     limit_message,
     limit_resets,
@@ -65,7 +66,13 @@ def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() ->
     assert _value(argv, "--permission-mode") == "dontAsk"
     assert _value(argv, "--permission-prompts") == "none"
     assert _value(argv, "--allowedTools") == f"mcp__{door.name}"
-    for flag in ("--include-partial-messages", "--verbose", "--strict-mcp-config", "--disable-slash-commands"):
+    for flag in (
+        "--include-partial-messages",
+        "--replay-user-messages",
+        "--verbose",
+        "--strict-mcp-config",
+        "--disable-slash-commands",
+    ):
         assert argv.count(flag) == 1, flag
     for never in ("--dangerously-skip-permissions", "--plugin-dir", "--plugin-url", "--safe-mode", "--resume"):
         assert never not in argv
@@ -124,7 +131,7 @@ def test_the_prompt_says_who_the_model_is_its_tools_and_what_it_knows_of_the_own
     assert "Dot's workspace, /w" in prompt and prompt.endswith("- (you said) My name is Ada.")
 
 
-def _init(tools: list[str], servers: list[dict[str, str]], extra: dict[str, list[str]]) -> Init:
+def _init(tools: list[str], servers: list[dict[str, str]], extra: dict[str, list[str] | list[dict[str, str]]]) -> Init:
     line: dict[str, object] = {
         "type": "system",
         "subtype": "init",
@@ -157,6 +164,12 @@ def test_an_init_with_the_doors_tools_alone_passes_and_anything_more_is_refused(
     for kind in ("slash_commands", "skills", "plugins"):
         extra: str | None = init_problem(_init(own, connected, {kind: ["review"]}), DOOR)
         assert extra is not None and "review" in extra, kind
+    # The plugins the program comes with pass (item 1013's first real run); one installed beside them does not.
+    shipped: dict[str, str] = {"name": "cc-plugin-privacy", "path": "builtin", "source": "cc-plugin-privacy@builtin"}
+    assert init_problem(_init(own, connected, {"plugins": [shipped]}), DOOR) is None
+    added: dict[str, str] = {"name": "review", "path": "/Users/x/.claude/plugins/review", "source": "review@market"}
+    installed: str | None = init_problem(_init(own, connected, {"plugins": [shipped, added]}), DOOR)
+    assert installed is not None and "plugins: review" in installed
 
 
 def test_the_stream_events_of_a_reply_are_read_in_order() -> None:
@@ -246,3 +259,12 @@ def test_a_run_ends_clean_only_neither_past_its_limits_nor_cut_at_the_models_out
     assert ended_clean(None, "end_turn")
     assert not ended_clean(None, "max_tokens")
     assert not ended_clean(over, "end_turn")
+
+
+def test_a_message_the_program_took_in_is_read_and_a_tool_result_is_not() -> None:
+    """Item 1013's first real run: a message sent while a tool worked was folded into that turn and one result answered
+    both, so the run counts the messages the program says it took in (--replay-user-messages), not the results."""
+    replay: dict[str, object] = {"type": "user", "isReplay": True, "message": {"role": "user", "content": []}}
+    assert read_line(json.dumps(replay)) == Taken()
+    tool_result: dict[str, object] = {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result"}]}}
+    assert read_line(json.dumps(tool_result)) is None

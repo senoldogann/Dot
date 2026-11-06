@@ -68,7 +68,11 @@ def _init(door: str, tools: list[str]) -> None:
             "mcp_servers": [{"name": door, "status": "connected"}],
             "slash_commands": [],
             "skills": [],
-            "plugins": [],
+            # As the real program lists them (2.1.318): the plugins it comes with, which a run lets be.
+            "plugins": [
+                {"name": "cc-plugin-sec-default", "path": "builtin", "source": "cc-plugin-sec-default@builtin"},
+                {"name": "cc-plugin-agents-md", "path": "builtin", "source": "cc-plugin-agents-md@builtin"},
+            ],
         }
     )
 
@@ -124,6 +128,9 @@ def main() -> None:
     )
     first: dict[str, object] = json.loads(sys.stdin.readline())
     message: dict[str, object] = first["message"]  # type: ignore[assignment]  # Dot's user line
+    # As the real program does with --replay-user-messages: it says it took the message in.
+    if "--replay-user-messages" in sys.argv:
+        _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
     said: str = json.dumps(message["content"])
     if "extra tools" in said:
         _init(door, ["Bash", f"mcp__{door}__notify"])

@@ -84,6 +84,7 @@ from dotagent.claude_code.stream import (
     StepBegan,
     StepClosed,
     StepFinished,
+    Taken,
     init_problem,
     limit_message,
     limit_resets,
@@ -234,6 +235,7 @@ def claude_argv(
         "--output-format",
         "stream-json",
         "--include-partial-messages",
+        "--replay-user-messages",
         "--verbose",
         "--model",
         model,
@@ -353,7 +355,8 @@ class _Follow:
     over: LimitReached | None = None
     steps: int = 0
     sent: int = 0
-    results: int = 0
+    # The messages the program said it took in: the run is over at a result once it took each one sent.
+    taken: int = 0
     answer: str = ""
     session_id: str = ""
     inited: bool = False
@@ -389,7 +392,8 @@ class _Follow:
             ) from error
 
     async def follow(self) -> str:
-        """Read the program's output until each message sent has its result; the model's last answer."""
+        """Read the program's output until a result comes after the program took in each message sent; the model's
+        last answer."""
         while True:
             item: _Item = await self.queue.get()
             match item:
@@ -433,6 +437,9 @@ class _Follow:
                         limit_message(window, limit_resets(window, "")),
                         {"run_id": self.agent.run.id, "window": window.model_dump(mode="json")},
                     )
+            case Taken():
+                self.taken += 1
+                return False
             case Result():
                 return await self.result(event)
             case _:
@@ -498,8 +505,8 @@ class _Follow:
             await self.keep_to_limits()
 
     async def result(self, event: Result) -> bool:
-        """A turn ended: the run is over once each message sent has its result."""
-        self.results += 1
+        """A turn ended: the run is over once the program has taken in each message sent, whether into a turn of its own
+        or folded into the one at work (one result then answers several)."""
         if event.is_error:
             context: JsonObject = {"run_id": self.agent.run.id, "subtype": event.subtype, "said": event.text[-2000:]}
             if limit_said(event.text) or (self.window is not None and window_refused(self.window)):
@@ -513,7 +520,7 @@ class _Follow:
         self.session_id = event.session_id or self.session_id
         if event.text.strip():
             self.answer = event.text.strip()
-        return self.results >= self.sent
+        return self.taken >= self.sent
 
     async def keep_to_limits(self) -> None:
         """Read the run's limits after a step that the model goes on from, as the loop reads them between its steps
