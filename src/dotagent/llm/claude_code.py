@@ -14,15 +14,22 @@ from pathlib import Path
 from dotagent.config import ClaudeCodeConfig
 from dotagent.core.errors import ClaudeCodeMissing, ConfigError, ProviderRefusedError
 from dotagent.core.paths import claude_code_command
-from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
+from dotagent.llm.types import ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply
 from dotagent.opencode.bridge import ToolBridge
 from dotagent.opencode.server import find_program
 from dotagent.repair.claude import ClaudeAccount, claude_state, read_account
 
 CLAUDE_CODE_PROVIDER: str = "claude_code"
-# The models a run may name: Claude Code's own aliases for the newest of each family (measured on 2.1.318, where
-# ``haiku`` is not one).
-MODELS: tuple[str, ...] = ("opus", "sonnet")
+# The models a run may name: Claude Code's own aliases for the newest of each family (2.1.318's `--help` names these
+# three; ``haiku`` is not one).
+MODELS: tuple[str, ...] = ("fable", "opus", "sonnet")
+# How hard a run thinks, as Claude Code's `--effort` takes it (item 1014), lowest first.
+EFFORTS: tuple[Effort, ...] = ("low", "medium", "high", "xhigh", "max")
+# The models of the plan that have fast mode (Claude Code's `fastMode` setting, item 1014): Opus, as for Anthropic's
+# API (:data:`dotagent.llm.anthropic.FAST_MODE_MODELS`). A plan without extra usage runs it at the standard speed.
+FAST_MODELS: frozenset[str] = frozenset({"opus"})
+# The settings that turn fast mode on, given to a run's program with `--settings`.
+FAST_SETTINGS: str = '{"fastMode":true}'
 NOT_INSTALLED: str = (
     "Claude Code is not installed on this Mac: install it (claude.com/claude-code) and sign in with your Claude plan "
     "by running 'claude' once in Terminal, or set [providers.claude_code] command to where it is"
@@ -34,7 +41,7 @@ NOT_SIGNED_IN: str = (
 
 def model_info_of(model: str) -> ModelInfo:
     """What one of Claude Code's models offers Dot: it sees, calls tools and thinks; its window is Claude Code's to
-    manage, so Dot names none, and its reasoning is Claude Code's own, so there is no level to pick."""
+    manage, so Dot names none; its reasoning levels are Claude Code's (:data:`EFFORTS`, item 1014)."""
     return ModelInfo(
         id=model,
         vision=True,
@@ -43,7 +50,7 @@ def model_info_of(model: str) -> ModelInfo:
         context_length=None,
         own_context_length=None,
         window_source=None,
-        efforts=(),
+        efforts=EFFORTS,
         free=False,
     )
 

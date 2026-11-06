@@ -104,6 +104,9 @@ class Result:
     is_error: bool
     subtype: str
     text: str
+    # Why the program ran without fast mode when it was asked for (``extra_usage_disabled``), "" when it ran it or was
+    # not asked (item 1014).
+    fast_off: str
 
 
 @dataclass(frozen=True)
@@ -261,6 +264,7 @@ def read_line(line: str) -> ClaudeEvent | None:
                 is_error=item.get("is_error") is not False,
                 subtype=_str(item.get("subtype")),
                 text=_str(item.get("result")) or ", ".join(_names(item.get("errors"))),
+                fast_off=_str(item.get("fast_mode_disabled_reason")) if item.get("fast_mode_state") == "off" else "",
             )
     return None
 

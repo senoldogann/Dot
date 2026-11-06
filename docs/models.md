@@ -263,10 +263,13 @@ answer keeps its words, Ollama's too.
   turned requests down for a few minutes after many in a short time, OpenCode's own command line's too (measured
   2026-10-15), and it is reported to refuse OpenCode with one of its tools switched off, so Dot switches none off and
   has them ask instead; a run it turns down fails with words that say so.
-- **Claude Code** (your own Claude plan, item 1013): `claude_code:opus` and `claude_code:sonnet` (Claude Code's own
-  names for the newest of each family) run on the limits of your Claude Pro or Max plan, through the `claude` program you
+- **Claude Code** (your own Claude plan, item 1013): `claude_code:fable`, `claude_code:opus` and `claude_code:sonnet`
+  (Claude Code's own names for the newest of each family) run on the limits of your Claude Pro or Max plan, at the
+  reasoning level you pick (low, medium, high, xhigh, max: Claude Code's `--effort`, item 1014) and, for Opus, in fast
+  mode when you pick it (`--settings`); fast mode is billed to your plan's extra usage, so on a plan without it the run
+  goes at the standard speed and its answer says so, through the `claude` program you
   installed and signed in to (run `claude` once in Terminal and sign in). No key: Dot takes every API key out of the
-  program's environment, so the plan is billed and nothing else. The menu lists the two models once the program is found
+  program's environment, so the plan is billed and nothing else. The menu lists the models once the program is found
   (`[providers.claude_code] command`, `claude` on your login PATH) and an account is signed in, which Dot reads from
   `~/.claude.json` (the address and the organisation, no secret: Dot never reads Claude Code's credentials nor its
   Keychain item). A run on one goes whole to Claude Code, started without a terminal (`claude -p`, its input and output
