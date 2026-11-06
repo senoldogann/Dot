@@ -179,7 +179,8 @@ _PROMPT: str = (
     "where they say so, the owner's approval; a refused call says why, and you go on another way. Work on the task "
     "until it is done, acting without asking what you can find out or decide yourself; ask_user is for what only the "
     "owner can answer. When the work is done, or cannot be done, write your final answer as your reply: it is what the "
-    "owner reads in the chat, so say what you did and what you found, with the evidence. Files you make go in Dot's "
+    "owner reads in the chat, so say what you did and what you found, with the evidence. Write every message, the "
+    "short lines between tool calls too, in the language the owner writes in. Files you make go in Dot's "
     "workspace, {workspace}, unless the owner names another place. Today is {today}."
 )
 
@@ -527,7 +528,7 @@ class _Follow:
                 "output_tokens": step.output_tokens,
                 "cached_tokens": step.cached_tokens,
                 "seconds": round(time.monotonic() - step.started, 3),
-                "finish": step.stop_reason,
+                "finish": dot_finish(step.stop_reason),
                 "plan_window": None if self.window is None else self.window.model_dump(mode="json"),
             },
             True,
@@ -725,6 +726,23 @@ _FAST_OFF_WORDS: dict[str, str] = {
 def fast_off_words(why: str) -> str:
     """The line said with a run's answer when fast mode was asked for and the program ran it off, for ``why``."""
     return f"Fast mode was off for this run: {_FAST_OFF_WORDS.get(why, why)}; it went at the standard speed."
+
+
+# Claude's names of how a reply ended, as Dot's timeline names them (item 1016): a reply that stops to call a tool or
+# ends its turn ended as it should, which the timeline reads from "tool_calls" and "stop"; any other (max_tokens,
+# refusal) stays as Claude names it, and the timeline says the message ended early.
+_DOT_FINISH: dict[str, str] = {
+    "tool_use": "tool_calls",
+    "end_turn": "stop",
+    "stop_sequence": "stop",
+    "pause_turn": "stop",
+}
+
+
+def dot_finish(stop_reason: str) -> str:
+    """How a step of a Claude Code run ended, in Dot's words (:data:`_DOT_FINISH`): the timeline marks each step whose
+    reply stopped for a tool call "ended early: tool_use" otherwise."""
+    return _DOT_FINISH.get(stop_reason, stop_reason)
 
 
 def run_effort(chosen: Effort | None, configured: Effort) -> Effort:

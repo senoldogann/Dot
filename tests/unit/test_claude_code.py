@@ -13,6 +13,7 @@ from dotagent.claude_code.run import (
     answered_all,
     claude_argv,
     claude_env,
+    dot_finish,
     ended_clean,
     fast_off_words,
     mcp_config,
@@ -336,3 +337,12 @@ def test_fast_mode_the_plan_ran_off_is_read_and_said() -> None:
     read: object = read_line(json.dumps(line))
     assert isinstance(read, Result) and read.fast_off == "extra_usage_disabled"
     assert "no extra usage" in fast_off_words("extra_usage_disabled")
+
+
+def test_a_step_that_stops_for_a_tool_ends_as_dots_steps_do() -> None:
+    """Item 1016, the owner's screenshot of 2026-11-07: each step that stopped to call a tool was marked "ended early:
+    tool_use", as Claude names a stop for a tool; the timeline reads Dot's names, and a cut reply still shows."""
+    assert dot_finish("tool_use") == "tool_calls" and dot_finish("end_turn") == "stop"
+    assert dot_finish("max_tokens") == "max_tokens"
+    said: str = system_prompt("Dot", DOOR, ("read_file",), Path("/w"), "2026-11-07", ())
+    assert "in the language the owner writes in" in said
