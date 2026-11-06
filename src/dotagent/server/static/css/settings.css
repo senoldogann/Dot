@@ -41,21 +41,7 @@
   letter-spacing: var(--tracking-title);
 }
 
-/* The row of a section's tabs, under its name (item 845); a row wider than the page scrolls sideways. */
-.settings-parts {
-  display: flex;
-  width: fit-content;
-  max-width: 100%;
-  margin-top: var(--space-3);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.settings-parts a {
-  flex: none;
-}
-
-.settings-parts + .set-lead {
+.set-lead {
   margin-top: var(--space-3);
 }
 
@@ -1252,13 +1238,6 @@
 .settings-row-words + .settings-row-value {
   flex: none;
   max-width: 40%;
-}
-
-/* On a phone each row opens its own tab (item 995): the row of a section's tabs over it is the sheet's already. */
-@media (max-width: 720px) {
-  .settings-parts {
-    display: none;
-  }
 }
 
 /* The first steps stand under the sheet while one is left (items 995 and 996). */

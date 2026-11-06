@@ -1,4 +1,4 @@
-"""On a phone the settings are a list of their sections (items 330 and 845), in WebKit as the owner's iPhone (440 px
+"""On a phone the settings are one sheet of groups of rows (items 330, 995), in WebKit as the owner's iPhone (440 px
 wide) and as a small one (320 px), on a served daemon with three notes and the Ocean theme.
 
 On a phone:
@@ -7,7 +7,7 @@ On a phone:
   ask for one plain sheet; before, seven rows of sections, item 845): Appearance tells the theme on screen and Memory
   how many notes Dot keeps (Models no model's name, item 852), and Connect apps stands among them;
 - a row opens its tab as a page of its own: the bar names the tab, its Back at the top left (item 338) is the one way
-  back and neither a rail nor the row of the section's tabs shows; Back leads to the sheet;
+  back and no rail shows; Back leads to the sheet; a Mac's nav is the same rows (item 999);
 - a card's name stands over the card, out of its surface;
 - neither the list nor any tab runs wider than the screen.
 
@@ -63,16 +63,6 @@ _TABS: dict[str, str] = {
     "system": "System",
 }
 _ROWS: list[str] = [*list(_TABS.values())[:2], "Connect apps", *list(_TABS.values())[2:]]
-# The sections of a Mac's nav (item 845), which the sheet does not change.
-_SECTIONS: tuple[str, ...] = (
-    "General",
-    "Appearance",
-    "Models",
-    "Rules and memory",
-    "Browser and Vault",
-    "Phone and channels",
-    "System",
-)
 _NOTES: tuple[str, ...] = (
     "Prefers window seats and morning flights.",
     "The team stand-up is at 09:30 on weekdays.",
@@ -218,7 +208,6 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                     await expect(back).to_be_visible()
                     await expect(page.locator("main .back")).to_have_count(0)
                     await expect(page.locator(".settings-side")).to_be_hidden()
-                    await expect(page.locator(".settings-parts")).to_be_hidden()
                     await expect(page.locator(".settings-pane")).not_to_be_empty()
                     faults += await _fits(page, f"{device} {tab}")
                     await back.click()
@@ -252,7 +241,8 @@ async def test_a_macs_window_opens_the_settings_on_general_with_the_nav_in_the_s
             await page.get_by_role("complementary", name="Sidebar").get_by_role("link", name="Settings").click()
             await expect(page).to_have_url(f"{address}/#/settings/general")
             nav: Locator = page.get_by_role("navigation", name="Settings")
-            await expect(nav.locator(".settings-nav-label")).to_have_text(list(_SECTIONS))
+            # A Mac's nav is the sheet's rows, their names alone (item 999).
+            await expect(nav.locator(".settings-nav-label")).to_have_text(_ROWS)
             await expect(nav.locator("[aria-current='page']")).to_contain_text("General")
             await expect(page.get_by_role("heading", level=1)).to_have_text("General")
             # The bar's name of the tab is drawn for a phone only, by the width (item 966).

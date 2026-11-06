@@ -597,47 +597,54 @@
   font-size: var(--text-sm);
 }
 
-/* The foot holds the way to the settings (the look itself is chosen there; item 120), above a phone's home indicator
-   and out of its rounded corners (item 275). */
+/* The foot holds Connect apps over your account's row, which leads to the settings (item 999: as the other chat apps
+   have it, after a cog beside Connect apps, items 492 and 855), above a phone's home indicator and out of its rounded
+   corners (item 275). */
 .side-foot {
   flex: none;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 4px;
   padding: 8px 8px calc(8px + var(--safe-bottom));
 }
 
 .side-foot > .side-link {
-  flex: 1;
   min-width: 0;
 }
 
-/* Settings is its cog alone (item 492), its name kept for a reader of the screen. */
-/* The cog and Connect apps beside it, both 36 px high (item 855: a slimmer foot). */
+/* Your account: your initials in a round mark, then your name, one row the width of the sidebar. */
 .side-foot > .side-settings {
-  flex: none;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
+  gap: var(--space-2);
+  min-height: 40px;
 }
 
-.side-foot > .side-settings > span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
+.side-account-initials {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-label);
+}
+
+.side-account-initials > .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.side-account-name {
+  min-width: 0;
   overflow: hidden;
-  clip-path: inset(50%);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.side-foot > .side-settings > .icon {
-  width: 18px;
-  height: 18px;
-}
-
-/* Connect apps (item 492), right of the cog: a pill with the plug, its words and the marks of the servers Dot is
+/* Connect apps (item 492), over your account's row: a pill with the plug, its words and the marks of the servers Dot is
    connected to, each a small light tile as on Customize, a little over the one before it. */
 .side-connect {
   display: flex;
@@ -649,7 +656,7 @@
   padding: 0 var(--space-2) 0 var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  /* The sidebar's own ground, as the cog beside it (item 509). */
+  /* The sidebar's own ground (item 509). */
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -1216,7 +1223,8 @@
 
   /* The foot under the thumb: the apps in a round button beside the search, a pill (item 991). */
   .side-foot {
-    flex-wrap: nowrap;
+    flex-direction: row;
+    align-items: center;
     gap: 8px;
     padding: 12px 16px calc(12px + var(--safe-bottom));
   }
@@ -1406,6 +1414,20 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* A group's name over its rows (item 999), as the phone's sheet names them; the first groups have none. */
+.settings-nav-group + .settings-nav-group {
+  margin-top: var(--space-3);
+}
+
+.settings-nav-group-title {
+  margin: 0 0 var(--space-1);
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-label);
+  line-height: var(--leading-sm);
 }
 
 .settings-nav-link {

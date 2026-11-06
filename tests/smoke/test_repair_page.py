@@ -1,4 +1,4 @@
-"""Settings › Rules and memory › Self-repair (item 921) in a real browser: off with no repository, it says how to turn
+"""Settings › Self-repair (item 921) in a real browser: off with no repository, it says how to turn
 it on and offers no Run now; on, it names when it runs and how it merges, the account of ``claude`` signed in, each
 problem of the book with its status and the link of its pull request, and each session; on a phone's width every row
 stays inside the screen."""

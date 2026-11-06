@@ -614,13 +614,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // Campaigns and Schedules are icons in the head, beside the "+" (item 855, the owner's ask: two rows of their own
   // before the chats).
   const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: "Campaigns", "aria-label": "Campaigns", onclick: onNavigate }, icon("target"));
-  // Settings is its cog at the foot, beside Connect apps (item 492), on a Mac; on a phone your initials at the head
-  // (item 991). Its name stays for a reader of the screen.
+  // Settings is your account's row at the foot, under Connect apps, on a Mac (item 999, as the other chat apps have it):
+  // your initials and your name; on a phone your initials at the head (item 991). Its name for a reader of the screen
+  // holds the name it shows (WCAG 2.5.3).
+  const accountInitials = el("span", { class: "side-account-initials", "aria-hidden": "true" });
+  const accountName = el("span", { class: "side-account-name" });
   const settingsLink = el(
     "a",
-    { class: "side-link side-settings", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate },
-    icon("settings"),
-    el("span", null, "Settings"),
+    { class: "side-link side-settings", href: "#/settings", title: "Settings", onclick: onNavigate },
+    accountInitials,
+    accountName,
   );
   const schedulesLink = el("a", { class: "icon-btn side-page", href: "#/schedules", title: "Schedules", "aria-label": "Schedules", onclick: onNavigate }, icon("calendar"));
   // The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name, to its
@@ -1603,20 +1606,24 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     );
   }
   paintConnected();
-  const foot = el("div", { class: "side-foot" }, settingsLink, connectButton);
+  const foot = el("div", { class: "side-foot" }, connectButton, settingsLink);
   // On a phone the list is the home (item 991, the owner's ask of 2026-11-05 for a plain home): your initials at the top
   // left lead to the settings, the "+" at the right starts a chat, Dot's own face stands large over the faces of the
   // other agents, and the foot holds the apps and the search.
   const ownerInitials = el("span", { class: "side-owner-initials", "aria-hidden": "true" });
   const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate }, ownerInitials);
   function paintOwner() {
-    const words = shownOwner().split(/\s+/).filter((word) => word !== "");
+    const owner = shownOwner().trim();
+    const words = owner.split(/\s+/).filter((word) => word !== "");
     // A word's first character whole, a letter outside the Basic Multilingual Plane too.
     const initials = words
       .slice(0, 2)
       .map((word) => firstGrapheme(word).toLocaleUpperCase())
       .join("");
     ownerInitials.replaceChildren(initials === "" ? icon("user") : initials);
+    accountInitials.replaceChildren(initials === "" ? icon("user") : initials);
+    setText(accountName, owner === "" ? "Settings" : owner);
+    settingsLink.setAttribute("aria-label", owner === "" ? "Settings" : `Settings, ${owner}`);
   }
   paintOwner();
   const heroName = el("span", { class: "side-dot-name" }, dotName());

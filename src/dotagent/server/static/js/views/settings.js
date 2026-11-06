@@ -1,14 +1,13 @@
-// The settings. In a Mac's window the sidebar is their nav (settingsnav.js, item 562) and the page is the open tab alone: its
-// section's name, the row of its tabs when it has more than one (item 845), a line that says what the tab is for and what
-// it holds, in a column of its own; on a phone, one sheet of rows in groups, a row a tab that opens as a page of its own
-// (items 330 and 995). Each tab is drawn by the module that owns it.
+// The settings. In a Mac's window the sidebar is their nav (settingsnav.js, item 562: the groups of rows, item 999) and the
+// page is the open tab alone: its name, a line that says what it is for and what it holds, in a column of its own; on a
+// phone, one sheet of the same rows, a row a tab that opens as a page of its own (items 330 and 995). Each tab is drawn by the module that owns it.
 
 import { api, query } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { PHONE } from "../layout.js";
 import { settingsHead } from "../panels.js";
-import { DEFAULT_TAB, PHONE_GROUPS, sectionOf, TABS } from "../settingstabs.js";
+import { DEFAULT_TAB, SETTINGS_GROUPS, TABS } from "../settingstabs.js";
 import { setStageTitle } from "../stage.js";
 import { findTheme, onSchemeChange, onThemeChange, shownScheme, themePicks } from "../theme.js";
 import { attempt } from "../ui.js";
@@ -62,27 +61,12 @@ function listRow(row, value) {
   );
 }
 
-/** The row of a section's tabs over the open one (item 845), none for a section of one tab: links, the open one marked. */
-function partsRow(section, open) {
-  if (section === null || section.tabs.length < 2) {
-    return null;
-  }
-  return el(
-    "nav",
-    { class: "segmented settings-parts", "aria-label": section.label },
-    section.tabs.map((id) => {
-      const tab = TABS.find((candidate) => candidate.id === id);
-      return el("a", { class: "settings-part", href: `#/settings/${id}`, "aria-current": id === open ? "page" : null }, tab.label);
-    }),
-  );
-}
-
 /** The phone's sheet of the settings (item 995): the groups of rows, then the first steps while one is left.
  * Appearance tells the theme on screen, Memory how many notes Dot keeps and Vault how many entries it holds. */
 function mountList(root, ctx) {
   ctx.setTitle("Settings");
   const values = new Map(TABS.map((tab) => [tab.id, el("span", { class: "settings-row-value" })]));
-  const groups = PHONE_GROUPS.map((group) =>
+  const groups = SETTINGS_GROUPS.map((group) =>
     el(
       "section",
       { class: "settings-group", "aria-label": group.title ?? null },
@@ -122,8 +106,7 @@ function mountList(root, ctx) {
 }
 
 /** Draw the settings of the route. On a phone `#/settings` is the sheet of the tabs (item 995); in a wider window it leads to
- * General, and so does an unknown tab. `#/settings/<tab>` draws that tab, under the head of its section (its name, and
- * the row of its tabs): the tab is given `ctx.head`, to say what it is for (`setLead`), what it holds (`setMeta`) and the
+ * General, and so does an unknown tab. `#/settings/<tab>` draws that tab under its own name: the tab is given `ctx.head`, to say what it is for (`setLead`), what it holds (`setMeta`) and the
  * buttons that belong to the whole page (`setActions`). */
 export function mount(root, ctx) {
   if (ctx.params[0] === undefined && PHONE.matches) {
@@ -135,14 +118,8 @@ export function mount(root, ctx) {
     return () => undefined;
   }
   ctx.setTitle(`${tab.label} · Settings`);
-  // Trading stands in no section (the Trader agent's, item 847): its page is named for itself.
-  const section = sectionOf(tab.id);
-  const name = section === null ? tab.label : section.label;
-  const head = settingsHead(name);
-  const parts = partsRow(section, tab.id);
-  if (parts !== null) {
-    head.element.querySelector(".set-title")?.after(parts);
-  }
+  // The page is named after its row (item 999), as on a phone, with no row of tabs over it.
+  const head = settingsHead(tab.label);
   const pane = el("div", { class: "settings-pane" }, head.element);
   root.append(el("div", { class: "settings-frame" }, pane));
   const dispose = MOUNTS[tab.id](pane, { ...ctx, head });
@@ -150,7 +127,6 @@ export function mount(root, ctx) {
   // always there and the width alone shows one or the other (settings.css), as the page's own name is hidden: two
   // choices made apart, one by the script as the page was drawn and one by the style, showed both a moment after a
   // phone turned (item 966).
-  // On a phone the page is the tab its row named (item 995): the bar names the tab, not its section.
   setStageTitle(el("h1", { class: "stage-h1 set-phone-title" }, tab.label));
   return dispose;
 }
