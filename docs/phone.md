@@ -81,7 +81,12 @@ code** takes its place. The same by hand:
    (403 for the Mac's token). The daemon pushes through APNs with the key of `[apns]` (`key_path`, a `.p8` file outside
    Dot's home, never logged; `key_id`, `team_id`, `topic`), and pushes nothing through it while they are empty. An alert
    says the title Web Push says and a fixed line ("Open Dot to see it."), never the question, the draft or the result,
-   since Apple reads what APNs carries; a message Dot wrote to you goes as "Dot has a message for you". A run of yours
+   since Apple reads what APNs carries; a message Dot wrote to you goes as "Dot has a message for you". An approval of a
+   step of low or medium risk has Approve and Deny on the lock screen (item 1008), each after Face ID or the passcode,
+   which the app sends as the app's page does (`POST /api/approvals/{id}/decision` with the phone's key, no note, no
+   "don't ask again"); a step of high risk (money, a message or a post sent for you, a credential), a question, a
+   secret and a handoff open Dot, where you see what is asked. An answer that does not reach the daemon is said in a
+   notification of its own ("Dot did not get your answer"); one the daemon no longer waits for is let go. A run of yours
    (not a helper's, a schedule's, a watcher's or Dot's own) starts a Live Activity on each phone that gave a
    push-to-start token: its chat's title (40 characters at most) and agent, and what it does now (item 1004), each with
    a mark of its own that turns into the next as the run moves on: "Thinking", "Browsing the web", "Searching the web",

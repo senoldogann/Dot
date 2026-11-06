@@ -64,7 +64,9 @@ run needs, sent where the configuration points:
   carries, unlike Web Push: an alert carries one of Dot's fixed titles ("A task is done", "Dot has a message for you")
   and "Open Dot to see it."; a run's Live Activity carries up to 40 characters of its chat's title, its agent's name, its
   state and a fixed line of what it does now ("Browsing the web", "Using Gmail": a connected app by its server's name
-  alone; items 997 and 1004, see [Dot on the phone](phone.md#dot-on-the-phone)).
+  alone; items 997 and 1004, see [Dot on the phone](phone.md#dot-on-the-phone)). An approval's alert carries its id
+  and the app's category, never what it asks; the lock screen answers only a step of low or medium risk, after Face ID
+  (item 1008), and a step of high risk opens Dot, where you see the amount or the receiver first.
 - **To your own devices through Apple, once you switch iMessage on: Dot's answers, and what it tells you on its own.**
   Each answer (masked of the secrets Dot holds, cut to about 2,000 characters), the line that says a run waits for you,
   the notices a message of yours earns, and what Dot tells you on its own (item 582: the first line of the morning

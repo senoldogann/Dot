@@ -96,6 +96,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             }
             try await client.decide(approvalId: approvalId, approve: approve, host: host, key: key)
             logger.info("approval answered from the lock screen: approve=\(approve)")
+        } catch DaemonRequestError.status(_, let code, _) where code == alreadyDecided {
+            // Answered meanwhile, on the Mac or the page, or no longer open: there is nothing to answer again.
+            logger.info("the approval was no longer open")
         } catch {
             logger.error("the approval's answer did not reach Dot: error=\(String(describing: error), privacy: .public)")
             await tellNotAnswered()
@@ -120,6 +123,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 private let approvalCategoryId: String = "DOT_APPROVAL"
 private let approveAction: String = "DOT_APPROVE"
 private let denyAction: String = "DOT_DENY"
+/// The daemon's answer to a decision on an approval no longer open (answered, expired or its run ended).
+private let alreadyDecided: Int = 409
 
 /// Approve and Deny on an approval's alert, each asking for Face ID (or the passcode) first: a phone left locked on a
 /// table answers nothing.
