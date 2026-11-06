@@ -48,6 +48,9 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
+        # An iPhone app that turns with the phone but not upside down: full screen, so Xcode does not ask for every
+        # orientation (that is for an iPad's split view).
+        UIRequiresFullScreen: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
