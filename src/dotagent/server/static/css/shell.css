@@ -744,7 +744,7 @@
    line, the three that worked last and All, in four equal columns the sidebar holds whole (item 855: the row scrolled
    sideways, and a face cut at the edge looked broken); never squeezed by the list under it, which scrolls. A face
    stands on nothing, hovered or open (item 998: the tile behind it looked like a smudge between the faces); the open
-   one has its name in the text's full colour. All is a round mark the size of a face. */
+   one has its name in the text's full colour and the weight of a label. All is a round mark the size of a face. */
 .side-agent-faces {
   display: grid;
   flex: none;
@@ -771,6 +771,11 @@
 .side-agent-face[aria-current="page"] {
   color: var(--text);
   text-decoration: none;
+}
+
+/* The open one's name is the heavier too, so that a face hovered does not look like the open one. */
+.side-agent-face[aria-current="page"] .side-agent-name {
+  font-weight: var(--weight-label);
 }
 
 .side-agent-face .avatar,
