@@ -131,7 +131,8 @@ notice); a toast stands under the bar, across the page, and never over the compo
 of a run at work; a sentence with a button beside it (the token this browser keeps, Appearance's two choices that follow
 the theme) gives the button a line of its own; a note the owner decides on (a forgotten one) has its buttons under its
 words; the buttons of a version in Self-improvement wrap rather than reach past the edge of a phone 320 px wide; the
-file's panel keeps the room for the file's name, and Open on the Mac is its icon; Add and Cancel in a service's key form
+file's panel keeps the room for the file's name, and Open on the Mac is its icon; a file open over the whole screen
+keeps its head (its name, Close and its views) under the status bar and the Dynamic Island (item 1006); Add and Cancel in a service's key form
 have space between them; a ready team the owner has already says so under its words, which have the card's width; and
 the name of a plugin is not cut by an ellipsis while there is room for it, which WebKit did to every name of two words.
 
