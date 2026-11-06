@@ -72,16 +72,17 @@ final class ShareModel {
         var found: Shared = Shared()
         for provider in items.flatMap({ $0.attachments ?? [] }) {
             do {
-                if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+                // A picture first: a photo is handed over as a file's address too, which is no page to read.
+                if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    if found.pictures.count < maxPictures {
+                        found.pictures.append(try await jpeg(from: try await pictureData(provider)))
+                    }
+                } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
                     guard let url: URL = try await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL
                     else {
                         throw CocoaError(.fileReadCorruptFile)
                     }
                     found.urls.append(url)
-                } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                    if found.pictures.count < maxPictures {
-                        found.pictures.append(try await jpegOf(provider))
-                    }
                 } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
                     guard
                         let text: String = try await provider.loadItem(
@@ -176,32 +177,45 @@ func goalOf(_ shared: Shared, note: String) -> String {
     return lines.joined(separator: "\n\n")
 }
 
-/// The picture of `provider` as a JPEG at most `pictureSide` on its longer side; throws when it is none the phone can
-/// draw.
+/// The bytes of the picture `provider` shares, read on the main actor that owns the provider.
 @MainActor
-private func jpegOf(_ provider: NSItemProvider) async throws -> Data {
+private func pictureData(_ provider: NSItemProvider) async throws -> Data {
     let item: NSSecureCoding? = try await provider.loadItem(forTypeIdentifier: UTType.image.identifier)
-    let image: UIImage?
     switch item {
     case let url as URL:
-        image = UIImage(contentsOfFile: url.path())
+        return try Data(contentsOf: url)
     case let data as Data:
-        image = UIImage(data: data)
+        return data
     case let picture as UIImage:
-        image = picture
+        guard let png: Data = picture.pngData() else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return png
     default:
-        image = nil
-    }
-    guard let image else {
         throw CocoaError(.fileReadCorruptFile)
     }
-    let scale: CGFloat = min(1, pictureSide / max(image.size.width, image.size.height))
-    let size: CGSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-    let drawn: UIImage = UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
-    guard let jpeg: Data = drawn.jpegData(compressionQuality: 0.85) else {
-        throw CocoaError(.fileWriteUnknown)
-    }
-    return jpeg
+}
+
+/// `data` as a JPEG at most `pictureSide` pixels on its longer side, drawn at a scale of 1 (a renderer's default is the
+/// screen's, which made a picture three times that size), off the main actor so that the sheet stays live; throws when
+/// it is no picture the phone can draw.
+private func jpeg(from data: Data) async throws -> Data {
+    try await Task.detached(priority: .userInitiated) {
+        guard let image: UIImage = UIImage(data: data) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let ratio: CGFloat = min(1, pictureSide / max(image.size.width, image.size.height))
+        let size: CGSize = CGSize(width: (image.size.width * ratio).rounded(), height: (image.size.height * ratio).rounded())
+        let format: UIGraphicsImageRendererFormat = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let drawn: UIImage = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
+        guard let jpeg: Data = drawn.jpegData(compressionQuality: 0.85) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        return jpeg
+    }.value
 }
 
 struct ShareView: View {
