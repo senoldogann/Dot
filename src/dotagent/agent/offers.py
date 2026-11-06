@@ -259,6 +259,7 @@ async def ask_helpers(
         speed="standard",
         session_key=f"offer:{work.run_id}",
         cache_mark=None,
+        prompt_reuse="single",
         window=await router.window_of(ref),
     )
     try:

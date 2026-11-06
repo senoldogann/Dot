@@ -659,6 +659,7 @@ async def _model_summary(
             speed="standard",
             session_key=f"{agent.run.thread_id}:summary",
             cache_mark=None,
+            prompt_reuse="single",
             window=window,
         )
         try:
@@ -2663,6 +2664,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             session_key=run.thread_id,
             # The end of what the next step sends unchanged, after the system message (item 237).
             cache_mark=_cache_mark(history, config),
+            prompt_reuse="conversation",
             # The window the run planned with as it started (item 520): a context size chosen since does not change it.
             window=scaffold.window if routed is None else routed.scaffold.window,
         )

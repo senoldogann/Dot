@@ -101,6 +101,7 @@ def _request(model: str, messages: tuple[Message, ...], effort: Effort) -> ChatR
         speed="standard",
         session_key="",
         cache_mark=None,
+        prompt_reuse="single",
         window=None,
     )
 
