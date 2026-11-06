@@ -431,7 +431,13 @@ async def _carry_out(
         if candidate is not None:
             candidates.append(candidate)
     if not candidates:
-        reason: str = "the proposer's answer was unusable" if proposals_unusable else "the proposer kept the harness"
+        reason: str = (
+            "the proposer failed"
+            if errors
+            else "the proposer's answer was unusable"
+            if proposals_unusable
+            else "the proposer kept the harness"
+        )
         return _Outcome(
             state="keep",
             facts={"from_run": from_run, "reason": reason, "task": learned_note, "unusable": list(unusable)},
