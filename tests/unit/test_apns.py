@@ -11,12 +11,13 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
-from dotagent.config import ApnsConfig
+from dotagent.config import ApnsConfig, AppConfig, load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify.apns import (
     ALERT_BODY,
+    LIVE_START_BODY,
     ApnsReply,
     ApnsSender,
     LiveState,
@@ -29,6 +30,7 @@ from dotagent.notify.apns import (
 )
 from dotagent.notify.apns_watch import TOLD_TITLE, ApnsWatch, follows_live
 from dotagent.notify.owner import OWNER_TOLD_EVENT
+from dotagent.runtime import _guarded_files
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, RunRecord
 
@@ -97,6 +99,7 @@ def test_an_alert_carries_its_title_and_a_fixed_line_and_a_live_activity_a_short
     assert aps["event"] == "start" and aps["attributes-type"] == "DotRunAttributes"
     assert aps["attributes"] == {"runId": "run-1", "agentName": "Dot"}
     assert aps["stale-date"] > _NOW
+    assert aps["alert"] == {"title": "Dot", "body": LIVE_START_BODY}
 
 
 async def _run(store: Store, source: str, parent: str | None) -> RunRecord:
@@ -169,3 +172,13 @@ async def test_a_message_dot_wrote_goes_with_a_fixed_title(tmp_path: Path) -> No
         assert alert["aps"]["alert"]["title"] == TOLD_TITLE and "rent" not in json.dumps(alert)  # type: ignore[index]  # a JSON payload read back
     finally:
         await store.close()
+
+
+def test_the_apns_key_is_guarded_from_the_runs_once_it_is_set() -> None:
+    """Item 997 (review): the key of ``[apns] key_path`` is among the files no run reads, by the guard or the
+    sandbox."""
+    config: AppConfig = load_default_config()
+    key: Path = Path("~/Library/Application Support/Dot-keys/AuthKey_TEST.p8")
+    with_key: AppConfig = config.model_copy(update={"apns": config.apns.model_copy(update={"key_path": str(key)})})
+    assert key.expanduser() in _guarded_files(with_key)
+    assert all(path.suffix != ".p8" for path in _guarded_files(config))

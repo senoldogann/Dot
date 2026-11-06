@@ -185,6 +185,10 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         await ctx.runtime.store.set_apns_device(
             phone_id, registration.device_token, registration.start_token, registration.environment, time.time()
         )
+        # The phone may have been removed while this request was on its way: its tokens must not outlive it.
+        if all(phone.id != phone_id for phone in phones.listed()):
+            await ctx.runtime.store.delete_apns_device(phone_id)
+            raise NotFoundError("that phone is not paired", {})
         log.info("apns_device_registered", phone=phone_id, environment=registration.environment)
         return Response(status_code=204)
 

@@ -25,7 +25,7 @@ in the Dynamic Island.
 To change the address later: press with two fingers on the web UI for a moment, or use "Change address" on the error
 screen. Changing the address forgets the phone's key, since a key belongs to the daemon that issued it.
 
-A build from Xcode registers its tokens with `"environment": "sandbox"`; a Release build says `production`.
+The app tells the daemon the APNs environment its entitlement was signed with (`APS_ENVIRONMENT` in `project.yml`): `sandbox` (`development`) until a production key and profile exist.
 
 Simulator check without signing:
 

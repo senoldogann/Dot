@@ -2,7 +2,7 @@
 # Writes the DOT_HOST build setting into the built app's Info.plist as its only WKAppBoundDomains entry.
 #
 # WKAppBoundDomains must name the host at build time, and the owner types the host at run time, so the key is left out
-# unless DOT_HOST is set. With the key absent the app enforces the single origin itself (Navigation.swift); with it set,
+# unless DOT_HOST is set. With the key absent the app enforces the single origin itself (Core/Policy.swift); with it set,
 # WebKit enforces it as well (limitsNavigationsToAppBoundDomains). An empty entry would mark every page as not
 # app-bound and disable the bridge, which is why the key is added here rather than written into project.yml.
 set -eu

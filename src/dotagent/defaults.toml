@@ -534,6 +534,8 @@ protected_paths = [
 # your own replaces this one; add a browser you use that is not here.
 sealed_paths = [
   "~/Library/Messages",
+  # Where the APNs key of [apns] is kept (item 997); the key_path itself is guarded whatever this list says.
+  "~/Library/Application Support/Dot-keys",
   "~/Library/Mail",
   "~/Library/Cookies",
   "~/Library/Safari",

@@ -21,6 +21,9 @@ settings:
     # and the app enforces the single origin itself. Set: it becomes the app's only WKAppBoundDomains entry and the
     # web view is limited to it by WebKit too (see scripts/app_bound_domains.sh).
     DOT_HOST: ""
+    # The APNs environment of the app's entitlement, read back by the app to tell the daemon where its tokens belong:
+    # `development` (the sandbox) for an install from Xcode; `production` once a production key and profile exist.
+    APS_ENVIRONMENT: development
 
 targets:
   Dot:
@@ -53,6 +56,7 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIBackgroundModes:
           - remote-notification
+        DotApsEnvironment: $(APS_ENVIRONMENT)
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
         NSMicrophoneUsageDescription: Dot records your voice when you speak a message to it.
@@ -62,7 +66,7 @@ targets:
     entitlements:
       path: Dot/Dot.entitlements
       properties:
-        aps-environment: development
+        aps-environment: $(APS_ENVIRONMENT)
         keychain-access-groups:
           - $(AppIdentifierPrefix)dev.dotagent.phone
         com.apple.security.application-groups:

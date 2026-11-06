@@ -947,7 +947,7 @@ class SkillsConfig(FrozenModel):
 
 class ApnsConfig(FrozenModel):
     """Dot's iPhone app (item 997, docs/phone.md): the APNs key Dot signs its pushes with, from Apple Developer › Keys,
-    and whose app they are for. ``key_path`` is the .p8 file, kept outside Dot's home and sealed from the runs; empty,
+    and whose app they are for. ``key_path`` is the .p8 file, kept outside Dot's home, which no run reads; empty,
     the app gets no pushes (the web app's Web Push is apart). ``key_id`` and ``team_id`` are Apple's ids of the key and
     the team, ``topic`` the app's bundle id."""
 

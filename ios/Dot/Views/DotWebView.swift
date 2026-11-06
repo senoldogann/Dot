@@ -175,7 +175,8 @@ struct DotWebView: UIViewRepresentable {
             let frame: WKFrameInfo = message.frameInfo
             let origin: MessageOrigin = MessageOrigin(
                 isMainFrame: frame.isMainFrame, scheme: frame.securityOrigin.protocol,
-                host: frame.securityOrigin.host, port: frame.securityOrigin.port)
+                host: frame.securityOrigin.host, port: frame.securityOrigin.port,
+                path: frame.request.url?.path() ?? "")
             switch readBridgeMessage(body: message.body, origin: origin, host: host) {
             case .success(.paired(let key)):
                 model.didPair(key: key)
@@ -185,7 +186,8 @@ struct DotWebView: UIViewRepresentable {
         }
 
         private func isDaemonFrame(_ frame: WKFrameInfo) -> Bool {
-            frame.isMainFrame && frame.securityOrigin.protocol == "https"
+            frame.isMainFrame && !isRunPage(frame.request.url?.path() ?? "")
+                && frame.securityOrigin.protocol == "https"
                 && frame.securityOrigin.host.lowercased() == host.name
                 && (frame.securityOrigin.port == 0 || frame.securityOrigin.port == 443)
         }

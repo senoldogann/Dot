@@ -48,6 +48,7 @@ func decideNavigation(url: URL, host: DaemonHost, opensFrame: Bool) -> Navigatio
 /// A message of the page refused by the bridge. Logged, never shown to the page.
 enum BridgeRejection: Error, Equatable {
     case notMainFrame
+    case runPage
     case foreignOrigin(protocol: String, host: String, port: Int)
     case notAnObject
     case unknownType(String)
@@ -67,6 +68,14 @@ struct MessageOrigin: Equatable, Sendable {
     let host: String
     /// 0 when the origin uses its scheme's default port.
     let port: Int
+    /// The path of the frame's document, e.g. `/` for the web UI or `/pages/<id>` for a page a run wrote.
+    let path: String
+}
+
+/// Whether `path` is a page a run wrote or a look the owner added (the daemon's `/pages/` and `/looks/`): served from
+/// the daemon's origin, but not the web UI, so it never reaches the bridge or the microphone.
+func isRunPage(_ path: String) -> Bool {
+    path.hasPrefix("/pages/") || path.hasPrefix("/looks/")
 }
 
 /// Validates a message posted to `window.webkit.messageHandlers.dot` and reads it.
@@ -77,6 +86,9 @@ struct MessageOrigin: Equatable, Sendable {
 func readBridgeMessage(body: Any, origin: MessageOrigin, host: DaemonHost) -> Result<BridgeMessage, BridgeRejection> {
     guard origin.isMainFrame else {
         return .failure(.notMainFrame)
+    }
+    guard !isRunPage(origin.path) else {
+        return .failure(.runPage)
     }
     guard origin.scheme == "https", origin.host.lowercased() == host.name, origin.port == 0 || origin.port == 443
     else {

@@ -320,8 +320,10 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     open in the Chrome of the user (item 703: Dot writes and reads it outside the sandbox), and the daemon's pid file
     and mark, which it opens and writes at its start (item 676), and the copies of the files a run uploaded, which the
     browser reads (item 681: one may be of a file the owner allowed from a place a command may not read), and the
-    secrets the owner gave the chats on a card (item 857: a chat's commands read its own from their environment)."""
+    secrets the owner gave the chats on a card (item 857: a chat's commands read its own from their environment), and
+    the APNs key of ``[apns] key_path`` (item 997), wherever the owner keeps it."""
     database: Path = db_path()
+    apns_key: tuple[Path, ...] = () if config.apns.key_path == "" else (Path(config.apns.key_path).expanduser(),)
     return (
         env_file_path(),
         env_lock_path(env_file_path()),
@@ -346,6 +348,7 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         running_mark_path(),
         uploads_dir(),
         held_dir(),
+        *apns_key,
     )
 
 

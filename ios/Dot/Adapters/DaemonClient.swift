@@ -60,13 +60,12 @@ enum DaemonRequestError: Error, CustomStringConvertible {
     }
 }
 
-/// The APNs environment this build's tokens belong to: `sandbox` for a Debug (Xcode) build, `production` otherwise.
+/// The APNs environment this build's tokens belong to, read from the `aps-environment` its entitlement was signed with
+/// (`APS_ENVIRONMENT`, written into the Info.plist as `DotApsEnvironment`): `production` for `production`, the
+/// sandbox otherwise. Debug or Release does not decide it: a Release build from Xcode still gets sandbox tokens.
 func apnsEnvironment() -> String {
-    #if DEBUG
-        "sandbox"
-    #else
-        "production"
-    #endif
+    let entitled: String? = Bundle.main.object(forInfoDictionaryKey: "DotApsEnvironment") as? String
+    return entitled == "production" ? "production" : "sandbox"
 }
 
 /// Posts what the app registers with the daemon, authenticated with the phone's key.

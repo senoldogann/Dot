@@ -1,7 +1,7 @@
 """Pushes to Dot's iPhone app through APNs (item 997, docs/phone.md): the alerts the web app's Web Push gives, and the
 Live Activity of a run at work on the lock screen and in the Dynamic Island.
 
-The daemon signs with the APNs key of ``[apns]`` (a .p8 file kept outside Dot's home, sealed from the runs), whose
+The daemon signs with the APNs key of ``[apns]`` (a .p8 file kept outside Dot's home, which no run reads), whose
 token it makes anew every 50 minutes (APNs refuses one older than an hour and one made too often). The key is read
 when the sender is made and lives in this process alone: it is never logged, returned or written anywhere.
 
@@ -39,6 +39,8 @@ HOSTS: dict[ApnsEnvironment, str] = {
 TOKEN_EVERY_S: float = 50 * 60.0
 # What an alert says under its title: nothing of what happened, which Apple would read.
 ALERT_BODY: str = "Open Dot to see it."
+# What the banner of a Live Activity's start says: the chat's title is in the activity alone.
+LIVE_START_BODY: str = "A task started"
 # How much of a chat's title a Live Activity shows.
 TITLE_CHARS: int = 40
 # How long a Live Activity of a run whose end never came stays before iOS marks it stale.
@@ -106,7 +108,7 @@ def live_start_payload(run_id: str, agent_name: str, state: LiveState, now: floa
             "content-state": state.model_dump(),
             "attributes-type": "DotRunAttributes",
             "attributes": {"runId": run_id, "agentName": agent_name},
-            "alert": {"title": agent_name, "body": state.title},
+            "alert": {"title": agent_name, "body": LIVE_START_BODY},
             "stale-date": int(now + STALE_AFTER_S),
         }
     }

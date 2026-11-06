@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import WebKit
 import os
 
 /// The app's state: the daemon's host, whether the phone is paired, and what the web view should open.
@@ -65,6 +66,11 @@ final class AppModel {
             logger.error("removing the phone key failed: error=\(error.description, privacy: .public)")
         }
         isPaired = readIsPaired()
+        // The page keeps the key in its own storage and hands it over on every load: it is signed out too, or the
+        // key would come back at the next load.
+        WKWebsiteDataStore.default().removeData(
+            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
+        ) {}
     }
 
     /// Opens `route` (a path from a notification) in the web view when it is a path on the daemon.
