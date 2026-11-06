@@ -12,10 +12,11 @@ import pytest
 
 from dotagent.agent.manager import RunManager
 from dotagent.cli_daemon import daemon_left_out
-from dotagent.cli_doctor import check_line
+from dotagent.cli_doctor import asking_failed, check_line
 from dotagent.config import AppConfig, load_config
+from dotagent.core.errors import ServiceError
 from dotagent.core.paths import ensure_layout, token_path
-from dotagent.doctor import left_out_checks
+from dotagent.doctor import CheckResult, left_out_checks
 from dotagent.mcp.types import LeftOutTool
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -88,3 +89,14 @@ async def test_doctor_names_the_tools_the_running_daemon_left_out(own_home: Path
         assert line.startswith("warn") and "notes/odd_filter" in line and "left out odd_filter" in line
     # No daemon answers at the port any more: there is nothing to tell.
     assert await daemon_left_out(config) is None
+
+
+def test_a_daemon_that_cannot_be_asked_is_a_warn_row_with_its_fix() -> None:
+    """The pre-push review of item 1001: the doctor's checks stand, and the daemon that could not be asked is a warn
+    row that says why and how to fix it, not an error that ends the doctor."""
+    row: CheckResult = asking_failed(
+        ServiceError("the daemon did not tell the tools it left out", {"status": 404, "fix": "restart it"})
+    )
+    line: str = check_line(row)
+    assert line.startswith("warn") and not row.required
+    assert "could not be asked: the daemon did not tell the tools it left out (restart it)" in line

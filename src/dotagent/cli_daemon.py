@@ -226,6 +226,16 @@ async def daemon_left_out(config: AppConfig) -> list[LeftOutTool] | None:
             raise ServiceError(
                 "asking the daemon for the tools it left out failed", {"url": url, "error": repr(exc)}
             ) from exc
+    if response.status_code != 200:
+        raise ServiceError(
+            "the daemon did not tell the tools it left out",
+            {
+                "url": url,
+                "status": response.status_code,
+                "body": _clip(response.text, _BODY_CHARS),
+                "fix": "a daemon of an older version has no such answer; 'dotx service restart' restarts it",
+            },
+        )
     try:
         return _LEFT_OUT.validate_json(response.content)
     except ValidationError as exc:
