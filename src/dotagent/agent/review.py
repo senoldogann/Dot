@@ -32,6 +32,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic_core import ErrorDetails
 
 from dotagent.core.errors import (
     ConfigError,
@@ -47,8 +48,28 @@ from dotagent.core.learned_text import gate
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.harness.components import component_problem, description_problem, names_a_task, normalized
-from dotagent.harness.tasks import TaskDraft, draft_problem
+from dotagent.harness.components import (
+    LINE_CHARS,
+    component_problem,
+    description_problem,
+    length_fix,
+    names_a_task,
+    normalized,
+    problem_fix,
+    words_within,
+)
+from dotagent.harness.tasks import (
+    CALLS_MAX,
+    CHECKS_MAX,
+    FILE_CHARS,
+    FILES_MAX,
+    GOAL_CHARS,
+    HABIT_CHARS,
+    PATH_CHARS,
+    TURNS_MAX,
+    TaskDraft,
+    draft_problem,
+)
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref, unavailable_reason
 from dotagent.llm.types import (
@@ -101,6 +122,12 @@ MOST_OVERLAP_PAIRS: int = 6
 _JUDGEMENT_EFFORT: Effort = "low"
 # The first answer and one more after a reply that is not a verdict; a refusal is not asked again.
 _ATTEMPTS: int = 2
+# The roles of the harness are asked twice more (item 1015): their answers are long texts held to bounds and to the gate
+# for learned texts, which a weak model (Kimi K3, the owner's proposer) missed after one more try on 7 nights of 10
+# (2026-10-28 to 11-06), each time with a note that said what was wrong but not what to change.
+_HARNESS_ATTEMPTS: int = 3
+# The longest list of what to fix that a note asking again carries.
+_FIX_CHARS: int = 600
 # How a provider ends a reply its model declined to give: Anthropic's stop reason, OpenAI's finish reason.
 _DECLINED_FINISHES: frozenset[str] = frozenset({"refusal", "content_filter"})
 _MAX_INSTRUCTIONS: int = 12
@@ -1671,10 +1698,60 @@ def _verdict_from[V: FrozenModel](
             else:
                 log.info("review_texts_cut", tool=tool, model=model, fields=len(exc.errors()))
                 return cut
-        raise ProviderProtocolError(
+        raise FixableAnswerError(
             f"the arguments of {tool} are not a valid verdict ({_fields_wrong(failed)})",
             {**context, "errors": failed.json(include_url=False, include_context=False, include_input=False)},
+            validation_fix(failed),
         ) from failed
+
+
+class FixableAnswerError(ProviderProtocolError):
+    """An answer of the review model that a check refused, with what to change in it (``fix``, item 1015): the note
+    that asks again tells the model that, as well as what was wrong."""
+
+    def __init__(self, message: str, context: JsonObject, fix: str) -> None:
+        super().__init__(message, context)
+        self.fix: str = fix
+
+
+def _field_fix(error: ErrorDetails) -> str:
+    """What to change in one field a verdict got wrong (item 1015), named by its path: for a text past its bound its
+    length, the bound and about how many words that is; for a list too long its bound; for a field left out, that it is
+    to be given; for text where an object belongs, that it is an object of its own fields. Never the model's own text,
+    and never a key it made up (:func:`_fields_wrong`)."""
+    kind: str = error["type"]
+    if kind == "extra_forbidden":
+        where: str = ".".join(str(part) for part in error["loc"][:-1]) or "the arguments"
+        return f"{where} holds a field the tool does not take: leave it out"
+    path: str = ".".join(str(part) for part in error["loc"]) or "the arguments"
+    given: object = error.get("input")
+    limit: object = error.get("ctx", {}).get("max_length")
+    if kind == "string_too_long" and isinstance(given, str) and isinstance(limit, int):
+        return length_fix(f"the field {path}", len(given), limit)
+    if kind == "too_long" and isinstance(limit, int):
+        return f"the field {path} holds more than {limit} items: keep the {limit} that matter most"
+    if kind == "missing":
+        return f"the field {path} is missing: give it"
+    if kind in ("model_type", "dict_type", "model_attributes_type"):
+        return f"the field {path} must be a JSON object of its own fields, not text"
+    return f"the field {path}: {error['msg']}"
+
+
+def validation_fix(exc: ValidationError) -> str:
+    """What to change in a verdict that is not valid (item 1015), field by field (:func:`_field_fix`)."""
+    fixes: list[str] = [_field_fix(error) for error in exc.errors(include_url=False)]
+    return truncate_middle("; ".join(fixes), _FIX_CHARS)
+
+
+def retry_note(tool: str, problem: str, fix: str) -> str:
+    """The note added to a question asked again (item 1015): what was wrong with the answer before (``problem``), what
+    to change in it (``fix``, left out when ``""``: a reply that called no tool needs no more than the last line) and
+    that the whole answer is given again with ``tool``."""
+    lines: list[str] = [f"Your previous answer was not usable ({problem})."]
+    if fix:
+        lines.append(f"What to fix: {fix}.")
+    lines.append(f"Answer by calling {tool} exactly once, with the whole answer again.")
+    return "\n".join(lines)
 
 
 def _fields_wrong(exc: ValidationError) -> str:
@@ -1734,7 +1811,7 @@ def _as_is[V: FrozenModel](verdict: V) -> V:
 
 async def _decide[V: FrozenModel](question: _Question[V]) -> V:
     """Ask until a valid verdict comes back; the last attempt's error is raised."""
-    return await _decide_checked(question, _as_is)
+    return await _decide_checked(question, _as_is, _ATTEMPTS)
 
 
 async def _decide_passing_on[V: FrozenModel](question: _Question[V], others: tuple[str, ...]) -> V:
@@ -1790,7 +1867,7 @@ async def _decide_checked_passing_on[V: FrozenModel, R](
                 to=model,
             )
         try:
-            return await _decide_checked(replace(question, review_model=model), check)
+            return await _decide_checked(replace(question, review_model=model), check, _ATTEMPTS)
         except ProviderRefusedError as refused:
             first = first or refused
             passed.append(f"{model} (declined)")
@@ -1814,27 +1891,27 @@ async def _decide_checked_passing_on[V: FrozenModel, R](
     raise first
 
 
-async def _decide_checked[V: FrozenModel, R](question: _Question[V], check: Callable[[V], R]) -> R:
-    """Ask until a valid verdict comes back that ``check`` turns into the answer (it raises a
-    :class:`ProviderProtocolError` for a verdict it cannot use, which is asked for again); the last attempt's error is
-    raised, and a refusal at once."""
-    retry_note: str = ""
-    for attempt in range(1, _ATTEMPTS):
+async def _decide_checked[V: FrozenModel, R](question: _Question[V], check: Callable[[V], R], attempts: int) -> R:
+    """Ask up to ``attempts`` times until a valid verdict comes back that ``check`` turns into the answer (it raises a
+    :class:`ProviderProtocolError` for a verdict it cannot use, which is asked for again with :func:`retry_note`: what
+    was wrong and, for a :class:`FixableAnswerError`, what to change); the last attempt's error is raised, and a
+    refusal at once."""
+    note: str = ""
+    for attempt in range(1, attempts):
         try:
-            return check(await _attempt(question, retry_note))
+            return check(await _attempt(question, note))
         except ProviderProtocolError as error:
+            fix: str = error.fix if isinstance(error, FixableAnswerError) else ""
             log.warning(
                 "review_answer_unusable",
                 model=question.review_model,
                 tool=question.tool.name,
                 attempt=attempt,
                 problem=error.message,
+                fix=fix,
             )
-            retry_note = (
-                f"Your previous answer was not usable ({error.message}). "
-                f"Answer by calling {question.tool.name} exactly once."
-            )
-    return check(await _attempt(question, retry_note))
+            note = retry_note(question.tool.name, error.message, fix)
+    return check(await _attempt(question, note))
 
 
 def reviewer_for(
@@ -1933,7 +2010,7 @@ def checkpoint_judge_for(
             tool=_CHECKPOINT_SPEC,
             verdict_type=CheckpointVerdict,
         )
-        return await _decide_checked(question, _checkpoint_checked)
+        return await _decide_checked(question, _checkpoint_checked, _ATTEMPTS)
 
     return judge
 
@@ -2221,7 +2298,7 @@ def rule_drafter_for(router: ModelRouter, review_model: str, timeout_s: float, s
         def checked(reply: RuleDraft) -> DraftedRule:
             return _kept_rule(reply, tools)
 
-        return await _decide_checked(question, checked)
+        return await _decide_checked(question, checked, _ATTEMPTS)
 
     return draft
 
@@ -2263,12 +2340,41 @@ def shorten_reason(reason: str) -> str:
 # ---------------------------------------------------------------------------------- the roles of the harness (item 390)
 
 
+def _about(chars: int) -> str:
+    """A bound in characters and in words, as a role is told it (item 1015): ``120 characters (about 17 words)``."""
+    return f"{chars} characters (about {words_within(chars)} words)"
+
+
 def _bounds_line(bounds: HarnessBounds) -> str:
     return (
-        f"Bounds: the habits at most {bounds.habits_chars} characters, the tool guidance at most "
-        f"{bounds.tool_guidance_chars} characters, each at most {bounds.component_lines} lines of at most 300 "
-        "characters."
+        f"Bounds: the habits at most {_about(bounds.habits_chars)}, the tool guidance at most "
+        f"{_about(bounds.tool_guidance_chars)}, each at most {bounds.component_lines} lines of at most "
+        f"{LINE_CHARS} characters. A text past them is refused whole, not cut: count before you answer."
     )
+
+
+# The bounds of the proposer's, the composer's, the task writer's and the experience writer's own fields, which each is
+# told in its prompt as well as in its tool's schema (item 1015: Kimi K3 wrote a summary, a task's habit and a tool
+# guidance past theirs, and the night lost the answer).
+_PROPOSAL_FIELDS: str = (
+    f"The summary is one line of at most {_about(120)}; at most 3 moments, each one line of at most {_about(300)}."
+)
+_COMPOSITION_FIELDS: str = (
+    f"The summary is one line of at most {_about(120)}; a decision's edit at most {_about(200)}, its evidence at most "
+    f"{_about(300)}, one line each."
+)
+_TASK_FIELDS: str = (
+    f"Bounds: the goal at most {_about(GOAL_CHARS)}; the habit one line of at most {_about(HABIT_CHARS)}; at most "
+    f"{FILES_MAX} files of at most {FILE_CHARS} characters each, each path at most {PATH_CHARS} characters, relative "
+    f"to the workspace; 1 to {CHECKS_MAX} checks; 1 to {TURNS_MAX} turns of the reference, each of 1 to {CALLS_MAX} "
+    "calls. No text of the task, a file's included, has a line that starts with # or is underlined with === or ---: "
+    "write a file's title as a plain line."
+)
+_EXPERIENCE_FIELDS: str = (
+    f"Bounds: an effect's why at most {_about(200)}. The entry is null or a JSON object of four fields, never a "
+    f"sentence. cue: one line of at most {_about(200)}; lesson and evidence: one line each of at most {_about(300)}; "
+    "confidence: high, medium or low."
+)
 
 
 def _proposal_prompt(request: ProposalRequest, nonce: str) -> str:
@@ -2286,6 +2392,7 @@ def _proposal_prompt(request: ProposalRequest, nonce: str) -> str:
                 "EXPERIENCE OF EARLIER STEPS", nonce, _listed(request.experience) if request.experience else "none yet"
             ),
             _bounds_line(request.bounds),
+            _PROPOSAL_FIELDS,
         )
     )
 
@@ -2315,6 +2422,7 @@ def _composition_prompt(request: CompositionRequest, nonce: str) -> str:
             _fenced("BASE TOOL GUIDANCE", nonce, request.tool_guidance or "(nothing)"),
             *(_candidate_text(candidate, nonce) for candidate in request.candidates),
             _bounds_line(request.bounds),
+            _COMPOSITION_FIELDS,
         )
     )
 
@@ -2340,6 +2448,7 @@ def _experience_prompt(request: ExperienceRequest, nonce: str) -> str:
             _fenced("THE STEP", nonce, request.summary),
             _fenced("EDITS", nonce, edits if edits else "none"),
             f"The composed version was adopted: {'yes' if request.adopted else 'no'}.",
+            _EXPERIENCE_FIELDS,
         )
     )
 
@@ -2353,7 +2462,10 @@ def _component_checked(name: str, text: str | None, chars: int, lines: int, held
     clean: str = normalized(text)
     problem: str | None = component_problem(clean, chars, lines, held)
     if problem is not None:
-        raise ProviderProtocolError(f"the {name} cannot be a component of the harness: {problem}", {name: problem})
+        fix: str = (
+            length_fix(f"the {name}", len(clean), chars) if len(clean) > chars else problem_fix(f"the {name}", problem)
+        )
+        raise FixableAnswerError(f"the {name} cannot be a component of the harness: {problem}", {name: problem}, fix)
     return clean
 
 
@@ -2362,7 +2474,7 @@ def _described(what: str, text: str, held: Sequence[str]) -> None:
     (``what`` it is: a moment, a decision, the summary), cannot be recorded (:func:`description_problem`, item 587)."""
     problem: str | None = description_problem(text, held)
     if problem is not None:
-        raise ProviderProtocolError(f"{what} cannot be recorded: {problem}", {what: problem})
+        raise FixableAnswerError(f"{what} cannot be recorded: {problem}", {what: problem}, problem_fix(what, problem))
 
 
 def proposal_check(request: ProposalRequest, held: Sequence[str]) -> Callable[[HarnessProposal], HarnessProposal]:
@@ -2496,8 +2608,10 @@ def experience_check(request: ExperienceRequest, held: Sequence[str]) -> Callabl
             ):
                 problem: str | None = component_problem(text, _ENTRY_CHARS, 1, held)
                 if problem is not None:
-                    raise ProviderProtocolError(
-                        f"the experience's {name} cannot stand in the library: {problem}", {name: problem}
+                    raise FixableAnswerError(
+                        f"the experience's {name} cannot stand in the library: {problem}",
+                        {name: problem},
+                        problem_fix(f"the experience's {name}", problem),
                     )
                 # The task is not named in the answer back to the model, which is never shown the scoring set.
                 if names_a_task(text, request.withheld) is not None:
@@ -2539,7 +2653,7 @@ def harness_proposer_for(
         # The check refuses a reply that holds a secret and asks again: the values filled into a page are not among
         # them (item 621).
         held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-        return await _decide_checked(question, proposal_check(request, held))
+        return await _decide_checked(question, proposal_check(request, held), _HARNESS_ATTEMPTS)
 
     return propose
 
@@ -2552,6 +2666,7 @@ def _task_prompt(request: TaskRequest, nonce: str) -> str:
             _fenced("WHAT WENT WRONG ON THE WAY", nonce, _listed(request.signals)),
             _fenced("ANSWER", nonce, request.answer),
             f"The run reached its goal: {'yes' if request.reached_goal else 'no'}.",
+            _TASK_FIELDS,
         )
     )
 
@@ -2565,7 +2680,9 @@ def task_check(held: Sequence[str]) -> Callable[[HarnessTaskAnswer], HarnessTask
         if answer.task is not None:
             problem: str | None = draft_problem(answer.task, held)
             if problem is not None:
-                raise ProviderProtocolError(f"the task cannot be kept: {problem}", {"task": problem})
+                raise FixableAnswerError(
+                    f"the task cannot be kept: {problem}", {"task": problem}, problem_fix("the task", problem)
+                )
         return answer
 
     return check
@@ -2591,7 +2708,7 @@ def harness_task_writer_for(
             verdict_type=HarnessTaskAnswer,
         )
         held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-        return await _decide_checked(question, task_check(held))
+        return await _decide_checked(question, task_check(held), _HARNESS_ATTEMPTS)
 
     return write
 
@@ -2617,7 +2734,7 @@ def harness_composer_for(
         # The check refuses a reply that holds a secret and asks again: the values filled into a page are not among
         # them (item 621).
         held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-        return await _decide_checked(question, composition_check(request, held))
+        return await _decide_checked(question, composition_check(request, held), _HARNESS_ATTEMPTS)
 
     return compose
 
@@ -2640,7 +2757,7 @@ def harness_selector_for(
             tool=_SELECT_SPEC,
             verdict_type=HarnessSelection,
         )
-        return await _decide_checked(question, selection_check(request))
+        return await _decide_checked(question, selection_check(request), _HARNESS_ATTEMPTS)
 
     return select
 
@@ -2666,6 +2783,6 @@ def experience_writer_for(
         # The check refuses a reply that holds a secret and asks again: the values filled into a page are not among
         # them (item 621).
         held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-        return await _decide_checked(question, experience_check(request, held))
+        return await _decide_checked(question, experience_check(request, held), _HARNESS_ATTEMPTS)
 
     return write

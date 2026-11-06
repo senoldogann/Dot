@@ -979,15 +979,17 @@ class HarnessVersion(FrozenModel):
     retired_at: float | None
 
 
-type HarnessStepState = Literal["done", "keep", "skipped", "failed", "calibrating"]
+type HarnessStepState = Literal["done", "keep", "skipped", "failed", "calibrating", "unusable"]
 
 
 class HarnessStep(FrozenModel):
     """One step of the improvement loop (item 391, docs/harness.md): the run it learned from (``from_run``, ``None``
     when none was there to learn from), the version the probes compared against (``base_version``, ``None`` for Dot's
     own text alone), how it ended (``state``: ``done`` with a probed version written, ``keep`` with the base kept,
-    ``skipped`` with nothing to learn from, ``failed``), what it did as JSON (``outcome``: the candidates, the probes'
-    contrasts, the decision, the probed version) and ``error`` when it failed."""
+    ``skipped`` with nothing to learn from, ``calibrating`` trying the pool, ``unusable`` when a model's answer stayed
+    unusable after its attempts and the rest of the night went on without it (item 1015: its reasons are in the record,
+    ``unusable``), ``failed``), what it did as JSON (``outcome``: the candidates, the probes' contrasts, the decision,
+    the probed version) and ``error`` when it failed."""
 
     id: str
     started_at: float

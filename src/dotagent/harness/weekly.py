@@ -7,7 +7,7 @@ import json
 from collections.abc import Sequence
 
 from dotagent.agent.review import HarnessProposal, ProposalRequest
-from dotagent.core.errors import DotError, NotFoundError
+from dotagent.core.errors import DotError, NotFoundError, ProviderProtocolError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.harness.components import HarnessText
@@ -86,7 +86,8 @@ async def _propose(runtime: Runtime, patterns: Sequence[FailureRow], now: float)
         bounds=bounds_of(runtime.config.harness),
     )
     proposal: HarnessProposal = await proposer_of(runtime, "harness:week", None)(request)
-    # The week is spent once the proposer answered: one that failed (a network error) is asked again the next night.
+    # The week is spent once the proposer answered: one that failed (a network error), or whose answer stayed unusable
+    # (item 1015, :func:`night`), is asked again the next night.
     await runtime.store.kv_set(PROPOSED_KEY, repr(now))
     if proposal.keep:
         return "the proposer kept the habits as they are for this week's failures"
@@ -162,10 +163,22 @@ async def _keep_better(runtime: Runtime, trial: Trial, candidate: Half, in_use: 
 
 async def night(runtime: Runtime, now: float) -> HarnessStep:
     """The night of the harness: the digest of the day's real runs (:func:`night_digest`), then the week's word
-    (:func:`week`), kept in the step's record (``week``). A week whose proposal failed fails the step with its error."""
+    (:func:`week`), kept in the step's record (``week``). A week whose proposal failed fails the step with its error.
+    One whose proposal stayed unusable after the proposer's attempts (item 1015: on 2026-11-06 Kimi K3 wrote a tool
+    guidance of 1749 characters against 1500, three times) keeps the digest and records the step ``unusable``, with
+    ``the proposal was unusable: <why>`` as the week's word and in ``unusable``; the week is not spent, so the next
+    night asks again, as after a network error: a weak model's answer says nothing of the week's patterns, and asking
+    costs three questions."""
     step: HarnessStep = await night_digest(runtime.store, runtime.config.harness, now, runtime.schedule_zone)
     try:
         said: str = await week(runtime, now)
+    except ProviderProtocolError as error:
+        log.warning("harness_week_unusable", step=step.id, error=error.message)
+        unusable: str = f"the proposal was unusable: {error.message}"
+        kept: JsonObject = json.loads(step.outcome)
+        kept["week"] = unusable
+        kept["unusable"] = [unusable]
+        return await runtime.store.finish_harness_step(step.id, now, "unusable", json.dumps(kept), None)
     except DotError as error:
         await runtime.store.finish_harness_step(step.id, now, "failed", step.outcome, error.message)
         raise

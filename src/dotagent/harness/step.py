@@ -217,14 +217,35 @@ def _changed(base: HarnessText, candidate: HarnessText) -> tuple[str, ...]:
 
 
 class _Outcome(FrozenModel):
-    """What a step came to: its state, its facts, and the error of a role that failed after the probes (the composer),
-    which leaves the step ``failed`` with the survivor probed all the same. The experience writer's failure is a
-    warning of the facts instead (item 931), which leaves the step as the probes decided it but adopts nothing on its
-    own."""
+    """What a step came to: its state, its facts, the error of what failed (a probe that did not start, a role that
+    could not be reached), which leaves the step ``failed`` with the survivor probed all the same, and the roles whose
+    answer stayed unusable after their attempts (``unusable``, item 1015), which the step went on without. The
+    experience writer's failure of another kind is a warning of the facts instead (item 931), which leaves the step as
+    the probes decided it but adopts nothing on its own."""
 
     state: HarnessStepState
     facts: dict[str, JsonValue]
     error: str | None
+    unusable: tuple[str, ...]
+
+
+def state_of(outcome: _Outcome) -> HarnessStepState:
+    """The state a step is recorded with (item 1015): ``failed`` when something failed; ``unusable`` when a role's
+    answer stayed unusable and the step made no change (a night that kept the base or tried the pool without it); else
+    the state the step came to, ``done`` among them, whose record still names the unusable answers. A weak model's
+    answer that the checks refuse is the checks at work, not a failure of the night: on 2026-10-28 to 11-06 one such
+    answer made 7 nights of 10 read as failed, and the rest of each night was lost with it."""
+    if outcome.error is not None:
+        return "failed"
+    if outcome.unusable and outcome.state != "done":
+        return "unusable"
+    return outcome.state
+
+
+def _unusable(answer: str, error: ProviderProtocolError) -> str:
+    """How the record says that ``answer`` (``the task writer's answer``) stayed unusable after its attempts (item
+    1015), and why."""
+    return f"{answer} was unusable: {error.message}"
 
 
 def adopts_on_its_own(adopt: str, survivor: Contrast, repeats: int, tainted: bool, *, failed: bool = False) -> bool:
@@ -270,6 +291,9 @@ async def _carry_out(
     errors: list[str] = []
     # What went wrong without changing the step's decision (item 931): shown with it, never as its failure.
     warnings: list[str] = []
+    # The roles whose answer stayed unusable after their attempts (item 1015): the step goes on without it, says so in
+    # its record and on the page, and adopts nothing on its own.
+    unusable: list[str] = []
     # The tasks the loop wrote from the owner's runs (item 904), which a probe is given whole.
     own: dict[str, EvalTask] = await own_tasks(store)
     # Probe: the base first, then each candidate within what is left of the budget; a probe with nothing left plays
@@ -314,6 +338,10 @@ async def _carry_out(
         if task_run is not None:
             try:
                 written, task_note = await write_task(runtime, task_run, prober)
+            except ProviderProtocolError as exc:
+                log.warning("harness_task_unusable", step=step.id, error=exc.message)
+                unusable.append(_unusable("the task writer's answer", exc))
+                written, task_note = None, "no task: the writer's answer was unusable"
             except DotError as exc:
                 log.warning("harness_task_failed", step=step.id, error=exc.message)
                 errors.append(f"the task writer failed: {exc.message}")
@@ -322,6 +350,9 @@ async def _carry_out(
                 own[written.id] = written
                 calibrated = scoring.model_copy(update={"calibrated": (written.id, *scoring.calibrated)})
         outcome: _Outcome = await _calibrate(calibrated, config, lambda tasks: played(BASE, base, tasks), errors)
+        outcome = outcome.model_copy(
+            update={"unusable": tuple(unusable), "facts": {**outcome.facts, "unusable": list(unusable)}}
+        )
         if task_note is None:
             return outcome
         return outcome.model_copy(update={"facts": {**outcome.facts, "task_run": task_run, "task": task_note}})
@@ -331,6 +362,7 @@ async def _carry_out(
             state="skipped",
             facts={"reason": "no run of the owner's ended since the last step that took one, a week back at most"},
             error=None,
+            unusable=(),
         )
     # A run as a task (item 904): a candidate is scored where an owner's run went wrong, which the tasks of the pool,
     # passed under any text, cannot show. The run is the worst that read only what is Dot's and the owner's (item
@@ -343,6 +375,10 @@ async def _carry_out(
     elif not plan.scripted and task_run is not None:
         try:
             learned, learned_note = await write_task(runtime, task_run, prober)
+        except ProviderProtocolError as exc:
+            log.warning("harness_task_unusable", step=step.id, error=exc.message)
+            unusable.append(_unusable("the task writer's answer", exc))
+            learned_note = "no task: the writer's answer was unusable"
         except DotError as exc:
             log.warning("harness_task_failed", step=step.id, error=exc.message)
             errors.append(f"the task writer failed: {exc.message}")
@@ -353,7 +389,8 @@ async def _carry_out(
     # and every task of the pool with headroom passes in more than three quarters of its attempts. The step proposes and
     # plays nothing then, and takes no run: it is marked ``no_signal``, which :func:`_since_last_step` passes over, so
     # that the run that went worst is still there for the next step that proposes. A task writer that failed tonight
-    # still fails the step, so that the night never reads clean (the review).
+    # still fails the step, so that the night never reads clean (the review); one whose answer was unusable makes it
+    # ``unusable`` (item 1015).
     if not plan.scripted and learned is None and not scoring.hard and not any(task in own for task in scoring.headroom):
         left: str = "" if from_run is None else f"; {from_run} is left for a step that proposes"
         return _Outcome(
@@ -366,34 +403,43 @@ async def _carry_out(
                     "nothing was proposed: no task tells a better text from luck (every task with headroom passes in "
                     f"more than three quarters of its attempts, and none was written from a run){left}"
                 ),
+                "unusable": list(unusable),
             },
             error="; ".join(errors) or None,
+            unusable=tuple(unusable),
         )
-    # Propose. A proposer whose answer is no proposal in one scope (the review module asked it twice already) leaves the
-    # other scopes to be proposed and played (item 718): on 2026-10-24 one such answer lost the night. The step is
-    # recorded failed all the same, with the error, and adopts nothing.
+    # Propose. A proposer whose answer is no proposal in one scope (the review module asked it three times already)
+    # leaves the other scopes to be proposed and played (item 718): on 2026-10-24 one such answer lost the night. The
+    # step records the answer as unusable (item 1015) and adopts nothing on its own.
     candidates: list[HarnessVersion] = []
+    proposals_unusable: int = 0
     for scope in plan.scopes:
         try:
             candidate: HarnessVersion | None = await propose_from_run(runtime, from_run, scope)
         except ProviderProtocolError as exc:
-            log.warning("harness_proposal_failed", step=step.id, scope=scope, error=exc.message)
-            errors.append(f"the proposer failed in the {scope} scope: {exc.message}")
+            log.warning("harness_proposal_unusable", step=step.id, scope=scope, error=exc.message)
+            unusable.append(_unusable(f"the proposer's answer in the {scope} scope", exc))
+            proposals_unusable += 1
             continue
         if candidate is not None:
             candidates.append(candidate)
     if not candidates:
-        reason: str = "the proposer failed" if errors else "the proposer kept the harness"
+        reason: str = "the proposer's answer was unusable" if proposals_unusable else "the proposer kept the harness"
         return _Outcome(
             state="keep",
-            facts={"from_run": from_run, "reason": reason, "task": learned_note},
+            facts={"from_run": from_run, "reason": reason, "task": learned_note, "unusable": list(unusable)},
             error="; ".join(errors) or None,
+            unusable=tuple(unusable),
         )
     case: LessonCase = await case_of(runtime, from_run)
 
     async def write_experience(probed: HarnessVersion | None) -> None:
         try:
             await _write_experience(runtime, step, from_run, base_text, candidates, contrasts, probed, held)
+        except ProviderProtocolError as exc:
+            # An answer that stayed unusable is recorded as such (item 1015), and no experience is kept from it.
+            log.warning("harness_experience_unusable", step=step.id, error=exc.message)
+            unusable.append(_unusable("the experience writer's answer", exc))
         except DotError as exc:
             # The record of the night, not its decision (item 931): a writer whose answer was malformed leaves the
             # step as the probes decided it, with a warning, rather than failed (on 2026-11-02 it made a night that
@@ -429,6 +475,7 @@ async def _carry_out(
             "tainted": case.tainted,
             "errors": list(errors),
             "warnings": list(warnings),
+            "unusable": list(unusable),
             "scored_on": list(scored),
             "task": learned_note,
         }
@@ -460,6 +507,7 @@ async def _carry_out(
                 "decision": f"the base is kept: no candidate did better{f' ({unclear})' if unclear else ''}",
             },
             error="; ".join(errors) or None,
+            unusable=tuple(unusable),
         )
     winners: list[Contrast] = [found for found in contrasts if found.verdict == "better"]
     survivor: Contrast = chosen
@@ -470,6 +518,11 @@ async def _carry_out(
             composed = await _compose(
                 runtime, step, from_run, base_text, [by_label[found.label] for found in winners], winners, held
             )
+        except ProviderProtocolError as exc:
+            log.warning("harness_composer_unusable", step=step.id, error=exc.message)
+            unusable.append(_unusable("the composer's answer", exc))
+            composed = None
+            decision = f"{decision}; the composer's answer was unusable, so the best candidate stands"
         except DotError as exc:
             log.warning("harness_composer_failed", step=step.id, error=exc.message)
             errors.append(f"the composer failed: {exc.message}")
@@ -519,9 +572,10 @@ async def _carry_out(
         return found
 
     # The owner already decided about the survivor while the step ran: nothing is left to adopt or to leave to them.
-    # A warning (the experience writer's failure) adopts nothing on its own either, as a failure does (item 588).
+    # A warning (the experience writer's failure) adopts nothing on its own either, as a failure does (item 588), nor
+    # does an answer that stayed unusable (item 1015).
     if not decided and adopts_on_its_own(
-        config.adopt, survivor, plan.repeats, case.tainted, failed=bool(errors) or bool(warnings)
+        config.adopt, survivor, plan.repeats, case.tainted, failed=bool(errors) or bool(warnings) or bool(unusable)
     ):
         sure: Contrast | None = None
         try:
@@ -552,12 +606,14 @@ async def _carry_out(
             decision = f"{decision}; left to you: the step failed after the probes"
         elif warnings:
             decision = f"{decision}; left to you: {warnings[0]}"
+        elif unusable:
+            decision = f"{decision}; left to you: {unusable[0]}"
     facts: dict[str, JsonValue] = {**facts_now(), "decision": decision, "probed": probed.id}
     if confirmation is not None:
         facts["confirmation"] = confirmation
     if adopted_now:
         facts["adopted"] = True
-    return _Outcome(state="done", facts=facts, error="; ".join(errors) or None)
+    return _Outcome(state="done", facts=facts, error="; ".join(errors) or None, unusable=tuple(unusable))
 
 
 async def scoring_of(store: Store, config: HarnessConfig, base: HarnessVersion | None) -> ScoringPlan:
@@ -590,6 +646,7 @@ async def _calibrate(
                 "decision": f"nothing to learn on the pool: {known}, and every task of it is known",
             },
             error=None,
+            unusable=(),
         )
     await tries(scoring.calibrated)
     return _Outcome(
@@ -603,6 +660,7 @@ async def _calibrate(
             ),
         },
         error="; ".join(errors) or None,
+        unusable=(),
     )
 
 
@@ -839,7 +897,7 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
     finished: HarnessStep = await store.finish_harness_step(
         step.id,
         time.time(),
-        "failed" if outcome.error is not None else outcome.state,
+        state_of(outcome),
         json.dumps(facts, ensure_ascii=False),
         outcome.error,
     )

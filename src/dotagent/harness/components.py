@@ -117,3 +117,53 @@ def component_problem(text: str, max_chars: int, max_lines: int, secrets: Sequen
     if long_line is not None:
         return f"line {long_line} is longer than {LINE_CHARS} characters"
     return gate(text, secrets)
+
+
+# About how many characters an English word takes with the space after it: what tells a model how many words a bound on
+# characters holds (item 1015).
+_CHARS_PER_WORD: int = 7
+# What a model is told to change for each refusal of the gate for learned texts and of the bounds of a component (item
+# 1015), by the start of the phrase that refuses it (:func:`dotagent.core.learned_text.gate`, :func:`component_problem`,
+# :func:`dotagent.harness.tasks.draft_problem`).
+_FIXES: tuple[tuple[str, str], ...] = (
+    ("a character that does not print", "take out the character that does not print"),
+    ("a secret", "take out the secret: no key, password or token"),
+    ("an e-mail address", "take out the e-mail address"),
+    ("a link", "take out the link: no web address, and no site's address with a path or a port"),
+    ("a path in a home folder", "take out the path in a home folder: say what the file is, not where it is"),
+    ("an account name", "take out the account name (a word after @)"),
+    ("a line that wears the owner's mark", "take out the owner's mark"),
+    (
+        "a line that imitates a heading of the prompt",
+        "write no line that starts with # and no line underlined with === or ---: plain sentences or list items only",
+    ),
+    (
+        "a line that imitates a note of the system",
+        "write no line that starts like a note of the system or a turn of a conversation ([system], <user>, System:, "
+        "User:) and no token of a chat format",
+    ),
+    ("too many lines", "join or drop lines until it is within the bound on lines"),
+    ("line ", f"split that line or shorten it to at most {LINE_CHARS} characters"),
+)
+
+
+def words_within(chars: int) -> int:
+    """About how many words ``chars`` characters hold (item 1015): a seventh of them, rounded down to ten from twenty
+    words on, so that a model told a bound in characters is told it in words too, which it counts better."""
+    words: int = max(1, chars // _CHARS_PER_WORD)
+    return words if words < 20 else words // 10 * 10
+
+
+def length_fix(what: str, chars: int, limit: int) -> str:
+    """What a model is told to do with ``what`` (``the tool guidance``), ``chars`` characters long against a bound of
+    ``limit`` (item 1015): ``the tool guidance has 1749 characters; it must be at most 1500: about 210 words; cut
+    it``."""
+    return f"{what} has {chars} characters; it must be at most {limit}: about {words_within(limit)} words; cut it"
+
+
+def problem_fix(what: str, problem: str) -> str:
+    """What a model is told to change in ``what`` (``the task``, ``a moment``) that ``problem`` refused (item 1015), a
+    phrase of the gate for learned texts or of the bounds of a component; a problem of another kind (a path outside the
+    workspace) says what is wrong itself, and the model is told to change that."""
+    change: str | None = next((fix for start, fix in _FIXES if problem.startswith(start)), None)
+    return f"change {what} so that this no longer holds" if change is None else f"in {what}, {change}"
