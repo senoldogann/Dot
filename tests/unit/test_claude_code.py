@@ -8,7 +8,8 @@ import json
 import stat
 from pathlib import Path
 
-from dotagent.claude_code.run import claude_argv, claude_env, mcp_config, system_prompt, write_mcp_config
+from dotagent.agent.limits import LimitReached, RunLimits
+from dotagent.claude_code.run import claude_argv, claude_env, ended_clean, mcp_config, system_prompt, write_mcp_config
 from dotagent.claude_code.stream import (
     BlockBegan,
     Delta,
@@ -236,3 +237,12 @@ def test_a_message_goes_to_the_program_as_a_line_with_its_pictures() -> None:
             ],
         },
     }
+
+
+def test_a_run_ends_clean_only_neither_past_its_limits_nor_cut_at_the_models_output_limit() -> None:
+    """The pre-push review of item 1013: a reply cut at the model's output limit ends the run failed, so its session is
+    let go as one past the run's limits is."""
+    over: LimitReached = LimitReached(seconds=99.0, tokens=1, limits=RunLimits(max_minutes=1.0, max_tokens=10))
+    assert ended_clean(None, "end_turn")
+    assert not ended_clean(None, "max_tokens")
+    assert not ended_clean(over, "end_turn")
