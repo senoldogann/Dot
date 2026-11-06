@@ -59,10 +59,12 @@ struct StoredAttachmentId: Decodable, Sendable {
     let id: String
 }
 
-/// A new chat, as `POST /api/runs` takes it from the share sheet: its goal and the files kept for it (item 1009).
+/// A new chat, as `POST /api/runs` takes it from the share sheet: its goal, the files kept for it, and the share's key,
+/// with which the daemon starts it once however often the request is sent again (item 1009, as the page's sends do).
 struct ChatStart: Encodable, Sendable {
     let goal: String
     let attachments: [String]
+    let key: String
 }
 
 /// A request to the daemon that did not succeed.
