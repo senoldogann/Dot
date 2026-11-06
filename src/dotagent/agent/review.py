@@ -1710,6 +1710,7 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
         speed="standard",
         session_key=question.session_key,
         cache_mark=None,
+        prompt_reuse="single",
         window=await question.router.window_of(ref),
     )
     try:

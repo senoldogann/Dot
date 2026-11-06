@@ -16,6 +16,10 @@ Effort = Literal["off", "on", "minimal", "low", "medium", "high", "xhigh", "max"
 # How fast a model writes its answer (item 223): ``fast`` is the faster output some Claude models offer at a higher
 # price (``llm/anthropic.py``), ``standard`` every other model's.
 Speed = Literal["standard", "fast"]
+# Whether a call's prompt is sent again as the start of a later call: ``conversation`` for the steps of a run, each the
+# one before it with more appended; ``single`` for a question asked once (a review, a summary, a recap). A provider
+# that charges for writing its prompt cache (Anthropic) writes it only for a conversation.
+PromptReuse = Literal["single", "conversation"]
 # Where a model's window comes from (item 250): its provider's API names it, Dot's table of the windows its provider
 # publishes holds it, Dot assumes it for a model neither names, or it is the window Dot asks Ollama for (num_ctx).
 WindowSource = Literal["provider", "published", "assumed", "asked"]
@@ -89,7 +93,8 @@ class ChatRequest(FrozenModel):
     the caller knows it (item 237); a provider whose cache looks back only a few blocks from a mark marks it there.
     ``window`` is the window the call asks the model's provider to give it, the one a run planned with
     (``agent.scaffold.run_window``) or a side call's (``ModelRouter.window_of``), or ``None`` for the provider's own;
-    Ollama is the provider that takes it, as ``num_ctx`` (item 520)."""
+    Ollama is the provider that takes it, as ``num_ctx`` (item 520). ``prompt_reuse`` says whether a later call starts
+    with this one's prompt (:data:`PromptReuse`)."""
 
     model: str
     messages: tuple[Message, ...]
@@ -100,6 +105,7 @@ class ChatRequest(FrozenModel):
     speed: Speed
     session_key: str
     cache_mark: int | None
+    prompt_reuse: PromptReuse
     window: int | None
 
 

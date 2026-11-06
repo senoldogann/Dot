@@ -27,6 +27,7 @@ REQUEST: ChatRequest = ChatRequest(
     speed="standard",
     session_key="thr_x:goal",
     cache_mark=None,
+    prompt_reuse="single",
     window=None,
 )
 REPLY: ModelReply = ModelReply(
