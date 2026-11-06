@@ -360,7 +360,9 @@ async def test_how_long_ago_a_chat_ended_stays_in_one_line_beside_a_long_goal(
     page: Page = await _phone(browser, address, "/customize/skills")
     try:
         await page.get_by_role("button", name="Save from a chat").click()
-        await expect(page.locator(".chat-skill-row").first).to_be_visible()
+        # The dialog lists the chats once the daemon has answered, which a loaded runner takes over 5 s for (main's
+        # gate failed here four times running on 2026-11-06), as the other waits of this file allow for.
+        await expect(page.locator(".chat-skill-row").first).to_be_visible(timeout=15_000)
         assert await _broken(page, ".chat-skill-row > .hint") == []
     finally:
         await page.context.close()
