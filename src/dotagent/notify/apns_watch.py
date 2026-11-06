@@ -12,9 +12,10 @@ faster than Apple lets a Live Activity change, and a run that waits or ends is t
 import asyncio
 import time
 
+from dotagent.agent.held_secrets import SECRET_SEVERITY
 from dotagent.core.errors import DotError
 from dotagent.core.logs import get_logger
-from dotagent.core.types import FrozenModel
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.events import SYSTEM_RUN_ID, Subscription
 from dotagent.notify.apns import (
@@ -24,6 +25,7 @@ from dotagent.notify.apns import (
     LiveStatus,
     PushPriority,
     alert_payload,
+    approval_payload,
     gone,
     live_end_payload,
     live_start_payload,
@@ -61,9 +63,21 @@ PROGRESS_EVERY_S: float = 4.0
 _AT_ONCE: PushPriority = "10"
 _WHEN_IT_SUITS: PushPriority = "5"
 _WAIT_S: float = 1.0
+# The approvals the lock screen does not answer: a question wants words, a secret its value (only its own route takes
+# a yes), a handoff the owner's own hands on the Mac. Every other card is a step's yes or no, by its risk.
+_NOT_ANSWERABLE: frozenset[str] = frozenset({"question", SECRET_SEVERITY, "handoff"})
 _DOT: str = "Dot"
 # The title of an alert of a message Dot wrote to the owner.
 TOLD_TITLE: str = "Dot has a message for you"
+
+
+def approval_answerable(event: EventRecord) -> str | None:
+    """The id of the approval ``event`` asks for when the lock screen may answer it (item 1008): a yes or a no to a
+    step, not a question (which wants words), a secret (which wants its value) or anything else; ``None`` otherwise."""
+    if event.kind != "approval_requested" or event.data.get("severity") in _NOT_ANSWERABLE:
+        return None
+    approval_id: object = event.data.get("approval_id")
+    return approval_id if isinstance(approval_id, str) and approval_id else None
 
 
 def follows_live(run: RunRecord) -> bool:
@@ -107,6 +121,9 @@ class ApnsWatch:
             log.info("apns_device_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
 
     async def alert(self, message: PushMessage) -> None:
+        await self._alert(alert_payload(message.title, message.route))
+
+    async def _alert(self, payload: JsonObject) -> None:
         for device in await self._store.list_apns_devices():
             try:
                 reply: ApnsReply = await self._sender.send(
@@ -114,7 +131,7 @@ class ApnsWatch:
                     device.device_token,
                     "alert",
                     _AT_ONCE,
-                    alert_payload(message.title, message.route),
+                    payload,
                 )
             except DotError as error:
                 log.warning("apns_alert_failed", phone=device.phone_id, error=error.message)
@@ -184,7 +201,10 @@ class ApnsWatch:
             return
         run: RunRecord = await self._store.get_run(event.run_id)
         message: PushMessage | None = push_message(event, run) if event.kind in PUSH_KINDS else None
-        if message is not None:
+        answerable: str | None = approval_answerable(event)
+        if message is not None and answerable is not None:
+            await self._alert(approval_payload(message.title, message.route, answerable))
+        elif message is not None:
             await self.alert(message)
         if not follows_live(run):
             # Known as no Live Activity's while it works, so that its steps are passed over without a read.
