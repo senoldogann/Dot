@@ -19,7 +19,6 @@ from dotagent.core.types import FrozenModel
 from dotagent.doctor import CheckResult, model_is_installed, setup_checks
 from dotagent.llm.calls import log_model_call
 from dotagent.llm.ollama import OllamaProvider
-from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.roles import ModelRole
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import WHOLE_RUN_AGENTS, ChatProvider, ModelInfo
@@ -211,14 +210,14 @@ def _models_lines(config: AppConfig, ref: ModelRef, roles: Sequence[ModelRole], 
             continue
         model: str = kept[role]
         why: str = (
-            "Zen's free models answer only as OpenCode's own agent"
-            if ref.provider == OPENCODE_PROVIDER
+            f"{ref.label} answers only as its own agent"
+            if ref.provider in WHOLE_RUN_AGENTS
             else f"{ref.label} sees no images"
         )
         owner: str = parse_model_ref(model).provider
         problem: str = ""
-        if owner == OPENCODE_PROVIDER:
-            problem = "; but Zen's free models cannot do this work, so choose another"
+        if owner in WHOLE_RUN_AGENTS:
+            problem = f"; but {model} answers only as its own agent and cannot do this work, so choose another"
         elif owner == "ollama" and ollama_down:
             problem = "; but it runs on Ollama, which does not answer on this Mac, so choose another"
         lines.append(f"  {role:<9} {model} (kept: {why}{problem})\n")
