@@ -673,6 +673,12 @@ async def _prompt_of(agent: AgentRun, door: Door) -> str:
     )
 
 
+def ended_clean(over: LimitReached | None, finish: str) -> bool:
+    """Whether a run ended clean, its session worth keeping: not cut at the run's limits (``over``) and its last reply
+    not cut at the model's output limit (``finish``), either of which ends the run failed (:func:`_outcome`)."""
+    return over is None and finish not in _CUT_SHORT
+
+
 def _outcome(follow: _Follow, answer: str, goal: str) -> RunOutcome:
     """How the run ends: failed when its limit was reached and the model went on regardless, and when its last reply
     was cut short at the model's output limit (item 552); else done with the model's last answer."""
@@ -767,7 +773,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                 except ClaudeCodeError as error:
                     error.context["stderr"] = await _stderr_now(tail, process)
                     raise
-                clean = follow.over is None
+                clean = ended_clean(follow.over, follow.finish)
                 await _close_input(process.stdin)
                 if clean:
                     with contextlib.suppress(TimeoutError):
