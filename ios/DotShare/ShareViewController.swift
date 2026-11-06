@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ImageIO
 import UniformTypeIdentifiers
 import os
 
@@ -196,22 +197,25 @@ private func pictureData(_ provider: NSItemProvider) async throws -> Data {
     }
 }
 
-/// `data` as a JPEG at most `pictureSide` pixels on its longer side, drawn at a scale of 1 (a renderer's default is the
-/// screen's, which made a picture three times that size), off the main actor so that the sheet stays live; throws when
-/// it is no picture the phone can draw.
+/// `data` as a JPEG at most `pictureSide` pixels on its longer side, upright. ImageIO makes the small picture without
+/// opening the whole one (a 48 MP photo opened takes some 195 MB, past what a share extension may hold, which the
+/// system ends without a word), off the main actor so that the sheet stays live; throws when it is no picture the
+/// phone can read.
 private func jpeg(from data: Data) async throws -> Data {
     try await Task.detached(priority: .userInitiated) {
-        guard let image: UIImage = UIImage(data: data) else {
+        guard let source: CGImageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        let ratio: CGFloat = min(1, pictureSide / max(image.size.width, image.size.height))
-        let size: CGSize = CGSize(width: (image.size.width * ratio).rounded(), height: (image.size.height * ratio).rounded())
-        let format: UIGraphicsImageRendererFormat = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let drawn: UIImage = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
+        let options: [CFString: Any] = [
+            kCGImageSourceThumbnailMaxPixelSize: pictureSide,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let small: CGImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            throw CocoaError(.fileReadCorruptFile)
         }
-        guard let jpeg: Data = drawn.jpegData(compressionQuality: 0.85) else {
+        guard let jpeg: Data = UIImage(cgImage: small).jpegData(compressionQuality: 0.85) else {
             throw CocoaError(.fileWriteUnknown)
         }
         return jpeg
