@@ -1067,35 +1067,34 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
   files above (its key file, token, push key, APNs key, MCP sign-ins, browser profiles, configuration, database and
   journals) and the stores no program has any use for (`[policy] sealed_paths`: the data and caches of your browsers,
-  their cookies, Messages and Mail, the folder of the APNs key, item 531), nor change what Dot loads and runs, nor rename a folder above any of them,
-  nor make, change or remove anything in Dot's home or its logs folder but in the workspace, nor remove, move or
-  replace the workspace itself (item 676: the daemon opens and writes files there with your rights, its pid file at
-  each start among them, so a link a command left in their place would have it write where the command may not),
-  whatever program does it: a script the run wrote, code that builds the path, a symbolic link, another letter case.
-  macOS answers `Operation not permitted`. A hard link is not closed, because the profile names paths: a hard link to
-  one of those files that a process outside the sandbox made earlier (a `yolo` run, a run while
-  `[shell] sandbox = false`) is another path to the same file, and a command reads it. The daemon
-  says in its log, when it starts, which of the files above have another name on the Mac (`sealed_file_has_other_names`,
-  item 561). The search tools may not read your protected locations either; a command still may
-  (ssh and git read their keys there), and for those the guard reads its line. A search that meets a place it may not
-  read shows
-  what it found elsewhere and names the places it did not read, as a search of any run does with a folder whose reading
-  macOS broke off (it does now and then under `~/Library/Containers` when the home folder is searched). macOS starts no
-  program that runs as root inside the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo`
-  run runs them, `[shell] sandbox = false` turns the sandbox off. Nor does a process of a run have another program act
-  for it, outside the sandbox (item 418): it opens nothing through Launch Services (`open`, a program's own call),
-  starts neither the `launchctl`, `shortcuts` nor `lsregister` that macOS installs and reaches neither the Shortcuts
-  service nor the Launch Services database they would hand the work to, whatever program asks, creates no job of
-  launchd, and writes nothing into `~/Library/LaunchAgents`, where launchd finds the jobs it starts at a login. Nor can it
-  look up the clipboard's service (item 534: no `pbpaste`, no `the clipboard` of an AppleScript, no `NSPasteboard`, whatever
-  the line says; `pbcopy` fails too, `desktop_clipboard_write` puts text there from Dot's own process). These
-  rules are best-effort, as the guard's are. An application that is open is still driven (Mail, Calendar), with its own
-  powers; `desktop_open_app` opens one from Dot's own process, and asks first for one whose bundle is not on the sealed
-  system volume, however it names it: by the bundle's path, or by a name or a bundle id Launch Services resolves to
-  one, which a run that registered a bundle it made can give it too. Settings › Rules switches it while the daemon
-  runs (under Advanced, "Keep Dot's commands in a safe box", `PUT /api/shell/sandbox`): from the next command on, with
-  no restart, and the config file keeps it; a terminal session already open keeps how it started. Switching it on where
-  `sandbox-exec` does not start is refused, and nothing changes.
+  their cookies, Messages and Mail, the folder of the APNs key, item 531), nor change what Dot loads and runs, nor
+  rename a folder above any of them, nor make, change or remove anything in Dot's home or its logs folder but in the
+  workspace, nor remove, move or replace the workspace itself (item 676: the daemon opens and writes files there with
+  your rights, its pid file at each start among them, so a link a command left in their place would have it write where
+  the command may not), whatever program does it: a script the run wrote, code that builds the path, a symbolic link,
+  another letter case. macOS answers `Operation not permitted`. A hard link is not closed, because the profile names
+  paths: a hard link to one of those files that a process outside the sandbox made earlier (a `yolo` run, a run while
+  `[shell] sandbox = false`) is another path to the same file, and a command reads it. The daemon says in its log, when
+  it starts, which of the files above have another name on the Mac (`sealed_file_has_other_names`, item 561). The search
+  tools may not read your protected locations either; a command still may (ssh and git read their keys there), and for
+  those the guard reads its line. A search that meets a place it may not read shows what it found elsewhere and names
+  the places it did not read, as a search of any run does with a folder whose reading macOS broke off (it does now and
+  then under `~/Library/Containers` when the home folder is searched). macOS starts no program that runs as root inside
+  the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo` run runs them, `[shell] sandbox =
+  false` turns the sandbox off. Nor does a process of a run have another program act for it, outside the sandbox (item
+  418): it opens nothing through Launch Services (`open`, a program's own call), starts neither the `launchctl`,
+  `shortcuts` nor `lsregister` that macOS installs and reaches neither the Shortcuts service nor the Launch Services
+  database they would hand the work to, whatever program asks, creates no job of launchd, and writes nothing into
+  `~/Library/LaunchAgents`, where launchd finds the jobs it starts at a login. Nor can it look up the clipboard's
+  service (item 534: no `pbpaste`, no `the clipboard` of an AppleScript, no `NSPasteboard`, whatever the line says;
+  `pbcopy` fails too, `desktop_clipboard_write` puts text there from Dot's own process). These rules are best-effort, as
+  the guard's are. An application that is open is still driven (Mail, Calendar), with its own powers; `desktop_open_app`
+  opens one from Dot's own process, and asks first for one whose bundle is not on the sealed system volume, however it
+  names it: by the bundle's path, or by a name or a bundle id Launch Services resolves to one, which a run that
+  registered a bundle it made can give it too. Settings › Rules switches it while the daemon runs (under Advanced, "Keep
+  Dot's commands in a safe box", `PUT /api/shell/sandbox`): from the next command on, with no restart, and the config
+  file keeps it; a terminal session already open keeps how it started. Switching it on where `sandbox-exec` does not
+  start is refused, and nothing changes.
 - What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
   startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
   so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`

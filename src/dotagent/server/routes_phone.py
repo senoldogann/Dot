@@ -202,6 +202,9 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         if not follows_live(run):
             raise NotFoundError("that run has no Live Activity", {"run_id": registration.run_id})
         await ctx.runtime.store.set_live_activity(run.id, phone_id, registration.token, time.time())
+        if all(phone.id != phone_id for phone in phones.listed()):
+            await ctx.runtime.store.delete_apns_device(phone_id)
+            raise NotFoundError("that phone is not paired", {})
         # A run that ended before the token came has its activity ended now (notify/apns_watch.py).
         await ctx.runtime.bus.emit(SYSTEM_RUN_ID, LIVE_REGISTERED_EVENT, {"run_id": run.id}, False)
         return Response(status_code=204)
