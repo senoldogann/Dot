@@ -20,7 +20,8 @@ from dotagent.core.types import FrozenModel
 from dotagent.llm import reach
 from dotagent.llm.anthropic import FAST_MODE_MODELS, AnthropicProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
-from dotagent.llm.claude_code import ClaudeCodeProvider
+from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, ClaudeCodeProvider
+from dotagent.llm.claude_code import FAST_MODELS as CLAUDE_FAST_MODELS
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode import OpenCodeProvider
@@ -65,7 +66,10 @@ def parse_model_ref(text: str) -> ModelRef:
 
 
 def offers_fast_mode(ref: ModelRef) -> bool:
-    """Whether the model ``ref`` names has fast mode (item 223): some of Anthropic's, as its page names them."""
+    """Whether the model ``ref`` names has fast mode (item 223): some of Anthropic's, as its page names them, and Opus
+    on the owner's Claude plan (item 1014)."""
+    if ref.provider == CLAUDE_CODE_PROVIDER:
+        return ref.model in CLAUDE_FAST_MODELS
     return ref.provider == "anthropic" and ref.model in FAST_MODE_MODELS
 
 

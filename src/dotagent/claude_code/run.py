@@ -100,9 +100,19 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import claude_code_dir
 from dotagent.core.text import redact_known, truncate_middle
 from dotagent.core.types import JsonObject
-from dotagent.llm.claude_code import ClaudeCodeProvider
+from dotagent.llm.claude_code import EFFORTS, FAST_SETTINGS, ClaudeCodeProvider
 from dotagent.llm.router import ModelRef, parse_model_ref
-from dotagent.llm.types import ChatProvider, ImageData, Message, ModelInfo, StreamDelta, ToolCall, assistant_message
+from dotagent.llm.types import (
+    ChatProvider,
+    Effort,
+    ImageData,
+    Message,
+    ModelInfo,
+    Speed,
+    StreamDelta,
+    ToolCall,
+    assistant_message,
+)
 from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
 from dotagent.opencode.run import bridged, meanwhile
 from dotagent.repair.claude import LimitWindow, window_refused, worker_env
@@ -222,12 +232,23 @@ def write_mcp_config(folder: Path, config: JsonObject) -> Path:
 
 
 def claude_argv(
-    program: str, model: str, prompt: str, config_file: Path, door: str, resume: str | None
+    program: str,
+    model: str,
+    effort: Effort | None,
+    speed: Speed,
+    prompt: str,
+    config_file: Path,
+    door: str,
+    resume: str | None,
 ) -> tuple[str, ...]:
-    """The command of a run: ``model`` (Claude Code's alias), with ``prompt`` after Claude Code's own system prompt, the
-    door ``door`` of ``config_file`` as its only MCP server and its tools as the only ones, in the session ``resume``
-    names or a new one; its input and output are lines of JSON."""
+    """The command of a run: ``model`` (Claude Code's alias) at ``effort`` (``--effort``, one of
+    :data:`~dotagent.llm.claude_code.EFFORTS`; Claude Code's own for any other) and ``speed`` (fast mode through
+    ``--settings``, the one settings source a run reads, item 1014), with ``prompt`` after Claude Code's own system
+    prompt, the door ``door`` of ``config_file`` as its only MCP server and its tools as the only ones, in the session
+    ``resume`` names or a new one; its input and output are lines of JSON."""
     again: tuple[str, ...] = () if resume is None else ("--resume", resume)
+    level: tuple[str, ...] = ("--effort", effort) if effort in EFFORTS else ()
+    fast: tuple[str, ...] = ("--settings", FAST_SETTINGS) if speed == "fast" else ()
     return (
         program,
         "-p",
@@ -240,6 +261,8 @@ def claude_argv(
         "--verbose",
         "--model",
         model,
+        *level,
+        *fast,
         "--append-system-prompt",
         prompt,
         "--tools",
@@ -360,6 +383,8 @@ class _Follow:
     # waits for a turn of its own; one taken before a step is that step's to answer).
     taken: int = 0
     taken_since_step: bool = False
+    # Why fast mode was off though the run asked for it, said with its answer (item 1014); "" when it was not.
+    fast_off: str = ""
     answer: str = ""
     session_id: str = ""
     inited: bool = False
@@ -522,6 +547,9 @@ class _Follow:
                 "Claude Code answered before it said what the model has, so Dot ended the run",
                 {"run_id": self.agent.run.id},
             )
+        if self.agent.run.speed == "fast" and event.fast_off:
+            self.fast_off = event.fast_off
+            log.warning("claude_code_fast_mode_off", run_id=self.agent.run.id, why=event.fast_off)
         self.session_id = event.session_id or self.session_id
         if event.text.strip():
             self.answer = event.text.strip()
@@ -685,6 +713,19 @@ async def _prompt_of(agent: AgentRun, door: Door) -> str:
     )
 
 
+# What the owner is told of fast mode that ran off, by the program's reason (item 1014): measured on 2.1.318, a plan
+# without extra usage runs it off, as fast mode is billed to extra usage.
+_FAST_OFF_WORDS: dict[str, str] = {
+    "extra_usage_disabled": "your Claude plan has no extra usage turned on, which fast mode is billed to (claude.ai "
+    "settings, Usage)",
+}
+
+
+def fast_off_words(why: str) -> str:
+    """The line said with a run's answer when fast mode was asked for and the program ran it off, for ``why``."""
+    return f"Fast mode was off for this run: {_FAST_OFF_WORDS.get(why, why)}; it went at the standard speed."
+
+
 def answered_all(taken: int, sent: int, taken_since_step: bool) -> bool:
     """Whether a result answers every message sent: the program took each one in (``taken``, by
     ``--replay-user-messages``), and none was taken after the turn's last step began (``taken_since_step``). Measured
@@ -708,7 +749,10 @@ def _outcome(follow: _Follow, answer: str, goal: str) -> RunOutcome:
     if follow.finish in _CUT_SHORT:
         cut: str = f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with '{follow.finish}')."
         return RunOutcome(status="failed", result=cut, needs="")
-    return RunOutcome(status="done", result=answer or "Claude Code finished without a closing message.", needs="")
+    said: str = answer or "Claude Code finished without a closing message."
+    if follow.fast_off:
+        said = f"{said}\n\n{fast_off_words(follow.fast_off)}"
+    return RunOutcome(status="done", result=said, needs="")
 
 
 async def run_in_claude_code(agent: AgentRun) -> RunEnd:
@@ -746,7 +790,14 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
         async with provider.bridge.opened(door) as url, _private_folder() as folder:
             config_file: Path = await asyncio.to_thread(write_mcp_config, folder, mcp_config(door, url))
             argv: tuple[str, ...] = claude_argv(
-                str(program), ref.model, prompt, config_file, door.name, None if chat is None else chat.session_id
+                str(program),
+                ref.model,
+                run.effort,
+                run.speed,
+                prompt,
+                config_file,
+                door.name,
+                None if chat is None else chat.session_id,
             )
             try:
                 process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
