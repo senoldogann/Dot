@@ -48,6 +48,7 @@ async def _describe(
         speed="standard",
         session_key=session_key,
         cache_mark=None,
+        prompt_reuse="single",
         window=await router.window_of(ref),
     )
     reply: ModelReply = await router.complete(ref, request, _discard, origin)

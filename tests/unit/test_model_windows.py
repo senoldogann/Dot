@@ -95,6 +95,7 @@ def _request(model: str, window: int | None) -> ChatRequest:
         speed="standard",
         session_key="s",
         cache_mark=None,
+        prompt_reuse="single",
         window=window,
     )
 

@@ -109,6 +109,7 @@ def request_for(model: str, messages: tuple[Message, ...], tools: tuple[ToolSpec
         speed="standard",
         session_key="smoke-session",
         cache_mark=None,
+        prompt_reuse="single",
         window=None,
     )
 
@@ -662,7 +663,7 @@ def test_claude_body_thinks_adaptively_caches_the_prompt_and_turns_thinking_off_
             tool_message(call, "18 C", ()),
         )
         request: ChatRequest = request_for(model, messages, (TEMPERATURE_TOOL,)).model_copy(
-            update={"effort": effort, "temperature": temperature}
+            update={"effort": effort, "temperature": temperature, "prompt_reuse": "conversation"}
         )
         return build_messages_body(request, claude_traits(entry), f"anthropic:{model}", CLAUDE_MESSAGES)
 

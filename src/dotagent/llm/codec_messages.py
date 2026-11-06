@@ -48,8 +48,10 @@ class MessagesOptions(FrozenModel):
     reasoning level as ``output_config.effort``, or thinking turned off at the lowest level of a model that allows it;
     a replayed thinking block whose earlier context changed is dropped by the server instead of failing the request
     (``block_binding``, which needs the ``thinking-binding-controls-2026-08-01`` beta header). Without it a model with
-    a thinking switch gets only the switch (OpenCode Go). ``prompt_cache``: the server caches the prompt up to its last
-    block, so the next step of a run reads it back at a fraction of the price. ``settled_mark`` (Anthropic, item 237):
+    a thinking switch gets only the switch (OpenCode Go). ``prompt_cache``: the server caches the prompt of a
+    conversation (``ChatRequest.prompt_reuse``) up to its last block, so the next step of a run reads it back at a
+    fraction of the price; a question asked once gets no mark, as writing the cache costs more than reading the prompt
+    and nothing would read it back. ``settled_mark`` (Anthropic, item 237):
     the request's ``cache_mark`` also gets a cache mark, at the end of the part of the run the next step sends
     unchanged. Anthropic looks for a cached prefix at most 20 blocks before a mark, and a step that shortens an older
     tool result changes the prompt further back than that from its end: the mark keeps the run before it in the cache.
@@ -188,7 +190,7 @@ def build_messages_body(request: ChatRequest, traits: ModelTraits, origin: str, 
     thinking_off: bool = label is not None and label_rank(label) == 0
     replayed: list[Message] = [_without_thinking(message) for message in conversation] if thinking_off else conversation
     body: JsonObject = {"model": request.model, "max_tokens": _max_tokens(request, traits, options)}
-    if options.prompt_cache:
+    if options.prompt_cache and request.prompt_reuse == "conversation":
         body["cache_control"] = {"type": "ephemeral"}
     if instructions:
         body["system"] = instructions

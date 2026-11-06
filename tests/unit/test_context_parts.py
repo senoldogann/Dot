@@ -17,6 +17,7 @@ def _request(system: str, tools: tuple[str, ...]) -> ChatRequest:
         speed="standard",
         session_key="thr",
         cache_mark=None,
+        prompt_reuse="single",
         window=None,
     )
 

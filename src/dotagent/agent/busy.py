@@ -103,6 +103,7 @@ async def is_separate(
             speed="standard",
             session_key=session_key,
             cache_mark=None,
+            prompt_reuse="single",
             window=await router.window_of(ref),
         )
         async with asyncio.timeout(timeout_s):

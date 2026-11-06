@@ -74,6 +74,7 @@ def _request(history: list[Message]) -> ChatRequest:
         speed="standard",
         session_key="thread",
         cache_mark=None if settled is None else settled + 1,
+        prompt_reuse="conversation",
         window=None,
     )
 
@@ -146,3 +147,15 @@ def test_old_output_is_shortened_once_and_then_left_as_it_is() -> None:
     once: str = truncate_middle("A line of output.\n" * 300, 700)
     assert len(once) <= 700
     assert truncate_middle(once, 700) == once
+
+
+def test_a_question_asked_once_writes_no_cache_and_a_step_does() -> None:
+    # A review or a summary is asked once: a cache written for it is paid for and never read (item 1003).
+    history: list[Message] = [user_message("Is this step what the owner asked for?", ())]
+    step: ChatRequest = _request(history)
+    once: ChatRequest = step.model_copy(update={"prompt_reuse": "single", "cache_mark": None})
+    for options in (_CLAUDE, _GATEWAY):
+        asked: JsonObject = build_messages_body(once, _OPUS, _ORIGIN, options)
+        assert "cache_control" not in asked
+        assert _marks(_positions(asked)) == []
+        assert build_messages_body(step, _OPUS, _ORIGIN, options)["cache_control"] == {"type": "ephemeral"}

@@ -87,6 +87,7 @@ async def _ask(runtime: Runtime, ref: ModelRef, run: RunRecord, record: str, que
             speed="standard",
             session_key=f"{run.thread_id}:aside",
             cache_mark=None,
+            prompt_reuse="single",
             window=await runtime.router.window_of(ref),
         )
         try:

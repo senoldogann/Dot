@@ -99,6 +99,7 @@ def _request(speed: Literal["standard", "fast"]) -> ChatRequest:
         speed=speed,
         session_key="fast-mode",
         cache_mark=None,
+        prompt_reuse="single",
         window=None,
     )
 
