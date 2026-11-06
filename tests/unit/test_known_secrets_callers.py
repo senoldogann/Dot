@@ -40,6 +40,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "opencode/run.py:_Follow.seen": (True,),
     "opencode/run.py:_Follow.tool": (True,),
     "opencode/run.py:_Follow.step_ended": (True,),
+    "claude_code/run.py:_Follow.reply": (True,),
+    "claude_code/run.py:_Follow.step_ended": (True,),
     "server/diagnostics.py:read_tail": (True,),
     "terminal/session.py:_loggable": (True,),
     "server/routes_runs.py:runs_router.run_changes_view": (True,),

@@ -6,13 +6,12 @@ import asyncio
 from fastapi import APIRouter
 
 from dotagent.core.errors import RepairError, RunConflict
-from dotagent.repair.claude import DEFAULT_WORKER, ClaudeAccount, WorkerChoice, read_account
+from dotagent.repair.claude import DEFAULT_WORKER, ClaudeAccount, WorkerChoice, claude_state, read_account
 from dotagent.repair.night import (
     FAST_KEY,
     LIVE_KEY,
     SESSIONS_KEY,
     WORKER_KEY,
-    claude_state,
     read_fast,
     read_live,
     read_sessions,

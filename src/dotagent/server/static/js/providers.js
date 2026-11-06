@@ -10,16 +10,21 @@ const LABELS = {
   opencode_go: "OpenCode Go",
   openrouter: "OpenRouter",
   opencode: "OpenCode",
+  claude_code: "Claude Code",
   ollama: "Ollama",
   typesafe: "TypeSafe",
 };
 
 // The providers with a mark of their own under static/icons/providers (item 108), OpenCode's free models wearing OpenCode
-// Go's; the rest wear the generic one.
-const MARKED = new Set(["anthropic", "openai", "ollama", "opencode_go", "openrouter", "opencode"]);
+// Go's and the owner's Claude plan Anthropic's (item 1013); the rest wear the generic one.
+const MARKED = new Set(["anthropic", "openai", "ollama", "opencode_go", "openrouter", "opencode", "claude_code"]);
 
-// The file each marked provider wears, OpenCode's free models OpenCode Go's.
-const FILES = { opencode: "opencode_go" };
+// The file each marked provider wears, OpenCode's free models OpenCode Go's, Claude Code Anthropic's.
+const FILES = { opencode: "opencode_go", claude_code: "anthropic" };
+
+// The providers whose models answer only as an agent program of their own, to which a run goes whole (items 283 and
+// 1013, `WHOLE_RUN_AGENTS` in llm/types.py): the program keeps its own window, and none can be a fallback model.
+export const WHOLE_RUN = new Set(["opencode", "claude_code"]);
 
 /**
  * The mark of a provider: the provider's SVG (`static/icons/providers/`) drawn inline in the colour of the text around

@@ -102,6 +102,7 @@ from dotagent.agent.welcome import WELCOME_SOURCE
 from dotagent.browser.attach import read_debug_endpoint
 from dotagent.browser.remote_input import NO_INPUT, InputBatch, InputResult, InputTally, MouseButton, ScreenHold
 from dotagent.browser.session import BrowserSession
+from dotagent.claude_code.run import run_in_claude_code
 from dotagent.config import ResumeMode
 from dotagent.core.errors import (
     BrowserError,
@@ -122,9 +123,16 @@ from dotagent.core.text import redact_json, redact_known, redact_secrets, trunca
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import fail_unsettled_drafts
 from dotagent.evals import EVAL_SOURCE
-from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
-from dotagent.llm.types import ONE_MESSAGE_LEVELS, Effort, ModelInfo, OneMessage, Speed, user_message
+from dotagent.llm.types import (
+    ONE_MESSAGE_LEVELS,
+    WHOLE_RUN_AGENTS,
+    Effort,
+    ModelInfo,
+    OneMessage,
+    Speed,
+    user_message,
+)
 from dotagent.memory.service import REFLECTION_SOURCE, SavedMemory
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
@@ -297,6 +305,18 @@ class FollowedUp(FrozenModel):
 
     run: RunRecord | None
     queued: QueuedMessage | None
+
+
+def run_way(provider: str) -> Callable[[AgentRun], Awaitable[RunEnd]]:
+    """How a run on a model of ``provider`` works: whole in OpenCode's own agent for Zen's free models (item 283),
+    whole in Claude Code for the owner's Claude plan (item 1013), else in Dot's own loop."""
+    match provider:
+        case "opencode":
+            return run_in_opencode
+        case "claude_code":
+            return run_in_claude_code
+        case _:
+            return run_agent
 
 
 def thread_title(goal: str) -> str:
@@ -2924,9 +2944,10 @@ class RunManager:
         the owner's words alone, so it takes no picks."""
         if picks == NO_PICKS:
             return
-        if model.provider == OPENCODE_PROVIDER:
+        whole: str | None = WHOLE_RUN_AGENTS.get(model.provider)
+        if whole is not None:
             raise InvalidValueError(
-                f"the message cannot start with what was picked for it: {model.label} works as OpenCode's own agent, "
+                f"the message cannot start with what was picked for it: {model.label} works as {whole}, "
                 "which takes no plugins, skills or Plan first; send it without them, or on one of Dot's own models",
                 {
                     "model": model.label,
@@ -3388,9 +3409,7 @@ class RunManager:
                 runtime.peers.begin(run.id, run.thread_id, run.goal)
                 # A run nobody watches does not wait for an Allow of Chrome nobody clicked (item 699).
                 runtime.browsers.unattended(run.thread_id, await self._nobody_watches(run))
-                # A run on one of Zen's free models goes whole to OpenCode's own agent (item 283).
-                in_opencode: bool = parse_model_ref(run.model).provider == OPENCODE_PROVIDER
-                ended: RunEnd = await (run_in_opencode(agent) if in_opencode else run_agent(agent))
+                ended: RunEnd = await run_way(parse_model_ref(run.model).provider)(agent)
                 status, result, needs, lessons = (
                     ended.outcome.status,
                     ended.outcome.result,

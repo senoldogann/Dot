@@ -54,6 +54,7 @@ from dotagent.config_edit import (
 )
 from dotagent.connections.directory import ServiceMark, mark_of_service
 from dotagent.core.errors import (
+    ClaudeCodeMissing,
     ConfigError,
     DotError,
     ElsewhereError,
@@ -106,7 +107,7 @@ from dotagent.launchd import JobState, inspect_job, service_runs
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
-from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
+from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS, Effort, ModelInfo
 from dotagent.opencode.server import learns_from_data
 from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
@@ -214,7 +215,7 @@ def _problem(exc: DotError) -> ProviderProblem:
     that the provider refused access, which a key does not change."""
     if isinstance(exc, MissingSecretError):
         return "no_key"
-    if isinstance(exc, OpenCodeMissing):
+    if isinstance(exc, OpenCodeMissing | ClaudeCodeMissing):
         return "not_installed"
     if isinstance(exc, ProviderAuthError):
         return "key_refused"
@@ -449,10 +450,10 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         is one that cannot call tools for the fast or the review model, or one that cannot see for the vision model,
         and one of Zen's free models, which answer only as OpenCode's own agent (item 283); nothing changes then."""
         ref: ModelRef = parse_model_ref(request.model)
-        if ref.provider == OPENCODE_PROVIDER:
+        whole: str | None = WHOLE_RUN_AGENTS.get(ref.provider)
+        if whole is not None:
             raise ConfigError(
-                f"Zen's free models answer only as OpenCode's own agent, so none can be the {request.role} model;"
-                " pick another",
+                f"{ref.label} answers only as {whole}, so it cannot be the {request.role} model; pick another",
                 {"model": request.model},
             )
         info: ModelInfo = await ctx.runtime.router.model_info(ref)
@@ -477,10 +478,10 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         if len(set(labels)) != len(labels):
             raise ConfigError("a standby model is named twice", {"models": ", ".join(labels)})
         for ref in refs:
-            if ref.provider == OPENCODE_PROVIDER:
+            whole: str | None = WHOLE_RUN_AGENTS.get(ref.provider)
+            if whole is not None:
                 raise ConfigError(
-                    "Zen's free models answer only as OpenCode's own agent, so none can be a standby model;"
-                    " pick another",
+                    f"{ref.label} answers only as {whole}, so it cannot be a standby model; pick another",
                     {"model": ref.label},
                 )
             info: ModelInfo = await ctx.runtime.router.model_info(ref)

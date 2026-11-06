@@ -32,6 +32,7 @@ from dotagent.core.paths import (
     browser_profile_dir,
     browser_profiles_dir,
     chrome_data_dir,
+    claude_code_dir,
     config_path,
     connected_servers_path,
     db_path,
@@ -321,7 +322,11 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     and mark, which it opens and writes at its start (item 676), and the copies of the files a run uploaded, which the
     browser reads (item 681: one may be of a file the owner allowed from a place a command may not read), and the
     secrets the owner gave the chats on a card (item 857: a chat's commands read its own from their environment), and
-    the APNs key of ``[apns] key_path`` (item 997), wherever the owner keeps it."""
+    the APNs key of ``[apns] key_path`` (item 997), wherever the owner keeps it, and, for the runs on the owner's Claude
+    plan (item 1013), what Dot keeps of them (the chats' sessions, and the private folder of each run that holds its
+    door's secret) and the workspace's ``.claude`` folder and ``.mcp.json``, which Claude Code would read as the
+    settings and the MCP servers of a project started there (it is told to read none, ``--setting-sources ""`` and
+    ``--strict-mcp-config``: this is the second line)."""
     database: Path = db_path()
     apns_key: tuple[Path, ...] = () if config.apns.key_path == "" else (Path(config.apns.key_path).expanduser(),)
     return (
@@ -349,6 +354,9 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         uploads_dir(),
         held_dir(),
         *apns_key,
+        claude_code_dir(),
+        workspace_dir() / ".claude",
+        workspace_dir() / ".mcp.json",
     )
 
 

@@ -193,6 +193,16 @@ class OpenCodeConfig(FrozenModel):
     models_ttl_s: float = Field(gt=0, allow_inf_nan=False)
 
 
+class ClaudeCodeConfig(FrozenModel):
+    """Claude Code on the owner's own plan (item 1013): a run on ``claude_code:<model>`` goes whole to the ``claude``
+    program the owner installed and signed in to. ``command`` is that program: a path, or a name looked up on the login
+    shell's PATH and in the usual places. A program that writes no line for ``silence_s`` while none of Dot's tools is
+    at work for it is ended, and its run fails."""
+
+    command: str = Field(min_length=1)
+    silence_s: float = Field(gt=0, allow_inf_nan=False)
+
+
 class AnthropicConfig(FrozenModel):
     base_url: ServiceAddress
     api_key_env: str
@@ -244,6 +254,7 @@ class ProvidersConfig(FrozenModel):
     anthropic: AnthropicConfig
     openrouter: OpenRouterConfig
     opencode: OpenCodeConfig
+    claude_code: ClaudeCodeConfig
 
 
 class ModelsConfig(FrozenModel):

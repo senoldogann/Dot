@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from pydantic import JsonValue
 
 from dotagent.agent.attachments import ATTACHMENTS_EVENT, AttachedFile
+from dotagent.claude_code.run import forget_chat as forget_claude_chat
 from dotagent.core.errors import StoreError, UndoError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel, JsonArray
@@ -53,9 +54,10 @@ async def opening_files(store: Store, run_id: str) -> list[AttachedFile]:
 
 async def rewind_chat(runtime: Runtime, run_id: str, expected: Sequence[str]) -> RewindCut:
     """Rewind the chat of ``run_id`` to before the run's first message (``Store.rewind_chat``, which ``expected``, the
-    runs the caller planned for, guards), let the chat's OpenCode session go and tell the pages."""
+    runs the caller planned for, guards), let the chat's OpenCode and Claude Code sessions go and tell the pages."""
     cut: RewindCut = await runtime.store.rewind_chat(run_id, expected)
     await asyncio.to_thread(forget_chat, cut.thread_id)
+    await asyncio.to_thread(forget_claude_chat, cut.thread_id)
     rewound: JsonArray = [run.id for run in cut.rewound]
     await runtime.bus.emit(
         run_id, CHAT_REWOUND_EVENT, {"thread_id": cut.thread_id, "rewound": rewound, "back_to": cut.back_to}, False

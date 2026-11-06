@@ -22,7 +22,7 @@ from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.roles import ModelRole
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
-from dotagent.llm.types import ChatProvider, ModelInfo
+from dotagent.llm.types import WHOLE_RUN_AGENTS, ChatProvider, ModelInfo
 from dotagent.secrets import resolve_secret
 from dotagent.server.links import base_url
 
@@ -145,9 +145,10 @@ def _write_models(ref: ModelRef, info: ModelInfo) -> tuple[ModelRole, ...]:
     """Make ``ref`` the model new chats start on, and the model of Dot's own work: the fast and the review model, and
     the vision model when it sees images. Returns the roles written. One of Zen's free models answers only as OpenCode's
     own agent, so no single call of Dot's (a summary, a review, a read of an image) can use it: it is the main model
-    alone, and the other roles keep the models they have (item 558)."""
+    alone, and the other roles keep the models they have (item 558); so is a model of the owner's Claude plan, which
+    answers only as Claude Code (item 1013)."""
     set_default_model(config_path(), ref.label)
-    if ref.provider == OPENCODE_PROVIDER:
+    if ref.provider in WHOLE_RUN_AGENTS:
         return ()
     roles: tuple[ModelRole, ...] = ("fast", "review", "vision") if info.vision else ("fast", "review")
     for role in roles:

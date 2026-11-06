@@ -23,6 +23,7 @@ import { icon } from "../icons.js";
 import { IMPORTED_SKILL_MARK, LEARNED_SKILL_MARK, skillMark } from "../marks.js";
 import { emptyPanel, errorPanel, foldGroup, loadingPanel, segmented } from "../panels.js";
 import { proposalCard } from "../skillproposals.js";
+import { WHOLE_RUN, providerOf } from "../providers.js";
 import { showVersions } from "../skillversions.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -568,15 +569,14 @@ function learnedCard(skill, onChanged, restDays) {
 }
 
 // A chat's run that can give a skill at the owner's word, by what the page knows of it: it ended done, it is no
-// delegated run, no eval's, and not OpenCode's agent's, whose tools a skill of Dot's cannot name (agent/playbooks.py
-// `unsavable`, which also wants an acting step: the server says so of a chat without one).
+// delegated run, no eval's, and not OpenCode's agent's nor Claude Code's, whose tools a skill of Dot's cannot name
+// (agent/playbooks.py `unsavable`, which also wants an acting step: the server says so of a chat without one).
 const EVAL_SOURCE = "eval";
-const OPENCODE_MODEL = "opencode:";
 // The runs the dialog looks among, newest first: the most the API gives in one read.
 const CHAT_RUNS = 200;
 
 function savable(run) {
-  return run.status === "done" && run.parent_run_id === null && run.source !== EVAL_SOURCE && !run.model.startsWith(OPENCODE_MODEL);
+  return run.status === "done" && run.parent_run_id === null && run.source !== EVAL_SOURCE && !WHOLE_RUN.has(providerOf(run.model));
 }
 
 /**

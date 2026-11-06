@@ -67,8 +67,7 @@ from dotagent.harness.service import (
     prune_records,
     step_facts,
 )
-from dotagent.llm.opencode import OPENCODE_PROVIDER
-from dotagent.llm.types import split_model_ref
+from dotagent.llm.types import WHOLE_RUN_AGENTS, split_model_ref
 from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
@@ -122,10 +121,11 @@ def learns_from(run: RunRecord) -> bool:
     that Dot's own agent worked. A run on one of Zen's free models goes whole to OpenCode's own agent, which takes no
     habits, no tool guidance, no notes and no skills of Dot's (item 589), so what it did says nothing of them and its
     tools are not Dot's; the reflection still reads it, since its journal, what Dot knows about the owner and its
-    lessons are of the owner's day. A model reference no provider of Dot's answers to (a run of a time before a provider
+    lessons are of the owner's day. So it is of a run on the owner's Claude plan, which goes whole to Claude Code (item
+    1013). A model reference no provider of Dot's answers to (a run of a time before a provider
     was renamed) is no OpenCode run: it is read as it was."""
     ref: tuple[str, str] | None = split_model_ref(run.model)
-    return wants_reflection(run) and (ref is None or ref[0] != OPENCODE_PROVIDER)
+    return wants_reflection(run) and (ref is None or ref[0] not in WHOLE_RUN_AGENTS)
 
 
 async def _why_not_adopted(store: Store, version_id: str, held: Sequence[str]) -> str:

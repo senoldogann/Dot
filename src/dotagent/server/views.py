@@ -1537,8 +1537,9 @@ type ProviderProblem = Literal["no_key", "not_installed", "key_refused", "access
 class ProviderModels(FrozenModel):
     """The models of one provider, or why it listed none: ``error`` is the message and ``problem`` what kind of failure
     it is (``no_key``: no key is set for it, ``not_installed``: the program it runs on is not installed, OpenCode for
-    Zen's free models, ``key_refused``: it answered HTTP 401, ``access_refused``: it answered HTTP 403, ``failed``:
-    anything else); both are ``None`` when the provider answered."""
+    Zen's free models, or Claude Code for the owner's Claude plan, not installed or not signed in, ``key_refused``: it
+    answered HTTP 401, ``access_refused``: it answered HTTP 403, ``failed``: anything else); both are ``None`` when the
+    provider answered."""
 
     provider: str
     models: list[ModelOption]

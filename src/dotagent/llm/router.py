@@ -20,6 +20,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.llm import reach
 from dotagent.llm.anthropic import FAST_MODE_MODELS, AnthropicProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
+from dotagent.llm.claude_code import ClaudeCodeProvider
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode import OpenCodeProvider
@@ -222,6 +223,8 @@ class ModelRouter:
                 return OpenRouterProvider(many, many_key)
             case "opencode":
                 return OpenCodeProvider(OpenCodeServer(self._config.providers.opencode, self._login_env), ToolBridge())
+            case "claude_code":
+                return ClaudeCodeProvider(self._config.providers.claude_code, self._login_env, ToolBridge())
             case _:
                 raise ConfigError("unknown provider", {"provider": name})
 

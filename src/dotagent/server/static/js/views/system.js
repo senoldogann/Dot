@@ -47,7 +47,7 @@ import {
   switchRowSetting,
   switchSetting,
 } from "../panels.js";
-import { providerLabel, providerOf } from "../providers.js";
+import { WHOLE_RUN, providerLabel, providerOf } from "../providers.js";
 import { voiceLanguage } from "../readaloud.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
@@ -1064,13 +1064,15 @@ function contextControl(initial, remember) {
   return { cell, row };
 }
 
-// OpenCode's agent keeps its own window and summarizes it by itself (item 283): Dot's context size does not reach it.
-function ownWindow() {
-  return { cell: el("td", { class: "hint" }, "OpenCode's own"), row: null };
+// OpenCode's agent and Claude Code keep their own windows and summarize them by themselves (items 283 and 1013): Dot's
+// context size does not reach them.
+function ownWindow(provider) {
+  return { cell: el("td", { class: "hint" }, `${providerLabel(provider)}'s own`), row: null };
 }
 
 function modelRows(model, mainModel, remember) {
-  const context = providerOf(model.ref) === "opencode" ? ownWindow() : contextControl(model, remember);
+  const provider = providerOf(model.ref);
+  const context = WHOLE_RUN.has(provider) ? ownWindow(provider) : contextControl(model, remember);
   return [
     el(
       "tr",
@@ -1286,8 +1288,6 @@ function modelSetting({ label, hint, className, fits, none, choose }) {
   return { element, paint, hide };
 }
 
-// The provider of Zen's free models, which answer only as OpenCode's own agent: none can be a standby model.
-const OPENCODE_PROVIDER = "opencode";
 const STANDBY_HINT =
   "When a task's model cannot answer (its allowance is used up, it is too busy, its key or access was refused, or its safety filter stopped the reply), the task goes on with the first of these that can, each once at most.";
 
@@ -1377,7 +1377,8 @@ function standbySetting({ choose }) {
   function paint(providers, chosen) {
     shown = [...chosen];
     const groups = providers
-      .filter((provider) => provider.provider !== OPENCODE_PROVIDER)
+      // A model that answers only as an agent program of its own (WHOLE_RUN) cannot be a standby model.
+      .filter((provider) => !WHOLE_RUN.has(provider.provider))
       .map((provider) => ({ provider: provider.provider, models: provider.models.filter((model) => model.tools && !shown.includes(model.ref)) }))
       .filter((group) => group.models.length > 0);
     add.replaceChildren(

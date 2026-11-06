@@ -187,6 +187,12 @@ def account_of(state_text: str) -> ClaudeAccount | None:
     return ClaudeAccount(email=email, organization=organization if isinstance(organization, str) else "")
 
 
+def claude_state(env: Mapping[str, str]) -> Path:
+    """Where ``claude`` keeps its state: ``$CLAUDE_CONFIG_DIR/.claude.json``, or ``~/.claude.json``."""
+    folder: str | None = env.get("CLAUDE_CONFIG_DIR")
+    return Path(folder).expanduser() / ".claude.json" if folder else Path.home() / ".claude.json"
+
+
 def read_account(state_file: Path) -> ClaudeAccount | None:
     """The account signed in, from ``state_file``; ``None`` when there is no such file."""
     try:
@@ -281,7 +287,7 @@ def look_argv(binary: str, prompt: str, worker: WorkerChoice) -> tuple[str, ...]
     )
 
 
-def _limit_of(info: object) -> LimitWindow | None:
+def limit_of(info: object) -> LimitWindow | None:
     """The window a ``rate_limit_event``'s ``rate_limit_info`` tells, or ``None`` when it tells none."""
     if not isinstance(info, dict):
         return None
@@ -331,7 +337,7 @@ def outcome_of(lines: Iterable[str], exit_code: int | None, timed_out: bool, std
             why_off: object = item.get("fast_mode_disabled_reason")
             fast_off = why_off if isinstance(why_off, str) and why_off else None
         if kind == "rate_limit_event":
-            limit = _limit_of(item.get("rate_limit_info")) or limit
+            limit = limit_of(item.get("rate_limit_info")) or limit
         elif kind == "result":
             result = item
     if result is None:
@@ -376,9 +382,14 @@ def outcome_of(lines: Iterable[str], exit_code: int | None, timed_out: bool, std
     )
 
 
+def window_refused(window: LimitWindow) -> bool:
+    """Whether the plan's window ``window`` (a ``rate_limit_event``'s) refuses calls: its status is not *allowed*."""
+    return window.status not in ("", "allowed", "allowed_warning")
+
+
 def limited(outcome: ClaudeOutcome) -> bool:
     """Whether the plan's window refused the session (its last ``rate_limit_event`` was not *allowed*)."""
-    return outcome.limit is not None and outcome.limit.status not in ("", "allowed", "allowed_warning")
+    return outcome.limit is not None and window_refused(outcome.limit)
 
 
 class RepairStep(FrozenModel):

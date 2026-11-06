@@ -8,7 +8,7 @@
 import { compact, el, svg } from "./dom.js";
 import { icon } from "./icons.js";
 import { anchoredPopover } from "./popover.js";
-import { providerOf } from "./providers.js";
+import { WHOLE_RUN, providerOf } from "./providers.js";
 
 // Past this share of the budget the ring says the run is near its next summary.
 const NEAR_SHARE = 0.8;
@@ -87,8 +87,9 @@ export function createContextMeter({ frame }) {
             el("p", { class: "small muted" }, "In the settings file, ", el("code", { class: "mono" }, "[agent] context_tokens"), " sets one number for every model."),
           )
         : null,
-      // OpenCode's agent keeps its own window (item 283), and a window its provider does not say takes no size.
-      model === null || modelWindow === null || providerOf(model) === "opencode"
+      // OpenCode's agent and Claude Code keep their own windows (items 283 and 1013), and a window its provider does not
+      // say takes no size.
+      model === null || modelWindow === null || WHOLE_RUN.has(providerOf(model))
         ? null
         : el("a", { class: "context-meter-link", href: sizeSetting(model) }, icon("sliders"), "Change the chat size"),
     ];
