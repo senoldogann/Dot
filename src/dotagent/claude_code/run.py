@@ -711,84 +711,87 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     )
     await runtime.store.append_messages(run.thread_id, [goal])
     prompt: str = await _prompt_of(agent, door)
-    async with provider.bridge.opened(door) as url, _private_folder() as folder:
-        config_file: Path = await asyncio.to_thread(write_mcp_config, folder, mcp_config(door, url))
-        argv: tuple[str, ...] = claude_argv(
-            str(program), ref.model, prompt, config_file, door.name, None if chat is None else chat.session_id
-        )
-        try:
-            process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-                *argv,
-                cwd=str(runtime.workspace),
-                env=claude_env(runtime.shell_env, folder),
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                start_new_session=True,
-                limit=_LINE_LIMIT,
+    # The chat's session is kept only when this run ended clean and its count of what the session saw was written:
+    # a run that failed, was stopped by the owner or was cut at its limits after the program took its messages leaves
+    # that count behind, and resumed, the session would hear them again (a stopped goal read as a new ask). Whatever
+    # ended it, the next run then starts a new session, which hears the chat with its first message.
+    kept: bool = False
+    try:
+        async with provider.bridge.opened(door) as url, _private_folder() as folder:
+            config_file: Path = await asyncio.to_thread(write_mcp_config, folder, mcp_config(door, url))
+            argv: tuple[str, ...] = claude_argv(
+                str(program), ref.model, prompt, config_file, door.name, None if chat is None else chat.session_id
             )
-        except OSError as error:
-            raise ClaudeCodeError(
-                "Claude Code could not be started", {"program": str(program), "error": str(error)}
-            ) from error
-        assert process.stdin is not None and process.stdout is not None and process.stderr is not None
-        log.info("claude_code_run_started", run_id=run.id, pid=process.pid, model=ref.model, resume=chat is not None)
-        queue: asyncio.Queue[_Item] = asyncio.Queue()
-        follow: _Follow = _Follow(
-            agent=agent,
-            stdin=process.stdin,
-            door=door.name,
-            vision=info.vision,
-            queue=queue,
-            started=started,
-            limits=limits_of(runtime.config.agent, run.mode),
-        )
-        tail: asyncio.Task[str] = asyncio.create_task(_read_tail(process.stderr), name="claude-code-stderr")
-        pumps: tuple[asyncio.Task[None], ...] = (
-            asyncio.create_task(_pump_lines(process.stdout, queue, quiet), name="claude-code-lines"),
-            asyncio.create_task(_pump_inbox(agent.inbox, queue), name="claude-code-inbox"),
-            asyncio.create_task(_pump_stop(agent.cancel, queue), name="claude-code-stop"),
-            asyncio.create_task(_watch(quiet, provider.config.silence_s, queue), name="claude-code-watch"),
-        )
-        clean: bool = False
-        try:
-            opening: str = meanwhile(goal.content, earlier[0 if chat is None else chat.seen :])
-            await follow.send(opening, await asyncio.to_thread(_images, agent.opening.files, info.vision))
             try:
-                answer: str = await follow.follow()
-            except ClaudeCodeError as error:
-                if chat is not None:
-                    # Either the program could not go on with the chat's session (gone from its transcripts), or it
-                    # took this run's messages into it before the run failed: a count of what it saw would be wrong
-                    # either way. The next run starts a new session, which hears the chat with its first message.
-                    await asyncio.to_thread(forget_chat, run.thread_id)
-                error.context["stderr"] = await _stderr_now(tail, process)
-                raise
-            clean = follow.over is None
-            await _close_input(process.stdin)
-            if clean:
-                with contextlib.suppress(TimeoutError):
-                    async with asyncio.timeout(_EXIT_WAIT_S):
-                        await process.wait()
-        finally:
-            for task in pumps:
-                task.cancel()
-            await asyncio.gather(*pumps, return_exceptions=True)
-            await asyncio.shield(_end_program(process))
-            tail.cancel()
-            await asyncio.gather(tail, return_exceptions=True)
-            await let_go(runtime, run.id, ())
-    await runtime.store.append_messages(run.thread_id, [assistant_message(answer, None, ())])
-    if clean and follow.session_id:
-        await asyncio.to_thread(
-            write_chat,
-            chat_path(run.thread_id),
-            ChatSession(session_id=follow.session_id, seen=len(earlier) + 2 + follow.added),
-        )
-    elif chat is not None:
-        # A run cut at its limits took its goal into the session and left it there: the next run starts a new session
-        # rather than resume one whose count of what it saw is behind (the pre-push review).
-        await asyncio.to_thread(forget_chat, run.thread_id)
+                process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+                    *argv,
+                    cwd=str(runtime.workspace),
+                    env=claude_env(runtime.shell_env, folder),
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    start_new_session=True,
+                    limit=_LINE_LIMIT,
+                )
+            except OSError as error:
+                raise ClaudeCodeError(
+                    "Claude Code could not be started", {"program": str(program), "error": str(error)}
+                ) from error
+            assert process.stdin is not None and process.stdout is not None and process.stderr is not None
+            log.info(
+                "claude_code_run_started", run_id=run.id, pid=process.pid, model=ref.model, resume=chat is not None
+            )
+            queue: asyncio.Queue[_Item] = asyncio.Queue()
+            follow: _Follow = _Follow(
+                agent=agent,
+                stdin=process.stdin,
+                door=door.name,
+                vision=info.vision,
+                queue=queue,
+                started=started,
+                limits=limits_of(runtime.config.agent, run.mode),
+            )
+            tail: asyncio.Task[str] = asyncio.create_task(_read_tail(process.stderr), name="claude-code-stderr")
+            pumps: tuple[asyncio.Task[None], ...] = (
+                asyncio.create_task(_pump_lines(process.stdout, queue, quiet), name="claude-code-lines"),
+                asyncio.create_task(_pump_inbox(agent.inbox, queue), name="claude-code-inbox"),
+                asyncio.create_task(_pump_stop(agent.cancel, queue), name="claude-code-stop"),
+                asyncio.create_task(_watch(quiet, provider.config.silence_s, queue), name="claude-code-watch"),
+            )
+            clean: bool = False
+            try:
+                opening: str = meanwhile(goal.content, earlier[0 if chat is None else chat.seen :])
+                await follow.send(opening, await asyncio.to_thread(_images, agent.opening.files, info.vision))
+                try:
+                    answer: str = await follow.follow()
+                except ClaudeCodeError as error:
+                    error.context["stderr"] = await _stderr_now(tail, process)
+                    raise
+                clean = follow.over is None
+                await _close_input(process.stdin)
+                if clean:
+                    with contextlib.suppress(TimeoutError):
+                        async with asyncio.timeout(_EXIT_WAIT_S):
+                            await process.wait()
+            finally:
+                for task in pumps:
+                    task.cancel()
+                await asyncio.gather(*pumps, return_exceptions=True)
+                await asyncio.shield(_end_program(process))
+                tail.cancel()
+                await asyncio.gather(tail, return_exceptions=True)
+                await let_go(runtime, run.id, ())
+        await runtime.store.append_messages(run.thread_id, [assistant_message(answer, None, ())])
+        if clean and follow.session_id:
+            await asyncio.to_thread(
+                write_chat,
+                chat_path(run.thread_id),
+                ChatSession(session_id=follow.session_id, seen=len(earlier) + 2 + follow.added),
+            )
+            kept = True
+    finally:
+        if chat is not None and not kept:
+            await asyncio.to_thread(forget_chat, run.thread_id)
     log.info("claude_code_run_ended", run_id=run.id, session=follow.session_id, steps=follow.steps, clean=clean)
     return RunEnd(outcome=_outcome(follow, answer, run.goal), lessons=None)
 

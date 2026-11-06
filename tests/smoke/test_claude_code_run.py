@@ -158,3 +158,18 @@ async def test_a_used_up_plan_ends_the_run_failed_with_when_it_resets(room: Room
     ended: RunRecord = await _run(room, "Hit the limit.")
     assert ended.status == "failed"
     assert "usage limit is reached (five hour window)" in ended.result and "resets at 2030-" in ended.result
+
+
+async def test_a_chat_whose_run_did_not_end_clean_starts_a_new_session(room: Room) -> None:
+    """The pre-push review of item 1013: a run that took the chat's messages into its session and then failed (here the
+    plan's window, as an owner's stop or the run's limits would) forgets the session, so that the next run does not
+    resume one whose count of what it saw is behind and hear the failed goal again as a new ask."""
+    first: RunRecord = await _run(room, "Write a note in the workspace.")
+    assert first.status == "done", first.result
+    assert await asyncio.to_thread(chat_path(first.thread_id).exists)
+    started: RunRecord = await room.manager.start(
+        "Hit the limit.", "task", MODEL, first.thread_id, "test", None, None, "standard", None, "auto", False, ()
+    )
+    ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.status == "failed"
+    assert not await asyncio.to_thread(chat_path(first.thread_id).exists)
