@@ -380,10 +380,11 @@ def test_the_errors_of_the_daemons_log_are_read_since_the_last_look() -> None:
 
 def test_the_paths_that_need_the_owner_are_those_review_md_lists() -> None:
     paths = human_paths((_REPO / "REVIEW.md").read_text(encoding="utf-8"))
-    assert "src/dotagent/policy/" in paths and "src/dotagent/agent/review.py" in paths and ".github/workflows/" in paths
-    assert needs_the_owner(
-        ("src/dotagent/policy/shell.py", "src/dotagent/tools/web.py", ".github/workflows/gate.yml"), paths
-    ) == ("src/dotagent/policy/shell.py", ".github/workflows/gate.yml")
+    assert "src/dotagent/policy/" in paths and "src/dotagent/agent/review.py" in paths and "pyproject.toml" in paths
+    assert needs_the_owner(("src/dotagent/policy/shell.py", "src/dotagent/tools/web.py", "pyproject.toml"), paths) == (
+        "src/dotagent/policy/shell.py",
+        "pyproject.toml",
+    )
     assert human_paths("# no such list") == ()
 
 
