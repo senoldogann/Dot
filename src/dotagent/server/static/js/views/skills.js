@@ -580,17 +580,21 @@ function savable(run) {
 }
 
 /**
- * The owner's choice of a finished chat whose work becomes a skill, and its saving: `save(run)` writes it while the
- * dialog stays open, its rows off and the chosen one saying so; a refusal or a failure is said in the dialog, which
- * stays open for another choice. Resolves to what `save` gave, or null when the owner closed the dialog.
+ * The owner's choice of a finished chat whose work becomes a skill, and its saving: the dialog opens at once and lists
+ * the chats once `loading` gives them (item 1005: it opened only after the daemon answered, which a loaded machine took
+ * seconds for, so a tap seemed to do nothing); `save(run)` writes the chosen one while the dialog stays open, its rows
+ * off and the chosen one saying so; a refusal or a failure is said in the dialog, which stays open for another choice.
+ * Resolves to what `save` gave, or null when the owner closed the dialog.
  */
-function chatDialog(runs, save) {
+function chatDialog(loading, save) {
   return new Promise((resolve) => {
     let saved = null;
     const dialog = el("dialog", { class: "modal chat-skill-dialog", "aria-labelledby": "chat-skill-title" });
     const problem = el("p", { class: "hint chat-skill-problem", role: "alert", hidden: true });
     const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, "Cancel");
-    const rows = runs.map((run) => {
+    const list = el("div", { class: "chat-skill-list" }, el("p", { class: "hint" }, "Reading your chats…"));
+    let rows = [];
+    const rowsOf = (runs) => runs.map((run) => {
       const when = el("span", { class: "hint" }, ago(run.finished_at ?? run.created_at));
       const row = el("button", { class: "chat-skill-row", type: "button" }, el("span", { class: "chat-skill-goal" }, clip(run.goal, 120)), when);
       row.addEventListener("click", async () => {
@@ -615,13 +619,24 @@ function chatDialog(runs, save) {
       });
       return row;
     });
+    loading.then(
+      (runs) => {
+        rows = rowsOf(runs);
+        list.replaceChildren(...(rows.length === 0 ? [el("p", { class: "hint" }, "No chat has ended done yet.")] : rows));
+      },
+      (error) => {
+        list.replaceChildren();
+        problem.textContent = `Your chats could not be read: ${error.message}`;
+        problem.hidden = false;
+      },
+    );
     dialog.append(
       el(
         "div",
         { class: "modal-body" },
         el("h3", { id: "chat-skill-title" }, "Save a skill from a chat"),
         el("p", { class: "muted" }, "Dot's reviewer writes how the chat's work was done as a skill, offered to the tasks of its kind after it."),
-        rows.length === 0 ? el("p", { class: "hint" }, "No chat has ended done yet.") : el("div", { class: "chat-skill-list" }, rows),
+        list,
         problem,
       ),
       el("div", { class: "modal-actions" }, cancel),
@@ -889,8 +904,8 @@ export function mount(root) {
   }
 
   async function saveFromChat() {
-    const runs = await api.get(`/runs${query({ limit: CHAT_RUNS })}`);
-    const saved = await chatDialog(runs.filter(savable), (run) => api.post(`/runs/${encodeURIComponent(run.id)}/skill`, {}));
+    const loading = api.get(`/runs${query({ limit: CHAT_RUNS })}`).then((runs) => runs.filter(savable));
+    const saved = await chatDialog(loading, (run) => api.post(`/runs/${encodeURIComponent(run.id)}/skill`, {}));
     if (saved === null) {
       return;
     }
