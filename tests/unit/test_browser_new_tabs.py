@@ -76,12 +76,20 @@ def test_a_failed_download_leaves_no_empty_file_and_keeps_a_written_one(tmp_path
     assert written.exists()
 
 
+def _info(target: str, url: str, attached: bool, context: str) -> dict[str, object]:
+    return {"targetId": target, "type": "page", "url": url, "attached": attached, "browserContextId": context}
+
+
 class _Cdp:
     def __init__(self) -> None:
         self.sent: list[tuple[str, object]] = []
 
     async def send(self, method: str, params: object = None) -> dict[str, object]:
         self.sent.append((method, params))
+        if method == "Target.getTargets":
+            return {
+                "targetInfos": [_info("T-ours", "about:blank", False, "C-other"), _info("T-1", "https://a", True, "C")]
+            }
         return {"targetId": "T-ours"} if method == "Target.createTarget" else {}
 
     async def detach(self) -> None:
@@ -149,11 +157,30 @@ async def test_a_new_tab_that_cannot_be_made_blank_is_closed(ids: None) -> None:
     assert _closed(context) and context.listeners == []
 
 
-async def test_a_new_tab_chrome_does_not_hand_over_is_closed(ids: None) -> None:
+async def test_a_new_tab_chrome_does_not_hand_over_is_closed_and_what_chrome_made_of_it_is_told(ids: None) -> None:
     context: _Context = _Context(_Blank(), report=False)
-    with pytest.raises(BrowserError, match="opening a tab failed"):
+    with pytest.raises(BrowserError, match="opening a tab failed") as failed:
         await _tab_session()._background_tab(cast(Any, context))
     assert _closed(context) and context.listeners == []
+    assert failed.value.context["chrome"] == (
+        "Chrome lists the tab at 'about:blank', not attached, in a browser context no other tab is in"
+    )
+
+
+def test_what_chrome_lists_of_a_tab_it_did_not_hand_over() -> None:
+    """Item 1002: the tab's address, whether Playwright attached to it and whether it is in the other tabs' context."""
+    mark: dict[str, object] = _info("T-ours", _MARK, True, "C")
+    others: list[object] = [_info("T-1", "https://a", True, "C"), {"targetId": "W", "type": "service_worker"}]
+    assert pages.unhanded_tab("T-ours", {"targetInfos": [mark, *others]}) == (
+        f"Chrome lists the tab at '{_MARK}', attached, in the browser context of the other tabs"
+    )
+    assert pages.unhanded_tab("T-ours", {"targetInfos": [mark]}).endswith(
+        "in no other tab to compare its browser context with"
+    )
+    assert pages.unhanded_tab("T-ours", {"targetInfos": others}) == (
+        "Chrome lists no such tab any more; it lists 1 other tabs"
+    )
+    assert pages.unhanded_tab("T-ours", "nope") == "Chrome lists no such tab any more; it lists 0 other tabs"
 
 
 async def test_a_run_stopped_while_its_new_tab_comes_closes_the_tab(ids: None) -> None:

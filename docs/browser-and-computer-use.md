@@ -429,7 +429,9 @@ Both modes share what follows.
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
   the Mac), and it still paints the page under Dot's computer. Such a tab is told by the id Chrome gives it, also when
   Chrome reports it before its address commits. A new tab that Chrome does not hand over within `action_timeout_s`,
-  that cannot be set up or whose run stops meanwhile is closed, not left open with no chat to close it (item 800). A
+  that cannot be set up or whose run stops meanwhile is closed, not left open with no chat to close it (item 800). The
+  error of one not handed over says what Chrome lists of it (item 1002): gone, or its address, whether Playwright
+  attached to it and whether it is in the browser context of the other tabs. A
   quiet read's tab is closed the way it was made, through Chrome's own `Target.closeTarget`: Playwright's close never
   came back for a tab whose failed navigation Chrome was still committing its error page in (item 960).
   macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own
