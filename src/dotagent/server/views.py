@@ -50,6 +50,7 @@ from dotagent.store.models import (
     REFUSES_CHARS,
     AgentLook,
     AgentRecord,
+    ApnsEnvironment,
     ApprovalRecord,
     ApprovalStatus,
     Behavior,
@@ -90,6 +91,8 @@ MAX_PICKED_SKILLS: int = 4
 MAX_PICKED_ACCOUNTS: int = 4
 PickedName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=_NAME_CHARS)]
 _KEY_CHARS: int = 1000
+# An APNs token as the app sends it: the hex of the bytes iOS gives (32 for a device, longer for a Live Activity).
+APNS_TOKEN: str = r"^[0-9a-f]{64,512}$"
 # Base64 takes four characters for every three bytes.
 _UPLOAD_B64_CHARS: int = (MAX_ATTACHMENT_BYTES + 2) // 3 * 4
 # A piece of the sound the composer's microphone streams has a limit of its own (item 969): two seconds of 16 kHz mono
@@ -227,6 +230,22 @@ class SignInLink(FrozenModel):
     """The address of a provider's page that asks the owner for a yes (item 422)."""
 
     link: str
+
+
+class ApnsRegistration(FrozenModel):
+    """What the iPhone app got from APNs (item 997): its device token, the token that starts a Live Activity (none
+    before iOS gives one) and the environment both belong to (``sandbox`` for an install from Xcode)."""
+
+    device_token: str = Field(pattern=APNS_TOKEN)
+    start_token: str | None = Field(pattern=APNS_TOKEN)
+    environment: ApnsEnvironment
+
+
+class LiveActivityRegistration(FrozenModel):
+    """The token of a run's Live Activity the app started from a push (item 997)."""
+
+    run_id: str = Field(min_length=1, max_length=64)
+    token: str = Field(pattern=APNS_TOKEN)
 
 
 class PairedView(FrozenModel):

@@ -1,0 +1,133 @@
+import Foundation
+import os
+
+/// The body of `POST /api/phone/apns`: what Apple gave this phone. Both tokens are sent each time.
+struct APNsRegistration: Encodable, Sendable, Equatable {
+    let deviceToken: String
+    let startToken: String?
+    let environment: String
+
+    enum CodingKeys: String, CodingKey {
+        case deviceToken = "device_token"
+        case startToken = "start_token"
+        case environment
+    }
+
+    /// Writes `start_token` as `null` when there is none, rather than leaving the key out.
+    func encode(to encoder: any Encoder) throws {
+        var container: KeyedEncodingContainer<CodingKeys> = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(deviceToken, forKey: .deviceToken)
+        try container.encode(startToken, forKey: .startToken)
+        try container.encode(environment, forKey: .environment)
+    }
+}
+
+/// The body of `POST /api/phone/apns/activity`: the update token of one run's Live Activity.
+struct ActivityRegistration: Encodable, Sendable, Equatable {
+    let runId: String
+    let token: String
+
+    enum CodingKeys: String, CodingKey {
+        case runId = "run_id"
+        case token
+    }
+}
+
+/// A request to the daemon that did not succeed.
+enum DaemonRequestError: Error, CustomStringConvertible {
+    /// The daemon answered with a status other than 2xx.
+    case status(path: String, code: Int, body: String)
+    /// The request did not reach the daemon or got no HTTP answer.
+    case transport(path: String, underlying: URLError)
+
+    var description: String {
+        switch self {
+        case .status(let path, let code, let body):
+            "POST \(path) answered \(code): \(body.prefix(300))"
+        case .transport(let path, let underlying):
+            "POST \(path) failed: \(underlying.code.rawValue) \(underlying.localizedDescription)"
+        }
+    }
+
+    /// 4xx other than 408 and 429 will not change on a retry.
+    var isRetryable: Bool {
+        switch self {
+        case .status(_, let code, _):
+            code >= 500 || code == 408 || code == 429
+        case .transport:
+            true
+        }
+    }
+}
+
+/// The APNs environment this build's tokens belong to: `sandbox` for a Debug (Xcode) build, `production` otherwise.
+func apnsEnvironment() -> String {
+    #if DEBUG
+        "sandbox"
+    #else
+        "production"
+    #endif
+}
+
+/// Posts what the app registers with the daemon, authenticated with the phone's key.
+///
+/// Each call is retried with exponential backoff (1, 2, 4, 8 s) on a transport error or a retryable status, with a
+/// warning logged per failed attempt; the last error is thrown. Neither the key nor a full token is logged.
+struct DaemonClient: Sendable {
+    let session: URLSession
+    let maxAttempts: Int
+    private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "daemon")
+
+    func registerAPNs(_ registration: APNsRegistration, host: DaemonHost, key: String) async throws {
+        try await post(path: "/api/phone/apns", body: registration, host: host, key: key)
+    }
+
+    func registerActivity(_ registration: ActivityRegistration, host: DaemonHost, key: String) async throws {
+        try await post(path: "/api/phone/apns/activity", body: registration, host: host, key: key)
+    }
+
+    private func post(path: String, body: some Encodable & Sendable, host: DaemonHost, key: String) async throws {
+        var request: URLRequest = URLRequest(url: host.url(path: path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+        request.timeoutInterval = 20
+
+        var attempt: Int = 1
+        while true {
+            do {
+                try await send(request, path: path)
+                logger.info("posted \(path, privacy: .public) on attempt \(attempt)")
+                return
+            } catch {
+                logger.warning(
+                    "post failed: path=\(path, privacy: .public) attempt=\(attempt) of=\(maxAttempts) error=\(error.description, privacy: .public)"
+                )
+                guard error.isRetryable, attempt < maxAttempts else {
+                    throw error
+                }
+                try await Task.sleep(for: .seconds(1 << (attempt - 1)))
+                attempt += 1
+            }
+        }
+    }
+
+    private func send(_ request: URLRequest, path: String) async throws(DaemonRequestError) {
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let error as URLError {
+            throw .transport(path: path, underlying: error)
+        } catch {
+            throw .transport(path: path, underlying: URLError(.unknown, userInfo: [NSUnderlyingErrorKey: error]))
+        }
+        guard let http: HTTPURLResponse = response as? HTTPURLResponse else {
+            throw .transport(path: path, underlying: URLError(.badServerResponse))
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw .status(path: path, code: http.statusCode, body: String(decoding: data, as: UTF8.self))
+        }
+    }
+}

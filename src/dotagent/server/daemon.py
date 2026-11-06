@@ -28,6 +28,8 @@ from dotagent.core.paths import db_path, dot_home, phones_path, pid_path, runnin
 from dotagent.desktop.flight import FlightOverlay
 from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
+from dotagent.notify.apns import ApnsSender, HttpTransport, sender_of
+from dotagent.notify.apns_watch import APNS_KINDS, ApnsWatch, watch_apns
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
 from dotagent.proactive.watching import watch_loop
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -280,6 +282,17 @@ async def run_daemon(config: AppConfig) -> int:
             )
             pusher.add_done_callback(_log_push_end)
             cleanup.push_async_callback(_cancelled, pusher)
+            # The iPhone app hears the same through APNs, and a run's Live Activity too (item 997), once a key is set.
+            transport: HttpTransport = HttpTransport()
+            cleanup.push_async_callback(transport.aclose)
+            sender: ApnsSender | None = sender_of(config.apns, transport)
+            if sender is not None:
+                apns_feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(APNS_KINDS))
+                apns: asyncio.Task[None] = asyncio.create_task(
+                    watch_apns(ApnsWatch(runtime.store, sender), apns_feed, stopping), name="apns"
+                )
+                apns.add_done_callback(_log_push_end)
+                cleanup.push_async_callback(_cancelled, apns)
             # The skills' embeddings are made now, in the background, so that the first run finds them (item 404).
             warming: asyncio.Task[None] = asyncio.create_task(warm_help_vectors(runtime), name="help-vectors")
             warming.add_done_callback(_log_warm_end)

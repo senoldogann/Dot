@@ -27,7 +27,7 @@ dependencies = [
     "cryptography>=50.0.2",
     "dotagent-web-research==1.4.9",
     "fastapi>=0.143.0",
-    "httpx>=0.28.1",
+    "httpx[http2]>=0.28.1",
     "mcp>=2.3.0",
     "openpyxl>=3.1.5",
     "pillow>=12.3.0",

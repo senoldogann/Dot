@@ -13,15 +13,19 @@ from fastapi import APIRouter, Request, Response
 
 from dotagent.config import load_user_config
 from dotagent.config_edit import set_setting
-from dotagent.core.errors import ConfigError, NotFoundError, PairingRefused, PhoneSetupError
+from dotagent.core.errors import ConfigError, NotFoundError, PairingRefused, PhoneOnly, PhoneSetupError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path
+from dotagent.notify.apns_watch import follows_live
 from dotagent.qr import qr_png
 from dotagent.server.context import ServerContext
+from dotagent.server.guard import PHONE_STATE
 from dotagent.server.pairing import PairingCode, Redeemed, new_code, redeem, shown_code
 from dotagent.server.phones import MAX_PHONES, PairedPhones, is_phone_id
 from dotagent.server.views import (
+    ApnsRegistration,
     AwakeRequest,
+    LiveActivityRegistration,
     PairedView,
     PairingView,
     PairRequest,
@@ -29,9 +33,19 @@ from dotagent.server.views import (
     PhoneDeviceView,
     PhoneView,
 )
+from dotagent.store.models import RunRecord
 from dotagent.tailnet import DOWNLOAD_PAGE, TailnetState, open_tailscale, serve_daemon, tailnet_state
 
 log = get_logger(__name__)
+
+
+def asking_phone(http: Request) -> str:
+    """The phone whose own key made ``http`` (item 997); a request made with the installation's token is refused: an
+    APNs token belongs to a phone."""
+    phone: object = getattr(http.state, PHONE_STATE, None)
+    if not isinstance(phone, str):
+        raise PhoneOnly("only the Dot app on a paired phone registers for its pushes", {})
+    return phone
 
 
 def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
@@ -160,6 +174,29 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         """Remove a phone: its key is refused from now on, and its streams that are open end (item 670)."""
         if not is_phone_id(phone_id) or not await phones.remove(phone_id):
             raise NotFoundError("that phone is not paired", {})
+        await ctx.runtime.store.delete_apns_device(phone_id)
+        return Response(status_code=204)
+
+    @router.post("/phone/apns", status_code=204)
+    async def register_apns(registration: ApnsRegistration, http: Request) -> Response:
+        """Keep what the iPhone app of the phone that asks got from APNs (item 997): its alerts and the Live
+        Activities of the owner's runs go to it from now on. Only a phone's own key asks it."""
+        phone_id: str = asking_phone(http)
+        await ctx.runtime.store.set_apns_device(
+            phone_id, registration.device_token, registration.start_token, registration.environment, time.time()
+        )
+        log.info("apns_device_registered", phone=phone_id, environment=registration.environment)
+        return Response(status_code=204)
+
+    @router.post("/phone/apns/activity", status_code=204)
+    async def register_live_activity(registration: LiveActivityRegistration, http: Request) -> Response:
+        """Keep the token of a run's Live Activity on the phone that asks (item 997): its updates and its end go to
+        it. The run must be one that has a Live Activity."""
+        phone_id: str = asking_phone(http)
+        run: RunRecord = await ctx.runtime.store.get_run(registration.run_id)
+        if not follows_live(run):
+            raise NotFoundError("that run has no Live Activity", {"run_id": registration.run_id})
+        await ctx.runtime.store.set_live_activity(run.id, phone_id, registration.token, time.time())
         return Response(status_code=204)
 
     return router

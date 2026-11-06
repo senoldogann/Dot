@@ -24,6 +24,8 @@ const NOT_SHOWN_TOLD_EVERY_MS = 10000;
 // does, says nothing (item 286).
 export const QUIET_BREAK_MS = 2000;
 let token = null;
+// How a phone's own key starts (server/phones.py, item 670).
+const PHONE_KEY_PREFIX = "phone.";
 let authLostHandler = null;
 let proving = null;
 let notShownToldAt = 0;
@@ -64,6 +66,20 @@ export function setToken(value, keep = true) {
   } catch {
     // Same as above: the page keeps working with the in-memory token.
   }
+}
+
+/**
+ * Tell Dot's iPhone app the phone's own key once the daemon has proven it (item 997): the app keeps it in its Keychain
+ * and registers with it for the lock screen's pushes. Only the app's web view has the `dot` handler, and the app takes
+ * the message from the daemon's own page alone; the installation's token is never passed on.
+ */
+export function tellPhoneApp() {
+  const handler = /** @type {{webkit?: {messageHandlers?: {dot?: {postMessage(message: object): void}}}}} */ (window).webkit
+    ?.messageHandlers?.dot;
+  if (handler === undefined || token === null || !token.startsWith(PHONE_KEY_PREFIX)) {
+    return;
+  }
+  handler.postMessage({ type: "paired", key: token });
 }
 
 export function clearToken() {

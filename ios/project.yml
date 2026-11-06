@@ -1,0 +1,109 @@
+# XcodeGen spec of Dot's iPhone shell. `xcodegen generate` writes Dot.xcodeproj (gitignored) from this file.
+name: Dot
+options:
+  bundleIdPrefix: dev.dotagent
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: 79DZ4AA4DW
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # The daemon's tailnet host (e.g. mac.tailnet.ts.net), known at build time. Empty: the owner types it in the app
+    # and the app enforces the single origin itself. Set: it becomes the app's only WKAppBoundDomains entry and the
+    # web view is limited to it by WebKit too (see scripts/app_bound_domains.sh).
+    DOT_HOST: ""
+
+targets:
+  Dot:
+    type: application
+    platform: iOS
+    sources:
+      - path: Dot
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone
+        PRODUCT_NAME: Dot
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # The app-bound domain script edits the built Info.plist in place, which the script sandbox forbids.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    info:
+      path: Dot/Info.plist
+      properties:
+        CFBundleDisplayName: Dot
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIBackgroundModes:
+          - remote-notification
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
+        NSMicrophoneUsageDescription: Dot records your voice when you speak a message to it.
+        NSCameraUsageDescription: Dot uses the camera when you take a photo to send to it.
+        NSPhotoLibraryUsageDescription: Dot opens your photos when you choose one to send to it.
+        NSPhotoLibraryAddUsageDescription: Dot saves an image to your photos when you ask it to.
+    entitlements:
+      path: Dot/Dot.entitlements
+      properties:
+        aps-environment: development
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)dev.dotagent.phone
+        com.apple.security.application-groups:
+          - group.dev.dotagent.phone
+    dependencies:
+      - target: DotLiveActivity
+    # After the extension is embedded: processing the Info.plist waits for the embedded extension.
+    postBuildScripts:
+      - name: App-bound domain from DOT_HOST
+        script: '"${SRCROOT}/scripts/app_bound_domains.sh"'
+        inputFiles:
+          - $(SRCROOT)/scripts/app_bound_domains.sh
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
+        outputFiles:
+          - $(DERIVED_FILE_DIR)/app_bound_domains.stamp
+    scheme:
+      testTargets: []
+
+  DotLiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: DotLiveActivity
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.live
+        PRODUCT_NAME: DotLiveActivity
+        SKIP_INSTALL: YES
+    info:
+      path: DotLiveActivity/Info.plist
+      properties:
+        CFBundleDisplayName: Dot
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: DotLiveActivity/DotLiveActivity.entitlements
+      properties:
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)dev.dotagent.phone
+        com.apple.security.application-groups:
+          - group.dev.dotagent.phone
