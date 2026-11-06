@@ -180,6 +180,10 @@ struct DotWebView: UIViewRepresentable {
             switch readBridgeMessage(body: message.body, origin: origin, host: host) {
             case .success(.paired(let key)):
                 model.didPair(key: key)
+            case .success(.openSettings):
+                if let url: URL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
             case .failure(let rejection):
                 logger.warning("bridge message refused: reason=\(String(describing: rejection), privacy: .public)")
             }

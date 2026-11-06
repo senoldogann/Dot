@@ -71,6 +71,8 @@ code** takes its place. The same by hand:
 
 4. Dot's iPhone app (item 997, `ios/`, installed from Xcode for now) is the same web UI in a native shell, which adds
    what a page on iOS cannot have: the run at work on the lock screen and in the Dynamic Island (a Live Activity). The
+   app's notifications are its own, through APNs: in the app Settings › General › Notifications says so and opens the
+   iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in its web view). The
    app asks once for the tailnet address (`https://<mac>.<tailnet>.ts.net`; it loads nothing else) and is signed in with
    a code as a browser is. Once the daemon has proven the phone's own key, the page hands it to the app (one
    `dot.paired` message, taken from the daemon's own page alone), which keeps it in its Keychain and registers what
