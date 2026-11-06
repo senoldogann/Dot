@@ -30,11 +30,12 @@ final class ShareViewController: UIViewController {
     }
 }
 
-/// What was shared, read from the extension's items.
+/// What was shared, read from the extension's items, and how many items could not be read.
 struct Shared: Sendable {
     var urls: [URL] = []
     var texts: [String] = []
     var pictures: [Data] = []
+    var unread: Int = 0
 }
 
 /// The most pictures one share sends, and the longest side each is sent at.
@@ -51,6 +52,10 @@ final class ShareModel {
     var problem: String?
 
     @ObservationIgnored private let items: [NSExtensionItem]
+    /// The share's key: one chat however often Send is tapped or the request sent again.
+    @ObservationIgnored private let key: String = UUID().uuidString
+    /// The ids of the pictures kept, so that Send tapped again keeps none twice.
+    @ObservationIgnored private var kept: [String] = []
     @ObservationIgnored private let onDone: () -> Void
     @ObservationIgnored let onCancel: () -> Void
     @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "share")
@@ -61,29 +66,40 @@ final class ShareModel {
         self.onCancel = onCancel
     }
 
-    /// Reads the shared items: an address, a text and the pictures, each kind in the order shared.
+    /// Reads the shared items: an address, a text and the pictures, each kind in the order shared. An item that cannot
+    /// be read (a picture still in iCloud, a format the phone cannot draw) is logged and counted, and the sheet says so.
     func read() async {
         var found: Shared = Shared()
         for provider in items.flatMap({ $0.attachments ?? [] }) {
-            if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
-                if let url: URL = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL {
+            do {
+                if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+                    guard let url: URL = try await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL
+                    else {
+                        throw CocoaError(.fileReadCorruptFile)
+                    }
                     found.urls.append(url)
-                }
-            } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier),
-                found.pictures.count < maxPictures
-            {
-                if let jpeg: Data = await jpegOf(provider) {
-                    found.pictures.append(jpeg)
-                }
-            } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
-                if let text: String = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier)
-                    as? String
-                {
+                } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    if found.pictures.count < maxPictures {
+                        found.pictures.append(try await jpegOf(provider))
+                    }
+                } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                    guard
+                        let text: String = try await provider.loadItem(
+                            forTypeIdentifier: UTType.plainText.identifier) as? String
+                    else {
+                        throw CocoaError(.fileReadCorruptFile)
+                    }
                     found.texts.append(text)
                 }
+            } catch {
+                logger.error("a shared item could not be read: error=\(String(describing: error), privacy: .public)")
+                found.unread += 1
             }
         }
         shared = found
+        if found.unread > 0 {
+            problem = found.unread == 1 ? "1 item could not be read and is left out." : "\(found.unread) items could not be read and are left out."
+        }
         reading = false
     }
 
@@ -110,25 +126,42 @@ final class ShareModel {
         }
         let client: DaemonClient = DaemonClient(session: URLSession(configuration: .ephemeral), maxAttempts: 3)
         do {
-            var ids: [String] = []
-            for (index, picture) in shared.pictures.enumerated() {
+            for (index, picture) in shared.pictures.enumerated().dropFirst(kept.count) {
                 let upload: AttachmentUpload = AttachmentUpload(
                     name: "shared-\(index + 1).jpg", mediaType: "image/jpeg",
                     dataB64: picture.base64EncodedString())
-                ids.append(try await client.uploadAttachment(upload, host: host, key: key))
+                kept.append(try await client.uploadAttachment(upload, host: host, key: key))
             }
-            try await client.startChat(ChatStart(goal: goalOf(shared, note: note), attachments: ids), host: host, key: key)
-            logger.info("shared to Dot: pictures=\(ids.count) addresses=\(self.shared.urls.count)")
+            let start: ChatStart = ChatStart(goal: goalOf(shared, note: note), attachments: kept, key: self.key)
+            try await client.startChat(start, host: host, key: key)
+            logger.info("shared to Dot: pictures=\(self.kept.count) addresses=\(self.shared.urls.count)")
             onDone()
+        } catch let error as DaemonRequestError {
+            logger.error("sharing to Dot failed: error=\(error.description, privacy: .public)")
+            fail(sendingFailed(error))
         } catch {
             logger.error("sharing to Dot failed: error=\(String(describing: error), privacy: .public)")
-            fail("Dot did not take it. Check that Tailscale is on, then try again.")
+            fail("Dot's answer could not be read. Open Dot to see whether the chat started.")
         }
     }
 
     private func fail(_ message: String) {
         problem = message
         sending = false
+    }
+}
+
+/// What the sheet says of a send the daemon refused or did not get, by why.
+func sendingFailed(_ error: DaemonRequestError) -> String {
+    switch error {
+    case .transport:
+        "Your Mac did not answer. Check that Tailscale is on, then try again."
+    case .status(_, let code, _) where code == 401 || code == 403:
+        "This phone is no longer signed in to Dot. Open Dot and sign in with your Mac's code."
+    case .status(_, let code, _) where code == 413 || code == 422:
+        "Dot did not take it: it is too long. Share less of it, then try again."
+    case .status(_, let code, _):
+        "Dot refused it (\(code)). Try again, or open Dot."
     }
 }
 
@@ -143,10 +176,11 @@ func goalOf(_ shared: Shared, note: String) -> String {
     return lines.joined(separator: "\n\n")
 }
 
-/// The picture of `provider` as a JPEG at most `pictureSide` on its longer side, or `nil` when it is none.
+/// The picture of `provider` as a JPEG at most `pictureSide` on its longer side; throws when it is none the phone can
+/// draw.
 @MainActor
-private func jpegOf(_ provider: NSItemProvider) async -> Data? {
-    let item: NSSecureCoding? = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier)
+private func jpegOf(_ provider: NSItemProvider) async throws -> Data {
+    let item: NSSecureCoding? = try await provider.loadItem(forTypeIdentifier: UTType.image.identifier)
     let image: UIImage?
     switch item {
     case let url as URL:
@@ -159,12 +193,15 @@ private func jpegOf(_ provider: NSItemProvider) async -> Data? {
         image = nil
     }
     guard let image else {
-        return nil
+        throw CocoaError(.fileReadCorruptFile)
     }
     let scale: CGFloat = min(1, pictureSide / max(image.size.width, image.size.height))
     let size: CGSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
     let drawn: UIImage = UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
-    return drawn.jpegData(compressionQuality: 0.85)
+    guard let jpeg: Data = drawn.jpegData(compressionQuality: 0.85) else {
+        throw CocoaError(.fileWriteUnknown)
+    }
+    return jpeg
 }
 
 struct ShareView: View {
