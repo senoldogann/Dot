@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from dotagent.cli_commands import (
     Command,
@@ -64,6 +64,7 @@ from dotagent.launchd import (
     uninstall_watchdog_job,
     watchdog_agent_path,
 )
+from dotagent.mcp.types import LEFT_OUT_PATH, LeftOutTool
 from dotagent.server.daemon import run_daemon
 from dotagent.server.guard import PROOF_PATH, daemon_proof, read_token
 from dotagent.server.links import base_url, health_url, ui_url
@@ -78,6 +79,7 @@ _POLL_S: float = 0.5
 # A start can include the servers of [[mcp]], the first of which may have to fetch its package.
 _START_WAIT_S: float = 60.0
 _BODY_CHARS: int = 300
+_LEFT_OUT: TypeAdapter[list[LeftOutTool]] = TypeAdapter(list[LeftOutTool])
 _NONCE_BYTES: int = 32
 
 _NO_DAEMON_FIX: str = "start it with 'dotx daemon' (in the foreground) or 'dotx service install' (at every login)"
@@ -205,6 +207,32 @@ async def reachable_ui_url(config: AppConfig) -> str:
     async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_S, trust_env=False) as client:
         await prove_daemon(client, host, port, token)
     return ui_url(host, port, token)
+
+
+async def daemon_left_out(config: AppConfig) -> list[LeftOutTool] | None:
+    """The tools the running daemon left out of its connected servers (item 1001), once it has proven that it holds the
+    token (:func:`prove_daemon`); ``None`` when no daemon answers, as ``dotx doctor`` starts no server itself."""
+    host: str = config.server.host
+    port: int = config.server.port
+    if await probe_daemon(health_url(host, port)) is None:
+        return None
+    token: str = await asyncio.to_thread(_token_of, token_path())
+    url: str = f"{base_url(host, port)}{LEFT_OUT_PATH}"
+    async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_S, trust_env=False) as client:
+        await prove_daemon(client, host, port, token)
+        try:
+            response: httpx.Response = await client.get(url, headers={"Authorization": f"Bearer {token}"})
+        except httpx.HTTPError as exc:
+            raise ServiceError(
+                "asking the daemon for the tools it left out failed", {"url": url, "error": repr(exc)}
+            ) from exc
+    try:
+        return _LEFT_OUT.validate_json(response.content)
+    except ValidationError as exc:
+        raise ServiceError(
+            "the daemon's answer about the tools it left out cannot be read",
+            {"url": url, "status": response.status_code, "body": _clip(response.text, _BODY_CHARS)},
+        ) from exc
 
 
 async def open_in_browser(address: str) -> None:

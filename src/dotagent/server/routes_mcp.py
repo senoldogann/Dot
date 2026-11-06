@@ -35,7 +35,7 @@ from dotagent.mcp.hub import McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.masking import masked_context, shown_command, shown_url
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
-from dotagent.mcp.types import McpFailure
+from dotagent.mcp.types import LEFT_OUT_PATH, LeftOutTool, McpFailure
 from dotagent.oauth.accounts import CameBack, denial_reason
 from dotagent.plugins.catalog import read_again
 from dotagent.plugins.removal import is_dots_own, move_to_trash, trash_folder
@@ -460,6 +460,12 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
     async def list_servers() -> McpServersView:
         """Every MCP server Dot has, where it is set up and where it stands, and the catalogue's services."""
         return await listing()
+
+    @router.get(LEFT_OUT_PATH)
+    async def left_out() -> list[LeftOutTool]:
+        """The tools of the connected servers that Dot did not hand to its runs, and why (the ``mcp_tool_left_out`` log
+        line): ``dotx doctor`` prints them, as it starts no server of its own (item 1001)."""
+        return list(hub.omitted)
 
     @router.post("/api/mcp/servers")
     async def add_server(body: McpServerAdd, request: Request) -> McpServerView:

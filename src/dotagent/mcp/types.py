@@ -34,6 +34,10 @@ class McpPurpose(FrozenModel):
     claimed: bool
 
 
+# Where the running daemon answers the tools it left out (``dotx doctor`` asks it there, item 1001).
+LEFT_OUT_PATH: str = "/api/mcp/left-out"
+
+
 class LeftOutTool(FrozenModel):
     """One tool ``usable_tools`` did not hand to the model: its name on the server and why. The server's other tools
     still serve. This is the ``mcp_tool_left_out`` log line, kept so doctor and the connector page can say it."""
