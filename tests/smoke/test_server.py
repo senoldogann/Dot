@@ -361,6 +361,7 @@ async def test_a_malformed_request_is_answered_with_what_is_wrong(client: httpx.
         "anthropic",
         "openrouter",
         "opencode",
+        "claude_code",
     ]
     unknown_thread: httpx.Response = await client.post("/api/runs", json={"goal": "x", "thread_id": "thr_nope"})
     assert unknown_thread.status_code == 404
@@ -678,6 +679,7 @@ async def test_the_status_the_models_and_the_checks_describe_this_installation(c
         "anthropic",
         "openrouter",
         "opencode",
+        "claude_code",
     ]
     checks: httpx.Response = await client.get("/api/doctor")
     assert checks.status_code == 200

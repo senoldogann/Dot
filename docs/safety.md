@@ -22,6 +22,17 @@ run needs, sent where the configuration points:
   OpenRouter passes each call on to the lab whose model it is. OpenCode Zen's free models (`opencode:`) get the whole
   conversation of a run that runs on one, through OpenCode's own agent, and the providers of some of them may use what
   they get to improve their models (see [Models and providers](models.md#models-and-providers)).
+- **To Anthropic, through your Claude plan: the whole conversation of a run on `claude_code:` (item 1013).** Such a run
+  goes to the `claude` program you installed and signed in to ([Models and providers](models.md#models-and-providers)),
+  which sends Anthropic the goal, what the chat said before on other models, your messages while it works, Dot's
+  instructions for the run (your name, an agent's instructions), the descriptions of Dot's tools it is given and what
+  each call returned, pictures included. The program's own traffic besides (its updater, telemetry and error reports) is
+  switched off (`DISABLE_AUTOUPDATER`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`). Claude Code keeps each session's
+  transcript under `~/.claude/projects/` (it needs it to resume the chat's session at its next message): what the tools
+  returned is written there in plain text, outside Dot's store, Dot's undo and Dot's rewind, until you delete it or
+  Claude Code's own clean-up does (`cleanupPeriodDays` in your Claude Code settings, 30 days by default). Dot never reads
+  Claude Code's credentials or its Keychain item: it reads only which account is signed in (`~/.claude.json`'s
+  `oauthAccount`, an address and an organisation).
 - **To Anthropic and GitHub: the repair night's work, once `[repair] repo` is set ([Self-repair](repair.md), items
   919-921).** Each session of Claude Code, on your own plan, sends Anthropic the problem it is handed (its words and
   lines of evidence from Dot's record, tool errors that may quote a page or a mail, errors of Dot's log, masked of the
@@ -1008,7 +1019,10 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   this one too), nor Dot's own key file, token, APNs key (`[apns] key_path`, whatever that list says), what signing in
   to an MCP server gave it,
   browser profiles, configuration, database, the copies of the database (`[store] backup_dir`, and
-  `<home>/backups-partial` while one is made, item 526) and journals of file changes. The configuration holds the policy
+  `<home>/backups-partial` while one is made, item 526) and journals of file changes, nor what Dot keeps of the runs on
+  your Claude plan (`<home>/claude_code`: the chats' sessions and each run's MCP config with its door's secret) nor the
+  workspace's `.claude` folder and `.mcp.json`, which Claude Code would read as a project's settings and servers (item
+  1013; a run there is told to read none, so this is the second line). The configuration holds the policy
   and the MCP servers, the database the rules, a copy all of the database and what you go back to, the journals what
   `dotx undo` writes back. For the locations of `[policy] protected_paths` this holds as far as the policy sees: the
   file tools refuse them, and the shell guard refuses a command line whose words reach one. What a script or a program

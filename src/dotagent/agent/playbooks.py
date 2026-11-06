@@ -95,8 +95,8 @@ from dotagent.core.paths import playbooks_dir
 from dotagent.core.text import redact_known, redact_secrets, truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
-from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import WHOLE_RUN_AGENTS
 from dotagent.memory.ranking import Similar, Vector, most_similar
 from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.secrets import known_secrets
@@ -375,7 +375,7 @@ def playbook_case(config: AppConfig, run: RunRecord, status: RunStatus) -> RunRe
     whose tools a playbook of Dot's cannot name, and it ended done or failed."""
     if not config.agent.playbooks or run.mode != "task" or run.parent_run_id is not None or run.source == EVAL_SOURCE:
         return None
-    if parse_model_ref(run.model).provider == OPENCODE_PROVIDER:
+    if parse_model_ref(run.model).provider in WHOLE_RUN_AGENTS:
         return None
     return run if status in ("done", "failed") else None
 
@@ -1565,8 +1565,9 @@ def unsavable(run: RunRecord, steps: int) -> str | None:
         return "an eval's run gives no skill"
     if run.mode == "chat":
         return "a chat-mode run only talks, and gives no skill"
-    if parse_model_ref(run.model).provider == OPENCODE_PROVIDER:
-        return "OpenCode's agent used tools that a skill of Dot's cannot name"
+    whole: str | None = WHOLE_RUN_AGENTS.get(parse_model_ref(run.model).provider)
+    if whole is not None:
+        return f"{whole} worked this run, with tools that a skill of Dot's cannot name"
     if run.status != "done":
         return f"it ended {run.status}, and only a run that ended done gives a skill"
     if steps == 0:

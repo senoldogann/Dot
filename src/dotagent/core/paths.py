@@ -177,6 +177,18 @@ def opencode_command(configured: str) -> str:
     return override if override is not None and override != "" else configured
 
 
+def claude_code_command(configured: str) -> str:
+    """The ``claude`` program a run on the owner's Claude plan starts (item 1013): ``[providers.claude_code] command``,
+    unless ``DOT_CLAUDE`` names another, so that tests point at a stand-in and never start the owner's."""
+    override: str | None = os.environ.get("DOT_CLAUDE")
+    return override if override is not None and override != "" else configured
+
+
+def claude_code_dir() -> Path:
+    """What Dot keeps of the runs on the owner's Claude plan (item 1013): the Claude Code session of each chat."""
+    return dot_home() / "claude_code"
+
+
 def opencode_dir() -> Path:
     """The home of the OpenCode server Dot starts (item 283): its config, its data (the sessions of the runs on Zen's
     free models), its state and cache, the chats' sessions and the list of free models; none of the owner's own."""

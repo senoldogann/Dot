@@ -42,6 +42,7 @@ def test_dotx_models_ends_with_1_when_no_provider_answers(tmp_path: Path) -> Non
         timeout=_TIME_LIMIT_S,
         check=False,
     )
-    assert listed.stdout.count(": unavailable - ") == len(PROVIDERS) + 1, listed.stdout + listed.stderr
+    assert listed.stdout.count(": unavailable - ") == len(PROVIDERS) + 2, listed.stdout + listed.stderr
     assert "opencode: unavailable - OpenCode is not installed" in listed.stdout
+    assert "claude_code: unavailable - Claude Code is not installed" in listed.stdout
     assert listed.returncode == 1, listed.stdout + listed.stderr

@@ -10,9 +10,8 @@ from dotagent.config_edit import set_look_model
 from dotagent.core.errors import ConfigError
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel
-from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, parse_model_ref
-from dotagent.llm.types import ModelInfo
+from dotagent.llm.types import WHOLE_RUN_AGENTS, ModelInfo
 from dotagent.oauth.providers import ProviderId
 from dotagent.oauth.tokens import Account
 from dotagent.proactive.brief import BriefRequest, BriefView, brief_view, set_brief
@@ -116,9 +115,10 @@ def proactive_router(ctx: ServerContext) -> APIRouter:
         if request.model != "":
             ref: ModelRef = parse_model_ref(request.model)
             chosen = ref.label
-            if ref.provider == OPENCODE_PROVIDER:
+            whole: str | None = WHOLE_RUN_AGENTS.get(ref.provider)
+            if whole is not None:
                 raise ConfigError(
-                    "Zen's free models answer only as OpenCode's own agent, so none can look for work; pick another",
+                    f"{ref.label} answers only as {whole}, so it cannot look for work; pick another",
                     {"model": request.model},
                 )
             info: ModelInfo = await ctx.runtime.router.model_info(ref)

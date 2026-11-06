@@ -114,12 +114,17 @@ def session_rules(name: str) -> list[JsonValue]:
     ]
 
 
+def authorization(door: Door) -> str:
+    """The ``Authorization`` header a request through ``door`` carries: its secret, as a bearer token."""
+    return f"{_BEARER}{door.secret}"
+
+
 def server_config(url: str, door: Door) -> JsonObject:
     """The remote MCP server OpenCode adds for ``door``: the bridge's address, the door's secret, no OAuth."""
     return {
         "type": "remote",
         "url": url,
-        "headers": {"Authorization": f"{_BEARER}{door.secret}"},
+        "headers": {"Authorization": authorization(door)},
         "oauth": False,
         "timeout": CALL_TIMEOUT_MS,
     }

@@ -38,8 +38,16 @@ from dotagent.agent.attachments import (
 )
 from dotagent.agent.authorization import Authorization, StepDecision
 from dotagent.agent.continuity import new_ledger
-from dotagent.agent.executor import ToolOutcome, execute_calls
-from dotagent.agent.gate import RunGate, masked_action
+from dotagent.agent.gate import masked_action
+from dotagent.agent.handover import (
+    ChatSession,
+    agent_tools,
+    bridged_call,
+    let_go,
+    read_chat,
+    tool_context,
+    write_chat,
+)
 from dotagent.agent.limits import (
     LIMIT_EVENT,
     LimitReached,
@@ -50,11 +58,8 @@ from dotagent.agent.limits import (
     limit_spent,
     limits_of,
 )
-from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOutcome, browser_of
-from dotagent.agent.progress import can_ask_user, question_mode
-from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
+from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome
 from dotagent.agent.streammask import StreamMask
-from dotagent.agent.verify import RunFacts, new_facts
 from dotagent.browser.safety import UrlVerdict, browser_host, check_url, host_matches, url_flags
 from dotagent.core.errors import (
     ApprovalRejected,
@@ -69,10 +74,10 @@ from dotagent.core.jsonutil import parse_json_object
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import opencode_dir
 from dotagent.core.text import redact_json, redact_known, truncate_middle
-from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.core.types import JsonObject
 from dotagent.llm.opencode import OpenCodeProvider
 from dotagent.llm.router import ModelRef, parse_model_ref
-from dotagent.llm.types import ChatProvider, Message, ModelInfo, StreamDelta, ToolCall, assistant_message
+from dotagent.llm.types import ChatProvider, Message, ModelInfo, StreamDelta, assistant_message
 from dotagent.llm.wire import get_obj, get_str
 from dotagent.mcp.naming import PREFIX as MCP_PREFIX
 from dotagent.opencode.bridge import Door, ToolBridge, new_door, server_config, session_rules
@@ -97,10 +102,8 @@ from dotagent.policy.types import ActionInfo, Flag, Risk
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.endings import PREFIX_CUT_SHORT
-from dotagent.store.models import AgentRecord, RunMode
-from dotagent.tools.base import ToolResult
+from dotagent.store.models import RunMode
 from dotagent.tools.channels import Channel
-from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_action, write_action
 from dotagent.tools.groups import BROWSER_GROUP, group_of
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
@@ -118,8 +121,6 @@ _PREVIEW_CHARS: int = 200
 _MEANWHILE_MESSAGES: int = 20
 _MEANWHILE_CHARS: int = 2000
 _TITLE_CHARS: int = 80
-# How long a run that ends lets the permissions it still decides finish (:func:`_let_go`).
-_ASK_GRACE_S: float = 10.0
 # How a step of the agent ended, in OpenCode's words (the ``reason`` of its ``step-finish``): the agent goes on after a
 # step that ended with a call of a tool, and stops after any other. A reply that stopped at the model's output limit
 # sets no error in OpenCode, which goes idle with the half of an answer; Dot's own loop counts it as cut short (item
@@ -164,28 +165,8 @@ FREE_TIER_REFUSED: str = (
 )
 
 
-class ChatSession(FrozenModel):
-    """The OpenCode session of a chat, and how many of the chat's messages it has seen."""
-
-    session_id: str
-    seen: int
-
-
 def _chat_path(thread_id: str) -> Path:
     return opencode_dir() / "chats" / f"{thread_id}.json"
-
-
-def _read_chat(thread_id: str) -> ChatSession | None:
-    path: Path = _chat_path(thread_id)
-    return ChatSession.model_validate_json(path.read_bytes()) if path.exists() else None
-
-
-def _write_chat(thread_id: str, chat: ChatSession) -> None:
-    path: Path = _chat_path(thread_id)
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    staged: Path = path.with_suffix(".tmp")
-    staged.write_text(chat.model_dump_json() + "\n", encoding="utf-8")
-    staged.replace(path)
 
 
 def forget_chat(thread_id: str) -> None:
@@ -820,84 +801,12 @@ async def _stop_agent(server: OpenCodeServer, session_id: str, directory: Path) 
         log.warning("opencode_abort_failed", session=session_id, error=error.message, context=error.context)
 
 
-async def _let_go(runtime: Runtime, run_id: str, asks: tuple[asyncio.Task[None], ...]) -> None:
-    """End the permissions a run that ends still decides. The questions it waits for are let go, and each task stores
-    its question as decided before it ends, so no page keeps offering one; a task cancelled in the middle of that would
-    leave its question open. One still under way after ``_ASK_GRACE_S`` is cancelled, and one that failed is logged:
-    the run's own ending is what it reports."""
-    runtime.approvals.release_run(run_id)
-    if not asks:
-        return
-    _, late = await asyncio.wait(asks, timeout=_ASK_GRACE_S)
-    for task in late:
-        task.cancel()
-    for ended in await asyncio.gather(*asks, return_exceptions=True):
-        if isinstance(ended, Exception):
-            log.warning("opencode_permission_failed", run_id=run_id, error=str(ended), error_type=type(ended).__name__)
-
-
 async def _session(server: OpenCodeServer, thread_id: str, directory: Path, title: str) -> ChatSession:
     """The OpenCode session of the chat: the one kept for it while OpenCode still has it, else a new one."""
-    kept: ChatSession | None = await asyncio.to_thread(_read_chat, thread_id)
+    kept: ChatSession | None = await asyncio.to_thread(read_chat, _chat_path(thread_id))
     if kept is not None and await server.has_session(kept.session_id, directory):
         return kept
     return ChatSession(session_id=await server.create_session(directory, title), seen=0)
-
-
-def _ignore(outcome: ToolOutcome) -> None:
-    """A call of the agent to one of Dot's tools ends alone: only its caller waits for its outcome."""
-
-
-async def _bridged_call(registry: ToolRegistry, context: ToolContext, gate: RunGate, call: ToolCall) -> ToolResult:
-    """A call of the agent to one of Dot's tools, run as Dot's loop runs a call of its own model's: checked, decided by
-    the run's gate (the owner's rules, the preset and the approvals), held to the tool's time limit and shown in the
-    run's timeline under the tool's own name."""
-    outcomes: list[ToolOutcome] = await execute_calls((call,), registry, {}, context, gate, 1, _ignore)
-    return outcomes[0].result
-
-
-async def _tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> ToolContext:
-    """What Dot's tools get while they run for the agent: what a run of Dot's own loop gives them, without
-    delegation."""
-    runtime: Runtime = agent.runtime
-    run = agent.run
-    scaffold: Scaffold = scaffold_for(
-        runtime.config.agent,
-        info,
-        await runtime.store.model_profile(ref.label, PROFILE_RUNS),
-        runtime.context_sizes.of(ref.label),
-    )
-    facts: RunFacts = new_facts()
-    return ToolContext(
-        runtime=runtime,
-        browser=await browser_of(runtime, run),
-        run_id=run.id,
-        agent_id=run.agent_id,
-        thread_id=run.thread_id,
-        mode=run.mode,
-        approvals=run.approvals,
-        questions=question_mode(
-            runtime.config.agent.questions,
-            can_ask_user(run.source, run.parent_run_id, run.approvals),
-            agent.spawner.answers_reach_runs,
-        ),
-        workspace=runtime.workspace,
-        gate=agent.gate,
-        cancel=agent.cancel,
-        output_chars=scaffold.tool_output_chars,
-        facts=lambda: facts,
-        spawner=None,
-        tainted=lambda: agent.gate.tainted,
-        ever_tainted=lambda: agent.gate.ever_tainted,
-    )
-
-
-async def _agent_tools(runtime: Runtime, agent_id: str | None) -> frozenset[str] | None:
-    """The tools the agent ``agent_id`` is bounded to, with the core ones (item 86); ``None`` when it is not bounded."""
-    record: AgentRecord | None = None if agent_id is None else await runtime.store.get_agent(agent_id)
-    if record is None or not record.tools:
-        return None
-    return frozenset(record.tools) | frozenset(AGENT_CORE_TOOLS)
 
 
 async def _drop_door(server: OpenCodeServer, directory: Path, name: str) -> None:
@@ -962,7 +871,7 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
     variant: str | None = run.effort if run.effort is not None and run.effort in info.efforts else None
     directory: Path = runtime.workspace
     earlier: list[Message] = await runtime.store.load_messages(run.thread_id, 0)
-    tools: ToolRegistry = bridged_tools(runtime.registry, run.mode, await _agent_tools(runtime, run.agent_id))
+    tools: ToolRegistry = bridged_tools(runtime.registry, run.mode, await agent_tools(runtime, run.agent_id))
     # Settings › Browser may keep every run off the browser (item 354), OpenCode's agent too.
     if not runtime.browser.config.enabled:
         tools = ToolRegistry(
@@ -971,7 +880,7 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
     door: Door = new_door(
         run.thread_id,
         tuple(tool.spec for tool in tools.tools.values()),
-        partial(_bridged_call, tools, await _tool_context(agent, ref, info), agent.gate),
+        partial(bridged_call, tools, await tool_context(agent, ref, info), agent.gate),
     )
     async with server.hold():
         chat: ChatSession = await _session(
@@ -1017,10 +926,12 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
                 await asyncio.gather(*pumps, return_exceptions=True)
                 if not ended:
                     await asyncio.shield(_stop_agent(server, chat.session_id, directory))
-                await _let_go(runtime, run.id, tuple(follow.asks))
+                await let_go(runtime, run.id, tuple(follow.asks))
         await runtime.store.append_messages(run.thread_id, [assistant_message(answer, None, ())])
         await asyncio.to_thread(
-            _write_chat, run.thread_id, ChatSession(session_id=chat.session_id, seen=len(earlier) + 2 + follow.added)
+            write_chat,
+            _chat_path(run.thread_id),
+            ChatSession(session_id=chat.session_id, seen=len(earlier) + 2 + follow.added),
         )
     log.info("opencode_run_ended", run_id=run.id, session=chat.session_id, steps=follow.steps)
     return RunEnd(outcome=_outcome(follow, answer, run.goal), lessons=None)

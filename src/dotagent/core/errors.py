@@ -240,6 +240,15 @@ class OpenCodeMissing(OpenCodeError):
     """The ``opencode`` program that runs Zen's free models (item 283) is not installed."""
 
 
+class ClaudeCodeError(DotError):
+    """A run on the owner's Claude plan (item 1013) could not start Claude Code, or its session failed, said more than
+    the run allows, went silent or met the plan's limit."""
+
+
+class ClaudeCodeMissing(ClaudeCodeError):
+    """The ``claude`` program a run on the owner's Claude plan needs (item 1013) is not installed, or not signed in."""
+
+
 class PreviewError(DotError):
     """macOS's Quick Look could not draw a file for the panel beside a chat (item 268)."""
 

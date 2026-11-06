@@ -1,0 +1,798 @@
+"""A run on the owner's Claude plan (item 1013). The run goes whole to Claude Code, the ``claude`` program the owner
+installed and signed in to, started without a terminal (``claude -p``) in Dot's workspace, in the Claude Code session
+of its chat, which the program keeps from run to run (``--resume``); what was said in the chat on other models since
+the session last saw it comes with the run's first message, as a run on OpenCode's agent has it
+(:mod:`dotagent.opencode.run`).
+
+The model sees Dot's tools alone: the program runs with no built-in tool (``--tools ""``), no settings file of the
+owner's, the project's or the workspace's (``--setting-sources ""``: no hook, no CLAUDE.md), no MCP server but the
+chat's door of Dot's bridge (``--strict-mcp-config``, :mod:`dotagent.opencode.bridge`), no slash command, and a
+permission mode that refuses whatever the door does not name (``dontAsk`` with ``--allowedTools mcp__<door>``). Its
+first line (``system``/``init``) says what the model has; a run whose model has anything else ends failed at once
+(:func:`dotagent.claude_code.stream.init_problem`). Each call of a tool of Dot's runs as a call of Dot's own loop
+(:func:`dotagent.agent.handover.bridged_call`: the run's gate, the tool's time limit, the run's timeline under the
+tool's own name). The door's secret is in a 0600 file of a private folder of the run, removed as it ends, never in the
+program's arguments, which ``ps`` shows every process of the owner.
+
+The program's environment is Self-repair's worker's (:func:`dotagent.repair.claude.worker_env`: no API key, so the plan
+is billed, no secret-named variable) without Dot's or git's own variables, with its updater, telemetry and error
+reports off. Dot never reads Claude Code's credentials.
+
+Dot shows what the model does as its own runs show theirs: its text and thinking as they come, each step with its
+tools, its tokens and the plan's window. The owner's messages go to the program on its input while it works, and a stop
+of the run ends it. The run ends done with the model's answer once each message sent has its result, and failed when
+the session fails, when the plan's window is used up (with when it resets: nothing moves the run to another model),
+when the program says nothing for ``[providers.claude_code] silence_s`` while none of Dot's tools works for it, when its
+last reply was cut short, and when it goes on past the run's limits (``run_max_minutes``, ``run_max_tokens``), which it
+is told of once. A run here has none of the rest of what Dot's own runs bring (the memory recalled at the start, the
+checks of a finish, the lessons and playbooks)."""
+
+import asyncio
+import base64
+import contextlib
+import os
+import shutil
+import signal
+import tempfile
+import time
+from collections.abc import AsyncIterator, Mapping, Sequence
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from datetime import datetime
+from functools import partial
+from pathlib import Path
+
+from dotagent.agent.attachments import (
+    ATTACHMENTS_EVENT,
+    StoredAttachment,
+    UserInput,
+    attachment_summary,
+    message_with_attachments,
+    steer_event,
+)
+from dotagent.agent.continuity import new_ledger
+from dotagent.agent.handover import (
+    ChatSession,
+    agent_tools,
+    bridged_call,
+    let_go,
+    read_chat,
+    tool_context,
+    write_chat,
+)
+from dotagent.agent.limits import (
+    LIMIT_EVENT,
+    LimitReached,
+    RunLimits,
+    limit_event_data,
+    limit_reached,
+    limit_result,
+    limit_spent,
+    limits_of,
+)
+from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome
+from dotagent.agent.streammask import StreamMask
+from dotagent.assistant import AssistantView, called_lines, owner_name_lines
+from dotagent.claude_code.stream import (
+    BlockBegan,
+    BlockKind,
+    ClaudeEvent,
+    Delta,
+    Init,
+    LimitSeen,
+    Result,
+    StepBegan,
+    StepClosed,
+    StepFinished,
+    init_problem,
+    limit_message,
+    limit_resets,
+    limit_said,
+    read_line,
+    tool_prefix,
+    user_line,
+)
+from dotagent.core.errors import ClaudeCodeError, RunCancelled
+from dotagent.core.jsonutil import dumps_compact
+from dotagent.core.logs import get_logger
+from dotagent.core.paths import claude_code_dir
+from dotagent.core.text import redact_known, truncate_middle
+from dotagent.core.types import JsonObject
+from dotagent.llm.claude_code import ClaudeCodeProvider
+from dotagent.llm.router import ModelRef, parse_model_ref
+from dotagent.llm.types import ChatProvider, ImageData, Message, ModelInfo, StreamDelta, ToolCall, assistant_message
+from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
+from dotagent.opencode.run import bridged, meanwhile
+from dotagent.repair.claude import LimitWindow, window_refused, worker_env
+from dotagent.runtime import Runtime
+from dotagent.secrets import known_secrets
+from dotagent.store.endings import PREFIX_CUT_SHORT
+from dotagent.store.models import AgentRecord, RunMode
+from dotagent.tools.base import ToolResult
+from dotagent.tools.groups import BROWSER_GROUP, group_of
+from dotagent.tools.registry import ToolRegistry, tools_for_mode
+from dotagent.tools.shell import kill_group
+
+log = get_logger(__name__)
+
+# Dot's core tools the model gets besides those an OpenCode agent gets (:func:`dotagent.opencode.run.bridged`): Claude
+# Code's own tools are off, so the files, the commands and the web are Dot's tools here. Those of Dot's own loop (the
+# plan, finish, the tool groups, helpers, teammates and a campaign's) stay out: the program runs its own loop.
+_OWN_CORE: frozenset[str] = frozenset(
+    {
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_dir",
+        "search_files",
+        "find_files",
+        "shell",
+        "web_fetch",
+        "web_search",
+        "web_extract",
+        "web_crawl",
+    }
+)
+# The variables of the program's environment that start so are taken out: Dot's own (the program needs none of them)
+# and git's (Self-repair's worker sets some to keep its sessions from GitHub; here the model has no command of its own).
+_CLEARED_PREFIXES: tuple[str, ...] = ("DOT_", "GIT_")
+# No updater, no telemetry and no error report: the program's only network is Anthropic's API.
+_PROGRAM_ENV: dict[str, str] = {"DISABLE_AUTOUPDATER": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
+# A line of the stream may be long (a step that read a big page): the reader takes lines up to this size.
+_LINE_LIMIT: int = 32 * 1024 * 1024
+_STDERR_KEPT: int = 4000
+# How long the program has to end after its input closed, and after a SIGTERM, before its group is killed.
+_EXIT_WAIT_S: float = 10.0
+_TERM_GRACE_S: float = 5.0
+# How often the watchdog looks at how long the program has been silent.
+_WATCH_EVERY_S: float = 1.0
+_THINKING_CHARS: int = 12_000
+# How a reply that the run counts as cut short stopped (Dot's own loop counts one so, item 552).
+_CUT_SHORT: frozenset[str] = frozenset({"max_tokens"})
+# The steps that end after the model was told that the run's limit is reached before one that goes on ends the run.
+_LIMIT_GRACE_STEPS: int = 2
+_LIMIT_NOTE: str = (
+    "[system note] The limit of this run is reached: it has used {spent}. Stop now, in this reply: write your final "
+    "answer with what was reached (the numbers), what is missing and how to go on. Call no more tools: the run ends "
+    "after this reply."
+)
+_PRIVATE: int = 0o700
+_SECRET_FILE: int = 0o600
+# What the model is told, before what Dot knows of the owner: who it is, its tools, how a run of Dot's ends.
+_PROMPT: str = (
+    "You are {name}, the owner's autonomous assistant on their Mac, at work on a task they gave you in one of Dot's "
+    "chats. You act through Dot's tools alone, the tools of the MCP server {door}: {tools}. Claude Code's own tools, "
+    "slash commands and skills are not available here; do not offer them. Each call goes through Dot's rules and, "
+    "where they say so, the owner's approval; a refused call says why, and you go on another way. Work on the task "
+    "until it is done, acting without asking what you can find out or decide yourself; ask_user is for what only the "
+    "owner can answer. When the work is done, or cannot be done, write your final answer as your reply: it is what the "
+    "owner reads in the chat, so say what you did and what you found, with the evidence. Files you make go in Dot's "
+    "workspace, {workspace}, unless the owner names another place. Today is {today}."
+)
+
+
+def chat_path(thread_id: str) -> Path:
+    """Where the Claude Code session of the chat ``thread_id`` is kept."""
+    return claude_code_dir() / "chats" / f"{thread_id}.json"
+
+
+def forget_chat(thread_id: str) -> None:
+    """Let the chat's Claude Code session go: a rewind took out of the chat what the session saw, so the chat's next
+    run on Claude Code starts a new session, which hears the chat's history with its first message. Blocking."""
+    chat_path(thread_id).unlink(missing_ok=True)
+
+
+def door_tool(name: str) -> bool:
+    """Whether Dot's tool ``name`` is one the model gets: an OpenCode agent's (:func:`dotagent.opencode.run.bridged`)
+    or one of :data:`_OWN_CORE`."""
+    return bridged(name) or name in _OWN_CORE
+
+
+def door_tools(
+    registry: ToolRegistry, mode: RunMode, bounded: frozenset[str] | None, left_out: frozenset[str]
+) -> ToolRegistry:
+    """The tools of Dot's a run in ``mode`` gives the model: the :func:`door_tool` ones of the mode, of those only the
+    ones ``bounded`` names when the run is an agent's whose tools are bounded (item 86), and none of the groups
+    ``left_out`` (the browser's, when Settings › Browser keeps every run off it, item 354)."""
+    return ToolRegistry(
+        tools={
+            tool.spec.name: tool
+            for tool in tools_for_mode(registry, mode)
+            if door_tool(tool.spec.name)
+            and (bounded is None or tool.spec.name in bounded)
+            and group_of(tool.spec.name) not in left_out
+        }
+    )
+
+
+def mcp_config(door: Door, url: str) -> JsonObject:
+    """The MCP configuration the program is given: the door alone, over HTTP, its secret in its header."""
+    return {"mcpServers": {door.name: {"type": "http", "url": url, "headers": {"Authorization": authorization(door)}}}}
+
+
+def write_mcp_config(folder: Path, config: JsonObject) -> Path:
+    """Write ``config`` to a new file only the owner reads (0600) in ``folder``. Blocking."""
+    path: Path = folder / "mcp.json"
+    descriptor: int = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, _SECRET_FILE)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as written:
+        written.write(dumps_compact(config))
+    return path
+
+
+def claude_argv(
+    program: str, model: str, prompt: str, config_file: Path, door: str, resume: str | None
+) -> tuple[str, ...]:
+    """The command of a run: ``model`` (Claude Code's alias), with ``prompt`` after Claude Code's own system prompt, the
+    door ``door`` of ``config_file`` as its only MCP server and its tools as the only ones, in the session ``resume``
+    names or a new one; its input and output are lines of JSON."""
+    again: tuple[str, ...] = () if resume is None else ("--resume", resume)
+    return (
+        program,
+        "-p",
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+        "--include-partial-messages",
+        "--verbose",
+        "--model",
+        model,
+        "--append-system-prompt",
+        prompt,
+        "--tools",
+        "",
+        "--setting-sources",
+        "",
+        "--strict-mcp-config",
+        "--mcp-config",
+        str(config_file),
+        "--disable-slash-commands",
+        "--permission-mode",
+        "dontAsk",
+        "--permission-prompts",
+        "none",
+        *again,
+        "--allowedTools",
+        f"mcp__{door}",
+    )
+
+
+def claude_env(env: Mapping[str, str], scratch: Path) -> dict[str, str]:
+    """The program's environment: Self-repair's worker's of ``env`` (no API key, no secret-named variable; its folders
+    in ``scratch``), without any variable of Dot's or git's own, with the updater, telemetry and error reports off. The
+    owner's ``HOME`` stays: the program's sign-in is there."""
+    kept: dict[str, str] = {
+        name: value for name, value in worker_env(env, scratch).items() if not name.startswith(_CLEARED_PREFIXES)
+    }
+    kept.update(_PROGRAM_ENV)
+    return kept
+
+
+def system_prompt(name: str, door: str, tools: Sequence[str], workspace: Path, today: str, known: Sequence[str]) -> str:
+    """What the model is told besides Claude Code's own prompt: who it is (``name``), the door's ``tools``, how a run of
+    Dot's works and ends, and the lines ``known`` of the owner."""
+    lead: str = _PROMPT.format(name=name, door=door, tools=", ".join(tools), workspace=workspace, today=today)
+    if not known:
+        return lead
+    lines: str = "\n".join(f"- {line}" for line in known)
+    return f"{lead}\n\nWhat you know about the owner:\n{lines}"
+
+
+@dataclass
+class _Quiet:
+    """When the program last wrote a line or a call of Dot's tool for it ended, and how many of those are at work: the
+    watchdog does not count a call's wait (an approval the owner takes a while over) as silence."""
+
+    heard: float
+    working: int = 0
+
+
+async def _watched_call(quiet: _Quiet, run: CallRunner, call: ToolCall) -> ToolResult:
+    quiet.working += 1
+    try:
+        return await run(call)
+    finally:
+        quiet.working -= 1
+        quiet.heard = time.monotonic()
+
+
+@dataclass
+class _Step:
+    """A reply of the model: its blocks' text and thinking, the tools it called, its tokens and why it stopped."""
+
+    started: float
+    input_tokens: int
+    cached_tokens: int
+    output_tokens: int = 0
+    stop_reason: str = ""
+    kinds: dict[int, BlockKind] = field(default_factory=dict)
+    texts: dict[int, str] = field(default_factory=dict)
+    tools: list[str] = field(default_factory=list)
+
+    def text(self, kind: BlockKind) -> str:
+        return "".join(text for index, text in sorted(self.texts.items()) if self.kinds.get(index) == kind)
+
+
+@dataclass(frozen=True)
+class _Ended:
+    """The program's output ended."""
+
+
+@dataclass(frozen=True)
+class _Stopped:
+    """The run was stopped."""
+
+
+@dataclass(frozen=True)
+class _Silent:
+    seconds: float
+
+
+@dataclass(frozen=True)
+class _Broke:
+    error: BaseException
+
+
+type _Item = str | UserInput | _Ended | _Stopped | _Silent | _Broke
+
+
+@dataclass
+class _Follow:
+    """One run's following of the program: what it has seen so far, and what it sends."""
+
+    agent: AgentRun
+    stdin: asyncio.StreamWriter
+    # The chat's door (``dot_1a2b3c4d``): its tools are named ``mcp__dot_1a2b3c4d__<tool>`` in the program.
+    door: str
+    vision: bool
+    queue: asyncio.Queue[_Item]
+    started: float
+    limits: RunLimits | None
+    told: LimitReached | None = None
+    since_told: int = 0
+    over: LimitReached | None = None
+    steps: int = 0
+    sent: int = 0
+    results: int = 0
+    answer: str = ""
+    session_id: str = ""
+    inited: bool = False
+    step: _Step | None = None
+    finish: str = ""
+    window: LimitWindow | None = None
+    added: int = 0
+    stream: StreamMask = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.stream = StreamMask(self.show)
+
+    @property
+    def runtime(self) -> Runtime:
+        return self.agent.runtime
+
+    async def show(self, delta: StreamDelta) -> None:
+        await self.emit("delta", {"kind": delta.kind, "text": delta.text, "step": self.steps + 1}, False)
+
+    async def emit(self, kind: str, data: JsonObject, persisted: bool) -> None:
+        await self.runtime.bus.emit(self.agent.run.id, kind, data, persisted)
+
+    async def send(self, text: str, images: tuple[ImageData, ...]) -> None:
+        """A message to the model, on the program's input."""
+        self.sent += 1
+        try:
+            self.stdin.write(user_line(text, images).encode("utf-8"))
+            await self.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError) as error:
+            raise ClaudeCodeError(
+                "Claude Code stopped reading its input before the run ended",
+                {"run_id": self.agent.run.id, "error": str(error)},
+            ) from error
+
+    async def follow(self) -> str:
+        """Read the program's output until each message sent has its result; the model's last answer."""
+        while True:
+            item: _Item = await self.queue.get()
+            match item:
+                case _Stopped():
+                    raise RunCancelled("the run was stopped", {"run_id": self.agent.run.id})
+                case _Ended():
+                    raise ClaudeCodeError(
+                        "Claude Code ended before it answered", {"run_id": self.agent.run.id, "inited": self.inited}
+                    )
+                case _Silent(seconds=seconds):
+                    raise ClaudeCodeError(
+                        f"Claude Code said nothing for {round(seconds)} s while none of Dot's tools worked for it, so "
+                        "Dot ended it",
+                        {"run_id": self.agent.run.id, "silence_s": round(seconds, 1)},
+                    )
+                case _Broke(error=error):
+                    raise error
+                case UserInput():
+                    await self.steer(item)
+                case str():
+                    event: ClaudeEvent | None = read_line(item)
+                    if event is not None and await self.seen(event):
+                        return self.answer
+
+    async def seen(self, event: ClaudeEvent) -> bool:
+        """Show ``event``; whether the run is over after it."""
+        match event:
+            case Init():
+                problem: str | None = init_problem(event, self.door)
+                if problem is not None:
+                    raise ClaudeCodeError(
+                        f"Claude Code gave the model more than Dot's tools, so Dot ended the run: {problem}",
+                        {"run_id": self.agent.run.id, "tools": list(event.tools)},
+                    )
+                self.inited = True
+                self.session_id = event.session_id or self.session_id
+            case LimitSeen(window=window):
+                self.window = window
+                if window_refused(window):
+                    raise ClaudeCodeError(
+                        limit_message(window, limit_resets(window, "")),
+                        {"run_id": self.agent.run.id, "window": window.model_dump(mode="json")},
+                    )
+            case Result():
+                return await self.result(event)
+            case _:
+                if not self.inited:
+                    raise ClaudeCodeError(
+                        "Claude Code began to answer before it said what the model has, so Dot ended the run",
+                        {"run_id": self.agent.run.id},
+                    )
+                await self.reply(event)
+        return self.over is not None
+
+    async def reply(self, event: StepBegan | BlockBegan | Delta | StepFinished | StepClosed) -> None:
+        match event:
+            case StepBegan():
+                self.stream.begin(await asyncio.to_thread(known_secrets, filled=True))
+                self.step = _Step(
+                    started=time.monotonic(), input_tokens=event.input_tokens, cached_tokens=event.cached_tokens
+                )
+            case BlockBegan() if self.step is not None:
+                self.step.kinds[event.index] = event.kind
+                if event.kind == "tool":
+                    self.step.tools.append(event.tool.removeprefix(tool_prefix(self.door)))
+            case Delta() if self.step is not None:
+                self.step.texts[event.index] = self.step.texts.get(event.index, "") + event.text
+                await self.stream(StreamDelta(kind=event.kind, text=event.text))
+            case StepFinished() if self.step is not None:
+                self.step.stop_reason = event.stop_reason or self.step.stop_reason
+                self.step.output_tokens = event.output_tokens
+            case StepClosed() if self.step is not None:
+                await self.step_ended(self.step)
+                self.step = None
+
+    async def step_ended(self, step: _Step) -> None:
+        await self.stream.flush()
+        self.steps += 1
+        self.finish = step.stop_reason
+        run_id: str = self.agent.run.id
+        await self.runtime.store.add_run_tokens(run_id, step.input_tokens, step.output_tokens)
+        await self.runtime.store.set_run_steps(run_id, self.steps)
+        thinking: str = step.text("thinking")
+        text: str = step.text("text")
+        if text.strip():
+            self.answer = text.strip()
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+        await self.emit(
+            "assistant",
+            {
+                "step": self.steps,
+                "text": redact_known(text, known),
+                "thinking": truncate_middle(redact_known(thinking, known), _THINKING_CHARS),
+                "thinking_chars": len(thinking),
+                "tool_calls": list(step.tools),
+                "input_tokens": step.input_tokens,
+                "output_tokens": step.output_tokens,
+                "cached_tokens": step.cached_tokens,
+                "seconds": round(time.monotonic() - step.started, 3),
+                "finish": step.stop_reason,
+                "plan_window": None if self.window is None else self.window.model_dump(mode="json"),
+            },
+            True,
+        )
+        if step.stop_reason == "tool_use":
+            await self.keep_to_limits()
+
+    async def result(self, event: Result) -> bool:
+        """A turn ended: the run is over once each message sent has its result."""
+        self.results += 1
+        if event.is_error:
+            context: JsonObject = {"run_id": self.agent.run.id, "subtype": event.subtype, "said": event.text[-2000:]}
+            if limit_said(event.text) or (self.window is not None and window_refused(self.window)):
+                raise ClaudeCodeError(limit_message(self.window, limit_resets(self.window, event.text)), context)
+            raise ClaudeCodeError(f"Claude Code's session failed: {event.text or event.subtype}", context)
+        if not self.inited:
+            raise ClaudeCodeError(
+                "Claude Code answered before it said what the model has, so Dot ended the run",
+                {"run_id": self.agent.run.id},
+            )
+        self.session_id = event.session_id or self.session_id
+        if event.text.strip():
+            self.answer = event.text.strip()
+        return self.results >= self.sent
+
+    async def keep_to_limits(self) -> None:
+        """Read the run's limits after a step that the model goes on from, as the loop reads them between its steps
+        (item 552): the first step that ends past one tells the model to stop and answer, and a run whose model still
+        goes on after :data:`_LIMIT_GRACE_STEPS` more steps is over (``over``): it ends failed and the program is
+        ended."""
+        if self.limits is None:
+            return
+        if self.told is not None:
+            self.since_told += 1
+            if self.since_told >= _LIMIT_GRACE_STEPS:
+                self.over = self.told
+            return
+        tokens: int = await self.runtime.store.family_tokens(self.agent.run.id)
+        reached: LimitReached | None = limit_reached(self.limits, time.monotonic() - self.started, tokens)
+        if reached is None:
+            return
+        self.told = reached
+        log.info("claude_code_limit_reached", run_id=self.agent.run.id, spent=limit_spent(reached))
+        await self.emit(LIMIT_EVENT, limit_event_data(reached), True)
+        await self.send(_LIMIT_NOTE.format(spent=limit_spent(reached)), ())
+
+    async def steer(self, sent: UserInput) -> None:
+        """The owner's message while the model works: kept in the chat and sent to the program, which reads it once
+        its turn allows."""
+        runtime: Runtime = self.runtime
+        run_id: str = self.agent.run.id
+        note: Message = await message_with_attachments(
+            runtime, self.agent.run.thread_id, run_id, sent.text, sent.files, self.vision
+        )
+        # As Dot's own loop takes it (item 902): one place for what a message does to the run's trust.
+        self.agent.gate.take(sent)
+        await runtime.store.append_messages(self.agent.run.thread_id, [note])
+        self.added += 1
+        await self.emit("steer", steer_event(sent, self.agent.gate.tainted), True)
+        await self.send(note.content, await asyncio.to_thread(_images, sent.files, self.vision))
+
+
+def _images(files: tuple[StoredAttachment, ...], vision: bool) -> tuple[ImageData, ...]:
+    """The pictures that go to the model with a message, for a model that sees; their description is in the message's
+    text already for one that does not. Blocking."""
+    if not vision:
+        return ()
+    return tuple(
+        ImageData(media_type=file.media_type, data_b64=base64.b64encode(Path(file.path).read_bytes()).decode("ascii"))
+        for file in files
+        if file.kind == "image"
+    )
+
+
+async def _pump_lines(stream: asyncio.StreamReader, queue: asyncio.Queue[_Item], quiet: _Quiet) -> None:
+    while True:
+        try:
+            raw: bytes = await stream.readline()
+        except (ValueError, asyncio.LimitOverrunError) as error:
+            queue.put_nowait(
+                _Broke(ClaudeCodeError("Claude Code wrote a line longer than Dot reads", {"error": str(error)}))
+            )
+            return
+        if not raw:
+            queue.put_nowait(_Ended())
+            return
+        quiet.heard = time.monotonic()
+        queue.put_nowait(raw.decode("utf-8", errors="replace"))
+
+
+async def _pump_inbox(inbox: asyncio.Queue[UserInput], queue: asyncio.Queue[_Item]) -> None:
+    while True:
+        try:
+            sent: UserInput = await inbox.get()
+        except asyncio.QueueShutDown:
+            return
+        queue.put_nowait(sent)
+
+
+async def _pump_stop(cancel: asyncio.Event, queue: asyncio.Queue[_Item]) -> None:
+    await cancel.wait()
+    queue.put_nowait(_Stopped())
+
+
+async def _watch(quiet: _Quiet, silence_s: float, queue: asyncio.Queue[_Item]) -> None:
+    """Tell the run once the program has been silent for ``silence_s`` with none of Dot's tools at work for it."""
+    while True:
+        await asyncio.sleep(_WATCH_EVERY_S)
+        silent: float = time.monotonic() - quiet.heard
+        if quiet.working == 0 and silent > silence_s:
+            queue.put_nowait(_Silent(seconds=silent))
+            return
+
+
+async def _read_tail(stream: asyncio.StreamReader) -> str:
+    data: bytes = await stream.read()
+    return data.decode("utf-8", errors="replace")[-_STDERR_KEPT:]
+
+
+async def _end_program(process: asyncio.subprocess.Process) -> None:
+    """End the program and everything it started: SIGTERM to its group, then, after :data:`_TERM_GRACE_S`, SIGKILL."""
+    if process.returncode is None:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(process.pid, signal.SIGTERM)
+        with contextlib.suppress(TimeoutError):
+            async with asyncio.timeout(_TERM_GRACE_S):
+                await process.wait()
+    kill_group(process.pid)
+    if process.returncode is None:
+        await process.wait()
+
+
+async def _close_input(stdin: asyncio.StreamWriter) -> None:
+    stdin.close()
+    with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+        await stdin.wait_closed()
+
+
+@asynccontextmanager
+async def _private_folder() -> AsyncIterator[Path]:
+    """A folder of the run's own that only the owner reads, in Dot's home (which no run's command reads, item 1013),
+    removed with all it holds as the block ends."""
+    parent: Path = claude_code_dir() / "runs"
+    await asyncio.to_thread(parent.mkdir, mode=_PRIVATE, parents=True, exist_ok=True)
+    folder: Path = Path(await asyncio.to_thread(tempfile.mkdtemp, "", "run-", str(parent)))
+    try:
+        yield folder
+    finally:
+        await asyncio.to_thread(shutil.rmtree, folder, True)
+
+
+async def _provider_of(runtime: Runtime, ref: ModelRef) -> ClaudeCodeProvider:
+    provider: ChatProvider = await runtime.router.provider(ref.provider)
+    if not isinstance(provider, ClaudeCodeProvider):
+        raise ClaudeCodeError("the model's provider is not Claude Code", {"model": ref.label})
+    return provider
+
+
+async def _prompt_of(agent: AgentRun, door: Door) -> str:
+    """Dot's system prompt for the run: who the model is, the door's tools, and the names of the owner and of Dot."""
+    runtime: Runtime = agent.runtime
+    names: AssistantView = runtime.assistant.view()
+    record: AgentRecord | None = (
+        None if agent.run.agent_id is None else await runtime.store.get_agent(agent.run.agent_id)
+    )
+    known: list[str] = list(owner_name_lines(names.owner, names.mac_name))
+    if record is None:
+        known.extend(called_lines(names.name))
+        name: str = "Dot"
+    else:
+        name = f"{record.name}, one of Dot's agents ({record.role})"
+        if record.instructions.strip():
+            known.append(f"Your instructions as {record.name}: {record.instructions.strip()}")
+    return system_prompt(
+        name,
+        door.name,
+        [spec.name for spec in door.specs],
+        runtime.workspace,
+        datetime.now().astimezone().strftime("%A %Y-%m-%d, time zone %Z (UTC%z)"),
+        known,
+    )
+
+
+def _outcome(follow: _Follow, answer: str, goal: str) -> RunOutcome:
+    """How the run ends: failed when its limit was reached and the model went on regardless, and when its last reply
+    was cut short at the model's output limit (item 552); else done with the model's last answer."""
+    if follow.over is not None:
+        result: str = limit_result(follow.over, new_ledger(goal), "", answer)
+        return RunOutcome(status="failed", result=result, needs="")
+    if follow.finish in _CUT_SHORT:
+        cut: str = f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with '{follow.finish}')."
+        return RunOutcome(status="failed", result=cut, needs="")
+    return RunOutcome(status="done", result=answer or "Claude Code finished without a closing message.", needs="")
+
+
+async def run_in_claude_code(agent: AgentRun) -> RunEnd:
+    """Run ``agent``'s run in Claude Code on the owner's plan (module docstring)."""
+    started: float = time.monotonic()
+    runtime: Runtime = agent.runtime
+    run = agent.run
+    if agent.opening.files:
+        await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(agent.opening.files)}, True)
+    ref: ModelRef = parse_model_ref(run.model)
+    provider: ClaudeCodeProvider = await _provider_of(runtime, ref)
+    program: Path = await provider.program()
+    info: ModelInfo = await provider.model_info(ref.model)
+    earlier: list[Message] = await runtime.store.load_messages(run.thread_id, 0)
+    left_out: frozenset[str] = frozenset() if runtime.browser.config.enabled else frozenset({BROWSER_GROUP})
+    tools: ToolRegistry = door_tools(runtime.registry, run.mode, await agent_tools(runtime, run.agent_id), left_out)
+    quiet: _Quiet = _Quiet(heard=time.monotonic())
+    door: Door = new_door(
+        run.thread_id,
+        tuple(tool.spec for tool in tools.tools.values()),
+        partial(_watched_call, quiet, partial(bridged_call, tools, await tool_context(agent, ref, info), agent.gate)),
+    )
+    chat: ChatSession | None = await asyncio.to_thread(read_chat, chat_path(run.thread_id))
+    goal: Message = await message_with_attachments(
+        runtime, run.thread_id, run.id, agent.opening.text, agent.opening.files, info.vision
+    )
+    await runtime.store.append_messages(run.thread_id, [goal])
+    prompt: str = await _prompt_of(agent, door)
+    async with provider.bridge.opened(door) as url, _private_folder() as folder:
+        config_file: Path = await asyncio.to_thread(write_mcp_config, folder, mcp_config(door, url))
+        argv: tuple[str, ...] = claude_argv(
+            str(program), ref.model, prompt, config_file, door.name, None if chat is None else chat.session_id
+        )
+        try:
+            process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+                *argv,
+                cwd=str(runtime.workspace),
+                env=claude_env(runtime.shell_env, folder),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,
+                limit=_LINE_LIMIT,
+            )
+        except OSError as error:
+            raise ClaudeCodeError(
+                "Claude Code could not be started", {"program": str(program), "error": str(error)}
+            ) from error
+        assert process.stdin is not None and process.stdout is not None and process.stderr is not None
+        log.info("claude_code_run_started", run_id=run.id, pid=process.pid, model=ref.model, resume=chat is not None)
+        queue: asyncio.Queue[_Item] = asyncio.Queue()
+        follow: _Follow = _Follow(
+            agent=agent,
+            stdin=process.stdin,
+            door=door.name,
+            vision=info.vision,
+            queue=queue,
+            started=started,
+            limits=limits_of(runtime.config.agent, run.mode),
+        )
+        tail: asyncio.Task[str] = asyncio.create_task(_read_tail(process.stderr), name="claude-code-stderr")
+        pumps: tuple[asyncio.Task[None], ...] = (
+            asyncio.create_task(_pump_lines(process.stdout, queue, quiet), name="claude-code-lines"),
+            asyncio.create_task(_pump_inbox(agent.inbox, queue), name="claude-code-inbox"),
+            asyncio.create_task(_pump_stop(agent.cancel, queue), name="claude-code-stop"),
+            asyncio.create_task(_watch(quiet, provider.config.silence_s, queue), name="claude-code-watch"),
+        )
+        clean: bool = False
+        try:
+            opening: str = meanwhile(goal.content, earlier[0 if chat is None else chat.seen :])
+            await follow.send(opening, await asyncio.to_thread(_images, agent.opening.files, info.vision))
+            try:
+                answer: str = await follow.follow()
+            except ClaudeCodeError as error:
+                if chat is not None and not follow.inited:
+                    # The program could not go on with the chat's session (gone from its transcripts): the next run
+                    # starts a new one, which hears the chat with its first message.
+                    await asyncio.to_thread(forget_chat, run.thread_id)
+                error.context["stderr"] = await _stderr_now(tail, process)
+                raise
+            clean = follow.over is None
+            await _close_input(process.stdin)
+            if clean:
+                with contextlib.suppress(TimeoutError):
+                    async with asyncio.timeout(_EXIT_WAIT_S):
+                        await process.wait()
+        finally:
+            for task in pumps:
+                task.cancel()
+            await asyncio.gather(*pumps, return_exceptions=True)
+            await asyncio.shield(_end_program(process))
+            tail.cancel()
+            await asyncio.gather(tail, return_exceptions=True)
+            await let_go(runtime, run.id, ())
+    await runtime.store.append_messages(run.thread_id, [assistant_message(answer, None, ())])
+    if clean and follow.session_id:
+        await asyncio.to_thread(
+            write_chat,
+            chat_path(run.thread_id),
+            ChatSession(session_id=follow.session_id, seen=len(earlier) + 2 + follow.added),
+        )
+    log.info("claude_code_run_ended", run_id=run.id, session=follow.session_id, steps=follow.steps, clean=clean)
+    return RunEnd(outcome=_outcome(follow, answer, run.goal), lessons=None)
+
+
+async def _stderr_now(tail: asyncio.Task[str], process: asyncio.subprocess.Process) -> str:
+    """What the program wrote to its error stream, once it ended (it is ended first, so that the stream closes)."""
+    await asyncio.shield(_end_program(process))
+    try:
+        async with asyncio.timeout(_EXIT_WAIT_S):
+            return await asyncio.shield(tail)
+    except TimeoutError:
+        return ""

@@ -132,6 +132,14 @@ idle_stop_s = 600.0
 # How long the list of free models is kept without asking OpenCode again; OpenCode refreshes its own catalog hourly.
 models_ttl_s = 3600.0
 
+[providers.claude_code]
+# Claude Code on your own Claude plan (item 1013): a run on "claude_code:opus" or "claude_code:sonnet" goes whole to the
+# claude program you installed and signed in to, with Dot's tools alone (docs/models.md). command: the claude program,
+# a path or a name looked up on the login PATH. A program that writes nothing for silence_s seconds while none of Dot's
+# tools works for it is ended, and the run fails.
+command = "claude"
+silence_s = 600.0
+
 [providers.opencode_go]
 base_url = "https://opencode.ai/zen/go/v1"
 api_key_env = "OPENCODE_API_KEY"

@@ -263,8 +263,45 @@ answer keeps its words, Ollama's too.
   turned requests down for a few minutes after many in a short time, OpenCode's own command line's too (measured
   2026-10-15), and it is reported to refuse OpenCode with one of its tools switched off, so Dot switches none off and
   has them ask instead; a run it turns down fails with words that say so.
+- **Claude Code** (your own Claude plan, item 1013): `claude_code:opus` and `claude_code:sonnet` (Claude Code's own
+  names for the newest of each family) run on the limits of your Claude Pro or Max plan, through the `claude` program you
+  installed and signed in to (run `claude` once in Terminal and sign in). No key: Dot takes every API key out of the
+  program's environment, so the plan is billed and nothing else. The menu lists the two models once the program is found
+  (`[providers.claude_code] command`, `claude` on your login PATH) and an account is signed in, which Dot reads from
+  `~/.claude.json` (the address and the organisation, no secret: Dot never reads Claude Code's credentials nor its
+  Keychain item). A run on one goes whole to Claude Code, started without a terminal (`claude -p`, its input and output
+  lines of JSON) in Dot's workspace, as Dot: the model is told it is Dot (or the agent whose run it is), your name and
+  the name you call Dot by, and it works with Dot's tools alone, served by Dot's bridge at the chat's door as OpenCode's
+  agent gets them, with Dot's files, commands and web tools besides (Claude Code's own are off): the browser with your
+  sign-ins, the Mac's applications, memory, schedules, notify, a page in the conversation, skills, a question to you and
+  the apps you connected, as the run's mode and agent allow them. Each call goes through the run's approvals, sandbox,
+  shell guard and time limit as a call of Dot's own loop does, and shows on the timeline under the tool's own name. The
+  program is started with no tool of its own (`--tools ""`), no settings file of yours, a project's or the workspace's
+  (`--setting-sources ""`: no hook runs, no `CLAUDE.md` or `AGENTS.md` is read), no MCP server but the door
+  (`--strict-mcp-config`), no slash command, and a permission mode that refuses whatever the door does not name
+  (`dontAsk` with `--allowedTools mcp__<door>`); its first line says what the model has, and a run whose model has any
+  tool, MCP server, slash command, skill or plugin besides the door's is ended failed at once. The door's secret is in a
+  file only you can read in a folder of the run's own, removed as the run ends, never in the program's arguments. The
+  timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
+  window; your messages reach it while it works, and Stop ends the program. A chat keeps its Claude Code session from
+  run to run (it is resumed, and hears what the chat said on other models since); a rewind lets it go. The run's limits
+  (`run_max_minutes`, `run_max_tokens`) bind it as they bind OpenCode's agent, and a reply cut at the model's output
+  limit ends the run failed. When the plan's window is used up, the run ends failed and says which window and when it
+  resets: nothing moves the run to another model on its own. A program that writes nothing for
+  `[providers.claude_code] silence_s` (600 s) while none of Dot's tools works for it is ended, and the run fails saying
+  so. What Dot's own runs bring besides (the memory recalled at the start, the checks of a finish, lessons and
+  playbooks) a run here does not have, and these models cannot be the fast, review, vision, standby or own-work model,
+  whose calls are Dot's own. What it sends Anthropic, and the transcripts Claude Code keeps under `~/.claude/projects/`,
+  are in [Safety](safety.md#what-leaves-this-mac).
 
-`dotx models [ollama|openai|opencode_go|anthropic|openrouter|opencode]` lists what a provider offers, including the
+  Anthropic's terms (read 2026-11-06, the Claude Code legal and compliance page and the Agent SDK overview) do not let
+  a third party offer a claude.ai sign-in or route requests through a plan's credentials for its users; you may sign in
+  to the unmodified Claude Code program with your own plan. Dot is your own program on your own Mac, run by you alone:
+  it runs the unmodified `claude` you signed in to and never reads, keeps or passes on its credentials, and it offers
+  this to no one else. That is a judgment, not an exception Anthropic documents: the plans' limits assume ordinary
+  individual use, and an always-on agent may be held to more, so use it as you would use Claude Code yourself.
+
+`dotx models [ollama|openai|opencode_go|anthropic|openrouter|opencode|claude_code]` lists what a provider offers, including the
 reasoning levels of each model, and ends with 1 when no provider answered (the one named, when one is). An Ollama server
 on this Mac is asked for its list once, so one that is not running is reported at once, here, in the model menu and by
 `dotx doctor`, not after the retries a network needs (item 212). `dotx models profile [provider:model]` shows how

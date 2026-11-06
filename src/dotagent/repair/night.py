@@ -54,6 +54,7 @@ from dotagent.repair.claude import (
     StepSink,
     WorkerChoice,
     claude_argv,
+    claude_state,
     limited,
     read_account,
     read_usage,
@@ -353,12 +354,6 @@ def read_fast(raw: str | None) -> FastSeen | None:
 
 def read_sessions(raw: str | None) -> tuple[RepairSession, ...]:
     return () if raw is None else SessionLog.model_validate_json(raw).sessions
-
-
-def claude_state(env: Mapping[str, str]) -> Path:
-    """Where ``claude`` keeps its state: ``$CLAUDE_CONFIG_DIR/.claude.json``, or ``~/.claude.json``."""
-    folder: str | None = env.get("CLAUDE_CONFIG_DIR")
-    return Path(folder).expanduser() / ".claude.json" if folder else Path.home() / ".claude.json"
 
 
 def room_left(kept: KeptWindow | None, account: ClaudeAccount, leave_room: float, now: float) -> bool:

@@ -37,7 +37,20 @@ def splits_work(once: OneMessage | None) -> bool:
 INVALID_ARGUMENTS_KEY: str = "__invalid_arguments__"
 
 # The providers a model reference ("<provider>:<model>") can name.
-KNOWN_PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go", "anthropic", "openrouter", "opencode")
+KNOWN_PROVIDERS: tuple[str, ...] = (
+    "ollama",
+    "openai",
+    "opencode_go",
+    "anthropic",
+    "openrouter",
+    "opencode",
+    "claude_code",
+)
+# The providers whose models answer only as an agent program of their own, to which a run goes whole, with the name of
+# that agent: Zen's free models as OpenCode's agent (item 283), the owner's Claude plan as Claude Code (item 1013). No
+# single call of Dot's (a role's, a standby model's, a side question) can use one, and such a run takes none of what
+# Dot's own loop brings.
+WHOLE_RUN_AGENTS: dict[str, str] = {"opencode": "OpenCode's own agent", "claude_code": "Claude Code"}
 
 
 def split_model_ref(text: str) -> tuple[str, str] | None:
