@@ -742,8 +742,9 @@
 
 /* The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name on one
    line, the three that worked last and All, in four equal columns the sidebar holds whole (item 855: the row scrolled
-   sideways, and a face cut at the edge looked broken); never squeezed by the list under it, which scrolls; the tile
-   that is open is a surface step up, as a row is (item 74). All is a round mark the size of a face. */
+   sideways, and a face cut at the edge looked broken); never squeezed by the list under it, which scrolls. A face
+   stands on nothing, hovered or open (item 998: the tile behind it looked like a smudge between the faces); the open
+   one has its name in the text's full colour. All is a round mark the size of a face. */
 .side-agent-faces {
   display: grid;
   flex: none;
@@ -766,16 +767,10 @@
   text-decoration: none;
 }
 
-.side-agent-face:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+.side-agent-face:hover,
+.side-agent-face[aria-current="page"] {
   color: var(--text);
   text-decoration: none;
-}
-
-.side-agent-face[aria-current="page"] {
-  background: var(--surface);
-  box-shadow: 0 1px 2px var(--shadow-ink);
-  color: var(--text);
 }
 
 .side-agent-face .avatar,
@@ -1195,8 +1190,8 @@
   }
 
   .side-dot-hero > .avatar {
-    width: 112px;
-    height: 112px;
+    width: 88px;
+    height: 88px;
   }
 
 
