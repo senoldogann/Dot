@@ -166,7 +166,9 @@ installed without you.
 **Connectors** lists 156 services with a search, **Connected** and **All** (each with its count) and **Check again** in
 its head, the accounts under it, and the sections as chips (item 545), one showing its section alone: Popular, Password
 managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item
-492), each titled with its count. Popular stands up as Plugins' New & noteworthy does, four cards a row (two on a
+492), each titled with its count. The page opens on the Popular chip (item 1000: every section at once ran to 43,000
+px on a phone), with a line under it that counts the rest; the chip All, another chip, a search (which looks in every
+section) or Connected lists them. Popular stands up as Plugins' New & noteworthy does, four cards a row (two on a
 narrower window); on a phone its cards are rows as the other sections' are, the mark beside the words (item 604). Each
 card has the service's mark, what Dot does with it, how it connects (Sign in, Key, Open to all, On this Mac, On this Mac · Key; and by Connected app,
 Mac app, Dot's browser, Synced folder or 1Password), where it stands, and its first step
@@ -230,8 +232,8 @@ same way (`args = ["-y", "some-mcp-server@1.2.3"]`).
 
 ### Connect apps
 
-**Connect apps** (items 492 and 545), at the foot of the sidebar right of the cog of Settings, on the sidebar's own
-ground as the cog is, opens Customize › Connectors, which it stands for while it is open, wearing the logos of four
+**Connect apps** (items 492 and 545), at the foot of the sidebar over your account's row (item 999), on the sidebar's
+own ground, opens Customize › Connectors, which it stands for while it is open, wearing the logos of four
 services (three until item 959): those whose servers are ready, the first by name and each service once, the same ones
 while they stay connected (item 853; item 509 turned them every few seconds), only a service's own logo, not the icon
 or the plug of a server with none, nor Dot's own; and while fewer are ready, the services most connect first (Google,

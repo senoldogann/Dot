@@ -73,10 +73,10 @@ said New chat). Under the search your agents stand as faces (item
 835), as a messaging app's people: the three that worked last, each its face over its name on one line, to its page,
 where a message to it starts, the one whose page is open marked, and **All**, the page of every agent and team, in
 four columns the sidebar holds whole (item 855: the row scrolled sideways and cut a face at its edge); an agent made,
-changed or deleted on a page shows there at once, and one a run made once that run ends. In the foot, the cog of
-**Settings**, **Connect apps** beside it
+changed or deleted on a page shows there at once, and one a run made once that run ends. In the foot, **Connect apps**
 ([Connect apps](extending.md#connect-apps), items 492 and 545), which opens
-[Customize › Connectors](extending.md#customize--connectors), and
+[Customize › Connectors](extending.md#customize--connectors), over your account's row, your initials and your name,
+which opens **Settings** (item 999, after a cog beside Connect apps), and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
@@ -97,8 +97,8 @@ drawer. On a touch screen of a phone's width it has no X (item 888): a chat you 
 to the left; a narrow window of the Mac keeps its button. On a phone the list is the home (item 991, the owner's
 ask of 2026-11-05 for a plain one): your initials at the head's left open the settings and the **+** of a new chat
 stands at its right, after Campaigns and Schedules; Dot's own face stands large with its name under it, over the faces
-of the other agents, centred; the foot holds the apps (Connect apps, a grid of tiles) and the search, the cog of the
-settings having moved to your initials. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
+of the other agents, centred; the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
+of a Mac having moved to your initials. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
 deleted under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only
 when the page comes to another chat (item 204).
 
@@ -853,20 +853,19 @@ their own). Which folds are open is kept in the browser. A card that folds keeps
 folded it is a row of the page, as a group of the health checks is (item 576).
 In a Mac's window the sidebar is the settings' nav while they are open (item 562): its first row holds the button that
 hides the sidebar where the chats' head holds it (in the desktop app beside the traffic lights, item 577), then the
-seven sections, and at its foot **Back to chats**, to the chat last open (item 852; it stood at the top). The seven
-sections (item 845, after fifteen tabs in four groups) are **General** (General and
-Snapshots), **Appearance**, **Models** (Models, AI services and Web search), **Rules and memory** (Rules, Memory and
-Self-improvement), **Browser and Vault**, **Phone and channels** and **System**, each with what it holds at its right
-(how many notes Dot keeps, how many items the vault holds, a dot when a phone reaches Dot; no model's name, item 852);
-whether the
+settings' groups of rows (item 999, the phone's sheet; before, seven sections of tabs, item 845), and at its foot
+**Back to chats**, to the chat last open (item 852; it stood at the top). The rows are **General** and **Vault**,
+**Connect apps**, then under **Dot** Rules, Memory, Models, AI services, Web search, Browser, Self-improvement and
+Self-repair, under **Phones and channels** Phone and Channels, and under **App** Appearance, Snapshots and System; a row
+is its name alone, with what it holds at its right (how many notes Dot keeps, how many items the vault holds, a dot when
+a phone reaches Dot; no model's name, item 852), and the rows scroll on their own in a short window; whether the
 daemon answers and the emergency stop are the page's, as on every page. The page is the open tab alone, in a column of
-920 px under its section's name, the row of the section's tabs (a section of one tab has none) and the line that says
-what the tab is for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is
-in the drawer. On a phone they are one sheet of rows, a row a tab, in groups (item 995), each opening its tab as a page
-of its own (item 330,
-under [Dot on the phone](phone.md#dot-on-the-phone)). Trading is in no section: it is the Trader agent's (item 847, see
+920 px under its own name and the line that says what it is for, with no row of tabs, each section a name over a card of
+rows; in a window too narrow for the docked sidebar the nav is in the drawer. On a phone they are the same rows as one
+sheet (item 995), each with a line under its name, each opening its tab as a page of its own (item 330,
+under [Dot on the phone](phone.md#dot-on-the-phone)). Trading is in no group: it is the Trader agent's (item 847, see
 [Settings › Trading](#settings--trading)). The addresses of the tabs are as they were (`#/settings/keys` opens AI
-services in Models). The earlier addresses of the memory, rules and system pages lead to their tabs, and
+services). The earlier addresses of the memory, rules and system pages lead to their tabs, and
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **Snapshots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
 
@@ -927,7 +926,7 @@ carries `positions` and `watch`), `PUT|DELETE /api/trading/key` and `POST /api/t
 
 ### Settings › Vault
 
-**Vault** (item 621, `#/settings/vault`, in the section Browser and Vault, item 845) is where you keep the logins, cards and contact details
+**Vault** (item 621, `#/settings/vault`) is where you keep the logins, cards and contact details
 you give Dot. It signs in with a login and types your contact details into pages where a form asks; a card is kept and
 shown to you, and Dot fills it into no page. A login a run made for a new account (`browser_create_login`, item 740) is
 kept here too, with the note "Made by Dot for a new account on …". Passwords and cards are kept in your Mac's Keychain,

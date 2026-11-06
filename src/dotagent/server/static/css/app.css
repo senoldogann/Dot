@@ -1808,8 +1808,7 @@ a.pill:hover {
    head they share (the search and the tab's controls in it); the services and the skills as tiles of a grid, two a row
    and one on a phone. A service's tile is a link to its own page through its name, whose link covers the tile under
    its step. */
-.customize-tabs a,
-.settings-parts a {
+.customize-tabs a {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -1824,14 +1823,12 @@ a.pill:hover {
   color: inherit;
 }
 
-.customize-tabs a:hover,
-.settings-parts a:hover {
+.customize-tabs a:hover {
   color: var(--text);
   text-decoration: none;
 }
 
-.customize-tabs a[aria-current="page"],
-.settings-parts a[aria-current="page"] {
+.customize-tabs a[aria-current="page"] {
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-seg);
@@ -10711,7 +10708,6 @@ button.attach-chip:hover {
   .input,
   .select,
   .segmented button,
-  .settings-parts a,
   .menu-item,
   .chip,
   .context-meter-link {

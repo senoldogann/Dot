@@ -840,6 +840,8 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     page: Page = await _home_page(browser, address, width, scheme)
                     await page.goto(f"{address}/#/customize/connectors")
                     await page.get_by_role("button", name=re.compile(r"^All \d+$")).click()
+                    # The page opens on Popular (item 1000); the chip All lists every service.
+                    await page.locator("[data-chip='all']").click()
                     tiles: dict[str, str] = {
                         name: await _mark_of(page.locator(f".plugin-tile[data-plugin='{name}'] .plugin-mark"))
                         for name in MARKED

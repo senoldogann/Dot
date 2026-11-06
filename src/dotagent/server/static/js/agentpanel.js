@@ -81,7 +81,7 @@ export function agentPanel({ agent }) {
         { class: "kv kv-rows agent-panel-facts" },
         fact("Model", settingsLink("models", modelWords(""))),
         fact("Name and look", settingsLink("general", "General")),
-        fact("Rules", settingsLink("rules", "Rules and memory")),
+        fact("Rules", settingsLink("rules", "Rules")),
         fact("Memory", settingsLink("memory", notes === null ? "Notes" : plural(notes, "note", "notes"))),
       ),
     );

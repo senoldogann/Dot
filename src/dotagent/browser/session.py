@@ -87,6 +87,7 @@ from dotagent.browser.pages import (
     page_target_id,
     taken_in,
     target_id_of,
+    unhanded_tab,
     watch_births,
 )
 from dotagent.browser.profile_lock import held_for_start, profile_holder_pid
@@ -222,6 +223,8 @@ _BLANK_URLS: frozenset[str] = frozenset({"about:blank", "chrome://newtab/", "chr
 # Where a task shown on a blank tab starts (item 510): a page to search from, rather than an empty one.
 _TEACH_START_PAGE: str = "https://www.google.com/"
 _TAB_MARK_BYTES: int = 6
+# How long Chrome is given to list its tabs for the error of a new tab it did not hand over (item 1002).
+_ASK_TABS_S: float = 2.0
 # Dot's own Chrome at this zoom draws a page at the size it was given, which the page need not be asked for (item 358).
 _UNZOOMED: int = 100
 # The height of a tab given a width alone (``browser_viewport``, item 746): a phone's, 390 by 844 being an iPhone's.
@@ -497,6 +500,21 @@ def idle_background_tabs(thread: ThreadTabs, cutoff: float) -> list[Tab]:
     pages a run went on from (item 696). Only the thread's own tabs are looked at, so a chat never closes a tab of
     another chat, or of the owner."""
     return [tab for index, tab in enumerate(thread.tabs) if index != thread.active and tab.last_used < cutoff]
+
+
+async def _what_chrome_made(cdp: CDPSession, made: str | None) -> str:
+    """What Chrome says of the tab ``made`` that it did not hand over (:func:`unhanded_tab`), for the error of the step.
+    Chrome is given :data:`_ASK_TABS_S` to answer: a Chrome that cannot list its tabs either says why it made none."""
+    if made is None:
+        return "Chrome's answer to Target.createTarget named no tab"
+    try:
+        async with asyncio.timeout(_ASK_TABS_S):
+            answer: dict[str, object] = await cdp.send("Target.getTargets")
+    except TimeoutError:
+        return f"Chrome did not list its tabs within {_ASK_TABS_S:g} s either"
+    except PlaywrightError as error:
+        return f"Chrome could not list its tabs: {truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}"
+    return unhanded_tab(made, answer)
 
 
 def _none_unattended(thread_id: str) -> bool:
@@ -2556,7 +2574,10 @@ class BrowserSession:
             except TimeoutError as error:
                 raise BrowserError(
                     "opening a tab failed",
-                    {"error": f"Chrome did not hand over the new tab within {self._config.action_timeout_s:g} s"},
+                    {
+                        "error": f"Chrome did not hand over the new tab within {self._config.action_timeout_s:g} s",
+                        "chrome": await _what_chrome_made(cdp, made),
+                    },
                 ) from error
             await page.goto("about:blank", wait_until="commit")
         except BaseException:

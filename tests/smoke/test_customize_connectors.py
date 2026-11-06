@@ -277,7 +277,9 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
                 await connect.click()
                 await expect(page).to_have_url(f"{address}/#/customize/connectors")
                 await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Connectors")
-                # Every service in its section, each with its mark, what Dot does with it and how it connects.
+                # The page opens on Popular (item 1000); All lists every service in its section, each with its mark,
+                # what Dot does with it and how it connects.
+                await page.locator("[data-chip='all']").click()
                 tiles: Locator = page.locator(".plugin-tile[data-plugin]")
                 await expect(tiles.first).to_be_visible()
                 assert await tiles.count() >= 25
@@ -494,6 +496,7 @@ async def test_a_keyed_services_tile_asks_for_its_key_in_a_dialog_and_keeps_none
                 await page.route("**/api/mcp/servers", adding)
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"{address}/#/customize/connectors")
+                await page.locator("[data-chip='all']").click()
                 tavily: Locator = _tile(page, "tavily")
                 opener: Locator = tavily.get_by_role("button", name="Add Tavily")
                 await expect(tavily).to_be_visible()

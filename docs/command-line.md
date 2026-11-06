@@ -15,8 +15,10 @@ configured models, each of which its provider must serve to the key (Ollama and 
 OpenAI, OpenCode Go and OpenRouter through the list of the models they serve), and says how to fix what is missing.
 It warns, without failing, when the review model is also the main model,
 when an MCP server's command or secret is missing (Dot starts without that server's tools), when a single tool of a
-connected server was left out because its schema cannot be used (the running daemon's doctor names that tool and why;
-`dotx doctor` itself does not start servers), and when a provider's list
+connected server was left out because its schema cannot be used (item 1001: `dotx doctor` starts no server, so it asks
+the running daemon, once it has proven that it holds the token, and prints a row per tool with why; with no daemon
+running it tells none, and a daemon that cannot be asked is a warn row of its own with why and its fix; Settings ›
+System's checks and the service's page name them too), and when a provider's list
 of models could not be read or the Ollama server could not be reached, as the provider's own row says why (the models of
 an Ollama server out of reach are not asked, so the doctor does not wait out the retries of each). The examples below
 write `dotx`: run it as `uv run dotx`, or put `.venv/bin` on your `PATH`.

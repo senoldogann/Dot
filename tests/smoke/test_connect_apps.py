@@ -154,14 +154,14 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             page: Page = await _page(browser, address, 1280, "light")
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
-            # The button stands right of the cog of Settings, on its row and in sight, and wears the mark of the
-            # server that is ready; the list of pages names Customize no more.
+            # The button stands over your account's row, which opens the settings (item 999), level with it and in
+            # sight, and wears the mark of the server that is ready; the list of pages names Customize no more.
             button: Locator = page.locator("#sidebar .side-foot").get_by_role("button", name="Connect apps")
             await expect(button).to_be_visible()
             settings: FloatRect = await _box(page.locator("#sidebar .side-foot").get_by_role("link", name="Settings"))
             at: FloatRect = await _box(button)
-            assert at["x"] >= settings["x"] + settings["width"] and at["y"] + at["height"] <= 860, (at, settings)
-            assert abs((at["y"] + at["height"] / 2) - (settings["y"] + settings["height"] / 2)) <= 1, (at, settings)
+            assert at["y"] + at["height"] <= settings["y"] and settings["y"] + settings["height"] <= 860, (at, settings)
+            assert abs(at["x"] - settings["x"]) <= 1, (at, settings)
             # The pages are Agents' row (while there is no agent of one's own) and the head's icons (item 855).
             await expect(page.locator("#sidebar nav.side-links a.side-link")).to_have_text(["Agents"])
             heads: list[str] = await page.locator("#sidebar .side-head nav.side-pages a").evaluate_all(
@@ -186,6 +186,11 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await expect(button).to_have_attribute("aria-current", "page")
             await expect(page.locator(".customize-hero-title")).to_have_text("Connect your apps")
             titles: Locator = page.locator(".plugin-section-title")
+            # The page opens on Popular alone, a line saying how to see the rest (item 1000); All lists every section.
+            await expect(titles).to_have_text(["Popular"])
+            await expect(page.locator(".connect-browse")).to_contain_text("choose All or a section above, or search")
+            await page.locator("[data-chip='all']").click()
+            await expect(page.locator(".connect-browse")).to_have_count(0)
             await expect(titles).to_have_text([_TITLES[section] for section in shown_sections])
             # Popular stands up as Plugins' New & noteworthy does; a section's title counts its cards.
             popular: Locator = page.locator(".plugin-section[data-section='popular'] .plugin-tile").first
@@ -200,9 +205,12 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await expect(page.locator(".plugin-section[data-section='code'] .plugin-tile")).to_have_count(
                 members["code"]
             )
-            # A chip and a search that find nothing together say so, rather than leave the page empty.
+            # A search looks in every section whatever chip is pressed (item 1000), and one that finds nothing says so,
+            # rather than leave the page empty.
             search: Locator = page.get_by_role("searchbox", name="Search connectors")
             await search.fill("linear")
+            await expect(page.locator(".plugin-tile[data-plugin]")).to_have_count(1)
+            await search.fill("no-such-service-anywhere")
             await expect(page.locator(".plugin-section[data-section]")).to_have_count(0)
             await expect(page.locator(".empty-state")).to_contain_text("No connector matches the search")
             await search.fill("")

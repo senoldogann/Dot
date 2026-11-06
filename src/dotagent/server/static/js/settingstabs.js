@@ -1,5 +1,5 @@
-// The tabs of the settings and the sections they stand in (items 562 and 845). The settings page draws the open one, the
-// settings nav in the sidebar (settingsnav.js) and the phone's list (views/settings.js) name the sections.
+// The tabs of the settings and the groups they stand in (items 562, 995 and 999). The settings page draws the open one;
+// the settings nav in the sidebar (settingsnav.js) and the phone's sheet (views/settings.js) list the groups.
 
 export const DEFAULT_TAB = "general";
 
@@ -22,24 +22,12 @@ export const TABS = [
   { id: "system", label: "System", icon: "monitor" },
 ];
 
-// The seven sections the settings are in (item 845, after fifteen tabs in four groups): the nav and the phone's list
-// name the sections, and a section of more than one tab shows its tabs in a row under its name. `value` is the tab
-// whose count, model or state the section's row shows. Trading is in no section: it is the Trader agent's (item 847),
-// and its tab opens from that agent.
-export const SECTIONS = [
-  { id: "general", label: "General", icon: "sliders", tabs: ["general", "snapshots"], value: null },
-  { id: "appearance", label: "Appearance", icon: "palette", tabs: ["appearance"], value: "appearance" },
-  { id: "models", label: "Models", icon: "layers", tabs: ["models", "keys", "websearch"], value: null },
-  { id: "rules", label: "Rules and memory", icon: "shield", tabs: ["rules", "memory", "harness", "repair"], value: "memory" },
-  { id: "browser", label: "Browser and Vault", icon: "globe", tabs: ["browser", "vault"], value: "vault" },
-  { id: "phone", label: "Phone and channels", icon: "smartphone", tabs: ["phone", "channels"], value: "phone" },
-  { id: "system", label: "System", icon: "monitor", tabs: ["system"], value: null },
-];
-
-// The phone's sheet of the settings (item 995, the owner's ask of 2026-11-05 for one plain sheet): groups of rows, a row
-// one tab (or Connect apps) with a line under its name that says what it holds, so that a setting is found without
-// knowing its section. `value` names the row whose count or state shows at its right.
-export const PHONE_GROUPS = [
+// The settings as groups of rows (item 995, the owner's ask of 2026-11-05 for one plain sheet; item 999, a Mac's nav
+// too, after seven sections of tabs, item 845): a row one tab (or Connect apps), so that a setting is found without
+// knowing its section. On a phone a row has a line under its name that says what it holds; a Mac's nav shows the name
+// alone. `value` names the row whose count or state shows at its right. Trading is in no group: it is the Trader
+// agent's (item 847), and its tab opens from that agent.
+export const SETTINGS_GROUPS = [
   {
     title: null,
     rows: [
@@ -67,7 +55,7 @@ export const PHONE_GROUPS = [
   {
     title: "Phones and channels",
     rows: [
-      { tab: "phone", line: "Dot on your phones" },
+      { tab: "phone", line: "Dot on your phones", value: "phone" },
       { tab: "channels", line: "iMessage and the other ways to reach Dot" },
     ],
   },
@@ -80,11 +68,6 @@ export const PHONE_GROUPS = [
     ],
   },
 ];
-
-/** The section the tab `id` stands in, or null for a tab in none (Trading). */
-export function sectionOf(id) {
-  return SECTIONS.find((section) => section.tabs.includes(id)) ?? null;
-}
 
 /**
  * The tab an address (`location.hash`) is on: `#/settings/<tab>`, or System for the pages under it (Diagnostics and the
