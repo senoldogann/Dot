@@ -12,7 +12,6 @@ faster than Apple lets a Live Activity change, and a run that waits or ends is t
 import asyncio
 import time
 
-from dotagent.agent.held_secrets import SECRET_SEVERITY
 from dotagent.core.errors import DotError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel, JsonObject
@@ -63,9 +62,11 @@ PROGRESS_EVERY_S: float = 4.0
 _AT_ONCE: PushPriority = "10"
 _WHEN_IT_SUITS: PushPriority = "5"
 _WAIT_S: float = 1.0
-# The approvals the lock screen does not answer: a question wants words, a secret its value (only its own route takes
-# a yes), a handoff the owner's own hands on the Mac. Every other card is a step's yes or no, by its risk.
-_NOT_ANSWERABLE: frozenset[str] = frozenset({"question", SECRET_SEVERITY, "handoff"})
+# The approvals the lock screen answers: a step of low or medium risk. A step of high risk (money, a message or a post
+# sent for the owner, a credential: ``policy.engine.approval_severity``) opens Dot, as the alert says nothing of what it
+# asks and the owner must see the amount or the receiver first; so do a question (it wants words), a secret (its value)
+# and a handoff (the owner's hands on the Mac).
+_ANSWERABLE: frozenset[str] = frozenset({"low", "medium"})
 _DOT: str = "Dot"
 # The title of an alert of a message Dot wrote to the owner.
 TOLD_TITLE: str = "Dot has a message for you"
@@ -73,8 +74,8 @@ TOLD_TITLE: str = "Dot has a message for you"
 
 def approval_answerable(event: EventRecord) -> str | None:
     """The id of the approval ``event`` asks for when the lock screen may answer it (item 1008): a yes or a no to a
-    step, not a question (which wants words), a secret (which wants its value) or anything else; ``None`` otherwise."""
-    if event.kind != "approval_requested" or event.data.get("severity") in _NOT_ANSWERABLE:
+    step of low or medium risk (:data:`_ANSWERABLE`); ``None`` otherwise, and the alert opens Dot."""
+    if event.kind != "approval_requested" or event.data.get("severity") not in _ANSWERABLE:
         return None
     approval_id: object = event.data.get("approval_id")
     return approval_id if isinstance(approval_id, str) and approval_id else None

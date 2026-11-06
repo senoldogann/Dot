@@ -23,14 +23,6 @@ struct APNsRegistration: Encodable, Sendable, Equatable {
 }
 
 /// The body of `POST /api/phone/apns/activity`: the update token of one run's Live Activity.
-/// The body of `POST /api/approvals/{id}/decision` from the lock screen (item 1008): a yes or a no, no note, and no
-/// "don't ask again", which is the app's page's to give.
-struct ApprovalDecision: Encodable, Sendable, Equatable {
-    let approve: Bool
-    let note: String
-    let remember: Bool
-}
-
 struct ActivityRegistration: Encodable, Sendable, Equatable {
     let runId: String
     let token: String
@@ -39,6 +31,14 @@ struct ActivityRegistration: Encodable, Sendable, Equatable {
         case runId = "run_id"
         case token
     }
+}
+
+/// The body of `POST /api/approvals/{id}/decision` from the lock screen (item 1008): a yes or a no, no note, and no
+/// "don't ask again", which is the app's page's to give.
+struct ApprovalDecision: Encodable, Sendable, Equatable {
+    let approve: Bool
+    let note: String
+    let remember: Bool
 }
 
 /// A request to the daemon that did not succeed.
