@@ -99,4 +99,4 @@ def test_a_daemon_that_cannot_be_asked_is_a_warn_row_with_its_fix() -> None:
     )
     line: str = check_line(row)
     assert line.startswith("warn") and not row.required
-    assert "could not be asked: the daemon did not tell the tools it left out (restart it)" in line
+    assert "could not be asked: the daemon did not tell the tools it left out (status 404; fix restart it)" in line

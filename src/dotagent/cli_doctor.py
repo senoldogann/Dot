@@ -19,14 +19,18 @@ def check_line(result: CheckResult) -> str:
     return f"{mark}  {result.name:<22} {result.detail}\n"
 
 
+# What of an error's context the row tells: the answer's status, its body, the error on the way, and the fix.
+_TOLD: tuple[str, ...] = ("status", "body", "error", "fix")
+
+
 def asking_failed(error: DotError) -> CheckResult:
     """The warn row of a running daemon that could not be asked for the tools it left out (item 1001)."""
-    fix: object = error.context.get("fix")
+    told: list[str] = [f"{key} {error.context[key]}" for key in _TOLD if key in error.context]
     return CheckResult(
         name="mcp tools left out",
         ok=False,
         required=False,
-        detail=f"the running daemon could not be asked: {error.message}" + ("" if fix is None else f" ({fix})"),
+        detail=f"the running daemon could not be asked: {error.message}" + (f" ({'; '.join(told)})" if told else ""),
     )
 
 

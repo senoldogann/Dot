@@ -79,6 +79,9 @@ _POLL_S: float = 0.5
 # A start can include the servers of [[mcp]], the first of which may have to fetch its package.
 _START_WAIT_S: float = 60.0
 _BODY_CHARS: int = 300
+_OK: int = 200
+_NOT_FOUND: int = 404
+_OLDER_DAEMON_FIX: str = "a daemon of an older version has no such answer; 'dotx service restart' restarts it"
 _LEFT_OUT: TypeAdapter[list[LeftOutTool]] = TypeAdapter(list[LeftOutTool])
 _NONCE_BYTES: int = 32
 
@@ -226,15 +229,15 @@ async def daemon_left_out(config: AppConfig) -> list[LeftOutTool] | None:
             raise ServiceError(
                 "asking the daemon for the tools it left out failed", {"url": url, "error": repr(exc)}
             ) from exc
-    if response.status_code != 200:
+    if response.status_code == _NOT_FOUND:
+        raise ServiceError(
+            "the daemon has no answer about the tools it left out",
+            {"url": url, "status": response.status_code, "fix": _OLDER_DAEMON_FIX},
+        )
+    if response.status_code != _OK:
         raise ServiceError(
             "the daemon did not tell the tools it left out",
-            {
-                "url": url,
-                "status": response.status_code,
-                "body": _clip(response.text, _BODY_CHARS),
-                "fix": "a daemon of an older version has no such answer; 'dotx service restart' restarts it",
-            },
+            {"url": url, "status": response.status_code, "body": _clip(response.text, _BODY_CHARS)},
         )
     try:
         return _LEFT_OUT.validate_json(response.content)
