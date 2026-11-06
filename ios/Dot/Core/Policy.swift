@@ -84,7 +84,7 @@ func isRunPage(_ path: String) -> Bool {
 ///
 /// Only the main frame of `https://<host>` on the default port is heard. `body` is what WebKit decoded from the
 /// page's JSON value (`WKScriptMessage.body` is untyped, so it is narrowed here at once); anything but
-/// `{type: "paired", key: "phone.…"}` is refused.
+/// `{type: "paired", key: "phone.…"}` and `{type: "openSettings"}` is refused.
 func readBridgeMessage(body: Any, origin: MessageOrigin, host: DaemonHost) -> Result<BridgeMessage, BridgeRejection> {
     guard origin.isMainFrame else {
         return .failure(.notMainFrame)
