@@ -508,7 +508,7 @@ export function mount(root, ctx) {
       const rest = showing.filter((plugin) => plugin.section !== "popular").length;
       parts.push(el("p", { class: "hint connect-browse" }, `${plural(rest, "more app", "more apps")}: choose All or a section above, or search.`));
     }
-    // The servers of no service belong to no section: a chip that shows one section alone leaves them out.
+    // The servers of no service belong to no section: Connected and a search, which look in every section, list them.
     if (others.length > 0 && (shown === "connected" || words !== "")) {
       parts.push(
         el(
@@ -519,13 +519,13 @@ export function mount(root, ctx) {
         ),
       );
     }
-    // Nothing drawn, whatever left it out (the search, Connected, a chip): the page says so rather than stand empty.
+    // Nothing drawn (a search that found nothing, or Connected with nothing connected): the page says so rather than
+    // stand empty. A search and Connected look in every section, whatever chip is pressed (item 1000).
     if (parts.every((part) => part === null)) {
-      const everywhere = everySection() ? "" : "The chip All looks in every section.";
       parts.push(
         words !== ""
-          ? emptyPanel("search", "No connector matches the search", everywhere)
-          : emptyPanel("plug", everySection() ? "Dot is connected to nothing yet" : "Dot is connected to nothing in this section", "All lists what it works with."),
+          ? emptyPanel("search", "No connector matches the search", "")
+          : emptyPanel("plug", "Dot is connected to nothing yet", "All lists what it works with."),
       );
     }
     parts.push(
