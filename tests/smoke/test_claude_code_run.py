@@ -124,7 +124,13 @@ async def test_a_run_goes_whole_to_claude_code_and_its_calls_go_through_the_gate
         ("--permission-prompts", "none"),
     ):
         assert args[args.index(flag) + 1] == value
-    for flag in ("--include-partial-messages", "--verbose", "--strict-mcp-config", "--disable-slash-commands"):
+    for flag in (
+        "--include-partial-messages",
+        "--replay-user-messages",
+        "--verbose",
+        "--strict-mcp-config",
+        "--disable-slash-commands",
+    ):
         assert flag in args
     door: str = args[args.index("--allowedTools") + 1]
     assert door.startswith("mcp__dot_") and "--resume" not in args

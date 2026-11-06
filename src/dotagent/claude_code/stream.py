@@ -106,7 +106,14 @@ class Result:
     text: str
 
 
-type ClaudeEvent = Init | StepBegan | BlockBegan | Delta | StepFinished | StepClosed | LimitSeen | Result
+@dataclass(frozen=True)
+class Taken:
+    """A message of Dot's the program took in (``--replay-user-messages``): into a turn of its own, or folded into the
+    turn at work (measured on 2.1.318: a message sent while a tool worked was taken into that turn, and one result
+    answered both)."""
+
+
+type ClaudeEvent = Init | StepBegan | BlockBegan | Delta | StepFinished | StepClosed | LimitSeen | Result | Taken
 
 
 def _str(value: object) -> str:
@@ -115,6 +122,29 @@ def _str(value: object) -> str:
 
 def _int(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+# How the init line marks a plugin that comes inside the program itself, which every install has and no flag turns
+# off (`--safe-mode` lists them too): measured on 2.1.318, with `--tools ""` and `--setting-sources ""` they give the
+# model no tool, slash command or skill, and no CLAUDE.md or AGENTS.md reached it (item 1013's first real run).
+_BUILT_IN: str = "builtin"
+
+
+def _added_plugins(value: object) -> tuple[str, ...]:
+    """The plugins of the init line that the program does not come with: one the owner or a project installed, which
+    could bring hooks, agents or skills of its own and so ends the run (:func:`init_problem`)."""
+    if not isinstance(value, list):
+        return ()
+    added: list[object] = [
+        item
+        for item in value
+        if not (
+            isinstance(item, dict)
+            and item.get("path") == _BUILT_IN
+            and _str(item.get("source")).endswith(f"@{_BUILT_IN}")
+        )
+    ]
+    return _names(added)
 
 
 def _names(value: object) -> tuple[str, ...]:
@@ -206,7 +236,7 @@ def read_line(line: str) -> ClaudeEvent | None:
                 mcp_servers=_servers(item.get("mcp_servers")),
                 slash_commands=_names(item.get("slash_commands")),
                 skills=_names(item.get("skills")),
-                plugins=_names(item.get("plugins")),
+                plugins=_added_plugins(item.get("plugins")),
             )
         case "stream_event":
             event: object = item.get("event")
@@ -214,6 +244,8 @@ def read_line(line: str) -> ClaudeEvent | None:
             if not isinstance(event, dict) or item.get("parent_tool_use_id") is not None:
                 return None
             return _stream_event(event)
+        case "user" if item.get("isReplay") is True:
+            return Taken()
         case "rate_limit_event":
             window: LimitWindow | None = limit_of(item.get("rate_limit_info"))
             return None if window is None else LimitSeen(window=window)
