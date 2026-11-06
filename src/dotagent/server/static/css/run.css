@@ -2519,10 +2519,13 @@ dialog.modal.file-dialog .file-picture img {
     translate: -50% 0;
   }
 
-  /* A file still takes all of what is seen. */
+  /* A file still takes all of what is seen, its head under the status bar and the Dynamic Island (item 1006): on the
+     Home Screen and in the iPhone app the page runs under them, and the head with Close and the views stood there,
+     out of reach. */
   .inspector[data-mode="drawer"][data-file="on"] {
     top: var(--seen-top);
     height: auto;
+    padding-top: var(--safe-top);
     border-radius: 0;
   }
 }
