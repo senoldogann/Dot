@@ -18,6 +18,7 @@ from dotagent.core.types import JsonObject
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify.apns import (
     ALERT_BODY,
+    APPROVAL_CATEGORY,
     LIVE_START_BODY,
     ApnsReply,
     ApnsSender,
@@ -280,3 +281,25 @@ def test_each_tool_says_what_the_run_does_in_a_fixed_line() -> None:
     assert tool_now("mcp__google-workspace__gmail_send") == LiveNow(kind="app", line="Using Google Workspace")
     assert tool_now("finish") is None and tool_now("update_plan") is None
     assert tool_now("something_new") == LiveNow(kind="working", line="Working")
+
+
+async def test_an_approval_alert_offers_the_lock_screens_answer_and_a_question_does_not(tmp_path: Path) -> None:
+    """Item 1008: an approval of a step goes with the app's category for Approve and Deny and its id, never what it
+    asks; a question, a secret and a handoff go as a plain alert, which opens Dot."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        run: RunRecord = await _run(store, "schedule", None)
+        step: JsonObject = {"approval_id": "apr_1", "severity": "high", "summary": "Pay 40 EUR", "args": {}}
+        await watch.on_event(_event(run.id, "approval_requested", step), _NOW)
+        asked: JsonObject = apple.posted[-1][2]
+        assert asked["aps"]["category"] == APPROVAL_CATEGORY and asked["approval_id"] == "apr_1"  # type: ignore[index]  # a JSON payload read back
+        assert "Pay" not in json.dumps(asked)
+        for severity in ("question", "secret", "handoff"):
+            other: JsonObject = {"approval_id": "apr_2", "severity": severity, "summary": "x", "args": {}}
+            await watch.on_event(_event(run.id, "approval_requested", other), _NOW)
+            assert "category" not in apple.posted[-1][2]["aps"] and "approval_id" not in apple.posted[-1][2]  # type: ignore[operator]  # a JSON payload read back
+    finally:
+        await store.close()

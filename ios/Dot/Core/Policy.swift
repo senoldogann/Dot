@@ -119,6 +119,14 @@ func isPhoneKey(_ key: String) -> Bool {
         && key.unicodeScalars.allSatisfy { allowed.contains($0) }
 }
 
+/// Whether `text` has the shape of the daemon's approval ids (`apr_…`): letters, digits, `_` and `-`, bounded, so that
+/// one from a notification's payload is a path segment and nothing more (item 1008).
+func isApprovalId(_ text: String) -> Bool {
+    let allowed: CharacterSet = CharacterSet(
+        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
+    return !text.isEmpty && text.count <= 64 && text.unicodeScalars.allSatisfy { allowed.contains($0) }
+}
+
 /// The lowercase hex of a token as APNs and the daemon expect it.
 func hexString(_ data: Data) -> String {
     data.map { String(format: "%02x", $0) }.joined()

@@ -39,6 +39,8 @@ HOSTS: dict[ApnsEnvironment, str] = {
 }
 # How long a provider token is used before a new one is made: APNs refuses one older than an hour.
 TOKEN_EVERY_S: float = 50 * 60.0
+# The app's notification category of an approval, which offers Approve and Deny (item 1008).
+APPROVAL_CATEGORY: str = "DOT_APPROVAL"
 # What an alert says under its title: nothing of what happened, which Apple would read.
 ALERT_BODY: str = "Open Dot to see it."
 # What the banner of a Live Activity's start says: the chat's title is in the activity alone.
@@ -109,6 +111,16 @@ def short_title(title: str) -> str:
 def alert_payload(title: str, route: str) -> JsonObject:
     """An alert: its title, the line that says to open Dot, and the route a tap opens."""
     return {"aps": {"alert": {"title": title, "body": ALERT_BODY}, "sound": "default"}, "route": route}
+
+
+def approval_payload(title: str, route: str, approval_id: str) -> JsonObject:
+    """The alert of an approval a run waits for (item 1008), which the app's notification answers on the lock screen:
+    Approve and Deny, each after Face ID. It carries the approval's id, never what it asks."""
+    return {
+        "aps": {"alert": {"title": title, "body": ALERT_BODY}, "sound": "default", "category": APPROVAL_CATEGORY},
+        "route": route,
+        "approval_id": approval_id,
+    }
 
 
 def live_start_payload(run_id: str, agent_name: str, state: LiveState, now: float) -> JsonObject:

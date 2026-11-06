@@ -23,6 +23,14 @@ struct APNsRegistration: Encodable, Sendable, Equatable {
 }
 
 /// The body of `POST /api/phone/apns/activity`: the update token of one run's Live Activity.
+/// The body of `POST /api/approvals/{id}/decision` from the lock screen (item 1008): a yes or a no, no note, and no
+/// "don't ask again", which is the app's page's to give.
+struct ApprovalDecision: Encodable, Sendable, Equatable {
+    let approve: Bool
+    let note: String
+    let remember: Bool
+}
+
 struct ActivityRegistration: Encodable, Sendable, Equatable {
     let runId: String
     let token: String
@@ -83,6 +91,13 @@ struct DaemonClient: Sendable {
 
     func registerActivity(_ registration: ActivityRegistration, host: DaemonHost, key: String) async throws {
         try await post(path: "/api/phone/apns/activity", body: registration, host: host, key: key)
+    }
+
+    /// Answers the approval `approvalId` (an id `isApprovalId` took) with the phone's key, as the app's page does.
+    func decide(approvalId: String, approve: Bool, host: DaemonHost, key: String) async throws {
+        try await post(
+            path: "/api/approvals/\(approvalId)/decision",
+            body: ApprovalDecision(approve: approve, note: "", remember: false), host: host, key: key)
     }
 
     private func post(path: String, body: some Encodable & Sendable, host: DaemonHost, key: String) async throws {
