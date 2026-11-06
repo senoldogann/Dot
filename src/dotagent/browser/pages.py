@@ -256,6 +256,36 @@ def target_id_of(answer: object) -> str | None:
     return _text(answer, "targetId")
 
 
+def unhanded_tab(made: str, answer: object) -> str:
+    """What Chrome's answer to ``Target.getTargets`` says of the tab ``made`` that Playwright never reported (item
+    1002): gone, or its address (still ``about:blank`` without the mark: its first page never committed), whether a
+    client is attached to it (Playwright attaches to every tab of its context) and whether it is in the browser context
+    of the other tabs. The handover takes 0.01 to 0.15 s, also with every core busy (measured 2026-11-06), and the cause
+    of the times it did not come within 8 s could not be read from the record."""
+    infos: object = answer.get("targetInfos") if isinstance(answer, Mapping) else None
+    tabs: list[Mapping[str, object]] = [
+        info
+        for info in (infos if isinstance(infos, list) else [])
+        if isinstance(info, Mapping) and info.get("type") == "page"
+    ]
+    ours: Mapping[str, object] | None = next((info for info in tabs if _text(info, "targetId") == made), None)
+    if ours is None:
+        return f"Chrome lists no such tab any more; it lists {len(tabs)} other tabs"
+    others: set[str] = {
+        theirs for info in tabs if info is not ours and (theirs := _text(info, "browserContextId")) is not None
+    }
+    context: str | None = _text(ours, "browserContextId")
+    where: str = (
+        "no other tab to compare its browser context with"
+        if not others
+        else "the browser context of the other tabs"
+        if context in others
+        else "a browser context no other tab is in"
+    )
+    attached: str = "attached" if ours.get("attached") is True else "not attached"
+    return f"Chrome lists the tab at {_text(ours, 'url') or 'no address'!r}, {attached}, in {where}"
+
+
 async def page_target_id(page: Page) -> str | None:
     """The id Chrome gives the tab of ``page``, ``None`` when the page cannot tell it (closed since)."""
     try:
