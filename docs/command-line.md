@@ -2,8 +2,8 @@
 
 `dotx setup` checks this Mac, asks for the model Dot runs on and stores its key, and installs the service (see
 [Install](../README.md#install)); `dotx --help` lists every command, and `dotx COMMAND --help` its flags. The model it
-asks for is also the fast and review model (and the vision model when it sees images), except one of Zen's free models,
-which answers only as OpenCode's own agent and so is the main model alone. With the models of a provider other than
+asks for is also the fast and review model (and the vision model when it sees images), except a model that answers only as
+its own agent (one of Zen's free models through OpenCode, or Claude Code's on your plan), which is the main model alone. With the models of a provider other than
 Ollama it asks the Ollama of this Mac for `bge-m3`, and where there is none it writes `[memory] embed_enabled = false`
 (the notes are found by their words alone, as `dotx doctor` then expects) and says how to switch it back on.
 

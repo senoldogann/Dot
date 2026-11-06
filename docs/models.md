@@ -284,7 +284,9 @@ answer keeps its words, Ollama's too.
   file only you can read in a folder of the run's own, removed as the run ends, never in the program's arguments. The
   timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
   window; your messages reach it while it works, and Stop ends the program. A chat keeps its Claude Code session from
-  run to run (it is resumed, and hears what the chat said on other models since); a rewind lets it go. The run's limits
+  run to run (it is resumed, and hears what the chat said on other models since) while each run ends clean; a run that
+  fails, is stopped or is cut at its limits lets the session go, and so does a rewind, and the next run starts a new
+  one that hears the chat with its first message. The run's limits
   (`run_max_minutes`, `run_max_tokens`) bind it as they bind OpenCode's agent, and a reply cut at the model's output
   limit ends the run failed. When the plan's window is used up, the run ends failed and says which window and when it
   resets: nothing moves the run to another model on its own. A program that writes nothing for
