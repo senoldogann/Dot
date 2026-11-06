@@ -6,8 +6,8 @@ import asyncio
 import json
 from collections.abc import Sequence
 
-from dotagent.agent.review import HarnessProposal, ProposalRequest
-from dotagent.core.errors import DotError, NotFoundError, ProviderProtocolError
+from dotagent.agent.review import HarnessProposal, ProposalRequest, UnusableAnswer
+from dotagent.core.errors import DotError, NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.harness.components import HarnessText
@@ -172,7 +172,7 @@ async def night(runtime: Runtime, now: float) -> HarnessStep:
     step: HarnessStep = await night_digest(runtime.store, runtime.config.harness, now, runtime.schedule_zone)
     try:
         said: str = await week(runtime, now)
-    except ProviderProtocolError as error:
+    except UnusableAnswer as error:
         log.warning("harness_week_unusable", step=step.id, error=error.message)
         unusable: str = f"the proposal was unusable: {error.message}"
         kept: JsonObject = json.loads(step.outcome)

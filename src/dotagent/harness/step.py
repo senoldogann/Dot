@@ -24,6 +24,7 @@ from dotagent.agent.review import (
     ExperienceRequest,
     HarnessComposition,
     ProposalScope,
+    UnusableAnswer,
 )
 from dotagent.config import HarnessConfig
 from dotagent.core.errors import DotError, InvalidValueError, ProviderProtocolError
@@ -242,7 +243,7 @@ def state_of(outcome: _Outcome) -> HarnessStepState:
     return outcome.state
 
 
-def _unusable(answer: str, error: ProviderProtocolError) -> str:
+def _unusable(answer: str, error: UnusableAnswer) -> str:
     """How the record says that ``answer`` (``the task writer's answer``) stayed unusable after its attempts (item
     1015), and why."""
     return f"{answer} was unusable: {error.message}"
@@ -338,7 +339,7 @@ async def _carry_out(
         if task_run is not None:
             try:
                 written, task_note = await write_task(runtime, task_run, prober)
-            except ProviderProtocolError as exc:
+            except UnusableAnswer as exc:
                 log.warning("harness_task_unusable", step=step.id, error=exc.message)
                 unusable.append(_unusable("the task writer's answer", exc))
                 written, task_note = None, "no task: the writer's answer was unusable"
@@ -375,7 +376,7 @@ async def _carry_out(
     elif not plan.scripted and task_run is not None:
         try:
             learned, learned_note = await write_task(runtime, task_run, prober)
-        except ProviderProtocolError as exc:
+        except UnusableAnswer as exc:
             log.warning("harness_task_unusable", step=step.id, error=exc.message)
             unusable.append(_unusable("the task writer's answer", exc))
             learned_note = "no task: the writer's answer was unusable"
@@ -416,10 +417,16 @@ async def _carry_out(
     for scope in plan.scopes:
         try:
             candidate: HarnessVersion | None = await propose_from_run(runtime, from_run, scope)
-        except ProviderProtocolError as exc:
+        except UnusableAnswer as exc:
             log.warning("harness_proposal_unusable", step=step.id, scope=scope, error=exc.message)
             unusable.append(_unusable(f"the proposer's answer in the {scope} scope", exc))
             proposals_unusable += 1
+            continue
+        except ProviderProtocolError as exc:
+            # A provider's broken reply (not the model's answer) is a failure, as before item 1015; the other scopes
+            # are still proposed (item 718).
+            log.warning("harness_proposal_failed", step=step.id, scope=scope, error=exc.message)
+            errors.append(f"the proposer failed in the {scope} scope: {exc.message}")
             continue
         if candidate is not None:
             candidates.append(candidate)
@@ -436,7 +443,7 @@ async def _carry_out(
     async def write_experience(probed: HarnessVersion | None) -> None:
         try:
             await _write_experience(runtime, step, from_run, base_text, candidates, contrasts, probed, held)
-        except ProviderProtocolError as exc:
+        except UnusableAnswer as exc:
             # An answer that stayed unusable is recorded as such (item 1015), and no experience is kept from it.
             log.warning("harness_experience_unusable", step=step.id, error=exc.message)
             unusable.append(_unusable("the experience writer's answer", exc))
@@ -518,7 +525,7 @@ async def _carry_out(
             composed = await _compose(
                 runtime, step, from_run, base_text, [by_label[found.label] for found in winners], winners, held
             )
-        except ProviderProtocolError as exc:
+        except UnusableAnswer as exc:
             log.warning("harness_composer_unusable", step=step.id, error=exc.message)
             unusable.append(_unusable("the composer's answer", exc))
             composed = None

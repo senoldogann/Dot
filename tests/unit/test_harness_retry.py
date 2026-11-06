@@ -15,6 +15,7 @@ from dotagent.agent.review import (
     HarnessProposal,
     HarnessTaskAnswer,
     ProposalRequest,
+    UnusableAnswer,
     harness_proposer_for,
     proposal_check,
     retry_note,
@@ -192,3 +193,22 @@ async def test_a_proposer_still_wrong_after_three_attempts_raises_the_last_probl
     with pytest.raises(ProviderProtocolError, match="the tool guidance cannot be a component of the harness: too long"):
         await _asked(provider)
     assert len(provider.asked) == 3
+
+
+class BrokenWireProvider(AskedProvider):
+    """A provider whose reply is broken on the wire (a body that is no JSON), not a model's answer."""
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        self.asked.append(request.messages[-1].content)
+        raise ProviderProtocolError("the provider answered with a body that is not a JSON object", {"status": 200})
+
+
+async def test_an_answer_the_checks_refuse_is_unusable_and_a_broken_wire_is_not() -> None:
+    """Item 1015's pre-push review: only the model's own answer is an UnusableAnswer, which a night records without
+    failing; a provider's broken reply stays a plain ProviderProtocolError, which fails the night as before."""
+    long_guidance: str = "- " + "settle " * 40
+    with pytest.raises(UnusableAnswer):
+        await _asked(AskedProvider([_proposal(long_guidance)] * 3))
+    with pytest.raises(ProviderProtocolError) as broken:
+        await _asked(BrokenWireProvider([]))
+    assert not isinstance(broken.value, UnusableAnswer)

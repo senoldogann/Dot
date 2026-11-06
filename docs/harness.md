@@ -211,7 +211,7 @@ the guards, a step scores on at most `headroom_tasks` tasks with headroom (6, th
 `pool_tasks`: the eval tasks safe to repeat that read nothing of the web, never one of the final set or a guard. With
 fewer than `headroom_least` tasks with headroom known (2), nothing is proposed, which spends no proposer and writes no
 candidate that nothing could judge: the base alone tries `calibrate_tasks` tasks of the pool it does not know yet (6,
-the untried first), the step is recorded `calibrating`, and its decision says how many tasks have headroom and how many
+the untried first), the step is recorded `calibrating` (or `unusable`, when the task writer's answer was, below), and its decision says how many tasks have headroom and how many
 are left to try. Such a step learns from no run and takes none, whatever it comes to (tried, failed, nothing to learn),
 not even the run named with `--run`: the window of runs the next step reads opens at the last step that took a run, and
 a week back at most, so the run that went worst meanwhile is still there for it. A new version in use starts its own
@@ -239,7 +239,7 @@ which tasks nor how each went; the task by task contrast (`write-todo-note: bett
 version's notes and in the step's record, for you to read on the page and with `dotx harness show`. The proposer reads
 the experience library, and so an experience that names a task of the scoring set or of the final set (by its id as the
 catalog writes it, `bump-version`, in any case; the words of its description, `bump version`, name nothing) is
-refused: the writer is asked again, without being told which task, and a writer that names one again fails the step.
+refused: the writer is asked again, without being told which task, and a writer that names one again leaves the step `unusable` (item 1015), its reason recorded.
 An experience stored before is left out of what the proposer reads, as is one written from a run that read content
 third parties can author, and both are left out before the newest twelve are taken, so that twelve such nights in a
 row do not hide the experience before them.
@@ -410,7 +410,7 @@ Since item 1015:
 - **Its own state.** A night or a step that made no change and lost an answer so is recorded `unusable` (*answer
   unusable* on the page, an amber cell in the strip, named in its legend), neither `failed` nor *no change*; one that
   still probed a version is `done`, its record naming the answer. Something that failed (a probe that did not start, a
-  role that could not be reached) is `failed` as before, and only `failed` counts as a failure of learning and is
+  role that could not be reached, a provider's broken reply such as a body that is no JSON) is `failed` as before, and only `failed` counts as a failure of learning and is
   handed to the repair night: an answer the checks refuse is the checks at work.
 - **The week's proposal.** One that stays unusable makes the week's word `the proposal was unusable: <why>`, and the
   week is not spent: the next night asks again, as after a network error. A weak model's answer says nothing of the

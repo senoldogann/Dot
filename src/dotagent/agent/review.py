@@ -1705,7 +1705,14 @@ def _verdict_from[V: FrozenModel](
         ) from failed
 
 
-class FixableAnswerError(ProviderProtocolError):
+class UnusableAnswer(ProviderProtocolError):
+    """An answer the review model gave that cannot be used (item 1015's pre-push review): no call of its tool,
+    arguments that are not a valid verdict, or a verdict a check refused. Its own doing, which it may get right when
+    asked again, unlike a provider's broken wire (a body that is no JSON, a stream line cut), which stays a
+    :class:`ProviderProtocolError` of the layer below and fails what asked."""
+
+
+class FixableAnswerError(UnusableAnswer):
     """An answer of the review model that a check refused, with what to change in it (``fix``, item 1015): the note
     that asks again tells the model that, as well as what was wrong."""
 
@@ -1800,9 +1807,15 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
     # A text past its bound is cut only when, whole, it holds none of the values Dot holds (item 840): refused, as the
     # gates of what is learned refuse, so `filled` is false; read only when a text would be cut, off the event loop,
     # as every read of them is (the pre-push review).
-    return await asyncio.to_thread(
-        _verdict_from, reply, question.tool.name, question.verdict_type, ref.label, _refused_values
-    )
+    try:
+        return await asyncio.to_thread(
+            _verdict_from, reply, question.tool.name, question.verdict_type, ref.label, _refused_values
+        )
+    except UnusableAnswer:
+        raise
+    except ProviderProtocolError as error:
+        # The reply came whole and the model's answer in it was not one its tool takes: the model's, not the wire's.
+        raise UnusableAnswer(error.message, error.context) from error
 
 
 def _as_is[V: FrozenModel](verdict: V) -> V:
@@ -1899,7 +1912,7 @@ async def _decide_checked[V: FrozenModel, R](question: _Question[V], check: Call
     note: str = ""
     for attempt in range(1, attempts):
         try:
-            return check(await _attempt(question, note))
+            return await _answered(question, check, note)
         except ProviderProtocolError as error:
             fix: str = error.fix if isinstance(error, FixableAnswerError) else ""
             log.warning(
@@ -1911,7 +1924,19 @@ async def _decide_checked[V: FrozenModel, R](question: _Question[V], check: Call
                 fix=fix,
             )
             note = retry_note(question.tool.name, error.message, fix)
-    return check(await _attempt(question, note))
+    return await _answered(question, check, note)
+
+
+async def _answered[V: FrozenModel, R](question: _Question[V], check: Callable[[V], R], note: str) -> R:
+    """One attempt: the verdict, which ``check`` turns into the answer; a verdict ``check`` refuses is an
+    :class:`UnusableAnswer`, as a reply that holds no verdict is (:func:`_attempt`)."""
+    verdict: V = await _attempt(question, note)
+    try:
+        return check(verdict)
+    except UnusableAnswer:
+        raise
+    except ProviderProtocolError as error:
+        raise UnusableAnswer(error.message, error.context) from error
 
 
 def reviewer_for(
