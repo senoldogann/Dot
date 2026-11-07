@@ -220,8 +220,10 @@ async def _open(
 ) -> Page:
     """A page signed in at the home, in a browser of its own, with `stand_ins` in the place of the voice; with `clock`,
     one whose time the test moves (`page.clock.run_for`)."""
+    # No service worker: once Dot's controls the page, its requests go through it, and a route of the page's own (the
+    # Mac's answer to ``POST /api/voice/allow``) never sees them; which test it takes over first depends on the order.
     context: BrowserContext = await browser.new_context(
-        viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+        viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce", service_workers="block"
     )
     await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
     await context.add_init_script(stand_ins)

@@ -217,10 +217,13 @@ async def test_each_steps_thinking_is_a_block_that_folds_live_and_loaded_again(
             )
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
-                # The page follows the run once its stream answers (the server listens to the run as it answers): then
-                # the model starts to think.
+                # The page follows the run once its live stream answers (the server listens to the run as it answers):
+                # then the model starts to think. The page reads the stored events first, on a stream of their own
+                # (``stored=true``, item 734), which a thought streamed meanwhile never reaches.
                 page: Page = await _signed_in(browser, address, 1280, "light")
-                async with page.expect_response(lambda response: f"/runs/{run.id}/stream" in response.url):
+                async with page.expect_response(
+                    lambda response: f"/runs/{run.id}/stream" in response.url and "stored=true" not in response.url
+                ):
                     await page.goto(f"{address}/#/runs/{run.id}")
                 start.set()
                 # While the model thinks: "Thinking…" with the brain, folded, the start of the thought beside it.
