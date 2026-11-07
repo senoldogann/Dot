@@ -43,6 +43,7 @@ type ConfigTable = Literal[
     "browser",
     "builtin_mcp",
     "channels",
+    "harness",
     "initiative",
     "judge",
     "memory",
@@ -72,6 +73,7 @@ type BrowserSetting = Literal[
     "zoom",
 ]
 type BuiltinMcpSetting = Literal["web_research"]
+type HarnessSetting = Literal["proposer", "composer", "selector", "experience"]
 type InitiativeSetting = Literal["look_model"]
 type JudgeSetting = Literal["provider"]
 type MemorySetting = Literal["embed_enabled"]
@@ -101,6 +103,7 @@ type SettingKey = (
     | BrowserSetting
     | BuiltinMcpSetting
     | ChannelsSetting
+    | HarnessSetting
     | InitiativeSetting
     | JudgeSetting
     | MemorySetting
@@ -367,6 +370,12 @@ def set_look_model(path: Path, model: str) -> None:
     """Write ``[initiative] look_model``, the model of the run that looks for work on Dot's own initiative ("" for the
     default model, items 910 and 916), into the config file at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "initiative", "look_model", model)
+
+
+def set_learning_model(path: Path, role: HarnessSetting, model: str) -> None:
+    """Write ``[harness] <role>``, the model of a role of the improvement loop ("" for the review model, item 1033),
+    into the config file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "harness", role, model)
 
 
 def set_resume(path: Path, mode: ResumeMode) -> None:

@@ -26,6 +26,13 @@ const FILES = { opencode: "opencode_go", claude_code: "anthropic" };
 // 1013, `WHOLE_RUN_AGENTS` in llm/types.py): the program keeps its own window, and none can be a fallback model.
 export const WHOLE_RUN = new Set(["opencode", "claude_code"]);
 
+/** Whether a model of `provider` can do the work of `role` of Dot's own work (`answers_role` in llm/types.py): one that
+ * answers only as its own agent cannot, but the owner's Claude plan may answer the review model's single questions,
+ * and those of the improvement loop's roles, which play on it (items 1032 and 1033). */
+export function answersRole(role, provider) {
+  return !WHOLE_RUN.has(provider) || (role === "review" && provider === "claude_code");
+}
+
 /**
  * The mark of a provider: the provider's SVG (`static/icons/providers/`) drawn inline in the colour of the text around
  * it (item 959, `inked.js`); `data-provider` names the mark. An unknown provider wears the generic mark.

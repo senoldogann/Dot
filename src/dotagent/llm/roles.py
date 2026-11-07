@@ -5,22 +5,36 @@ which reads images for a model that cannot; and the standby models a run moves t
 keeps too; so does it the model that looks for work on Dot's own initiative (``[initiative] look_model``, items 910 and
 916), "" for the default model."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Literal
 
-from dotagent.config import ModelReference, ModelsConfig
+from dotagent.config import HarnessConfig, ModelReference, ModelsConfig
 from dotagent.core.logs import get_logger
 
 log = get_logger(__name__)
 
 type ModelRole = Literal["fast", "review", "vision"]
+# The roles of the improvement loop (item 390, ``[harness]``): each a single question, on the review model unless one is
+# named for it.
+type LearningRole = Literal["proposer", "composer", "selector", "experience"]
+LEARNING_ROLES: tuple[LearningRole, ...] = ("proposer", "composer", "selector", "experience")
+
+
+def learning_of(harness: HarnessConfig) -> dict[LearningRole, str]:
+    """The model ``[harness]`` names for each role of the improvement loop, "" for the review model."""
+    return {
+        "proposer": harness.proposer,
+        "composer": harness.composer,
+        "selector": harness.selector,
+        "experience": harness.experience,
+    }
 
 
 class ModelRoles:
     """The models of Dot's own work, as the config file named them when the runtime was built or as the owner chose them
     since (:meth:`choose`). One per runtime, read as each call is made, so that a choice holds from the next call on."""
 
-    def __init__(self, models: ModelsConfig, look: str) -> None:
+    def __init__(self, models: ModelsConfig, look: str, learning: Mapping[LearningRole, str]) -> None:
         self._models: dict[ModelRole, ModelReference] = {
             "fast": models.fast,
             "review": models.review,
@@ -28,6 +42,7 @@ class ModelRoles:
         }
         self._standby: tuple[ModelReference, ...] = tuple(models.standby)
         self._look: str = look
+        self._learning: dict[LearningRole, str] = {role: learning[role] for role in LEARNING_ROLES}
 
     def fast(self) -> ModelReference:
         return self._models["fast"]
@@ -52,6 +67,22 @@ class ModelRoles:
         its own."""
         self._look = model
         log.info("look_model_set", model=model)
+
+    def learning(self, role: LearningRole) -> str:
+        """The model named for ``role`` of the improvement loop (``[harness] <role>``), "" when it plays on the review
+        model."""
+        return self._learning[role]
+
+    def learning_model(self, role: LearningRole) -> ModelReference:
+        """The model that plays ``role`` of the improvement loop: the one named for it, else the review model."""
+        named: str = self._learning[role]
+        return named if named != "" else self.review()
+
+    def choose_learning(self, role: LearningRole, model: str) -> None:
+        """Have ``model`` ("" for the review model) play ``role`` of the improvement loop from its next question on
+        (item 1033); a question under way keeps its own."""
+        self._learning[role] = model
+        log.info("learning_model_set", role=role, model=model)
 
     def after_review(self, own: Sequence[ModelReference] = ()) -> tuple[ModelReference, ...]:
         """The models a question of Dot's own learning goes to, in turn, when the review model declines it or cannot

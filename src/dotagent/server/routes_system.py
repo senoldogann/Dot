@@ -47,6 +47,7 @@ from dotagent.config_edit import (
     set_default_model,
     set_free_mode,
     set_judge_provider,
+    set_learning_model,
     set_resume,
     set_role_model,
     set_shell_sandbox,
@@ -105,6 +106,7 @@ from dotagent.help.elsewhere import (
 )
 from dotagent.launchd import JobState, inspect_job, service_runs
 from dotagent.llm.opencode import OPENCODE_PROVIDER
+from dotagent.llm.roles import ModelRoles
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS, Effort, ModelInfo, answers_role
@@ -132,6 +134,8 @@ from dotagent.server.views import (
     JudgeView,
     LearnedSkillsView,
     LearnedSkillView,
+    LearningModelRequest,
+    LearningModels,
     MainModelRequest,
     ModelOption,
     PaletteView,
@@ -467,6 +471,44 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         await asyncio.to_thread(set_role_model, config_path(), request.role, request.model)
         ctx.runtime.roles.choose(request.role, request.model)
         return models_now()
+
+    def learning_now() -> LearningModels:
+        roles: ModelRoles = ctx.runtime.roles
+        return LearningModels(
+            proposer=roles.learning("proposer"),
+            composer=roles.learning("composer"),
+            selector=roles.learning("selector"),
+            experience=roles.learning("experience"),
+            review=roles.review(),
+        )
+
+    @router.get("/models/learning")
+    async def learning_models() -> LearningModels:
+        """The model of each role of the improvement loop (item 1033), "" where it plays on the review model."""
+        return learning_now()
+
+    @router.put("/models/learning")
+    async def choose_learning_model(request: LearningModelRequest) -> LearningModels:
+        """Have ``model`` play a role of the improvement loop from its next question on (item 1033), "" for the review
+        model; the config file keeps it as ``[harness] <role>``. Each role is a single question, as the review model's
+        are: a model the review model could not be (one that cannot use actions, one of Zen's free models) is refused,
+        and nothing changes."""
+        if request.model != "":
+            ref: ModelRef = parse_model_ref(request.model)
+            whole: str | None = WHOLE_RUN_AGENTS.get(ref.provider)
+            if whole is not None and not answers_role("review", ref.provider):
+                raise ConfigError(
+                    f"{ref.label} answers only as {whole}, so it cannot play a role of the learning; pick another",
+                    {"model": request.model, "role": request.role},
+                )
+            info: ModelInfo = await ctx.runtime.router.model_info(ref)
+            if not info.tools:
+                raise ConfigError(
+                    f"the {request.role} of the learning must be a model that can use actions", {"model": ref.label}
+                )
+        await asyncio.to_thread(set_learning_model, config_path(), request.role, request.model)
+        ctx.runtime.roles.choose_learning(request.role, request.model)
+        return learning_now()
 
     @router.put("/models/standby")
     async def choose_standby_models(request: StandbyModelsRequest) -> ModelsConfig:

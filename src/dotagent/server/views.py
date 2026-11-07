@@ -35,7 +35,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.desktop.snapshots import SnapshotTaken
 from dotagent.help.elsewhere import FoundElsewhere
-from dotagent.llm.roles import ModelRole
+from dotagent.llm.roles import LearningRole, ModelRole
 from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource
 from dotagent.mcp.catalogue import ServiceKind
 from dotagent.mcp.types import McpFailure
@@ -751,6 +751,24 @@ class RoleModelRequest(FrozenModel):
 
     role: ModelRole
     model: ModelReference
+
+
+class LearningModelRequest(FrozenModel):
+    """The model of a role of the improvement loop (item 1033): ``model`` "" plays it on the review model."""
+
+    role: LearningRole
+    model: str
+
+
+class LearningModels(FrozenModel):
+    """The model named for each role of the improvement loop, "" where it plays on the review model (item 1033), and
+    the review model it then plays on."""
+
+    proposer: str
+    composer: str
+    selector: str
+    experience: str
+    review: str
 
 
 # How many standby models Settings › Models keeps at most (item 478): a run takes each once at most.

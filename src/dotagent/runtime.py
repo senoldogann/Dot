@@ -69,7 +69,7 @@ from dotagent.help.added import AddedServers, added_server_configs, read_added_s
 from dotagent.help.meaning import HelpVectors
 from dotagent.launchd import launch_agent_path
 from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
-from dotagent.llm.roles import ModelRoles
+from dotagent.llm.roles import ModelRoles, learning_of
 from dotagent.llm.router import ModelRouter
 from dotagent.mcp.builtin import builtin_servers
 from dotagent.mcp.connected import ConnectedServers, read_connected
@@ -594,7 +594,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             vault=OnePassword(None),
             vault_items=VaultItems(store, LoginKeychain(keychain_file())),
             router=router,
-            roles=ModelRoles(config.models, config.initiative.look_model),
+            roles=ModelRoles(config.models, config.initiative.look_model, learning_of(config.harness)),
             context_sizes=router.context_sizes,
             judge=judge_for(config, typesafe),
             typesafe=typesafe,

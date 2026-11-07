@@ -385,6 +385,9 @@ For the composer, keeping the base needs no texts, decisions or summary. For the
 is none. What a change cannot do without is still asked again: its summary, and a composition's texts. The tools'
 schemas still ask for every field.
 `[harness] proposer`, `composer`, `selector` and `experience` name a model for each; "" is `[models] review`.
+Settings › Models chooses the proposer, the composer and the experience writer while the daemon runs (item 1033,
+`PUT /api/models/learning`), from their next question on, and the config file keeps the choice; a model there is one
+the review model could be, a model of your Claude plan among them.
 
 ### When an answer stays unusable
 
