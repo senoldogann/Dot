@@ -226,8 +226,39 @@ async def _phone(playwright: Playwright, browser: Browser, device: str, address:
     return page
 
 
-async def _misfits(page: Page, where: str, iphone: bool) -> list[str]:
+# How many frames a page is given to report its touch screen and to stand still (about 5 s at 60 frames a second).
+_SETTLE_FRAMES: int = 300
+# Whether the page's style sheets see a touch screen, read at the next frame: app.css gives a field 16 px under
+# `(pointer: coarse)` only.
+_COARSE_NEXT_FRAME: str = (
+    "() => new Promise((done) => requestAnimationFrame(() => done(matchMedia('(pointer: coarse)').matches)))"
+)
+_NEXT_FRAME: str = "() => new Promise((done) => requestAnimationFrame(() => done(null)))"
+
+
+async def _settled_fit(page: Page, where: str, iphone: bool) -> Fit:
+    """What the page measures once it is as a phone shows it (item 1024): on a phone other than an iPhone, once the
+    browser reports a touch screen, which is what gives a field its 16 px (CI's first attempt twice measured every field
+    at its size without one, `(pointer: coarse)` not yet in force); and once two measures a frame apart agree, which
+    replaces a pause of 300 ms."""
+    if not iphone:
+        for _ in range(_SETTLE_FRAMES):
+            if await page.evaluate(_COARSE_NEXT_FRAME):
+                break
+        else:
+            raise AssertionError(f"{where}: the browser never reported a touch screen (pointer: coarse)")
     fit: Fit = await page.evaluate(_FIT)
+    for _ in range(_SETTLE_FRAMES):
+        await page.evaluate(_NEXT_FRAME)
+        again: Fit = await page.evaluate(_FIT)
+        if again == fit:
+            return fit
+        fit = again
+    raise AssertionError(f"{where}: the page never stood still: {fit}")
+
+
+async def _misfits(page: Page, where: str, iphone: bool) -> list[str]:
+    fit: Fit = await _settled_fit(page, where, iphone)
     found: list[str] = []
     if fit["wider"] > 0 or fit["slid"] > 0:
         found.append(f"{where}: {fit['wider']} px wider than the screen, slides {fit['slid']} px")
@@ -247,7 +278,6 @@ async def _pages_of(playwright: Playwright, browser: Browser, device: str, addre
     for where in hashes:
         await page.goto(f"{address}/{where}")
         await expect(page.locator("main.page")).not_to_be_empty()
-        await page.wait_for_timeout(300)
         found.extend(await _misfits(page, f"{device} {where}", iphone))
     await page.goto(f"{address}/#/runs/{run_id}")
     await expect(page.get_by_text("Column 9")).to_be_visible()
