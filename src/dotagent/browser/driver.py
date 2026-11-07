@@ -1350,9 +1350,23 @@ def _script_error(raw: str) -> str:
     return "\n".join(line for line in lines if not line.startswith(_STACK_LINE)).strip()
 
 
+def _frame_of_ref(ref: str) -> str:
+    """The frame part of a ref of the right format (``f2`` of ``f2e7``; empty for the page's own frame)."""
+    return ref.partition("e")[0]
+
+
 async def _elements_of(page: Page, refs: Sequence[str]) -> tuple[Frame, list[ElementHandle]]:
     """The elements the refs ``refs`` of the latest snapshot stand for (:func:`live_locator`), and the frame they share:
     a script runs in one document, so the elements of two frames cannot be given to one script."""
+    # A ref names its frame (`f2e7` is in the frame Playwright numbered 2, `e7` in the page's own): refs of two frames
+    # are told by their names, before the page is asked anything (item 1021), which a busy page may be slow to answer.
+    # A ref of the wrong format is left to live_locator, which says so.
+    well_formed: bool = all(_REF_FORMAT.fullmatch(ref) is not None for ref in refs)
+    if well_formed and len({_frame_of_ref(ref) for ref in refs}) > 1:
+        raise BrowserError(
+            "the refs are in different frames of the page: give one script the elements of one frame",
+            {"action": "script", "refs": ", ".join(refs), "url": page.url},
+        )
     handles: list[ElementHandle] = []
     frames: list[Frame] = []
     for ref in refs:

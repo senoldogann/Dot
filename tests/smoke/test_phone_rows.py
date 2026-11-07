@@ -129,6 +129,10 @@ async def _measure(served: tuple[RunManager, str], run_id: str) -> dict[str, obj
             )  # the steps this test reads (item 830)
             page: Page = await context.new_page()
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            # The chat's page says when it shows the chat as it opens (PAGE_READY_EVENT, views/run.js).
+            await page.add_init_script(
+                "document.addEventListener('dot:page-ready', () => { window.dotPageReady = true; }, true)"
+            )
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             await page.goto(f"{address}/#/runs/{run_id}")
             await page.wait_for_selector(".run-main", timeout=20000)
@@ -139,11 +143,39 @@ async def _measure(served: tuple[RunManager, str], run_id: str) -> dict[str, obj
                 "() => document.querySelectorAll('.run-main details.steps').forEach((node) => { node.open = true; })"
             )
             await page.wait_for_selector(".run-main .steps-body .tool-head", state="visible", timeout=20000)
-            found: dict[str, object] = await page.evaluate(_ROWS)
+            found: dict[str, object] = await _settled_rows(page)
             await context.close()
             return found
         finally:
             await browser.close()
+
+
+# How many times the rows are measured at most before the page is taken as never settling.
+_SETTLE_TRIES: int = 50
+# Two frames after the fonts are in: what a measure that comes after a layout of the page waits for.
+_NEXT_FRAMES: str = """() => document.fonts.ready.then(
+  () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(null))))
+)"""
+
+
+async def _settled_rows(page: Page) -> dict[str, object]:
+    """The rows once the chat's page said it is shown and two measures two frames apart agree (item 1021): measured as
+    the group opened, a loaded runner gave a pitch of 39 px once, a state of the page on its way that a quiet Mac never
+    shows; the condition waits for the page instead of a time."""
+    for _ in range(_SETTLE_TRIES):
+        if await page.evaluate("() => window.dotPageReady === true"):
+            break
+        await page.evaluate(_NEXT_FRAMES)
+    else:
+        raise AssertionError("the chat's page never said it was shown")
+    found: dict[str, object] = await page.evaluate(_ROWS)
+    for _ in range(_SETTLE_TRIES):
+        await page.evaluate(_NEXT_FRAMES)
+        again: dict[str, object] = await page.evaluate(_ROWS)
+        if again == found:
+            return found
+        found = again
+    raise AssertionError(f"the rows never stood still: {found}")
 
 
 async def test_a_runs_rows_stand_close_on_a_phone(served: tuple[RunManager, str]) -> None:
