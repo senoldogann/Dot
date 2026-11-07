@@ -47,12 +47,18 @@ def repo(tmp_path: Path) -> Path:
 
 def _run_hook(repo: Path, tmp_path: Path, local: str, remote: str) -> tuple[subprocess.CompletedProcess[str], int]:
     """The hook as git runs it before a push of ``local`` over ``remote``, and how many times the stand-in was asked."""
+    return _run_hook_on(repo, tmp_path, f"refs/heads/feature {local} refs/heads/feature {remote}\n")
+
+
+def _run_hook_on(repo: Path, tmp_path: Path, refs: str) -> tuple[subprocess.CompletedProcess[str], int]:
+    """The hook as git runs it with ``refs`` on its stdin; the stand-in reads its stdin whole, as `claude -p` does."""
     bin_dir: Path = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     asked: Path = tmp_path / "asked"
     stand_in: Path = bin_dir / "claude"
     stand_in.write_text(
-        f'#!/bin/sh\necho asked >> "{asked}"\necho "No issues found."\necho "VERDICT: PASS"\n', encoding="utf-8"
+        f'#!/bin/sh\ncat > /dev/null\necho asked >> "{asked}"\necho "No issues found."\necho "VERDICT: PASS"\n',
+        encoding="utf-8",
     )
     stand_in.chmod(0o755)
     env = {key: value for key, value in os.environ.items() if key != "ANTHROPIC_API_KEY"}
@@ -60,7 +66,7 @@ def _run_hook(repo: Path, tmp_path: Path, local: str, remote: str) -> tuple[subp
     done = subprocess.run(
         ["bash", str(_HOOK)],
         cwd=repo,
-        input=f"refs/heads/feature {local} refs/heads/feature {remote}\n",
+        input=refs,
         capture_output=True,
         text=True,
         env=env,
@@ -74,8 +80,16 @@ def test_a_first_push_is_reviewed(repo: Path, tmp_path: Path) -> None:
     assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
 
 
+def _passed(repo: Path, sha: str) -> None:
+    """Records that ``sha`` passed the review here, as the hook does after a PASS."""
+    review_dir: Path = Path(_git(repo, "rev-parse", "--absolute-git-dir")) / "claude-review"
+    review_dir.mkdir(exist_ok=True)
+    (review_dir / f"{sha}.pass").touch()
+
+
 def test_a_push_that_only_brings_main_in_is_not_reviewed_again(repo: Path, tmp_path: Path) -> None:
     pushed: str = _git(repo, "rev-parse", "HEAD")
+    _passed(repo, pushed)
     # Main moves in a file the change does not touch, and the branch takes it in cleanly.
     _git(repo, "checkout", "-q", "main")
     _commit(repo, "other.txt", "other, moved on\n", "main moves")
@@ -151,3 +165,46 @@ def test_a_push_that_only_changes_whitespace_of_the_change_is_reviewed(repo: Pat
     _commit(repo, "feature.txt", "  its own change\n", "re-indent")
     done, asked = _run_hook(repo, tmp_path, _git(repo, "rev-parse", "HEAD"), pushed)
     assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+
+
+def _main_moves_and_the_branch_takes_it(repo: Path) -> None:
+    _git(repo, "checkout", "-q", "main")
+    _commit(repo, "other.txt", "another session's merged change\n", "main takes another pull request")
+    _git(repo, "push", "-q", "origin", "main")
+    _git(repo, "checkout", "-q", "feature")
+    _git(repo, "merge", "-q", "-m", "merge main", "main")
+    _git(repo, "fetch", "-q", "origin")
+
+
+def test_a_merge_of_main_whose_remote_tip_was_not_reviewed_here_is_reviewed(repo: Path, tmp_path: Path) -> None:
+    """Item 1020: a remote tip pushed with --no-verify, or from another checkout, vouches for nothing."""
+    pushed: str = _git(repo, "rev-parse", "HEAD")
+    _main_moves_and_the_branch_takes_it(repo)
+    done, asked = _run_hook(repo, tmp_path, _git(repo, "rev-parse", "HEAD"), pushed)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+
+
+def test_a_push_of_main_taken_in_and_a_commit_on_top_reads_only_the_branchs_change(repo: Path, tmp_path: Path) -> None:
+    """Item 1020: the remote tip is an ancestor, but main moved under the branch since; a diff from that tip would hold
+    the pull requests main took, so the review reads from where the branch leaves main."""
+    pushed: str = _git(repo, "rev-parse", "HEAD")
+    _main_moves_and_the_branch_takes_it(repo)
+    head: str = _commit(repo, "feature.txt", "its own change, fixed after the merge\n", "a fix")
+    done, asked = _run_hook(repo, tmp_path, head, pushed)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    git_dir: Path = Path(_git(repo, "rev-parse", "--absolute-git-dir"))
+    reviewed: str = (git_dir / "claude-review" / f"{head}.diff").read_text(encoding="utf-8")
+    assert "fixed after the merge" in reviewed and "another session's merged change" not in reviewed
+
+
+def test_a_push_of_two_branches_reviews_both(repo: Path, tmp_path: Path) -> None:
+    """Item 1020: `claude -p` reads a piped stdin; the hook's stdin is git's list of refs, so a review that inherited it
+    swallowed the second ref, which was then pushed unreviewed."""
+    first: str = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "-b", "second", "main")
+    second: str = _commit(repo, "second.txt", "the second branch's change\n", "the second change")
+    refs: str = (
+        f"refs/heads/feature {first} refs/heads/feature {_ZERO}\nrefs/heads/second {second} refs/heads/second {_ZERO}\n"
+    )
+    done, asked = _run_hook_on(repo, tmp_path, refs)
+    assert (done.returncode, asked) == (0, 2), done.stdout + done.stderr
