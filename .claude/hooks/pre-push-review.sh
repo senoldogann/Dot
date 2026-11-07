@@ -7,7 +7,8 @@
 #
 # Each review is saved under .git/claude-review/<commit>.md next to the diff it read; a commit that passed is not
 # reviewed again, and neither is a push that only brings main in (item 540): when the change the branch makes against
-# main is the same patch as at the tip already on the remote, there is nothing of its own to read. After three earlier
+# main is the same patch as at the tip already on the remote, which passed review here, there is nothing of its own to
+# read. After three earlier
 # reviews of the branch that BLOCKed, the hook says so before the next one (REVIEW.md: reconsider the approach).
 set -euo pipefail
 
@@ -22,7 +23,8 @@ own_change() {
 
 zero_sha=0000000000000000000000000000000000000000
 repo_root=$(git rev-parse --show-toplevel)
-review_dir="$(git rev-parse --git-dir)/claude-review"
+# One folder for every worktree of the repository (item 1020), so that a tip that passed in one vouches in another.
+review_dir="$(git rev-parse --path-format=absolute --git-common-dir)/claude-review"
 mkdir -p "$review_dir"
 cd "$repo_root"
 
@@ -36,10 +38,13 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   # A deleted branch has nothing to review.
   [[ "$local_sha" == "$zero_sha" ]] && continue
 
-  # A new branch, and one rewritten by a rebase onto main (its old head is no ancestor of the new: item 955), are
-  # reviewed from where they leave main, so that the pull requests main took meanwhile are not read as theirs.
-  if [[ "$remote_sha" == "$zero_sha" ]] || ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
-    base=$(git merge-base origin/main "$local_sha")
+  # A new branch, one rewritten by a rebase onto main (its old head is no ancestor of the new: item 955), and one that
+  # took main in since its last push (where it leaves main moved: item 1020) are reviewed from where they leave main,
+  # so that the pull requests main took meanwhile are not read as theirs.
+  fork=$(git merge-base origin/main "$local_sha")
+  if [[ "$remote_sha" == "$zero_sha" ]] || ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null ||
+    [[ "$(git merge-base origin/main "$remote_sha" 2>/dev/null || true)" != "$fork" ]]; then
+    base=$fork
   else
     base=$remote_sha
   fi
@@ -50,7 +55,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     continue
   fi
 
-  if [[ "$remote_sha" != "$zero_sha" ]] && git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+  # Only a remote tip that passed review here vouches for its change (item 1020): one pushed with --no-verify, or from
+  # another checkout, does not.
+  if [[ -f "$review_dir/$remote_sha.pass" ]] && git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
     before=$(own_change "$remote_sha" || true)
     after=$(own_change "$local_sha" || true)
     if [[ -n "$after" && "$before" == "$after" ]]; then
@@ -88,13 +95,15 @@ starts with the finding count. Read the surrounding code before reporting a find
 your answer with one last line that is exactly \`VERDICT: BLOCK\` if there is at least one Important finding or you \
 could not review the change, otherwise exactly \`VERDICT: PASS\`."
 
-  # The model is named because the user's default routes each turn to the cheapest model that can do it.
+  # The model is named because the user's default routes each turn to the cheapest model that can do it. Its stdin is
+  # /dev/null (item 1020): `claude -p` reads a piped stdin into the prompt, and the hook's stdin is git's list of refs,
+  # so it would swallow the refs after this one and push them unreviewed.
   if ! claude -p "$prompt" \
     --model claude-opus-5-5 \
     --permission-mode dontAsk \
     --allowedTools "Read" "Grep" "Glob" \
     --no-session-persistence \
-    >"$review_file"; then
+    </dev/null >"$review_file"; then
     echo "claude-review: the claude command failed; its output is in $review_file" >&2
     exit 1
   fi
