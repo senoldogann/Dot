@@ -203,7 +203,7 @@ async def test_on_it_shows_the_problems_their_fixes_and_the_sessions(
             await line.get_by_role("button", name="Show all 7").click()
             await expect(line.locator(".set-row")).to_have_count(7)
             closed = page.locator("section.set-section").filter(has=page.get_by_role("heading", name="Closed"))
-            await expect(closed.get_by_text("1 fixed or not Dot's")).to_be_visible()
+            await expect(closed.get_by_text("1 fixed, closed or not Dot's")).to_be_visible()
             assert await page.evaluate(FITS)
             await page.screenshot(path=tmp_path / f"repair-{width}.png", full_page=True)
         finally:

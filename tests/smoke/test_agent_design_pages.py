@@ -251,6 +251,12 @@ async def test_an_agent_with_every_action_is_offered_to_keep_only_the_ones_its_r
         await playwright.stop()
 
 
+async def _edit(page: Page, name: str) -> None:
+    """Open the editor of the agent ``name`` from its page: Edit is in the agent's "More" menu."""
+    await page.get_by_role("button", name=f"More for {name}").first.click()
+    await page.get_by_role("menuitem", name="Edit").click()
+
+
 async def test_the_editor_keeps_what_the_agent_never_does_and_the_page_saves_it(
     runtime: Runtime, client: httpx.AsyncClient
 ) -> None:
@@ -259,7 +265,7 @@ async def test_the_editor_keeps_what_the_agent_never_does_and_the_page_saves_it(
     playwright, browser = await _launch(runtime)
     try:
         page: Page = await _open(browser, client, f"/agents/{agent['id']}", 1280)
-        await page.get_by_role("button", name="Edit").click()
+        await _edit(page, "Prospector")
         never: Locator = page.get_by_label("Never does")
         await expect(never).to_have_value("")
         await never.fill("Work inbound leads\nSend a message itself")
@@ -269,10 +275,10 @@ async def test_the_editor_keeps_what_the_agent_never_does_and_the_page_saves_it(
         assert record["refuses"] == "Work inbound leads\nSend a message itself"
         # Opened again, the editor shows it as saved.
         await page.reload()
-        await page.get_by_role("button", name="Edit").click()
+        await _edit(page, "Prospector")
         await expect(page.get_by_label("Never does")).to_have_value("Work inbound leads\nSend a message itself")
         phone: Page = await _open(browser, client, f"/agents/{agent['id']}", 390, phone=True)
-        await phone.get_by_role("button", name="Edit").click()
+        await _edit(phone, "Prospector")
         await expect(phone.get_by_label("Never does")).to_be_visible()
         assert await phone.evaluate(_SIDEWAYS) <= 0
     finally:

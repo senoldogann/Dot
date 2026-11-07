@@ -100,7 +100,10 @@ class HeldModel:
 async def _served(home: Path, model: HeldModel) -> AsyncIterator[tuple[RunManager, str]]:
     """A daemon on the Dot home ``home`` whose main model is ``model``: its run manager and the address it is at."""
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{HELD}"\n\n[agent]\ngoal_mode = false', encoding="utf-8"
+        # A message sent to the chat at work waits in its queue: the fast model that would judge whether it is a
+        # request of its own (item 915) is the held one here, which would hold the send for its 12 s.
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{HELD}"\n\n[agent]\ngoal_mode = false\nbusy_parallel = false',
+        encoding="utf-8",
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register(_PROVIDER, model)
