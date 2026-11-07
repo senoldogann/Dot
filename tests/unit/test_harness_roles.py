@@ -25,7 +25,7 @@ from dotagent.agent.review import (
 from dotagent.config import load_default_config
 from dotagent.core.errors import ProviderProtocolError
 from dotagent.harness.roles import ROLE_NAMES, role_model
-from dotagent.llm.roles import ModelRoles
+from dotagent.llm.roles import ModelRoles, learning_of
 
 BOUNDS: HarnessBounds = HarnessBounds(habits_chars=200, tool_guidance_chars=200, component_lines=4)
 HABIT: str = "- Read a file before you change it."
@@ -54,13 +54,18 @@ def _proposal(**fields: object) -> HarnessProposal:
 
 def test_each_role_plays_on_the_review_model_unless_the_configuration_names_one() -> None:
     config = load_default_config()
-    roles: ModelRoles = ModelRoles(config.models, "")
-    assert {role: role_model(config.harness, roles, role) for role in ROLE_NAMES} == {
-        role: config.models.review for role in ROLE_NAMES
-    }
-    named = config.harness.model_copy(update={"selector": "openai:gpt-5"})
-    assert role_model(named, roles, "selector") == "openai:gpt-5"
-    assert role_model(named, roles, "proposer") == config.models.review
+    roles: ModelRoles = ModelRoles(config.models, "", learning_of(config.harness))
+    assert {role: role_model(roles, role) for role in ROLE_NAMES} == {role: config.models.review for role in ROLE_NAMES}
+    named: ModelRoles = ModelRoles(
+        config.models, "", learning_of(config.harness.model_copy(update={"selector": "openai:gpt-5"}))
+    )
+    assert role_model(named, "selector") == "openai:gpt-5"
+    assert role_model(named, "proposer") == config.models.review
+    # Chosen while the daemon runs (item 1033): from the next question on; "" is the review model again.
+    named.choose_learning("proposer", "claude_code:opus")
+    assert role_model(named, "proposer") == "claude_code:opus"
+    named.choose_learning("proposer", "")
+    assert role_model(named, "proposer") == config.models.review
 
 
 def test_a_proposal_that_keeps_gives_no_text_and_a_change_names_its_moment() -> None:

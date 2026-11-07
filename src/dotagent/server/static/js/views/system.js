@@ -47,7 +47,7 @@ import {
   switchRowSetting,
   switchSetting,
 } from "../panels.js";
-import { WHOLE_RUN, providerLabel, providerOf } from "../providers.js";
+import { answersRole, WHOLE_RUN, providerLabel, providerOf } from "../providers.js";
 import { voiceLanguage } from "../readaloud.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
@@ -1211,21 +1211,41 @@ const ROLE_SETTINGS = [
     role: "fast",
     label: "Fast model",
     hint: "Writes the summary of a long task first (the task's own model does when it cannot) and reads web pages for the facts asked of them.",
-    fits: (model) => model.tools,
+    fits: (model) => model.tools && answersRole("fast", providerOf(model.ref)),
   },
   {
     role: "review",
     label: "Review model",
     hint: "A second AI that double-checks Dot's work: it checks tasks against their goal, gives a second opinion, writes lessons and skills from them, and turns your words into rules.",
-    fits: (model) => model.tools,
+    fits: (model) => model.tools && answersRole("review", providerOf(model.ref)),
   },
   {
     role: "vision",
     label: "Vision model",
     hint: "Reads images and screenshots for a model that cannot see them.",
-    fits: (model) => model.vision,
+    fits: (model) => model.vision && answersRole("vision", providerOf(model.ref)),
   },
 ];
+
+// The roles of the night's learning (item 1033, `[harness]`), each played on the review model unless one is chosen for
+// it. The selector is built but no step asks it yet, so it is not offered.
+const LEARNING_SETTINGS = [
+  { role: "proposer", label: "Proposer", hint: "Reads what Dot's runs did and proposes a better version of how it works, and writes the tasks that test it." },
+  { role: "composer", label: "Composer", hint: "Weighs the versions the night tried and keeps, revises or drops each change." },
+  { role: "experience", label: "Experience writer", hint: "Writes down what a night learned, for the next night to read first." },
+];
+
+// The models Claude Code offers Self-repair (item 933, `ClaudeModel` in repair/claude.py), "default" its own choice.
+const REPAIR_MODELS = [
+  { value: "default", label: "Claude Code's own choice" },
+  { value: "opus", label: "Opus" },
+  { value: "sonnet", label: "Sonnet" },
+  { value: "haiku", label: "Haiku" },
+  { value: "fable", label: "Fable" },
+];
+
+// What "Use my Claude plan" chooses (item 1033): the review model on Opus of the plan, and the night's roles on it.
+const PLAN_REVIEW = "claude_code:opus";
 
 /**
  * A model that Settings › Models chooses: the default one (item 199), the one a run that names none starts on, a new
@@ -1445,7 +1465,8 @@ function buildModels(isDisposed, asked, head) {
     label: "Own work model",
     hint: "Decides what is worth doing when Dot works on its own while the Mac is idle (Schedules › On its own). The work itself runs on the default model.",
     className: "models-role",
-    fits: (model) => model.tools,
+    // The look is a run with tools no agent program of its own is given (its list, the owner's mail): items 916, 1032.
+    fits: (model) => model.tools && !WHOLE_RUN.has(providerOf(model.ref)),
     none: "Default model",
     choose: async (ref) => {
       const view = await api.put("/initiative/look-model", { model: ref });
@@ -1453,6 +1474,63 @@ function buildModels(isDisposed, asked, head) {
       toast("ok", ref === "" ? "Dot's own work is chosen on the default model from its next look." : `Dot's own work is chosen on ${modelName(ref)} from its next look.`);
     },
   });
+  // The roles of the night's learning (item 1033), read on their own as the look is: "" plays a role on the review
+  // model, and null hides the rows until they are read.
+  let learningChosen = null;
+  const learningFailed = el("div", { class: "set-row models-look-failed", hidden: true });
+  const learning = LEARNING_SETTINGS.map((setting) => ({
+    role: setting.role,
+    control: modelSetting({
+      label: setting.label,
+      hint: setting.hint,
+      className: "models-role",
+      fits: (model) => model.tools && answersRole("review", providerOf(model.ref)),
+      none: "Review model",
+      choose: async (ref) => {
+        paintLearning(await api.put("/models/learning", { role: setting.role, model: ref }));
+        const what = setting.label.toLowerCase();
+        toast("ok", ref === "" ? `The ${what} plays on the review model from its next question.` : `The ${what} is ${modelName(ref)} from its next question.`);
+      },
+    }),
+  }));
+  // Self-repair's model (item 933), Claude Code's own: the same choice as Settings › Self-repair makes.
+  let worker = null;
+  const repairSelect = el("select", { class: "select sm", "aria-label": "Self-repair model" }, ...REPAIR_MODELS.map((choice) => el("option", { value: choice.value }, choice.label)));
+  const repairRow = setRow({ title: "Self-repair model", lead: "The model of your Claude plan that repairs Dot's own problems at night, as Settings › Self-repair chooses it.", control: repairSelect });
+  repairRow.hidden = true;
+  repairSelect.addEventListener("change", () =>
+    attempt(async () => {
+      try {
+        const view = await api.put("/repair/worker", { model: repairSelect.value, effort: worker.effort, fast: worker.fast });
+        worker = view.worker;
+        toast("ok", `Self-repair works on ${REPAIR_MODELS.find((choice) => choice.value === worker.model)?.label ?? worker.model} from its next session.`);
+      } finally {
+        repairSelect.value = worker.model;
+      }
+    }),
+  );
+  // One press puts the review model, and with it the night's roles, on Opus of the owner's Claude plan (item 1033).
+  const planButton = el("button", { class: "btn sm", type: "button" }, "Use my Claude plan");
+  const planRow = setRow({
+    title: "Your Claude plan",
+    lead: "Puts the review model and the night's learning on Opus of your Claude plan, billed to the plan rather than an API key; everything else stays as it is.",
+    control: planButton,
+  });
+  planRow.hidden = true;
+  planButton.addEventListener("click", () =>
+    attempt(async () => {
+      // The roles first: one that fails leaves the review model as it was, and the roles already on it follow it.
+      for (const { role } of LEARNING_SETTINGS) {
+        paintLearning(await api.put("/models/learning", { role, model: "" }));
+      }
+      await api.post("/models/roles", { role: "review", model: PLAN_REVIEW });
+      await refresh();
+      toast("ok", "The review model and the night's learning are on Opus of your Claude plan from their next question.");
+    }),
+  );
+  // What the schedules and the agents run on, each chosen on its own page: counted here, so that this page says where
+  // every model of Dot's is.
+  const usage = el("div", { class: "set-row hint models-usage", hidden: true });
   const standby = standbySetting({
     choose: async (refs) => {
       const answered = await api.put("/models/standby", { models: refs });
@@ -1466,7 +1544,8 @@ function buildModels(isDisposed, asked, head) {
   const element = el(
     "div",
     { class: "set-sections" },
-    setSection({ title: "Roles", body: setCard(main.element, ...roles.map(({ control }) => control.element), look.element, lookFailed) }),
+    setSection({ title: "Roles", body: setCard(planRow, main.element, ...roles.map(({ control }) => control.element), look.element, lookFailed, usage) }),
+    setSection({ title: "Night's learning and self-repair", body: setCard(...learning.map(({ control }) => control.element), learningFailed, repairRow) }),
     standby.element,
     setSection({ title: "Every model, by service", body: setCard(el("div", { class: "set-row models-search" }, el("span", { class: "models-search-box" }, icon("search"), search)), list, noMatch) }),
   );
@@ -1513,6 +1592,8 @@ function buildModels(isDisposed, asked, head) {
     if (lookModel !== null) {
       look.paint(providers, lookModel);
     }
+    paintLearningRows();
+    planRow.hidden = !providers.some((provider) => provider.models.some((model) => model.ref === PLAN_REVIEW));
     standby.paint(providers, standbyModels);
     list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider), remember)));
     cueTables();
@@ -1579,6 +1660,84 @@ function buildModels(isDisposed, asked, head) {
     }
   }
 
+  /** Keep the roles of the night's learning as the daemon answered, and draw them once the list is here. */
+  function paintLearning(view) {
+    learningChosen = view;
+    paintLearningRows();
+  }
+
+  function paintLearningRows() {
+    if (providers === null || learningChosen === null) {
+      return;
+    }
+    for (const { role, control } of learning) {
+      control.paint(providers, learningChosen[role]);
+    }
+  }
+
+  /** The roles of the night's learning, read on their own: a failure stands in their place with a way to read them
+   * again, and leaves the rest of the page as it is. */
+  async function loadLearning() {
+    learningFailed.hidden = true;
+    try {
+      const view = await api.get("/models/learning");
+      if (!isDisposed()) {
+        paintLearning(view);
+      }
+    } catch (error) {
+      if (!isDisposed()) {
+        console.error("the models of the night's learning could not be read", error);
+        learningFailed.replaceChildren(inlineError(error, () => attempt(loadLearning)));
+        learningFailed.hidden = false;
+      }
+    }
+  }
+
+  /** Self-repair's model, read from its page's view; the row stays hidden when it cannot be read. */
+  async function loadRepair() {
+    const view = await api.get("/repair");
+    if (isDisposed()) {
+      return;
+    }
+    worker = view.worker;
+    repairSelect.value = worker.model;
+    repairRow.hidden = false;
+  }
+
+  /** How many schedules and agents run on each model, "the default model" for those that name none. */
+  async function loadUsage() {
+    const [schedules, agents] = await Promise.all([api.get("/schedules"), api.get("/agents")]);
+    if (isDisposed()) {
+      return;
+    }
+    const count = (models) => {
+      const counts = new Map();
+      for (const model of models) {
+        const name = model === null || model === "" ? "the default model" : modelName(model);
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
+      return [...counts].map(([name, many]) => `${many} on ${name}`).join(", ");
+    };
+    // A schedule names its model in its options; one that names none runs on its agent's, and on the default model
+    // when it has no agent or its agent names none either (scheduler/runner.py).
+    const agentModels = new Map(agents.map((agent) => [agent.record.id, agent.record.model]));
+    const scheduled = schedules.map((schedule) => {
+      const options = schedule.record.options;
+      return options.model ?? (options.agent_id === null ? null : (agentModels.get(options.agent_id) ?? null));
+    });
+    const made = agents.filter((agent) => agent.record.id !== DOT_ID).map((agent) => agent.record.model);
+    usage.replaceChildren(
+      el("span", null, scheduled.length === 0 ? "No schedules. " : `Schedules: ${count(scheduled)}. `),
+      el("span", null, made.length === 0 ? "No agents. " : `Agents: ${count(made)}. `),
+      el("span", null, "Each is chosen on its own page: "),
+      el("a", { href: "#/schedules" }, "Schedules"),
+      el("span", null, ", "),
+      el("a", { href: "#/agents" }, "Agents"),
+      el("span", null, "."),
+    );
+    usage.hidden = false;
+  }
+
   /** Draw the row of the model that looks for work alone, with `model` chosen, once the list is here: drawing the page
    * again would take the focus off the model an address asked for. */
   function paintLook(model) {
@@ -1614,7 +1773,11 @@ function buildModels(isDisposed, asked, head) {
     // draws nothing from the list before it (the pre-push review of item 916).
     providers = null;
     lookModel = null;
+    learningChosen = null;
     attempt(loadLook);
+    attempt(loadLearning);
+    attempt(loadRepair);
+    attempt(loadUsage);
     forgetModels();
     painted = null;
     main.hide();
@@ -1622,6 +1785,9 @@ function buildModels(isDisposed, asked, head) {
       control.hide();
     }
     look.hide();
+    for (const { control } of learning) {
+      control.hide();
+    }
     standby.hide();
     list.replaceChildren(inlineLoading());
     head.setMeta();

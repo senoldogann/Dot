@@ -105,7 +105,7 @@ async def test_an_error_that_says_nothing_of_the_models_quota_is_not_passed_on()
 def test_after_the_review_model_come_the_runs_own_model_then_the_standby_models_each_once() -> None:
     config = load_default_config()
     models = config.models.model_copy(update={"standby": ["anthropic:claude-sonnet-5-5", "ollama:writer"]})
-    roles: ModelRoles = ModelRoles(models, "")
+    roles: ModelRoles = ModelRoles(models, "", {"proposer": "", "composer": "", "selector": "", "experience": ""})
     assert roles.after_review(("ollama:writer",)) == ("ollama:writer", "anthropic:claude-sonnet-5-5")
     assert roles.after_review() == ("anthropic:claude-sonnet-5-5", "ollama:writer")
 

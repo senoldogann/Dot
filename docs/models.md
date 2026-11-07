@@ -28,7 +28,13 @@ its second opinion and its approvals), and the config file keeps it with the res
 cannot do the work is refused, and nothing changes (`POST /api/models/roles`). Under them, **Own work model** chooses
 the model that decides what Dot does on its own initiative (`[initiative] look_model`, items 910 and 916), from the
 models that call tools, or **Default model** for `[models] main`; it holds from the next look on
-(`PUT /api/initiative/look-model`, [Dot comes to you](proactive.md)). A model of your Claude plan (`claude_code:opus`,
+(`PUT /api/initiative/look-model`, [Dot comes to you](proactive.md)). **Use my Claude plan** (shown once Claude Code
+lists its models) puts the review model on `claude_code:opus` and the roles of the night's learning on it (item 1033).
+Under the roles, the page says how many schedules and agents run on each model, each chosen on its own page; and
+**Night's learning and self-repair** chooses the model of each role of the improvement loop ([The
+harness](harness.md)) and Self-repair's model, as Settings › Self-repair does. A role's list offers only the models
+that can do its work: the fast, the vision and the own work model list no model of an agent program of its own
+(OpenCode's free models, the Claude plan), while the review model and the night's roles list the Claude plan's too. A model of your Claude plan (`claude_code:opus`,
 `claude_code:sonnet`, or any other it offers) may be the review model, as every question of it is a single one the
 plan answers (item 1032); not the fast model, which takes a run's steps, nor the vision model, which reads pictures,
 nor the own work model: its look is a run whose tools (its list, your mail and calendar) Claude Code's door to Dot's
