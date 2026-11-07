@@ -3222,8 +3222,22 @@ class BrowserSession:
         page whose changes cannot be read is never taken for still."""
         started: float = time.monotonic()
         ends: float = started + timeout_s
-        watch_dialogs: bool = await no_dialog_open(tab.page)
-        changes: int | None = (await page_pulse(tab.page)).changes
+        # A navigation under way (a click that leaves for a slow page) holds every question to the page until it
+        # commits: it is waited for within the wait, and one that outlasts it ends the wait as its time does (item
+        # 1035). Asked while it began, the page's dialogs were not counted in time and the wait failed after 2 s.
+        while True:
+            if not tab.nav_idle.is_set():
+                try:
+                    await asyncio.wait_for(tab.nav_idle.wait(), timeout=max(0.0, ends - time.monotonic()))
+                except TimeoutError:
+                    return "timeout"
+            try:
+                watch_dialogs: bool = await no_dialog_open(tab.page)
+                changes: int | None = (await page_pulse(tab.page)).changes
+                break
+            except BrowserError:
+                if tab.nav_idle.is_set():
+                    raise
         requests: int = tab.requests
         moved: float = started
         while True:
