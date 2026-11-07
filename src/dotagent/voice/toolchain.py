@@ -24,10 +24,11 @@ FIRST_MACOS: int = 26
 _XCODE_SELECT: str = "/usr/bin/xcode-select"
 _XCRUN: str = "/usr/bin/xcrun"
 _PROBE_TIMEOUT_S: float = 10.0
-INSTALL_TOOLS: str = "Install Apple's developer tools on the Mac: xcode-select --install"
+INSTALL_TOOLS: str = "Install Apple's developer software on the Mac: xcode-select --install"
 OLD_MACOS: str = f"This Mac needs macOS {FIRST_MACOS} or later"
 NO_COMPILER: str = (
-    "Apple's developer tools on this Mac cannot build programs: install Xcode, or the tools with xcode-select --install"
+    "Apple's developer software on this Mac cannot build programs: install Xcode, or its smaller part with "
+    "xcode-select --install"
 )
 # What a program started here is given of the daemon's own environment: who runs it and where its files go, with a
 # ``PATH`` of the system's own folders, as an MCP server is given a short list of variables and the shell's ``PATH``.

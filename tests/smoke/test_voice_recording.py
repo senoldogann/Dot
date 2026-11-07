@@ -740,7 +740,9 @@ async def test_the_voice_card_of_an_iphone_whose_mac_cannot_write_down_says_what
     voice: Locator = page.locator("section.card", has=page.get_by_text("Voice", exact=True))
     await expect(voice).to_contain_text("Safari and Chrome may send your voice to Apple's or Google's servers")
     await expect(voice).to_contain_text("Safari on an iPhone or an iPad at times hears only the first dictation")
-    await expect(voice).to_contain_text("A Mac that writes down what you say hears every time. Apple's developer tools")
+    await expect(voice).to_contain_text(
+        "A Mac that writes down what you say hears every time. Apple's developer software"
+    )
     await _fits(page, "Settings › General › Voice on a phone, the Mac without the tools")
     await page.context.close()
 

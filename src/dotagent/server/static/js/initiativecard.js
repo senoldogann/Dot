@@ -147,7 +147,7 @@ export function mountInitiative() {
     lookName.textContent = view.look_model === "" ? "the default model" : modelName(view.look_model);
     costly.textContent =
       view.costly_tokens > 0
-        ? `Work that gets done is never cut for what it spends; a try that spends over ${(view.costly_tokens / 1_000_000).toLocaleString()} million tokens without doing it is tried once more from what it found, and a second such try in a row lets the thing go.`
+        ? `Work that gets done is never cut for what it spends; a try that spends over ${(view.costly_tokens / 1_000_000).toLocaleString()} million word pieces without doing it is tried once more from what it found, and a second such try in a row lets the thing go.`
         : "";
     toggle.title = view.enabled ? "Dot works on its own while the Mac is idle: switch it off" : "Switch on: Dot works on its own while the Mac is idle";
     toggle.disabled = busy;
