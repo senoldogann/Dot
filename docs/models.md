@@ -289,7 +289,10 @@ answer keeps its words, Ollama's too.
   it; a built-in a later version brings ends the run until it is measured). The door's secret is in a
   file only you can read in a folder of the run's own, removed as the run ends, never in the program's arguments. The
   timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
-  window; your messages reach it while it works, and Stop ends the program. A chat keeps its Claude Code session from
+  window; your messages reach it while it works, and Stop ends the program. Skills and connected apps picked in the
+  composer come with the message as on Dot's own models (item 1022): each picked skill's instructions in its first
+  message, the apps' tools through the door; a message picked with accounts or Plan first is refused before it runs,
+  as those are Dot's own loop's. A chat keeps its Claude Code session from
   run to run (it is resumed, and hears what the chat said on other models since) while each run ends clean; a run that
   fails, is stopped or is cut at its limits lets the session go, and so does a rewind, and the next run starts a new
   one that hears the chat with its first message. The run's limits

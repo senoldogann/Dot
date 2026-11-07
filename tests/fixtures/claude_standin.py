@@ -132,6 +132,7 @@ def main() -> None:
     if "--replay-user-messages" in sys.argv:
         _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
     said: str = json.dumps(message["content"])
+    (record / "first.json").write_text(json.dumps(message["content"]), encoding="utf-8")
     if "extra tools" in said:
         _init(door, ["Bash", f"mcp__{door}__notify"])
     else:

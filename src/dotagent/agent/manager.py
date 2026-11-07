@@ -123,6 +123,7 @@ from dotagent.core.text import redact_json, redact_known, redact_secrets, trunca
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import fail_unsettled_drafts
 from dotagent.evals import EVAL_SOURCE
+from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.llm.types import (
     ONE_MESSAGE_LEVELS,
@@ -2945,7 +2946,16 @@ class RunManager:
         if picks == NO_PICKS:
             return
         whole: str | None = WHOLE_RUN_AGENTS.get(model.provider)
-        if whole is not None:
+        if model.provider == CLAUDE_CODE_PROVIDER and (picks.accounts or picks.plan_first):
+            # Claude Code takes the picked skills in its first message and the picked servers' tools through Dot's door
+            # (item 1022); the accounts' mail tools and the plan of Plan first are Dot's loop's, which it does not run.
+            raise InvalidValueError(
+                f"the message cannot start with what was picked for it: {model.label} works as Claude Code, "
+                "which takes skills and connected apps but no accounts or Plan first; send it without them, or on one "
+                "of Dot's own models",
+                {"model": model.label, "accounts": list(picks.accounts), "plan_first": picks.plan_first},
+            )
+        if whole is not None and model.provider != CLAUDE_CODE_PROVIDER:
             raise InvalidValueError(
                 f"the message cannot start with what was picked for it: {model.label} works as {whole}, "
                 "which takes no plugins, skills or Plan first; send it without them, or on one of Dot's own models",
