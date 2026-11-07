@@ -18,7 +18,7 @@ import { createDetails } from "../details.js";
 import { CHAT_BOX_PX, composerFrame, keepDraft, moveDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
 import { createContextPanel } from "../contextpanelview.js";
-import { clip, debounce, duration, el, modelName, OPEN_FILE_EVENT, plural, setText, showAfter } from "../dom.js";
+import { clip, debounce, duration, el, modelName, OPEN_FILE_EVENT, plural, setText, showFrom } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { BACKGROUND_SOURCE, RESUME_SOURCE, WELCOME_SOURCE, backgroundNote, earlierTurns, followsReaction, loadHistory } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
@@ -42,7 +42,7 @@ import { setupSection } from "../setup.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
 import { RUN_BACK_EVENT } from "../shell.js";
-import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFailed } from "../state.js";
+import { getSnapshot, onChange, onLifecycle, onStreamBack, breakToldAt, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { createWorkStatus } from "../workstatus.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
@@ -296,7 +296,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const connectionNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Connection lost. Reconnecting…"));
   // A break that mends at once, as when the page comes back into view, says nothing (items 286 and 328); one that lasts
   // is told over the conversation, never in its way: what is read does not move (item 328).
-  const showConnectionNote = showAfter(connectionNote, quietBreak);
+  const showConnectionNote = showFrom(connectionNote, breakToldAt);
   const connectionSlot = el("div", { class: "connection-slot" }, connectionNote);
 
   // ------------------------------------------------------------------------------------ details and plan

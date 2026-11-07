@@ -110,23 +110,39 @@ export function switchRow(row, toggle) {
 }
 
 /** Show `node` once what it tells has held for `ms`, and hide it as soon as it no longer holds: returns `set(shown)`.
- * `ms` is a number, or a function that tells it when the wait starts. A break of the connection that mends within it
- * (a phone back from the background) shows nothing (items 286 and 328). */
+ * A break of the connection that mends within it shows nothing (item 286). */
 export function showAfter(node, ms) {
+  return showFrom(node, (since) => since + ms);
+}
+
+/** Show `node` once what it tells has held until `dueAt(since)` (a time as `Date.now()` gives it, `since` when it began
+ * to hold), and hide it as soon as it no longer holds: returns `set(shown)`. The time is asked again when it comes, so a
+ * later one holds: a break that began while a phone's page was away is told only after the grace of its return
+ * (item 328), not at the short wait it was given when it began. */
+export function showFrom(node, dueAt) {
   let timer = null;
+  let since = 0;
+  const wait = () => {
+    timer = setTimeout(
+      () => {
+        if (Date.now() < dueAt(since)) {
+          wait();
+          return;
+        }
+        timer = null;
+        node.hidden = false;
+      },
+      Math.max(0, dueAt(since) - Date.now()),
+    );
+  };
   return (shown) => {
     if (!shown) {
       clearTimeout(timer);
       timer = null;
       node.hidden = true;
     } else if (node.hidden && timer === null) {
-      timer = setTimeout(
-        () => {
-          timer = null;
-          node.hidden = false;
-        },
-        typeof ms === "function" ? ms() : ms,
-      );
+      since = Date.now();
+      wait();
     }
   };
 }

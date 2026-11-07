@@ -17,10 +17,10 @@ export const RETURN_GRACE_MS = 8000;
 // When the page last came back into view or onto the network.
 let returnedAt = -Infinity;
 
-/** How long a break of a stream lasts before the page tells it (`showAfter`): a short break (item 286), or until the
+/** When a break of a stream that began at `since` is told (`showFrom`): after a short break (item 286), or once the
  * grace after the page's return is over, whichever ends later (item 328). */
-export function quietBreak() {
-  return Math.max(QUIET_BREAK_MS, returnedAt + RETURN_GRACE_MS - Date.now());
+export function breakToldAt(since) {
+  return Math.max(since + QUIET_BREAK_MS, returnedAt + RETURN_GRACE_MS);
 }
 
 const snapshot = {
