@@ -43,6 +43,7 @@ note = {{
     "samples": count,
     "peak": max((abs(sample) for sample in samples), default=0),
     "crossings": sum(1 for a, b in zip(samples, samples[1:]) if a < 0 <= b and max(abs(a), abs(b)) > 200),
+    "voiced": sum(1 for sample in samples if abs(sample) > 200),
     "tail": tail,
 }}
 with open({runs!r}, "a", encoding="utf-8") as log:

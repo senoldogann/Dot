@@ -53,6 +53,9 @@ GOAL: str = "textarea[aria-label='Goal']"
 IPHONE: str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1"
 _WORDS: str = "hello from the mac"
 _TAIL_SAMPLES: int = round(TAIL_SECONDS * RECORDING_RATE)
+# How far the tone's samples at 16 kHz may be from those the page's worklet was given, at the edges where the tone
+# starts and stops (measured: 1 at most); a block the page lost would be some 680.
+_EDGE_SAMPLES: int = 16
 _OVERFLOW: str = "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
 _OVER_PX: int = 1
 _WAIT_MS: int = 15_000
@@ -61,7 +64,7 @@ _WAIT_MS: int = 15_000
 # tracks it was given and which are live, the audio contexts it made and the blocks its worklet sent.
 _MICROPHONE: str = """
 (() => {
-  const state = { asked: [], tracks: [], contexts: [], blocks: 0, refuse: null };
+  const state = { asked: [], tracks: [], contexts: [], blocks: 0, loud: 0, rate: 0, refuse: null };
   window.__mic = state;
   const Context = window.AudioContext;
   window.AudioContext = class extends Context {
@@ -74,8 +77,16 @@ _MICROPHONE: str = """
   window.AudioWorkletNode = class extends Node {
     constructor(...options) {
       super(...options);
-      this.port.addEventListener("message", () => {
+      this.port.addEventListener("message", (event) => {
         state.blocks += 1;
+        // The tone's samples the page's worklet was given since the last `speak`, at the context's rate: what the
+        // page had to send the Mac (the browser's own way from the stand-in's context to the page's may lose some).
+        state.rate = this.context.sampleRate;
+        for (const sample of event.data) {
+          if (Math.abs(sample) * 32767 > 200) {
+            state.loud += 1;
+          }
+        }
       });
     }
   };
@@ -109,6 +120,7 @@ _MICROPHONE: str = """
     state.gain.gain.setValueAtTime(level, now);
     state.gain.gain.setValueAtTime(0, now + seconds);
     state.quietAt = now + seconds;
+    state.loud = 0;
   };
   // Whether the tone has ended by the audio's own clock, which runs behind the wall's on a busy runner.
   state.spoken = (after) => state.gain.context.currentTime >= state.quietAt + after;
@@ -385,9 +397,8 @@ async def _released(page: Page) -> None:
 
 
 async def _spoken(page: Page, after: float) -> None:
-    """Wait until the tone `speak` turned on has ended, and `after` seconds more, by the audio's clock: on a busy runner
-    it ran behind the wall's, and a tick after a second and a half of the wall's cut the tone short (170 of its 220
-    cycles reached the Mac)."""
+    """Wait until the tone `speak` turned on has ended, and `after` seconds more, by the audio's clock rather than the
+    wall's, which a busy runner does not keep in step with it."""
     deadline: float = time.monotonic() + _WAIT_MS / 1000
     while not await page.evaluate("(after) => window.__mic.spoken(after)", after):
         assert time.monotonic() < deadline, "the tone never ended by the audio's clock"
@@ -413,6 +424,7 @@ async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_ev
     await expect(mic).to_be_visible()
     streamed: list[str] = []
     page.on("request", lambda request: streamed.append(f"{request.method} {request.url.partition('/api')[2]}"))
+    heard: list[tuple[int, float]] = []
     for round_number in (1, 2, 3):
         await _listening(page)
         # The microphone was asked for as the page asks: with the browser's own echo cancelling and noise suppression.
@@ -420,6 +432,7 @@ async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_ev
         assert await _mic(page, "mic.live()") == 1
         await page.evaluate("() => window.__mic.speak(1.0)")
         await _spoken(page, 0.5)
+        heard.append((int(await _mic(page, "mic.loud")), float(await _mic(page, "mic.rate"))))
         await _fits(page, f"{engine} while the microphone records")
         # The stream was opened at the press and given the sound while the owner spoke, before the tick.
         voice: list[str] = [line for line in streamed if "/voice/streams" in line]
@@ -439,15 +452,22 @@ async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_ev
     assert await page.evaluate("() => window.__voice.starts") == 0
     runs: list[dict[str, Any]] = mac_can.runs_made()[-3:]
     assert len(runs) == 3
-    for given in runs:
-        # What reached the Mac's program: 16 kHz mono 16-bit samples in the page's language, with a second of a tone of
-        # 220 hertz in it (the times its wave rises through zero count its pitch: 220, every piece in its place) and
-        # the silence the daemon adds.
+    for given, (loud, rate) in zip(runs, heard, strict=True):
+        # What reached the Mac's program: 16 kHz mono 16-bit samples in the page's language, with the tone of 220 hertz
+        # in it and the silence the daemon adds. Every sample of the tone the page's worklet was given reached the Mac,
+        # at 16 kHz (``loud`` at the context's ``rate``), and at its pitch: the times its
+        # wave rises through zero over the time it sounds. On a busy runner the browser's way from the stand-in's
+        # context to the page's lost up to a fifth of the tone before the page saw it (170 to 190 of 220 cycles), which
+        # is the browser's, so the page is held to what it was given.
         assert given["language"] == "en-US" and given["argc"] == 2
         assert given["samples"] > RECORDING_RATE + _TAIL_SAMPLES
         assert given["tail"] >= _TAIL_SAMPLES
         assert given["peak"] > 0.2 * 32767
-        assert 0.9 * 220 <= given["crossings"] <= 1.1 * 220, given["crossings"]
+        assert rate > 0 and loud >= rate / 2, (loud, rate)
+        expected_voiced: float = loud * RECORDING_RATE / rate
+        assert abs(given["voiced"] - expected_voiced) <= _EDGE_SAMPLES, (given, loud, rate)
+        pitch: float = given["crossings"] / (given["voiced"] / RECORDING_RATE)
+        assert 0.95 * 220 <= pitch <= 1.05 * 220, (pitch, given)
     await page.context.close()
 
 
