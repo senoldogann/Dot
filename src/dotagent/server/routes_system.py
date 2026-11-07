@@ -107,7 +107,7 @@ from dotagent.launchd import JobState, inspect_job, service_runs
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
-from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS, Effort, ModelInfo
+from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS, Effort, ModelInfo, answers_role
 from dotagent.opencode.server import learns_from_data
 from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
@@ -448,10 +448,13 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         review model, which checks runs and draws their lessons; or the vision model, which reads images for a model
         that cannot. The config file keeps it as ``[models] <role>``. A model its provider does not offer is refused, as
         is one that cannot call tools for the fast or the review model, or one that cannot see for the vision model,
-        and one of Zen's free models, which answer only as OpenCode's own agent (item 283); nothing changes then."""
+        and one of Zen's free models, which answer only as OpenCode's own agent (item 283); nothing changes then. A
+        model of the owner's Claude plan may be the review model (item 1032): every question of the review model is a
+        single one (:func:`dotagent.claude_code.ask.question_of`), which the plan answers; the fast model takes a run's
+        steps and the vision model pictures, which it cannot."""
         ref: ModelRef = parse_model_ref(request.model)
         whole: str | None = WHOLE_RUN_AGENTS.get(ref.provider)
-        if whole is not None:
+        if whole is not None and not answers_role(request.role, ref.provider):
             raise ConfigError(
                 f"{ref.label} answers only as {whole}, so it cannot be the {request.role} model; pick another",
                 {"model": request.model},

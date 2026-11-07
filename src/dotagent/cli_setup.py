@@ -21,7 +21,7 @@ from dotagent.llm.calls import log_model_call
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.roles import ModelRole
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
-from dotagent.llm.types import WHOLE_RUN_AGENTS, ChatProvider, ModelInfo
+from dotagent.llm.types import WHOLE_RUN_AGENTS, ChatProvider, ModelInfo, answers_role
 from dotagent.secrets import resolve_secret
 from dotagent.server.links import base_url
 
@@ -217,7 +217,7 @@ def _models_lines(config: AppConfig, ref: ModelRef, roles: Sequence[ModelRole], 
         )
         owner: str = parse_model_ref(model).provider
         problem: str = ""
-        if owner in WHOLE_RUN_AGENTS:
+        if not answers_role(role, owner):
             problem = f"; but {model} answers only as its own agent and cannot do this work, so choose another"
         elif owner == "ollama" and ollama_down:
             problem = "; but it runs on Ollama, which does not answer on this Mac, so choose another"
