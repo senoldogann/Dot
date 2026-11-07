@@ -564,3 +564,47 @@ async def test_a_ready_team_the_owner_has_keeps_the_room_for_its_words(
         assert badge["y"] >= words["y"] + words["height"] - 1, (words, badge)
     finally:
         await page.context.close()
+
+
+_WATCH = """() => {
+  window.__mark = Date.now();
+  window.__log = [];
+  const log = (...a) => window.__log.push([Math.round(performance.now()), ...a]);
+  document.addEventListener('click', (e) => log('click', e.target.closest('button')?.textContent ?? e.target.tagName, e.isTrusted), true);
+  document.addEventListener('pointerdown', (e) => log('pointerdown', e.target.tagName), true);
+  window.addEventListener('pagehide', () => log('pagehide'));
+  window.addEventListener('hashchange', () => log('hash', location.hash));
+  new MutationObserver((ms) => { for (const m of ms) { for (const n of m.addedNodes) { if (n.tagName === 'DIALOG') log('dialog+', n.className); } for (const n of m.removedNodes) { if (n.tagName === 'DIALOG') log('dialog-', n.className, n.returnValue); } } }).observe(document.body, { childList: true });
+  const main = document.querySelector('main');
+  new MutationObserver(() => log('main changed', main.childElementCount)).observe(main, { childList: true });
+  log('watching', performance.getEntriesByType('navigation')[0]?.type, navigator.serviceWorker?.controller ? 'sw' : 'no-sw');
+}"""
+
+
+async def test_zz_probe_save_from_a_chat(browser: Browser, served: tuple[str, str]) -> None:
+    """Diagnostic only, not to be merged: why the dialog of Save from a chat is not found on CI."""
+    address, _ = served
+    fails: list[str] = []
+    for attempt_number in range(25):
+        page: Page = await _phone(browser, address, "/customize/skills")
+        console: list[str] = []
+        page.on("console", lambda message: console.append(f"{message.type}: {message.text}"[:200]))
+        page.on("framenavigated", lambda frame: console.append(f"navigated {frame.url}"[:200]))
+        try:
+            button: Locator = page.get_by_role("button", name="Save from a chat")
+            await button.wait_for()
+            await page.evaluate(_WATCH)
+            await button.click()
+            try:
+                await expect(page.get_by_role("dialog", name="Save a skill from a chat")).to_be_visible()
+            except AssertionError:
+                state = await page.evaluate(
+                    "() => JSON.stringify({mark: window.__mark ?? null, log: window.__log ?? null, hash: location.hash,"
+                    " dialogs: [...document.querySelectorAll('dialog')].map((d) => [d.className, d.open]),"
+                    " nav: performance.getEntriesByType('navigation')[0]?.type, buttons: document.querySelectorAll('button').length})"
+                )
+                fails.append(f"#{attempt_number}: {state} console={console}")
+        finally:
+            await page.context.close()
+    print("\n".join(fails))
+    assert fails == [], "\n".join(fails)
