@@ -304,6 +304,10 @@ Both modes share what follows.
   the judges and the log lines that name a refused address do not have them either (item 533); a screenshot shows a page
   as pixels, so a cookie a script wrote into its text shows there. It takes the place of AppleScript's `execute
   javascript`, which lands in the front window of whichever Chrome macOS picks when several run (item 263).
+- `browser_scroll` turns the mouse wheel over the page's centre, or over a scroll container it names, and reads the
+  page once the wheel has moved it and it stands still (item 1029): a wheel lands after the call that sends it, late on
+  a busy Mac, where a page read too soon said "no change". A wheel that moves nothing (a page at its end), or a page
+  that does not answer where it stands, is waited for one second at most.
 - `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
   call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A dialog
   that opens in front of the page during the wait ends it at once, saying so (item 698): the text would not come until

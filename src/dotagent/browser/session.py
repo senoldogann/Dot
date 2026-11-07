@@ -3187,7 +3187,7 @@ class BrowserSession:
             await scroll_page(
                 tab.page, direction, distance, ref, viewport.width, viewport.height, _ms(self._config.action_timeout_s)
             )
-            # The wheel lands a few tens of milliseconds after the call returns, inside the DOM quiet window.
+            # scroll_page returned once the wheel moved the page (item 1029); the settle waits out what it set off.
             await self._settle(tab)
             return await self._changes_view(thread, tab, hide_secrets)
 

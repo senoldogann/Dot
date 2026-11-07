@@ -40,6 +40,11 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 SERVER: ServerConfig = load_default_config().server
 _SLOW_REST_S: float = 8.0
 _LATE_HEADERS_S: float = 3.0
+# /late-headers answers once the test lets it: after a sleep of _LATE_HEADERS_S the navigation committed while the click
+# that started it still settled on a slow runner, and the click was refused before the wait it is about.
+_LATE_HEADERS: threading.Event = threading.Event()
+# The most a page held for the test (/later-tab, /late-headers) waits for it, and the test for what it then does.
+_HELD_FOR_TEST_MOST_S: float = 30.0
 # How long the server takes to answer a page's own request (item 774): past the time a wait may end early.
 _ANSWER_LATE_S: float = 7.0
 # How late the end of /held-page comes (item 954): past what the open waits for it with a navigation timeout of
@@ -49,7 +54,9 @@ _HELD_NAVIGATION_S: float = 2.0
 
 # How late the pages of /opens-late answer: within the wait for a new tab (one second), and after it.
 _LATE_TAB_S: float = 0.4
-_LATER_TAB_S: float = 1.6
+# /later-tab answers once the test lets it (``_LATER_TAB``), after the wait: a sleep of 1.6 s was over before the view
+# of a stopped batch was taken on a slow runner, and the tab had joined already.
+_LATER_TAB: threading.Event = threading.Event()
 _ITEMS: str = "".join(f"<li><button>Item {n}</button></li>" for n in range(300))
 _NUMBERS: str = "".join(f"<option{' selected' if n == 250 else ''}>Number {n}</option>" for n in range(300))
 # The states arrive 600 ms after the click, the way a script fills a dropdown from a request.
@@ -316,11 +323,11 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = self.path.split("?", 1)[0]
         if path == "/late-headers":
-            time.sleep(_LATE_HEADERS_S)
+            _LATE_HEADERS.wait(_HELD_FOR_TEST_MOST_S)
         if path == "/late-tab":
             time.sleep(_LATE_TAB_S)
         if path == "/later-tab":
-            time.sleep(_LATER_TAB_S)
+            _LATER_TAB.wait(_HELD_FOR_TEST_MOST_S)
         if path == "/poll":
             self._plain(b"not yet")
             return
@@ -505,6 +512,16 @@ async def test_a_tab_whose_page_answers_late_still_stops_the_batch(browser: Brow
     assert [tab.title for tab in outcome.view.tabs] == ["Opens late", "Late tab"]
 
 
+async def _two_tabs(browser: BrowserSession, thread: str) -> PageView:
+    """The view of ``thread`` once its second tab has joined, looked at again as a model would."""
+    deadline: float = time.monotonic() + _HELD_FOR_TEST_MOST_S
+    while True:
+        view: PageView = await browser.snapshot(thread, True)
+        if len(view.tabs) == 2 or time.monotonic() > deadline:
+            return view
+        await asyncio.sleep(0.2)
+
+
 async def test_a_tab_still_opening_when_the_wait_ends_stops_the_batch_and_joins_later(
     browser: BrowserSession, site: str
 ) -> None:
@@ -513,12 +530,13 @@ async def test_a_tab_still_opening_when_the_wait_ends_stops_the_batch_and_joins_
         Step(action="click", ref=ref_of(view.body, 'link "Open later tab"')),
         Step(action="click", ref=ref_of(view.body, 'button "Stay"')),
     ]
+    _LATER_TAB.clear()
     outcome: ActOutcome = await act(browser, "later-tab", steps, False)
     assert [report.outcome for report in outcome.steps] == ["done", "skipped"]
     assert outcome.stopped is not None and outcome.stopped.startswith("a new tab is opening")
     assert len(outcome.view.tabs) == 1
-    await asyncio.sleep(_LATER_TAB_S)
-    again: PageView = await browser.snapshot("later-tab", True)
+    _LATER_TAB.set()
+    again: PageView = await _two_tabs(browser, "later-tab")
     assert [tab.title for tab in again.tabs] == ["Opens late", "Later tab"]
     assert "a new tab opened as tab 2" in again.notes
 
@@ -873,7 +891,10 @@ async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_befo
     )
     try:
         view: PageView = await session.open_url("blocked", f"{site}/to-blocked", True)
+        _LATE_HEADERS.clear()
         await act(session, "blocked", [Step(action="click", ref=ref_of(view.body, 'button "Leave"'))], False)
+        # The blocked host answers once the wait below has timed out.
+        asyncio.get_running_loop().call_later(_LATE_HEADERS_S, _LATE_HEADERS.set)
         with pytest.raises(BrowserError, match="may not be opened"):
             await session.wait_text("blocked", "Arrived", 1.0, True)
     finally:
