@@ -19,7 +19,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, FloatRect, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_default_config
@@ -94,6 +94,19 @@ async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, str
 def _fold(page: Page, title: str) -> Locator:
     """The folding card of the System page whose title is ``title`` (item 411)."""
     return page.locator("section.card.fold", has=page.locator(".fold-title", has_text=title))
+
+
+async def _settled_boxes(card: Locator) -> tuple[FloatRect | None, FloatRect | None]:
+    """The boxes of a fold's title and of its summary once they stand still: two looks two frames apart agree.
+    Measured as the fold was drawn again, the summary stood a line under the title on a slow runner."""
+    deadline: float = time.monotonic() + 5.0
+    before: tuple[FloatRect | None, FloatRect | None] | None = None
+    while True:
+        await card.evaluate("() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))")
+        now = (await card.locator(".fold-title").bounding_box(), await card.locator(".fold-summary").bounding_box())
+        if now == before or time.monotonic() > deadline:
+            return now
+        before = now
 
 
 async def test_diagnostics_and_the_licences_show_what_is_there(
@@ -187,8 +200,7 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     if width < 960:
                         for title in ("Details", "Permissions"):
                             card = _fold(page, title)
-                            title_box = await card.locator(".fold-title").bounding_box()
-                            summary_box = await card.locator(".fold-summary").bounding_box()
+                            title_box, summary_box = await _settled_boxes(card)
                             assert title_box is not None and summary_box is not None, title
                             title_middle = title_box["y"] + title_box["height"] / 2
                             summary_middle = summary_box["y"] + summary_box["height"] / 2
