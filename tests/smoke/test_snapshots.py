@@ -295,10 +295,22 @@ async def test_the_box_takes_a_capture_that_waited_and_one_that_comes_while_it_i
         # The draft keeps them: a reload lists them again.
         await page.reload()
         await expect(page.locator(".composer .attach-chip")).to_have_count(3)
+        # Captures taken before a page just loaded follows the stream sent their events to nobody: the box claims them
+        # once the stream is live (item 1030). The page's stream is held until they are taken.
+        followed: asyncio.Event = asyncio.Event()
+
+        async def held(route: Route) -> None:
+            await followed.wait()
+            await route.continue_()
+
+        await page.route(re.compile(r"/api/stream(\?|$)"), held)
+        await page.reload()
+        await expect(page.locator(".composer .attach-chip")).to_have_count(3)
         # A capture past the ten files of a message is left out, and the box says so.
         await client.post("/api/snapshots/settings", json={"key": "app_text", "value": True})
         for _ in range(3):
             await client.post("/api/snapshots/take")
+        followed.set()
         await expect(page.locator(".composer .attach-chip")).to_have_count(9)
         await client.post("/api/snapshots/take")
         await expect(page.locator(".composer .attach-chip")).to_have_count(10)
