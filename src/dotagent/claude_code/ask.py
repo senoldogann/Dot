@@ -21,6 +21,7 @@ import os
 import shutil
 import signal
 import tempfile
+import time
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -250,9 +251,10 @@ def _int(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
 
 
-def reply_of(answer: Answer, question: Question, model: str) -> ModelReply:
+def reply_of(answer: Answer, question: Question, model: str, now: float) -> ModelReply:
     """The reply a call's ``answer`` is: the question's tool called with the structured output, or the text. Raises
-    :class:`ProviderWindowError` when the plan's window refused it (with when it resets),
+    :class:`ProviderWindowError` when the plan's window refused it (with when it resets, from ``now``, so that the
+    router pauses the model until then),
     :class:`ProviderTransportError` when the session failed, and :class:`ProviderProtocolError` when the model had more
     than it may or the answer lacks what the question asked for."""
     problem: str | None = answer_problem(answer, question.tool is not None)
@@ -268,7 +270,7 @@ def reply_of(answer: Answer, question: Question, model: str) -> ModelReply:
         raise ProviderWindowError(
             limit_message(answer.window, resets),
             _WINDOW_STATUS,
-            None,
+            None if resets is None else max(resets - now, 0.0),
             {"model": model, "resets_at": resets},
         )
     if result is None:
@@ -379,4 +381,4 @@ async def ask_claude(
                     "stderr": errors.decode("utf-8", "replace")[-_STDERR_KEPT:],
                 },
             )
-        return reply_of(read_answer(output.decode("utf-8", "replace")), question, model)
+        return reply_of(read_answer(output.decode("utf-8", "replace")), question, model, time.time())
