@@ -40,7 +40,7 @@ from dotagent.claude_code.stream import (
     read_line,
     user_line,
 )
-from dotagent.llm.claude_code import model_info_of
+from dotagent.llm.claude_code import MODELS, model_info_of
 from dotagent.llm.router import ModelRef, offers_fast_mode
 from dotagent.llm.types import ImageData, ToolSpec
 from dotagent.opencode.bridge import Door, new_door
@@ -321,6 +321,9 @@ def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     assert offers_fast_mode(ModelRef(provider="claude_code", model="opus"))
     assert not offers_fast_mode(ModelRef(provider="claude_code", model="sonnet"))
     assert model_info_of("fable").efforts == ("low", "medium", "high", "xhigh", "max")
+    # Haiku is one of the plan's models too (item 1018), without fast mode.
+    assert "haiku" in MODELS
+    assert not offers_fast_mode(ModelRef(provider="claude_code", model="haiku"))
 
 
 def test_fast_mode_the_plan_ran_off_is_read_and_said() -> None:

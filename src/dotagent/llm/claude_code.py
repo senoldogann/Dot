@@ -24,8 +24,8 @@ from dotagent.repair.claude import ClaudeAccount, claude_state, read_account
 
 CLAUDE_CODE_PROVIDER: str = "claude_code"
 # The models a run may name: Claude Code's own aliases for the newest of each family (2.1.318's `--help` names these
-# three; ``haiku`` is not one).
-MODELS: tuple[str, ...] = ("fable", "opus", "sonnet")
+# three, and ``haiku`` answers too: measured on 2.1.318 on 2026-11-07, as Claude Haiku 5.5, at every level of effort).
+MODELS: tuple[str, ...] = ("fable", "opus", "sonnet", "haiku")
 # How hard a run thinks, as Claude Code's `--effort` takes it (item 1014), lowest first.
 EFFORTS: tuple[Effort, ...] = ("low", "medium", "high", "xhigh", "max")
 # The models of the plan that have fast mode (Claude Code's `fastMode` setting, item 1014): Opus, as for Anthropic's
