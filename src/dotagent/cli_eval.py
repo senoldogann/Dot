@@ -166,10 +166,16 @@ def _report_of(config: AppConfig, model: str, started_at: float, outcomes: Seque
 def configured_for(config: AppConfig, command: EvalRunCommand) -> AppConfig:
     """``config`` as ``command`` plays the tasks with: ``--no-mcp-purposes`` leaves the line of each MCP server's tool
     group as it was before it said what the server is for (``[agent] mcp_purposes = false`` for this run), so that the
-    same tasks can be played both ways (item 659). The report keeps the setting."""
+    same tasks can be played both ways (item 659); ``--effort`` sets how hard the model thinks on every attempt
+    (``[models] effort`` for this run, item 1041). The report keeps both."""
+    effort: AppConfig = (
+        config
+        if command.effort is None
+        else config.model_copy(update={"models": config.models.model_copy(update={"effort": command.effort})})
+    )
     if not command.no_mcp_purposes:
-        return config
-    return config.model_copy(update={"agent": config.agent.model_copy(update={"mcp_purposes": False})})
+        return effort
+    return effort.model_copy(update={"agent": effort.agent.model_copy(update={"mcp_purposes": False})})
 
 
 async def play_and_save(command: EvalRunCommand) -> tuple[EvalReport, Path]:
@@ -239,7 +245,12 @@ async def cmd_eval_speed(command: EvalSpeedCommand) -> int:
         return 0
     report, path = await play_and_save(
         EvalRunCommand(
-            name="eval-run", model=command.model, tasks=SPEED_TASKS, repeat=command.repeat, no_mcp_purposes=False
+            name="eval-run",
+            model=command.model,
+            tasks=SPEED_TASKS,
+            repeat=command.repeat,
+            no_mcp_purposes=False,
+            effort=command.effort,
         )
     )
     _write(["", *render_speed(report), "", f"Saved: {path}"])

@@ -357,6 +357,8 @@ class EvalRunCommand(FrozenModel):
     tasks: tuple[str, ...]
     repeat: int = Field(ge=1)
     no_mcp_purposes: bool
+    # How hard the model thinks on every attempt (item 1041), ``None`` for ``[models] effort``.
+    effort: Effort | None
 
 
 class EvalToolsCommand(FrozenModel):
@@ -376,6 +378,7 @@ class EvalSpeedCommand(FrozenModel):
     model: str | None
     repeat: int = Field(ge=1)
     reports: tuple[str, ...]
+    effort: Effort | None
 
 
 class EvalReportCommand(FrozenModel):
