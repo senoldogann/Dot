@@ -308,7 +308,9 @@ Both modes share what follows.
   page once the wheel has moved it and it stands still (item 1029): a wheel lands after the call that sends it, late on
   a busy Mac, where a page read too soon said "no change". A wheel that moves nothing (a page at its end), or a page
   that does not answer where it stands, is waited for one second at most.
-- `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
+- `browser_wait_text` waits until a text is visible and says after how long. A wait that begins while the page is
+  leaving for another (a click that went to a slow page) waits for that page within its time first (item 1035): the
+  page answers nothing while it goes, and the wait failed after 2 s. When the text does not come in time the
   call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A dialog
   that opens in front of the page during the wait ends it at once, saying so (item 698): the text would not come until
   the dialog is answered. A dialog that holds the text is the text appearing; a cookie banner ends no wait. A wait that
