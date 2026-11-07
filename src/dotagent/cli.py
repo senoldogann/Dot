@@ -560,6 +560,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--repeat", type=int, default=1, help="play every task this many times: one attempt says little about a model"
     )
     eval_run.add_argument(
+        "--effort",
+        choices=["off", "on", "minimal", "low", "medium", "high", "xhigh", "max"],
+        default=None,
+        help="how hard the model thinks on every attempt ([models] effort if omitted)",
+    )
+    eval_run.add_argument(
         "--no-mcp-purposes",
         action="store_true",
         help="leave the line of each MCP server's tool group as it was before it said what the server is for "
@@ -586,6 +592,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--model", default=None, help="provider:model; the main model of the configuration if omitted"
     )
     eval_speed.add_argument("--repeat", type=int, default=3, help="play every task this many times (default 3)")
+    eval_speed.add_argument(
+        "--effort",
+        choices=["off", "on", "minimal", "low", "medium", "high", "xhigh", "max"],
+        default=None,
+        help="how hard the model thinks on every attempt ([models] effort if omitted): the speed of a level, measured",
+    )
     eval_speed.add_argument(
         "--report",
         dest="reports",
