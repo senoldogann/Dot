@@ -155,6 +155,11 @@ def _row(page: Page, run_id: str) -> Locator:
     return page.locator("details.child").filter(has=page.locator(f"a.child-open[href='#/runs/{run_id}']"))
 
 
+def _asked(page: Page) -> Locator:
+    """The card of an approval in the panel that stands at the composer's place (item 973)."""
+    return page.get_by_label("Dot asked you").locator(".approval")
+
+
 async def test_a_helper_is_a_closed_row_that_opens_for_its_approval_and_folds_again_wide_and_on_a_phone(
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
@@ -203,11 +208,13 @@ async def test_a_helper_is_a_closed_row_that_opens_for_its_approval_and_folds_ag
                     # A page opened later says at once how long it has worked, not when its last event came.
                     shown: str | None = await figure.text_content()
                     assert shown is not None and not shown.endswith(" ms"), shown
-                # The helper that asks is open, the card of its approval in sight.
+                # The helper that asks is open, saying what it waits for; the card of its approval stands in the
+                # panel at the composer's place (item 973).
                 open_row: Locator = _row(page, asking.id)
                 await expect(open_row).to_have_js_property("open", True)
-                await expect(open_row.locator(".approval")).to_be_visible()
-                await expect(open_row.locator(".approval")).to_contain_text(_WRITE_COMMAND)
+                await expect(open_row).to_contain_text("Needs approval")
+                await expect(_asked(page)).to_be_visible()
+                await expect(_asked(page)).to_contain_text(_WRITE_COMMAND)
                 await page.screenshot(path=str(tmp_path / f"helpers-{width}-{scheme}.png"))
                 await page.close()
             page = await browser.new_page(
@@ -219,7 +226,7 @@ async def test_a_helper_is_a_closed_row_that_opens_for_its_approval_and_folds_ag
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"{address}/#/runs/{parent.id}")
             open_row = _row(page, asking.id)
-            await expect(open_row.locator(".approval")).to_be_visible()
+            await expect(_asked(page)).to_be_visible()
             # Decided (denied: the file is not written), the helper finishes, and its row, never touched, folds again.
             await manager.decide(approval.id, False, "test", "")
             async with asyncio.timeout(_RUN_WAIT_S):

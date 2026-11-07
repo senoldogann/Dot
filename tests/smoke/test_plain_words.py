@@ -573,14 +573,15 @@ async def test_a_chat_its_messages_menus_and_cards_say_what_they_mean(browser: B
         page: Page = await _signed_in(browser, served, width)
         reader: _Reader = _Reader(page, width)
         await reader.go("/runs", "New chat", "textarea")
-        for key, label in (
-            ("files", "A chat that worked"),
-            ("failing", "A chat that failed"),
-            ("question", "A chat that asked"),
-            ("approval", "A chat that waits for a yes"),
-            ("slow", "A chat at work"),
+        # A chat whose question waits shows the asks dock where the composer was (item 973).
+        for key, label, settle in (
+            ("files", "A chat that worked", "textarea"),
+            ("failing", "A chat that failed", "textarea"),
+            ("question", "A chat that asked", ".asks"),
+            ("approval", "A chat that waits for a yes", "textarea"),
+            ("slow", "A chat at work", "textarea"),
         ):
-            await reader.go(f"/runs/{served.runs[key]}", label, "textarea")
+            await reader.go(f"/runs/{served.runs[key]}", label, settle)
         # The composer's menus, on the home.
         await reader.go("/runs", "New chat", "textarea")
         await reader.opens("The model menu", page.locator("button[title='ollama:scripted']").first)

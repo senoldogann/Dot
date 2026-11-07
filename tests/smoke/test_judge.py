@@ -295,8 +295,9 @@ async def runtime(service: _Service, tmp_path_factory: pytest.TempPathFactory) -
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nreview = "{SCRIPTED_MODEL}"\nfast = "{FAST_MODEL}"\n'
-        f'helpers = ["{HELPER_MODEL}"]\nstep_router = true\n\n[judge]\nprovider = "typesafe"\n'
-        f'base_url = "{service.base}"\napi_key_env = "{KEY_ENV}"\nitems_per_request = 3\n\n[agent]\ngoal_mode = false',
+        f'helpers = ["{HELPER_MODEL}"]\n\n[judge]\nprovider = "typesafe"\n'
+        f'base_url = "{service.base}"\napi_key_env = "{KEY_ENV}"\nitems_per_request = 3\n\n'
+        "[agent]\ngoal_mode = false\nstep_router = true",
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
