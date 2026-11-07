@@ -91,7 +91,9 @@ def test_swiftc_is_never_run_when_the_developer_tools_are_not_installed(mac: Fak
     """macOS's `swiftc` and `xcrun` are stubs where the tools are missing: they open a dialog on the owner's screen.
     Only `xcode-select -p`, which does not, is run until it has succeeded."""
     mac.answers[("/usr/bin/xcode-select", "-p")] = None
-    assert look_for_compiler() == Toolchain(None, "Install Apple's developer tools on the Mac: xcode-select --install")
+    assert look_for_compiler() == Toolchain(
+        None, "Install Apple's developer software on the Mac: xcode-select --install"
+    )
     assert INSTALL_TOOLS.endswith("xcode-select --install")
     assert mac.run == [("/usr/bin/xcode-select", "-p")]
 

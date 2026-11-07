@@ -374,7 +374,7 @@ async def test_the_card_on_schedules_switches_it_and_keeps_the_list(login_env: d
                         judge: Locator = card.locator(".initiative-judge")
                         await expect(judge).to_contain_text("It decides what is worth doing on the default model.")
                         await expect(judge).to_contain_text("Work that gets done is never cut for what it spends")
-                        await expect(judge).to_contain_text("over 5 million tokens")
+                        await expect(judge).to_contain_text("over 5 million word pieces")
                         await expect(judge.get_by_role("link")).to_have_attribute("href", "#/settings/models")
                         await switch.click()
                     await expect(switch).to_have_attribute("aria-checked", "true")

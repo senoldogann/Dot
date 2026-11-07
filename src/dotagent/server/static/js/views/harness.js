@@ -469,7 +469,7 @@ function scheduleControl(view, onSchedule) {
  * night reads Dot's own record of the day's real runs, and calls no model; once a week, the proposer (item 988).
  */
 function nightCost() {
-  return "A night reads Dot's own record of the day's runs and calls no model. Once a week, when a tool failed again and again across chats and days, Dot asks its proposer model (the review model, unless the settings name another) for one new version and tries it on half of its real tasks; the version in use stays unless the trial shows the new one better.";
+  return "A night reads Dot's own record of the day's runs and calls no model. Once a week, when one of its actions failed again and again across chats and days, Dot asks its proposer model (the review model, unless the settings name another) for one new version and tries it on half of its real tasks; the version in use stays unless the trial shows the new one better.";
 }
 
 // The nights the page shows before "Show all" (item 938).
