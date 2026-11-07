@@ -23,7 +23,8 @@ own_change() {
 
 zero_sha=0000000000000000000000000000000000000000
 repo_root=$(git rev-parse --show-toplevel)
-review_dir="$(git rev-parse --git-dir)/claude-review"
+# One folder for every worktree of the repository (item 1020), so that a tip that passed in one vouches in another.
+review_dir="$(git rev-parse --path-format=absolute --git-common-dir)/claude-review"
 mkdir -p "$review_dir"
 cd "$repo_root"
 

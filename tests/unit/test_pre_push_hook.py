@@ -117,6 +117,7 @@ def test_a_merge_of_main_that_resolved_a_conflict_by_editing_the_change_is_revie
     _commit(repo, "shared.txt", "feature one\ntwo\nthree\n", "the change edits the same line")
     _git(repo, "push", "-q", "origin", "feature")
     pushed: str = _git(repo, "rev-parse", "HEAD")
+    _passed(repo, pushed)
     merged = subprocess.run(["git", "merge", "-q", "main"], cwd=repo, capture_output=True, text=True, check=False)
     assert merged.returncode != 0
     (repo / "shared.txt").write_text("both one\ntwo\nthree\n", encoding="utf-8")
@@ -162,6 +163,7 @@ def test_after_three_blocked_reviews_the_hook_says_to_reconsider_the_approach(re
 def test_a_push_that_only_changes_whitespace_of_the_change_is_reviewed(repo: Path, tmp_path: Path) -> None:
     """Whitespace is meaning in Python and YAML: a dedent that moves a line out of an `if` is a change."""
     pushed: str = _git(repo, "rev-parse", "HEAD")
+    _passed(repo, pushed)
     _commit(repo, "feature.txt", "  its own change\n", "re-indent")
     done, asked = _run_hook(repo, tmp_path, _git(repo, "rev-parse", "HEAD"), pushed)
     assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
