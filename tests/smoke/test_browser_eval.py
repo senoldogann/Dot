@@ -541,6 +541,12 @@ async def test_refs_a_script_cannot_be_given_are_told_and_the_page_stays_usable(
     assert json.loads(framed.text) == "Inside"
     again: ScriptRun = await browser.run_script("bad-refs", "document.title", 10.0, False)
     assert json.loads(again.text) == "Stubborn page"
+    # Item 1021: refs of two frames are told by their names, so a page that a script holds (as a loaded runner made a
+    # page slow to answer) does not turn the answer into a wait that ran out.
+    held: ScriptRun = await browser.run_script("bad-refs", _BUSY, 0.5, False)
+    assert held.end == "timeout"
+    with pytest.raises(BrowserError, match="different frames"):
+        await browser.run_script("bad-refs", "(a, b) => 1", 10.0, False, (send, inside))
 
 
 async def test_what_a_scripts_page_sent_is_said_reads_are_not(browser: BrowserSession, site: str) -> None:
