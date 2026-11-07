@@ -368,6 +368,16 @@ class EvalToolsCommand(FrozenModel):
     repeat: int = Field(ge=1)
 
 
+class EvalSpeedCommand(FrozenModel):
+    """`dotx eval speed` (item 1037): the speed set played on ``model``, ``repeat`` times each, and its table; or, with
+    ``reports``, the table of saved reports (two: a baseline and a later run, side by side), playing nothing."""
+
+    name: Literal["eval-speed"]
+    model: str | None
+    repeat: int = Field(ge=1)
+    reports: tuple[str, ...]
+
+
 class EvalReportCommand(FrozenModel):
     name: Literal["eval-report"]
     files: tuple[str, ...]
@@ -576,6 +586,7 @@ type Command = Annotated[
     | EvalFromRunCommand
     | EvalRunCommand
     | EvalToolsCommand
+    | EvalSpeedCommand
     | EvalReportCommand
     | StatsCommand
     | TradingBacktestCommand

@@ -23,6 +23,7 @@ from pydantic import JsonValue
 from dotagent.config import McpServerConfig
 from dotagent.core.errors import EvalError
 from dotagent.evals.office_tasks import AUGUST, NEW_NAME, OLD_NAME, letter_document, sales_workbook
+from dotagent.evals.speed_tasks import speed_tasks
 from dotagent.evals.tool_server import HOLIDAYS, SERVER_NAME, WORKING_DAYS, StandIn, stand_in
 from dotagent.evals.types import (
     AnswerContains,
@@ -1944,15 +1945,24 @@ def _choice_tasks() -> tuple[EvalTask, ...]:
 
 def all_tasks() -> tuple[EvalTask, ...]:
     """Every task of the catalog, in a fixed order: the small tasks, the long ones, the two on a site, the three that
-    help makes short, the two on Office files, then the five of the choice of help."""
-    return (*_catalog(), *_long_tasks(), *_site_tasks(), *_help_tasks(), *_office_tasks(), *_choice_tasks())
+    help makes short, the two on Office files, then the five of the choice of help. The speed set is not among them
+    (:mod:`dotagent.evals.speed_tasks`): `dotx eval speed` plays it, and the weekly score does not."""
+    return (
+        *_catalog(),
+        *_long_tasks(),
+        *_site_tasks(),
+        *_help_tasks(),
+        *_office_tasks(),
+        *_choice_tasks(),
+    )
 
 
 def select_tasks(task_ids: Sequence[str]) -> tuple[EvalTask, ...]:
     """The tasks called ``task_ids``, in the order of the catalog; every task when ``task_ids`` is empty."""
-    catalog: tuple[EvalTask, ...] = all_tasks()
     if not task_ids:
-        return catalog
+        return all_tasks()
+    # A task of the speed set is played by its id too (`dotx eval speed`), though the catalog leaves the set out.
+    catalog: tuple[EvalTask, ...] = (*all_tasks(), *speed_tasks())
     known: set[str] = {task.id for task in catalog}
     unknown: list[str] = sorted(set(task_ids) - known)
     if unknown:

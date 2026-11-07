@@ -19,6 +19,7 @@ from dotagent.cli_commands import (
     EvalListCommand,
     EvalReportCommand,
     EvalRunCommand,
+    EvalSpeedCommand,
     EvalToolsCommand,
 )
 from dotagent.config import AppConfig, load_default_config, load_user_config
@@ -48,6 +49,8 @@ from dotagent.evals.scoring import (
     render_scorecard,
     score_report,
 )
+from dotagent.evals.speed import render_speed, render_speed_change
+from dotagent.evals.speed_tasks import SPEED_TASKS, speed_tasks
 from dotagent.evals.tool_cases import CASES as TOOL_CASES
 from dotagent.evals.toolcalls import CaseResult, ToolCase, pass_rate
 from dotagent.evals.toolcalls_play import keys_for, play_cases
@@ -111,7 +114,8 @@ async def _task_problems(
 
 async def cmd_eval_check(command: EvalCheckCommand) -> int:
     config: AppConfig = eval_config(load_default_config())
-    tasks: tuple[EvalTask, ...] = all_tasks()
+    # The speed set is checked with the catalog, though only `dotx eval speed` plays it (item 1037).
+    tasks: tuple[EvalTask, ...] = (*all_tasks(), *speed_tasks())
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     broken: list[str] = list(catalog_problems(tasks))
@@ -168,7 +172,9 @@ def configured_for(config: AppConfig, command: EvalRunCommand) -> AppConfig:
     return config.model_copy(update={"agent": config.agent.model_copy(update={"mcp_purposes": False})})
 
 
-async def cmd_eval_run(command: EvalRunCommand) -> int:
+async def play_and_save(command: EvalRunCommand) -> tuple[EvalReport, Path]:
+    """Play the tasks of ``command`` against its model, telling each attempt as it ends, and save the report, after
+    each attempt as at the end."""
     config: AppConfig = configured_for(load_user_config(), command)
     model: str = command.model if command.model is not None else config.models.main
     parse_model_ref(model)
@@ -210,7 +216,33 @@ async def cmd_eval_run(command: EvalRunCommand) -> int:
         await asyncio.to_thread(save_report, evals_dir(), _report_of(run_config, model, started_at, outcomes))
     report: EvalReport = _report_of(run_config, model, started_at, outcomes)
     path: Path = await asyncio.to_thread(save_report, evals_dir(), report)
+    return report, path
+
+
+async def cmd_eval_run(command: EvalRunCommand) -> int:
+    report, path = await play_and_save(command)
     _write(["", *render_scorecard(score_report(report)), "", f"Saved: {path}"])
+    return 0
+
+
+async def cmd_eval_speed(command: EvalSpeedCommand) -> int:
+    """The speed set (item 1037): its table of saved reports, or of a run of it played now and saved."""
+    if command.reports:
+        if len(command.reports) > 2:
+            raise InvalidValueError("give one report, or two to compare", {"reports": list(command.reports)})
+        paths: list[Path] = _report_files(command.reports)
+        reports: list[EvalReport] = [await asyncio.to_thread(load_report, path) for path in paths]
+        for report in reports:
+            _write([*render_speed(report), ""])
+        if len(reports) == 2:
+            _write(render_speed_change(reports[0], reports[1]))
+        return 0
+    report, path = await play_and_save(
+        EvalRunCommand(
+            name="eval-run", model=command.model, tasks=SPEED_TASKS, repeat=command.repeat, no_mcp_purposes=False
+        )
+    )
+    _write(["", *render_speed(report), "", f"Saved: {path}"])
     return 0
 
 
@@ -318,6 +350,8 @@ async def dispatch(command: Command) -> int:
             return await cmd_eval_run(command)
         case EvalReportCommand():
             return await cmd_eval_report(command)
+        case EvalSpeedCommand():
+            return await cmd_eval_speed(command)
         case EvalToolsCommand():
             return await cmd_eval_tools(command)
         case _:
