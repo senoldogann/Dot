@@ -36,7 +36,7 @@ import shutil
 import signal
 import tempfile
 import time
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -74,6 +74,7 @@ from dotagent.agent.limits import (
 from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome
 from dotagent.agent.streammask import StreamMask
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
+from dotagent.claude_code.env import claude_env
 from dotagent.claude_code.stream import (
     BlockBegan,
     BlockKind,
@@ -116,7 +117,7 @@ from dotagent.llm.types import (
 )
 from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
 from dotagent.opencode.run import bridged, meanwhile
-from dotagent.repair.claude import LimitWindow, window_refused, worker_env
+from dotagent.repair.claude import LimitWindow, window_refused
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.endings import PREFIX_CUT_SHORT
@@ -146,11 +147,6 @@ _OWN_CORE: frozenset[str] = frozenset(
         "web_crawl",
     }
 )
-# The variables of the program's environment that start so are taken out: Dot's own (the program needs none of them)
-# and git's (Self-repair's worker sets some to keep its sessions from GitHub; here the model has no command of its own).
-_CLEARED_PREFIXES: tuple[str, ...] = ("DOT_", "GIT_")
-# No updater, no telemetry and no error report: the program's only network is Anthropic's API.
-_PROGRAM_ENV: dict[str, str] = {"DISABLE_AUTOUPDATER": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
 # A line of the stream may be long (a step that read a big page): the reader takes lines up to this size.
 _LINE_LIMIT: int = 32 * 1024 * 1024
 _STDERR_KEPT: int = 4000
@@ -283,17 +279,6 @@ def claude_argv(
         "--allowedTools",
         f"mcp__{door}",
     )
-
-
-def claude_env(env: Mapping[str, str], scratch: Path) -> dict[str, str]:
-    """The program's environment: Self-repair's worker's of ``env`` (no API key, no secret-named variable; its folders
-    in ``scratch``), without any variable of Dot's or git's own, with the updater, telemetry and error reports off. The
-    owner's ``HOME`` stays: the program's sign-in is there."""
-    kept: dict[str, str] = {
-        name: value for name, value in worker_env(env, scratch).items() if not name.startswith(_CLEARED_PREFIXES)
-    }
-    kept.update(_PROGRAM_ENV)
-    return kept
 
 
 def system_prompt(name: str, door: str, tools: Sequence[str], workspace: Path, today: str, known: Sequence[str]) -> str:

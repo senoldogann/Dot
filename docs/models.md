@@ -298,8 +298,15 @@ answer keeps its words, Ollama's too.
   resets: nothing moves the run to another model on its own. A program that writes nothing for
   `[providers.claude_code] silence_s` (600 s) while none of Dot's tools works for it is ended, and the run fails saying
   so. What Dot's own runs bring besides (the memory recalled at the start, the checks of a finish, lessons and
-  playbooks) a run here does not have, and these models cannot be the fast, review, vision, standby or own-work model,
-  whose calls are Dot's own. What it sends Anthropic, and the transcripts Claude Code keeps under `~/.claude/projects/`,
+  playbooks) a run here does not have, and these models cannot be the fast, review, vision, standby or own-work model
+  chosen on the Models page, whose calls include conversations. They can be the models of the improvement loop's roles
+  (`[harness] proposer`, `composer`, `selector`, `experience`, item 1017): each of those is a single question, which
+  `claude -p` answers in one go with no tool at all (`--tools ""`, no settings file, MCP server, slash command or kept
+  session, `--no-session-persistence`), the question on its input, the system prompt in a file only you can read in a
+  folder of the call's own that is removed as it ends, and the tool the question is answered by given as the program's
+  `--json-schema` (with null allowed in each field, as an API allows it; Dot's own checks of the answer then hold it).
+  Its first line must list nothing but `StructuredOutput`, else the call fails; a used-up window fails it with when it
+  resets. A conversation, a picture or several tools in one call is refused. What it sends Anthropic, and the transcripts Claude Code keeps under `~/.claude/projects/`,
   are in [Safety](safety.md#what-leaves-this-mac).
 
   Anthropic's terms (read 2026-11-06, the Claude Code legal and compliance page and the Agent SDK overview) do not let

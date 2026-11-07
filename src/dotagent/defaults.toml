@@ -982,7 +982,8 @@ component_lines = 16
 # The models of the roles of the improvement loop (docs/harness.md): the proposer writes a candidate from what a run
 # did, the composer makes one version of the candidates and what their probes showed, the selector picks among
 # anonymous answers, the experience writer records what each edit did. A model reference each ("provider:model");
-# "" means [models] review. A role's model sees a digest of a run, the harness and the candidates, never a key.
+# "" means [models] review. A role's model sees a digest of a run, the harness and the candidates, never a key. A model
+# of your Claude plan ("claude_code:opus", item 1017) answers each question in one go on the plan, with no tool.
 proposer = ""
 composer = ""
 selector = ""
