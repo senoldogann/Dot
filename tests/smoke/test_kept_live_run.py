@@ -158,7 +158,13 @@ async def test_a_run_at_work_that_is_opened_again_goes_on_from_its_newest_stored
             run: RunRecord = await manager.start(
                 GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
             )
-            await page.goto(f"{address}/#/runs/{run.id}")
+            # The page reads the stored events on a stream of their own (``stored=true``, item 734) and then follows the
+            # live one, which alone carries the words being written: they are written once it answers.
+            async with page.expect_response(
+                lambda response: f"/runs/{run.id}/stream" in response.url and "stored=true" not in response.url,
+                timeout=30_000,
+            ):
+                await page.goto(f"{address}/#/runs/{run.id}")
             # The call is read, and the message is on its way: the last thing the page was sent is a piece of it.
             await expect(page.locator(".tool-name")).to_have_count(1, timeout=30_000)
             model.write.set()
@@ -187,7 +193,8 @@ async def test_a_run_at_work_that_is_opened_again_goes_on_from_its_newest_stored
             model.go_on.set()
             async with asyncio.timeout(_RUN_WAIT_S):
                 assert (await manager.wait(run.id)).status == "done"
-            await expect(page.get_by_text(ANSWER)).to_have_count(1)
+            # In the conversation: the sidebar's row of the chat says its last words too, the answer once it is in.
+            await expect(page.locator(".timeline").get_by_text(ANSWER)).to_have_count(1)
             # Each thing the run did is drawn once: the message sent, and the call.
             await expect(page.locator(".user-message")).to_have_count(1)
             await expect(page.locator(".tool-name")).to_have_count(1)

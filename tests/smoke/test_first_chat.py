@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -457,6 +457,12 @@ async def test_a_chat_dot_opened_at_and_deleted_since_says_not_found(tmp_path: P
             await expect(page.get_by_role("textbox", name="Goal")).to_be_visible()
             await page.goto(f"{address}/#/runs/{run.id}")
             await expect(page.get_by_text(f"No task has the ID {run.id}.")).to_be_visible()
-            await expect(page.locator(".toast")).to_have_count(0)
+            # The words of a toast that stands are said, so that a failure names what showed it (the nightly run of
+            # 2026-11-07 failed here twice with a toast whose words it did not keep).
+            toasts: Locator = page.locator(".toast")
+            try:
+                await expect(toasts).to_have_count(0)
+            except AssertionError as error:
+                raise AssertionError(f"a toast stands: {await toasts.all_inner_texts()}") from error
         finally:
             await chromium.close()
