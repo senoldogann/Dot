@@ -59,6 +59,20 @@ _MASK_COLOUR: str = "#333333"
 _STALE_GENERATION: str = "Invalid frame in aria-ref selector"
 _ERROR_CHARS: int = 900
 _WHEEL_TO_END: float = 1_000_000.0
+# Where the page stands under a wheel: the window's scroll and that of every element from ``node`` up, which one of them
+# the wheel moves. A wheel lands after the call that sent it returns, a few tens of milliseconds on a Mac at rest and
+# later than the page's settle on a busy one, which then read the page as it was before ("no change"). How long a wheel
+# that moves nothing (a page at its end) is waited for, in frames' time.
+_SCROLL_STATE: str = """(node) => {
+  const parts = [window.scrollX, window.scrollY];
+  for (let at = node; at !== null; at = at.parentElement) {
+    parts.push(at.scrollTop, at.scrollLeft);
+  }
+  return parts.join(",");
+}"""
+_SCROLL_AT_POINT: str = f"([x, y]) => ({_SCROLL_STATE})(document.elementFromPoint(x, y))"
+_WHEEL_LANDS_S: float = 1.0
+_WHEEL_POLL_S: float = 0.03
 
 # Chromium commits its error page asynchronously after a failed navigation, and a goto issued in that window fails
 # with "interrupted by another navigation" (measured: 0 of 8 succeed without a delay, 8 of 8 with 50 ms or more).
@@ -1266,6 +1280,23 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
         raise _failure(f"{step.action} failed", page, {"ref": ref}, error) from error
 
 
+async def _scroll_state(page: Page, locator: Locator | None, centre: list[float], timeout_s: float) -> str | None:
+    """Where the page stands under the wheel (:data:`_SCROLL_STATE`), or None when it cannot be read within
+    ``timeout_s``: a page whose script holds its main thread never answers (item 471), the element ``locator`` names
+    was drawn again, or the page went on to another document."""
+    try:
+        async with asyncio.timeout(timeout_s):
+            if locator is None:
+                return str(await page.evaluate(_SCROLL_AT_POINT, centre))
+            return str(await locator.evaluate(_SCROLL_STATE, timeout=round(timeout_s * 1000)))
+    except (TimeoutError, PlaywrightTimeoutError):
+        return None
+    except PlaywrightError as error:
+        if _document_replaced(error):
+            return None
+        raise
+
+
 async def scroll_page(
     page: Page,
     direction: Literal["down", "up", "top", "bottom"],
@@ -1275,13 +1306,19 @@ async def scroll_page(
     viewport_height: int,
     timeout_ms: int,
 ) -> None:
-    """Scroll with the mouse wheel over the page centre, or over the element ``ref`` when it is a scroll container."""
+    """Scroll with the mouse wheel over the page centre, or over the element ``ref`` when it is a scroll container, and
+    return once the wheel has moved the page and it stands still, or once :data:`_WHEEL_LANDS_S` has passed (a page at
+    its end does not move) or where it stands cannot be read (:func:`_scroll_state`): the wheel was sent, and the
+    session's settle reads what it set off (item 1029)."""
+    centre: list[float] = [viewport_width / 2, viewport_height / 2]
+    locator: Locator | None = None
     try:
         if ref is None:
             await page.mouse.move(viewport_width / 2, viewport_height / 2)
         else:
-            locator: Locator = await live_locator(page, ref, "scroll")
+            locator = await live_locator(page, ref, "scroll")
             await locator.hover(timeout=timeout_ms)
+        before: str | None = await _scroll_state(page, locator, centre, _WHEEL_LANDS_S)
         match direction:
             case "down":
                 await page.mouse.wheel(0, pixels)
@@ -1291,6 +1328,15 @@ async def scroll_page(
                 await page.mouse.wheel(0, _WHEEL_TO_END)
             case "top":
                 await page.mouse.wheel(0, -_WHEEL_TO_END)
+        # Landed: moved from where it stood, and still at two looks in a row (a smooth scroll goes on for frames).
+        deadline: float = time.monotonic() + _WHEEL_LANDS_S
+        last: str | None = before
+        while before is not None and last is not None and time.monotonic() < deadline:
+            await asyncio.sleep(_WHEEL_POLL_S)
+            now: str | None = await _scroll_state(page, locator, centre, max(0.0, deadline - time.monotonic()))
+            if now is None or (now != before and now == last):
+                return
+            last = now
     except PlaywrightError as error:
         raise _failure("scrolling failed", page, {"direction": direction, "ref": ref}, error) from error
 

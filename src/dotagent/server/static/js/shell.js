@@ -2,14 +2,14 @@
 // owner: the approvals that wait, the connection while it is not live, the banner of an engaged emergency stop and the
 // one of a page that Dot's update left out of date.
 
-import { el, setText, showAfter } from "./dom.js";
+import { el, setText, showFrom } from "./dom.js";
 import { releaseFailsafe } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { followSeen, PHONE, setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
 import { buildSidebar } from "./sidebar.js";
 import { stageTitleSlot, stageToolsSlot } from "./stage.js";
-import { quietBreak } from "./state.js";
+import { breakToldAt } from "./state.js";
 import { SCHEMES, chooseScheme, nextScheme } from "./theme.js";
 import { attempt, toast } from "./ui.js";
 
@@ -28,7 +28,7 @@ function buildIndicators() {
   const dot = el("span", { class: "live-dot connecting" });
   const connectionLabel = el("span", { class: "label" }, STREAM_LABEL.connecting);
   const connection = el("span", { class: "pill", hidden: true }, dot, connectionLabel);
-  const showConnection = showAfter(connection, quietBreak);
+  const showConnection = showFrom(connection, breakToldAt);
   let returnsSeen = 0;
   const banner = el(
     "div",

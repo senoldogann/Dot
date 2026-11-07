@@ -135,6 +135,15 @@ async def _bottom(locator: Locator) -> float:
     return await locator.evaluate("(node) => node.getBoundingClientRect().bottom")
 
 
+async def _ready(page: Page) -> None:
+    """Wait until the chat's page has scrolled where it opens (``dot:page-ready``): a scroll of the test's before it was
+    undone by the page's own landing on the answer on a slow runner."""
+    deadline: float = time.monotonic() + WAIT_S
+    while not await page.evaluate("() => window.dotPageReady === true"):
+        assert time.monotonic() < deadline, "the chat's page never said it was ready"
+        await asyncio.sleep(0.05)
+
+
 @pytest.mark.browser
 async def test_the_pill_of_a_helpers_page_stays_in_the_window_as_its_conversation_scrolls(
     login_env: dict[str, str], tmp_path: Path
@@ -168,8 +177,12 @@ async def test_the_pill_of_a_helpers_page_stays_in_the_window_as_its_conversatio
                     page: Page = await browser.new_page(
                         viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
                     )
+                    await page.add_init_script(
+                        "document.addEventListener('dot:page-ready', () => { window.dotPageReady = true; }, true)"
+                    )
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{address}/#/runs/{helpers[0].id}")
+                    await _ready(page)
                     answer: Locator = page.locator(".answer")
                     await expect(answer).to_contain_text(ANSWER)
                     pill: Locator = page.locator(".child-foot")

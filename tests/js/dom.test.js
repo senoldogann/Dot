@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { clip, compact, duration, joined, modelName, nextNight, plural, repeatsAnswer } from "../../src/dotagent/server/static/js/dom.js";
+import { clip, compact, duration, joined, modelName, nextNight, plural, repeatsAnswer, showFrom } from "../../src/dotagent/server/static/js/dom.js";
 
 test("plural", () => {
   assert.equal(plural(1, "file", "files"), "1 file");
@@ -115,4 +115,22 @@ test("nextNight says tonight for an evening still to come and tomorrow once it p
   assert.equal(nextNight("04:00", at(14, 0)), "Next: tonight, 04:00");
   assert.equal(nextNight("14:00", at(9, 0)), "Next: today, 14:00");
   assert.equal(nextNight("14:00", at(15, 0)), "Next: tomorrow, 14:00");
+});
+
+test("showFrom asks its time again when it comes: a later one, as a return's grace, holds the node back", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
+  const node = { hidden: true };
+  // A break that began while the page was away is due 2 s after it began; the page comes back at 1 s, and its grace
+  // runs to 9 s.
+  let returnedAt = -Infinity;
+  const show = showFrom(node, (since) => Math.max(since + 2000, returnedAt + 8000));
+  show(true);
+  t.mock.timers.tick(1000);
+  returnedAt = 1000;
+  t.mock.timers.tick(1500);
+  assert.equal(node.hidden, true, "told at its first time, inside the grace");
+  t.mock.timers.tick(6500);
+  assert.equal(node.hidden, false);
+  show(false);
+  assert.equal(node.hidden, true);
 });
