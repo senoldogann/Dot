@@ -1,7 +1,8 @@
 """The owner's Claude plan as Dot's model picker lists it (item 1013), provider ``claude_code``: Claude Code's own model
 aliases, ``opus`` and ``sonnet``, listed once the ``claude`` program is found and signed in. They answer Claude Code
-alone, so a run on one goes to that program whole (:func:`dotagent.claude_code.run.run_in_claude_code`) and no single
-call of Dot's reaches one: :meth:`ClaudeCodeProvider.complete` refuses. The program gets Dot's own tools, and only
+alone, so a run on one goes to that program whole (:func:`dotagent.claude_code.run.run_in_claude_code`), and a single
+question of Dot's (a review, the harness's roles, item 1017) goes to it as one call with no tool of its own
+(:mod:`dotagent.claude_code.ask`); a call of a conversation is refused. The program gets Dot's own tools, and only
 those, through the provider's bridge (:mod:`dotagent.opencode.bridge`).
 
 Whose plan it is is read from ``~/.claude.json``'s ``oauthAccount`` (:func:`dotagent.repair.claude.read_account`): an
@@ -11,9 +12,11 @@ import asyncio
 from collections.abc import Mapping
 from pathlib import Path
 
+from dotagent.claude_code.ask import ask_claude
 from dotagent.config import ClaudeCodeConfig
-from dotagent.core.errors import ClaudeCodeMissing, ConfigError, ProviderRefusedError
+from dotagent.core.errors import ClaudeCodeMissing, ConfigError
 from dotagent.core.paths import claude_code_command
+from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply
 from dotagent.opencode.bridge import ToolBridge
 from dotagent.opencode.server import find_program
@@ -95,16 +98,22 @@ class ClaudeCodeProvider:
         return await asyncio.to_thread(read_account, claude_state(self._login_env))
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
-        raise ProviderRefusedError(
-            "The models of your Claude plan answer only as Claude Code: a run on one goes to Claude Code whole, and no"
-            " single call of Dot's (a side question, a summary, a review) can use one; pick another model for it",
-            {"provider": CLAUDE_CODE_PROVIDER, "purpose": request.session_key or ""},
+        """A single question of Dot's (item 1017: a review, the harness's roles) answered by the program in one go,
+        with no tool but the shape of its answer (:mod:`dotagent.claude_code.ask`); a run goes to it whole instead."""
+        if request.model not in MODELS:
+            raise ConfigError(
+                "Claude Code offers Dot its fable, opus and sonnet models only; pick one of them",
+                {"provider": CLAUDE_CODE_PROVIDER, "model": request.model, "models": list(MODELS)},
+            )
+        level: Effort | None = effective_effort(EFFORTS, request.effort)
+        return await ask_claude(
+            await self.program(), request, self._login_env, request.model, EFFORTS[0] if level is None else level
         )
 
     async def model_info(self, model: str) -> ModelInfo:
         if model not in MODELS:
             raise ConfigError(
-                "Claude Code offers Dot its opus and sonnet models only; pick one of them",
+                "Claude Code offers Dot its fable, opus and sonnet models only; pick one of them",
                 {"provider": CLAUDE_CODE_PROVIDER, "model": model, "models": list(MODELS)},
             )
         await self.program()
