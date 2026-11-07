@@ -35,6 +35,8 @@ from dotagent.tools.shell import read_login_env
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 TOKEN: str = "phone-reach-test-token"
+# How long a test waits for what the page does with a QR code it was given.
+_UNTIL_S: float = 15.0
 _NAME: str = "mac.tail1234.ts.net"
 _OWNERS_PHONE: str = "iPhone 17 Pro Max"
 _SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
@@ -396,6 +398,18 @@ _WATCH_BLOBS: str = """() => {
 }"""
 
 
+async def _until(page: Page, condition: str) -> None:
+    """Wait until ``condition`` (an expression over the page) holds, read by the page itself a frame at a time: a
+    ``wait_for_function`` of 3 s ran out on a slow runner before the code was let go of, and Dot's content rules stop
+    one that must wait at all (item 1034)."""
+    deadline: float = time.monotonic() + _UNTIL_S
+    while not await page.evaluate(
+        f"() => new Promise((done) => requestAnimationFrame(() => done(Boolean({condition}))))"
+    ):
+        assert time.monotonic() < deadline, f"never held: {condition}"
+        await asyncio.sleep(0.05)
+
+
 @pytest.mark.browser
 async def test_a_qr_code_that_comes_after_the_tab_was_left_is_let_go_of(stand_ins: Path) -> None:
     """Item 559: a QR code read from the daemon is a ``blob:`` URL, and one whose answer came after Settings › Phone was
@@ -422,9 +436,9 @@ async def test_a_qr_code_that_comes_after_the_tab_was_left_is_let_go_of(stand_in
             await expect(page.locator(".agent-card").first).to_be_visible()
             before: int = await page.evaluate("window.__blobs.made.length")
             release.set()
-            await page.wait_for_function("(count) => window.__blobs.made.length > count", arg=before)
+            await _until(page, f"window.__blobs.made.length > {before}")
             made: str = await page.evaluate(f"window.__blobs.made[{before}]")
-            await page.wait_for_function("(url) => window.__blobs.revoked.includes(url)", arg=made, timeout=3000)
+            await _until(page, f"window.__blobs.revoked.includes({made!r})")
             await page.close()
         finally:
             await browser.close()
