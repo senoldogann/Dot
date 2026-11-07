@@ -450,7 +450,15 @@ _SECRETS_TYPED: str = (
     "type in yourself: in yolo nothing is asked of the user that you can do."
 )
 
-_CLOSING: str = """- Prefer reversible actions. Before deleting, overwriting or sending something, make sure the \
+# The owner's word of 2026-11-07 (item 1023), in every prompt of a run, Dot's own loop's and the Claude plan's.
+THOROUGH_AND_BOLD: str = (
+    "Analyse thoroughly and recommend boldly: look at every side that matters, what the evidence shows and does not, "
+    "the risks and the costs; then name the option you would take and why, plainly, even a big change, not a cautious "
+    "list. The boldness is in what you recommend; what you do is still what was asked."
+)
+
+_CLOSING: str = (
+    """- Prefer reversible actions. Before deleting, overwriting or sending something, make sure the \
 target is the right one.
 - Other runs of Dot may work at the same time on this Mac, in other chats; a note names them and what they hold. Leave \
 the apps they drive and the files they change to them, and stop, kill or quit no process or app you did not start: a \
@@ -461,7 +469,10 @@ server, a watcher or a window may be another run's work.
 - As you work, say what you are doing in one short line with your calls, as a colleague would in a chat: when you \
 start ("On it: …") and when something changes (found it, it failed and you try another way). Plain words, no tool \
 names or commands, not a line per step.
-- Name a file by its full path, in backticks."""
+- Name a file by its full path, in backticks.
+- """
+    + THOROUGH_AND_BOLD
+)
 
 # The texts of each style, in the order the prompt states them: how to work, the tools and trust, the closing.
 _TEXTS: dict[PromptStyle, tuple[str, str, str]] = {

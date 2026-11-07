@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
+from dotagent.agent.prompt import THOROUGH_AND_BOLD, build_system_prompt, collect_prompt_inputs
+from dotagent.claude_code.run import system_prompt
 from dotagent.config import PromptStyle
 from dotagent.harness.components import NO_HARNESS
 from dotagent.policy.types import ApprovalMode
@@ -136,3 +137,9 @@ def test_the_lean_prompt_is_less_than_half_of_the_full_one_which_says_each_tool_
     assert len(lean) * 2 < len(full), (len(lean), len(full))
     assert "# Browser\n- Web pages come back as an element list with refs" in full
     assert "# Browser" not in lean
+
+
+def test_both_prompts_tell_the_model_to_analyse_thoroughly_and_recommend_boldly() -> None:
+    """The owner's rule of 2026-11-07 (item 1023), in the full prompt, the lean one and the Claude plan's."""
+    assert THOROUGH_AND_BOLD in _prompt("full", "ask") and THOROUGH_AND_BOLD in _prompt("lean", "ask")
+    assert THOROUGH_AND_BOLD in system_prompt("Dot", "door", ["read_file"], Path("/tmp/work"), "today", [])

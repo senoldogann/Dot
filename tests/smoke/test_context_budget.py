@@ -72,12 +72,15 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # tools 18,329).
 # Raised by 100 for `send_to_chat` (item 957, the same ask): a note to the run at work in another chat, described in a
 # line (26,049 measured; system 7,591, tools 18,432).
-BUDGET_TOKENS: int = 26_050
+# Raised by 100 for the owner's rule of 2026-11-07 (item 1023): analyses thorough, recommendations bold, one line of
+# the prompt's Communication (26,138 measured; system 7,688).
+BUDGET_TOKENS: int = 26_150
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
 # Raised by 200 for the lead's paragraph on work orders (item 907).
-SYSTEM_BUDGET_TOKENS: int = 7_600
+# Raised by 100 for the rule of item 1023 above.
+SYSTEM_BUDGET_TOKENS: int = 7_700
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
