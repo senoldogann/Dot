@@ -579,7 +579,7 @@ def build_parser() -> argparse.ArgumentParser:
     eval_tools.add_argument("--repeat", type=int, default=1, help="ask every case this many times")
     eval_speed = eval_commands.add_parser(
         "speed",
-        help="play the speed set (four browser tasks on a local site) and print what each took: passes, wall seconds, "
+        help="play the speed set (five browser tasks on a local site) and print what each took: passes, wall seconds, "
         "model calls, single-step acts, time to the first token, context (this spends the tokens of that model)",
     )
     eval_speed.add_argument(

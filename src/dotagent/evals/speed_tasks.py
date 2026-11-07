@@ -1,8 +1,9 @@
-"""The speed set (item 1037): four browser tasks on a local site, with no network and no account, that measure how long
-Dot's browser use takes to finish the kind of work the owner gives it, not whether it can: a form over several pages,
-a search and the result it opens, a long list read to the end, and a daily check over a few pages. Each is ordinary
-work a person does in a browser, its answer judged by what the pages say; `dotx eval speed` plays them and prints, per
-task, what a change to Dot's browser use is measured against (docs/development.md).
+"""The speed set (items 1037 and 1040): five browser tasks on a local site, with no network and no account, that
+measure how long Dot's browser use takes to finish the kind of work the owner gives it, not whether it can: a form over
+several pages, a search and the result it opens, a long list read to the end, a daily check over a few pages, and a job
+application in a dialog whose steps show one after the other. Each is ordinary work a person does in a browser, its
+answer judged by what the pages say; `dotx eval speed` plays them and prints, per task, what a change to Dot's browser
+use is measured against (docs/development.md).
 
 The pages are plain HTML whose ``{name}`` placeholders the site fills from the query string
 (:mod:`dotagent.evals.site`), so a form submitted with GET carries what was typed to the next page. No page holds a
@@ -21,7 +22,13 @@ from dotagent.evals.types import (
 from dotagent.tools.meta import FINISH_TOOL
 
 # The task ids of the speed set, in the order they are played and reported.
-SPEED_TASKS: tuple[str, ...] = ("speed-signup-wizard", "speed-shop-search", "speed-stock-list", "speed-daily-check")
+SPEED_TASKS: tuple[str, ...] = (
+    "speed-signup-wizard",
+    "speed-shop-search",
+    "speed-stock-list",
+    "speed-daily-check",
+    "speed-apply-dialog",
+)
 # Generous for the slowest model the owner runs: a run past it is cut and counts as failed, which the table shows.
 SPEED_TIME_LIMIT_S: float = 420.0
 SPEED_TOKEN_BUDGET: int = 900_000
@@ -240,8 +247,46 @@ _DAILY: tuple[SitePage, ...] = (
 )
 
 
+# A job page whose Easy apply opens a dialog of three steps that replace one another in place, as a job board's does:
+# contact, questions, review; the last says the application's number (item 1040). The page never navigates. The number
+# is made from what the steps took (7700, the email's length, ten times the years' choice), so that no source of the
+# page holds it before the application is sent with the answers the goal asks for.
+_APPLY_EMAIL: str = "ada@example.org"
+_APPLY_ID: str = str(7700 + len(_APPLY_EMAIL) + 10 * 1)
+# No brace: the site fills the page's placeholders (item 1037). Each step is a part of the dialog that the one before it
+# shows: hidden, it is not in the page's accessibility tree, as a job board's next step is not there yet.
+_GO: str = (
+    "window.go = (n) => document.querySelectorAll('[data-step]')"
+    ".forEach((part) => part.hidden = part.dataset.step != n)"
+)
+_APPLY: tuple[SitePage, ...] = (
+    _page(
+        "/jobs/42",
+        _html(
+            "Backend developer at Acme",
+            "<h1>Backend developer</h1><p>Acme, Oulu. Python, Postgres.</p>",
+            "<button onclick=\"document.getElementById('apply').hidden = false\">Easy apply</button>",
+            '<div role="dialog" aria-label="Apply to Acme" id="apply" hidden>',
+            '<div data-step="1"><h2>Contact</h2><label>Email <input id="email"></label>',
+            '<label>Phone <input id="phone"></label><button onclick="go(2)">Next</button></div>',
+            '<div data-step="2" hidden><h2>Questions</h2><label>Years of experience <select id="years">',
+            "<option>0-2</option><option>3-5</option><option>6 or more</option></select></label>",
+            '<label><input type="checkbox" id="fi"> I can work in Finland</label>',
+            "<button onclick=\"document.getElementById('sum').textContent = email.value + ', ' + years.value + "
+            "' years, Finland: ' + fi.checked, go(3)\">Review</button></div>",
+            '<div data-step="3" hidden><h2>Review</h2><p id="sum"></p>',
+            "<button onclick=\"document.getElementById('sent').textContent = 'Application ' + "
+            "(7700 + email.value.length + 10 * years.selectedIndex) + ' sent for ' + email.value + ' (' + "
+            "years.value + ' years, Finland: ' + fi.checked + ').', go(4)\">Submit application</button></div>",
+            '<div data-step="4" hidden><p id="sent"></p></div></div>',
+            f"<script>{_GO}</script>",
+        ),
+    ),
+)
+
+
 def speed_tasks() -> tuple[EvalTask, ...]:
-    """The four tasks of the speed set, in :data:`SPEED_TASKS`'s order."""
+    """The five tasks of the speed set, in :data:`SPEED_TASKS`'s order."""
     pending: tuple[str, ...] = tuple(order for order, _, state in _ORDERS if state == "pending")
     return (
         _task(
@@ -294,7 +339,8 @@ def speed_tasks() -> tuple[EvalTask, ...]:
             (
                 *(_says(title) for title, state in _ALERTS if state == "open"),
                 _matches(rf"\b{len(pending)}\b"),
-                _says(pending[0]),
+                # An order's id as a model may write it, with a non-breaking hyphen (one attempt of 2026-11-07).
+                _matches(pending[0].replace("-", "[-\u2010\u2011]")),
             ),
             (
                 _open("{site}/alerts"),
@@ -304,6 +350,20 @@ def speed_tasks() -> tuple[EvalTask, ...]:
                     + "; ".join(title for title, state in _ALERTS if state == "open")
                     + f". Today {len(pending)} orders are pending; the oldest is {pending[0]}."
                 ),
+            ),
+        ),
+        _task(
+            "speed-apply-dialog",
+            "Apply to the job at {site}/jobs/42 in the browser with its Easy apply: email ada@example.org, phone "
+            "+358 40 123 4567, 3-5 years of experience, able to work in Finland; review and submit the application. "
+            "Report the line the page shows once it is sent.",
+            _APPLY,
+            # The line only a submitted application shows, with what its steps chose: a run that skipped a choice or
+            # never pressed Submit does not have it.
+            (_says(f"Application {_APPLY_ID} sent for {_APPLY_EMAIL} (3-5 years, Finland: true)"),),
+            (
+                _open("{site}/jobs/42"),
+                _finish(f"Application {_APPLY_ID} sent for {_APPLY_EMAIL} (3-5 years, Finland: true)."),
             ),
         ),
     )
