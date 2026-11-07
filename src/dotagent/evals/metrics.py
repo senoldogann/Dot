@@ -94,6 +94,33 @@ def _unproven_steps(events: Sequence[EventRecord]) -> int:
     return total
 
 
+def _step_calls(events: Sequence[EventRecord]) -> list[EventRecord]:
+    """The model calls of the run's own steps, not its side questions (a summary, a review)."""
+    return [event for event in events if event.kind == CALL_EVENT and event.data.get("purpose") == "step"]
+
+
+def _first_token_mean(events: Sequence[EventRecord]) -> float | None:
+    """The mean time to the first token of the steps' calls that gave one (item 1037), ``None`` when none did."""
+    times: list[float] = [
+        float(seconds)
+        for event in _step_calls(events)
+        if isinstance(seconds := event.data.get("first_token_seconds"), int | float)
+    ]
+    return round(sum(times) / len(times), 3) if times else None
+
+
+def _peak_input(events: Sequence[EventRecord]) -> int:
+    """The most input tokens one of the run's model calls was sent: the largest context it had (item 1037)."""
+    return max(
+        (
+            int(tokens)
+            for event in events
+            if event.kind == CALL_EVENT and isinstance(tokens := event.data.get("input_tokens"), int)
+        ),
+        default=0,
+    )
+
+
 def run_metrics(
     run: RunRecord, events: Sequence[EventRecord], delegated_input: int = 0, delegated_output: int = 0
 ) -> RunMetrics:
@@ -129,6 +156,10 @@ def run_metrics(
         help_calls=sum(1 for event in events if event.kind == "tool_call" and event.data.get("tool") == FIND_HELP_TOOL),
         plan_changes=sum(1 for event in events if event.kind == PLAN_EVENT),
         approvals_asked=sum(1 for event in events if event.kind == "approval_requested"),
+        model_calls=sum(1 for event in events if event.kind == CALL_EVENT),
+        first_token_seconds=_first_token_mean(events),
+        peak_input_tokens=_peak_input(events),
+        browser_calls=sum(1 for event in results if str(event.data.get("tool", "")).startswith("browser_")),
     )
 
 

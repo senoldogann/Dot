@@ -60,6 +60,13 @@ class RunMetrics(FrozenModel):
     help_calls: int | None = None
     plan_changes: int | None = None
     approvals_asked: int | None = None
+    # The speed set's numbers (item 1037): the run's model calls, the mean time to the first token of its steps' calls,
+    # and the most input tokens one of its calls was sent.
+    model_calls: int | None = None
+    first_token_seconds: float | None = None
+    peak_input_tokens: int | None = None
+    # The calls of the browser's tools the run made: a pass of the speed set with none read the pages another way.
+    browser_calls: int | None = None
 
 
 class TaskOutcome(FrozenModel):

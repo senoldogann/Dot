@@ -118,6 +118,7 @@ _FAMILIES: dict[str, str] = {
     "eval-run": "dotagent.cli_eval",
     "eval-report": "dotagent.cli_eval",
     "eval-tools": "dotagent.cli_eval",
+    "eval-speed": "dotagent.cli_eval",
     "stats": "dotagent.cli_stats",
     "trading-backtest": "dotagent.cli_trading",
     "daemon": "dotagent.cli_daemon",
@@ -576,6 +577,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--case", dest="cases", action="append", default=[], help="ask only this case; give it again for more"
     )
     eval_tools.add_argument("--repeat", type=int, default=1, help="ask every case this many times")
+    eval_speed = eval_commands.add_parser(
+        "speed",
+        help="play the speed set (four browser tasks on a local site) and print what each took: passes, wall seconds, "
+        "model calls, single-step acts, time to the first token, context (this spends the tokens of that model)",
+    )
+    eval_speed.add_argument(
+        "--model", default=None, help="provider:model; the main model of the configuration if omitted"
+    )
+    eval_speed.add_argument("--repeat", type=int, default=3, help="play every task this many times (default 3)")
+    eval_speed.add_argument(
+        "--report",
+        dest="reports",
+        action="append",
+        default=[],
+        help="print the table of a saved report instead of playing; give two to compare a baseline with a later run",
+    )
     eval_report = eval_commands.add_parser(
         "report", help="show the score of saved eval runs and compare them (all saved runs if no file is given)"
     )
