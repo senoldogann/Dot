@@ -62,7 +62,8 @@ code** takes its place. The same by hand:
    it happens before a page is back: the daemon started again after it did not stop cleanly (it was killed, crashed or
    ended with an error; it leaves `<home>/daemon.running` while it runs), with how many runs that cut off. The daemon
    signs the pushes with a key pair it makes on first start (`<home>/vapid-key.pem`), naming the project's page as
-   who sends them (Apple refuses an address it cannot reach, item 992), and logs what a push service that refuses one
+   who sends them (Apple refuses an address it cannot reach, item 992; the signing library's own check, narrower
+   than RFC 8292, is off so that it takes a page's address, item 1019), and logs what a push service that refuses one
    answers; subscriptions live in the store
    and go when their push service says they are gone; a service that is busy or failing (429, 5xx) is asked once
    more a second later. A subscription whose keys cannot encrypt a message is refused

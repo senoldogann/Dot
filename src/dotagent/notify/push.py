@@ -45,6 +45,10 @@ log = structlog.get_logger(__name__)
 # mailto: one (RFC 8292). Apple's service refuses a subject it cannot reach (403 BadJwtToken): "mailto:dot@localhost"
 # had every push to an iPhone refused (item 992; 253 of 253 in the owner's log), so it is the project's own page.
 SUBJECT: str = "https://github.com/senoldogann/Dot"
+# py_vapid's own check of the subject is narrower than RFC 8292: it takes an https: address without a path only, and
+# refused the project's page with ``VapidException`` before any push was sent (item 1019). Its "no-strict" setting asks
+# only that there is a subject.
+_SIGNING: dict[str, bool] = {"no-strict": True}
 # How much of a refusing push service's answer is kept: Apple says why in it ({"reason": "BadJwtToken"}).
 _ANSWER_CHARS: int = 300
 _TTL_S: int = 600
@@ -238,6 +242,11 @@ def notice_message(event: EventRecord) -> PushMessage | None:
     return None
 
 
+def _signer(keys: PushKeys) -> Vapid:
+    """The daemon's key, set to sign with ``SUBJECT``."""
+    return Vapid(private_key=Vapid.from_pem(keys.private_pem.encode("ascii")).private_key, conf=dict(_SIGNING))
+
+
 def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) -> None:
     # pywebpush loads aiohttp and requests, about 25 MB: the first notification sent loads it, not the daemon's start
     # (item 729).
@@ -250,7 +259,7 @@ def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) 
                 "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
             },
             data=json.dumps(message.model_dump()),
-            vapid_private_key=Vapid.from_pem(keys.private_pem.encode("ascii")),
+            vapid_private_key=_signer(keys),
             vapid_claims={"sub": SUBJECT},
             ttl=_TTL_S,
             timeout=_SEND_TIMEOUT_S,
