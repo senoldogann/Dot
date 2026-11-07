@@ -353,16 +353,51 @@ async def test_what_is_tapped_on_a_phone_is_a_fingers_size(browser: Browser, ser
     assert small == [], "\n".join(small)
 
 
+# A record of what the page does after a click: the clicks and where they land, a page left, a dialog added or removed,
+# the main page drawn again; the page's own mark tells a page loaded again from the one it was.
+_WATCH_THE_PAGE: str = """() => {
+  window.dotWatch = { since: Date.now(), log: [] };
+  const log = (...what) => window.dotWatch.log.push([Math.round(performance.now()), ...what]);
+  const named = (target) => target.closest('button')?.textContent ?? target.tagName;
+  document.addEventListener('click', (event) => log('click', named(event.target)), true);
+  window.addEventListener('pagehide', () => log('pagehide'));
+  window.addEventListener('hashchange', () => log('hash', location.hash));
+  window.addEventListener('error', (event) => log('error', String(event.message)));
+  window.addEventListener('unhandledrejection', (event) => log('rejection', String(event.reason)));
+  new MutationObserver((changes) => {
+    for (const change of changes) {
+      for (const node of change.addedNodes) if (node.tagName === 'DIALOG') log('dialog added', node.className);
+      for (const node of change.removedNodes)
+        if (node.tagName === 'DIALOG') log('dialog removed', node.className, node.returnValue);
+    }
+  }).observe(document.body, { childList: true });
+  const main = document.querySelector('main');
+  if (main !== null) new MutationObserver(() => log('main drawn again')).observe(main, { childList: true });
+}"""
+_WHAT_THE_PAGE_DID: str = """() => JSON.stringify({
+  watched: window.dotWatch ?? 'no: the page was loaded again',
+  hash: location.hash,
+  dialogs: [...document.querySelectorAll('dialog')].map((dialog) => [dialog.className, dialog.open]),
+})"""
+
+
 async def test_how_long_ago_a_chat_ended_stays_in_one_line_beside_a_long_goal(
     browser: Browser, served: tuple[str, str]
 ) -> None:
     address, _ = served
     page: Page = await _phone(browser, address, "/customize/skills")
     try:
-        await page.get_by_role("button", name="Save from a chat").click()
-        # The dialog opens at once and lists the chats once the daemon has answered (item 1005), which a loaded runner
-        # took over 5 s for: main's gate failed here four times running on 2026-11-06, the dialog not yet open.
-        await expect(page.get_by_role("dialog", name="Save a skill from a chat")).to_be_visible()
+        button: Locator = page.get_by_role("button", name="Save from a chat")
+        await button.wait_for()
+        await page.evaluate(_WATCH_THE_PAGE)
+        await button.click()
+        # The dialog opens at once and lists the chats once the daemon has answered (item 1005). CI's first attempt
+        # still found no dialog four times since 2026-11-03, which neither this Mac nor CI alone (25 tries) showed:
+        # what the page did after the click is said with the failure (item 1021), so that the next one names its cause.
+        try:
+            await expect(page.get_by_role("dialog", name="Save a skill from a chat")).to_be_visible()
+        except AssertionError as error:
+            raise AssertionError(f"{error}\nwhat the page did: {await page.evaluate(_WHAT_THE_PAGE_DID)}") from error
         await expect(page.locator(".chat-skill-row").first).to_be_visible(timeout=15_000)
         assert await _broken(page, ".chat-skill-row > .hint") == []
     finally:
