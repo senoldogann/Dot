@@ -108,7 +108,10 @@ _MICROPHONE: str = """
     const now = state.gain.context.currentTime;
     state.gain.gain.setValueAtTime(level, now);
     state.gain.gain.setValueAtTime(0, now + seconds);
+    state.quietAt = now + seconds;
   };
+  // Whether the tone has ended by the audio's own clock, which runs behind the wall's on a busy runner.
+  state.spoken = (after) => state.gain.context.currentTime >= state.quietAt + after;
   state.live = () => state.tracks.filter((track) => track.readyState === "live").length;
   state.states = () => state.contexts.map((context) => context.state);
 })();
@@ -381,6 +384,16 @@ async def _released(page: Page) -> None:
     )
 
 
+async def _spoken(page: Page, after: float) -> None:
+    """Wait until the tone `speak` turned on has ended, and `after` seconds more, by the audio's clock: on a busy runner
+    it ran behind the wall's, and a tick after a second and a half of the wall's cut the tone short (170 of its 220
+    cycles reached the Mac)."""
+    deadline: float = time.monotonic() + _WAIT_MS / 1000
+    while not await page.evaluate("(after) => window.__mic.spoken(after)", after):
+        assert time.monotonic() < deadline, "the tone never ended by the audio's clock"
+        await asyncio.sleep(0.05)
+
+
 @pytest.mark.parametrize("engine", ["chromium", "webkit"])
 async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_every_time(
     chromium: Browser,
@@ -406,7 +419,7 @@ async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_ev
         assert (await _mic(page, "mic.asked"))[-1] == {"audio": {"echoCancellation": True, "noiseSuppression": True}}
         assert await _mic(page, "mic.live()") == 1
         await page.evaluate("() => window.__mic.speak(1.0)")
-        await asyncio.sleep(1.5)
+        await _spoken(page, 0.5)
         await _fits(page, f"{engine} while the microphone records")
         # The stream was opened at the press and given the sound while the owner spoke, before the tick.
         voice: list[str] = [line for line in streamed if "/voice/streams" in line]

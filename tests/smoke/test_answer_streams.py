@@ -18,6 +18,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -67,20 +68,41 @@ _SAMPLER: str = """() => {
 }"""
 
 
+class GatedProvider(ScriptedProvider):
+    """The scripted model, whose reply that finishes a run waits for ``gate``: a run the page is to see end under its
+    eyes ends once the page follows it, however long the page took to open (a slow runner took longer than a step)."""
+
+    def __init__(self, turns: list[ScriptedTurn]) -> None:
+        super().__init__(_PROVIDER, turns)
+        self.gate: asyncio.Event = asyncio.Event()
+        self.gate.set()
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        reply: ModelReply = await super().complete(request, sink)
+        if any(call.name == FINISH_TOOL for call in reply.tool_calls):
+            await self.gate.wait()
+        return reply
+
+
 def _script() -> list[ScriptedTurn]:
     # Each run writes a file, so that a line of what it changed would come, and it is not under the answer (item 841).
     write = ScriptedTurn(
         text="", calls=(ScriptedCall(tool="write_file", arguments={"path": "shelves.md", "content": "Dry.\n"}),)
     )
-    look = ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 2"}),))
+    look = ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "true"}),))
     finish = ScriptedTurn(
         text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": _ANSWER, "success": True}),)
     )
     return [turn for _ in range(_RUNS) for turn in (write, look, finish)]
 
 
+@pytest.fixture(scope="module")
+def model() -> GatedProvider:
+    return GatedProvider(_script())
+
+
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
-async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
+async def runtime(tmp_path_factory: pytest.TempPathFactory, model: GatedProvider) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
         "[browser]\nheadless = true\n\n[agent]\nplaybooks = false"
@@ -92,7 +114,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script()))
+    await built.router.register(_PROVIDER, model)
     try:
         yield built
     finally:
@@ -139,10 +161,10 @@ async def _start(manager: RunManager) -> RunRecord:
 
 
 async def _watch(
-    browser: Browser, address: str, run: RunRecord, reduced: bool, height: int
+    browser: Browser, address: str, run: RunRecord, reduced: bool, height: int, model: GatedProvider
 ) -> tuple[list[list[int | str | None]], int]:
     """What the page showed of the answer of `run` frame by frame, from its opening, in a window `height` tall, and the
-    length of its words."""
+    length of its words. A run held at its end (``model.gate``) is let go once the page follows its live stream."""
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     context = await browser.new_context(
         viewport={"width": 1280, "height": height},
@@ -155,8 +177,17 @@ async def _watch(
         page.on("pageerror", lambda error: errors.append(str(error)))
         await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
         await page.goto(ui_url(host, port, TOKEN))
-        await page.goto(f"{address}/#/runs/{run.id}")
+        if model.gate.is_set():
+            await page.goto(f"{address}/#/runs/{run.id}")
+        else:
+            # The live stream, not the one of the stored events the page reads first (``stored=true``, item 734).
+            async with page.expect_response(
+                lambda response: f"/runs/{run.id}/stream" in response.url and "stored=true" not in response.url,
+                timeout=_RUN_WAIT_S * 1000,
+            ):
+                await page.goto(f"{address}/#/runs/{run.id}")
         await page.evaluate(_SAMPLER)
+        model.gate.set()
         foot = page.locator(".answer > .answer-foot")
         await expect(foot).to_be_visible(timeout=_RUN_WAIT_S * 1000)
         await expect(foot).to_have_css("visibility", "visible")
@@ -169,14 +200,17 @@ async def _watch(
     return seen, whole
 
 
-async def test_an_answer_that_ends_a_run_under_the_readers_eyes_is_written_in(served: tuple[RunManager, str]) -> None:
+async def test_an_answer_that_ends_a_run_under_the_readers_eyes_is_written_in(
+    served: tuple[RunManager, str], model: GatedProvider
+) -> None:
     manager, address = served
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch()
         try:
+            model.gate.clear()
             run: RunRecord = await _start(manager)
             # A window shorter than the conversation: the page must scroll to land on the answer.
-            seen, whole = await _watch(browser, address, run, reduced=False, height=_SHORT_WINDOW)
+            seen, whole = await _watch(browser, address, run, reduced=False, height=_SHORT_WINDOW, model=model)
             lengths: list[int] = [int(length) for length, _, _, _ in seen if isinstance(length, int) and length >= 0]
             partial = [frame for frame in seen if isinstance(frame[0], int) and 0 < frame[0] < whole]
             assert len(partial) >= 5, f"the words came at once: {sorted(set(lengths))[:12]} of {whole}"
@@ -196,19 +230,20 @@ async def test_an_answer_that_ends_a_run_under_the_readers_eyes_is_written_in(se
 
 
 async def test_under_reduced_motion_and_on_a_run_read_again_the_answer_shows_at_once(
-    served: tuple[RunManager, str],
+    served: tuple[RunManager, str], model: GatedProvider
 ) -> None:
     manager, address = served
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch()
         try:
+            model.gate.clear()
             live: RunRecord = await _start(manager)
-            seen, whole = await _watch(browser, address, live, reduced=True, height=900)
+            seen, whole = await _watch(browser, address, live, reduced=True, height=900, model=model)
             assert next(length for length, _, _, _ in seen if isinstance(length, int) and length >= 0) == whole
             ended: RunRecord = await _start(manager)
             async with asyncio.timeout(_RUN_WAIT_S):
                 assert (await manager.wait(ended.id)).status == "done"
-            seen, whole = await _watch(browser, address, ended, reduced=False, height=900)
+            seen, whole = await _watch(browser, address, ended, reduced=False, height=900, model=model)
             assert next(length for length, _, _, _ in seen if isinstance(length, int) and length >= 0) == whole
         finally:
             await browser.close()

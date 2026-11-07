@@ -260,7 +260,13 @@ async def test_a_chat_left_and_come_back_to_while_its_run_works_shows_each_messa
             run: RunRecord = await manager.start(
                 _GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
             )
-            await page.goto(f"{address}/#/runs/{run.id}")
+            # The thought is streamed once the page follows the live stream: the stored events are read first, on a
+            # stream of their own (``stored=true``, item 734), which a live piece sent meanwhile never reaches.
+            async with page.expect_response(
+                lambda response: f"/runs/{run.id}/stream" in response.url and "stored=true" not in response.url,
+                timeout=15000,
+            ):
+                await page.goto(f"{address}/#/runs/{run.id}")
             chat: Locator = page.locator(".timeline")
             await expect(chat.get_by_text(_FIRST)).to_have_count(1, timeout=15000)
             model.followed.set()
