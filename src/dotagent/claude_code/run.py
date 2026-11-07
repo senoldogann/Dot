@@ -36,7 +36,7 @@ import shutil
 import signal
 import tempfile
 import time
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Iterable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -72,7 +72,7 @@ from dotagent.agent.limits import (
     limits_of,
 )
 from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome, opening_text
-from dotagent.agent.picks import PICKS_EVENT, picks_event_data
+from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
 from dotagent.agent.playbooks import offered_to_run
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask
@@ -778,15 +778,31 @@ def _outcome(follow: _Follow, answer: str, goal: str) -> RunOutcome:
     return RunOutcome(status="done", result=said, needs="")
 
 
+async def _bounds_of(agent: AgentRun) -> frozenset[str] | None:
+    """The tools a run of an agent whose tools are bounded may have (item 86), ``None`` when it is not bounded: the ones
+    it names and the core ones, and those of the connected apps the owner opened to it (item 415, item 1022): picked for
+    this message or an earlier one of its chat, as Dot's own loop opens them."""
+    runtime: Runtime = agent.runtime
+    bounded: frozenset[str] | None = await agent_tools(runtime, agent.run.agent_id)
+    if bounded is None:
+        return None
+    picked_before: frozenset[str] = await runtime.store.picked_servers(agent.run.thread_id, PICKS_EVENT)
+    return opened_bounds(bounded, owner_server_groups(agent.opening.picks, picked_before), runtime.registry.tools)
+
+
+def opened_bounds(bounded: frozenset[str], opened: frozenset[str], names: Iterable[str]) -> frozenset[str]:
+    """``bounded``, an agent's tools, with those of ``names`` in the groups ``opened`` to it by the owner's picks."""
+    return bounded | frozenset(name for name in names if group_of(name) in opened)
+
+
 async def _opening_of(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> str:
     """The run's first message: the owner's words, then what they picked for it (item 1022), as Dot's own loop gives
     them: each picked skill's instructions and the connected apps (MCP servers) whose tools to use, which reach the
-    program through the door. The chips stand over the message as in Dot's own loop. The manager refuses the picks
+    program through the door. The manager refuses the picks
     Claude Code cannot take (the accounts, Plan first) before the run starts."""
     runtime: Runtime = agent.runtime
     if agent.opening.picks == NO_PICKS:
         return agent.opening.text
-    await runtime.bus.emit(agent.run.id, PICKS_EVENT, picks_event_data(agent.opening.picks), True)
     catalog: SkillCatalog = await asyncio.to_thread(
         load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
     )
@@ -813,7 +829,10 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     info: ModelInfo = await provider.model_info(ref.model)
     earlier: list[Message] = await runtime.store.load_messages(run.thread_id, 0)
     left_out: frozenset[str] = frozenset() if runtime.browser.config.enabled else frozenset({BROWSER_GROUP})
-    tools: ToolRegistry = door_tools(runtime.registry, run.mode, await agent_tools(runtime, run.agent_id), left_out)
+    # What the message came with stands under it at once, as in Dot's own loop (item 967).
+    if agent.opening.picks != NO_PICKS:
+        await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(agent.opening.picks), True)
+    tools: ToolRegistry = door_tools(runtime.registry, run.mode, await _bounds_of(agent), left_out)
     quiet: _Quiet = _Quiet(heard=time.monotonic())
     door: Door = new_door(
         run.thread_id,

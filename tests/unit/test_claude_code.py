@@ -9,6 +9,7 @@ import stat
 from pathlib import Path
 
 from dotagent.agent.limits import LimitReached, RunLimits
+from dotagent.agent.picks import owner_server_groups
 from dotagent.claude_code.run import (
     answered_all,
     claude_argv,
@@ -17,6 +18,7 @@ from dotagent.claude_code.run import (
     ended_clean,
     fast_off_words,
     mcp_config,
+    opened_bounds,
     run_effort,
     run_speed,
     system_prompt,
@@ -45,6 +47,7 @@ from dotagent.llm.router import ModelRef, offers_fast_mode
 from dotagent.llm.types import ImageData, ToolSpec
 from dotagent.opencode.bridge import Door, new_door
 from dotagent.repair.claude import window_refused
+from dotagent.store.models import RunPicks
 from dotagent.tools.base import ToolResult, ok
 
 DOOR: str = "dot_1a2b3c4d"
@@ -349,3 +352,15 @@ def test_a_step_that_stops_for_a_tool_ends_as_dots_steps_do() -> None:
     assert dot_finish("max_tokens") == "max_tokens"
     said: str = system_prompt("Dot", DOOR, ("read_file",), Path("/w"), "2026-11-07", ())
     assert "in the language the owner writes in" in said
+
+
+def test_an_agents_bounds_take_in_the_tools_of_the_apps_the_owner_picked() -> None:
+    """Item 1022: a run on the plan of an agent whose tools are bounded gets the tools of a connected app picked for
+    its message (or an earlier one of its chat), as Dot's own loop gives them (item 415), and no other app's."""
+    names: list[str] = ["read_file", "mcp__notes__save", "mcp__notes__list", "mcp__mail__send"]
+    opened: frozenset[str] = owner_server_groups(RunPicks(plugins=("notes",), skills=(), plan_first=False), frozenset())
+    assert opened_bounds(frozenset({"read_file"}), opened, names) == {
+        "read_file",
+        "mcp__notes__save",
+        "mcp__notes__list",
+    }

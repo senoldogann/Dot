@@ -2942,7 +2942,8 @@ class RunManager:
         ``approvals``, sent from ``source``, could not start with (:func:`picks_problems`): the tools it may use are its
         mode's, within the agent's bounds, which take in the servers the owner picked (item 415), as the loop gives
         them. A run on one of OpenCode's models goes whole to OpenCode's own agent (item 283), whose first message is
-        the owner's words alone, so it takes no picks."""
+        the owner's words alone, so it takes no picks; one on the Claude plan takes the skills and the servers, which
+        Dot gives it (item 1022), but not the accounts or Plan first, which are Dot's own loop's."""
         if picks == NO_PICKS:
             return
         whole: str | None = WHOLE_RUN_AGENTS.get(model.provider)
