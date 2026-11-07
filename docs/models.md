@@ -34,8 +34,8 @@ Under the roles, the page says how many schedules and agents run on each model, 
 **Night's learning and self-repair** chooses the model of each role of the improvement loop ([The
 harness](harness.md)) and Self-repair's model, as Settings › Self-repair does. A role's list offers only the models
 that can do its work: the fast, the vision and the own work model list no model of an agent program of its own
-(OpenCode's free models, the Claude plan), while the review model and the night's roles list the Claude plan's too. A model of your Claude plan (`claude_code:opus`,
-`claude_code:sonnet`, or any other it offers) may be the review model, as every question of it is a single one the
+(OpenCode's free models, the Claude plan), while the review model and the night's roles list the Claude plan's too.
+A model of your Claude plan (`claude_code:opus`, `claude_code:sonnet`, or any other it offers) may be the review model, as every question of it is a single one the
 plan answers (item 1032); not the fast model, which takes a run's steps, nor the vision model, which reads pictures,
 nor the own work model: its look is a run whose tools (its list, your mail and calendar) Claude Code's door to Dot's
 tools does not give.
