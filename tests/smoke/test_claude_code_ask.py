@@ -167,5 +167,7 @@ async def test_a_tool_of_the_programs_own_or_a_used_up_window_fails_the_call(roo
     with pytest.raises(ProviderProtocolError, match=r"more than Dot's question allows \(tools: Bash\)"):
         await _propose(room)
     await asyncio.to_thread((room.record / "mode").write_text, "limit", encoding="utf-8")
-    with pytest.raises(ProviderWindowError, match="usage limit is reached"):
+    with pytest.raises(ProviderWindowError, match="usage limit is reached") as refused:
         await _propose(room)
+    # The router pauses the model until the window resets, not for its short cool-down.
+    assert refused.value.retry_after_s is not None and refused.value.retry_after_s > 3600

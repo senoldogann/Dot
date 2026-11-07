@@ -102,7 +102,7 @@ class ClaudeCodeProvider:
         with no tool but the shape of its answer (:mod:`dotagent.claude_code.ask`); a run goes to it whole instead."""
         if request.model not in MODELS:
             raise ConfigError(
-                "Claude Code offers Dot its fable, opus and sonnet models only; pick one of them",
+                f"Claude Code offers Dot its {', '.join(MODELS)} models only; pick one of them",
                 {"provider": CLAUDE_CODE_PROVIDER, "model": request.model, "models": list(MODELS)},
             )
         level: Effort | None = effective_effort(EFFORTS, request.effort)
@@ -113,7 +113,7 @@ class ClaudeCodeProvider:
     async def model_info(self, model: str) -> ModelInfo:
         if model not in MODELS:
             raise ConfigError(
-                "Claude Code offers Dot its fable, opus and sonnet models only; pick one of them",
+                f"Claude Code offers Dot its {', '.join(MODELS)} models only; pick one of them",
                 {"provider": CLAUDE_CODE_PROVIDER, "model": model, "models": list(MODELS)},
             )
         await self.program()

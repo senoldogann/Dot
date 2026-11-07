@@ -8,6 +8,7 @@ import json
 import os
 import stat
 import sys
+import time
 from pathlib import Path
 
 record: Path = Path(sys.argv[1])
@@ -46,7 +47,7 @@ init: dict[str, object] = {
 status: str = "rejected" if mode == "limit" else "allowed"
 window: dict[str, object] = {
     "type": "rate_limit_event",
-    "rate_limit_info": {"status": status, "resetsAt": 1794021000, "rateLimitType": "five_hour"},
+    "rate_limit_info": {"status": status, "resetsAt": int(time.time()) + 7200, "rateLimitType": "five_hour"},
 }
 usage: dict[str, int] = {
     "input_tokens": 2,
