@@ -39,11 +39,13 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 # Whose interface the browser never opens: the daemon's default address.
 SERVER: ServerConfig = load_default_config().server
 _SLOW_REST_S: float = 8.0
-_LATE_HEADERS_S: float = 3.0
-# /late-headers answers once the test lets it: after a sleep of _LATE_HEADERS_S the navigation committed while the click
-# that started it still settled on a slow runner, and the click was refused before the wait it is about.
-_LATE_HEADERS: threading.Event = threading.Event()
-# The most a page held for the test (/later-tab, /late-headers) waits for it, and the test for what it then does.
+# /held-redirect answers once the test lets it (``_HELD_REDIRECT``), with a redirect to a host the test blocks: the
+# navigation is pending, and allowed, until then. A blocked host itself is refused as it is asked, so a navigation to it
+# is never pending: its refusal raced the wait it is about. The wait the test makes, and when the answer comes after it.
+_HELD_REDIRECT: threading.Event = threading.Event()
+_HELD_WAIT_S: float = 5.0
+_HELD_REDIRECT_S: float = _HELD_WAIT_S + 2.0
+# The most a page held for the test (/later-tab, /held-redirect) waits for it, and the test for what it then does.
 _HELD_FOR_TEST_MOST_S: float = 30.0
 # How long the server takes to answer a page's own request (item 774): past the time a wait may end early.
 _ANSWER_LATE_S: float = 7.0
@@ -225,10 +227,9 @@ setTimeout(tick, 1500)</script>""",
     # only after _SLOW_REST_S.
     "/leaving": """<!doctype html><title>Leaving</title>
 <button onclick="setTimeout(() => { location.href = '/half-page' }, 900)">Leave</button>""",
-    # The page leaves 0.9 s after the click for another host, whose answer comes after _LATE_HEADERS_S.
+    # The page leaves 0.9 s after the click for one whose answer, held, sends it on to another host.
     "/to-blocked": """<!doctype html><title>Leaving</title>
-<button onclick="setTimeout(() => {
-  location.href = `http://localhost:${location.port}/late-headers` }, 900)">Leave</button>""",
+<button onclick="setTimeout(() => { location.href = '/held-redirect' }, 900)">Leave</button>""",
     "/late-headers": "<!doctype html><title>Blocked</title><h1>Blocked page</h1>",
     # A page that loads, then at once goes on to one whose end comes only after _HELD_REST_S (item 954): what
     # browser_open met on LinkedIn, whose page answered and was still being parsed when the wait for it to settle ended.
@@ -322,8 +323,13 @@ for (const list of document.querySelectorAll('ul')) {
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = self.path.split("?", 1)[0]
-        if path == "/late-headers":
-            _LATE_HEADERS.wait(_HELD_FOR_TEST_MOST_S)
+        if path == "/held-redirect":
+            _HELD_REDIRECT.wait(_HELD_FOR_TEST_MOST_S)
+            self.send_response(302)
+            self.send_header("Location", f"http://localhost:{self.server.server_address[1]}/late-headers")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if path == "/late-tab":
             time.sleep(_LATE_TAB_S)
         if path == "/later-tab":
@@ -881,7 +887,7 @@ async def test_a_wait_that_times_out_while_a_page_still_loads_shows_it_without_w
 async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_before_showing_the_page(
     browser_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
-    """The page leaves for a blocked host that answers after the wait timed out; reading the page waits for that
+    """The page leaves for one held past the wait, which sends it on to a blocked host; reading the page waits for that
     navigation to commit, so the URL rules are checked once more before anything is shown."""
     config: BrowserConfig = browser_config.model_copy(update={"blocked_hosts": ["localhost"]})
     (tmp_path / "profile").mkdir()
@@ -891,12 +897,12 @@ async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_befo
     )
     try:
         view: PageView = await session.open_url("blocked", f"{site}/to-blocked", True)
-        _LATE_HEADERS.clear()
+        _HELD_REDIRECT.clear()
         await act(session, "blocked", [Step(action="click", ref=ref_of(view.body, 'button "Leave"'))], False)
-        # The blocked host answers once the wait below has timed out.
-        asyncio.get_running_loop().call_later(_LATE_HEADERS_S, _LATE_HEADERS.set)
+        # The held page answers, sending the tab on to the blocked host, once the wait below has timed out.
+        asyncio.get_running_loop().call_later(_HELD_REDIRECT_S, _HELD_REDIRECT.set)
         with pytest.raises(BrowserError, match="may not be opened"):
-            await session.wait_text("blocked", "Arrived", 1.0, True)
+            await session.wait_text("blocked", "Arrived", _HELD_WAIT_S, True)
     finally:
         await session.aclose()
 
