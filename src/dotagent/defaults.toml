@@ -133,9 +133,9 @@ idle_stop_s = 600.0
 models_ttl_s = 3600.0
 
 [providers.claude_code]
-# Claude Code on your own Claude plan (item 1013): a run on "claude_code:fable", "claude_code:opus" or "claude_code:sonnet" goes whole to the
-# claude program you installed and signed in to, with Dot's tools alone (docs/models.md). command: the claude program,
-# a path or a name looked up on the login PATH. A program that writes nothing for silence_s seconds while none of Dot's
+# Claude Code on your own Claude plan (item 1013): a run on "claude_code:fable", "claude_code:opus",
+# "claude_code:sonnet" or "claude_code:haiku" goes whole to the claude program you installed and signed in to, with
+# Dot's tools alone (docs/models.md). command: the claude program, a path or a name looked up on the login PATH. A program that writes nothing for silence_s seconds while none of Dot's
 # tools works for it is ended, and the run fails.
 command = "claude"
 silence_s = 600.0
