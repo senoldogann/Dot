@@ -124,3 +124,16 @@ async def test_an_ollama_that_does_not_answer_is_none(home: Path) -> None:
     ollama: str = f'base_url = "http://127.0.0.1:{_closed_port()}"\napi_key_env = "DOT_TEST_SURELY_UNSET_SECRET"\n'
     config: AppConfig = _config(home, f"[providers.ollama]\n{ollama}")
     assert await cli_setup._ollama_models(config) is None
+
+
+def test_setup_keeps_a_review_model_of_the_claude_plan_and_says_a_fast_one_cannot_do_the_work(home: Path) -> None:
+    """Item 1032: the plan answers the review model's single questions, not the fast model's steps."""
+    (home / "config.toml").write_text(
+        '[models]\nfast = "claude_code:sonnet"\nreview = "claude_code:opus"\n', encoding="utf-8"
+    )
+    config: AppConfig = load_config(home / "config.toml")
+    ref: ModelRef = ModelRef(provider="claude_code", model="opus")
+    said: str = cli_setup._models_lines(config, ref, (), ollama_down=False)
+    fast, review = (line for line in said.splitlines() if line.lstrip().startswith(("fast", "review")))
+    assert "claude_code:sonnet answers only as its own agent and cannot do this work" in fast, fast
+    assert "claude_code:opus" in review and "cannot do this work" not in review, review

@@ -22,9 +22,11 @@ run needs, sent where the configuration points:
   OpenRouter passes each call on to the lab whose model it is. OpenCode Zen's free models (`opencode:`) get the whole
   conversation of a run that runs on one, through OpenCode's own agent, and the providers of some of them may use what
   they get to improve their models (see [Models and providers](models.md#models-and-providers)).
-- **To Anthropic, through your Claude plan: the whole conversation of a run on `claude_code:` (item 1013), and the
-  question of an improvement loop's role you set to one (item 1017: the digest of a run, the harness and the
-  candidates, with the secrets Dot holds masked, as for any review model; nothing of it is kept by the program).** Such a run
+- **To Anthropic, through your Claude plan: the whole conversation of a run on `claude_code:` (item 1013), and each
+  question of the review model or of an improvement loop's role you set to one (items 1017 and 1032: an action to
+  approve with its arguments, a run's goal and its end for the goal check, a run's progress, the lessons and skills
+  drawn from runs, the notes the nightly merge weighs, the digest of a run, the harness and the candidates, with the
+  secrets Dot holds masked, as for any review model; nothing of it is kept by the program).** Such a run
   goes to the `claude` program you installed and signed in to ([Models and providers](models.md#models-and-providers)),
   which sends Anthropic the goal, what the chat said before on other models, your messages while it works, Dot's
   instructions for the run (your name, an agent's instructions), the descriptions of Dot's tools it is given and what

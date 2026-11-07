@@ -28,7 +28,11 @@ its second opinion and its approvals), and the config file keeps it with the res
 cannot do the work is refused, and nothing changes (`POST /api/models/roles`). Under them, **Own work model** chooses
 the model that decides what Dot does on its own initiative (`[initiative] look_model`, items 910 and 916), from the
 models that call tools, or **Default model** for `[models] main`; it holds from the next look on
-(`PUT /api/initiative/look-model`, [Dot comes to you](proactive.md)).
+(`PUT /api/initiative/look-model`, [Dot comes to you](proactive.md)). A model of your Claude plan (`claude_code:opus`,
+`claude_code:sonnet`, or any other it offers) may be the review model, as every question of it is a single one the
+plan answers (item 1032); not the fast model, which takes a run's steps, nor the vision model, which reads pictures,
+nor the own work model: its look is a run whose tools (its list, your mail and calendar) Claude Code's door to Dot's
+tools does not give.
 
 Under them, **Fallbacks** (item 478, the standby models; drawn as a numbered list since item 563) lists the models a run
 moves to when its own model cannot answer (below), in their order: **Add a fallback model** puts one of the models that
@@ -301,8 +305,9 @@ answer keeps its words, Ollama's too.
   resets: nothing moves the run to another model on its own. A program that writes nothing for
   `[providers.claude_code] silence_s` (600 s) while none of Dot's tools works for it is ended, and the run fails saying
   so. What Dot's own runs bring besides (the memory recalled at the start, the checks of a finish, lessons and
-  playbooks) a run here does not have, and these models cannot be the fast, review, vision, standby or own-work model
-  chosen on the Models page, whose calls include conversations. They can be the models of the improvement loop's roles
+  playbooks) a run here does not have, and these models cannot be the fast, vision or standby model chosen on the
+  Models page, whose calls include conversations and pictures, nor the own work model, whose look needs tools Claude
+  Code's door does not give; they can be the review model (item 1032). They can be the models of the improvement loop's roles
   (`[harness] proposer`, `composer`, `selector`, `experience`, item 1017): each of those is a single question, which
   `claude -p` answers in one go with no tool at all (`--tools ""`, no settings file, MCP server, slash command or kept
   session, `--no-session-persistence`), the question on its input, the system prompt in a file only you can read in a

@@ -47,10 +47,19 @@ KNOWN_PROVIDERS: tuple[str, ...] = (
     "claude_code",
 )
 # The providers whose models answer only as an agent program of their own, to which a run goes whole, with the name of
-# that agent: Zen's free models as OpenCode's agent (item 283), the owner's Claude plan as Claude Code (item 1013). No
-# single call of Dot's (a role's, a standby model's, a side question) can use one, and such a run takes none of what
-# Dot's own loop brings.
+# that agent: Zen's free models as OpenCode's agent (item 283), the owner's Claude plan as Claude Code (item 1013). Such
+# a run takes none of what Dot's own loop brings. Dot's own calls cannot use one (a standby model's, a side question,
+# the fast and the vision model's) but the plan's single questions: the review model's and the harness's roles' (items
+# 1017 and 1032, :func:`answers_role`).
 WHOLE_RUN_AGENTS: dict[str, str] = {"opencode": "OpenCode's own agent", "claude_code": "Claude Code"}
+
+
+def answers_role(role: str, provider: str) -> bool:
+    """Whether a model of ``provider`` can do the work of ``role`` of Dot's own work (``fast``, ``review``,
+    ``vision``): one that answers only as its own agent cannot, as its calls are conversations or pictures, but a model
+    of the owner's Claude plan may be the review model, every question of which is a single one the plan answers
+    (item 1032)."""
+    return provider not in WHOLE_RUN_AGENTS or (role == "review" and provider == "claude_code")
 
 
 def split_model_ref(text: str) -> tuple[str, str] | None:
