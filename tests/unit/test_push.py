@@ -431,3 +431,41 @@ async def test_a_push_is_signed_with_a_subject_apple_takes_and_a_refusal_keeps_i
     assert claims == [{"sub": push.SUBJECT}]
     assert push.SUBJECT.startswith("https://") and "localhost" not in push.SUBJECT
     assert (refused.value.context["status"], refused.value.context["answer"]) == (403, "MARKER-answer-403")
+
+
+class _Taken:
+    """What a push service answers when it takes a message."""
+
+    def __init__(self) -> None:
+        self.status_code: int = 201
+        self.text: str = ""
+        self.headers: dict[str, str] = {}
+
+
+@pytest.mark.asyncio
+async def test_a_push_is_signed_by_pywebpush_itself_with_the_project_page_as_its_subject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1019: py_vapid's own check takes an https: subject with no path only, so every push with the project's page
+    as its subject raised ``VapidException`` before it was sent, and the push watch ended. The real pywebpush signs here
+    and only the post to the push service is a fake: no push service is called."""
+    posted: list[dict[str, str]] = []
+
+    def post(endpoint: str, **request: object) -> _Taken:
+        headers: object = request["headers"]
+        assert isinstance(headers, dict)
+        posted.append({str(name): str(value) for name, value in headers.items()})
+        return _Taken()
+
+    monkeypatch.setattr(pywebpush.requests, "post", post)
+    keys: PushKeys = read_or_create_keys(tmp_path / "vapid-key.pem")
+    p256dh, auth = _usable_keys()
+    subscription: PushSubscription = PushSubscription(
+        endpoint="https://web.push.apple.com/a", p256dh=p256dh, auth=auth, created_at=_NOW
+    )
+    message: PushMessage = PushMessage(title="t", body="b", route="#/runs", state="failed")
+    await push.send_push(keys, subscription, message)
+    token: str = posted[0]["authorization"].removeprefix("vapid t=").split(",")[0]
+    payload: str = token.split(".")[1]
+    claims: dict[str, object] = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    assert (claims["sub"], claims["aud"]) == (push.SUBJECT, "https://web.push.apple.com")
