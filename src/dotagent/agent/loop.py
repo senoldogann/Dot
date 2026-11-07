@@ -1044,7 +1044,7 @@ def _turned_on(outcomes: Sequence[ToolOutcome], hidden: Mapping[str, str], on: f
     return tuple(dict.fromkeys(group for group in named if group not in on))
 
 
-async def _opening_text(
+async def opening_text(
     opening: RunOpening, offered: Sequence[Skill], room: int, root: Path | None, providers: Mapping[str, str]
 ) -> str:
     """The run's first message to the model: its opening's text, then what the owner picked for it (item 318), each
@@ -2394,7 +2394,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         runtime,
         run.thread_id,
         run.id,
-        await _opening_text(
+        await opening_text(
             opening,
             skills.skills,
             scaffold.tool_output_chars,

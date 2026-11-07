@@ -21,9 +21,10 @@ import pytest_asyncio
 from dotagent.agent.manager import RunManager
 from dotagent.claude_code.run import chat_path
 from dotagent.config import load_config
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import claude_code_dir
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import EventRecord, RunPicks, RunRecord
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -179,3 +180,66 @@ async def test_a_chat_whose_run_did_not_end_clean_starts_a_new_session(room: Roo
     ended: RunRecord = await room.manager.wait(started.id)
     assert ended.status == "failed"
     assert not await asyncio.to_thread(chat_path(first.thread_id).exists)
+
+
+_SKILL: str = "weekly-report"
+_SKILL_STEPS: str = "MARKER-weekly-report-steps: one line a project, the late ones first."
+
+
+def _write_skill(home: Path) -> None:
+    folder: Path = home / "skills" / _SKILL
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "SKILL.md").write_text(
+        f'---\nname: {_SKILL}\ndescription: "Write the weekly report as the owner likes it."\n---\n'
+        f"# The weekly report\n\n{_SKILL_STEPS}\n",
+        encoding="utf-8",
+    )
+
+
+async def test_a_picked_skill_reaches_claude_code_in_the_first_message(room: Room) -> None:
+    """Item 1022: a message sent with skills picked on a model of the owner's Claude plan was refused before it ran;
+    the skill's instructions now come in the program's first message, as Dot's own loop gives them."""
+    await asyncio.to_thread(_write_skill, Path(os.environ["DOT_HOME"]))
+    picks: RunPicks = RunPicks(plugins=(), skills=(_SKILL,), plan_first=False)
+    started: RunRecord = await room.manager.start_picked(
+        "Write a note in the workspace.",
+        "task",
+        MODEL,
+        None,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "auto",
+        False,
+        (),
+        picks,
+    )
+    ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.status == "done", ended.result
+    assert ended.goal == "Write a note in the workspace."
+    first: str = await asyncio.to_thread((room.record / "first.json").read_text, encoding="utf-8")
+    assert _SKILL_STEPS in first and "The owner picked the skills below for this message." in first
+    chips: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "picks", 10)
+    assert [event.data["skills"] for event in chips] == [[_SKILL]]
+
+
+async def test_plan_first_on_claude_code_is_refused_before_the_run(room: Room) -> None:
+    """Plan first is Dot's own loop's plan and ask, which Claude Code does not run: refused, with what to do instead."""
+    with pytest.raises(InvalidValueError, match="no accounts or Plan first"):
+        await room.manager.start_picked(
+            "Write a note in the workspace.",
+            "task",
+            MODEL,
+            None,
+            "test",
+            None,
+            None,
+            "standard",
+            None,
+            "auto",
+            False,
+            (),
+            RunPicks(plugins=(), skills=(), plan_first=True),
+        )

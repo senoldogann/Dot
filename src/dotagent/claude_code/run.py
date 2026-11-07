@@ -71,7 +71,10 @@ from dotagent.agent.limits import (
     limit_spent,
     limits_of,
 )
-from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome
+from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome, opening_text
+from dotagent.agent.picks import PICKS_EVENT, picks_event_data
+from dotagent.agent.playbooks import offered_to_run
+from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
 from dotagent.claude_code.env import claude_env
@@ -120,8 +123,10 @@ from dotagent.opencode.run import bridged, meanwhile
 from dotagent.repair.claude import LimitWindow, window_refused
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
+from dotagent.skills.catalog import load_skills, playbook_root
+from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.endings import PREFIX_CUT_SHORT
-from dotagent.store.models import AgentRecord, RunMode
+from dotagent.store.models import NO_PICKS, AgentRecord, RunMode
 from dotagent.tools.base import ToolResult
 from dotagent.tools.groups import BROWSER_GROUP, group_of
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
@@ -773,6 +778,28 @@ def _outcome(follow: _Follow, answer: str, goal: str) -> RunOutcome:
     return RunOutcome(status="done", result=said, needs="")
 
 
+async def _opening_of(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> str:
+    """The run's first message: the owner's words, then what they picked for it (item 1022), as Dot's own loop gives
+    them: each picked skill's instructions and the connected apps (MCP servers) whose tools to use, which reach the
+    program through the door. The chips stand over the message as in Dot's own loop. The manager refuses the picks
+    Claude Code cannot take (the accounts, Plan first) before the run starts."""
+    runtime: Runtime = agent.runtime
+    if agent.opening.picks == NO_PICKS:
+        return agent.opening.text
+    await runtime.bus.emit(agent.run.id, PICKS_EVENT, picks_event_data(agent.opening.picks), True)
+    catalog: SkillCatalog = await asyncio.to_thread(
+        load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
+    )
+    offered: tuple[Skill, ...] = await offered_to_run(runtime.config, catalog, agent.run.agent_id)
+    scaffold: Scaffold = scaffold_for(
+        runtime.config.agent,
+        info,
+        await runtime.store.model_profile(ref.label, PROFILE_RUNS),
+        runtime.context_sizes.of(ref.label),
+    )
+    return await opening_text(agent.opening, offered, scaffold.tool_output_chars, playbook_root(runtime.config), {})
+
+
 async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     """Run ``agent``'s run in Claude Code on the owner's plan (module docstring)."""
     started: float = time.monotonic()
@@ -795,7 +822,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     )
     chat: ChatSession | None = await asyncio.to_thread(read_chat, chat_path(run.thread_id))
     goal: Message = await message_with_attachments(
-        runtime, run.thread_id, run.id, agent.opening.text, agent.opening.files, info.vision
+        runtime, run.thread_id, run.id, await _opening_of(agent, ref, info), agent.opening.files, info.vision
     )
     await runtime.store.append_messages(run.thread_id, [goal])
     prompt: str = await _prompt_of(agent, door)
