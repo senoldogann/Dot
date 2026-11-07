@@ -5,6 +5,11 @@
 A run is a loop. The model answers with tool calls; Dot checks each call against the [policy](safety.md#safety), runs the ones
 that pass (up to `parallel_tools` at once) and hands the results back, until the model calls `finish`.
 
+Every run's prompt, on Dot's own models and on your Claude plan, tells the model to analyse thoroughly and recommend
+boldly (item 1023, your word of 2026-11-07): an analysis weighs every side that matters, its evidence, risks and costs,
+and a recommendation names the option it would take and why, even a big change, rather than a cautious list. What a
+run does is still what you asked.
+
 A chat keeps its turns on one page (item 374): each earlier turn reads as its question, what it did and its answer,
 with no "open run" to hop through. What it did is what its run said, in the order it said it, and each stretch of its
 tool calls as one line that says what they did ("Ran 2 commands and read 1 file"), which opens to every call and its

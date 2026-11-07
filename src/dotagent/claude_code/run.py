@@ -74,6 +74,7 @@ from dotagent.agent.limits import (
 from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome, opening_text
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
 from dotagent.agent.playbooks import offered_to_run
+from dotagent.agent.prompt import THOROUGH_AND_BOLD
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
@@ -182,7 +183,7 @@ _PROMPT: str = (
     "owner can answer. When the work is done, or cannot be done, write your final answer as your reply: it is what the "
     "owner reads in the chat, so say what you did and what you found, with the evidence. Write every message, the "
     "short lines between tool calls too, in the language the owner writes in. Files you make go in Dot's "
-    "workspace, {workspace}, unless the owner names another place. Today is {today}."
+    "workspace, {workspace}, unless the owner names another place. Today is {today}.\n\n" + THOROUGH_AND_BOLD
 )
 
 
