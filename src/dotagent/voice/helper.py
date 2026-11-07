@@ -278,8 +278,8 @@ class Transcriber:
         told: list[str] = [] if sdk is None else ["-sdk", str(sdk)]
         arguments: list[str] = [str(compiler), *told, "-parse-as-library", "-O", "-o", str(program), str(source)]
         words: str = (
-            "Apple's developer tools on this Mac could not build the program that writes recordings down: "
-            "update them (Xcode, or xcode-select --install)"
+            "Apple's developer software on this Mac could not build the program that writes recordings down: "
+            "update it (Xcode, or xcode-select --install)"
         )
         try:
             outcome: _Outcome = await _exec(arguments, BUILD_TIMEOUT_S)
