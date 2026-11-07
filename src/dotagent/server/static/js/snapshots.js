@@ -7,7 +7,7 @@
 // sight, or into focus, within a few seconds), never a page the reader has in sight elsewhere.
 
 import { api } from "./api.js";
-import { onLifecycle } from "./state.js";
+import { onLifecycle, onStreamLive } from "./state.js";
 import { toast } from "./ui.js";
 
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
@@ -115,6 +115,13 @@ function wire() {
     return;
   }
   wired = true;
+  // A capture taken before the page followed the stream (a page just loaded) sent its event to nobody: the box claims
+  // what waits each time the stream is live, as on an event.
+  onStreamLive(() => {
+    if (current !== null && onThisMac(location.hostname)) {
+      claimInSight();
+    }
+  });
   onLifecycle((event) => {
     if (event.kind === "snapshot_taken") {
       if (!onThisMac(location.hostname)) {

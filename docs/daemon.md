@@ -1446,8 +1446,9 @@ and one it may not is brought to the front as it is), else Dot opened in the def
 that took the last capture is asked first. A helper process draws the flash and the flight (`python -m
 dotagent.desktop.flight`, an application without a Dock icon that reads nothing of the screen), as the daemon has no
 window of its own. The page takes the capture once it is seen, so the picture flies into its chip and the chip springs
-into the box (`animations`); a page of this Mac with no box that came to the front goes to the new chat, whose box takes
-it. With **Include app text** the window's text and controls, as the application shows them to accessibility and as the
+into the box (`animations`); a capture taken while a page was still connecting to the daemon is taken once it is
+connected (item 1030), as the event that told of it reached no page; a page of this Mac with no box that came to the
+front goes to the new chat, whose box takes it. With **Include app text** the window's text and controls, as the application shows them to accessibility and as the
 model reads a window, come as a Markdown file beside the picture. The keys are watched by the daemon through a
 listen-only event tap once macOS has granted Accessibility to the app that runs Dot; it reads only whether a Command key
 went down or up (the left and the right apart) and whether another key was pressed meanwhile (⌘C ⌘V is two shortcuts,

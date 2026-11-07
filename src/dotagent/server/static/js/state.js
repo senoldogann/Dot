@@ -41,6 +41,7 @@ const OWN_PAGES = /** @type {HTMLMetaElement} */ (document.querySelector('meta[n
 const changeListeners = new Set();
 const lifecycleListeners = new Set();
 const backListeners = new Set();
+const liveListeners = new Set();
 
 export function getSnapshot() {
   return snapshot;
@@ -72,6 +73,16 @@ export function onLifecycle(listener) {
 export function onStreamBack(listener) {
   backListeners.add(listener);
   return () => backListeners.delete(listener);
+}
+
+/**
+ * Run `listener` each time the lifecycle stream is live: when it first connects, and again after each break. An event
+ * sent before the page followed the stream never reaches it (the stream replays nothing), so what the page claims on an
+ * event it also claims then. Returns the function that stops it.
+ */
+export function onStreamLive(listener) {
+  liveListeners.add(listener);
+  return () => liveListeners.delete(listener);
 }
 
 // The newest read: an older one that answers after it shows nothing (the review of 2026-11-01: a card answered between
@@ -221,6 +232,14 @@ export async function runLifecycle(signal, onAuthRejected) {
         announce();
         if (state === "live") {
           refreshSoon();
+          // Each listener runs even when one before it fails.
+          for (const listener of liveListeners) {
+            try {
+              listener();
+            } catch (error) {
+              console.warn("a listener of the live stream failed", error);
+            }
+          }
         }
         if (back) {
           settle();
