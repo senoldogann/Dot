@@ -1762,16 +1762,30 @@ function mountPage(root, ctx, agentId) {
     }
   }
 
-  // The whole page: the top built again (the composer, after a save) and the lists.
-  async function reload() {
-    const detail = await load();
-    if (detail !== null) {
+  // Whether the top is to be built again by the next read that is drawn: only the newest read is (`load`), and a
+  // refresh that started after the page's opening read, as its agent's run ended, left the page without its box (item
+  // 1036).
+  let greetDue = false;
+
+  /** Draw a read: the top built again when it is due, and the lists. */
+  function paint(detail) {
+    if (greetDue) {
+      greetDue = false;
       greet(detail.record);
-      paintLists(detail);
       // On a touch screen the caret waits for a tap, as on the home (item 293).
       if (!touchFirst()) {
         composer.focus();
       }
+    }
+    paintLists(detail);
+  }
+
+  // The whole page: the top built again (the composer, after a save) and the lists.
+  async function reload() {
+    greetDue = true;
+    const detail = await load();
+    if (detail !== null) {
+      paint(detail);
     }
   }
 
@@ -1779,7 +1793,7 @@ function mountPage(root, ctx, agentId) {
   async function refresh() {
     const detail = await load();
     if (detail !== null) {
-      paintLists(detail);
+      paint(detail);
     }
   }
 

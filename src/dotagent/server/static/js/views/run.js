@@ -1290,9 +1290,14 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       drawRecord(fresh);
       paintCost();
     } catch (error) {
+      // A page left while the read was on its way says nothing of it (item 1036): its 404, a chat deleted meanwhile,
+      // stood as a toast over the page the reader had gone to.
+      if (signal.aborted) {
+        return;
+      }
       // A run deleted since it was kept (its chat deleted on another page or on the phone) is not drawn as it stood:
       // the page is opened again, and says Task not found.
-      if (error.status === 404 && !signal.aborted) {
+      if (error.status === 404) {
         keptRuns.delete(runId);
         reload();
         return;
@@ -1353,7 +1358,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     try {
       runs = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${NEWEST_READ}`);
     } catch (error) {
-      readFailed("The chat", error);
+      if (!signal.aborted) {
+        readFailed("The chat", error);
+      }
       return;
     }
     const newest = runs.find((each) => each.parent_run_id === null);

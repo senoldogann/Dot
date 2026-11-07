@@ -135,6 +135,17 @@ async def _bottom(locator: Locator) -> float:
     return await locator.evaluate("(node) => node.getBoundingClientRect().bottom")
 
 
+async def _still(page: Page) -> None:
+    """Wait until the conversation stands still: its height and where it is scrolled to are the same at three looks
+    a tenth of a second apart (on a slow runner the page held its foot for longer than a reader's scroll took)."""
+    deadline: float = time.monotonic() + WAIT_S
+    looks: list[object] = []
+    while len(looks) < 3 or len({str(look) for look in looks[-3:]}) > 1:
+        assert time.monotonic() < deadline, f"the conversation never stood still: {looks[-3:]}"
+        looks.append(await page.evaluate(f"[{_SCROLLER}.scrollHeight, {_SCROLLER}.scrollTop]"))
+        await asyncio.sleep(0.1)
+
+
 async def _ready(page: Page) -> None:
     """Wait until the chat's page has scrolled where it opens (``dot:page-ready``): a scroll of the test's before it was
     undone by the page's own landing on the answer on a slow runner."""
@@ -191,6 +202,9 @@ async def test_the_pill_of_a_helpers_page_stays_in_the_window_as_its_conversatio
                     heights: list[int] = await page.evaluate(f"[{_SCROLLER}.scrollHeight, {_SCROLLER}.clientHeight]")
                     assert heights[0] > heights[1] * 1.5, heights
 
+                    # What is above the foot settles for a while after the page says it is ready, and the page holds
+                    # the foot until then (items 440 and 446): the reader scrolls once it stands still.
+                    await _still(page)
                     await page.evaluate(f"{_SCROLLER}.scrollTo(0, 0)")
                     await expect(page.get_by_text("Shelf 1 next.")).to_be_in_viewport()
                     assert await _in_window(pill), "scrolled to the top, the pill is out of the window"
