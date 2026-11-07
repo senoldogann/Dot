@@ -61,6 +61,20 @@ _SMALL: str = """() => [...document.querySelectorAll('dialog.form-dialog[open] :
   .filter((node) => parseFloat(getComputedStyle(node).fontSize) < 16)
   .map((node) => (node.getAttribute('aria-label') ?? node.className) + ' ' + getComputedStyle(node).fontSize)"""
 _NOTE: str = "The user likes strong tea."
+# Whether the page's style sheets see a touch screen, read at the next frame, and how many frames it is given (about
+# 5 s): app.css gives a field 16 px under `(pointer: coarse)` only.
+_COARSE_NEXT_FRAME: str = (
+    "() => new Promise((done) => requestAnimationFrame(() => done(matchMedia('(pointer: coarse)').matches)))"
+)
+_COARSE_FRAMES: int = 300
+
+
+async def _touch_screen(page: Page, title: str) -> None:
+    """Wait until the browser reports a touch screen to the page's style sheets, or fail saying it never did."""
+    for _ in range(_COARSE_FRAMES):
+        if await page.evaluate(_COARSE_NEXT_FRAME):
+            return
+    raise AssertionError(f"{title}: the browser never reported a touch screen (pointer: coarse)")
 
 
 @pytest.fixture
@@ -184,6 +198,9 @@ async def test_every_form_is_a_sheet_that_fits_the_phone_with_its_foot_in_view(
                 await foot_is_in_view(page, dialog)
                 await keeps_inside_the_window(page)
                 if not device.startswith("iPhone"):
+                    # Measured once the browser reports a touch screen (item 1024): CI once measured "Edit note" with
+                    # every field at its size without one, `(pointer: coarse)` not yet in force.
+                    await _touch_screen(page, title)
                     assert await page.evaluate(_SMALL) == [], title
                 await page.screenshot(path=str(tmp_path / f"{device.replace(' ', '-')}-{number}.png"))
                 await closes_with_escape(page, dialog, back)
