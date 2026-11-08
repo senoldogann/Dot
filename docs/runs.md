@@ -232,7 +232,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   [Helpers and standby](models.md#models-and-providers)), and the model is not paused for other runs; with no standby
   model left, the run fails saying that the filter stopped it and that another model would answer.
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
-  as "What Dot needs from you", and `dotx run` prints it after the answer.
+  as "What Dot needs from you", and `dotx run` prints it after the answer. A run that failed so is stored `failed`, but
+  its page says "Waiting on you", not "The task failed", and the line that offers Continue says that a message below
+  answers it (item 1061).
 - A small model with the full tool list sometimes writes the `finish` call out as a plain message (`gpt-oss:20b-cloud`
   did in most trial runs). Dot does not reinterpret such text: it is nudged first when tools were used, otherwise it
   becomes the result as written. Use a larger model as `main` for task and research runs.

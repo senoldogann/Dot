@@ -6912,6 +6912,17 @@ summary:has(> .chev)::-webkit-details-marker {
   color: var(--bad);
 }
 
+/* An answer that waits on the owner (item 1061): what only they can give, in the warning's colours, not a failure's. */
+.answer-alert.answer-waiting {
+  border-color: var(--warn-border);
+  background: var(--warn-weak);
+  color: var(--text);
+}
+
+.answer-alert.answer-waiting .icon {
+  color: var(--warn);
+}
+
 /* What the run changed on this Mac (item 597): a quiet line under the answer, the files by name, Review and Undo at its
    end, as the actions under a message stand; not an editor's list, which the Changes tab is. */
 .run-changes {
@@ -7024,13 +7035,13 @@ summary:has(> .chev)::-webkit-details-marker {
 /* Where a pointer can hover, the foot of an answer that ended well and of your message waits for it, as a messaging
    app's actions do (item 832): a reaction that stands, a failure and a stop stay in sight. */
 @media (hover: hover) {
-  .answer.done > .answer-foot:not(:has(.reaction-chip)),
+  .answer.answer-done > .answer-foot:not(:has(.reaction-chip)),
   .user-message > .message-foot {
     opacity: 0;
     transition: opacity var(--motion-quick) var(--ease);
   }
 
-  .answer.done:is(:hover, :focus-within) > .answer-foot,
+  .answer.answer-done:is(:hover, :focus-within) > .answer-foot,
   .user-message:is(:hover, :focus-within) > .message-foot {
     opacity: 1;
   }
