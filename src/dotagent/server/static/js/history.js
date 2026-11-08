@@ -6,7 +6,7 @@ import { el, plural, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, besideLine, chatNoteLine,
-  scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+  needsAside, outcomeOf, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
@@ -127,7 +127,7 @@ async function allEvents(runId, signal) {
 }
 
 /** What a run said and ran, read and drawn into the turn's `flow`; nothing is drawn once `signal` aborted. */
-async function fillFlow(past, flow, asked, signal, reactions) {
+async function fillFlow(past, flow, asked, signal, reactions, onRead) {
   let events;
   try {
     events = await allEvents(past.id, signal);
@@ -137,6 +137,7 @@ async function fillFlow(past, flow, asked, signal, reactions) {
   }
   if (events !== null && !signal.aborted) {
     drawRead(past, flow, asked, events, reactions);
+    onRead(events);
   }
 }
 
@@ -320,17 +321,27 @@ function scrollBox(node) {
   return PHONE.matches && document.documentElement.classList.contains("chat-shell") ? node.closest(".run-thread") : null;
 }
 
-/** `change()` fills the turn's `flow`. A browser that keeps the reader's place by itself does (scroll anchoring);
- * elsewhere, when the work goes in above what is seen, the conversation scrolls by as much as what follows it moved,
- * the turn's answer, so what is read stays where it was. Work that goes in where it is seen grows in place. */
-function keepPlace(flow, change) {
+/** The first element after `node` in the page: its next sibling, or its parent's, and so on up. */
+function following(node) {
+  for (let at = node; at !== null; at = at.parentElement) {
+    if (at.nextElementSibling !== null) {
+      return at.nextElementSibling;
+    }
+  }
+  return node;
+}
+
+/** `change()` grows `part`: fills a turn's flow, or adds to its answer. A browser that keeps the reader's place by
+ * itself does (scroll anchoring); elsewhere, when it grows above what is seen, the conversation scrolls by as much as
+ * what follows it moved, so what is read stays where it was. What grows where it is seen grows in place. */
+function keepPlace(part, change) {
   if (ANCHORS) {
     change();
     return;
   }
-  const box = scrollBox(flow);
+  const box = scrollBox(part);
   const seenFrom = box === null ? 0 : box.getBoundingClientRect().top;
-  const follows = flow.nextElementSibling ?? flow.parentElement;
+  const follows = following(part);
   const before = follows.getBoundingClientRect().top;
   change();
   if (before > seenFrom) {
@@ -349,7 +360,7 @@ function keepPlace(flow, change) {
 
 /** Fills a turn's operations once it comes near what is seen, once: near the window, or on a phone near the box the
  * conversation scrolls in, which the turn is in once the page stands. The watch ends with the page (`signal`). */
-function whenNear(element, ops, asked, run, signal, reactions) {
+function whenNear(element, ops, asked, run, signal, reactions, onRead) {
   requestAnimationFrame(() => {
     if (signal.aborted) {
       return;
@@ -358,7 +369,7 @@ function whenNear(element, ops, asked, run, signal, reactions) {
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           watch.disconnect();
-          void fillFlow(run, ops, asked, signal, reactions);
+          void fillFlow(run, ops, asked, signal, reactions, onRead);
         }
       },
       { root: scrollBox(element), rootMargin: OPS_MARGIN },
@@ -376,9 +387,26 @@ function turn(past, editFromHereOf, known, signal, reactions) {
   const href = `#/runs/${past.id}`;
   const ended = FINISHED.has(past.status);
   const ops = el("div", { class: "turn-ops", hidden: true });
-  const answer = ended
-    ? answerMessage({ actorId: past.agent_id ?? "dot", status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href: null, reactions, runId: past.id })
+  const answerAs = (status) =>
+    answerMessage({ actorId: past.agent_id ?? "dot", status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href: null, reactions, runId: past.id });
+  let answer = ended
+    ? answerAs(past.status)
     : el("div", { class: "note" }, icon("clock"), el("span", null, "This task is still going."), el("a", { class: "small", href }, "Open task"));
+  // Once the run's events are read: a run that stopped for what only the owner gives waits on them, and says what
+  // (item 1061), where its stored status alone said it failed.
+  const onRead = (events) => {
+    const finished = events.find((event) => event.kind === "run_finished");
+    const needs = typeof finished?.data.needs === "string" ? finished.data.needs.trim() : "";
+    if (!ended || outcomeOf(past.status, needs) === past.status) {
+      return;
+    }
+    const waiting = answerAs(outcomeOf(past.status, needs));
+    // The box goes in under the answer, which may be above what is read (item 708's place kept, as for the flow).
+    keepPlace(answer, () => {
+      answer.replaceWith(waiting, needsAside(needs));
+      answer = waiting;
+    });
+  };
   const asked = followsReaction(past) || past.source === WELCOME_SOURCE
     ? null
     : past.source === RESUME_SOURCE
@@ -393,9 +421,10 @@ function turn(past, editFromHereOf, known, signal, reactions) {
         flowNotShown(past, ops, known.error);
       } else {
         drawRead(past, ops, asked, known.events, reactions);
+        onRead(known.events);
       }
     } else {
-      whenNear(element, ops, asked, past, signal, reactions);
+      whenNear(element, ops, asked, past, signal, reactions, onRead);
     }
   }
   return element;

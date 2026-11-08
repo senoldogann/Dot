@@ -18,7 +18,7 @@ import { helperCard } from "./helpercard.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
-import { answerMessage, besideLine, chatNoteLine, scheduleLine, userMessage } from "./messages.js";
+import { answerMessage, besideLine, chatNoteLine, needsAside, outcomeOf, scheduleLine, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
@@ -1066,7 +1066,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const readAlready = dropRepeatedReply(scope, result, record.data.restated ?? []);
       const answer = answerMessage({
         actorId: scope.actorId,
-        status,
+        // A run that stopped for what only the owner gives waits on them, and says so (item 1061).
+        // A helper's needs go to the run that asked it, not to the owner: only the root run waits on them.
+        status: isRoot ? outcomeOf(status, needs) : status,
         text: result,
         endedAt: record.ts,
         startedAt: scope.began,
@@ -1079,8 +1081,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       });
       place(scope, answer, record.ts);
       if (isRoot && needs !== "") {
-        const head = el("div", { class: "aside-head" }, icon("hand"), el("span", null, "What Dot needs from you"));
-        place(scope, el("div", { class: "needs", "aria-label": "What Dot needs from you" }, head, prose(needs)), record.ts);
+        place(scope, needsAside(needs), record.ts);
       }
       if (isRoot) {
         if (!readAlready && revealing() && !REDUCED_MOTION.matches) {

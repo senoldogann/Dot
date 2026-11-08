@@ -264,7 +264,7 @@ async def test_a_closed_helper_row_keeps_its_steps_out_of_the_page_until_it_open
                 await row.locator("summary.child-row").click()
                 await expect(row).to_have_js_property("open", True)
                 await expect(row.locator("details.tool")).to_have_count(_STEPS)
-                await expect(row.locator(f".answer.{status}")).to_be_visible()
+                await expect(row.locator(f".answer.answer-{status}")).to_be_visible()
             await expect(_row(page, done.id).locator(".answer")).to_contain_text(_HELPERS[0][2])
             opened: int = await page.evaluate(_COUNT)
             assert closed * _SHARE < opened, (

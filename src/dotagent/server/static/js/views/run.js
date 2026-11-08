@@ -71,6 +71,8 @@ const CUT_OFF_LINES = {
   process_died: "Its Terminal command stopped suddenly while this task worked.",
 };
 const RESUME_WITHOUT_CUT = "This task stopped before it was done. Continue picks it up.";
+// A run that ended on what only the owner can give (item 1061): what it asked stands above, in "What Dot needs from you".
+const RESUME_WHEN_ASKED = "Dot waits on what it asked above. Write it below, or Continue once it is done.";
 // Edit from here (item 282): the dialog's line and the owner's two ways of rewinding.
 const REWIND_MESSAGE = "Take this chat back to before this message. Your message and its files go back in the message box.";
 const REWIND_CHOICES = [
@@ -185,6 +187,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // stopped; `cutOff` is how.
   let resumable = detail.resumable;
   let cutOff = detail.cut_off;
+  // Whether the run's end said what it needs from the owner (its `run_finished` event's `needs`, item 1061).
+  let asked = false;
   let finishedAt = run.finished_at;
   // The end of the run as the page read it when it opened, if it was over then (item 646): the end its stored events
   // replay is that one (a run's end event is never after its record's end), and the record, the bill and the changes
@@ -1070,7 +1074,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
 
   function syncControls() {
     resumeLine.hidden = active || !resumable;
-    resumeWords.textContent = cutOff === null ? (resumable ? RESUME_WITHOUT_CUT : "") : CUT_OFF_LINES[cutOff];
+    resumeWords.textContent =
+      cutOff !== null ? CUT_OFF_LINES[cutOff] : !resumable ? "" : asked ? RESUME_WHEN_ASKED : RESUME_WITHOUT_CUT;
     // A delegated run is not steered: its dock keeps the arrow down (item 96) and its pill, whose Stop stops it.
     const delegated = run.parent_run_id !== null;
     frame.element.hidden = delegated;
@@ -1780,6 +1785,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     recap.onEvent(message.data);
     if (!replaying && message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
       refreshChanges();
+    }
+    if (message.data.kind === "run_finished" && message.data.run_id === runId) {
+      const needs = message.data.data.needs;
+      asked = typeof needs === "string" && needs.trim() !== "";
+      syncControls();
     }
     if (message.data.run_id !== runId && RUN_ENDS.has(message.data.kind)) {
       agentsChanged();
