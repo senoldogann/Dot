@@ -112,7 +112,8 @@ class ApprovalBroker:
                     decided_by=stored.decided_by or "",
                     note=stored.note,
                 )
-            await self._store.set_run_status(run_id, "running")
+            # Another question of the run that is still open keeps it blocked (item 1050).
+            await self._store.unblock_run(run_id)
             await self._bus.emit(
                 run_id,
                 "approval_decided",
