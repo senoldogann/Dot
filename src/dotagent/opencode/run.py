@@ -80,7 +80,7 @@ from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import ChatProvider, Message, ModelInfo, StreamDelta, assistant_message
 from dotagent.llm.wire import get_obj, get_str
 from dotagent.mcp.naming import PREFIX as MCP_PREFIX
-from dotagent.opencode.bridge import Door, ToolBridge, new_door, server_config, session_rules
+from dotagent.opencode.bridge import Door, ToolBridge, door_name, new_door, server_config, session_rules
 from dotagent.opencode.events import (
     MessageSeen,
     PartSeen,
@@ -878,7 +878,7 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
             tools={name: tool for name, tool in tools.tools.items() if group_of(name) != BROWSER_GROUP}
         )
     door: Door = new_door(
-        run.thread_id,
+        door_name(run.thread_id),
         tuple(tool.spec for tool in tools.tools.values()),
         partial(bridged_call, tools, await tool_context(agent, ref, info), agent.gate),
     )
