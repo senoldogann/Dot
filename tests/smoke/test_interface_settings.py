@@ -31,11 +31,16 @@ _KEYS: tuple[str, ...] = (
     "dot.panelMotion",
     "dot.fontInterface",
     "dot.sizeInterface",
+    "dot.weightInterface",
     "dot.fontAnswers",
+    "dot.sizeAnswers",
+    "dot.weightAnswers",
     "dot.fontComposer",
     "dot.sizeComposer",
+    "dot.weightComposer",
     "dot.fontCode",
     "dot.sizeCode",
+    "dot.weightCode",
     "dot.smoothing",
     "dot.wrapCode",
 )
@@ -44,7 +49,8 @@ _ON_THE_PAGE: str = """() => {
   const root = document.documentElement;
   const flags = ["data-contrast", "data-chat-width", "data-smoothing", "data-wrap-code"];
   const tokens = ["--contrast-base", "--contrast-boost", "--contrast-border-boost", "--motion-panel", "--font",
-    "--type-scale", "--voice", "--composer-font", "--composer-size", "--mono", "--code-size"];
+    "--type-scale", "--weight-text", "--voice", "--answer-size", "--answer-weight", "--composer-font",
+    "--composer-size", "--composer-weight", "--mono", "--code-size", "--code-weight"];
   return {
     ...Object.fromEntries(flags.map((name) => [name, root.getAttribute(name)])),
     ...Object.fromEntries(tokens.map((token) => [token, root.style.getPropertyValue(token)])),
@@ -65,6 +71,40 @@ _INK: str = """(token) => {
   }
   context.fillRect(0, 0, 1, 1);
   return Array.from(context.getImageData(0, 0, 1, 1).data.slice(0, 3));
+}"""
+# The weights a label, a title and a label drawn with the shorthand `font` are drawn in.
+_WEIGHTS: str = """() => {
+  const probe = (style) => {
+    const node = document.createElement("span");
+    node.style.cssText = style;
+    document.body.append(node);
+    const weight = getComputedStyle(node).fontWeight;
+    node.remove();
+    return weight;
+  };
+  return [
+    probe("font-weight: var(--weight-label)"),
+    probe("font-weight: var(--weight-title)"),
+    probe("font: var(--weight-label) var(--text-xs) / var(--leading-xs) var(--font)"),
+  ];
+}"""
+# An answer's heading, inline code and code in bold, as the page draws them.
+_ANSWER: str = """() => {
+  const answer = document.createElement("div");
+  answer.className = "prose";
+  answer.innerHTML = "<h1>Title</h1><h3>Part</h3><p><code>x</code> and <strong><code>y</code></strong></p>";
+  document.body.append(answer);
+  const style = (selector) => getComputedStyle(answer.querySelector(selector));
+  const drawn = {
+    h1: style("h1").fontSize,
+    h1_weight: style("h1").fontWeight,
+    h3_weight: style("h3").fontWeight,
+    code: style("p > code").fontSize,
+    code_weight: style("p > code").fontWeight,
+    bold_code: style("strong code").fontWeight,
+  };
+  answer.remove();
+  return drawn;
 }"""
 _STYLE: str = "([selector, property]) => getComputedStyle(document.querySelector(selector)).getPropertyValue(property)"
 
@@ -219,22 +259,55 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
     await typed.press("Tab")
     await expect(typed).to_have_attribute("aria-invalid", "true")
     assert (await _kept(page))["dot.fontInterface"] == "IBM Plex Sans"
-    await page.get_by_role("slider", name="Text size").fill("16")
+    await page.get_by_role("slider", name="Interface size").fill("16")
     assert await _style(page, "body", "font-size") == "16px"
+    await page.get_by_role("combobox", name="Interface weight").select_option("300")
+    assert await _style(page, "body", "font-weight") == "300"
+    # A label and a title move with it, a step and two over the text, the shorthand `font` of a label too.
+    assert await page.evaluate(_WEIGHTS) == ["400", "500", "400"]
 
-    # The answers, the composer and the code.
-    await page.get_by_role("group", name="Answers").get_by_role("button", name="Serif").click()
-    assert (await _style(page, ".type-preview[data-preview='answers']", "font-family")).startswith("ui-serif")
+    # Every face has the same three (item 1062): its family, its weight and its size.
+    answers = ".type-preview[data-preview='answers']"
+    # Until set, the answers' size follows the interface's: a message's 15 px scaled by 16 over 14.
+    await expect(page.get_by_role("slider", name="Answers size")).to_have_value("17")
+    await page.get_by_role("combobox", name="Answers font").select_option("serif")
+    assert (await _style(page, answers, "font-family")).startswith("ui-serif")
+    await page.get_by_role("combobox", name="Answers weight").select_option("500")
+    await page.get_by_role("slider", name="Answers size").fill("18")
+    assert await _style(page, answers, "font-weight") == "500"
+    assert await _style(page, answers, "font-size") == "18px"
+    # An answer's first heading a step over its text and its inline code a step under, as 17 and 13 are to 15; code has
+    # the code's weight, but in bold it keeps the bold's; its headings are a step and two over its weight (500).
+    assert await page.evaluate(_ANSWER) == {
+        "h1": "20.4px",
+        "h1_weight": "700",
+        "h3_weight": "600",
+        "code": "15.6px",
+        "code_weight": "400",
+        "bold_code": "700",
+    }
+    # A size kept stays when the interface's brings the default to it (17 px: 15 × 17 / 14 is 18), and after it.
+    await page.get_by_role("slider", name="Interface size").fill("17")
+    await page.reload()
+    await expect(page.get_by_role("slider", name="Answers size")).to_have_value("18")
+    assert await _style(page, answers, "font-size") == "18px"
+    await page.get_by_role("slider", name="Interface size").fill("13")
+    assert await _style(page, answers, "font-size") == "18px"
+    await page.get_by_role("slider", name="Interface size").fill("16")
     await page.get_by_role("combobox", name="Code font").select_option("menlo")
+    await page.get_by_role("combobox", name="Code weight").select_option("500")
     await page.get_by_role("slider", name="Code size").fill("15")
     code = ".type-preview[data-preview='code']"
     assert (await _style(page, code, "font-family")).startswith("Menlo")
     assert await _style(page, code, "font-size") == "15px"
-    await page.get_by_role("combobox", name="Message box font").select_option("mono")
+    assert await _style(page, code, "font-weight") == "500"
+    await page.get_by_role("combobox", name="Message box font").select_option("geist-mono")
+    await page.get_by_role("combobox", name="Message box weight").select_option("600")
     await page.get_by_role("slider", name="Message box size").fill("18")
     composer = ".type-preview[data-preview='composer']"
-    assert (await _style(page, composer, "font-family")).startswith("Menlo")
+    assert (await _style(page, composer, "font-family")).startswith('"Geist Mono"')
     assert await _style(page, composer, "font-size") == "18px"
+    assert await _style(page, composer, "font-weight") == "600"
     await page.get_by_role("switch", name="Font smoothing").click()
     assert await _style(page, "body", "-webkit-font-smoothing") == "auto"
     await page.get_by_role("switch", name="Wrap long lines of code").click()
@@ -251,11 +324,16 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
         "--motion-panel": "400ms",
         "--font": '"IBM Plex Sans", var(--family-system)',
         "--type-scale": str(16 / 14),
+        "--weight-text": "300",
         "--voice": "var(--family-serif)",
-        "--composer-font": "var(--family-mono)",
+        "--answer-size": "18px",
+        "--answer-weight": "500",
+        "--composer-font": "var(--family-geist-mono)",
         "--composer-size": "18px",
+        "--composer-weight": "600",
         "--mono": "var(--family-menlo)",
         "--code-size": "15px",
+        "--code-weight": "500",
     }
     await page.screenshot(path=str(tmp_path / "appearance-set.png"), full_page=True)
 
@@ -277,7 +355,8 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
     await expect(page.locator(".home .composer .textarea")).to_be_visible()
     assert await _style(page, ".home", "max-width") == "1152px"
     assert await _style(page, ".home .composer .textarea", "font-size") == "18px"
-    assert (await _style(page, ".home .composer .textarea", "font-family")).startswith("Menlo")
+    assert (await _style(page, ".home .composer .textarea", "font-family")).startswith('"Geist Mono"')
+    assert await _style(page, ".home .composer .textarea", "font-weight") == "600"
     await expect(page.locator("main.page")).to_have_css("opacity", "1")
     await page.screenshot(path=str(tmp_path / "home-set.png"))
 
@@ -287,17 +366,37 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
     await page.get_by_role("group", name="Chat width").get_by_role("button", name="Comfortable").click()
     await page.get_by_role("slider", name="Panel animation").fill("200")
     await page.get_by_role("combobox", name="Interface font").select_option("")
-    await page.get_by_role("slider", name="Text size").fill("14")
-    await page.get_by_role("group", name="Answers").get_by_role("button", name="Theme").click()
+    await page.get_by_role("slider", name="Interface size").fill("14")
+    await page.get_by_role("combobox", name="Interface weight").select_option("400")
+    await page.get_by_role("combobox", name="Answers font").select_option("")
+    await page.get_by_role("combobox", name="Answers weight").select_option("400")
+    await page.get_by_role("slider", name="Answers size").fill("15")
     await page.get_by_role("combobox", name="Message box font").select_option("")
+    await page.get_by_role("combobox", name="Message box weight").select_option("400")
     await page.get_by_role("slider", name="Message box size").fill("15")
     await page.get_by_role("combobox", name="Code font").select_option("")
+    await page.get_by_role("combobox", name="Code weight").select_option("400")
     await page.get_by_role("slider", name="Code size").fill("13")
     await page.get_by_role("switch", name="Font smoothing").click()
     await page.get_by_role("switch", name="Wrap long lines of code").click()
     assert await _on_the_page(page) == untouched
     assert all(value is None for value in (await _kept(page)).values())
     assert await _contrast(page, "--text") == pytest.approx(text_at_100)
+
+    # What a browser kept before every face offered the same families reads as what it is now: the answers' "interface"
+    # the interface's, the message box's "mono" the code's, before the first paint and on the page.
+    await page.evaluate(
+        "localStorage.setItem('dot.fontAnswers', 'interface'); localStorage.setItem('dot.fontComposer', 'mono')"
+    )
+    await page.route("**/js/main.js", lambda route: route.abort())
+    await page.reload()
+    kept = await _on_the_page(page)
+    assert (kept["--voice"], kept["--composer-font"]) == ("var(--family-interface)", "var(--family-mono)")
+    await page.unroute("**/js/main.js")
+    await page.reload()
+    await expect(page.get_by_role("combobox", name="Answers font")).to_have_value("interface")
+    await expect(page.get_by_role("combobox", name="Message box font")).to_have_value("mono")
+    assert (await _on_the_page(page))["--composer-font"] == "var(--family-mono)"
     await page.close()
 
 

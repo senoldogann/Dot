@@ -1916,6 +1916,7 @@ dialog.modal.file-dialog .file-picture img {
 .file-text {
   margin: 0;
   font: var(--code-size) / var(--code-leading) var(--mono);
+  font-weight: var(--code-weight);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -2129,6 +2130,7 @@ dialog.modal.file-dialog .file-picture img {
   display: inline-flex;
   gap: var(--space-1);
   font: var(--code-size) / var(--code-leading) var(--mono);
+  font-weight: var(--code-weight);
   white-space: nowrap;
 }
 
@@ -2157,6 +2159,7 @@ dialog.modal.file-dialog .file-picture img {
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   font: var(--code-size) / var(--code-leading) var(--mono);
+  font-weight: var(--code-weight);
 }
 
 .diff-line {

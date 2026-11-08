@@ -193,7 +193,7 @@
   --shadow-ink: light-dark(rgb(20 20 19 / 5%), transparent);
   --shadow-ink-soft: light-dark(rgb(20 20 19 / 10%), rgb(0 0 0 / 30%));
   --shadow-ink-deep: light-dark(rgb(20 20 19 / 22%), rgb(0 0 0 / 60%));
-  --voice: var(--family-serif);
+  --theme-voice: var(--family-serif);
 }
 
 :root[data-theme="paper"] .home-name {

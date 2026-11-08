@@ -1,10 +1,10 @@
 """Settings › Appearance on a phone (item 331), in WebKit as the owner's iPhone and as a small one, on a served daemon
 with a finished task.
 
-- Text: one "Text size", the size of the body on this device, under a line of an answer: a phone's own is 16 px and the
-  choice runs from 12 to 20 (item 347; it ran from 14). Moved to 18, the answer, a row of the sidebar and a label of the
-  settings grow by 18/16 together, and at 12 they shrink by 12/16 together; after a reload it is still 18, and boot.js
-  alone (main.js held back) puts it on the page before the first paint.
+- Text: one "Interface size" (item 1062; "Text size" before), the size of the body on this device: a phone's own is
+  16 px and the choice runs from 12 to 20 (item 347; it ran from 14). Moved to 18, the answer, a row of the sidebar and
+  a label of the settings grow by 18/16 together, and at 12 they shrink by 12/16 together; after a reload it is still
+  18, and boot.js alone (main.js held back) puts it on the page before the first paint.
 - The colour scheme's cards draw a phone, upright, and the themes stand two a row, 320 px wide too, nothing wider than
   the screen. A Mac's window draws a window, wider than high.
 
@@ -39,6 +39,17 @@ from dotagent.tools.meta import FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 
+# The sizes of an answer's first heading and of its inline code, as the page draws them.
+_ANSWER_TYPE: str = """() => {
+  const answer = document.createElement("div");
+  answer.className = "prose";
+  answer.innerHTML = "<h1>Title</h1><p><code>x</code></p>";
+  document.body.append(answer);
+  const size = (selector) => getComputedStyle(answer.querySelector(selector)).fontSize;
+  const sizes = [size("h1"), size("code")];
+  answer.remove();
+  return sizes;
+}"""
 TOKEN: str = "phone-text-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _PHONES: tuple[str, ...] = ("iPhone 17 Pro Max", "iPhone SE")
@@ -147,7 +158,9 @@ async def test_a_phones_text_size_is_its_bodys_and_grows_every_text_together(own
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             own: list[float] = await _sizes(page, address, task.id)
 
-            slider: Locator = page.get_by_role("slider", name="Text size")
+            # An answer's first heading and its inline code are a phone's at its own size (item 1057): 19 and 15 px.
+            assert await page.evaluate(_ANSWER_TYPE) == ["19px", "15px"]
+            slider: Locator = page.get_by_role("slider", name="Interface size")
             await expect(slider).to_have_value(str(_OWN_PX))
             assert [await slider.get_attribute("min"), await slider.get_attribute("max")] == [
                 str(_LEAST_PX),
@@ -170,7 +183,7 @@ async def test_a_phones_text_size_is_its_bodys_and_grows_every_text_together(own
 
             # Kept: after a reload, and on the page before main.js runs.
             await page.reload()
-            await expect(page.get_by_role("slider", name="Text size")).to_have_value(str(_CHOSEN_PX))
+            await expect(page.get_by_role("slider", name="Interface size")).to_have_value(str(_CHOSEN_PX))
             assert await page.locator("body").evaluate(_SIZE) == _CHOSEN_PX
             await page.route("**/js/main.js", lambda route: route.abort())
             await page.reload()

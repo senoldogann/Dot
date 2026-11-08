@@ -206,19 +206,49 @@ export const PANEL_MOTION = {
   paint: (value) => (value === 200 ? dropToken("--motion-panel") : setToken("--motion-panel", `${value}ms`)),
 };
 
-// The interface's face (item 1057): the system's by default, Inter a choice; "system", kept by a browser that picked it
-// before item 1057, is read as the default it now is, so that Settings shows it so.
-const INTERFACE_FAMILY = family("dot.fontInterface", "--font", ["inter"], "var(--family-system)");
-export const INTERFACE_FONT = {
-  ...INTERFACE_FAMILY,
-  parse: (stored) => (stored === "system" ? "" : INTERFACE_FAMILY.parse(stored)),
-};
+/** The families each of the four faces offers (item 1062), the same for all: ids of app.css's `--family-<id>`. The
+ * answers and the message box, which follow the interface or the code, offer theirs too (`--family-interface`,
+ * `--family-mono`); the interface and the code cannot take each other's, which would take theirs in a circle. */
+const FAMILY_STACKS = ["system", "inter", "serif", "geist-mono", "sf-mono", "menlo"];
+const FOLLOWING_STACKS = ["interface", "mono", ...FAMILY_STACKS];
+
+/** The weights each of the four faces offers (item 1062), the same for all; 400 is each one's own. */
+export const WEIGHTS = [
+  { id: 300, label: "Light" },
+  { id: 400, label: "Regular" },
+  { id: 500, label: "Medium" },
+  { id: 600, label: "Semibold" },
+];
+
+// A family of one of the four faces, of `stacks`, read with what a browser kept before item 1062 offered every face the
+// same families: `legacy` maps such a value to the one it is now ("" for the face's own).
+function faceFamily(key, token, stacks, fallback, legacy) {
+  const base = family(key, token, stacks, fallback);
+  return {
+    ...base,
+    parse: (stored) => (stored !== null && Object.hasOwn(legacy, stored) ? legacy[stored] : base.parse(stored)),
+  };
+}
+
+// A weight on its own token, nothing written at 400.
+function weight(key, token) {
+  return {
+    key,
+    initial: 400,
+    parse: (stored) => WEIGHTS.find((option) => String(option.id) === stored)?.id ?? null,
+    paint: (value) => (value === 400 ? dropToken(token) : setToken(token, String(value))),
+  };
+}
+
+// The interface's face: the system's by default (item 1057).
+export const INTERFACE_FONT = faceFamily("dot.fontInterface", "--font", FAMILY_STACKS, "var(--family-system)", {});
 
 // A phone, as app.css draws one (item 329): a touch screen 720 px wide or less, or under 500 px high on its side.
 const PHONE_TYPE = window.matchMedia("(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)");
 // The body's own size on this device and the sizes it may be given: iOS's 16 px on a phone, down to 12 (item 347: the
-// owner asked for smaller text there), Dot's 14 elsewhere.
-const BODY = PHONE_TYPE.matches ? { own: 16, least: 12, most: 20 } : { own: 14, least: 13, most: 17 };
+// owner asked for smaller text there), Dot's 14 elsewhere. A message's own size is app.css's --text-md at 1: 16 on a
+// phone, 15 elsewhere.
+const BODY = PHONE_TYPE.matches ? { own: 16, least: 12, most: 20, message: 16 } : { own: 14, least: 13, most: 17, message: 15 };
 
 /** The size of the body's text on this device (item 331), which the seven sizes of the type are scaled by over the
  * device's own; kept in this browser, so that each device has its own. */
@@ -231,24 +261,42 @@ export const INTERFACE_SIZE = {
   paint: (value) => (value === BODY.own ? dropToken("--type-scale") : setToken("--type-scale", String(value / BODY.own))),
 };
 
-/** The answers' voice: the theme's (serif in Paper), the interface's font, or serif. */
-export const ANSWER_FONT = {
-  key: "dot.fontAnswers",
-  initial: "theme",
-  parse: oneOf(["theme", "interface", "serif"]),
+export const INTERFACE_WEIGHT = weight("dot.weightInterface", "--weight-text");
+
+/** The answers' face: the theme's (serif in Paper) by default. Before item 1062 "theme" was kept for it. */
+export const ANSWER_FONT = faceFamily("dot.fontAnswers", "--voice", FOLLOWING_STACKS, "var(--theme-voice)", { theme: "" });
+
+/** The answers' size (item 1062): a message's size scaled with the interface's until set, then its own, 12 to 24 px;
+ * the line keeps the ratio of a message's. Its default is read anew, as the interface's size moves it; so it is painted
+ * by whether a size is kept, not by what the default is now (a size kept stays when the default comes to it). Set to
+ * the size it shows while it follows, it goes on following. */
+export const ANSWER_SIZE = {
+  key: "dot.sizeAnswers",
+  get initial() {
+    return Math.round((BODY.message * settingValue(INTERFACE_SIZE)) / BODY.own);
+  },
+  least: 12,
+  most: 24,
+  parse: wholeIn(12, 24, 1),
   paint(value) {
-    if (value === "theme") {
-      dropToken("--voice");
+    if (this.parse(readPref(this.key)) === null) {
+      dropToken("--answer-size");
     } else {
-      setToken("--voice", value === "interface" ? "var(--font)" : "var(--family-serif)");
+      setToken("--answer-size", `${value}px`);
     }
   },
 };
 
-export const COMPOSER_FONT = family("dot.fontComposer", "--composer-font", ["serif", "mono"], "var(--font)");
+export const ANSWER_WEIGHT = weight("dot.weightAnswers", "--answer-weight");
+
+/** The message box's face: the interface's by default. */
+export const COMPOSER_FONT = faceFamily("dot.fontComposer", "--composer-font", FOLLOWING_STACKS, "var(--font)", {});
 export const COMPOSER_SIZE = size("dot.sizeComposer", "--composer-size", 12, 20, 15);
-export const CODE_FONT = family("dot.fontCode", "--mono", ["sf-mono", "menlo"], "var(--family-geist-mono)");
+export const COMPOSER_WEIGHT = weight("dot.weightComposer", "--composer-weight");
+/** The code's face: Geist Mono by default. */
+export const CODE_FONT = faceFamily("dot.fontCode", "--mono", FAMILY_STACKS, "var(--family-geist-mono)", {});
 export const CODE_SIZE = size("dot.sizeCode", "--code-size", 10, 18, 13);
+export const CODE_WEIGHT = weight("dot.weightCode", "--code-weight");
 
 /** Font smoothing, "on" (antialiased, Dot's) or "off" (the system's heavier strokes on a Mac). */
 export const SMOOTHING = {
@@ -272,11 +320,16 @@ const SETTINGS = [
   PANEL_MOTION,
   INTERFACE_FONT,
   INTERFACE_SIZE,
+  INTERFACE_WEIGHT,
   ANSWER_FONT,
+  ANSWER_SIZE,
+  ANSWER_WEIGHT,
   COMPOSER_FONT,
   COMPOSER_SIZE,
+  COMPOSER_WEIGHT,
   CODE_FONT,
   CODE_SIZE,
+  CODE_WEIGHT,
   SMOOTHING,
   WRAP_CODE,
 ];
