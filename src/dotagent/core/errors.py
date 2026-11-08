@@ -161,6 +161,11 @@ class RunCancelled(DotError):
     """The run was stopped by the user or by a limit."""
 
 
+class RunAlreadyEnded(DotError):
+    """A run about to start had ended already (item 1045): closed while it was queued, as its command's process seemed
+    gone, or at the daemon's start. It does no work, and its end stands."""
+
+
 class RunHoldLapsed(RunCancelled):
     """The owner held the run with a ✋ and wrote nothing to it for as long as the hold may last (item 586): it stops,
     with this error's words as its result."""

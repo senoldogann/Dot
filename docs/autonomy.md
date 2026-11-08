@@ -487,6 +487,9 @@ the one the journal noted is not written back, and a folder that is now where a 
 file tools are in the journal (`write_file`, `edit_file` and `write_notes`): what a shell command (`rm`, `mv`,
 `sed -i`), the browser or the desktop changed is not. A
 run that is still working is refused; a run of `dotx run` that a crash left working ends when the daemon starts again.
+A run ends once (item 1045): the first end stored stands, with its `run_finished` event and the scores of the notes it
+used, and a later one (the process of a `dotx run` that was taken for dead ending it after all) is not stored over it;
+a queued run that was closed before it started does none of its work.
 `dotx prune --apply` deletes the journals whose last change is older than `undo_keep_days` (30 days).
 `GET /api/runs/{id}/actions` lists the same plan, one file at a time, and `POST /api/runs/{id}/undo` takes back a file
 that is as the run left it.

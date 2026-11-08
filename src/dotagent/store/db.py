@@ -1502,6 +1502,10 @@ def _writing[**P, R](
 _OPTIMIZE_AT_OPEN: int = 0x10002
 
 
+# The working states of a run, as SQL: the ones a run may move between or end from (item 1045).
+_WORKING_SQL: str = ", ".join(f"'{status}'" for status in sorted(WORKING_STATUSES))
+
+
 class Store:
     """Connector to the SQLite database."""
 
@@ -2950,9 +2954,15 @@ class Store:
         return record
 
     @_writing
-    async def set_run_status(self, run_id: str, status: RunStatus) -> None:
-        await self._db.execute("UPDATE runs SET status = ? WHERE id = ?", (status, run_id))
+    async def set_run_status(self, run_id: str, status: RunStatus) -> bool:
+        """Move a run that has not ended between its working states (queued, running, blocked on an approval); whether
+        it moved. A run that ended keeps its end (item 1045): an approval answered as the run was cancelled, or a start
+        that comes after a close, never makes it look at work again."""
+        cursor = await self._db.execute(
+            f"UPDATE runs SET status = ? WHERE id = ? AND status IN ({_WORKING_SQL})", (status, run_id)
+        )
         await self._db.commit()
+        return cursor.rowcount > 0
 
     @_writing
     async def set_run_steps(self, run_id: str, steps: int) -> None:
@@ -2976,28 +2986,36 @@ class Store:
         await self._db.commit()
 
     @_writing
-    async def finish_run(self, run_id: str, status: RunStatus, result: str) -> None:
-        await self._set_end(run_id, status, result, time.time())
+    async def finish_run(self, run_id: str, status: RunStatus, result: str) -> bool:
+        """End a run that has not ended; whether it did (item 1045: an end is never written over another)."""
+        ended: bool = await self._set_end(run_id, status, result, time.time())
         await self._db.commit()
+        return ended
 
-    async def end_run(self, run_id: str, status: RunStatus, result: str, data: JsonObject) -> EventRecord:
+    async def end_run(self, run_id: str, status: RunStatus, result: str, data: JsonObject) -> EventRecord | None:
         """Store how run ``run_id`` ended: its status and result, the scores of the notes it was handed
         (:meth:`close_memory_uses`) and its ``run_finished`` event with ``data``, which is returned. One transaction:
         all of it is stored or none, so an end stored here never lacks the event that tells of it. The time of the end
-        is taken once the transaction holds the write lock, as :meth:`finish_run` takes it."""
+        is taken once the transaction holds the write lock, as :meth:`finish_run` takes it. A run that ended already
+        (closed as its command's process seemed gone, by the daemon's start, by an end stored late) keeps that end:
+        nothing is stored and ``None`` is returned (item 1045), so no run has two ends nor its notes scored twice."""
 
-        async def statements() -> EventRecord:
+        async def statements() -> EventRecord | None:
             now: float = time.time()
-            await self._set_end(run_id, status, result, now)
+            if not await self._set_end(run_id, status, result, now):
+                return None
             await self._score_memory_uses(run_id, status)
             return await self._insert_event(run_id, now, "run_finished", data)
 
         return await self._unit(statements)
 
-    async def _set_end(self, run_id: str, status: RunStatus, result: str, now: float) -> None:
-        await self._db.execute(
-            "UPDATE runs SET status = ?, result = ?, finished_at = ? WHERE id = ?", (status, result, now, run_id)
+    async def _set_end(self, run_id: str, status: RunStatus, result: str, now: float) -> bool:
+        """Write the end of a run that has not ended; whether it was written."""
+        cursor = await self._db.execute(
+            f"UPDATE runs SET status = ?, result = ?, finished_at = ? WHERE id = ? AND status IN ({_WORKING_SQL})",
+            (status, result, now, run_id),
         )
+        return cursor.rowcount > 0
 
     async def get_run(self, run_id: str) -> RunRecord:
         row: aiosqlite.Row | None = await self._one("SELECT * FROM runs WHERE id = ?", (run_id,))

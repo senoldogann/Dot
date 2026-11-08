@@ -112,6 +112,7 @@ from dotagent.core.errors import (
     InvalidValueError,
     NotFoundError,
     PolicyDenied,
+    RunAlreadyEnded,
     RunCancelled,
     RunConflict,
     RunHoldLapsed,
@@ -713,8 +714,14 @@ class RunManager:
         whose ends are still left (:meth:`recover`). Returns the number of ends stored."""
         stored: int = 0
         for left in list(self._left_ends.values()):
-            ended: EventRecord = await self._runtime.store.end_run(left.run.id, left.status, left.result, left.data)
+            ended: EventRecord | None = await self._runtime.store.end_run(
+                left.run.id, left.status, left.result, left.data
+            )
             del self._left_ends[left.run.id]
+            if ended is None:
+                # Closed meanwhile (the daemon's start, a dead command's close): that end was told and followed.
+                log.info("run_end_already_recorded", run_id=left.run.id, status=left.status)
+                continue
             self._runtime.bus.publish(ended)
             stored += 1
             if left.run.campaign_id is not None and not self._stopping:
@@ -3313,12 +3320,13 @@ class RunManager:
         refuses is logged and left to :meth:`store_left_ends`: the error of the start is the one that goes on."""
         data: JsonObject = {"status": "failed", "result": RESULT_NOT_STARTED, "needs": ""}
         try:
-            ended: EventRecord = await self._runtime.store.end_run(run.id, "failed", RESULT_NOT_STARTED, data)
+            ended: EventRecord | None = await self._runtime.store.end_run(run.id, "failed", RESULT_NOT_STARTED, data)
         except DotError as exc:
             log.error("run_end_not_recorded", run_id=run.id, status="failed", error=exc.message, context=exc.context)
             self._left_ends[run.id] = _LeftEnd(run=run, status="failed", result=RESULT_NOT_STARTED, needs="", data=data)
             return
-        self._runtime.bus.publish(ended)
+        if ended is not None:
+            self._runtime.bus.publish(ended)
 
     async def _instructions_for(
         self, own: tuple[str, ...], thread_id: str, parent_run_id: str | None, parent: RunHandle | None
@@ -3411,7 +3419,9 @@ class RunManager:
         restated: tuple[int, ...] = ()
         try:
             async with self._place_for(run):
-                await runtime.store.set_run_status(run.id, "running")
+                if not await runtime.store.set_run_status(run.id, "running"):
+                    # Ended while it was queued: it does none of its work, and the end it has stands (item 1045).
+                    raise RunAlreadyEnded("the run ended before it started", {"run_id": run.id})
                 await runtime.bus.emit(
                     run.id, "run_started", {"model": run.model, "parent_run_id": run.parent_run_id}, True
                 )
@@ -3434,6 +3444,10 @@ class RunManager:
             status, result = "cancelled", self._stop_result(run.id)
         except FailSafeTriggered as exc:
             status, result = "cancelled", f"{PREFIX_EMERGENCY_STOP}{exc.message}"
+        except RunAlreadyEnded as exc:
+            # Its end is the store's already: the one recorded below is refused there (item 1045).
+            status, result = "failed", exc.message
+            log.warning("run_ended_before_it_started", run_id=run.id)
         except DotError as exc:
             status, result, error = "failed", exc.message, {"message": exc.message, "context": exc.context}
             log.error("run failed", run_id=run.id, error=exc.message, context=exc.context)
@@ -3501,11 +3515,12 @@ class RunManager:
         failure to record it is logged here with its traceback; an end the store refused is stored later
         (:meth:`store_left_ends`), and the run stays as the store has it until then."""
         try:
-            await _to_its_end(self._record_end(run, status, result, needs, error, inbox, restated))
+            recorded: bool = await _to_its_end(self._record_end(run, status, result, needs, error, inbox, restated))
             # The orders a Stop ends are ended under the same shield: a second stop meanwhile cuts nothing short (the
-            # pre-push review of item 907).
-            await _to_its_end(self._stop_orders_with(run, status, result))
-            return True
+            # pre-push review of item 907). An end not stored, as the run had ended already, follows nothing twice.
+            if recorded:
+                await _to_its_end(self._stop_orders_with(run, status, result))
+            return recorded
         except Exception:
             log.exception("run_end_not_recorded", run_id=run.id, status=status)
             return False
@@ -3538,7 +3553,7 @@ class RunManager:
         error: JsonObject | None,
         inbox: RunInbox,
         restated: tuple[int, ...] = (),
-    ) -> None:
+    ) -> bool:
         """Store how the run ended and tell about it: its waiters are released, the answers that reached its inbox
         (shut by :meth:`_drive`) too late are kept, the status and result are stored with the scores of the notes it
         used and its ``run_finished`` event in one write (:meth:`Store.end_run`), the event is sent, and what follows a
@@ -3558,10 +3573,15 @@ class RunManager:
             data["restated"] = list(restated)
         try:
             await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
-            ended: EventRecord = await runtime.store.end_run(run.id, status, clean, data)
+            ended: EventRecord | None = await runtime.store.end_run(run.id, status, clean, data)
         except DotError:
             self._left_ends[run.id] = _LeftEnd(run=run, status=status, result=clean, needs=needed, data=data)
             raise
+        if ended is None:
+            # The run was closed while it worked (its command's process seemed gone): that end stands, and was told
+            # and followed then; this one is not stored over it (item 1045).
+            log.warning("run_end_already_recorded", run_id=run.id, status=status)
+            return False
         runtime.bus.publish(ended)
         # A session the daemon's own end cut off is planned by :meth:`resume_campaigns` when it starts again; any other
         # end that comes as the daemon stops (a session that ended done as the shutdown began, or at the owner's
@@ -3570,6 +3590,7 @@ class RunManager:
         ending: Ending = classify_ending(status, clean)
         if run.campaign_id is not None and ending != "daemon_shutdown":
             await self._follow_session(run, run.campaign_id, ending, needed)
+        return True
 
     async def _follow_queue(self, run: RunRecord, status: RunStatus) -> None:
         """Move the queue of a run's chat on as the run ends: an end done starts its next message (:meth:`_drain`), or,
