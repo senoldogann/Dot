@@ -206,7 +206,13 @@ export const PANEL_MOTION = {
   paint: (value) => (value === 200 ? dropToken("--motion-panel") : setToken("--motion-panel", `${value}ms`)),
 };
 
-export const INTERFACE_FONT = family("dot.fontInterface", "--font", ["system"], "var(--family-inter)");
+// The interface's face (item 1057): the system's by default, Inter a choice; "system", kept by a browser that picked it
+// before item 1057, is read as the default it now is, so that Settings shows it so.
+const INTERFACE_FAMILY = family("dot.fontInterface", "--font", ["inter"], "var(--family-system)");
+export const INTERFACE_FONT = {
+  ...INTERFACE_FAMILY,
+  parse: (stored) => (stored === "system" ? "" : INTERFACE_FAMILY.parse(stored)),
+};
 
 // A phone, as app.css draws one (item 329): a touch screen 720 px wide or less, or under 500 px high on its side.
 const PHONE_TYPE = window.matchMedia("(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)");

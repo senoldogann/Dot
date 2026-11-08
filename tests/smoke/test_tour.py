@@ -238,7 +238,8 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             "[getComputedStyle(document.body).fontFamily, getComputedStyle(document.querySelector('code, .mono') ?? "
             "document.body).fontFamily]"
         )
-        assert faces[0].startswith('"Inter"') or faces[0].startswith("Inter"), faces
+        # The system's face by default (item 1057).
+        assert faces[0].startswith("system-ui"), faces
         await page.screenshot(path=str(out / f"{tag}-{name}.png"), full_page=False)
         if name == "home":
             # Inside the desktop shell (item 88) the page keeps room for the traffic lights: in the sidebar's head, and
