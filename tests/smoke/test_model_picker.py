@@ -17,6 +17,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from composer_choices import show_choices
+from model_menu import expect_chosen
 from playwright.async_api import Browser, BrowserContext, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -484,7 +485,7 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             # The Settings show the default the menu made.
             await page.keyboard.press("Escape")
             await page.goto(f"{served}/#/settings/models")
-            await expect(page.locator(".models-default select")).to_have_value("anthropic:claude-haiku-5-5")
+            await expect_chosen(page, "Default model", "anthropic:claude-haiku-5-5")
             assert errors == []
             await page.context.close()
 

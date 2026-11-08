@@ -47,7 +47,9 @@ import {
   switchRowSetting,
   switchSetting,
 } from "../panels.js";
-import { answersRole, WHOLE_RUN, providerLabel, providerOf } from "../providers.js";
+import { answersRole, WHOLE_RUN, providerLabel, providerMark, providerOf } from "../providers.js";
+import { modelPicker } from "../modelpicker.js";
+import { anchoredPopover } from "../popover.js";
 import { voiceLanguage } from "../readaloud.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
@@ -1211,19 +1213,25 @@ const ROLE_SETTINGS = [
     role: "fast",
     label: "Fast model",
     hint: "Writes the summary of a long task first (the task's own model does when it cannot) and reads web pages for the facts asked of them.",
-    fits: (model) => model.tools && answersRole("fast", providerOf(model.ref)),
+    can: (model) => model.tools,
+    takes: (provider) => answersRole("fast", provider),
+    refused: "The fast model takes a run's simpler steps, which only Dot's own loop gives a model.",
   },
   {
     role: "review",
     label: "Review model",
     hint: "A second AI that double-checks Dot's work: it checks tasks against their goal, gives a second opinion, writes lessons and skills from them, and turns your words into rules.",
-    fits: (model) => model.tools && answersRole("review", providerOf(model.ref)),
+    can: (model) => model.tools,
+    takes: (provider) => answersRole("review", provider),
+    refused: "Of the agent programs, only the Claude plan answers the single questions it is asked.",
   },
   {
     role: "vision",
     label: "Vision model",
     hint: "Reads images and screenshots for a model that cannot see them.",
-    fits: (model) => model.vision && answersRole("vision", providerOf(model.ref)),
+    can: (model) => model.vision,
+    takes: (provider) => answersRole("vision", provider),
+    refused: "The vision model reads pictures for another model in one call, which they do not answer.",
   },
 ];
 
@@ -1248,64 +1256,95 @@ const REPAIR_MODELS = [
 const PLAN_REVIEW = "claude_code:opus";
 
 /**
- * A model that Settings › Models chooses: the default one (item 199), the one a run that names none starts on, a new
- * chat's among them, or one of Dot's own work (item 232). It offers the models that `fits` (the default one, as the
- * composer does, and the fast and review models call tools; the vision model sees), and the one chosen now, listed or
- * not; `none` names the choice of "" (the default model, for the model that looks for work, item 916), null for none;
- * `choose(ref)` makes the choice. `paint(providers, chosen)` fills it again; the select stays, and so does the
- * focus on it.
+ * What a model menu of Settings › Models offers (item 1044): the models that `can` do the role's work (call tools, or
+ * see) of each provider it `takes`, and a provider it does not take (one whose models answer only as an agent program
+ * of their own) but whose models could do the work, with none and the reason, so that its mark stays on the rail, as in
+ * the composer's menu; `refused` says why the role cannot take them.
  */
-function modelSetting({ label, hint, className, fits, none, choose }) {
+function settingGroups(providers, can, takes, refused) {
+  return providers
+    .map((one) => {
+      const able = one.models.filter(can);
+      const models = takes(one.provider) ? able : [];
+      const closed = !takes(one.provider) && able.length > 0;
+      const why = closed ? `${providerLabel(one.provider)} models answer only as their own agent program. ${refused}` : null;
+      return { provider: one.provider, models, why };
+    })
+    .filter((group) => group.models.length > 0 || group.why !== null);
+}
+
+/**
+ * A model that Settings › Models chooses: the default one (item 199), the one a run that names none starts on, a new
+ * chat's among them, or one of Dot's own work (item 232). Its box opens the composer's model menu (item 1044): the
+ * favourites and the providers on a rail, a search, the models of the provider pressed. It offers the models that
+ * `can` do its work (the default one, as the composer does, and the fast and review models call tools; the vision
+ * model sees) from the providers it `takes`, and shows those it does not take with why; `none` names the choice of "" (the default model, for the
+ * model that looks for work, item 916), null for none; `choose(ref)` makes the choice. `paint(providers, chosen)`
+ * draws it again, and the menu with it while it is open.
+ */
+function modelSetting({ label, hint, className, can, takes, refused, none, choose }) {
   let shown = "";
-  const select = el("select", { class: "select sm mono", "aria-label": label });
-  // The provider of the model chosen stands in the select's box, before its chevron, as the design draws it.
+  let groups = [];
+  // The model the blank row stands for (the default model for the own work model, the review model for the night's
+  // roles), null for none: its mark leads the row.
+  let blankModel = null;
+  const mark = el("span", { class: "model-pick-mark" });
+  const name = el("span", { class: "model-pick-name mono" });
+  // The provider of the model chosen stands in the box, before its chevron, as the design draws it.
   const provider = el("span", { class: "model-pick-provider", "aria-hidden": "true" });
-  const element = setRow({ title: label, lead: hint, control: el("div", { class: "model-pick" }, select, provider) });
-  element.classList.add(className);
+  const button = el("button", { class: "select sm model-pick-button", type: "button" }, mark, name, provider);
+  const element = setRow({ title: label, lead: hint, control: el("div", { class: "model-pick" }, button) });
+  element.classList.add(className, "model-setting");
   element.hidden = true;
-  // Each pick is sent once the one before it was answered, so the last one made holds; the select shows the model the
+  // Each pick is sent once the one before it was answered, so the last one made holds; the box shows the model the
   // status says after each.
   let making = Promise.resolve();
-  select.addEventListener("change", () => {
-    const ref = select.value;
-    making = making.then(() =>
-      attempt(async () => {
-        try {
-          await choose(ref);
-          await refresh();
-        } finally {
-          select.value = shown;
-        }
-      }),
-    );
+  const picker = modelPicker({
+    onPick: (ref) => {
+      menu.close();
+      if (ref === shown) {
+        return;
+      }
+      making = making.then(() =>
+        attempt(async () => {
+          try {
+            await choose(ref);
+            await refresh();
+          } finally {
+            paintBox();
+          }
+        }),
+      );
+    },
+    onMakeDefault: null,
   });
+  const menu = anchoredPopover({ anchor: button, frame: element, label, build: () => picker.build({ groups, chosen: shown, fallback: blankModel, blank: none }) });
 
-  function paint(providers, chosen) {
-    const groups = providers
-      .map((one) => ({ provider: one.provider, models: one.models.filter(fits) }))
-      .filter((group) => group.models.length > 0);
-    const listed = groups.some((group) => group.models.some((model) => model.ref === chosen));
-    // The native replaceChildren writes a null as text: the option of a model not listed is left out instead.
-    const unlisted = listed || chosen === "" ? [] : [el("option", { value: chosen }, `${modelName(chosen)} (not listed now)`)];
-    const empty = none === null ? [] : [el("option", { value: "" }, none)];
-    select.replaceChildren(
-      ...empty,
-      ...unlisted,
-      ...groups.map((group) =>
-        el("optgroup", { label: providerLabel(group.provider) }, group.models.map((model) => el("option", { value: model.ref }, modelName(model.ref)))),
-      ),
-    );
+  function paintBox() {
+    const words = shown === "" ? (none ?? "") : modelName(shown);
+    const listed = shown === "" || groups.some((group) => group.models.some((model) => model.ref === shown));
+    mark.replaceChildren(shown === "" ? "" : providerMark(providerOf(shown)));
+    name.textContent = listed ? words : `${words} (not listed now)`;
+    provider.textContent = shown === "" ? "" : providerLabel(providerOf(shown));
+    button.setAttribute("aria-label", `${label}: ${name.textContent}`);
+    button.title = shown;
+  }
+
+  function paint(providers, chosen, fallback) {
+    groups = settingGroups(providers, can, takes, refused);
     shown = chosen;
-    select.value = chosen;
-    provider.textContent = chosen === "" ? "" : providerLabel(providerOf(chosen));
+    blankModel = fallback;
+    paintBox();
+    menu.repaint();
     element.hidden = false;
   }
 
   function hide() {
+    menu.close();
     element.hidden = true;
   }
 
-  return { element, paint, hide };
+  return { element, paint, hide, dispose: menu.dispose };
 }
 
 const STANDBY_HINT =
@@ -1435,7 +1474,9 @@ function buildModels(isDisposed, asked, head) {
     label: "Default model",
     hint: "New chats start on it, and so does any task that names no model. A chat keeps the model it has; Default in its message box follows this one.",
     className: "models-default",
-    fits: (model) => model.tools,
+    can: (model) => model.tools,
+    takes: () => true,
+    refused: "A task's model takes its steps in Dot's own loop.",
     none: null,
     choose: async (ref) => {
       await api.post("/models/main", { model: ref });
@@ -1448,7 +1489,9 @@ function buildModels(isDisposed, asked, head) {
       label: setting.label,
       hint: setting.hint,
       className: "models-role",
-      fits: setting.fits,
+      can: setting.can,
+      takes: setting.takes,
+      refused: setting.refused,
       none: null,
       choose: async (ref) => {
         await api.post("/models/roles", { role: setting.role, model: ref });
@@ -1466,7 +1509,9 @@ function buildModels(isDisposed, asked, head) {
     hint: "Decides what is worth doing when Dot works on its own while the Mac is idle (Schedules › On its own). The work itself runs on the default model.",
     className: "models-role",
     // The look is a run with tools no agent program of its own is given (its list, the owner's mail): items 916, 1032.
-    fits: (model) => model.tools && !WHOLE_RUN.has(providerOf(model.ref)),
+    can: (model) => model.tools,
+    takes: (provider) => !WHOLE_RUN.has(provider),
+    refused: "Its look uses tools (its list, your mail and calendar) an agent program of its own is not given.",
     none: "Default model",
     choose: async (ref) => {
       const view = await api.put("/initiative/look-model", { model: ref });
@@ -1484,7 +1529,9 @@ function buildModels(isDisposed, asked, head) {
       label: setting.label,
       hint: setting.hint,
       className: "models-role",
-      fits: (model) => model.tools && answersRole("review", providerOf(model.ref)),
+      can: (model) => model.tools,
+      takes: (provider) => answersRole("review", provider),
+      refused: "Of the agent programs, only the Claude plan answers the single questions it is asked.",
       none: "Review model",
       choose: async (ref) => {
         paintLearning(await api.put("/models/learning", { role: setting.role, model: ref }));
@@ -1585,12 +1632,12 @@ function buildModels(isDisposed, asked, head) {
     painted = { providers, mainModel, chosen, standbyKey, usage };
     head.setMeta(...modelsSummary(providers, inUse));
     search.placeholder = `Search ${plural(providers.reduce((count, provider) => count + provider.models.length, 0), "model", "models")}`;
-    main.paint(providers, mainModel);
+    main.paint(providers, mainModel, null);
     for (const { role, control } of roles) {
-      control.paint(providers, status === null ? "" : status.models[role]);
+      control.paint(providers, status === null ? "" : status.models[role], null);
     }
     if (lookModel !== null) {
-      look.paint(providers, lookModel);
+      look.paint(providers, lookModel, mainModel === "" ? null : mainModel);
     }
     paintLearningRows();
     planRow.hidden = !providers.some((provider) => provider.models.some((model) => model.ref === PLAN_REVIEW));
@@ -1670,8 +1717,11 @@ function buildModels(isDisposed, asked, head) {
     if (providers === null || learningChosen === null) {
       return;
     }
+    // The review model as the status says it now, which a choice of its row changes after the roles were read.
+    const status = getSnapshot().status;
+    const review = status === null ? learningChosen.review : status.models.review;
     for (const { role, control } of learning) {
-      control.paint(providers, learningChosen[role]);
+      control.paint(providers, learningChosen[role], review);
     }
   }
 
@@ -1743,7 +1793,8 @@ function buildModels(isDisposed, asked, head) {
   function paintLook(model) {
     lookModel = model;
     if (providers !== null) {
-      look.paint(providers, lookModel);
+      const status = getSnapshot().status;
+      look.paint(providers, lookModel, status === null ? null : status.models.main);
     }
   }
 
@@ -1821,7 +1872,15 @@ function buildModels(isDisposed, asked, head) {
     cues = [...list.querySelectorAll(".table-scroll")].map(scrollCue);
   }
 
-  return { element, load, paint, dispose: stopCues };
+  // Leaving the page closes a model menu left open, and with it what it listens to on the document.
+  function dispose() {
+    stopCues();
+    for (const setting of [main, look, ...roles.map(({ control }) => control), ...learning.map(({ control }) => control)]) {
+      setting.dispose();
+    }
+  }
+
+  return { element, load, paint, dispose };
 }
 
 function buildTokenCard() {

@@ -15,7 +15,8 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from model_menu import expect_chosen, model_box, offered, why_not
+from playwright.async_api import Browser, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -143,10 +144,6 @@ async def test_settings_choose_the_model_of_each_role_of_the_learning_from_its_n
         assert load_config(config_path()).harness.proposer == ""
 
 
-async def _offered(select: Locator) -> list[str]:
-    return await select.locator("option").evaluate_all("(options) => options.map((option) => option.value)")
-
-
 @pytest.mark.browser
 async def test_the_models_page_puts_every_model_of_dots_own_work_in_one_place(
     served: tuple[Runtime, str], tmp_path: Path
@@ -188,14 +185,15 @@ async def test_the_models_page_puts_every_model_of_dots_own_work_in_one_place(
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900}, reduced_motion="reduce")
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/settings/models")
-                fast: Locator = page.get_by_role("combobox", name="Fast model")
-                review: Locator = page.get_by_role("combobox", name="Review model")
-                await expect(review).to_be_visible(timeout=15_000)
-                assert not any(ref.startswith("claude_code:") for ref in await _offered(fast))
-                assert "claude_code:opus" in await _offered(review)
-                proposer: Locator = page.get_by_role("combobox", name="Proposer")
-                await expect(proposer).to_be_visible()
-                assert (await _offered(proposer))[0] == ""
+                await expect(model_box(page, "Review model")).to_be_visible(timeout=15_000)
+                # The plan's models stand on every box's rail (item 1044): offered where they can play the role, and
+                # where they cannot, their view says why.
+                fast: dict[str, list[str]] = await offered(page, "Fast model")
+                assert fast.get("claude_code") == [], fast
+                assert "only as their own agent program" in await why_not(page, "Fast model", "claude_code")
+                assert "claude_code:opus" in (await offered(page, "Review model"))["claude_code"]
+                assert "claude_code:haiku" in (await offered(page, "Default model"))["claude_code"]
+                await expect(model_box(page, "Proposer")).to_contain_text("Review model")
                 await expect(page.get_by_role("combobox", name="Self-repair model")).to_be_visible()
                 await expect(page.locator(".models-usage")).to_contain_text("Schedules: 1 on sonnet, 1 on opus")
                 await expect(page.locator(".models-usage")).to_contain_text("Agents: 1 on sonnet")
@@ -209,7 +207,7 @@ async def test_the_models_page_puts_every_model_of_dots_own_work_in_one_place(
                     await expect(page.locator(".toast.ok")).to_contain_text("Claude plan")
                     assert runtime.roles.review() == "claude_code:opus"
                     assert runtime.roles.learning_model("proposer") == "claude_code:opus"
-                    await expect(review).to_have_value("claude_code:opus")
+                    await expect_chosen(page, "Review model", "claude_code:opus")
                 await page.close()
         finally:
             await browser.close()

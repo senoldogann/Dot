@@ -14,6 +14,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from model_menu import close_box, expect_chosen, model_box, offered, open_box, pick
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -166,8 +167,9 @@ async def _roles(http: httpx.AsyncClient) -> tuple[object, object, object]:
     return models["fast"], models["review"], models["vision"]
 
 
-async def _offered(select: Locator) -> list[str]:
-    return await select.locator("option").evaluate_all("(options) => options.map((option) => option.value)")
+def _flat(found: dict[str, list[str]]) -> list[str]:
+    """Every model a box offers, whatever its provider."""
+    return [ref for refs in found.values() for ref in refs]
 
 
 async def test_settings_choose_the_models_of_dots_own_work_and_the_next_call_goes_to_them(
@@ -196,20 +198,18 @@ async def test_settings_choose_the_models_of_dots_own_work_and_the_next_call_goe
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{served}/#/settings/models")
-                fast: Locator = page.get_by_role("combobox", name="Fast model")
-                review: Locator = page.get_by_role("combobox", name="Review model")
-                vision: Locator = page.get_by_role("combobox", name="Vision model")
+                await expect(model_box(page, "Review model")).to_be_visible(timeout=15_000)
                 # Each offers the models that can do its work: tools for the fast and review models, sight for vision.
-                await expect(review.locator("option")).to_have_count(5)
-                assert sorted(await _offered(review)) == sorted([SCRIPTED_MODEL, _QUICK, _OPUS, _HAIKU, _MINI])
-                assert sorted(await _offered(fast)) == sorted([SCRIPTED_MODEL, _QUICK, _OPUS, _HAIKU, _MINI])
-                assert sorted(await _offered(vision)) == sorted([_SEEING, _OPUS, _HAIKU])
+                tools: list[str] = sorted([SCRIPTED_MODEL, _QUICK, _OPUS, _HAIKU, _MINI])
+                assert sorted(_flat(await offered(page, "Review model"))) == tools
+                assert sorted(_flat(await offered(page, "Fast model"))) == tools
+                assert sorted(_flat(await offered(page, "Vision model"))) == sorted([_SEEING, _OPUS, _HAIKU])
                 if index == 0:
-                    await expect(review).to_have_value(_QUICK)
+                    await expect_chosen(page, "Review model", _QUICK)
                     # The review model chosen, the next call of its work goes to it, with no restart.
-                    await review.select_option(_HAIKU)
+                    await pick(page, "Review model", _HAIKU)
                     await expect(page.get_by_text(f"The review model is {_HAIKU.split(':')[1]}")).to_be_visible()
-                    await expect(review).to_have_value(_HAIKU)
+                    await expect_chosen(page, "Review model", _HAIKU)
                     assert runtime.roles.review() == _HAIKU
                     drafted: httpx.Response = await http.post(
                         "/api/rules/draft", json={"sentence": "Ask me before any file is deleted."}
@@ -218,12 +218,12 @@ async def test_settings_choose_the_models_of_dots_own_work_and_the_next_call_goe
                     anthropic = await runtime.router.provider("anthropic")
                     assert isinstance(anthropic, Listed)
                     assert anthropic.asked and set(anthropic.asked) == {"claude-haiku-5-5"}, anthropic.asked
-                    await fast.select_option(_OPUS)
+                    await pick(page, "Fast model", _OPUS)
                     await expect(page.get_by_text(f"The fast model is {_OPUS.split(':')[1]}")).to_be_visible()
-                    await expect(fast).to_have_value(_OPUS)
-                    await vision.select_option(_HAIKU)
+                    await expect_chosen(page, "Fast model", _OPUS)
+                    await pick(page, "Vision model", _HAIKU)
                     await expect(page.get_by_text(f"The vision model is {_HAIKU.split(':')[1]}")).to_be_visible()
-                    await expect(vision).to_have_value(_HAIKU)
+                    await expect_chosen(page, "Vision model", _HAIKU)
                     assert await _roles(http) == (_OPUS, _HAIKU, _HAIKU)
                     assert (runtime.roles.fast(), runtime.roles.vision()) == (_OPUS, _HAIKU)
                     # The config file keeps each choice, and the rest of it as it was.
@@ -235,19 +235,24 @@ async def test_settings_choose_the_models_of_dots_own_work_and_the_next_call_goe
                     assert (written.fast, written.review, written.vision) == (_OPUS, _HAIKU, _HAIKU)
                     # The model that looks for work on Dot's own initiative (item 916): the default one until chosen,
                     # then the next look's, kept as [initiative] look_model.
-                    own: Locator = page.get_by_role("combobox", name="Own work model")
-                    await expect(own).to_have_value("")
-                    await expect(own.locator("option").first).to_have_text("Default model")
-                    await own.select_option(_OPUS)
+                    await expect_chosen(page, "Own work model", "")
+                    await expect(model_box(page, "Own work model")).to_contain_text("Default model")
+                    await pick(page, "Own work model", _OPUS)
                     await expect(page.get_by_text(f"Dot's own work is chosen on {_OPUS.split(':')[1]}")).to_be_visible()
-                    await expect(own).to_have_value(_OPUS)
+                    await expect_chosen(page, "Own work model", _OPUS)
                     assert runtime.roles.look() == _OPUS
                     assert load_config(path).initiative.look_model == _OPUS
                 else:
-                    await expect(fast).to_have_value(_OPUS)
-                    await expect(review).to_have_value(_HAIKU)
-                    await expect(vision).to_have_value(_HAIKU)
-                    await expect(page.get_by_role("combobox", name="Own work model")).to_have_value(_OPUS)
+                    await expect_chosen(page, "Fast model", _OPUS)
+                    await expect_chosen(page, "Review model", _HAIKU)
+                    await expect_chosen(page, "Vision model", _HAIKU)
+                    await expect_chosen(page, "Own work model", _OPUS)
+                    # On a phone the menu stays inside the window.
+                    menu: Locator = await open_box(page, "Vision model")
+                    box = await menu.bounding_box()
+                    assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+                    await page.screenshot(path=str(tmp_path / f"menu-{width}-{scheme}.png"), animations="disabled")
+                    await close_box(page)
                 card: Locator = page.locator(".models-role").first
                 assert not (
                     await page.locator(".models-role").evaluate_all(

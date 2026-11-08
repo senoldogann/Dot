@@ -16,6 +16,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from composer_choices import show_choices
+from model_menu import expect_chosen, model_box, offered, pick
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -224,11 +225,8 @@ async def test_the_default_model_chosen_in_settings_starts_the_runs_that_name_no
             for width, scheme in _SHOTS:
                 shown, shown_errors = await _page(browser, address, width, scheme)
                 await shown.goto(f"{address}/#/settings/models")
-                offered: Locator = shown.locator(".models-default select")
-                await expect(offered).to_have_value(SCRIPTED_MODEL)
-                values: list[str] = await offered.locator("option").evaluate_all(
-                    "(options) => options.map((option) => option.value)"
-                )
+                await expect_chosen(shown, "Default model", SCRIPTED_MODEL)
+                values: list[str] = [ref for refs in (await offered(shown, "Default model")).values() for ref in refs]
                 assert values == [SCRIPTED_MODEL, THINKER, OTHER], values
                 await shown.screenshot(
                     path=str(tmp_path / f"default-model-{width}-{scheme}.png"), animations="disabled"
@@ -238,15 +236,14 @@ async def test_the_default_model_chosen_in_settings_starts_the_runs_that_name_no
 
             page, errors = await _page(browser, address, 1280, "light")
             await page.goto(f"{address}/#/settings/models")
-            select: Locator = page.locator(".models-default select")
             # It shows once the models are listed.
-            await expect(select).to_have_value(SCRIPTED_MODEL)
-            await select.focus()
-            await select.select_option(OTHER)
+            await expect_chosen(page, "Default model", SCRIPTED_MODEL)
+            await pick(page, "Default model", OTHER)
             await expect(page.locator(".toast.ok")).to_contain_text("New chats start on other")
             await expect(page.locator("tr", has=page.locator(".badge", has_text="default"))).to_contain_text(OTHER)
-            await expect(select).to_have_value(OTHER)
-            await expect(select).to_be_focused()
+            await expect_chosen(page, "Default model", OTHER)
+            # The menu closed, the focus is back on the box.
+            await expect(model_box(page, "Default model")).to_be_focused()
             assert manager.main_model() == OTHER
             assert _written_models()["main"] == OTHER
             assert tomllib.loads(config_path().read_text(encoding="utf-8"))["browser"] == {"headless": True}

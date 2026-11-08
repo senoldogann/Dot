@@ -5,6 +5,8 @@
 // The focus stays in the search: the arrows move the active row, Enter picks it, ⌘1 to ⌘9 pick the rows that show
 // those keys, ⌘D stars the active row, and the left arrow (on an empty search) goes to the rail, the right arrow back.
 // The default's row has Change (item 209): the list then chooses the daemon's default instead of the chat's model.
+// Settings › Models opens the same menu from each of its roles (item 1044), with no Change, and with the providers
+// whose models cannot play the role on the rail all the same, their view saying why.
 
 import { el, foldSearch, modelName } from "./dom.js";
 import { icon } from "./icons.js";
@@ -106,20 +108,21 @@ function foundEntries(entries, words, favourites) {
 }
 
 /** Where a menu opened anew starts: on the favourites when any of them is offered, else on the provider of `current`
- * (the model a run would use, or null), else on the first provider. */
+ * (the model chosen now, or null) when it offers models here, else on the first provider that does. */
 function openingView(groups, favourites, current) {
   if (entriesOf(groups).some(({ info }) => favourites.includes(info.ref))) {
     return FAVOURITES;
   }
   const provider = current === null ? "" : providerOf(current);
-  if (groups.some((group) => group.provider === provider)) {
+  if (groups.some((group) => group.provider === provider && group.models.length > 0)) {
     return provider;
   }
-  return groups.length > 0 ? groups[0].provider : FAVOURITES;
+  const open = groups.find((group) => group.models.length > 0);
+  return open === undefined ? FAVOURITES : open.provider;
 }
 
-/** The words of the daemon's default model, for the row that follows it. */
-function defaultRowText(ref) {
+/** The words of the daemon's default model, for the row that follows it in the composer's menu. */
+export function defaultRowText(ref) {
   return ref === null ? "Default model" : `Default (${modelName(ref)})`;
 }
 
@@ -134,14 +137,15 @@ function keepFocus(event) {
 }
 
 /**
- * The model menu of one composer, for `anchoredPopover`: `build({ groups, chosen, fallback })` returns its content, where
- * `groups` are the models runs can use, by provider (`{ provider, models }`), `chosen` the reference picked ("" for the
- * daemon's default) and `fallback` the daemon's default (null while it is not known); `onPick(ref)` runs when a row is
- * picked ("" for the default). Change, on the default's row, turns the list to choosing the daemon's default: a row
- * picked then goes to `onMakeDefault(ref)`, which resolves to whether the daemon took it, and the list goes back to the
- * chat's model once it did; Escape or Cancel goes back at once, and the menu stays open. A menu opened anew starts on
- * its opening view with an empty search, choosing the chat's model; one built again while it is open (a repaint) keeps
- * its search, its view and what it chooses.
+ * A model menu, for `anchoredPopover`: `build({ groups, chosen, fallback, blank })` returns its content, where `groups`
+ * are the models that may be picked, by provider (`{ provider, models, why }`: a provider whose models cannot be picked
+ * here has none and `why` says so, null otherwise), `chosen` the reference picked ("" for the blank row), `fallback` the
+ * model the blank row stands for (null while it is not known) and `blank` the blank row's words (null for no blank
+ * row); `onPick(ref)` runs when a row is picked ("" for the blank one). With `onMakeDefault` (the composer's menu, null
+ * in Settings), Change on the blank row turns the list to choosing the daemon's default: a row picked then goes to
+ * `onMakeDefault(ref)`, which resolves to whether the daemon took it, and the list goes back to the chat's model once
+ * it did; Escape or Cancel goes back at once, and the menu stays open. A menu opened anew starts on its opening view
+ * with an empty search; one built again while it is open (a repaint) keeps its search, its view and what it chooses.
  */
 export function modelPicker({ onPick, onMakeDefault }) {
   made += 1;
@@ -159,7 +163,7 @@ export function modelPicker({ onPick, onMakeDefault }) {
   // Paints the menu as last built again, while it is open: what a default being made ended in.
   let repaintBuilt = () => undefined;
 
-  function build({ groups, chosen, fallback }) {
+  function build({ groups, chosen, fallback, blank }) {
     const views = [FAVOURITES, ...groups.map((group) => group.provider)];
     const anew = root === null || !root.isConnected;
     if (anew) {
@@ -168,7 +172,7 @@ export function modelPicker({ onPick, onMakeDefault }) {
     }
     if (anew || guessed || !views.includes(view)) {
       view = openingView(groups, readFavourites(), chosen === "" ? fallback : chosen);
-      guessed = groups.length === 0 || (chosen === "" && fallback === null);
+      guessed = groups.length === 0 || (chosen === "" && fallback === null && blank !== null);
     }
     // Where a pointer can hover, a keyboard is likely: the search takes the focus and the rows show their keys. On a
     // touch screen the focus stays off the search, so that no keyboard springs up over the list.
@@ -349,17 +353,18 @@ export function modelPicker({ onPick, onMakeDefault }) {
       return row;
     }
 
-    // The default's row, with Change, which turns the list to choosing the default (once the default is known).
-    function defaultRow() {
+    // The blank row, with Change in the composer's menu, which turns the list to choosing the default (once the default
+    // is known).
+    function blankRow(words) {
       const { option } = optionOf({
         lead: providerMark(fallback === null ? "" : providerOf(fallback)),
-        label: defaultRowText(fallback),
+        label: words,
         hint: "",
         key: null,
         ref: "",
       });
       const change =
-        fallback === null
+        fallback === null || onMakeDefault === null
           ? el("span", { class: "model-star-room", "aria-hidden": "true" })
           : el(
               "button",
@@ -400,9 +405,10 @@ export function modelPicker({ onPick, onMakeDefault }) {
       return el("div", { class: "model-row", role: "none" }, row.option, row.star);
     }
 
-    // The rows of the view, or of those of its models the search finds: the default's row first (in a search only when
-    // its words match; never while the list chooses the default), then the models, the first nine with their keys. A
-    // row starred or not stays where it is until the list is shown again.
+    // The rows of the view, or of those of its models the search finds: the blank row first (in a search only when its
+    // words match; never while the list chooses the default), then the models, the first nine with their keys. A row
+    // starred or not stays where it is until the list is shown again. A provider's view whose models cannot be picked
+    // here says why.
     function paintList() {
       const words = foldSearch(query)
         .split(/\s+/)
@@ -415,16 +421,19 @@ export function modelPicker({ onPick, onMakeDefault }) {
       setActive(-1);
       rows = [];
       const children = [];
-      if (!choosingDefault && (!searching || searchScore([foldSearch(defaultRowText(fallback))], words) !== null)) {
-        children.push(defaultRow());
+      if (blank !== null && !choosingDefault && (!searching || searchScore([foldSearch(blank)], words) !== null)) {
+        children.push(blankRow(blank));
       }
       entries.forEach((entry, index) => {
         const key = index < KEYED_ROWS ? index + 1 : null;
         children.push(modelRow(entry, keyboard ? key : null, view === FAVOURITES, favourites.includes(entry.info.ref)));
       });
       keyed = entries.slice(0, KEYED_ROWS).map(({ info }) => info.ref);
+      const closed = groups.find((group) => group.provider === view)?.why ?? null;
       let lack = "";
-      if (searching && rows.length === 0) {
+      if (closed !== null) {
+        lack = closed;
+      } else if (searching && rows.length === 0) {
         lack = `No ${viewModels(view)} match “${query.trim()}”.`;
       } else if (!searching && view === FAVOURITES && entries.length === 0) {
         lack = "No favourites yet: star a model to keep it here.";
