@@ -4,7 +4,8 @@ pure: :func:`read_line` makes a line one of the events below (``None`` for a lin
 checks the run makes of them are functions of their own.
 
 - ``system``/``init`` (:class:`Init`): the session, and what the model has: its tools, its MCP servers, its slash
-  commands, skills and plugins. A run's must list the door's tools alone (:func:`init_problem`).
+  commands, skills and plugins. A run's must list the door's tools alone, and Claude Code's search of them (item 1053,
+  :func:`init_problem`).
 - ``stream_event``: the model's reply as it comes, Anthropic's own stream events: ``message_start``
   (:class:`StepBegan`, with the tokens read), ``content_block_start`` (:class:`BlockBegan`: text, thinking or a tool's
   call), ``content_block_delta`` (:class:`Delta`, text or thinking), ``message_delta`` (:class:`StepFinished`: why it
@@ -274,13 +275,18 @@ def tool_prefix(door: str) -> str:
     return f"{MCP_TOOL_PREFIX}{door}__"
 
 
+# Claude Code's search of a server's tools, which a run's model may have beside the door's tools (item 1053).
+SEARCH_TOOL: str = "ToolSearch"
+
+
 def init_problem(init: Init, door: str) -> str | None:
-    """What is wrong with what the model was given, ``None`` when it has the tools of the door ``door`` and nothing
-    else: no tool of Claude Code's own nor of another MCP server, no MCP server but the door, connected, no slash
-    command, no skill and no plugin."""
+    """What is wrong with what the model was given, ``None`` when it has the tools of the door ``door`` and Claude
+    Code's search of them (:data:`SEARCH_TOOL`, item 1053), and nothing else: no other tool of Claude Code's own nor
+    one of another MCP server, no MCP server but the door, connected, no slash command, no skill and no plugin."""
     prefix: str = tool_prefix(door)
     problems: list[str] = []
-    others: list[str] = [tool for tool in init.tools if not tool.startswith(prefix)]
+    # The one tool of Claude Code's own a run's model has is its search of the door's tools (item 1053).
+    others: list[str] = [tool for tool in init.tools if not tool.startswith(prefix) and tool != SEARCH_TOOL]
     if others:
         problems.append(f"tools that are not Dot's: {', '.join(others)}")
     servers: list[str] = [server.name for server in init.mcp_servers if server.name != door]

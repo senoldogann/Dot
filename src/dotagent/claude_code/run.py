@@ -4,11 +4,13 @@ of its chat, which the program keeps from run to run (``--resume``); what was sa
 the session last saw it comes with the run's first message, as a run on OpenCode's agent has it
 (:mod:`dotagent.opencode.run`).
 
-The model sees Dot's tools alone: the program runs with no built-in tool (``--tools ""``), no settings file of the
-owner's, the project's or the workspace's (``--setting-sources ""``: no hook, no CLAUDE.md), no MCP server but the
-chat's door of Dot's bridge (``--strict-mcp-config``, :mod:`dotagent.opencode.bridge`), no slash command, and a
-permission mode that refuses whatever the door does not name (``dontAsk`` with ``--allowedTools mcp__<door>``). Its
-first line (``system``/``init``) says what the model has; a run whose model has anything else ends failed at once
+The model sees Dot's tools alone: the program runs with no built-in tool but its search of the door's tools (``--tools
+ToolSearch``, item 1053: the tools' definitions stay out of the prompt until the model looks one up), no settings file
+of the owner's, the project's or the workspace's (``--setting-sources ""``: no hook, no CLAUDE.md), no MCP server but
+the door of Dot's bridge (``--strict-mcp-config``, :mod:`dotagent.opencode.bridge`), no slash command, and a permission
+mode that refuses whatever the door and the search do not name (``dontAsk`` with ``--allowedTools
+mcp__<door>,ToolSearch``). Its first line (``system``/``init``) says what the model has; a run whose model has anything
+else ends failed at once
 (:func:`dotagent.claude_code.stream.init_problem`). Each call of a tool of Dot's runs as a call of Dot's own loop
 (:func:`dotagent.agent.handover.bridged_call`: the run's gate, the tool's time limit, the run's timeline under the
 tool's own name). The door's secret is in a 0600 file of a private folder of the run, removed as it ends, never in the
@@ -80,6 +82,7 @@ from dotagent.agent.streammask import StreamMask
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
 from dotagent.claude_code.env import claude_env
 from dotagent.claude_code.stream import (
+    SEARCH_TOOL,
     BlockBegan,
     BlockKind,
     ClaudeEvent,
@@ -224,10 +227,27 @@ def door_tools(
 
 # The name of the door of every run in Claude Code (item 1052): each run is a process of its own that is given its door
 # alone (``--strict-mcp-config``), and its secret is what lets its requests in, so the name need not tell chats apart.
-# One name keeps the tools' names, and so the head of every chat's prompt, the same: Anthropic's cache of that head,
-# about 160,000 tokens with the owner's servers' tools, is read by each new chat instead of written again, which took a
-# new chat's first word from 3 to 25 seconds after its message (measured 2026-11-08).
+# One name keeps the tools' names, and so the head of every chat's prompt, the same, and Anthropic's cache of that head
+# is read by each new chat instead of written again (with 480 tools before item 1053: 151,000 tokens read instead of
+# 158,000 written, the first word in 3.9 s instead of 11.7; measured 2026-11-08).
 CLAUDE_DOOR: str = "dot"
+
+
+# What turns on Claude Code's own search of the door's tools (item 1053, :data:`SEARCH_TOOL`), the one tool of its own a
+# run's model has, whatever the size of the door (Claude Code's own threshold would leave it off for a small one): the
+# door's tools are not put in the prompt, only their names; the model looks a tool up when it needs it and calls it as
+# before, through the door and the run's gate. It reaches nothing but the door's list. With 296 tools, as many as the
+# owner's servers give, a new chat wrote 10,800 tokens to the cache instead of 99,000 and its first word came in 1.2 s
+# (measured 2026-11-08; on the owner's Dot a two-line answer had read 169,000 tokens and come 4 to 26 s after the
+# message).
+SEARCH_ENV: dict[str, str] = {"ENABLE_TOOL_SEARCH": "true"}
+
+
+def dot_tool(tool: str, door: str) -> str | None:
+    """The name of Dot's tool a block of a step calls through ``door``, ``None`` for a look-up of one (item 1053), which
+    is Claude Code's own and not a call of Dot's."""
+    prefix: str = tool_prefix(door)
+    return tool.removeprefix(prefix) if tool.startswith(prefix) else None
 
 
 def door_specs(specs: Iterable[ToolSpec]) -> tuple[ToolSpec, ...]:
@@ -285,7 +305,7 @@ def claude_argv(
         "--append-system-prompt",
         prompt,
         "--tools",
-        "",
+        SEARCH_TOOL,
         "--setting-sources",
         "",
         "--strict-mcp-config",
@@ -298,7 +318,7 @@ def claude_argv(
         "none",
         *again,
         "--allowedTools",
-        f"mcp__{door}",
+        f"mcp__{door},{SEARCH_TOOL}",
     )
 
 
@@ -498,8 +518,9 @@ class _Follow:
                 )
             case BlockBegan() if self.step is not None:
                 self.step.kinds[event.index] = event.kind
-                if event.kind == "tool":
-                    self.step.tools.append(event.tool.removeprefix(tool_prefix(self.door)))
+                called: str | None = dot_tool(event.tool, self.door) if event.kind == "tool" else None
+                if called is not None:
+                    self.step.tools.append(called)
             case Delta() if self.step is not None:
                 self.step.texts[event.index] = self.step.texts.get(event.index, "") + event.text
                 await self.stream(StreamDelta(kind=event.kind, text=event.text))
@@ -883,7 +904,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                 process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
                     *argv,
                     cwd=str(runtime.workspace),
-                    env=claude_env(runtime.shell_env, folder),
+                    env={**claude_env(runtime.shell_env, folder), **SEARCH_ENV},
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
