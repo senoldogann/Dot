@@ -23,14 +23,39 @@ from dotagent.opencode.server import find_program
 from dotagent.repair.claude import ClaudeAccount, claude_state, read_account
 
 CLAUDE_CODE_PROVIDER: str = "claude_code"
-# The models a run may name: Claude Code's own aliases for the newest of each family (2.1.318's `--help` names these
-# three, and ``haiku`` answers too: measured on 2.1.318 on 2026-11-07, as Claude Haiku 5.5, at every level of effort).
-MODELS: tuple[str, ...] = ("fable", "opus", "sonnet", "haiku")
+# Claude Code's own aliases for the newest of each family, and the model each named (item 1054: its first line,
+# ``system``/``init``, says the model; measured on 2.1.319 on 2026-11-08). The alias stays what a run names, so that a
+# choice of "the newest Opus" follows Claude Code; the model it names gives its name on the page.
+ALIASES: dict[str, str] = {
+    "fable": "claude-fable-5-1",
+    "opus": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "haiku": "claude-haiku-5-5",
+}
+# The older models the plan answers on (item 1054): each asked once with `--model` at the lowest and the highest
+# effort on 2.1.319 on 2026-11-08, and each answered; Sonnet 4.5 and 4, Haiku 5 and the Claude 3 models did not.
+LEGACY: tuple[str, ...] = (
+    "claude-fable-5",
+    "claude-opus-5",
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-opus-4-5",
+    "claude-opus-4-1",
+    "claude-opus-4-0",
+    "claude-sonnet-5",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
+)
+# The models a run may name: the newest of each family by its alias, then the older ones (item 1054).
+MODELS: tuple[str, ...] = (*ALIASES, *LEGACY)
 # How hard a run thinks, as Claude Code's `--effort` takes it (item 1014), lowest first.
 EFFORTS: tuple[Effort, ...] = ("low", "medium", "high", "xhigh", "max")
-# The models of the plan that have fast mode (Claude Code's `fastMode` setting, item 1014): Opus, as for Anthropic's
-# API (:data:`dotagent.llm.anthropic.FAST_MODE_MODELS`). A plan without extra usage runs it at the standard speed.
-FAST_MODELS: frozenset[str] = frozenset({"opus"})
+# The models of the plan that have fast mode (Claude Code's `fastMode` setting, item 1014): those of Anthropic's API
+# that have it (:data:`dotagent.llm.anthropic.FAST_MODE_MODELS`), Opus 5.5 by its alias and Opus 5 (item 1054). A
+# plan without extra usage runs it at the standard speed (measured: every model answered ``extra_usage_disabled``).
+FAST_MODELS: frozenset[str] = frozenset({"opus", "claude-opus-5"})
+# The families of Claude's models, by the word their names carry.
+_FAMILIES: tuple[str, ...] = ("fable", "opus", "sonnet", "haiku")
 # The settings that turn fast mode on, given to a run's program with `--settings`.
 FAST_SETTINGS: str = '{"fastMode":true}'
 NOT_INSTALLED: str = (
@@ -40,6 +65,18 @@ NOT_INSTALLED: str = (
 NOT_SIGNED_IN: str = (
     "Claude Code is not signed in: run 'claude' once in Terminal and sign in with your Claude plan (Pro or Max)"
 )
+
+
+def model_label(model: str) -> str:
+    """The name of one of Claude Code's models as people know it (item 1054): an alias by the model it names, "Opus
+    5.5"; a model's id by its family and version, ``claude-opus-4-7`` "Opus 4.7", ``claude-opus-4-0`` "Opus 4". An id
+    that is neither is shown as it is."""
+    named: str = ALIASES.get(model, model)
+    parts: list[str] = named.removeprefix("claude-").split("-")
+    if not parts or parts[0] not in _FAMILIES or not all(part.isdigit() for part in parts[1:]) or len(parts) < 2:
+        return model
+    version: list[str] = parts[1:-1] if len(parts) > 2 and parts[-1] == "0" else parts[1:]
+    return f"{parts[0].capitalize()} {'.'.join(version)}"
 
 
 def model_info_of(model: str) -> ModelInfo:

@@ -1,7 +1,7 @@
 // What every page shares: the daemon status, the approvals that wait for an answer, and the live event stream.
 
 import { api, eventNotShown, follow, QUIET_BREAK_MS, tellOutOfDate, unreachable } from "./api.js";
-import { debounce } from "./dom.js";
+import { debounce, rememberModelLabels } from "./dom.js";
 
 const REFRESH_EVERY_MS = 15000;
 // After a break of the stream, or once the page is back in view, the network may not answer every request at once (a
@@ -99,6 +99,7 @@ export async function refresh() {
   }
   if (status.status === "fulfilled") {
     snapshot.status = status.value;
+    rememberModelLabels(Object.entries(status.value.model_labels));
     snapshot.outdated = status.value.pages !== OWN_PAGES;
   }
   if (approvals.status === "fulfilled") {
@@ -126,7 +127,11 @@ let modelsPending = null;
 /** The models each provider offers; asked once, because providers can be slow to answer. */
 export function loadModels() {
   if (modelsPending === null) {
-    modelsPending = api.get("/models");
+    // The names the providers give their models are kept for every page that names one (item 1054).
+    modelsPending = api.get("/models").then((providers) => {
+      rememberModelLabels(providers.flatMap((provider) => provider.models.map((model) => [model.ref, model.label])));
+      return providers;
+    });
     modelsPending.catch(() => {
       modelsPending = null;
     });

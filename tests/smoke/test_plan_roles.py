@@ -195,8 +195,8 @@ async def test_the_models_page_puts_every_model_of_dots_own_work_in_one_place(
                 assert "claude_code:haiku" in (await offered(page, "Default model"))["claude_code"]
                 await expect(model_box(page, "Proposer")).to_contain_text("Review model")
                 await expect(page.get_by_role("combobox", name="Self-repair model")).to_be_visible()
-                await expect(page.locator(".models-usage")).to_contain_text("Schedules: 1 on sonnet, 1 on opus")
-                await expect(page.locator(".models-usage")).to_contain_text("Agents: 1 on sonnet")
+                await expect(page.locator(".models-usage")).to_contain_text("Schedules: 1 on Sonnet 5.5, 1 on Opus 5.5")
+                await expect(page.locator(".models-usage")).to_contain_text("Agents: 1 on Sonnet 5.5")
                 over: object = await page.evaluate(
                     "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
                 )
