@@ -553,7 +553,8 @@ class RunManager:
             if owner is not None and not await asyncio.to_thread(owner_alive, directory, owner):
                 gone.append(owner)
         interrupted: int = await store.mark_interrupted_runs(gone)
-        await store.expire_pending_approvals(_EXPIRED_ON_START)
+        for decided in await store.expire_pending_approvals(_EXPIRED_ON_START):
+            self._runtime.bus.publish(decided)
         await fail_unsettled_drafts(store, self._runtime.bus)
         await store.forget_stops_of_ended_runs()
         await self._hold_claims_of_gone(directory)
@@ -588,7 +589,8 @@ class RunManager:
         for finished in told:
             self._runtime.bus.publish(finished)
         if told:
-            await store.expire_pending_approvals(_EXPIRED_COMMAND_DIED)
+            for decided in await store.expire_pending_approvals(_EXPIRED_COMMAND_DIED):
+                self._runtime.bus.publish(decided)
         for finished in told:
             closed: RunRecord = await store.get_run(finished.run_id)
             await self._follow_queue(closed, "failed")

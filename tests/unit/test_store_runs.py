@@ -89,7 +89,10 @@ async def test_only_the_runs_of_owners_that_are_gone_are_closed_with_the_approva
         }
         assert await store.active_run_owners() == [None, "a" * 32, "b" * 32]
         assert await store.mark_interrupted_runs(["b" * 32]) == 2
-        await store.expire_pending_approvals("daemon restarted")
+        decided: list[EventRecord] = await store.expire_pending_approvals("daemon restarted")
+        # Each expired card is closed by the event every decision stores (item 1049).
+        assert sorted(str(event.data["approval_id"]) for event in decided) == sorted([waiting["b" * 32], waiting[None]])
+        assert {(event.kind, event.data["status"]) for event in decided} == {("approval_decided", "expired")}
         assert (await store.get_run(runs["a" * 32].id)).status == "running"
         assert (await store.get_approval(waiting["a" * 32])).status == "pending"
         for gone in ("b" * 32, None):
