@@ -903,7 +903,54 @@ async def _embedding_failed(runtime: Runtime, run: RunRecord, purpose: str, erro
     await runtime.bus.emit(run.id, EMBEDDING_FAILED, {"purpose": purpose, "error": error.message}, True)
 
 
-async def _start_notes(runtime: Runtime, run: RunRecord, query: str, budget: int) -> Remembered:
+async def count_start_notes(runtime: Runtime, run: RunRecord, recalled: Remembered, seen_at: float) -> None:
+    """Count the notes ``run`` starts with as used, and tell the chat's page, which says how many of them no earlier
+    run of the chat was handed (item 335): Dot's own loop and a run on the Claude plan (item 1055) alike."""
+    if not recalled.records:
+        return
+    handed: list[str] = [record.id for record in recalled.records]
+    before: set[str] = await runtime.store.handed_in_thread(run.thread_id, run.id)
+    await runtime.store.mark_memories_used(run.id, handed, seen_at, "start")
+    await runtime.bus.emit(
+        run.id,
+        "memories",
+        {"ids": [*handed], "tokens": recalled.tokens, "fresh": sum(1 for one in handed if one not in before)},
+        True,
+    )
+
+
+class HandedNotes(FrozenModel):
+    """What a message is handed under it of the notes (item 404): the notes as rendered that its context does not
+    carry with that text, the ids of the notes forgotten since the context was handed them and not named yet, and the
+    notes that stand in for ones a merge put aside (item 584)."""
+
+    fresh: tuple[str, ...]
+    forgotten: tuple[str, ...]
+    stood_in: tuple[MemoryRecord, ...]
+
+
+async def notes_to_hand(
+    runtime: Runtime, run: RunRecord, remembered: Sequence[MemoryRecord], carried: str, seen_at: float
+) -> HandedNotes:
+    """Of the notes ``remembered`` for a message, those the context ``carried`` (its user messages, as the model has
+    them) does not hold with the same text (a note changed since, on the Memory page or by a run, comes again, and one
+    folded into a summary is handed again), the notes it quotes that were forgotten since, and the notes a merge made of
+    ones it quotes, counted as used: Dot's own loop and a run on the Claude plan (item 1055) alike."""
+    handed_before: set[str] = handed_note_ids(carried) - {record.id for record in remembered}
+    # A note the chat quotes that was forgotten, or that a merge put aside (item 584), is named as forgotten; the note
+    # a merge made of it, which the chat does not carry, is handed in its place.
+    away: Gone = await notes_gone(runtime.memory, handed_before, run.agent_id, time.time())
+    forgotten: list[str] = forgotten_unnamed(list(away.gone), carried)
+    stood_in: list[MemoryRecord] = [
+        record for record in away.stand_in if record.id not in {note.id for note in remembered}
+    ]
+    fresh: list[str] = notes_missing([render_note(record) for record in (*remembered, *stood_in)], carried)
+    if stood_in_fresh := [record.id for record in stood_in if render_note(record) in fresh]:
+        await runtime.store.mark_memories_used(run.id, stood_in_fresh, seen_at, "start")
+    return HandedNotes(fresh=tuple(fresh), forgotten=tuple(forgotten), stood_in=tuple(stood_in))
+
+
+async def start_notes(runtime: Runtime, run: RunRecord, query: str, budget: int) -> Remembered:
     """The notes ``run`` starts with: by meaning and words, or by words alone when the embedding service fails."""
     try:
         return await prompt_memories(runtime.memory, query, budget, run.agent_id)
@@ -1066,7 +1113,7 @@ async def opening_text(
     return with_picks(opening.text, opening.picks, skills, providers)
 
 
-async def _goal_query(runtime: Runtime, run: RunRecord) -> str:
+async def goal_query(runtime: Runtime, run: RunRecord) -> str:
     """What a run's notes, and the help its instructions list (item 166), are chosen by: its goal, then the goals of the
     latest earlier runs of its thread, so a short follow-up ("go on", "now the second one") still finds the notes and
     the help of the work it continues."""
@@ -2254,8 +2301,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # The last note about the other runs at work (item 301); empty while there were none.
     peers_said: str = ""
     notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
-    query: str = await _goal_query(runtime, run)
-    recalled: Remembered = await _start_notes(runtime, run, query, notes_budget)
+    query: str = await goal_query(runtime, run)
+    recalled: Remembered = await start_notes(runtime, run, query, notes_budget)
     # The secrets Dot holds, which the texts a prompt takes from what Dot learned are asked for again, as when they
     # were written (item 587). A gate refuses by a value, so the values filled into a page are not among them (item
     # 621); a text that holds one reaches the prompt with it masked (``given_text``, ``owner_prompt_lines``).
@@ -2268,18 +2315,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if seat is not None:
         await runtime.store.add_event(run.id, TRIAL_EVENT, {"version": seat.version, "arm": seat.arm})
     remembered: tuple[MemoryRecord, ...] = recalled.records
-    if remembered:
-        handed: list[str] = [record.id for record in remembered]
-        # How many of them no earlier run of the chat was handed: the chat's page says nothing of notes it recalled
-        # before (item 335).
-        before: set[str] = await runtime.store.handed_in_thread(run.thread_id, run.id)
-        await runtime.store.mark_memories_used(run.id, handed, memory_seen_at, "start")
-        await runtime.bus.emit(
-            run.id,
-            "memories",
-            {"ids": [*handed], "tokens": recalled.tokens, "fresh": sum(1 for one in handed if one not in before)},
-            True,
-        )
+    await count_start_notes(runtime, run, recalled, memory_seen_at)
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     asks: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
     # A message sent with Plan first acts only once the owner agrees (item 318): where the run chooses, its questions
@@ -2411,17 +2447,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # handed again), the notes forgotten since a message was handed them (their old text stays in the chat), and the
     # fitting skills the instructions leave out.
     carried: str = "\n".join(message.content for message in history if message.role == "user")
-    handed_before: set[str] = handed_note_ids(carried) - {record.id for record in remembered}
-    # A note the chat quotes that was forgotten, or that a merge put aside (item 584), is named as forgotten; the note
-    # a merge made of it, which the chat does not carry, is handed in its place.
-    away: Gone = await notes_gone(runtime.memory, handed_before, run.agent_id, time.time())
-    forgotten: list[str] = forgotten_unnamed(list(away.gone), carried)
-    stood_in: list[MemoryRecord] = [
-        record for record in away.stand_in if record.id not in {note.id for note in remembered}
-    ]
-    fresh_notes: list[str] = notes_missing([render_note(record) for record in (*remembered, *stood_in)], carried)
-    if stood_in_fresh := [record.id for record in stood_in if render_note(record) in fresh_notes]:
-        await runtime.store.mark_memories_used(run.id, stood_in_fresh, memory_seen_at, "start")
+    handed_notes: HandedNotes = await notes_to_hand(runtime, run, remembered, carried, memory_seen_at)
+    fresh_notes: list[str] = list(handed_notes.fresh)
+    forgotten: list[str] = list(handed_notes.forgotten)
+    stood_in: list[MemoryRecord] = list(handed_notes.stood_in)
     listed_names: set[str] = {skill.name for skill in listing.skills}
     extra_skills: list[Skill] = [skill for skill in fitting.skills if skill.name not in listed_names][
         :_TURN_SKILLS_MOST
