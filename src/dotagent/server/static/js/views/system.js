@@ -1223,7 +1223,7 @@ const ROLE_SETTINGS = [
     hint: "A second AI that double-checks Dot's work: it checks tasks against their goal, gives a second opinion, writes lessons and skills from them, and turns your words into rules.",
     can: (model) => model.tools,
     takes: (provider) => answersRole("review", provider),
-    refused: "Only the Claude plan answers the single questions it is asked.",
+    refused: "Of the agent programs, only the Claude plan answers the single questions it is asked.",
   },
   {
     role: "vision",
@@ -1531,7 +1531,7 @@ function buildModels(isDisposed, asked, head) {
       className: "models-role",
       can: (model) => model.tools,
       takes: (provider) => answersRole("review", provider),
-      refused: "Only the Claude plan answers the single questions it is asked.",
+      refused: "Of the agent programs, only the Claude plan answers the single questions it is asked.",
       none: "Review model",
       choose: async (ref) => {
         paintLearning(await api.put("/models/learning", { role: setting.role, model: ref }));
