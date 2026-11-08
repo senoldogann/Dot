@@ -2957,6 +2957,20 @@ class Store:
         return record
 
     @_writing
+    async def unblock_run(self, run_id: str) -> bool:
+        """A blocked run whose question was decided works again, unless another of its questions is still open (item
+        1050: the read-only calls of a step run side by side, and two of them may each ask); whether it moved. A run
+        that ended meanwhile keeps its end."""
+        cursor = await self._db.execute(
+            "UPDATE runs SET status = 'running' WHERE id = ? AND status = 'blocked'"
+            " AND NOT EXISTS"
+            " (SELECT 1 FROM approvals WHERE approvals.run_id = runs.id AND approvals.status = 'pending')",
+            (run_id,),
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
     async def set_run_status(self, run_id: str, status: RunStatus) -> bool:
         """Move a run that has not ended between its working states (queued, running, blocked on an approval); whether
         it moved. A run that ended keeps its end (item 1045): an approval answered as the run was cancelled, or a start

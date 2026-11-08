@@ -298,3 +298,26 @@ async def test_the_steps_of_a_run_are_those_of_its_family_with_the_helpers_steps
         assert [(step.tool, step.helper) for step in await store.result_steps(stranger.id)] == [("shell", False)]
     finally:
         await store.close()
+
+
+async def test_a_run_with_two_questions_stays_blocked_until_both_are_decided(tmp_path: Path) -> None:
+    """Item 1050: the read-only calls of a step run side by side, and two of them may each ask; the first answered
+    leaves the run blocked while the other waits."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        thread: ThreadRecord = await store.create_thread("t", "test")
+        run: RunRecord = await store.create_run(
+            thread.id, "goal", "task", "ollama:a", None, "test", "medium", "standard", None, "ask", False, None, None,
+            None,
+        )  # fmt: skip
+        await store.set_run_status(run.id, "blocked")
+        first = await store.create_approval(run.id, "read_file", "Read ~/.ssh/config", "high", {})
+        second = await store.create_approval(run.id, "read_file", "Read ~/.aws/config", "high", {})
+        await store.decide_approval(first.id, "approved", "owner", "")
+        assert not await store.unblock_run(run.id)
+        assert (await store.get_run(run.id)).status == "blocked"
+        await store.decide_approval(second.id, "denied", "owner", "")
+        assert await store.unblock_run(run.id)
+        assert (await store.get_run(run.id)).status == "running"
+    finally:
+        await store.close()
