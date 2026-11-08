@@ -2957,6 +2957,20 @@ class Store:
         return record
 
     @_writing
+    async def unblock_run(self, run_id: str) -> bool:
+        """A blocked run whose question was decided works again, unless another of its questions is still open (item
+        1050: the read-only calls of a step run side by side, and two of them may each ask); whether it moved. A run
+        that ended meanwhile keeps its end."""
+        cursor = await self._db.execute(
+            "UPDATE runs SET status = 'running' WHERE id = ? AND status = 'blocked'"
+            " AND NOT EXISTS"
+            " (SELECT 1 FROM approvals WHERE approvals.run_id = runs.id AND approvals.status = 'pending')",
+            (run_id,),
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
     async def set_run_status(self, run_id: str, status: RunStatus) -> bool:
         """Move a run that has not ended between its working states (queued, running, blocked on an approval); whether
         it moved. A run that ended keeps its end (item 1045): an approval answered as the run was cancelled, or a start
@@ -4457,17 +4471,25 @@ class Store:
         return int(row["left_count"]) if row is not None else 0
 
     @_writing
-    async def expire_pending_approvals(self, note: str) -> int:
+    async def expire_pending_approvals(self, note: str) -> list[EventRecord]:
         """The approvals still pending for runs that are no longer active expire, with ``note`` for why; those of an
-        active run (one that a process that lives drives) wait on."""
-        cursor = await self._db.execute(
+        active run (one that a process that lives drives) wait on. Each gets, in the same write, the
+        ``approval_decided`` event every other decision stores (item 1049): the card that asked closes on the pages
+        that follow its run, and on any that reads its events later. Returns those events."""
+        now: float = time.time()
+        async with self._db.execute(
             "UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
             " WHERE status = 'pending' AND run_id NOT IN"
-            " (SELECT id FROM runs WHERE status IN ('running', 'queued', 'blocked'))",
-            (time.time(), note),
-        )
+            " (SELECT id FROM runs WHERE status IN ('running', 'queued', 'blocked')) RETURNING id, run_id",
+            (now, note),
+        ) as cursor:
+            expired: list[sqlite3.Row] = list(await cursor.fetchall())
+        told: list[EventRecord] = []
+        for row in expired:
+            data: JsonObject = {"approval_id": str(row["id"]), "status": "expired", "note": note}
+            told.append(await self._insert_event(str(row["run_id"]), now, "approval_decided", data))
         await self._db.commit()
-        return cursor.rowcount
+        return told
 
     # ----- shown pages -----------------------------------------------------------------------
 

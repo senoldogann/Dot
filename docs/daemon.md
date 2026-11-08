@@ -414,7 +414,10 @@ answered in time; a question with its answer) is one quiet line, not a card (ite
 "this looks very ugly"): what it was ("Run"), its command on one line, cut at the width, and how it ended ("Expired",
 "Denied"); its note under it; under **Details** the whole command, what the step does and a reason of its own,
 and for one nobody answered "Nobody answered in time, so the step did not run.", never the fixed sentences of why Dot
-asks again. A waiting card says each thing once (item 872, after OpenMausBot's quiet approvals): the command or
+asks again. A card whose run is gone (the daemon restarted, or the `dotx` command that drove it died) settles as
+expired too, live and when the chat opens again (item 1049); and a run that asked two things at once, in a step of
+read-only calls, stays waiting until both are answered (item 1050).
+A waiting card says each thing once (item 872, after OpenMausBot's quiet approvals): the command or
 what the step acts on in its box alone, not in the words above it again, which keep what the step does ("Runs vercel;
 vercel puts a project's change live"); why Dot asks once: the line under the box says it for a chat of Dot's own
 initiative and for what yolo asks you, and the words above leave out only that sentence; any other reason (a payment's

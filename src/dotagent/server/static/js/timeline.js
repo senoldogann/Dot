@@ -9,6 +9,7 @@ import { AUTO_LINES, settingValue } from "./appearance/settings.js";
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { memoryChange } from "./contextpanel.js";
+import { stillAsks } from "./openasks.js";
 import { clip, clock, compact, dateTime, duration, el, plural, repeatsAnswer, setText } from "./dom.js";
 import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
@@ -1339,10 +1340,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         } else {
           entry.card.settle(record.data.status, record.data.note);
         }
-        // The time spent waiting for the decision was not spent working.
-        entry.scope.boundary = record.ts;
+        // Each card answered folds its rows by one (a count, item 245); the run waits on while another of its
+        // questions is open (item 1050: two read-only calls of a step may each ask), and once none is, the time spent
+        // waiting was not spent working.
         unreveal(entry.scope);
-        markWaiting(entry.scope, false, record.ts);
+        if (!stillAsks(cards.values(), entry.scope)) {
+          entry.scope.boundary = record.ts;
+          markWaiting(entry.scope, false, record.ts);
+        }
       }
     },
 
