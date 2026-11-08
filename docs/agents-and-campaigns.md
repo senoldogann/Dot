@@ -504,6 +504,9 @@ emergency stop, `campaign_max_sessions` or `campaign_failed_sessions` (item 724)
   in its ledger that says so and you told (item 724): one was tried again every `campaign_gap_minutes` for ever, its
   page saying when its next session was. A claim of a session still working after your Stop leaves the campaign
   stopped: `campaign_achieved` achieves only an active campaign (item 724), while your own Mark achieved still does.
+  The other way holds too (item 1046): a Stop, or a stop of the rules above, that comes after the campaign was
+  achieved leaves it achieved with its evidence, and a next session planned late (by a session's
+  `campaign_schedule`, or after a session's end) is not put on a campaign that was stopped or achieved meanwhile.
 - **Deleting one** (`DELETE /api/campaigns/{id}`) deletes its ledger and the thread of its sessions after the first,
   with all they hold, as deleting those chats would. The conversation it started in stays a chat, with the first
   session as a run of that chat, and the questions its runs left for you expire, as no session reads the answers any

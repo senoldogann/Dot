@@ -1403,7 +1403,9 @@ class RunManager:
         following: float | None = (
             None if campaign.cron is None else next_firing(campaign.cron, now, runtime.schedule_zone)
         )
-        await runtime.store.set_next_session(campaign.id, following)
+        if not await runtime.store.set_next_session(campaign.id, following):
+            # Stopped or achieved while its brief was made: no session starts on it (item 1046).
+            raise RunConflict("the campaign is not active", {"campaign_id": campaign.id})
         made_thread_id: str | None = None
         try:
             # The sessions after the first go on in one chat of the campaign's (item 952), not a chat each: the one the
@@ -1484,8 +1486,8 @@ class RunManager:
             if any(session.status in WORKING_STATUSES for session in sessions):
                 continue
             died: bool = bool(sessions) and cut_off_by(sessions[-1]) == "daemon_restarted"
-            await store.set_next_session(campaign.id, now + gap_s if died else now)
-            planned += 1
+            if await store.set_next_session(campaign.id, now + gap_s if died else now):
+                planned += 1
         return planned
 
     async def delegate(
@@ -2689,8 +2691,8 @@ class RunManager:
         """Plan the next session of an active campaign for now, unless one is planned earlier."""
         campaign: CampaignRecord = await self._runtime.store.get_campaign(campaign_id)
         now: float = time.time()
-        if campaign.status == "active" and (campaign.next_session_at is None or campaign.next_session_at > now):
-            await self._runtime.store.set_next_session(campaign.id, now)
+        earlier: bool = campaign.next_session_at is None or campaign.next_session_at > now
+        if campaign.status == "active" and earlier and await self._runtime.store.set_next_session(campaign.id, now):
             log.info("campaign_session_brought_forward", campaign_id=campaign.id)
 
     async def _brief(self, campaign: CampaignRecord, sessions: list[RunRecord], number: int, now: float) -> Brief:
@@ -4034,7 +4036,9 @@ class RunManager:
                 return
             if ending == "emergency_stop":
                 halted: str = "Stopped: the owner's emergency stop ended this session."
-                await runtime.store.set_campaign_status(campaign.id, "stopped", None)
+                if not await runtime.store.stop_active_campaign(campaign.id):
+                    # It ended meanwhile (the owner's mark, the session's own claim): that end stands (item 1046).
+                    return
                 await runtime.store.add_campaign_entry(campaign.id, run.id, "note", halted, {})
                 log.info("campaign_stopped_by_an_emergency_stop", campaign_id=campaign.id, run_id=run.id)
                 await self._tell_campaign_stopped(run, campaign, halted)
@@ -4049,7 +4053,9 @@ class RunManager:
                     f"Stopped: its last {in_row} sessions failed ([agent] campaign_failed_sessions is {failing}). "
                     "Read the newest one, then Go on when what made them fail is fixed."
                 )
-                await runtime.store.set_campaign_status(campaign.id, "stopped", None)
+                if not await runtime.store.stop_active_campaign(campaign.id):
+                    # It ended meanwhile (the owner's mark, the session's own claim): that end stands (item 1046).
+                    return
                 await runtime.store.add_campaign_entry(campaign.id, run.id, "note", why, {})
                 log.info("campaign_stopped_failing", campaign_id=campaign.id, sessions_failed=in_row)
                 await self._tell_campaign_stopped(run, campaign, why)
@@ -4057,7 +4063,9 @@ class RunManager:
             limit: int = runtime.config.agent.campaign_max_sessions
             if 0 < limit <= sessions:
                 spent: str = f"Stopped after {sessions} sessions: [agent] campaign_max_sessions is {limit}."
-                await runtime.store.set_campaign_status(campaign.id, "stopped", None)
+                if not await runtime.store.stop_active_campaign(campaign.id):
+                    # It ended meanwhile (the owner's mark, the session's own claim): that end stands (item 1046).
+                    return
                 await runtime.store.add_campaign_entry(campaign.id, None, "note", spent, {})
                 log.info("campaign_stopped_at_its_limit", campaign_id=campaign.id, sessions=sessions)
                 await self._tell_campaign_stopped(run, campaign, spent)

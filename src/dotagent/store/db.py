@@ -53,6 +53,7 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignEntryKind,
     CampaignRecord,
+    CampaignStatus,
     ChatChoices,
     ChatTeam,
     Correspondent,
@@ -6312,19 +6313,50 @@ class Store:
     async def set_campaign_targets(self, campaign_id: str, targets: str, verification: str) -> None:
         await self._update_campaign(campaign_id, "targets = ?, verification = ?", (targets, verification))
 
-    async def plan_campaign_sessions(self, campaign_id: str, cron: str, next_session_at: float) -> None:
-        """Give the campaign's sessions the rhythm ``cron``, with the next one at ``next_session_at``."""
-        await self._update_campaign(campaign_id, "cron = ?, next_session_at = ?", (cron, next_session_at))
+    async def _update_campaign_in(
+        self, campaign_id: str, assignments: str, params: Sequence[object], statuses: Sequence[CampaignStatus]
+    ) -> bool:
+        """Change a campaign only while its status is one of ``statuses`` (item 1046): whether it changed. A campaign
+        that is not there is an error; one whose status moved meanwhile (the owner stopped it, a session achieved it) is
+        left as it is."""
+        marks: str = ", ".join("?" * len(statuses))
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            f"UPDATE campaigns SET {assignments}, updated_at = ? WHERE id = ? AND status IN ({marks})",
+            (*params, time.time(), campaign_id, *statuses),
+        )
+        await self._db.commit()
+        if cursor.rowcount > 0:
+            return True
+        await self.get_campaign(campaign_id)
+        return False
 
-    async def set_next_session(self, campaign_id: str, next_session_at: float | None) -> None:
-        await self._update_campaign(campaign_id, "next_session_at = ?", (next_session_at,))
+    async def plan_campaign_sessions(self, campaign_id: str, cron: str, next_session_at: float) -> bool:
+        """Give an active campaign's sessions the rhythm ``cron``, with the next one at ``next_session_at``; whether
+        it was active."""
+        return await self._update_campaign_in(
+            campaign_id, "cron = ?, next_session_at = ?", (cron, next_session_at), ("active",)
+        )
 
-    async def set_campaign_status(
-        self, campaign_id: str, status: Literal["active", "stopped"], next_session_at: float | None
-    ) -> None:
-        """A campaign that is not achieved has no evidence."""
-        await self._update_campaign(
-            campaign_id, "status = ?, next_session_at = ?, evidence = ''", (status, next_session_at)
+    async def set_next_session(self, campaign_id: str, next_session_at: float | None) -> bool:
+        """Plan the next session of an active campaign; whether it was active (item 1046: a late plan never puts a
+        session on a campaign that was stopped or achieved meanwhile)."""
+        return await self._update_campaign_in(campaign_id, "next_session_at = ?", (next_session_at,), ("active",))
+
+    async def stop_active_campaign(self, campaign_id: str) -> bool:
+        """Stop a campaign that is active: no session follows, and it has no evidence. Whether it was active (item
+        1046): a campaign achieved meanwhile keeps its outcome and its evidence."""
+        return await self._update_campaign_in(
+            campaign_id, "status = 'stopped', next_session_at = NULL, evidence = ''", (), ("active",)
+        )
+
+    async def reactivate_campaign(self, campaign_id: str, next_session_at: float | None) -> bool:
+        """Let a stopped or achieved campaign go on, its next session at ``next_session_at``, its evidence dropped;
+        whether it was not active already."""
+        return await self._update_campaign_in(
+            campaign_id,
+            "status = 'active', next_session_at = ?, evidence = ''",
+            (next_session_at,),
+            ("stopped", "achieved"),
         )
 
     async def achieve_campaign(self, campaign_id: str, evidence: str, only_active: bool = False) -> bool:
