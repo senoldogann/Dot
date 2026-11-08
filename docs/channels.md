@@ -290,12 +290,13 @@ took (every three seconds while the channel is on):
   and why: `[channels] links` is off (`links_off`), or `[server] reach` names no address (`links` in `GET
   /api/channels`). The log says which once as the daemon starts (`channel_links_not_sent`, its `why`).
 
-**The warning.** When the log has changed and nothing Dot can read has changed with it, for more than two minutes, the
-tab says: *Messages has written since Dot last saw a new message; Dot may not be seeing the newest. Quit and reopen
-Messages.* A change that Dot's own read shows is not one: a new row, or a message Dot sent being marked delivered or
-read in one of the newest rows. Messages folds its log into the database when it quits, and Dot reads it from then. The
-log has `imessage_wal_unseen` once for it, with the sizes and times. The warning says Dot *may* not see the newest:
-Messages writes its log for other reasons too.
+**The note of Messages' log.** When the log has changed and nothing Dot can read has changed with it, for more than two
+minutes, the tab says: *Messages has written since Dot last saw a new message. That is usually a receipt or a sync; if a
+message you sent Dot got no answer, quit and reopen Messages.* (item 1059: on the owner's Mac it came eleven times in
+three days, and Dot had seen the newest row each time). A change that Dot's own read shows is not one: a new row, or a
+message Dot sent being marked delivered or read in one of the newest rows. Messages folds its log into the database when
+it quits, and Dot reads it from then. The log has `imessage_wal_unseen` once for it, as information, with the sizes and
+times. Messages writes its log for other reasons too, so the note is a cue only when a message went unanswered.
 
 **Check now** looks at once. With the channel on and a number paired it is a poll like the loop's: it reads and runs
 what is new, once (the loop's poll and this one never read the same row twice). With the channel off, or nothing

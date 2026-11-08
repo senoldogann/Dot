@@ -136,7 +136,8 @@ def test_a_log_that_changed_and_nothing_else_is_said_after_two_minutes_and_logge
         assert watch.seen(7, changed + UNSEEN_S + 60).warning == WAL_UNSEEN
     said: list[dict[str, object]] = [entry for entry in logs if entry["event"] == "imessage_wal_unseen"]
     assert len(said) == 1
-    assert said[0]["log_level"] == "warning"
+    # Information, not a warning (item 1059): it is usually a receipt or a sync.
+    assert said[0]["log_level"] == "info"
     assert (said[0]["wal_bytes"], said[0]["wal_changed_at"]) == (12_288, changed)
     assert (said[0]["db_bytes"], said[0]["db_changed_at"]) == (40_960, START - 900)
     assert said[0]["newest_row"] == 7 and said[0]["newest_seen_at"] == START
@@ -144,8 +145,8 @@ def test_a_log_that_changed_and_nothing_else_is_said_after_two_minutes_and_logge
 
 def test_the_words_of_the_warning_are_the_ones_the_owner_reads() -> None:
     assert WAL_UNSEEN == (
-        "Messages has written since Dot last saw a new message; Dot may not be seeing the newest. "
-        "Quit and reopen Messages."
+        "Messages has written since Dot last saw a new message. That is usually a receipt or a sync; if a message you "
+        "sent Dot got no answer, quit and reopen Messages."
     )
     assert UNSEEN_S == 120.0
 
