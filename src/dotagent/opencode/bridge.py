@@ -101,8 +101,10 @@ def door_name(thread_id: str) -> str:
     return f"{DOOR_PREFIX}{hashlib.sha256(thread_id.encode()).hexdigest()[:_DOOR_DIGITS]}"
 
 
-def new_door(thread_id: str, specs: tuple[ToolSpec, ...], run: CallRunner) -> Door:
-    return Door(name=door_name(thread_id), secret=secrets.token_urlsafe(32), specs=specs, run=run)
+def new_door(name: str, specs: tuple[ToolSpec, ...], run: CallRunner) -> Door:
+    """A door named ``name`` (:func:`door_name` for OpenCode, whose one server holds the doors of every chat side by
+    side), with a secret of its own, which is what lets its requests in."""
+    return Door(name=name, secret=secrets.token_urlsafe(32), specs=specs, run=run)
 
 
 def session_rules(name: str) -> list[JsonValue]:

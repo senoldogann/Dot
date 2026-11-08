@@ -117,6 +117,7 @@ from dotagent.llm.types import (
     Speed,
     StreamDelta,
     ToolCall,
+    ToolSpec,
     assistant_message,
 )
 from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
@@ -219,6 +220,20 @@ def door_tools(
             and group_of(tool.spec.name) not in left_out
         }
     )
+
+
+# The name of the door of every run in Claude Code (item 1052): each run is a process of its own that is given its door
+# alone (``--strict-mcp-config``), and its secret is what lets its requests in, so the name need not tell chats apart.
+# One name keeps the tools' names, and so the head of every chat's prompt, the same: Anthropic's cache of that head,
+# about 160,000 tokens with the owner's servers' tools, is read by each new chat instead of written again, which took a
+# new chat's first word from 3 to 25 seconds after its message (measured 2026-11-08).
+CLAUDE_DOOR: str = "dot"
+
+
+def door_specs(specs: Iterable[ToolSpec]) -> tuple[ToolSpec, ...]:
+    """``specs`` in the order of their names (item 1052): the tools head the prompt, and the same tools in the same
+    order are the same head, which Anthropic's cache reads, whatever order the servers connected in."""
+    return tuple(sorted(specs, key=lambda spec: spec.name))
 
 
 def mcp_config(door: Door, url: str) -> JsonObject:
@@ -836,8 +851,8 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     tools: ToolRegistry = door_tools(runtime.registry, run.mode, await _bounds_of(agent), left_out)
     quiet: _Quiet = _Quiet(heard=time.monotonic())
     door: Door = new_door(
-        run.thread_id,
-        tuple(tool.spec for tool in tools.tools.values()),
+        CLAUDE_DOOR,
+        door_specs(tool.spec for tool in tools.tools.values()),
         partial(_watched_call, quiet, partial(bridged_call, tools, await tool_context(agent, ref, info), agent.gate)),
     )
     chat: ChatSession | None = await asyncio.to_thread(read_chat, chat_path(run.thread_id))

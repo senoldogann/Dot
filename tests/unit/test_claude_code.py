@@ -14,6 +14,7 @@ from dotagent.claude_code.run import (
     answered_all,
     claude_argv,
     claude_env,
+    door_specs,
     dot_finish,
     ended_clean,
     fast_off_words,
@@ -364,3 +365,11 @@ def test_an_agents_bounds_take_in_the_tools_of_the_apps_the_owner_picked() -> No
         "mcp__notes__save",
         "mcp__notes__list",
     }
+
+
+def test_the_door_offers_its_tools_in_the_order_of_their_names() -> None:
+    """Item 1052: the tools head the prompt, so the same tools must come in the same order, whatever order their
+    servers connected in, for Anthropic's cache of that head to be read by the next chat."""
+    names: tuple[str, ...] = ("web_fetch", "mcp__github__issues", "browser_open", "list_dir")
+    specs: list[ToolSpec] = [ToolSpec(name=name, description=name, parameters={"type": "object"}) for name in names]
+    assert [spec.name for spec in door_specs(specs)] == sorted(names)
