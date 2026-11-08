@@ -728,7 +728,11 @@ async def test_a_pin_on_a_message_that_holds_a_secret_is_refused_as_the_memory_t
         for stored in (f"The staging password is {held}, keep it close.", f"Use {key} for the depot's service."):
             run: RunRecord = await session.start()
             await session.ended(run.id)
-            await session.runtime.store.finish_run(run.id, "done", stored)
+            # A run ends once (item 1045), so no write of the store changes an ended run's result: the result a store
+            # from before held is put in on the store's own connection, which holds the database's lock.
+            database = session.runtime.store._db
+            await database.execute("UPDATE runs SET result = ? WHERE id = ?", (stored, run.id))
+            await database.commit()
             with pytest.raises(InvalidValueError) as refused:
                 await session.reactions.add(run.id, "answer", "remember")
             # The refusal says what is wrong, not what the secret is, and leaves neither a note nor the pin standing.
