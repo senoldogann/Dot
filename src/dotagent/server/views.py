@@ -1532,9 +1532,11 @@ class ModelOption(FrozenModel):
     size of its runs (item 250); ``efforts`` are its reasoning levels, lowest first (fewer than two: no choice);
     ``default_effort`` is the level the configured default effort selects on it; ``free``: served at no cost;
     ``learns``: its provider may use what is sent to it to improve its models (some of Zen's free models, item 283);
-    ``fast_mode``: it has fast mode (item 223)."""
+    ``fast_mode``: it has fast mode (item 223); ``label``: its name as people know it, which the pages show ("Opus 5.5"
+    for the Claude plan's ``opus``, item 1054), else its id."""
 
     ref: str
+    label: str
     vision: bool
     tools: bool
     thinking: bool
@@ -2057,6 +2059,10 @@ class StatusView(FrozenModel):
     resume: ResumeView
     # The night's learning under way (item 815), which ``dotx service restart --when-idle`` waits for as for the runs.
     night_work: list[NightWork]
+    # The names of the Claude plan's models as people know them, by reference (item 1054: "Opus 5.5" for
+    # ``claude_code:opus``): every page reads the status first, so a page that names one names it so before the slower
+    # model listing is read.
+    model_labels: dict[str, str]
 
 
 # The sections: what waits for the user, what works now, what ended today, what was learned today (item 72: the

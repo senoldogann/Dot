@@ -44,7 +44,7 @@ from dotagent.claude_code.stream import (
     read_line,
     user_line,
 )
-from dotagent.llm.claude_code import MODELS, model_info_of
+from dotagent.llm.claude_code import FAST_MODELS, MODELS, model_info_of, model_label
 from dotagent.llm.router import ModelRef, offers_fast_mode
 from dotagent.llm.types import ImageData, ToolSpec
 from dotagent.opencode.bridge import Door, new_door
@@ -385,3 +385,20 @@ def test_a_look_up_of_a_tool_is_not_a_call_of_dots() -> None:
     assert dot_tool(f"mcp__{DOOR}__list_dir", DOOR) == "list_dir"
     assert dot_tool("ToolSearch", DOOR) is None
     assert dot_tool("mcp__other__list_dir", DOOR) is None
+
+
+def test_the_plans_models_are_named_as_people_know_them() -> None:
+    """Item 1054: an alias by the model Claude Code took it for, an older model by its family and version, and only
+    the models of Anthropic's API that have fast mode have it."""
+    assert [
+        model_label(model) for model in ("opus", "fable", "claude-opus-4-7", "claude-opus-4-0", "claude-haiku-4-5")
+    ] == [
+        "Opus 5.5",
+        "Fable 5.1",
+        "Opus 4.7",
+        "Opus 4",
+        "Haiku 4.5",
+    ]
+    assert model_label("default") == "default"
+    assert {"opus", "claude-opus-4-7", "claude-sonnet-4-6"} <= set(MODELS)
+    assert {"opus", "claude-opus-5"} == FAST_MODELS

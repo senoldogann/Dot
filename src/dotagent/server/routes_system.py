@@ -105,6 +105,8 @@ from dotagent.help.elsewhere import (
     found_elsewhere,
 )
 from dotagent.launchd import JobState, inspect_job, service_runs
+from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, model_label
+from dotagent.llm.claude_code import MODELS as CLAUDE_CODE_MODELS
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.roles import ModelRoles
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
@@ -199,6 +201,7 @@ def _option(
     ref: ModelRef = ModelRef(provider=provider, model=info.id)
     return ModelOption(
         ref=ref.label,
+        label=model_label(info.id) if provider == CLAUDE_CODE_PROVIDER else info.id,
         vision=info.vision,
         tools=info.tools,
         thinking=info.thinking,
@@ -342,6 +345,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             models=models_now(),
             resume=resume_now(),
             night_work=[] if ctx.scheduler is None else list(ctx.scheduler.night_work()),
+            model_labels={f"{CLAUDE_CODE_PROVIDER}:{model}": model_label(model) for model in CLAUDE_CODE_MODELS},
         )
 
     @router.get("/models")

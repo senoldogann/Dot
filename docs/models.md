@@ -277,9 +277,12 @@ answer keeps its words, Ollama's too.
   2026-10-15), and it is reported to refuse OpenCode with one of its tools switched off, so Dot switches none off and
   has them ask instead; a run it turns down fails with words that say so.
 - **Claude Code** (your own Claude plan, item 1013): `claude_code:fable`, `claude_code:opus`, `claude_code:sonnet` and `claude_code:haiku`
-  (Claude Code's own names for the newest of each family) run on the limits of your Claude Pro or Max plan, at the
-  reasoning level you pick (low, medium, high, xhigh, max: Claude Code's `--effort`, item 1014) and, for Opus, in fast
-  mode when you pick it (`--settings`); fast mode is billed to your plan's extra usage, so on a plan without it the run
+  (Claude Code's own names for the newest of each family, shown by the model each names: Fable 5.1, Opus 5.5, Sonnet
+  5.5, Haiku 5.5, item 1054), and the older models the plan answers on, each by its id and shown by its name (Fable 5,
+  Opus 5, 4.7, 4.6, 4.5, 4.1 and 4, Sonnet 5 and 4.6, Haiku 4.5: measured on Claude Code 2.1.319 on 2026-11-08), run on
+  the limits of your Claude Pro or Max plan, at the reasoning level you pick (low, medium, high, xhigh, max: Claude
+  Code's `--effort`, item 1014) and, for Opus 5.5 and Opus 5, the models of Anthropic's API that have it, in fast mode
+  when you pick it (`--settings`); fast mode is billed to your plan's extra usage, so on a plan without it the run
   goes at the standard speed and its answer says so, through the `claude` program you
   installed and signed in to (run `claude` once in Terminal and sign in). No key: Dot takes every API key out of the
   program's environment, so the plan is billed and nothing else. The menu lists the models once the program is found
@@ -368,8 +371,8 @@ of such a run on a model with fast mode asks for it (`speed: "fast"` with the be
 preview models need
 and Opus 5.5 takes without effect); a step on another model (a routed step, a standby model) runs at the standard speed,
 as do helpers on a model without it. Dot never falls back by itself: a refusal (an organization not let into a preview
-model's fast mode, fast mode's own rate limit, once retried) is the run's error, as Anthropic says it. Opus on your
-Claude plan (`claude_code:opus`) has fast mode too, which Claude Code runs off on a plan without extra usage: there the
+model's fast mode, fast mode's own rate limit, once retried) is the run's error, as Anthropic says it. Opus 5.5 and
+Opus 5 on your Claude plan (`claude_code:opus`, `claude_code:claude-opus-5`, item 1054) have fast mode too, which Claude Code runs off on a plan without extra usage: there the
 run goes at the standard speed and its answer says so (item 1014, above). Fast mode for a
 model without it is refused (a 422 over HTTP). Switching the speed of a chat starts the prompt cache again.
 

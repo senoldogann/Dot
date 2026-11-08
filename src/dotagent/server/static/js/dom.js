@@ -476,9 +476,22 @@ export function plural(count, one, many) {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-/** The model part of a `provider:model` reference: `ollama:gpt-oss:20b-cloud` reads `gpt-oss:20b-cloud`. */
+// The names of the models as their providers give them (item 1054: "Opus 5.5" for the plan's ``opus``), by reference,
+// once the models are read (`state.loadModels`); a model not read yet is called by its id.
+const modelLabels = new Map();
+
+/** Keep the names of models, `[ref, label]` pairs: the status's (`model_labels`, read first by every page) and those
+ * the providers give with their models (`GET /models`). */
+export function rememberModelLabels(pairs) {
+  for (const [ref, label] of pairs) {
+    modelLabels.set(ref, label);
+  }
+}
+
+/** The name of the model of a `provider:model` reference: the one its provider gives it ("Opus 5.5" for
+ * `claude_code:opus`), else the model part, `ollama:gpt-oss:20b-cloud` reads `gpt-oss:20b-cloud`. */
 export function modelName(ref) {
-  return ref.slice(ref.indexOf(":") + 1);
+  return modelLabels.get(ref) ?? ref.slice(ref.indexOf(":") + 1);
 }
 
 export async function copyText(text) {

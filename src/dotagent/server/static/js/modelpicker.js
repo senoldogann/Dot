@@ -87,9 +87,16 @@ function viewEntries(groups, view, favourites) {
     : entries.filter(({ provider }) => provider === view);
 }
 
-// What a search reads of a model: its name, its provider's name and id, and "free" when it costs nothing.
+// What a search reads of a model: its name, its provider's name and id, "free" when it costs nothing, and its id, so
+// that `claude-opus-4-7` finds Opus 4.7 (item 1054).
 function searchFields({ info, provider }) {
-  return [foldSearch(modelName(info.ref)), foldSearch(providerLabel(provider)), provider, info.free ? "free" : ""];
+  return [
+    foldSearch(modelName(info.ref)),
+    foldSearch(providerLabel(provider)),
+    provider,
+    info.free ? "free" : "",
+    foldSearch(info.ref.slice(info.ref.indexOf(":") + 1)),
+  ];
 }
 
 /** The models of `entries` that match the search `words`, closest first; on a tie the favourites first, then the
