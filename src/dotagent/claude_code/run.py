@@ -73,10 +73,20 @@ from dotagent.agent.limits import (
     limit_spent,
     limits_of,
 )
-from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome, opening_text
+from dotagent.agent.loop import (
+    AgentRun,
+    HandedNotes,
+    RunEnd,
+    RunOutcome,
+    count_start_notes,
+    goal_query,
+    notes_to_hand,
+    opening_text,
+    start_notes,
+)
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
 from dotagent.agent.playbooks import offered_to_run
-from dotagent.agent.prompt import THOROUGH_AND_BOLD
+from dotagent.agent.prompt import THOROUGH_AND_BOLD, turn_note
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
@@ -122,7 +132,9 @@ from dotagent.llm.types import (
     ToolCall,
     ToolSpec,
     assistant_message,
+    user_message,
 )
+from dotagent.memory.service import Remembered, memory_budget, owner_prompt_lines, owner_section
 from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
 from dotagent.opencode.run import bridged, meanwhile
 from dotagent.repair.claude import LimitWindow, window_refused
@@ -131,7 +143,7 @@ from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.endings import PREFIX_CUT_SHORT
-from dotagent.store.models import NO_PICKS, AgentRecord, RunMode
+from dotagent.store.models import NO_PICKS, AgentRecord, RunMode, RunRecord
 from dotagent.tools.base import ToolResult
 from dotagent.tools.groups import BROWSER_GROUP, group_of
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
@@ -187,7 +199,13 @@ _PROMPT: str = (
     "owner can answer. When the work is done, or cannot be done, write your final answer as your reply: it is what the "
     "owner reads in the chat, so say what you did and what you found, with the evidence. Write every message, the "
     "short lines between tool calls too, in the language the owner writes in. Files you make go in Dot's "
-    "workspace, {workspace}, unless the owner names another place. Today is {today}.\n\n" + THOROUGH_AND_BOLD
+    "workspace, {workspace}, unless the owner names another place. Today is {today}.\n\n"
+    # Item 1055: a run on the plan said it did not know what Dot's memory and its agents' files held.
+    "What Dot knows of the owner and of their work is yours too: the lines about the owner below (one marked "
+    "(you said) is the owner's own and outranks the others), the notes under their message, Dot's memory "
+    "(memory_search, recall) and the files Dot and its agents wrote in the workspace (list_dir, read_file, "
+    "search_files). "
+    "Before you say you do not know something about the owner or their work, look it up there.\n\n" + THOROUGH_AND_BOLD
 )
 
 
@@ -725,6 +743,10 @@ async def _prompt_of(agent: AgentRun, door: Door) -> str:
         None if agent.run.agent_id is None else await runtime.store.get_agent(agent.run.agent_id)
     )
     known: list[str] = list(owner_name_lines(names.owner, names.mac_name))
+    # What Dot's nightly reflection keeps of the owner, as Dot's own loop gives it (item 1055); a value Dot holds is
+    # asked for again, so a line that holds one is left out, as there (``owner_prompt_lines``).
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
+    known.extend(owner_prompt_lines(await owner_section(runtime.store), held))
     if record is None:
         known.extend(called_lines(names.name))
         name: str = "Dot"
@@ -832,6 +854,25 @@ def opened_bounds(bounded: frozenset[str], opened: frozenset[str], names: Iterab
     return bounded | frozenset(name for name in names if group_of(name) in opened)
 
 
+async def _notes_for(agent: AgentRun, info: ModelInfo, carried: str) -> str:
+    """What the run's message is handed under it (item 1055), as Dot's own loop hands it (``turn_note``,
+    :func:`notes_to_hand`): the time of day, the notes of Dot's memory recalled for the goal and the goals before it in
+    the chat, within the notes' budget, but those ``carried`` holds with the same text (the user messages the program's
+    session took in whole: a note changed since comes again), and the notes it quotes that were forgotten since. Every
+    note recalled counts as used, as in Dot's own loop."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    seen_at: float = time.time()
+    recalled: Remembered = await start_notes(
+        runtime, run, await goal_query(runtime, run), memory_budget(runtime.config.memory, info.context_length)
+    )
+    await count_start_notes(runtime, run, recalled, seen_at)
+    handed: HandedNotes = await notes_to_hand(runtime, run, recalled.records, carried, seen_at)
+    return turn_note(
+        datetime.now().astimezone(), list(handed.fresh), recalled.tainted_left_out, (), list(handed.forgotten)
+    )
+
+
 async def _opening_of(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> str:
     """The run's first message: the owner's words, then what they picked for it (item 1022), as Dot's own loop gives
     them: each picked skill's instructions and the connected apps (MCP servers) whose tools to use, which reach the
@@ -877,10 +918,18 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
         partial(_watched_call, quiet, partial(bridged_call, tools, await tool_context(agent, ref, info), agent.gate)),
     )
     chat: ChatSession | None = await asyncio.to_thread(read_chat, chat_path(run.thread_id))
+    # The notes the session the run goes on in heard, read from the messages it took in whole, as Dot's own loop reads
+    # what its context carries (``handed_note_ids``); what the chat said on other models since comes cut short
+    # (``meanwhile``), and a new session has heard none (the pre-push reviews of item 1055).
+    heard: list[Message] = [] if chat is None else earlier[: chat.seen]
+    carried: str = "\n".join(message.content for message in heard if message.role == "user")
     goal: Message = await message_with_attachments(
         runtime, run.thread_id, run.id, await _opening_of(agent, ref, info), agent.opening.files, info.vision
     )
-    await runtime.store.append_messages(run.thread_id, [goal])
+    # The notes go after the owner's words as a message of their own, as Dot's own loop stores them, so that no one
+    # reads them as the owner's (a group chat's members read the lead's chat); the program gets both in one message.
+    noted: Message = user_message(await _notes_for(agent, info, carried), ())
+    await runtime.store.append_messages(run.thread_id, [goal, noted])
     prompt: str = await _prompt_of(agent, door)
     # The chat's session is kept only when this run ended clean and its count of what the session saw was written:
     # a run that failed, was stopped by the owner or was cut at its limits after the program took its messages leaves
@@ -938,7 +987,9 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
             )
             clean: bool = False
             try:
-                opening: str = meanwhile(goal.content, earlier[0 if chat is None else chat.seen :])
+                opening: str = meanwhile(
+                    f"{goal.content}\n\n{noted.content}", earlier[0 if chat is None else chat.seen :]
+                )
                 await follow.send(opening, await asyncio.to_thread(_images, agent.opening.files, info.vision))
                 try:
                     answer: str = await follow.follow()
@@ -964,7 +1015,9 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
             await asyncio.to_thread(
                 write_chat,
                 chat_path(run.thread_id),
-                ChatSession(session_id=follow.session_id, seen=len(earlier) + 2 + follow.added),
+                # What the session took in of the chat: what was there, the goal and its notes, the answer, and the
+                # messages added while it worked.
+                ChatSession(session_id=follow.session_id, seen=len(earlier) + 3 + follow.added),
             )
             kept = True
     finally:

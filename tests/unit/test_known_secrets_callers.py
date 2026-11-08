@@ -110,6 +110,9 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     # An agent is exported only if its words hold none; the file has the values masked.
     "server/routes_agents.py:agents_router.export_agent": (False,),
     "server/routes_agents.py:agents_router.use_template": (False,),
+    # The owner's lines of a run on the Claude plan (item 1055), as the prompt of Dot's own loop takes them: a line of
+    # Dot's that the gate refuses by a value is left out.
+    "claude_code/run.py:_prompt_of": (False,),
     # ----- Both: refuses by the first list, then masks by the second. -----
     # A step of a run that read outside content is refused for the secret it would send out of the Mac; its record
     # masks them all.

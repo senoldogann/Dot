@@ -290,7 +290,9 @@ answer keeps its words, Ollama's too.
   `~/.claude.json` (the address and the organisation, no secret: Dot never reads Claude Code's credentials nor its
   Keychain item). A run on one goes whole to Claude Code, started without a terminal (`claude -p`, its input and output
   lines of JSON) in Dot's workspace, as Dot: the model is told it is Dot (or the agent whose run it is), your name and
-  the name you call Dot by, and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
+  the name you call Dot by, what Dot's nightly reflection keeps of you, and, under your message, the notes of Dot's
+  memory recalled for it, as Dot's own loop hands them (item 1055: before it, a run on the plan said it did not know
+  what the memory held), and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
   chat (item 1052: the tools' names, in their order, head every chat's prompt the same, so Anthropic's cache of that
   head is read by a new chat instead of written again), as OpenCode's agent gets them, with Dot's files, commands and
   web tools besides (Claude Code's own are off, but its search of the door's tools): the browser with your

@@ -23,6 +23,7 @@ from dotagent.claude_code.run import chat_path
 from dotagent.config import load_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import claude_code_dir
+from dotagent.memory.service import SavedMemory, save_memory, update_memory_note, words_only
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import EventRecord, RunPicks, RunRecord
 
@@ -45,7 +46,10 @@ def _lay_out(root: Path) -> tuple[Path, Path, Path, Path]:
     signed in (no secret in it)."""
     home: Path = root / "home"
     home.mkdir()
-    (home / "config.toml").write_text("[browser]\nheadless = true\n\n[agent]\ngoal_mode = false", encoding="utf-8")
+    # No embedding service, as on CI: no test reaches one, and a run's notes are recalled by their words.
+    (home / "config.toml").write_text(
+        "[browser]\nheadless = true\n\n[agent]\ngoal_mode = false\n\n[memory]\nembed_enabled = false", encoding="utf-8"
+    )
     record: Path = root / "record"
     record.mkdir()
     program: Path = root / "bin" / "claude"
@@ -244,3 +248,72 @@ async def test_plan_first_on_claude_code_is_refused_before_the_run(room: Room) -
             (),
             RunPicks(plugins=(), skills=(), plan_first=True),
         )
+
+
+async def test_a_run_on_the_plan_is_handed_what_dot_remembers_of_its_goal(room: Room) -> None:
+    """Item 1055: a run on the plan said it did not know what Dot's memory held. Its first message carries the notes
+    recalled for its goal, as Dot's own loop hands them, and they count as used by the run."""
+    # Saved by its words, as with embeddings off: no test reaches an embedding service, and the run's recall falls back
+    # to the words when the service cannot be reached, as it does in the owner's Dot.
+    saved: SavedMemory = await save_memory(
+        words_only(room.runtime.memory),
+        "The owner's Finnish level is B1, from the YKI test of 2026.",
+        ["language"],
+        None,
+        None,
+        None,
+        False,
+    )
+    ended: RunRecord = await _run(room, "What is my Finnish level?")
+    assert ended.status == "done", ended.result
+    first: str = await asyncio.to_thread((room.record / "first.json").read_text, encoding="utf-8")
+    assert "Finnish level is B1" in first and saved.record.id in first
+    handed: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "memories", 10)
+    assert [event.data["ids"] for event in handed] == [[saved.record.id]]
+    # The chat's next message goes on in the session, which heard the note: it is not handed again.
+    started: RunRecord = await room.manager.start(
+        "And my level in Swedish?",
+        "task",
+        MODEL,
+        ended.thread_id,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "auto",
+        False,
+        (),
+    )
+    again: RunRecord = await room.manager.wait(started.id)
+    assert again.status == "done", again.result
+    # It counts as used, as in Dot's own loop, though its text is not sent again.
+    used: list[EventRecord] = await room.runtime.store.events_of_kind(again.id, "memories", 10)
+    assert [(event.data["ids"], event.data["fresh"]) for event in used] == [([saved.record.id], 0)]
+    second: str = await asyncio.to_thread((room.record / "first.json").read_text, encoding="utf-8")
+    assert saved.record.id not in second
+    # A note changed since the session heard it comes again with its new text (the pre-push review of item 1055).
+    await update_memory_note(
+        words_only(room.runtime.memory),
+        saved.record.id,
+        "The owner's Finnish level is B2, from the YKI test of 2026.",
+        ["language"],
+    )
+    started = await room.manager.start(
+        "And my Finnish level now?",
+        "task",
+        MODEL,
+        ended.thread_id,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "auto",
+        False,
+        (),
+    )
+    third: RunRecord = await room.manager.wait(started.id)
+    assert third.status == "done", third.result
+    changed: str = await asyncio.to_thread((room.record / "first.json").read_text, encoding="utf-8")
+    assert "Finnish level is B2" in changed
