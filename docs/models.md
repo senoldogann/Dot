@@ -288,16 +288,21 @@ answer keeps its words, Ollama's too.
   Keychain item). A run on one goes whole to Claude Code, started without a terminal (`claude -p`, its input and output
   lines of JSON) in Dot's workspace, as Dot: the model is told it is Dot (or the agent whose run it is), your name and
   the name you call Dot by, and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
-  chat (item 1052: the tools, in the order of their names, head every chat's prompt the same, so Anthropic's cache of
-  them is read by a new chat instead of written again), as OpenCode's agent gets them, with Dot's files, commands and web tools besides (Claude Code's own are off): the browser with your
+  chat (item 1052: the tools' names, in their order, head every chat's prompt the same, so Anthropic's cache of that
+  head is read by a new chat instead of written again), as OpenCode's agent gets them, with Dot's files, commands and
+  web tools besides (Claude Code's own are off, but its search of the door's tools): the browser with your
   sign-ins, the Mac's applications, memory, schedules, notify, a page in the conversation, skills, a question to you and
   the apps you connected, as the run's mode and agent allow them. Each call goes through the run's approvals, sandbox,
   shell guard and time limit as a call of Dot's own loop does, and shows on the timeline under the tool's own name. The
-  program is started with no tool of its own (`--tools ""`), no settings file of yours, a project's or the workspace's
+  program is started with no tool of its own but `ToolSearch` (`--tools ToolSearch`, item 1053: the door's tools are
+  named in the prompt and the model looks one up as it needs it: with 296 tools a new chat wrote 10,800 tokens to the
+  cache rather than 99,000, and its first word came in 1.2 s; it reaches nothing but the door's list), no settings
+  file of yours, a project's or the workspace's
   (`--setting-sources ""`: no hook runs, no `CLAUDE.md` or `AGENTS.md` is read), no MCP server but the door
-  (`--strict-mcp-config`), no slash command, and a permission mode that refuses whatever the door does not name
-  (`dontAsk` with `--allowedTools mcp__<door>`); its first line says what the model has, and a run whose model has any
-  tool, MCP server, slash command, skill or plugin besides the door's is ended failed at once, but the four plugins the
+  (`--strict-mcp-config`), no slash command, and a permission mode that refuses whatever the door and the search do
+  not name (`dontAsk` with `--allowedTools mcp__<door>,ToolSearch`); its first line says what the model has, and a run
+  whose model has any tool, MCP server, slash command, skill or plugin besides the door's and Claude Code's search of
+  them (`ToolSearch`) is ended failed at once, but the four plugins the
   program comes with (`cc-plugin-sec-default`, `-agents-md`, `-privacy`, `-plugin-authoring`, by name: measured on
   2.1.318 with the flags above, they gave the model no tool, command or skill, and no `CLAUDE.md` or `AGENTS.md` reached
   it; a built-in a later version brings ends the run until it is measured). The door's secret is in a

@@ -16,6 +16,7 @@ from dotagent.claude_code.run import (
     claude_env,
     door_specs,
     dot_finish,
+    dot_tool,
     ended_clean,
     fast_off_words,
     mcp_config,
@@ -80,12 +81,13 @@ def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() ->
     assert _value(argv, "--model") == "opus"
     assert _value(argv, "--append-system-prompt") == "You are Dot."
     # No built-in tool at all, no settings file read, the door as the only MCP server and the only allowed tools.
-    assert _value(argv, "--tools") == ""
+    # Claude Code's search of the door's tools is its one tool of its own (item 1053).
+    assert _value(argv, "--tools") == "ToolSearch"
     assert _value(argv, "--setting-sources") == ""
     assert _value(argv, "--mcp-config") == str(CONFIG)
     assert _value(argv, "--permission-mode") == "dontAsk"
     assert _value(argv, "--permission-prompts") == "none"
-    assert _value(argv, "--allowedTools") == f"mcp__{door.name}"
+    assert _value(argv, "--allowedTools") == f"mcp__{door.name},ToolSearch"
     for flag in (
         "--include-partial-messages",
         "--replay-user-messages",
@@ -103,7 +105,7 @@ def test_a_chat_with_a_session_resumes_it() -> None:
     argv: tuple[str, ...] = claude_argv("claude", "sonnet", "medium", "standard", "p", CONFIG, DOOR, "ses-1")
     assert _value(argv, "--resume") == "ses-1"
     # The allowed tools stay the last words, so that nothing after them is read as one.
-    assert argv[-2:] == ("--allowedTools", f"mcp__{DOOR}")
+    assert argv[-2:] == ("--allowedTools", f"mcp__{DOOR},ToolSearch")
 
 
 def test_the_environment_has_no_api_key_and_none_of_dots_or_gits_variables(tmp_path: Path) -> None:
@@ -173,7 +175,9 @@ def test_an_init_with_the_doors_tools_alone_passes_and_anything_more_is_refused(
     good: Init = _init(own, connected, {})
     assert good.session_id == "ses-1" and good.mcp_servers == (McpServer(name=DOOR, status="connected"),)
     assert init_problem(good, DOOR) is None
-    built_in: str | None = init_problem(_init([*own, "Bash", "Read"], connected, {}), DOOR)
+    # Claude Code's search of the door's tools is the one tool of its own a run's model may have (item 1053).
+    assert init_problem(_init([*own, "ToolSearch"], connected, {}), DOOR) is None
+    built_in: str | None = init_problem(_init([*own, "ToolSearch", "Bash", "Read"], connected, {}), DOOR)
     assert built_in is not None and "tools that are not Dot's: Bash, Read" in built_in
     other_door: str | None = init_problem(_init([*own, "mcp__dot_99999999__shell"], connected, {}), DOOR)
     assert other_door is not None and "mcp__dot_99999999__shell" in other_door
@@ -373,3 +377,11 @@ def test_the_door_offers_its_tools_in_the_order_of_their_names() -> None:
     names: tuple[str, ...] = ("web_fetch", "mcp__github__issues", "browser_open", "list_dir")
     specs: list[ToolSpec] = [ToolSpec(name=name, description=name, parameters={"type": "object"}) for name in names]
     assert [spec.name for spec in door_specs(specs)] == sorted(names)
+
+
+def test_a_look_up_of_a_tool_is_not_a_call_of_dots() -> None:
+    """Item 1053: a step's calls of Dot's tools are the blocks that name a tool of the door; Claude Code's search of
+    them is its own and is left out, and a tool of another door is no call of this run's."""
+    assert dot_tool(f"mcp__{DOOR}__list_dir", DOOR) == "list_dir"
+    assert dot_tool("ToolSearch", DOOR) is None
+    assert dot_tool("mcp__other__list_dir", DOOR) is None

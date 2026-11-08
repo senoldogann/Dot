@@ -108,7 +108,7 @@ def main() -> None:
     record: Path = Path(sys.argv[1])
     args: list[str] = sys.argv[2:]
     config_file: Path = Path(_flag(args, "--mcp-config"))
-    door: str = _flag(args, "--allowedTools").removeprefix("mcp__")
+    door: str = _flag(args, "--allowedTools").split(",")[0].removeprefix("mcp__")
     (record / "started.json").write_text(
         json.dumps(
             {

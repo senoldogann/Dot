@@ -119,7 +119,7 @@ async def test_a_run_goes_whole_to_claude_code_and_its_calls_go_through_the_gate
         ("--input-format", "stream-json"),
         ("--output-format", "stream-json"),
         ("--model", "sonnet"),
-        ("--tools", ""),
+        ("--tools", "ToolSearch"),
         ("--setting-sources", ""),
         ("--permission-mode", "dontAsk"),
         ("--permission-prompts", "none"),
@@ -135,7 +135,7 @@ async def test_a_run_goes_whole_to_claude_code_and_its_calls_go_through_the_gate
         assert flag in args
     door: str = args[args.index("--allowedTools") + 1]
     # One door's name for every chat (item 1052), so that the tools head every prompt the same and its cache is read.
-    assert door == "mcp__dot" and "--resume" not in args
+    assert door == "mcp__dot,ToolSearch" and "--resume" not in args
     assert "--dangerously-skip-permissions" not in args
     env: list[str] = started["env"]  # type: ignore[assignment]
     assert not [name for name in env if name.startswith(("DOT_", "GIT_")) or name == "ANTHROPIC_API_KEY"]
