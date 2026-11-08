@@ -430,7 +430,7 @@ class Initiative:
             with contextlib.suppress(NotFoundError):
                 ended = await store.get_run(todo.run_id)
         if ended is None:
-            await store.set_todo(todo.id, "open", todo.attempts, todo.run_id, todo.note)
+            await store.set_todo(todo.id, todo.status, "open", todo.attempts, todo.run_id, todo.note)
         elif cut_off_by(ended) == "daemon_restarted":
             await self._tried(todo, ended, "Dot stopped while it did this, without shutting down.")
         else:
@@ -443,7 +443,9 @@ class Initiative:
         # leaves a run going and its thing open: what is left is the moment between the start and the line below. It
         # names no run until then: an earlier run's id, kept here, would be read by the recovery (:meth:`_recover`) as
         # how this try ended.
-        await store.set_todo(todo.id, "doing", todo.attempts, None, todo.note)
+        if await store.set_todo(todo.id, "open", "doing", todo.attempts, None, todo.note) is None:
+            # Let go or taken up by another tick since it was listed: not started (item 1048).
+            return
         try:
             opening: str = (
                 await self._review_opening(todo)
@@ -459,9 +461,9 @@ class Initiative:
             # Its last run stays named (the review of item 790): an owner's resume of it is found by that id. Whatever
             # kept the run from starting (a store, a bug, the daemon stopping), the thing is open again, not left
             # "doing" with no run until the next start of the daemon (the review of 2026-11-01).
-            await store.set_todo(todo.id, "open", todo.attempts, todo.run_id, todo.note)
+            await store.set_todo(todo.id, "doing", "open", todo.attempts, todo.run_id, todo.note)
             raise
-        await store.set_todo(todo.id, "doing", todo.attempts, run.id, todo.note)
+        await store.set_todo(todo.id, "doing", "doing", todo.attempts, run.id, todo.note)
         log.info("initiative_started", todo_id=todo.id, run_id=run.id, tainted=todo.tainted)
         self._follow(run.id, todo.id)
 
@@ -671,7 +673,8 @@ class Initiative:
                 )
             return
         if ended.status == "done":
-            await store.set_todo(todo.id, "done", todo.attempts + 1, ended.id, note)
+            if await store.set_todo(todo.id, todo.status, "done", todo.attempts + 1, ended.id, note) is None:
+                return
             await tell_owner(self._runtime.bus, DID_TITLE, one_line(todo.title, _TELL_CHARS), url)
             return
         # The emergency stop ends a run in two words: the stop of every run, and the STOP file a run saw as it worked
@@ -679,10 +682,10 @@ class Initiative:
         if ended.status == "cancelled" and (
             ended.result == RESULT_SHUTDOWN or ended.result.startswith(PREFIX_EMERGENCY_STOP)
         ):
-            await store.set_todo(todo.id, "open", todo.attempts, ended.id, todo.note)
+            await store.set_todo(todo.id, todo.status, "open", todo.attempts, ended.id, todo.note)
             return
         if ended.status == "cancelled":
-            await store.set_todo(todo.id, "dropped", todo.attempts + 1, ended.id, "You stopped it.")
+            await store.set_todo(todo.id, todo.status, "dropped", todo.attempts + 1, ended.id, "You stopped it.")
             return
         await self._tried(todo, ended, note)
 
@@ -710,13 +713,15 @@ class Initiative:
         # One that left the owner what only they decide (item 868) stays to do, its try counted, while it waits for
         # their answer; it is let go once it is not waiting and has no try left (:meth:`_next`).
         if tried < config.attempts or waiting:
-            await store.set_todo(todo.id, "open", tried, ended.id, note)
+            await store.set_todo(todo.id, todo.status, "open", tried, ended.id, note)
             return
         await self._let_go(todo, tried, ended.id, note)
 
     async def _let_go(self, todo: TodoRecord, tried: int, run_id: str | None, note: str) -> None:
         """Let go of ``todo`` after ``tried`` tries, its last run ``run_id``, and tell the owner."""
-        await self._runtime.store.set_todo(todo.id, "dropped", tried, run_id, note)
+        if await self._runtime.store.set_todo(todo.id, todo.status, "dropped", tried, run_id, note) is None:
+            # It moved meanwhile (the owner let it go or took it up again): nothing to tell.
+            return
         await tell_owner(
             self._runtime.bus,
             LET_GO_TITLE,

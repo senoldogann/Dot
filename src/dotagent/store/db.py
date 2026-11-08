@@ -4168,16 +4168,21 @@ class Store:
 
     @_writing
     async def set_todo(
-        self, todo_id: str, status: TodoStatus, attempts: int, run_id: str | None, note: str
-    ) -> TodoRecord:
-        """Where a thing of Dot's list stands now, the runs that tried it and what came of it."""
+        self, todo_id: str, expected: TodoStatus, status: TodoStatus, attempts: int, run_id: str | None, note: str
+    ) -> TodoRecord | None:
+        """Where a thing of Dot's list stands now, the runs that tried it and what came of it, written only while it
+        stands where the caller read it, ``expected`` (item 1048): a thing the owner or its run let go meanwhile stays
+        let go, and is neither opened again nor started. The thing as written, ``None`` when it had moved."""
         cursor: aiosqlite.Cursor = await self._db.execute(
-            "UPDATE todos SET status = ?, attempts = ?, run_id = ?, note = ?, updated_at = ? WHERE id = ?",
-            (status, attempts, run_id, note, time.time(), todo_id),
+            "UPDATE todos SET status = ?, attempts = ?, run_id = ?, note = ?, updated_at = ?"
+            " WHERE id = ? AND status = ?",
+            (status, attempts, run_id, note, time.time(), todo_id, expected),
         )
         await self._db.commit()
         if cursor.rowcount == 0:
-            raise NotFoundError("no such thing on Dot's list", {"todo_id": todo_id})
+            moved: TodoRecord = await self.get_todo(todo_id)
+            log.info("todo_moved_meanwhile", todo_id=todo_id, expected=expected, status=moved.status, wanted=status)
+            return None
         return await self.get_todo(todo_id)
 
     # ----- work orders (item 907) -----------------------------------------------------------

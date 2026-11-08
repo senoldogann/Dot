@@ -304,7 +304,7 @@ async def let_go(store: Store, todo_id: str) -> InitiativeView:
     """Take a thing off the list; one being done is let go once its run ends (the owner stops it in its chat)."""
     todo: TodoRecord = await store.get_todo(todo_id)
     if todo.status == "open":
-        await store.set_todo(todo.id, "dropped", todo.attempts, todo.run_id, "You took it off the list.")
+        await store.set_todo(todo.id, "open", "dropped", todo.attempts, todo.run_id, "You took it off the list.")
     return await initiative_view(store)
 
 
@@ -312,5 +312,5 @@ async def take_up_again(store: Store, todo_id: str) -> InitiativeView:
     """Put a thing that was let go back on the list, with its tries counted from none."""
     todo: TodoRecord = await store.get_todo(todo_id)
     if todo.status == "dropped":
-        await store.set_todo(todo.id, "open", 0, todo.run_id, "")
+        await store.set_todo(todo.id, "dropped", "open", 0, todo.run_id, "")
     return await initiative_view(store)

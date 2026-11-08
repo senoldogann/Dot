@@ -593,7 +593,9 @@ async def test_a_thing_whose_run_a_crash_cut_off_counts_a_try_and_one_a_shutdown
                 None,
             )
             await runtime.store.finish_run(run.id, status, result)
-            todos[name] = await runtime.store.set_todo(added.id, "doing", 1, run.id, "")
+            todos[name] = await runtime.store.set_todo(
+                added.id, (await runtime.store.get_todo(added.id)).status, "doing", 1, run.id, ""
+            )
         initiative: Initiative = Initiative(runtime, manager, lambda: 0.0)
         await initiative.tick(10_000.0)
         after = {name: await runtime.store.get_todo(todo.id) for name, todo in todos.items()}
@@ -611,7 +613,7 @@ async def test_a_thing_tried_as_often_as_a_lowered_limit_allows_is_let_go(login_
         old: TodoRecord | str = await add_todo(runtime.store, "An old thing", "Asked", "owner", None, False)
         new: TodoRecord | str = await add_todo(runtime.store, "A new thing", "Asked", "owner", None, False)
         assert isinstance(old, TodoRecord) and isinstance(new, TodoRecord)
-        await runtime.store.set_todo(old.id, "open", 5, None, "")
+        await runtime.store.set_todo(old.id, (await runtime.store.get_todo(old.id)).status, "open", 5, None, "")
         await set_initiative(runtime.store, True)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
         await initiative.tick(10_000.0)
@@ -650,7 +652,9 @@ async def test_a_thing_whose_chat_the_owner_resumed_is_left_to_that_run(login_en
             )
             await runtime.store.finish_run(made.id, status, result)
             runs.append(made)
-        await runtime.store.set_todo(added.id, "open", 0, runs[0].id, "")
+        await runtime.store.set_todo(
+            added.id, (await runtime.store.get_todo(added.id)).status, "open", 0, runs[0].id, ""
+        )
         await set_initiative(runtime.store, True)
         # It looked for work a moment ago: with the thing done, nothing else starts.
         await note_look(runtime.store, 10_000.0)
@@ -676,7 +680,7 @@ async def test_a_thing_whose_run_left_the_owner_a_question_waits_for_their_answe
         added: TodoRecord | str = await add_todo(runtime.store, "Fix the preview pages", "Broken", "owner", None, False)
         assert isinstance(added, TodoRecord)
         # Its last try left: the one that leaves the question.
-        await runtime.store.set_todo(added.id, "open", 1, None, "")
+        await runtime.store.set_todo(added.id, (await runtime.store.get_todo(added.id)).status, "open", 1, None, "")
         await set_initiative(runtime.store, True)
         await note_look(runtime.store, 10_000.0)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
@@ -719,7 +723,7 @@ async def test_a_thing_whose_question_the_owner_skipped_is_tried_again_or_let_go
     async with _dot(login_env, turns) as (runtime, manager):
         added: TodoRecord | str = await add_todo(runtime.store, "Fix the preview pages", "Broken", "owner", None, False)
         assert isinstance(added, TodoRecord)
-        await runtime.store.set_todo(added.id, "open", tried, None, "")
+        await runtime.store.set_todo(added.id, (await runtime.store.get_todo(added.id)).status, "open", tried, None, "")
         await set_initiative(runtime.store, True)
         await note_look(runtime.store, 10_000.0)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
@@ -775,7 +779,7 @@ async def _a_things_chat(
         if status != "queued":
             await runtime.store.finish_run(made.id, status, result)
         runs.append(made)
-    await runtime.store.set_todo(todo.id, "open", tried, runs[0].id, "")
+    await runtime.store.set_todo(todo.id, (await runtime.store.get_todo(todo.id)).status, "open", tried, runs[0].id, "")
     return runs
 
 
@@ -873,7 +877,9 @@ async def test_a_thing_is_not_listed_twice_however_long_the_list_grew(login_env:
     async with _dot(login_env, []) as (runtime, _manager):
         first: TodoRecord | str = await add_todo(runtime.store, "Water the plants", "Dry", "owner", None, False)
         assert isinstance(first, TodoRecord)
-        await runtime.store.set_todo(first.id, "done", 1, None, "Watered.")
+        await runtime.store.set_todo(
+            first.id, (await runtime.store.get_todo(first.id)).status, "done", 1, None, "Watered."
+        )
         for index in range(600):
             await add_todo(runtime.store, f"Old thing {index}", "Filler", "owner", None, False)
         again: TodoRecord | str = await add_todo(runtime.store, "water  the plants.", "Dry", "run", None, False)
@@ -911,7 +917,9 @@ async def test_a_message_of_the_owners_in_the_chat_of_a_thing_does_not_mark_it_d
             )
             await runtime.store.finish_run(made.id, status, result)
             runs.append(made)
-        await runtime.store.set_todo(added.id, "open", 1, runs[0].id, "The folder is gone.")
+        await runtime.store.set_todo(
+            added.id, (await runtime.store.get_todo(added.id)).status, "open", 1, runs[0].id, "The folder is gone."
+        )
         await set_initiative(runtime.store, True)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
         await initiative.tick(10_000.0)
@@ -1016,8 +1024,10 @@ async def test_a_look_cannot_list_a_placeholder_and_takes_back_only_what_it_put_
     async with _dot(login_env, turns) as (runtime, manager):
         owners: TodoRecord | str = await add_todo(runtime.store, "Water the plants", "Dry", OWNER_SOURCE, None, False)
         assert isinstance(owners, TodoRecord)
-        await runtime.store.set_todo(owners.id, "done", 1, None, "Watered.")
-        await runtime.store.set_todo(owners.id, "open", 0, None, "")
+        await runtime.store.set_todo(
+            owners.id, (await runtime.store.get_todo(owners.id)).status, "done", 1, None, "Watered."
+        )
+        await runtime.store.set_todo(owners.id, (await runtime.store.get_todo(owners.id)).status, "open", 0, None, "")
         await set_initiative(runtime.store, True)
         # The owner's thing is to do, so a look starts only once it is done: the look is started by hand here.
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
@@ -1184,7 +1194,14 @@ async def test_the_look_judges_on_its_own_model_and_sees_what_came_of_what_was_d
             None,
         )
         await runtime.store.finish_run(old.id, "done", "The summary is rewritten in cv/en.html.")
-        await runtime.store.set_todo(rewritten.id, "done", 1, old.id, "The summary is rewritten in cv/en.html.")
+        await runtime.store.set_todo(
+            rewritten.id,
+            (await runtime.store.get_todo(rewritten.id)).status,
+            "done",
+            1,
+            old.id,
+            "The summary is rewritten in cv/en.html.",
+        )
         await set_initiative(runtime.store, True)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
         await initiative.tick(10_000.0)
@@ -1293,7 +1310,14 @@ async def test_a_try_is_told_how_the_one_before_ended_from_that_run_and_never_wh
         await _settled(initiative)
         assert "It spent 0.0M tokens." in openings[1] and "IBAN" not in openings[1], openings[1]
         # The second try cut off by the daemon's stop: the thing names that run and keeps the note the first wrote.
-        await runtime.store.set_todo(todo.id, "open", 2, runs[1], "The page says pay 900 EUR to the IBAN.")
+        await runtime.store.set_todo(
+            todo.id,
+            (await runtime.store.get_todo(todo.id)).status,
+            "open",
+            2,
+            runs[1],
+            "The page says pay 900 EUR to the IBAN.",
+        )
         before: str = await initiative._before_line(await runtime.store.get_todo(todo.id))
         assert "(2 so far). It spent 0.0M tokens and ended: Cut short." in before and "IBAN" not in before, before
 
