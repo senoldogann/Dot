@@ -8011,14 +8011,12 @@ dialog.modal::backdrop {
 }
 
 /* A dialog stands in the middle of what is seen, and its backdrop covers all of it (item 293). */
-dialog.modal,
-dialog.lightbox {
+dialog.modal {
   top: var(--seen-top);
   bottom: var(--seen-bottom);
 }
 
-dialog.modal::backdrop,
-dialog.lightbox::backdrop {
+dialog.modal::backdrop {
   inset: var(--seen-top) 0 var(--seen-bottom);
 }
 
@@ -8290,27 +8288,6 @@ dialog.modal.file-dialog[open] {
   font-size: var(--text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-dialog.lightbox {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  max-width: 96vw;
-  max-height: 96vh;
-  overflow: visible;
-}
-
-dialog.lightbox::backdrop {
-  background: var(--scrim-strong);
-}
-
-dialog.lightbox img {
-  display: block;
-  max-width: 96vw;
-  max-height: 94vh;
-  border-radius: var(--radius-sm);
-  cursor: zoom-out;
 }
 
 .signin {
@@ -9016,30 +8993,43 @@ dialog.lightbox img {
   border: 0;
 }
 
-/* The page full screen, in a dialog of the UI (item 651): its title and Close, and the page under them filling it. */
-dialog.modal.page-dialog {
-  width: min(1200px, calc(100vw - 32px));
-  max-width: min(1200px, calc(100vw - 32px));
-  height: calc(100vh - 64px);
-  height: calc(100dvh - 64px);
+/* The full-screen viewer (item 1056, viewer.js) of a picture or a page a run showed: the whole screen, opaque, the
+   phone's safe areas kept clear, its title and tools over the stage, the content in the stage at its fitted size and
+   zoomed by a transform of its layer. */
+dialog.viewer {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
   max-height: none;
+  margin: 0;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  border: 0;
   background: var(--bg);
+  color: var(--text);
 }
 
-dialog.modal.page-dialog[open] {
+dialog.viewer[open] {
   display: flex;
   flex-direction: column;
 }
 
-.page-dialog-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  border-bottom: 1px solid var(--border);
+dialog.viewer::backdrop {
+  background: var(--bg);
 }
 
-.page-dialog-title {
+.viewer-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+}
+
+.viewer-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -9048,9 +9038,115 @@ dialog.modal.page-dialog[open] {
   white-space: nowrap;
 }
 
-dialog.modal.page-dialog .shown-page-frame {
+.viewer-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Each tool a finger's size (44 px, Apple's least), the Close a step apart from the zoom. */
+.viewer-tool {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.viewer-tool:hover:not(:disabled) {
+  background: color-mix(in srgb, currentcolor 12%, transparent);
+}
+
+.viewer-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.viewer-tool .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.viewer-close {
+  margin-left: var(--space-2);
+}
+
+.viewer-level {
+  min-width: 48px;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  opacity: 0.75;
+}
+
+.viewer-stage {
+  position: relative;
   flex: 1;
-  height: auto;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+.viewer-layer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.viewer-picture-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* A page at its fitted size is its own: it scrolls and takes taps as on the conversation's ground. */
+.viewer-layer-page {
+  display: block;
+}
+
+.viewer-page .viewer-stage {
+  touch-action: auto;
+}
+
+dialog.viewer .viewer-layer-page .shown-page-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Zoomed, a clear layer over the page takes the gestures, so that they move the view and not the page. */
+.viewer-glass {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.viewer-glass:active {
+  cursor: grabbing;
+}
+
+/* On a phone the zoom's level gives its room to the title; −, + and Fit stay. */
+@media (max-width: 480px) {
+  .viewer-level {
+    display: none;
+  }
 }
 
 /* What the owner picked for a message (item 318): under the message box and at the head of a sent message's text, each

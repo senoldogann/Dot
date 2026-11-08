@@ -125,6 +125,8 @@ const SHAPES = {
     ["path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" }],
   ],
   plus: [["path", { d: "M5 12h14" }], ["path", { d: "M12 5v14" }]],
+  // Zoom out in the full-screen viewer (item 1056).
+  minus: [["path", { d: "M5 12h14" }]],
   // Three tiles and a plus: the apps Dot connects to (item 991).
   appsGrid: [
     ["rect", { x: 3, y: 3, width: 7, height: 7, rx: 1.5 }],
@@ -489,6 +491,7 @@ const FRAMES = {
   pinOff: [-0.97, -0.97, 25.95],
   play: [2.7, 1.7, 20.59],
   plug: [1.09, 1.09, 21.82],
+  minus: [2.92, 2.92, 18.16],
   plus: [2.92, 2.92, 18.16],
   pointer: [0.47, 0.47, 22.05],
   puzzle: [-0.97, -0.97, 25.95],

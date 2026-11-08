@@ -1,9 +1,10 @@
-// Overlays shared by every page: toasts, the dialogs (a question, a choice, a form) and the screenshot viewer.
+// Overlays shared by every page: toasts, the dialogs (a question, a choice, a form) and the pictures full screen.
 
 import { el } from "./dom.js";
 import { explain } from "./errors.js";
 import { createFormFlow, firstFieldOf, stateOfControls } from "./formflow.js";
 import { icon } from "./icons.js";
+import { openViewer } from "./viewer.js";
 
 const TOAST_MS = 3500;
 const ERROR_TOAST_MS = 9000;
@@ -11,7 +12,6 @@ const ERROR_TOAST_MS = 9000;
 const ACTION_TOAST_MS = 15000;
 
 let region = null;
-let viewer = null;
 // How many dialogs were made: the number that keeps the ids of one dialog's title and line apart from another's.
 let dialogCount = 0;
 
@@ -445,29 +445,10 @@ export function formDialog({
   return { closed, fail: showProblem, revalidate: paintPrimary, accept };
 }
 
-/** Show a screenshot at full size until it is clicked or Escape is pressed. */
+/** Show a picture (a screenshot, a picture of a file) full screen, in the viewer (item 1056), which zooms; it closes on
+ * its Close, Escape, a tap beside the picture or a swipe down, and the focus goes back to what had it. */
 export function showImage(url, description) {
-  if (viewer === null) {
-    const image = el("img", { alt: "" });
-    viewer = el("dialog", { class: "lightbox" }, image);
-    viewer.addEventListener("click", () => viewer.close());
-    // Escape closes the picture before the page behind it: the panel a picture was opened from answers Escape too, and
-    // would take the key first, leaving the picture over what it showed.
-    window.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape" && viewer.open) {
-          event.preventDefault();
-          event.stopPropagation();
-          viewer.close();
-        }
-      },
-      true,
-    );
-    document.body.append(viewer);
-  }
-  const image = viewer.querySelector("img");
-  image.src = url;
-  image.alt = description;
-  viewer.showModal();
+  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const image = el("img", { class: "viewer-picture-image", src: url, alt: description, draggable: "false" });
+  openViewer({ title: description, content: image, page: false, onClose: () => opener?.focus() });
 }
