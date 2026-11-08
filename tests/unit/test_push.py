@@ -10,7 +10,9 @@ import pytest
 import pywebpush
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from py_vapid import VapidException
 from pywebpush import WebPushException
+from structlog.testing import capture_logs
 
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify import push
@@ -469,3 +471,34 @@ async def test_a_push_is_signed_by_pywebpush_itself_with_the_project_page_as_its
     payload: str = token.split(".")[1]
     claims: dict[str, object] = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
     assert (claims["sub"], claims["aud"]) == (push.SUBJECT, "https://web.push.apple.com")
+
+
+@pytest.mark.asyncio
+async def test_a_push_that_cannot_be_signed_is_one_failed_and_the_next_goes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1058: py_vapid's refusal to sign ended the watch of the pushes, and the phone heard nothing until the daemon
+    started again; it is a push that failed, and the next subscription is still sent to."""
+    taken: list[str] = []
+
+    def webpush(subscription_info: dict[str, str], data: str, **signing: object) -> None:
+        if subscription_info["endpoint"] == "https://push.example/unsigned":
+            raise VapidException("Missing 'sub' from claims. 'sub' is your admin email as a mailto: link.")
+        taken.append(subscription_info["endpoint"])
+
+    monkeypatch.setattr(pywebpush, "webpush", webpush)
+    keys: PushKeys = read_or_create_keys(tmp_path / "vapid-key.pem")
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        p256dh, auth = _usable_keys()
+        for endpoint in ("https://push.example/unsigned", "https://push.example/good"):
+            await store.add_push_subscription(endpoint, p256dh, auth)
+        with capture_logs() as logs:
+            totals: PushTotals = await push_event(store, keys, _notice("daemon_restarted", {"runs_cut_off": 0}))
+        assert totals == PushTotals(sent=1, failed=1, removed=0)
+        assert taken == ["https://push.example/good"]
+        # Why it failed is in the log, as the watch's end said it before.
+        failed: list[dict[str, object]] = [entry for entry in logs if entry["event"] == "push_failed"]
+        assert len(failed) == 1 and "Missing 'sub'" in str(failed[0]["detail"])
+    finally:
+        await store.close()
