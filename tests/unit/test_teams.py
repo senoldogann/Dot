@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.agent.loop import _team_brief
+from dotagent.agent.loop import team_brief
 from dotagent.agent.prompt import AgentBrief, TeamBrief, build_system_prompt, collect_prompt_inputs
 from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.harness.components import NO_HARNESS
@@ -351,7 +351,7 @@ def test_the_run_leads_the_team_as_it_is_now_with_its_agents_that_are_left_in_th
         created_at=1.0,
         ready_team=None,
     )
-    brief: TeamBrief | None = _team_brief(team, agents, _team_run(None))
+    brief: TeamBrief | None = team_brief(team, agents, _team_run(None))
     assert brief is not None and (brief.name, brief.purpose) == ("Content team", "Writes")
     # The order is the team's, an agent that is gone is not named, and none of an agent's instructions comes with it.
     assert [(member.name, member.role) for member in brief.members] == [
@@ -367,7 +367,7 @@ def test_only_a_run_of_dots_in_the_chat_leads_the_team_not_an_agents_nor_a_helpe
         id="team_1", name="Content team", purpose="", agents=("agt_1",), created_at=1.0, ready_team=None
     )
     agents: list[AgentRecord] = [_record("agt_1", "Research Desk", "Finds the sources")]
-    assert _team_brief(team, agents, _team_run(None)) is not None
-    assert _team_brief(team, agents, _team_run("agt_1")) is None
-    assert _team_brief(team, agents, _team_run(None, parent_run_id="run_0")) is None
-    assert _team_brief(None, agents, _team_run(None)) is None
+    assert team_brief(team, agents, _team_run(None)) is not None
+    assert team_brief(team, agents, _team_run("agt_1")) is None
+    assert team_brief(team, agents, _team_run(None, parent_run_id="run_0")) is None
+    assert team_brief(None, agents, _team_run(None)) is None

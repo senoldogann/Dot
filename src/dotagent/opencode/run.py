@@ -880,7 +880,7 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
     door: Door = new_door(
         door_name(run.thread_id),
         tuple(tool.spec for tool in tools.tools.values()),
-        partial(bridged_call, tools, await tool_context(agent, ref, info), agent.gate),
+        partial(bridged_call, tools, await tool_context(agent, ref, info, frozenset(tools.tools)), agent.gate),
     )
     async with server.hold():
         chat: ChatSession = await _session(

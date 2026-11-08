@@ -33,6 +33,12 @@ export function answersRole(role, provider) {
   return !WHOLE_RUN.has(provider) || (role === "review" && provider === "claude_code");
 }
 
+/** Whether a run on a model of `provider` has Dot's tools (`runs_dots_tools` in llm/types.py): any but Zen's free
+ * models, whose OpenCode agent gets a part of them; the Claude plan's run has every one (item 1063). */
+export function runsDotsTools(provider) {
+  return !WHOLE_RUN.has(provider) || provider === "claude_code";
+}
+
 /**
  * The mark of a provider: the provider's SVG (`static/icons/providers/`) drawn inline in the colour of the text around
  * it (item 959, `inked.js`); `data-provider` names the mark. An unknown provider wears the generic mark.

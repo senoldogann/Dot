@@ -62,6 +62,13 @@ def answers_role(role: str, provider: str) -> bool:
     return provider not in WHOLE_RUN_AGENTS or (role == "review" and provider == "claude_code")
 
 
+def runs_dots_tools(provider: str) -> bool:
+    """Whether a run on a model of ``provider`` has Dot's tools: a model Dot's own loop drives, or one of the owner's
+    Claude plan, whose door gives every tool of that loop (item 1063); not one of Zen's free models, whose OpenCode
+    agent gets a part of them. The look for work, a run that keeps Dot's list and reads the owner's mail, needs them."""
+    return provider not in WHOLE_RUN_AGENTS or provider == "claude_code"
+
+
 def split_model_ref(text: str) -> tuple[str, str] | None:
     """The provider and the model of ``<provider>:<model>``, split at the first colon (model names may contain colons,
     e.g. ``qwen3:8b``), or ``None`` when ``text`` is not one or names a provider Dot does not know."""
