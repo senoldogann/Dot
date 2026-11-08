@@ -347,6 +347,9 @@ what moved; a schedule switched off is not started so, and the end of such a run
   at work when the schedule comes due beside it (item 553): a repeating schedule is skipped, as for any run still
   going, and the end of that run is written to the schedule. One that ends before the schedule is due again writes
   nothing to it.
+- A firing that is skipped moves the schedule on only while it is still due at the time it was read (item 1047): an
+  edit of its times or a switch made while the firing was weighed is kept. A schedule says `running` only while its
+  run works, so a run that ended at once shows how it ended, not `running`.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)
   is skipped and waits for the next; you are told, as you are when a firing's run cannot start (see the notifications
   under the web UI). A one-time schedule has no next time and is never dropped: overdue, it fires late, and its run

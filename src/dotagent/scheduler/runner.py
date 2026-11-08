@@ -654,6 +654,8 @@ class Scheduler:
         store: Store = self._runtime.store
         if record.next_run_at is None:
             raise StoreError("a due schedule has no next run", {"schedule_id": record.id})
+        # The time it was read due at: a skip moves it on only while it still is (item 1047).
+        due: float = record.next_run_at
         zone: ZoneInfo = await schedule_zone(record.options, self._zone)
         following: float | None = _following(record, now, zone)
         overdue_s: float = now - record.next_run_at
@@ -666,7 +668,7 @@ class Scheduler:
                     await store.set_schedule_status(record.id, HELD_STATUS)
                 return
             log.warning("schedule_skipped_emergency_stop", schedule_id=record.id)
-            await store.record_schedule_skip(record.id, following, "skipped: the emergency stop is engaged")
+            await store.record_schedule_skip(record.id, due, following, "skipped: the emergency stop is engaged")
             return
         paused: AgentRecord | None = await self._paused_agent(record)
         if paused is not None:
@@ -678,7 +680,7 @@ class Scheduler:
                     await store.set_schedule_status(record.id, waiting)
                 return
             log.info("schedule_skipped_agent_paused", schedule_id=record.id, agent_id=paused.id)
-            await store.record_schedule_skip(record.id, following, f"skipped: {paused.name} is paused")
+            await store.record_schedule_skip(record.id, due, following, f"skipped: {paused.name} is paused")
             return
         if one_time:
             # The wait is that of a try of this time again: a time given since the last failure fires when it comes.
@@ -692,7 +694,7 @@ class Scheduler:
                 # due, and fires once that run has ended, as it waits for the release of the emergency stop.
                 return
             log.warning("schedule_skipped_running", schedule_id=record.id, run_id=self._in_flight.get(record.id))
-            await store.record_schedule_skip(record.id, following, "skipped: the previous task was still going")
+            await store.record_schedule_skip(record.id, due, following, "skipped: the previous task was still going")
             return
         if late and not one_time:
             log.warning("schedule_skipped_overdue", schedule_id=record.id, overdue_s=round(overdue_s))
@@ -703,7 +705,7 @@ class Scheduler:
                 if failed_before is not None and failed_before.last_failure_at >= record.next_run_at
                 else f"skipped: {round(overdue_s / 60)} minutes overdue (Dot was off or the Mac slept)"
             )
-            await store.record_schedule_skip(record.id, following, overdue)
+            await store.record_schedule_skip(record.id, due, following, overdue)
             await self._tell_missed(record, overdue)
             return
         self._starting.add(record.id)
@@ -807,7 +809,7 @@ class Scheduler:
         run: RunRecord = started
         await self._track(record.id, run, self._level(record))
         try:
-            await store.set_schedule_status(record.id, "running")
+            await store.mark_schedule_running(record.id, run.id)
             await record_firing_started(store, record.id)
         except DotError as exc:
             # The run started all the same; its watch writes how it ended.
@@ -894,7 +896,7 @@ class Scheduler:
                 record.id, run, BY_HAND_LEVEL if signal is None else self._level(record), by_hand=signal is None
             )
             try:
-                await store.record_schedule_hand_run(record.id, now, thread_id)
+                await store.record_schedule_hand_run(record.id, now, thread_id, run.id)
             except DotError as exc:
                 # The run started all the same; its watch writes how it ended.
                 log.error(

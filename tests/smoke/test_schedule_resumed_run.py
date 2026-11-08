@@ -81,7 +81,7 @@ async def _cut_firing(runtime: Runtime, source: str) -> tuple[ScheduleRecord, Ru
         chat.id, GOAL, "task", SCRIPTED_MODEL, None, source, "medium", "standard", None, "yolo", False, None, None, None
     )
     await store.end_run(cut.id, "cancelled", RESULT_SHUTDOWN, {"status": "cancelled", "result": RESULT_SHUTDOWN})
-    await store.record_schedule_hand_run(schedule.id, time.time(), chat.id)
+    await store.record_schedule_hand_run(schedule.id, time.time(), chat.id, cut.id)
     return await store.get_schedule(schedule.id), cut
 
 
