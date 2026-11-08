@@ -1505,6 +1505,8 @@ _OPTIMIZE_AT_OPEN: int = 0x10002
 
 # The working states of a run, as SQL: the ones a run may move between or end from (item 1045).
 _WORKING_SQL: str = ", ".join(f"'{status}'" for status in sorted(WORKING_STATUSES))
+# Whether the run of the bound id works (item 1047).
+_RUN_WORKS_SQL: str = f"EXISTS (SELECT 1 FROM runs WHERE runs.id = ? AND runs.status IN ({_WORKING_SQL}))"
 
 
 class Store:
@@ -6129,13 +6131,15 @@ class Store:
         return [ScheduleFiring(run=_run(row), chat_title=str(row["chat_title"])) for row in rows]
 
     @_writing
-    async def record_schedule_hand_run(self, schedule_id: str, started_at: float, thread_id: str) -> None:
+    async def record_schedule_hand_run(self, schedule_id: str, started_at: float, thread_id: str, run_id: str) -> None:
         """A run of the schedule ``schedule_id`` started out of its time at ``started_at`` in the chat ``thread_id``, by
         the owner's hand (item 455) or by a move of the market (item 772): its last run and its chat, and nothing of
-        when it fires next nor of whether it is switched on, which :meth:`record_schedule_fire` would change."""
+        when it fires next nor of whether it is switched on, which :meth:`record_schedule_fire` would change. It says
+        ``running`` only while ``run_id`` works (item 1047): a run that ended first has its outcome written already."""
         await self._db.execute(
-            "UPDATE schedules SET last_run_at = ?, thread_id = ?, last_status = 'running' WHERE id = ?",
-            (started_at, thread_id, schedule_id),
+            "UPDATE schedules SET last_run_at = ?, thread_id = ?,"
+            f" last_status = CASE WHEN {_RUN_WORKS_SQL} THEN 'running' ELSE last_status END WHERE id = ?",
+            (started_at, thread_id, run_id, schedule_id),
         )
         await self._db.commit()
 
@@ -6164,14 +6168,31 @@ class Store:
         await self._db.commit()
 
     @_writing
-    async def record_schedule_skip(self, schedule_id: str, next_run_at: float | None, status: str) -> None:
-        """A due firing that did not start a run: move on to ``next_run_at`` (``None`` ends the schedule)."""
-        await self._db.execute(
+    async def record_schedule_skip(self, schedule_id: str, due: float, next_run_at: float | None, status: str) -> bool:
+        """A firing due at ``due`` that did not start a run: move on to ``next_run_at`` (``None`` ends the schedule).
+        Only while the schedule is still due at ``due`` (item 1047): an edit of its times or a switch made while the
+        firing was weighed is kept, and nothing moves. Whether it moved on."""
+        cursor = await self._db.execute(
             "UPDATE schedules SET next_run_at = ?, last_status = ?,"
-            " enabled = CASE WHEN ? IS NULL THEN 0 ELSE enabled END WHERE id = ?",
-            (next_run_at, status, next_run_at, schedule_id),
+            " enabled = CASE WHEN ? IS NULL THEN 0 ELSE enabled END WHERE id = ? AND next_run_at IS ?",
+            (next_run_at, status, next_run_at, schedule_id, due),
         )
         await self._db.commit()
+        if cursor.rowcount == 0:
+            log.info("schedule_skip_not_written", schedule_id=schedule_id, due=due, status=status)
+            return False
+        return True
+
+    @_writing
+    async def mark_schedule_running(self, schedule_id: str, run_id: str) -> bool:
+        """Say that the schedule's run ``run_id`` works, only while it does (item 1047): a run that ended before this
+        write has its outcome written by its watch, which ``running`` would hide until the next firing. Whether it was
+        written."""
+        cursor = await self._db.execute(
+            f"UPDATE schedules SET last_status = 'running' WHERE id = ? AND {_RUN_WORKS_SQL}", (schedule_id, run_id)
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
 
     @_writing
     async def set_schedule_status(self, schedule_id: str, status: str) -> None:
