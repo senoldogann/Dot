@@ -4457,17 +4457,25 @@ class Store:
         return int(row["left_count"]) if row is not None else 0
 
     @_writing
-    async def expire_pending_approvals(self, note: str) -> int:
+    async def expire_pending_approvals(self, note: str) -> list[EventRecord]:
         """The approvals still pending for runs that are no longer active expire, with ``note`` for why; those of an
-        active run (one that a process that lives drives) wait on."""
-        cursor = await self._db.execute(
+        active run (one that a process that lives drives) wait on. Each gets, in the same write, the
+        ``approval_decided`` event every other decision stores (item 1049): the card that asked closes on the pages
+        that follow its run, and on any that reads its events later. Returns those events."""
+        now: float = time.time()
+        async with self._db.execute(
             "UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
             " WHERE status = 'pending' AND run_id NOT IN"
-            " (SELECT id FROM runs WHERE status IN ('running', 'queued', 'blocked'))",
-            (time.time(), note),
-        )
+            " (SELECT id FROM runs WHERE status IN ('running', 'queued', 'blocked')) RETURNING id, run_id",
+            (now, note),
+        ) as cursor:
+            expired: list[sqlite3.Row] = list(await cursor.fetchall())
+        told: list[EventRecord] = []
+        for row in expired:
+            data: JsonObject = {"approval_id": str(row["id"]), "status": "expired", "note": note}
+            told.append(await self._insert_event(str(row["run_id"]), now, "approval_decided", data))
         await self._db.commit()
-        return cursor.rowcount
+        return told
 
     # ----- shown pages -----------------------------------------------------------------------
 
