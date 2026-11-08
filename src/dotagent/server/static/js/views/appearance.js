@@ -743,8 +743,8 @@ function typeCard() {
     hint: "The menus, the lists and the pages.",
     setting: INTERFACE_FONT,
     stacks: [
-      { id: "", label: "Inter" },
-      { id: "system", label: "The system's" },
+      { id: "", label: "The system's" },
+      { id: "inter", label: "Inter" },
     ],
   });
   const answers = choiceSetting({

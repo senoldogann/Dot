@@ -1073,8 +1073,8 @@ steps (on in all but Paper) and the side panel (off in all). **Motion**: **Panel
 the side panel take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never slide), and "Faces
 that move" (below). **Text** (item 331): one **Text size** under a line of an answer, the size of the body on this
 device, every text size scaled with it: on a phone 12 to 20 px around 16 (item 347), as iOS's own, and elsewhere 13 to
-17 px around 14; each device keeps its own. **Type**: the interface's font (Inter, the system's, or families typed,
-which go before Inter so that no glyph goes missing); the answers' font (the theme's, which is a serif in Paper, the
+17 px around 14; each device keeps its own. **Type**: the interface's font (the system's by default, San Francisco on
+a Mac and an iPhone, item 1057; Inter; or families typed, which go before the system's so that no glyph goes missing); the answers' font (the theme's, which is a serif in Paper, the
 interface's, or a serif); the composer's font (the interface's, a serif, the code's, or families typed) and size (12 to
 20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed) and the size of an answer's code
 blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on) and long lines of code wrapped
@@ -1091,8 +1091,9 @@ sunken sidebar, raised cards) rather
 than by shadow in dark; borders are the text colour at a small alpha so they sit on every surface; the text tiers are
 measured against every surface by a unit test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones; the
 neutral and the paper look hold the muted one to 4.5:1 too, the sidebar's group labels being set in it); the yellow is
-the owner's bubbles. Type: Inter for the interface and the answers, Geist Mono for code and identifiers, both served
-from Dot's own origin (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and
+the owner's bubbles. Type: the system's face for the interface and the answers (item 1057; Inter, served from Dot's own
+origin with Geist Mono, a choice), Geist Mono for code and identifiers (`static/fonts`, SIL Open Font License); on a
+phone an answer's text is 16 on 22 px (item 1057, 17 on 26 before); seven sizes each with its line-height (12/16 badges and
 chips, 13/18 meta and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles,
 24/32 the greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit
 test refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: a box of the

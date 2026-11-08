@@ -108,7 +108,7 @@
     return bare === "" || plain ? bare : '"' + bare + '"';
   };
   /** @type {Array<[string, string, string[], string]>} */ ([
-    ["dot.fontInterface", "--font", ["system"], "var(--family-inter)"],
+    ["dot.fontInterface", "--font", ["inter", "system"], "var(--family-system)"],
     ["dot.fontComposer", "--composer-font", ["serif", "mono"], "var(--font)"],
     ["dot.fontCode", "--mono", ["sf-mono", "menlo"], "var(--family-geist-mono)"],
   ]).forEach(function (font) {

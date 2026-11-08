@@ -127,9 +127,11 @@ async def _checked(page: Page, address: str, title: str, tmp_path: Path, name: s
     assert problems == [], problems
     assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
     font: str = await page.evaluate("getComputedStyle(document.querySelector('h1')).fontFamily")
-    assert "Inter" in font, f"the page is drawn without the interface's sheets: {font}"
+    # The interface's sheets draw it, in the system's face by default (item 1057), and it asks for nothing but Dot's
+    # own fonts, which a page in the system's face may need none of.
+    assert font.startswith("system-ui"), f"the page is drawn without the interface's sheets: {font}"
     files: list[str] = [urlsplit(url).path for url in asked if url != address and not url.startswith("data:")]
-    assert all(path.startswith("/fonts/") for path in files) and files, asked
+    assert all(path.startswith("/fonts/") for path in files), asked
     await page.screenshot(path=str(tmp_path / f"{name}.png"), full_page=True)
 
 

@@ -1,5 +1,6 @@
 /* Dot web interface. Light and dark follow the system. The two faces are served from this origin (static/fonts; the
-   CSP allows no other): Inter for the interface and the prose, Geist Mono for code and identifiers. The colours live
+   CSP allows no other): Inter, a choice for the interface and the prose, which take the system's face by default (item
+   1057), and Geist Mono for code and identifiers. The colours live
    in themes.css, one block per look; this file holds the type, shape and spacing tokens and every control drawn on
    them. No literal colour, font size, weight, line-height or radius outside the token blocks
    (tests/unit/test_css_tokens.py). */
@@ -36,7 +37,8 @@
   --endless: running;
   /* The stage bar's height, measured by layout.js once the page is up; this is the bar's height without a banner. */
   --stagebar-h: 56px;
-  /* Type (item 77): Inter for the interface and the prose, a serif voice where a look asks for it, Geist Mono for
+  /* Type (item 77): the system's face for the interface and the prose (item 1057; Inter a choice), a serif voice where a
+     look asks for it, Geist Mono for
      code; seven sizes, each with its line-height; three weights (text, label, title); titles tracked a touch tighter.
      Every size, weight, line-height and letter-spacing in the sheets is one of these (tests/unit/test_css_tokens.py).
      Settings › Appearance (item 127) picks the families from these stacks or puts one typed before them, scales the
@@ -47,7 +49,9 @@
   --family-geist-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --family-sf-mono: "SF Mono", ui-monospace, Menlo, monospace;
   --family-menlo: Menlo, ui-monospace, monospace;
-  --font: var(--family-inter);
+  /* The system's own face by default (item 1057: San Francisco on the owner's iPhone and Mac); Inter
+     stays a choice of Settings › Appearance. */
+  --font: var(--family-system);
   --voice: var(--font);
   --mono: var(--family-geist-mono);
   --family-mono: var(--mono);
@@ -192,8 +196,9 @@
     --leading-sm: calc(20px * var(--type-scale));
     --text-ui: calc(16px * var(--type-scale));
     --leading-ui: calc(22px * var(--type-scale));
-    --text-md: calc(17px * var(--type-scale));
-    --leading-md: calc(26px * var(--type-scale));
+    /* A message's text (item 1057): iOS's body size and a line of 1.375, where 17 on 26 set a third less on a screen. */
+    --text-md: calc(16px * var(--type-scale));
+    --leading-md: calc(22px * var(--type-scale));
     --text-lg: calc(19px * var(--type-scale));
     --leading-lg: calc(26px * var(--type-scale));
     --text-xl: calc(22px * var(--type-scale));

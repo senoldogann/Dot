@@ -204,15 +204,17 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
     await panels.fill("400")
     assert await _style(page, ".shell", "transition-duration") == "0.4s"
 
-    # The interface's family: the system's, then one typed; what a family cannot hold is refused and not kept.
+    # The interface's family: the system's by default (item 1057), Inter, then one typed; what a family cannot hold is
+    # refused and not kept.
     interface_font = page.get_by_role("combobox", name="Interface font")
-    await interface_font.select_option("system")
     assert (await _style(page, "body", "font-family")).startswith("system-ui")
+    await interface_font.select_option("inter")
+    assert (await _style(page, "body", "font-family")).startswith("Inter")
     await interface_font.select_option("another")
     typed = page.get_by_role("textbox", name="Interface font: another family")
     await typed.fill("IBM Plex Sans")
     await typed.press("Tab")
-    assert (await _style(page, "body", "font-family")).startswith('"IBM Plex Sans", Inter')
+    assert (await _style(page, "body", "font-family")).startswith('"IBM Plex Sans", system-ui')
     await typed.fill("Plex; } body {")
     await typed.press("Tab")
     await expect(typed).to_have_attribute("aria-invalid", "true")
@@ -247,7 +249,7 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
         "--contrast-boost": "50%",
         "--contrast-border-boost": "12.5%",
         "--motion-panel": "400ms",
-        "--font": '"IBM Plex Sans", var(--family-inter)',
+        "--font": '"IBM Plex Sans", var(--family-system)',
         "--type-scale": str(16 / 14),
         "--voice": "var(--family-serif)",
         "--composer-font": "var(--family-mono)",
