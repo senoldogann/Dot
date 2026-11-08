@@ -9,7 +9,7 @@ import { composerPill } from "./composer.js";
 import { el, modelName } from "./dom.js";
 import { allModels, levelLabel, offersChoice, ONE_MESSAGE, oneMessageChoices, SPEED_HINTS } from "./efforts.js";
 import { icon } from "./icons.js";
-import { modelPicker } from "./modelpicker.js";
+import { defaultRowText, modelPicker } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
 import { providerMark, providerOf } from "./providers.js";
 import { approvalBadge, approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
@@ -45,7 +45,7 @@ function defaultRefOf(snapshot) {
 /** The models that can call tools, grouped by provider: runs need tools, so the others would only fail. */
 function toolGroups(providers) {
   return providers
-    .map((provider) => ({ provider: provider.provider, models: provider.models.filter((model) => model.tools) }))
+    .map((provider) => ({ provider: provider.provider, models: provider.models.filter((model) => model.tools), why: null }))
     .filter((group) => group.models.length > 0);
 }
 
@@ -392,7 +392,10 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     anchor: modelPill.element,
     frame: frame.element,
     label: "Model",
-    build: () => picker.build({ groups: toolGroups(providers), chosen: chosenRef, fallback: defaultRefOf(getSnapshot()) }),
+    build: () => {
+      const fallback = defaultRefOf(getSnapshot());
+      return picker.build({ groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) });
+    },
   });
   const reasoningMenu = anchoredPopover({ anchor: reasoningPill.element, frame: frame.element, label: "Reasoning", build: reasoningRows });
 

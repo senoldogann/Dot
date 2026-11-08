@@ -243,43 +243,67 @@
   }
 }
 
-/* The roles (item 563): a model's select in a row of the Roles card, the provider of the model chosen in the box of the
-   select, before its chevron. */
-.model-pick {
+/* The roles (item 563): a model's box in a row of the Roles card, which opens the composer's model menu (item 1044):
+   the provider's mark, the model's name, and the provider's name before the chevron. The row is the frame the menu
+   stands in. */
+.model-setting {
   position: relative;
+}
+
+.model-pick {
   display: flex;
   flex: 0 1 312px;
+  width: 312px;
+  max-width: 100%;
   min-width: 0;
   align-items: center;
 }
 
-.model-pick .select {
+.model-pick-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   width: 100%;
-  padding-right: 112px;
+  min-width: 0;
   font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.model-pick-mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-2);
+}
+
+.model-pick-mark:empty {
+  display: none;
+}
+
+.model-pick-mark > .provider-mark {
+  width: 16px;
+  height: 16px;
+}
+
+.model-pick-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .model-pick-provider {
-  position: absolute;
-  top: 50%;
-  right: 36px;
-  translate: 0 -50%;
+  flex: none;
   color: var(--muted);
-  font-size: var(--text-sm);
-  pointer-events: none;
 }
 
 .model-pick-provider:empty {
   display: none;
 }
 
-/* On a phone the select keeps its whole width for the model's name (item 787): the provider's name, which stood in the
-   box and left the name cut short, is the group the name is under when the list opens. */
+/* On a phone the box keeps its width for the model's name (item 787): the provider's mark says whose it is. */
 @media (max-width: 720px) {
-  .model-pick .select {
-    padding-right: 32px;
-  }
-
   .model-pick-provider {
     display: none;
   }

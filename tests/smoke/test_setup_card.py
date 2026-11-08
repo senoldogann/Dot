@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 from form_dialogs import foot_is_in_view, open_form
+from model_menu import pick
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -198,7 +199,7 @@ async def test_each_way_of_the_card_leads_to_a_model(own_home: Path) -> None:
 
                 await card.get_by_role("link", name="Choose a model").click()
                 await expect(page).to_have_url(re.compile(r"#/settings/models$"))
-                await page.locator(".models-default select").select_option(SCRIPTED_MODEL)
+                await pick(page, "Default model", SCRIPTED_MODEL)
                 await expect(page.get_by_text("New chats start on scripted.")).to_be_visible()
                 card = await _home(page, address, "ready")
                 await expect(card).to_be_hidden()

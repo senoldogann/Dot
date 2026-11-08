@@ -365,13 +365,12 @@ async def test_no_page_slides_sideways_or_lets_the_phone_zoom_into_a_field(own_h
 
 
 async def test_on_an_iphone_a_field_has_the_size_it_has_on_the_mac(own_home: Path) -> None:
-    """The fields of the owner's screenshots of Settings (item 311): on their iPhone a model's select, the rule's
-    words and the composer's box have the sizes of a phone's text, 15 and 16 px (item 329), and the composer's own size,
-    15 px, none raised to keep the page from zooming; on a Pixel, where only 16 px keeps the page from zooming into a
-    field, they are 16 px."""
+    """The fields of the owner's screenshots of Settings (item 311): on their iPhone the rule's words and the composer's
+    box have the sizes of a phone's text, 16 px (item 329), and the composer's own size, 15 px, none raised to keep the
+    page from zooming; on a Pixel, where only 16 px keeps the page from zooming into a field, they are 16 px. A model's
+    box of Settings › Models is a button since item 1044, which no phone zooms into."""
     # Each page, the field measured, and the button that opens it (the rules' box is on the page, item 622).
     fields: tuple[tuple[str, str, str | None], ...] = (
-        ("#/settings/models", "Default model", None),
         ("#/settings/rules", "When Dot wants to", None),
         ("#/runs", "Goal", None),
     )
@@ -393,7 +392,7 @@ async def test_on_an_iphone_a_field_has_the_size_it_has_on_the_mac(own_home: Pat
                     sizes[device].append(await field.evaluate("(node) => getComputedStyle(node).fontSize"))
             finally:
                 await browser.close()
-    assert sizes == {_OWNERS_PHONE: ["15px", "16px", "15px"], "Pixel 7": ["16px", "16px", "16px"]}
+    assert sizes == {_OWNERS_PHONE: ["16px", "15px"], "Pixel 7": ["16px", "16px"]}
 
 
 async def test_the_words_in_an_empty_composer_box_fit_its_line_on_every_phone(own_home: Path) -> None:
