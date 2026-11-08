@@ -790,7 +790,7 @@ async def test_dotx_stats_counts_what_waits_and_will_not_move_on_by_itself(
         assert await cmd_stats(StatsCommand(name="stats", days=1, by="model", run=None)) == 0
         printed: str = capsys.readouterr().out
     finally:
-        await runtime.store.set_campaign_status(campaign.id, "stopped", None)
+        assert await runtime.store.stop_active_campaign(campaign.id)
         await runtime.store.delete_threads([stalled.id, held.id])
     added: tuple[int, int, int, int] = (
         after.stale_schedules - before.stale_schedules,

@@ -35,7 +35,7 @@ from dotagent.agent.reflection import REFLECTION_OFF
 from dotagent.agent.review import GOAL_TOOL
 from dotagent.browser.modes import browser_data_dir
 from dotagent.config import AppConfig, BrowserConfig, load_default_config
-from dotagent.core.errors import BrowserError, StoreError
+from dotagent.core.errors import BrowserError, RunConflict, StoreError
 from dotagent.core.paths import db_path, failsafe_path
 from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
@@ -886,9 +886,9 @@ class _StoppedWhileStarting(RunManager):
         return brief
 
 
-async def test_a_campaign_stopped_while_its_session_starts_ends_that_session(login_env: dict[str, str]) -> None:
-    """Item 136: the owner's Stop finds no session to stop while one is being started; the session ends as soon as it
-    is, instead of running its whole course on a stopped campaign."""
+async def test_a_campaign_stopped_while_its_session_starts_starts_no_session(login_env: dict[str, str]) -> None:
+    """Item 136: the owner's Stop finds no session to stop while one is being started; since item 1046 the session is
+    not started at all, as the plan of a next session is written only on an active campaign."""
     model: RecordingProvider = RecordingProvider(
         ScriptedProvider(
             _PROVIDER,
@@ -909,10 +909,9 @@ async def test_a_campaign_stopped_while_its_session_starts_ends_that_session(log
             assert opening.campaign_id is not None
             async with asyncio.timeout(_TIME_LIMIT_S):
                 await manager.wait(opening.id)
-            session: RunRecord = await manager.start_session(opening.campaign_id)
-            async with asyncio.timeout(_TIME_LIMIT_S):
-                ended: RunRecord = await manager.wait(session.id)
-            assert ended.status == "cancelled"
+            with pytest.raises(RunConflict, match="not active"):
+                await manager.start_session(opening.campaign_id)
+            assert [run.id for run in await runtime.store.campaign_sessions(opening.campaign_id)] == [opening.id]
             assert (await runtime.store.get_campaign(opening.campaign_id)).status == "stopped"
         finally:
             await manager.shutdown()
@@ -1305,9 +1304,9 @@ async def test_a_claim_that_comes_after_the_owner_stopped_the_campaign_leaves_it
         campaign: CampaignRecord = await store.create_campaign(
             "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
         )
-        await store.set_campaign_status(campaign.id, "stopped", None)
+        assert await store.stop_active_campaign(campaign.id)
         assert not await store.achieve_campaign(campaign.id, "Fifty leads.", only_active=True)
         assert (await store.get_campaign(campaign.id)).status == "stopped"
-        await store.set_campaign_status(campaign.id, "active", None)
+        assert await store.reactivate_campaign(campaign.id, None)
         assert await store.achieve_campaign(campaign.id, "Fifty leads.", only_active=True)
         assert (await store.get_campaign(campaign.id)).status == "achieved"

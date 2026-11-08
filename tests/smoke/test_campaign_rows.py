@@ -121,7 +121,7 @@ async def test_a_campaigns_row_stops_marks_achieved_and_deletes_it_where_it_is(o
         active: CampaignRecord = await _campaign(runtime, "Leads for the studio")
         stopped: CampaignRecord = await _campaign(runtime, "Newsletter subscribers")
         achieved: CampaignRecord = await _campaign(runtime, "Ten reviews")
-        await runtime.store.set_campaign_status(stopped.id, "stopped", None)
+        assert await runtime.store.stop_active_campaign(stopped.id)
         await runtime.store.achieve_campaign(achieved.id, "Ten reviews are on the page.")
         async with async_playwright() as playwright:
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)

@@ -233,9 +233,11 @@ def _schedule_tool() -> RegisteredTool:
         timing: Timing = tool_timing(args.cron, args.at, ctx)
         when: str = describe_timing(timing, ctx.runtime.schedule_zone)
         if timing.cron is not None:
-            await ctx.runtime.store.plan_campaign_sessions(campaign.id, timing.cron, timing.first_run)
+            if not await ctx.runtime.store.plan_campaign_sessions(campaign.id, timing.cron, timing.first_run):
+                return fail(_NOT_ACTIVE)
             return ok(f"The sessions follow this rhythm from now on: {when}.")
-        await ctx.runtime.store.set_next_session(campaign.id, timing.first_run)
+        if not await ctx.runtime.store.set_next_session(campaign.id, timing.first_run):
+            return fail(_NOT_ACTIVE)
         rhythm: str = "" if campaign.cron is None else f" The rhythm {campaign.cron} goes on after it."
         return ok(f"The next session is planned: {when}.{rhythm}")
 
