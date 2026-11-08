@@ -2,16 +2,20 @@
 
 The daemon serves a page as the run wrote it, after a bootstrap of its own, and the guard sandboxes it
 (``PAGE_HEADERS``): its origin is opaque, so its scripts reach nothing of Dot's. The bootstrap gives the page the CSS
-variables of :data:`THEME_VARIABLES`, and speaks four messages of the MCP Apps protocol (JSON-RPC 2.0 over
+variables of :data:`THEME_VARIABLES`, and speaks five messages of the MCP Apps protocol (JSON-RPC 2.0 over
 ``postMessage``) with the frame it is in:
 
-- ``ui/notifications/host-context-changed`` from the frame: the conversation's theme,
-  ``{"theme": "light" | "dark", "styles": {"variables": {name: value}}}``. The frame puts the same object in the address
-  it loads, after ``#dot-theme=``, so that the page is drawn in that theme from the first; the bootstrap takes it out of
-  the address again.
+- ``ui/notifications/host-context-changed`` from the frame: the conversation's theme, ``{"theme": "light" | "dark",
+  "displayMode": "inline" | "fullscreen", "styles": {"variables": {name: value}}}``. The frame puts the same object in
+  the address it loads, after ``#dot-theme=``, so that the page is drawn in that theme from the first; the bootstrap
+  takes it out of the address again.
 - ``ui/notifications/size-changed`` to the frame: ``{"height": pixels}``, every time the page's height changes.
 - ``ui/open-link`` to the frame: ``{"url": address}``, for a link to another page that the user clicked; the frame
   opens it in the user's browser. A page opened full size follows its links itself.
+- ``ui/notifications/zoom`` to the frame: ``{"phase": "start" | "move" | "end" | "step", "ratio": number, "x": pixels,
+  "y": pixels}``, only while the frame says the page is full screen (``displayMode`` of the host context, item 1056):
+  a pinch of two fingers (its ratio to where it started) or the trackpad's (a step), about a point of the frame, which
+  the viewer zooms by, as a page in a frame cannot be zoomed on a phone.
 - ``ui/message`` to the frame: ``{"role": "user", "content": [{"type": "text", "text": words}]}``, for a choice the
   page offers that the user tapped (item 658): an element with ``data-answer`` sends its words, and the page's own
   scripts may send the same after a click. The frame writes the words into the message box, for the user to send.
@@ -44,12 +48,20 @@ _BOOTSTRAP: str = """(() => {
   const SIZE_CHANGED = "ui/notifications/size-changed";
   const OPEN_LINK = "ui/open-link";
   const MESSAGE = "ui/message";
+  const ZOOM = "ui/notifications/zoom";
   const NAME = /^--[a-z0-9-]+$/;
+  // Whether the frame shows the page full screen (the host context's displayMode): there two fingers and the
+  // trackpad's pinch zoom the viewer (item 1056), which a frame's page cannot be on a phone.
+  let fullscreen = false;
   const theme = document.getElementById("dot-theme");
   const framed = window.parent !== window;
 
   // The conversation's theme, as the frame sends it: its values take the place of Dot's own.
   function paint(context) {
+    fullscreen = context?.displayMode === "fullscreen";
+    if (fullscreen && framed) {
+      listenForPinch();
+    }
     const variables = context?.styles?.variables;
     if (typeof variables !== "object" || variables === null) {
       return;
@@ -134,6 +146,67 @@ _BOOTSTRAP: str = """(() => {
       "*",
     );
   });
+
+  // Full screen, a pinch of two fingers and the trackpad's (the wheel with Ctrl) are the viewer's to zoom with (item
+  // 1056): the frame is told the pinch's ratio and the point between the fingers, in the frame's own coordinates.
+  function zoom(phase, ratio, x, y) {
+    window.parent.postMessage({ jsonrpc: "2.0", method: ZOOM, params: { phase, ratio, x, y } }, "*");
+  }
+  let pinch = null;
+  function apart(touches) {
+    const [a, b] = touches;
+    return {
+      distance: Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)),
+      x: (a.clientX + b.clientX) / 2,
+      y: (a.clientY + b.clientY) / 2,
+    };
+  }
+  // Listened for only once the page is full screen: a listener that may stop a scroll makes the browser wait for it at
+  // every scroll, which a page in the conversation is spared.
+  let listening = false;
+  function listenForPinch() {
+    if (listening) {
+      return;
+    }
+    listening = true;
+    window.addEventListener(
+      "touchstart",
+      (event) => {
+        if (fullscreen && event.touches.length === 2) {
+          pinch = apart(event.touches);
+          zoom("start", 1, pinch.x, pinch.y);
+        }
+      },
+      { passive: true },
+    );
+    window.addEventListener(
+      "touchmove",
+      (event) => {
+        if (pinch !== null && event.touches.length === 2) {
+          event.preventDefault();
+          const now = apart(event.touches);
+          zoom("move", now.distance / pinch.distance, pinch.x, pinch.y);
+        }
+      },
+      { passive: false },
+    );
+    window.addEventListener("touchend", (event) => {
+      if (pinch !== null && event.touches.length < 2) {
+        pinch = null;
+        zoom("end", 1, 0, 0);
+      }
+    });
+    window.addEventListener(
+      "wheel",
+      (event) => {
+        if (fullscreen && event.ctrlKey) {
+          event.preventDefault();
+          zoom("step", Math.exp(-event.deltaY / 200), event.clientX, event.clientY);
+        }
+      },
+      { passive: false },
+    );
+  }
 
   // The page's height: what overflows the frame, or, when the page is shorter than the frame, the page itself.
   let reported = 0;

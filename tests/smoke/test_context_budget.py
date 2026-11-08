@@ -74,7 +74,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # line (26,049 measured; system 7,591, tools 18,432).
 # Raised by 100 for the owner's rule of 2026-11-07 (item 1023): analyses thorough, recommendations bold, one line of
 # the prompt's Communication (26,138 measured; system 7,688).
-BUDGET_TOKENS: int = 26_150
+# Raised by 50 for the line of `show_page` that has a document shown as its text, not a picture of it (item 1056: the
+# owner's CV, shown as a JPEG, blurred in the full-screen viewer; 26,162 measured).
+BUDGET_TOKENS: int = 26_200
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -92,7 +94,8 @@ SYSTEM_BUDGET_TOKENS: int = 7_700
 # Raised by 350 for `recall`, `pass_reply` and a plan step's `brief` (items 924, 926 and 927) above.
 # Raised by 200 for `chats` and `read_chat` (item 953) above.
 # Raised by 100 for `send_to_chat` (item 957) above.
-TOOLS_BUDGET_TOKENS: int = 18_450
+# Raised by 50 for the line of `show_page` of item 1056 above.
+TOOLS_BUDGET_TOKENS: int = 18_500
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

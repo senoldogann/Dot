@@ -14,6 +14,7 @@
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { shownScheme } from "./theme.js";
+import { ZOOM_EVENT, openViewer } from "./viewer.js";
 
 const MIN_HEIGHT = 80;
 const MAX_HEIGHT = 2000;
@@ -27,6 +28,7 @@ const CONTEXT_CHANGED = "ui/notifications/host-context-changed";
 const SIZE_CHANGED = "ui/notifications/size-changed";
 const OPEN_LINK = "ui/open-link";
 const MESSAGE = "ui/message";
+const ZOOM = "ui/notifications/zoom";
 // The event that carries the words of a choice the user tapped in a page to the message box (item 658): its detail is
 // `{ text }`, which the page of the run puts in its box for the user to send, cancelling the event to say it did.
 export const PAGE_ANSWER_EVENT = "dot:page-answer";
@@ -114,8 +116,14 @@ function context() {
   return { theme: shownScheme(), styles: { variables } };
 }
 
+// The phases of a pinch a page full screen tells the frame of (item 1056).
+const ZOOM_PHASES = new Set(["start", "move", "end", "step"]);
+
+/** Send the theme to the frame, with whether it shows its page full screen (MCP Apps' `displayMode`), where the page
+ * passes a pinch to the viewer (item 1056). */
 function sendTheme(frame, theme) {
-  frame.contentWindow?.postMessage({ jsonrpc: "2.0", method: CONTEXT_CHANGED, params: theme }, "*");
+  const displayMode = frame.dataset.full === "true" ? "fullscreen" : "inline";
+  frame.contentWindow?.postMessage({ jsonrpc: "2.0", method: CONTEXT_CHANGED, params: { ...theme, displayMode } }, "*");
 }
 
 /** @returns {HTMLIFrameElement[]} */
@@ -191,6 +199,19 @@ function onMessage(event) {
     }
     return;
   }
+  if (message.method === ZOOM) {
+    // A pinch on a page full screen, which the viewer zooms by (item 1056): numbers alone, from a frame full screen.
+    const params = message.params;
+    const sound =
+      frame.dataset.full === "true" &&
+      ZOOM_PHASES.has(params?.phase) &&
+      [params.ratio, params.x, params.y].every((value) => typeof value === "number" && Number.isFinite(value)) &&
+      params.ratio > 0;
+    if (sound) {
+      frame.dispatchEvent(new CustomEvent(ZOOM_EVENT, { detail: { phase: params.phase, ratio: params.ratio, x: params.x, y: params.y } }));
+    }
+    return;
+  }
   if ((message.method === OPEN_LINK || message.method === MESSAGE) && (typeof message.id === "string" || typeof message.id === "number")) {
     const refused = message.method === OPEN_LINK ? openLink(frame, message.params?.url) : writeChoice(frame, message.params);
     const answer = refused === null ? { result: {} } : { error: { code: -32000, message: refused } };
@@ -254,24 +275,12 @@ function pageFrame(pageId, address, title, onLeft, full = false) {
   return frame;
 }
 
-/** The page full screen, in a dialog of the UI (item 651): Escape, its Close or a click beside it closes it. */
+/** The page full screen (items 651 and 1056), in the viewer, which covers the screen and zooms: Escape or its Close
+ * closes it, and a page that loads another in its place closes it too. */
 function showFull(pageId, address, title, opener) {
-  const close = el("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon("x"));
-  const dialog = el("dialog", { class: "modal page-dialog", "aria-label": title });
-  const frame = pageFrame(pageId, address, title, () => dialog.close(), true);
-  dialog.append(el("div", { class: "page-dialog-head" }, el("span", { class: "page-dialog-title" }, title), close), frame);
-  close.addEventListener("click", () => dialog.close());
-  dialog.addEventListener("click", (event) => {
-    if (event.target === dialog) {
-      dialog.close();
-    }
-  });
-  dialog.addEventListener("close", () => {
-    dialog.remove();
-    opener.focus();
-  });
-  document.body.append(dialog);
-  dialog.showModal();
+  let dialog = null;
+  const frame = pageFrame(pageId, address, title, () => dialog?.close(), true);
+  dialog = openViewer({ title, content: frame, page: true, onClose: () => opener.focus() });
 }
 
 /**

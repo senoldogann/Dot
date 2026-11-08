@@ -377,11 +377,41 @@ async def _one_size(
         assert frame is not None and drawn is not None
         assert frame["height"] - drawn["height"] <= 32, (frame, drawn)
     await view.get_by_role("button", name="chart.png, show at full size").click()
-    lightbox: Locator = page.locator("dialog.lightbox")
-    await expect(lightbox).to_be_visible()
-    await expect(lightbox.locator("img")).to_have_attribute("src", re.compile(r"^blob:"))
+    # The picture full screen, in the viewer (item 1056): it covers the window and zooms; Escape closes it.
+    viewer: Locator = page.get_by_role("dialog", name="chart.png")
+    await expect(viewer).to_be_visible()
+    await expect(viewer.locator("img")).to_have_attribute("src", re.compile(r"^blob:"))
+    covered: dict[str, float] | None = await viewer.bounding_box()
+    window: dict[str, int] | None = page.viewport_size
+    assert covered is not None and window is not None
+    assert (covered["x"], covered["y"], covered["width"], covered["height"]) == (
+        0,
+        0,
+        window["width"],
+        window["height"],
+    )
+    await viewer.get_by_role("button", name="Zoom in").click()
+    await expect(viewer.locator(".viewer-layer")).to_have_attribute("style", re.compile(r"scale\(1\.5\)"))
+    await viewer.get_by_role("button", name="Fit").click()
+    await expect(viewer.locator(".viewer-layer")).to_have_attribute("style", re.compile(r"scale\(1\)"))
+    # A tap on the picture keeps it open, once it is sure to be no double tap; a tap beside it closes it.
+    await viewer.locator("img").click()
+    await page.wait_for_timeout(600)
+    await expect(viewer).to_be_visible()
+    stage: dict[str, float] | None = await viewer.locator(".viewer-stage").bounding_box()
+    drawn: dict[str, float] | None = await viewer.locator("img").bounding_box()
+    assert stage is not None and drawn is not None
+    beside: tuple[float, float] = (
+        (stage["x"] + 4, stage["y"] + stage["height"] / 2)
+        if drawn["x"] - stage["x"] > 8
+        else (stage["x"] + stage["width"] / 2, stage["y"] + stage["height"] - 4)
+    )
+    await page.mouse.click(*beside)
+    await expect(viewer).to_have_count(0)
+    await view.get_by_role("button", name="chart.png, show at full size").click()
+    await expect(viewer).to_be_visible()
     await page.keyboard.press("Escape")
-    await expect(lightbox).not_to_be_visible()
+    await expect(viewer).to_have_count(0)
     await _close(page, view, chart)
 
     # A source file as code (item 624): its language and path over it, its lines numbered, its words coloured by kind,

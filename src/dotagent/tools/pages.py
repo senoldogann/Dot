@@ -37,7 +37,9 @@ _PAGE_MAX_BYTES: int = PAGE_MAX_CHARS * 4
 # What the tool says of a page; since item 521 it asks for one that lives: animated, with values on hover.
 _DESCRIPTION: str = (
     "Show the user a page you write in HTML, in the conversation where they read you: a chart, a table, a diagram, a "
-    "3D view, a mockup or anything that says more drawn than written. It is part of your answer: no title over it and "
+    "3D view, a mockup or anything that says more drawn than written. Show a document (a CV) as its text, not a "
+    "picture: zoomed, text stays sharp. "
+    "It is part of your answer: no title over it and "
     "no box round it, on the conversation's own ground, as wide as the conversation (about 360px on a phone) and as "
     "tall as the page; the user can open it full screen. Give it a quiet heading of its own if it needs one, not a "
     "banner; leave html, body and the outermost element without a background, a border or side padding, and give a "

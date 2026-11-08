@@ -365,8 +365,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   TSV table (split at its commas, or at its semicolons where a comma marks decimals), a grid with a tab for each sheet,
   a click on a cell saying what it holds (its formula and the value last worked out); a Word document its headings,
   paragraphs, lists and tables; a presentation its slides with their text, tables, charts' series and notes; an image
-  itself, whole in a frame that fits it, and at full size over the page when it is pressed (Escape closes the picture
-  first; item 624); a Markdown file (`.md`, `.markdown`) formatted as an answer is, with its headings, lists, tables and
+  itself, whole in a frame that fits it, and full screen when it is pressed (Escape closes the picture first; item
+  624), in the viewer pictures and pages open in (item 1056: it covers the screen, the phone's safe areas clear, and
+  zooms with two fingers, a double tap, the trackpad's pinch or Ctrl and the wheel, and its −, + and Fit; zoomed, the
+  picture is dragged; Close, Escape, a tap beside the picture or a swipe down close it); a Markdown file (`.md`, `.markdown`) formatted as an answer is, with its headings, lists, tables and
   code, and as it is written a click away (item 269), its HTML never drawn; a source file (Python, JavaScript,
   TypeScript, shell, Rust, Go, Swift, SQL, YAML and the like, by its extension) as code, its lines numbered and its
   words coloured by their kind (keywords, strings, numbers, comments), its language and its path over it (item 624); any
@@ -641,8 +643,12 @@ or at the file, which a command of a `task` run can make, is refused, never foll
 **Pages in the conversation.** `show_page(title, html | path)` shows you a page the run writes in HTML, in the chat: a
 chart, a table, a diagram, a 3D view, a mockup. Since item 651 it is part of the answer: no title over it and no box
 round it, on the conversation's own ground, as wide as the conversation and as tall as the page (80 to 2,000 pixels; a
-longer one scrolls inside it). Over its corner, seen on hover and always on a touch screen, Full screen opens it in a
-dialog of the UI and Open in the browser in yours. The height a page took is kept in the browser by its width, for the
+longer one scrolls inside it). Over its corner, seen on hover and always on a touch screen, Full screen opens it in the
+viewer of pictures and pages (item 1056: the whole screen, zoomed with two fingers, −, + and Fit, the trackpad's pinch or
+Ctrl and the wheel; at its fitted size the page is its own, links, choices and scrolling, and passes a pinch to the
+viewer, `ui/notifications/zoom`; zoomed, a clear layer over it takes the gestures, two fingers and a drag; Close or
+Escape closes it) and Open in the browser in yours. A document is
+shown as its text, not as a picture of it, so that it stays sharp zoomed (the tool says so to the run). The height a page took is kept in the browser by its width, for the
 last 100 pages shown, so a page shown again stands at its height at once and the conversation does not jump. It is drawn
 in the colours of the theme on screen, given to it as CSS variables (`--background`, `--foreground`, `--accent`,
 `--chart-1` to `--chart-6` and others), and takes the new ones when the theme or the system's scheme changes. Its

@@ -309,7 +309,27 @@ async def _one_size(
     await expect(dialog).to_be_visible()
     await expect(dialog.frame_locator("iframe.shown-page-frame").locator("#ink")).to_have_text(TITLE)
     await _check_reach(dialog.frame_locator("iframe.shown-page-frame"))
+    # It covers the window, and zooms (item 1056): zoomed, a clear layer over the page takes the gestures; fitted, the
+    # page is its own again.
+    covered: dict[str, float] | None = await dialog.bounding_box()
+    assert covered is not None and (covered["width"], covered["height"]) == (width, 900)
+    glass: Locator = dialog.locator(".viewer-glass")
+    await expect(glass).to_be_hidden()
+    await dialog.get_by_role("button", name="Zoom in").click()
+    await expect(glass).to_be_visible()
+    await page.screenshot(path=str(shots / f"full-zoomed-{width}-{_OTHER[scheme]}.png"))
+    await dialog.get_by_role("button", name="Fit").click()
+    await expect(glass).to_be_hidden()
     await page.screenshot(path=str(shots / f"full-{width}-{_OTHER[scheme]}.png"))
+    # A pinch on the page at its fitted size reaches the page's frame, which passes it to the viewer: the trackpad's
+    # pinch comes as the wheel with Ctrl.
+    await page.mouse.move(width / 2, 450)
+    await page.keyboard.down("Control")
+    await page.mouse.wheel(0, -300)
+    await page.keyboard.up("Control")
+    await expect(glass).to_be_visible()
+    await dialog.get_by_role("button", name="Fit").click()
+    await expect(glass).to_be_hidden()
     await page.keyboard.press("Escape")
     await expect(dialog).to_have_count(0)
 
