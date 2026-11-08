@@ -198,6 +198,8 @@ done, or to try again when the run failed, and the run is told never to change t
 put one on it with the box at the card's foot; **Remove** takes a thing to do off it, **Again** puts back one that was
 let go. The card's title folds the rest of it away, its switch and its count (**On · 2 to do**) still in sight, and
 opens it again; the browser keeps the choice (item 929).
+A thing moves only from where it stood when it was read (item 1048): one let go while its try was being weighed stays
+let go, and one let go before its run started is not started.
 
 **When it works.** The scheduler looks at every tick. Switched on, it starts one of its runs when none of the Mac's runs
 works, nobody touched the keyboard, the mouse or the trackpad for `idle_minutes` (10), `gap_minutes` (15) have passed

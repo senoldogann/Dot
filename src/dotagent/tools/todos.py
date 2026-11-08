@@ -128,7 +128,11 @@ def _drop_tool() -> RegisteredTool:
         if not works_on and kept.status != "open":
             return fail(f"It is {kept.status} already, not to do: {kept.title}")
         note: str = f"{LET_GO_BY_ITS_RUN}{args.reason}" if works_on else f"Taken back: {args.reason}"
-        await store.set_todo(kept.id, "dropped", kept.attempts, kept.run_id, one_line(note, 200))
+        if (
+            await store.set_todo(kept.id, kept.status, "dropped", kept.attempts, kept.run_id, one_line(note, 200))
+            is None
+        ):
+            return fail(f"It changed meanwhile, as it is no longer {kept.status}: {kept.title}")
         return ok(f"Off Dot's list: {kept.title}")
 
     return make_tool(
