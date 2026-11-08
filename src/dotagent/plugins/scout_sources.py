@@ -303,7 +303,11 @@ class GitHub:
         headers: dict[str, str] = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        self._client: httpx.AsyncClient = client or httpx.AsyncClient(timeout=TIMEOUT_S, headers=headers)
+        # A repository renamed or moved answers 301 with its new address (item 1060: nine leads of the owner's scout
+        # failed so); httpx drops the token on a redirect to another host.
+        self._client: httpx.AsyncClient = client or httpx.AsyncClient(
+            timeout=TIMEOUT_S, headers=headers, follow_redirects=True
+        )
         self.requests: int = 0
         self.remaining: int | None = None
 

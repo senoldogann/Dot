@@ -26,8 +26,12 @@ log = get_logger(__name__)
 COMMAND_KEY: str = "channels.imessage.command"
 # How long the log of Messages' database may have changed with nothing Dot can read changing, before the tab says so.
 UNSEEN_S: float = 120.0
+# Messages writes its log for more than a new message (a receipt or a sync of an older row, which the look does not
+# watch), so this says what it may be and what to do only if a message went unanswered (item 1059: eleven such notes in
+# three days on the owner's Mac, and Dot had seen the newest row each time).
 WAL_UNSEEN: str = (
-    "Messages has written since Dot last saw a new message; Dot may not be seeing the newest. Quit and reopen Messages."
+    "Messages has written since Dot last saw a new message. That is usually a receipt or a sync; if a message you sent "
+    "Dot got no answer, quit and reopen Messages."
 )
 # The least time between two lines of the log that say the newest row changed.
 NEWEST_LOGGED_APART_S: float = 60.0
@@ -205,7 +209,7 @@ class Watch:
     def _log_unseen(self, look: Look, now: float) -> None:
         wal: SeenFile | None = look.chat_db_wal
         database: SeenFile | None = look.chat_db
-        log.warning(
+        log.info(
             "imessage_wal_unseen",
             newest_row=look.newest,
             newest_seen_at=self._newest_seen_at,

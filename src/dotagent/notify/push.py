@@ -250,6 +250,7 @@ def _signer(keys: PushKeys) -> Vapid:
 def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) -> None:
     # pywebpush loads aiohttp and requests, about 25 MB: the first notification sent loads it, not the daemon's start
     # (item 729).
+    from py_vapid import VapidException
     from pywebpush import WebPushException, webpush
 
     try:
@@ -270,6 +271,13 @@ def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) 
         raise PushError(
             "the push service did not take the message",
             {"endpoint": subscription.endpoint, "status": status, "answer": answer, "detail": str(exc)},
+        ) from exc
+    except VapidException as exc:
+        # The message could not be signed (item 1058: its claims refused, as before item 1019): this one is not sent,
+        # and the watch of the pushes goes on to the next, where the error had ended it and the phone heard nothing
+        # until the daemon started again.
+        raise PushError(
+            "the push could not be signed", {"endpoint": subscription.endpoint, "status": None, "detail": str(exc)}
         ) from exc
     except OSError as exc:
         # The network failed on the way (requests raises its errors as OSError): the service never answered.
@@ -326,11 +334,15 @@ async def _push_to(store: Store, keys: PushKeys, subscription: PushSubscription,
             log.info("push_subscription_gone", endpoint=subscription.endpoint, status=error.context.get("status"))
             return "removed"
         # What the service answered says why (item 992: Apple's reason was never logged, and a 403 hid for days).
+        # A push that never reached the service (it could not be signed, item 1058, or the network failed) says why in
+        # its detail, which a status and an answer do not hold.
         log.warning(
             "push_failed",
             endpoint=subscription.endpoint,
             status=error.context.get("status"),
             answer=error.context.get("answer"),
+            error=error.message,
+            detail=error.context.get("detail"),
         )
         return "failed"
     return "sent"

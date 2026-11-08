@@ -190,3 +190,14 @@ async def test_github_says_how_many_requests_are_left_and_none_is_made_past_the_
         assert github.remaining == 2 and asked[-1].startswith(f"{API}/search/")
     finally:
         await github.aclose()
+
+
+@pytest.mark.asyncio
+async def test_the_scouts_own_client_follows_a_repository_that_moved() -> None:
+    """Item 1060: GitHub answers a renamed or moved repository with 301 and its new address; the scout's client follows
+    it (httpx drops the token on a redirect to another host)."""
+    github: GitHub = GitHub(None)
+    try:
+        assert github._client.follow_redirects is True
+    finally:
+        await github._client.aclose()
