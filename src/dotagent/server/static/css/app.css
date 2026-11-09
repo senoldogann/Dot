@@ -52,10 +52,33 @@
   /* The system's own face by default (item 1057: San Francisco on the owner's iPhone and Mac); Inter
      stays a choice of Settings › Appearance. */
   --font: var(--family-system);
-  --voice: var(--font);
+  /* The answers' own face: the interface's, but where a theme gives its answers a voice of their own (themes.css:
+     Paper's serif). Settings › Appearance's Answers font puts what it picks in --voice, a family typed before this. */
+  --theme-voice: var(--font);
+  --voice: var(--theme-voice);
   --mono: var(--family-geist-mono);
   --family-mono: var(--mono);
+  /* The interface's face, which the answers and the message box may take, as they may take the code's (--family-mono,
+     item 1062). */
+  --family-interface: var(--font);
   --composer-font: var(--font);
+  /* Each of the four faces of Settings › Appearance (item 1062) has its family, its size and its weight: the interface
+     (--font, --type-scale, --weight-text), the answers (--voice, --answer-size, --answer-weight), the message box
+     (--composer-font, --composer-size, --composer-weight) and the code (--mono, --code-size, --code-weight). The answers
+     are the message size and follow the interface's until given their own. */
+  --answer-size: var(--text-md);
+  --answer-leading-ratio: 1.6;
+  --answer-leading: calc(var(--answer-size) * var(--answer-leading-ratio));
+  /* An answer's first heading a step over its text, and its inline code a step under it, as 17 and 13 are to 15. */
+  --answer-heading: calc(var(--answer-size) * 17 / 15);
+  --answer-heading-leading: calc(var(--answer-heading) * 24 / 17);
+  --answer-code: calc(var(--answer-size) * 13 / 15);
+  --answer-weight: 400;
+  /* An answer's headings a step and two over its own weight, as the interface's labels and titles are over its. */
+  --answer-label: calc(var(--answer-weight) + 100);
+  --answer-title: calc(var(--answer-weight) + 200);
+  --composer-weight: 400;
+  --code-weight: 400;
   --type-scale: 1;
   --text-xs: calc(12px * var(--type-scale));
   --leading-xs: calc(16px * var(--type-scale));
@@ -89,9 +112,11 @@
   --seen-bottom: 0px;
   --code-size: 13px;
   --code-leading: calc(var(--code-size) * 18 / 13);
+  /* The interface's weight (Settings › Appearance, item 1062) moves the three together, so that a label stays a step over
+     the text and a title two. */
   --weight-text: 400;
-  --weight-label: 500;
-  --weight-title: 600;
+  --weight-label: calc(var(--weight-text) + 100);
+  --weight-title: calc(var(--weight-text) + 200);
   --tracking-title: -0.01em;
   --tracking-caps: 0.04em;
   /* Shape: the radii of marks, controls, cards, bubbles and pills, soft as a messaging app's (item 837: they were 6, 8,
@@ -199,6 +224,11 @@
     /* A message's text (item 1057): iOS's body size and a line of 1.375, where 17 on 26 set a third less on a screen. */
     --text-md: calc(16px * var(--type-scale));
     --leading-md: calc(22px * var(--type-scale));
+    --answer-leading-ratio: 1.375;
+    /* An answer's first heading and its inline code as a phone draws them at its message's 16 px: 19 on 26, and 15. */
+    --answer-heading: calc(var(--answer-size) * 19 / 16);
+    --answer-heading-leading: calc(var(--answer-heading) * 26 / 19);
+    --answer-code: calc(var(--answer-size) * 15 / 16);
     --text-lg: calc(19px * var(--type-scale));
     --leading-lg: calc(26px * var(--type-scale));
     --text-xl: calc(22px * var(--type-scale));
@@ -227,6 +257,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font: var(--text-ui) / var(--leading-ui) var(--font);
+  font-weight: var(--weight-text);
   font-optical-sizing: auto;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
@@ -3684,6 +3715,7 @@ dialog.modal.versions-dialog {
   font-family: var(--composer-font);
   font-size: var(--composer-size);
   line-height: var(--composer-leading);
+  font-weight: var(--composer-weight);
   resize: none;
   background: transparent;
 }
@@ -3713,6 +3745,7 @@ dialog.modal.versions-dialog {
   font-family: var(--composer-font);
   font-size: var(--composer-size);
   line-height: var(--composer-leading);
+  font-weight: var(--composer-weight);
   white-space: pre-wrap;
   overflow-wrap: break-word;
   color: var(--text);
@@ -5297,8 +5330,9 @@ dialog.modal.versions-dialog {
 
 .prose {
   font-family: var(--voice);
-  font-size: var(--text-md);
-  line-height: var(--leading-md);
+  font-size: var(--answer-size);
+  line-height: var(--answer-leading);
+  font-weight: var(--answer-weight);
   word-break: break-word;
 }
 
@@ -5317,19 +5351,19 @@ dialog.modal.versions-dialog {
 .prose h2,
 .prose h3,
 .prose h4 {
-  font-size: var(--text-md);
-  line-height: var(--leading-md);
-  font-weight: var(--weight-title);
+  font-size: var(--answer-size);
+  line-height: var(--answer-leading);
+  font-weight: var(--answer-title);
 }
 
 .prose h1 {
-  font-size: var(--text-lg);
-  line-height: var(--leading-lg);
+  font-size: var(--answer-heading);
+  line-height: var(--answer-heading-leading);
 }
 
 .prose h3,
 .prose h4 {
-  font-weight: var(--weight-label);
+  font-weight: var(--answer-label);
 }
 
 /* The browser's own room around a list and a quote goes; the room between the blocks of a prose, which `.prose > * + *`
@@ -5363,11 +5397,16 @@ dialog.modal.versions-dialog {
   font-family: var(--mono);
   /* Code shows the letters it holds: no ligature turns `->` or `!=` into a sign (item 537). */
   font-variant-ligatures: none;
-  font-size: var(--text-sm);
+  font-size: var(--answer-code);
   padding: var(--space-half) 4px;
   border-radius: var(--radius-xs);
   background: var(--surface-2);
   border: 1px solid var(--border);
+}
+
+/* Code has the code's own weight (item 1062), but in a heading or in bold, where it keeps the weight around it. */
+.prose code:not(:is(h1, h2, h3, h4, strong, b, th) code) {
+  font-weight: var(--code-weight);
 }
 
 /* A block of code is a box with its head (item 537): what it is at the left (the language it was written for, or a
@@ -5416,6 +5455,7 @@ dialog.modal.versions-dialog {
   padding: var(--space-half) var(--space-3) var(--space-3);
   overflow-x: auto;
   font: var(--code-size) / var(--code-leading) var(--mono);
+  font-weight: var(--code-weight);
   font-variant-ligatures: none;
 }
 
@@ -11076,6 +11116,7 @@ button.attach-chip:hover {
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   font: var(--code-size) / var(--code-leading) var(--mono);
+  font-weight: var(--code-weight);
   white-space: pre;
 }
 
