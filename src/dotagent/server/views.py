@@ -2116,6 +2116,9 @@ class ActivityRow(FrozenModel):
     steps: int | None
     parent_run_id: str | None
     actor_id: str | None
+    # The chat of the run a delegated run's work came from at the top (item 1074): a work order's attempt outlives the
+    # lead's turn that gave it, and stands under that chat, which works while it does. None for any other row.
+    root_thread_id: str | None = None
 
 
 class ActivityView(FrozenModel):

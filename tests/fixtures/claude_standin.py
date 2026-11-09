@@ -4,6 +4,16 @@ first message on its input, and answers as the message says:
 
 - ``extra tools``: an init line that lists a tool of Claude Code's own besides the door's, and nothing more;
 - ``limit``: an init line, then a ``rate_limit_event`` whose window refuses calls;
+- ``finish then talk``: as ``talk with me``, its first turn a call of ``finish`` that did not succeed (item 1076's
+  pre-push review: what comes after it decides the run's end);
+- ``finish then check``: a call of ``finish`` that succeeded and found nothing new, then a call of ``shell`` and a
+  plain answer that the work failed after all (item 1076's pre-push review: a call after a finish drops it);
+- ``talk with me``: an init line, a second's pause, an answer and a ``result``; then the same for each message that
+  comes on its input, taken in first (item 1076: a run the owner holds waits for their next message);
+- ``needs a code``: an init line, then a call of ``finish`` that did not succeed and needs a code from the owner, and
+  a ``result`` (item 1076);
+- ``slow command``: an init line, then a call of ``shell`` that sleeps before it writes ``late.txt`` in the workspace,
+  for a Stop to cut short (item 1076);
 - anything else: an init line naming the door's tools, a step that calls ``write_file`` twice through the door's MCP
   endpoint with the config file it was given (once into the workspace's ``.claude`` folder, once into ``notes.txt``),
   a step that answers with what the calls said, and a ``result``; then it waits for its input to close.
@@ -89,6 +99,62 @@ async def _work(server: dict[str, object], door: str, said: str) -> None:
         if "limit" in said:
             refused: dict[str, object] = {"status": "rejected", "rateLimitType": "five_hour", "resetsAt": 1_900_000_000}
             _say({"type": "rate_limit_event", "rate_limit_info": refused})
+            return
+        if "finish then talk" in said:
+            _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
+            await client.call_tool(
+                "finish", {"answer": "The bank asks for a code.", "success": False, "needs_from_user": "The code."}
+            )
+        if "talk with me" in said or "finish then talk" in said:
+            await asyncio.sleep(1.0)
+            _step([("text", "Heard you.")], "end_turn")
+            _say(
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": False,
+                    "result": "Heard you.",
+                    "session_id": SESSION,
+                }
+            )
+            loop = asyncio.get_running_loop()
+            while line := await loop.run_in_executor(None, sys.stdin.readline):
+                more: dict[str, object] = json.loads(line)["message"]
+                _say({"type": "user", "isReplay": True, "message": more, "session_id": SESSION})
+                _step([("text", "Heard you again.")], "end_turn")
+                _say(
+                    {
+                        "type": "result",
+                        "subtype": "success",
+                        "is_error": False,
+                        "result": "Heard you again.",
+                        "session_id": SESSION,
+                    }
+                )
+            return
+        if "needs a code" in said:
+            _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
+            args: dict[str, object] = {
+                "answer": "The bank asks for a code.",
+                "success": False,
+                "needs_from_user": "The code the bank sent to your phone.",
+            }
+            await client.call_tool("finish", args)
+            _step([("text", "")], "end_turn")
+            _say({"type": "result", "subtype": "success", "is_error": False, "result": "", "session_id": SESSION})
+            return
+        if "finish then check" in said:
+            _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
+            await client.call_tool("finish", {"answer": "Paid the bill.", "success": True, "nothing_new": True})
+            _step([("tool_use", f"mcp__{door}__shell")], "tool_use")
+            await client.call_tool("shell", {"command": "echo checked"})
+            late: str = "The payment was declined after all."
+            _step([("text", late)], "end_turn")
+            _say({"type": "result", "subtype": "success", "is_error": False, "result": late, "session_id": SESSION})
+            return
+        if "slow command" in said:
+            _step([("text", "Running it."), ("tool_use", f"mcp__{door}__shell")], "tool_use")
+            await client.call_tool("shell", {"command": "sleep 2; echo late > late.txt"})
             return
         _step([("text", "Writing the files."), ("tool_use", f"mcp__{door}__write_file")], "tool_use")
         sealed: CallToolResult = await client.call_tool(

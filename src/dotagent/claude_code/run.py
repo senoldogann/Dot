@@ -92,6 +92,8 @@ from dotagent.agent.loop import (
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
 from dotagent.agent.prompt import THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team_sections, turn_note
+from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
+from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
@@ -117,7 +119,7 @@ from dotagent.claude_code.stream import (
     tool_prefix,
     user_line,
 )
-from dotagent.core.errors import ClaudeCodeError, RunCancelled
+from dotagent.core.errors import ClaudeCodeError, FailSafeTriggered, RunCancelled, RunHoldLapsed
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import claude_code_dir
@@ -154,7 +156,14 @@ from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.delegate import DELEGATE_TOOL
 from dotagent.tools.groups import group_of
-from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, REACT_TOOL, UPDATE_PLAN_TOOL, USE_TOOLS_TOOL
+from dotagent.tools.meta import (
+    FINISH_TOOL,
+    MARK_PLAN_STEP_TOOL,
+    REACT_TOOL,
+    UPDATE_PLAN_TOOL,
+    USE_TOOLS_TOOL,
+    FinishArgs,
+)
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
 from dotagent.tools.shell import kill_group
@@ -162,11 +171,12 @@ from dotagent.tools.shell import kill_group
 log = get_logger(__name__)
 
 # The tools of Dot's own loop, which the program does not get: it runs its own loop, so it plans, ends and finds its
-# tools in its own way (finish is its last reply, use_tools its search of the door, item 1053), and a reaction is on a
+# tools in its own way (use_tools is its search of the door, item 1053; finish is the door's since item 1076, where its
+# mode has it), and a reaction is on a
 # message of the owner's in Dot's own chat. Every other tool of Dot's is the model's, as a run of Dot's own loop has it
 # (item 1063: a run on the plan had no tool to message an agent, give it work or delegate, nor the mail, the drafts,
 # the vault or Dot's own list).
-_LOOP_OWN: frozenset[str] = frozenset({FINISH_TOOL, UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, USE_TOOLS_TOOL, REACT_TOOL})
+_LOOP_OWN: frozenset[str] = frozenset({UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, USE_TOOLS_TOOL, REACT_TOOL})
 # A line of the stream may be long (a step that read a big page): the reader takes lines up to this size.
 _LINE_LIMIT: int = 32 * 1024 * 1024
 _STDERR_KEPT: int = 4000
@@ -185,6 +195,14 @@ _LIMIT_NOTE: str = (
     "answer with what was reached (the numbers), what is missing and how to go on. Call no more tools: the run ends "
     "after this reply."
 )
+# How the model ends its turn's work: with finish where its mode has it (item 1076), else with its last reply (a chat).
+_ENDS_WITH_FINISH: str = (
+    "When the work is done, or cannot be done, call finish with your final answer (what the owner reads in the chat: "
+    "what you did and what you found, with the evidence), success true only if the goal was achieved and verified, "
+    "and needs_from_user for what only the owner can give or decide; then end your turn without writing the answer "
+    "again."
+)
+_ENDS_WITH_REPLY: str = "When the work is done, write your answer as your last reply: it is what the owner reads."
 _PRIVATE: int = 0o700
 _SECRET_FILE: int = 0o600
 # What the model is told, before what Dot knows of the owner: who it is, its tools, how a run of Dot's ends.
@@ -194,8 +212,7 @@ _PROMPT: str = (
     "slash commands and skills are not available here; do not offer them. Each call goes through Dot's rules and, "
     "where they say so, the owner's approval; a refused call says why, and you go on another way. Work on the task "
     "until it is done, acting without asking what you can find out or decide yourself; ask_user is for what only the "
-    "owner can answer. When the work is done, or cannot be done, write your final answer as your reply: it is what the "
-    "owner reads in the chat, so say what you did and what you found, with the evidence. Write every message, the "
+    "owner can answer. {ending} Write every message, the "
     "short lines between tool calls too, in the language the owner writes in. Files you make go in Dot's "
     "workspace, {workspace}, unless the owner names another place. Today is {today}.\n\n"
     # Item 1055: a run on the plan said it did not know what Dot's memory and its agents' files held.
@@ -347,7 +364,10 @@ def system_prompt(
     """What the model is told besides Claude Code's own prompt: who it is (``name``), the door's ``tools``, how a run of
     Dot's works and ends, what Dot's own prompt says of the ``team`` (item 1063; empty for none), and the lines
     ``known`` of the owner."""
-    lead: str = _PROMPT.format(name=name, door=door, tools=", ".join(tools), workspace=workspace, today=today)
+    ending: str = _ENDS_WITH_FINISH if FINISH_TOOL in tools else _ENDS_WITH_REPLY
+    lead: str = _PROMPT.format(
+        name=name, door=door, tools=", ".join(tools), workspace=workspace, today=today, ending=ending
+    )
     parts: list[str] = [lead, team]
     if known:
         lines: str = "\n".join(f"- {line}" for line in known)
@@ -358,16 +378,41 @@ def system_prompt(
 @dataclass
 class _Quiet:
     """When the program last wrote a line or a call of Dot's tool for it ended, and how many of those are at work: the
-    watchdog does not count a call's wait (an approval the owner takes a while over) as silence."""
+    watchdog does not count a call's wait (an approval the owner takes a while over) as silence. ``queue`` is what the
+    run reads, which a call's emergency stop reaches (item 1076)."""
 
     heard: float
+    queue: "asyncio.Queue[_Item]"
     working: int = 0
+    # What the model's finish said (item 1076): how the run ends, its answer and what it needs from the owner.
+    finished: FinishArgs | None = None
+    # Since when the owner holds the run with a ✋ (item 1076), None while they do not. ``resting_since`` is when its
+    # turn ended while held: the program waits for the owner then, its silence is no fault, and the hold's time counts
+    # from it, so a turn at work (a tool, an approval) is never cut by it, unlike Dot's own loop, which counts from the
+    # ✋ but cannot be held mid-step.
+    held_since: float | None = None
+    resting_since: float | None = None
 
 
 async def _watched_call(quiet: _Quiet, run: CallRunner, call: ToolCall) -> ToolResult:
+    """Run a call of Dot's tool for the program. It runs in the bridge's task, not the run's (item 1076): the owner's
+    emergency stop that it meets (the pointer in a corner of the screen) ends the run as one, as in Dot's own loop, not
+    as an error the model reads and goes past. (A Stop cuts it already: the program ended, its request is cancelled.)"""
     quiet.working += 1
+    # A finish ends Dot's own runs on the spot; here the program's turn can go on after it, and what it does then (a
+    # check that fails, a fix) is newer than what the finish said: a later call drops it, as a message does.
+    if call.name != FINISH_TOOL:
+        quiet.finished = None
     try:
-        return await run(call)
+        result: ToolResult = await run(call)
+        # The model's finish, as Dot's own loop reads its own (item 1076): the run ends as it says, not "done" whatever
+        # it said; a finish the gate refused or that did not parse says nothing.
+        if call.name == FINISH_TOOL and not result.is_error:
+            quiet.finished = FinishArgs.model_validate(call.arguments)
+        return result
+    except FailSafeTriggered as error:
+        quiet.queue.put_nowait(_Broke(error))
+        raise
     finally:
         quiet.working -= 1
         quiet.heard = time.monotonic()
@@ -425,6 +470,7 @@ class _Follow:
     queue: asyncio.Queue[_Item]
     started: float
     limits: RunLimits | None
+    quiet: _Quiet
     told: LimitReached | None = None
     since_told: int = 0
     over: LimitReached | None = None
@@ -474,7 +520,7 @@ class _Follow:
         """Read the program's output until a result comes after the program took in each message sent; the model's
         last answer."""
         while True:
-            item: _Item = await self.queue.get()
+            item: _Item = await self._next()
             match item:
                 case _Stopped():
                     raise RunCancelled("the run was stopped", {"run_id": self.agent.run.id})
@@ -494,8 +540,14 @@ class _Follow:
                     await self.steer(item)
                 case str():
                     event: ClaudeEvent | None = read_line(item)
+                    # A run the owner holds with a ✋ (item 586) does not end with the turn: it waits for what they
+                    # write next, or their ✋ taken back, as Dot's own loop does (item 1076).
+                    # A run past its limit ends all the same.
                     if event is not None and await self.seen(event):
-                        return self.answer
+                        if self.quiet.held_since is None or self.over is not None:
+                            return self.answer
+                        # Held, the turn ended: the hold's time counts from now.
+                        self.quiet.resting_since = time.monotonic()
 
     async def seen(self, event: ClaudeEvent) -> bool:
         """Show ``event``; whether the run is over after it."""
@@ -628,9 +680,52 @@ class _Follow:
         await self.emit(LIMIT_EVENT, limit_event_data(reached), True)
         await self.send(_LIMIT_NOTE.format(spent=limit_spent(reached)), ())
 
+    async def _next(self) -> _Item:
+        """What comes next for the run; while the owner holds it, within ``[reactions] hold_minutes`` of the hold, past
+        which it ends (:class:`RunHoldLapsed`), as a held run of Dot's own loop does."""
+        resting_since: float | None = self.quiet.resting_since
+        held_since: float | None = self.quiet.held_since
+        if resting_since is None or held_since is None:
+            return await self.queue.get()
+        minutes: float = self.runtime.config.reactions.hold_minutes
+        try:
+            async with asyncio.timeout(max(minutes * 60.0 - (time.monotonic() - resting_since), 0.0)):
+                return await self.queue.get()
+        except TimeoutError:
+            held_s: float = round(time.monotonic() - held_since, 1)
+            await self.emit(HOLD_ENDED_EVENT, {"reason": "lapsed", "held_s": held_s}, True)
+            raise RunHoldLapsed(hold_lapsed_text(minutes), {"run_id": self.agent.run.id, "held_s": held_s}) from None
+
+    async def _mind_hold(self, sent: UserInput) -> None:
+        """A ✋ of the owner holds the run (items 586 and 1076); what they write next, or their ✋ taken back, lets it
+        go on, told to the pages as Dot's own loop tells them. A note about any other reaction changes nothing of
+        that."""
+        if sent.reaction == "hold" and self.quiet.held_since is None:
+            self.quiet.held_since = time.monotonic()
+            self.agent.inbox.holding = True
+            await self.emit(HOLD_EVENT, {"step": self.steps}, True)
+        elif sent.reaction in (None, "release") and self.quiet.held_since is not None:
+            held_s: float = round(time.monotonic() - self.quiet.held_since, 1)
+            self.quiet.held_since = None
+            self.quiet.resting_since = None
+            self.quiet.heard = time.monotonic()
+            self.agent.inbox.holding = False
+            reason: str = "message" if sent.reaction is None else "released"
+            await self.emit(HOLD_ENDED_EVENT, {"reason": reason, "held_s": held_s}, True)
+
     async def steer(self, sent: UserInput) -> None:
         """The owner's message while the model works: kept in the chat and sent to the program, which reads it once
         its turn allows."""
+        await self._mind_hold(sent)
+        # What comes after a finish (the owner's message, a note) goes on with the work: the run ends as the model's
+        # next finish says, or with its last reply, not as the finish before it did (the pre-push review). A ✋ changes
+        # nothing of the work.
+        if sent.reaction != "hold":
+            self.quiet.finished = None
+        # Whatever is sent (a message, a note, a second ✋) starts a turn of the program's: it is at work, not resting,
+        # so the hold's time stops and the silence counts from now (the pre-push review).
+        self.quiet.resting_since = None
+        self.quiet.heard = time.monotonic()
         runtime: Runtime = self.runtime
         run_id: str = self.agent.run.id
         note: Message = await message_with_attachments(
@@ -691,7 +786,7 @@ async def _watch(quiet: _Quiet, silence_s: float, queue: asyncio.Queue[_Item]) -
     while True:
         await asyncio.sleep(_WATCH_EVERY_S)
         silent: float = time.monotonic() - quiet.heard
-        if quiet.working == 0 and silent > silence_s:
+        if quiet.working == 0 and quiet.resting_since is None and silent > silence_s:
             queue.put_nowait(_Silent(seconds=silent))
             return
 
@@ -865,18 +960,25 @@ def ended_clean(over: LimitReached | None, finish: str) -> bool:
     return over is None and finish not in _CUT_SHORT
 
 
-def _outcome(follow: _Follow, answer: str, goal: str) -> RunOutcome:
+def _outcome(follow: _Follow, answer: str, goal: str, finished: FinishArgs | None) -> RunOutcome:
     """How the run ends: failed when its limit was reached and the model went on regardless, and when its last reply
-    was cut short at the model's output limit (item 552); else done with the model's last answer."""
+    was cut short at the model's output limit (item 552); else as the model's ``finished`` says (item 1076: done only
+    when it succeeded, with what it needs from the owner), or, when it never called finish, done with its last
+    answer."""
     if follow.over is not None:
         result: str = limit_result(follow.over, new_ledger(goal), "", answer)
         return RunOutcome(status="failed", result=result, needs="")
     if follow.finish in _CUT_SHORT:
         cut: str = f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with '{follow.finish}')."
         return RunOutcome(status="failed", result=cut, needs="")
-    said: str = answer or "Claude Code finished without a closing message."
+    closing: str = finished.answer if finished is not None else answer
+    said: str = closing or "Claude Code finished without a closing message."
     if follow.fast_off:
         said = f"{said}\n\n{fast_off_words(follow.fast_off)}"
+    if finished is not None:
+        return RunOutcome(
+            status="done" if finished.success else "failed", result=said, needs=finished.needs_from_user or ""
+        )
     return RunOutcome(status="done", result=said, needs="")
 
 
@@ -916,7 +1018,22 @@ async def _notes_for(agent: AgentRun, info: ModelInfo, carried: str) -> str:
     )
 
 
+# What a resumed run on the plan is told after the note of the run it goes on from (item 1076): that note says the
+# conversation holds every step of that run, which Dot's own loop keeps; a session of the program does not.
+_RESUMED_HERE: str = (
+    "[system note] On this model the steps of the run you go on from are not in your session: what it found is in the "
+    "files and pages it left and in the chat above. Look at them again before you act on them."
+)
+
+
 async def _opening_of(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> str:
+    """The run's first message (:func:`_picked_opening`), and for a resumed run what it cannot see of the run it goes
+    on from (:data:`_RESUMED_HERE`)."""
+    text: str = await _picked_opening(agent, ref, info)
+    return text if agent.opening.resumed is None else f"{text}\n\n{_RESUMED_HERE}"
+
+
+async def _picked_opening(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> str:
     """The run's first message: the owner's words, then what they picked for it (item 1022), as Dot's own loop gives
     them: each picked skill's instructions and the connected apps (MCP servers) whose tools to use, which reach the
     program through the door. The manager refuses what Claude Code cannot take (Plan first) before the run starts."""
@@ -938,6 +1055,9 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     started: float = time.monotonic()
     runtime: Runtime = agent.runtime
     run = agent.run
+    # A resumed run says which it goes on from, as Dot's own loop's does (item 1076): its page links that run.
+    if agent.opening.resumed is not None:
+        await runtime.bus.emit(run.id, RESUMED_EVENT, resumed_event_data(agent.opening.resumed), True)
     if agent.opening.files:
         await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(agent.opening.files)}, True)
     ref: ModelRef = parse_model_ref(run.model)
@@ -951,7 +1071,8 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     tools: ToolRegistry = await _withheld_out(
         runtime, run, door_tools(runtime.registry, run, await _bounds_of(agent)), ref
     )
-    quiet: _Quiet = _Quiet(heard=time.monotonic())
+    queue: asyncio.Queue[_Item] = asyncio.Queue()
+    quiet: _Quiet = _Quiet(heard=time.monotonic(), queue=queue)
     door: Door = new_door(
         CLAUDE_DOOR,
         door_specs(tool.spec for tool in tools.tools.values()),
@@ -1012,7 +1133,6 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
             log.info(
                 "claude_code_run_started", run_id=run.id, pid=process.pid, model=ref.model, resume=chat is not None
             )
-            queue: asyncio.Queue[_Item] = asyncio.Queue()
             follow: _Follow = _Follow(
                 agent=agent,
                 stdin=process.stdin,
@@ -1021,6 +1141,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                 queue=queue,
                 started=started,
                 limits=limits_of(runtime.config.agent, run.mode),
+                quiet=quiet,
             )
             tail: asyncio.Task[str] = asyncio.create_task(_read_tail(process.stderr), name="claude-code-stderr")
             pumps: tuple[asyncio.Task[None], ...] = (
@@ -1050,11 +1171,24 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                 for task in pumps:
                     task.cancel()
                 await asyncio.gather(*pumps, return_exceptions=True)
+                # What the owner sent that the program never took in (a message in the run's last seconds) goes back
+                # to the run's inbox, where Dot keeps it as it keeps one a run of its own loop did not read (item 1076).
+                # Ahead of what reached the inbox meanwhile, so that they keep the order they were sent in.
+                later: list[UserInput] = [agent.inbox.get_nowait() for _ in range(agent.inbox.qsize())]
+                while not queue.empty():
+                    unread: _Item = queue.get_nowait()
+                    if isinstance(unread, UserInput):
+                        agent.inbox.put_nowait(unread)
+                for sent_later in later:
+                    agent.inbox.put_nowait(sent_later)
                 await asyncio.shield(_end_program(process))
                 tail.cancel()
                 await asyncio.gather(tail, return_exceptions=True)
                 await let_go(runtime, run.id, ())
-        await runtime.store.append_messages(run.thread_id, [assistant_message(answer, None, ())])
+        # The chat keeps the run's answer, its finish's when it called one (the pre-push review: the reply after a
+        # finish is often empty, and a later run read nothing of the answer).
+        closing: str = answer if quiet.finished is None else quiet.finished.answer
+        await runtime.store.append_messages(run.thread_id, [assistant_message(closing, None, ())])
         if clean and follow.session_id:
             await asyncio.to_thread(
                 write_chat,
@@ -1068,7 +1202,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
         if chat is not None and not kept:
             await asyncio.to_thread(forget_chat, run.thread_id)
     log.info("claude_code_run_ended", run_id=run.id, session=follow.session_id, steps=follow.steps, clean=clean)
-    return RunEnd(outcome=_outcome(follow, answer, run.goal), lessons=None)
+    return RunEnd(outcome=_outcome(follow, answer, run.goal, quiet.finished), lessons=None)
 
 
 async def _stderr_now(tail: asyncio.Task[str], process: asyncio.subprocess.Process) -> str:

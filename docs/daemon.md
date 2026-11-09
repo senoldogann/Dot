@@ -42,7 +42,9 @@ Under its name, in the line its last words would take, stand the faces of the ru
 work and those that ended: three at most, laid over one another as the marks of the connected apps stand in the foot, the
 rest counted, and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. What works lists too what is no chat's: the session of a campaign
-(which works in a thread of its own). A chat that waits for you (item 836) leaves its day too and stands first, above
+(which works in a thread of its own). A run another run delegated stands under the chat its work came from, never as a
+row of its own, also once the run that delegated it has ended (item 1074: a work order's try outlives the lead's turn
+that gave it): that chat stands at work while it works, and the home's Today strip lists no such run either. A chat that waits for you (item 836) leaves its day too and stands first, above
 what works, as its own row with its menu, its creature waiting: its last line says **Waiting for you:** and what
 has waited longest, with how many more wait ("(+1)"), in the warning's ink, the dot of a run that waits stands in its
 age's place, and its name for a screen reader names each thing and how it waits; a pinned chat stays under Pinned,
@@ -767,7 +769,9 @@ with a mark and a title (no page yet, waiting for the page, the view closed, the
 command, item 220). A Screen tab that has had no page at all says instead, in the empty panel the other tabs use, that
 Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the setting under
 Settings › Browser that opens it when a run starts its browser (item 401). **Watch** and **Close the view** open and
-close it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the
+close it by hand; once the run has ended it keeps the last screen and Watch goes. **Zoom** beside the page's address,
+or a click on the page while it is only watched, opens the view in the full-screen viewer, live, to zoom it (item
+1071, [Phone](phone.md)); the frames come at JPEG quality 80 (50 before), a little more to send for each. A pill under it says who has the
 browser ("Dot has control", or the agent's name), on one line, beside Take over and Use it here; a panel too narrow for
 the three puts the words on top and the buttons under them (item 512). Since that view shows the page, Dot's own Chrome stays in the
 background while a run works (`[browser] raise_window`, off by default, items 97 and 118): the tabs Dot opens are opened

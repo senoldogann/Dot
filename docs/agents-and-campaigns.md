@@ -425,7 +425,11 @@ An order is `assigned` (recorded, its run starting), `working`, `in_review` (a t
 failed, and the lead has not judged it), `returned`, `accepted`, `escalated` or `cancelled`; the store refuses any other
 move, so a try that ends late cannot undo a verdict. When a try's run ends the order is `in_review` and the lead is
 told in a note (Dot's words, not yours: it vouches for nothing) if a run of its chat is at work; a lead whose turn ended
-is told nothing and finds the order in `work_orders` at its next run, and the morning brief lists the orders that wait
+(a run on your Claude plan ends its turn as it gives the order) has a run of its chat started for it (item 1075), as a
+command that ends in the background does: Dot's note in the chat, the agent's answer read first, untrusted when the
+order is, with the chat's model and approvals; not while a run works there or its queue waits or holds, after you
+stopped its newest run or one failed, or under the emergency stop, when the lead finds the order in `work_orders` at
+its next run, and the morning brief lists the orders that wait
 for a review for more than a day, and those waiting for you. The tries belong to the order, not to the lead's run: the
 lead's turn may end while the agent works.
 
