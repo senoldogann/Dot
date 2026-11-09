@@ -1160,8 +1160,10 @@ the few that still redraw while something works in front of you: the ring of the
 plan's step at work, and the light over the words of a thought being written (a chat being opened has three dots that
 rise and fade, item 643). Dot's mark is a ball of obsidian lit at its upper left, with the character's eyes in champagne
 gold and a hairline of gold round it (item 642, "Obsidian", the owner's choice of five drawn for them), the o of the
-wordmark "dot" between a d and a t drawn in one line (`static/index.html`); the favicon, the app's icon, the menu bar's
-and the web app's icons are drawn from it (`desktop/icons/render.py`), and the wordmark heads the sign-in card. A window
+wordmark "dot" between a d and a t drawn in one line (`static/index.html`); the favicon, the app's icon and the menu bar's
+are drawn from it (`desktop/icons/render.py`), and the wordmark heads the sign-in card. On a phone the icon is flat
+(item 1069, the owner's choice of three drawn for them): the two eyes in white on a tile of black, no ball, light or
+gold, the web app's icons and the home screen's alike. A window
 that opens the UI plays the opening once: the d and the t hop up, the dot drops in with its eyes shut, bounces twice,
 opens its eyes and blinks, and the page shows through, 1.3 s in all; a click or a key cuts it short, it takes no
 pointer, and it plays neither on a reload nor under reduced motion. The look, the scheme and the density you chose are
