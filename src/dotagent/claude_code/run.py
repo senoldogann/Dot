@@ -63,7 +63,6 @@ from dotagent.agent.handover import (
     tool_context,
     write_chat,
 )
-from dotagent.agent.helpers import Roster, current_roster
 from dotagent.agent.limits import (
     LIMIT_EVENT,
     LimitReached,
@@ -84,13 +83,14 @@ from dotagent.agent.loop import (
     goal_query,
     notes_to_hand,
     opening_text,
+    run_helpers,
+    run_skills,
     start_notes,
     team_brief,
     team_name,
     withheld_tools,
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
-from dotagent.agent.playbooks import offered_to_run
 from dotagent.agent.prompt import THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team_sections, turn_note
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask
@@ -145,14 +145,15 @@ from dotagent.opencode.run import meanwhile
 from dotagent.repair.claude import LimitWindow, window_refused
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
-from dotagent.skills.catalog import load_skills, playbook_root
+from dotagent.skills.catalog import playbook_root
 from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.endings import PREFIX_CUT_SHORT
 from dotagent.store.models import NO_PICKS, AgentRecord, RunRecord, ThreadRecord
 from dotagent.tools.base import ToolResult
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
-from dotagent.tools.groups import BROWSER_GROUP, group_of
+from dotagent.tools.delegate import DELEGATE_TOOL
+from dotagent.tools.groups import group_of
 from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, REACT_TOOL, UPDATE_PLAN_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
@@ -230,20 +231,15 @@ def door_tool(name: str, delegated: bool) -> bool:
     )
 
 
-def door_tools(
-    registry: ToolRegistry, run: RunRecord, bounded: frozenset[str] | None, left_out: frozenset[str]
-) -> ToolRegistry:
+def door_tools(registry: ToolRegistry, run: RunRecord, bounded: frozenset[str] | None) -> ToolRegistry:
     """The tools of Dot's ``run`` gives the model: the :func:`door_tool` ones of its mode, of those only the ones
-    ``bounded`` names when the run is an agent's whose tools are bounded (item 86), and none of the groups ``left_out``
-    (the browser's, when Settings › Browser keeps every run off it, item 354)."""
+    ``bounded`` names when the run is an agent's whose tools are bounded (item 86)."""
     delegated: bool = run.parent_run_id is not None
     return ToolRegistry(
         tools={
             tool.spec.name: tool
             for tool in tools_for_mode(registry, run.mode)
-            if door_tool(tool.spec.name, delegated)
-            and (bounded is None or tool.spec.name in bounded)
-            and group_of(tool.spec.name) not in left_out
+            if door_tool(tool.spec.name, delegated) and (bounded is None or tool.spec.name in bounded)
         }
     )
 
@@ -776,15 +772,15 @@ async def _prompt_of(agent: AgentRun, door: Door) -> str:
 
 
 async def _withheld_out(runtime: Runtime, run: RunRecord, tools: ToolRegistry, ref: ModelRef) -> ToolRegistry:
-    """``tools`` without those Dot's own loop withholds from ``run`` as it starts (item 1063, :func:`withheld_tools`),
-    and without consulting a helper when no helper but the run's own model can answer, as there."""
+    """``tools`` without those Dot's own loop withholds from ``run`` as it starts, by the same rules and what they read
+    (items 1063 and 1068: :func:`withheld_tools`, :func:`run_skills`, :func:`run_helpers`)."""
     team: list[AgentRecord] = [member for member in await runtime.store.list_agents() if member.id != run.agent_id]
     offered: frozenset[str] = frozenset(tools.tools)
-    withheld: set[str] = set(await withheld_tools(runtime, run, team, offered, bool(await runtime.accounts.accounts())))
-    if CONSULT_TOOL in offered:
-        roster: Roster = await current_roster(runtime.router, runtime.config.providers, runtime.config.models.helpers)
-        if not [model for model in roster.available if model != ref.label]:
-            withheld.add(CONSULT_TOOL)
+    skills: SkillCatalog = await run_skills(runtime, run)
+    helpers: tuple[str, ...] = await run_helpers(runtime, ref.label) if offered & {CONSULT_TOOL, DELEGATE_TOOL} else ()
+    withheld: frozenset[str] = await withheld_tools(
+        runtime, run, team, offered, bool(await runtime.accounts.accounts()), bool(skills.skills), helpers
+    )
     return ToolRegistry(tools={name: tool for name, tool in tools.tools.items() if name not in withheld})
 
 
@@ -923,15 +919,11 @@ async def _notes_for(agent: AgentRun, info: ModelInfo, carried: str) -> str:
 async def _opening_of(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> str:
     """The run's first message: the owner's words, then what they picked for it (item 1022), as Dot's own loop gives
     them: each picked skill's instructions and the connected apps (MCP servers) whose tools to use, which reach the
-    program through the door. The manager refuses the picks
-    Claude Code cannot take (the accounts, Plan first) before the run starts."""
+    program through the door. The manager refuses what Claude Code cannot take (Plan first) before the run starts."""
     runtime: Runtime = agent.runtime
     if agent.opening.picks == NO_PICKS:
         return agent.opening.text
-    catalog: SkillCatalog = await asyncio.to_thread(
-        load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
-    )
-    offered: tuple[Skill, ...] = await offered_to_run(runtime.config, catalog, agent.run.agent_id)
+    offered: tuple[Skill, ...] = tuple((await run_skills(runtime, agent.run)).skills)
     scaffold: Scaffold = scaffold_for(
         runtime.config.agent,
         info,
@@ -953,12 +945,11 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     program: Path = await provider.program()
     info: ModelInfo = await provider.model_info(ref.model)
     earlier: list[Message] = await runtime.store.load_messages(run.thread_id, 0)
-    left_out: frozenset[str] = frozenset() if runtime.browser.config.enabled else frozenset({BROWSER_GROUP})
     # What the message came with stands under it at once, as in Dot's own loop (item 967).
     if agent.opening.picks != NO_PICKS:
         await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(agent.opening.picks), True)
     tools: ToolRegistry = await _withheld_out(
-        runtime, run, door_tools(runtime.registry, run, await _bounds_of(agent), left_out), ref
+        runtime, run, door_tools(runtime.registry, run, await _bounds_of(agent)), ref
     )
     quiet: _Quiet = _Quiet(heard=time.monotonic())
     door: Door = new_door(
