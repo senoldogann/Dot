@@ -181,13 +181,82 @@ async def _standing(served: Served, run: RunRecord, message: str = "answer") -> 
     return [record.reaction for record in await served.runtime.store.message_reactions(run.id, message)]
 
 
+# A finger that rests on a message, as pointer events of the touch kind, which Playwright's touch screen cannot hold: a
+# phone opens the message's sheet then (item 1064).
+_HOLD: str = """async (node) => {
+  const message = node.closest(".user-message, article.answer, .bubble.say, .turn-say") ?? node;
+  const target = message.querySelector(".prose") ?? message;
+  const box = target.getBoundingClientRect();
+  const at = { clientX: box.left + box.width / 2, clientY: box.top + Math.min(12, box.height / 2), bubbles: true,
+    pointerType: "touch", pointerId: 7, isPrimary: true };
+  const under = document.elementFromPoint(at.clientX, at.clientY) ?? target;
+  under.dispatchEvent(new PointerEvent("pointerdown", at));
+  await new Promise((done) => setTimeout(done, 700));
+  under.dispatchEvent(new PointerEvent("pointerup", at));
+}"""
+
+
+def _sheet(page: Page) -> Locator:
+    return page.locator("dialog.message-sheet")
+
+
+async def _hold(message: Locator) -> None:
+    """Hold ``message`` as a finger does, which opens its sheet on a phone."""
+    await message.evaluate(_HOLD)
+
+
 async def _react(page: Page, foot: Locator, name: str) -> None:
-    """Open the palette of the message whose foot is ``foot``, pick ``name`` and wait for its chip."""
-    await foot.get_by_role("button", name="React to this message").click()
-    await expect(_palette(page)).to_be_visible()
-    await _choice(page, name).click()
-    await expect(_palette(page)).to_be_hidden()
+    """Pick ``name`` for the message whose foot is ``foot`` and wait for its chip: from the palette of its button with a
+    pointer, from the sheet of a hold of the message on a phone (item 1064), which shows no button."""
+    if await page.evaluate("matchMedia('(hover: none)').matches"):
+        await _hold(foot)
+        await expect(_sheet(page)).to_be_visible()
+        await _sheet(page).get_by_role("button", name=name).click()
+        await expect(_sheet(page)).to_have_count(0)
+    else:
+        await foot.get_by_role("button", name="React to this message").click()
+        await expect(_palette(page)).to_be_visible()
+        await _choice(page, name).click()
+        await expect(_palette(page)).to_be_hidden()
     await expect(foot.get_by_role("button", name=name, pressed=True)).to_be_visible()
+
+
+async def _phone_reacts(page: Page, answer: Locator, run: RunRecord, served: Served, tmp_path: Path) -> None:
+    """A phone shows no react button (item 1064): a hold of the answer opens its sheet, whose reactions are the
+    palette's, a thumb's each; a pick stands as a chip, ticked in the sheet when it opens again, where a press takes it
+    back, as does a press of its chip."""
+    # Out of sight, but there for VoiceOver and a keyboard.
+    hidden = await answer.get_by_role("button", name="React to this message").bounding_box()
+    assert hidden is not None and (hidden["width"] <= 1 or hidden["height"] <= 1), hidden
+    await _hold(answer.locator(".prose"))
+    sheet: Locator = _sheet(page)
+    await expect(sheet).to_be_visible()
+    labels: object = await sheet.locator(".sheet-reaction").evaluate_all(
+        "nodes => nodes.map((node) => node.getAttribute('aria-label'))"
+    )
+    assert labels == PALETTE
+    first = await sheet.get_by_role("button", name="Good").bounding_box()
+    assert first is not None and first["width"] >= 44, first
+    await page.screenshot(path=str(tmp_path / "sheet-phone.png"))
+    await sheet.get_by_role("button", name="Good").click()
+    await expect(sheet).to_have_count(0)
+    chip: Locator = answer.get_by_role("group", name="Your reactions").get_by_role("button", name="Good")
+    await expect(chip).to_have_attribute("aria-pressed", "true")
+    assert await _standing(served, run) == ["good"]
+    await _hold(answer.locator(".prose"))
+    await expect(sheet.get_by_role("button", name="Good")).to_have_attribute("aria-pressed", "true")
+    await expect(sheet.get_by_role("button", name="Love it")).to_have_attribute("aria-pressed", "false")
+    await sheet.get_by_role("button", name="Good").click()
+    await expect(chip).to_have_count(0)
+    assert await _standing(served, run) == []
+    await _react(page, answer.locator(".answer-foot"), "Love it")
+    love: Locator = answer.get_by_role("button", name="Love it", pressed=True)
+    await _fits(page, "phone with a chip")
+    await page.screenshot(path=str(tmp_path / "chip-phone.png"))
+    await love.click()
+    await expect(love).to_have_count(0)
+    assert await _standing(served, run) == []
+    await page.context.close()
 
 
 # ----------------------------------------------------------------------------------------- the palette and chips
@@ -201,14 +270,15 @@ async def test_the_palette_puts_a_reaction_under_an_answer_and_a_second_press_of
     page: Page = await _open(browsers, served, look, f"/runs/{run.id}")
     answer: Locator = page.get_by_role("article", name="Answer")
     await expect(answer).to_contain_text(ANSWER)
+    if look == "phone":
+        await _phone_reacts(page, answer, run, served, tmp_path)
+        return
     button: Locator = answer.get_by_role("button", name="React to this message")
     await expect(button).to_have_attribute("aria-expanded", "false")
-    # Item 652: with a pointer the button is seen only on the message it is on, and while its palette is open; a
-    # phone, with no pointer to rest, shows it always.
-    if look == "wide":
-        await page.mouse.move(0, 0)
-        await expect(button).to_have_css("opacity", "0")
-        await answer.hover()
+    # Item 652: with a pointer the button is seen only on the message it is on, and while its palette is open.
+    await page.mouse.move(0, 0)
+    await expect(button).to_have_css("opacity", "0")
+    await answer.hover()
     await expect(button).to_have_css("opacity", "1")
     await button.click()
     await expect(button).to_have_attribute("aria-expanded", "true")
@@ -424,7 +494,8 @@ async def test_what_a_run_said_has_a_foot_with_the_reactions_while_it_works_and_
     page: Page = await _open(browsers, served, look, f"/runs/{run.id}")
     said: Locator = page.locator(".bubble.say").filter(has_text=SAID)
     foot: Locator = said.locator(".say-foot")
-    await expect(foot).to_be_visible()
+    # A phone draws no foot before a reaction stands on the message (item 1064).
+    await expect(foot).to_be_attached()
     await _react(page, foot, "Not right")
     await expect(foot.get_by_role("button", name="Not right", pressed=True)).to_be_visible()
     assert await _standing(served, run, "step-1") == ["wrong"]

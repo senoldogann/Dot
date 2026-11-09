@@ -2,8 +2,8 @@
 
 Without Tailscale, Dot can also be reached from the phone's own Messages, in the conversation you have with yourself:
 see [Channels](channels.md). By voice, where the phone's browser offers it (Safari does; an app added to the home
-screen may not, and the page says when the browser refuses): the composer's microphone dictates a message, and the
-speaker under an answer reads it aloud with the browser's own voice, in the language chosen in Settings › General ›
+screen may not, and the page says when the browser refuses): the composer's microphone dictates a message, and Read
+the answer aloud in an answer's sheet (hold the answer, item 1064) reads it with the browser's own voice, in the language chosen in Settings › General ›
 Voice (item 574; see [the daemon page](daemon.md#the-daemon-the-web-ui-and-the-service)). Safari's own speech
 recognition hears the first dictation of a page and at times none after it, so on an iPhone or an iPad the microphone
 records your voice itself and your Mac writes it down, on the device, every time (item 626): the Mac needs macOS 26 or
@@ -11,8 +11,12 @@ later and Apple's developer tools (`xcode-select --install`), which the page ask
 language is used the Mac downloads its dictation model from Apple, so that first one takes longer; the voice goes to
 your Mac and nowhere else ([Safety](safety.md)). A Mac that cannot leaves the microphone Safari's own, where a later
 dictation Safari does not hear says so, names what the Mac lacks, and Reload brings the microphone back (item 616).
-Under each message of Dot's a smiley opens the palette of reactions, a thumb's size, and what each does is the same on
-the phone: a 👎 on a run at work reaches it, a ✋ holds it until you write, a 📌 keeps the message as a note (item 586; see
+A message shows no buttons under it on the phone (item 1064), only the reactions that stand on it: hold a message (about
+half a second) and a sheet rises from the foot of the screen, with when it was sent and how long its work took, the
+seven reactions of Dot's messages, a thumb's size each, and what the message can do, a row each: copy it, select its
+text (a hold no longer selects it), read it aloud, show its steps, edit from here (your own), open its task. A press
+outside the sheet, a swipe down or Escape closes it. A reaction does on the phone what it does elsewhere: a 👎 on a run
+at work reaches it, a ✋ holds it until you write, a 📌 keeps the message as a note (item 586; see
 [Reactions](runs.md#reactions-on-dots-messages)).
 
 The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on the chat you

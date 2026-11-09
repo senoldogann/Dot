@@ -1,6 +1,7 @@
 """Under a message, its foot follows it closely (item 336): the time, the copy button and how long the run took stand
-at most a few pixels under your bubble and under the answer's last line, wide and on a phone, whose controls are a
-finger's size. A chat of the scripted model, served by a real server, in a real headless Chrome as a Mac's window and
+at most a few pixels under your bubble and under the answer's last line in a Mac's window. A phone shows no foot under
+a message with no reaction on it (item 1064): holding the message opens its sheet (test_message_sheet.py). A chat of
+the scripted model, served by a real server, in a real headless Chrome as a Mac's window and
 in WebKit as an iPhone.
 """
 
@@ -37,7 +38,6 @@ _RUN_WAIT_S: float = 60.0
 # The answer's foot keeps a breath of 4 px under its last line (item 832), on a phone as in a window: 9 px and 10.
 _MOST_GAP_PX: dict[str, dict[str, float]] = {
     "wide": {"user": 6.0, "answer": 12.0},
-    "phone": {"user": 8.0, "answer": 12.0},
 }
 # What the page measures once the test has put on it a file sent with the message, a code block that ends the answer
 # and an answer's foot with no buttons: how far each foot stands under what is above it (review B7: the feet rose
@@ -164,17 +164,18 @@ async def test_the_foot_of_a_message_follows_it_closely(runtime: Runtime, tmp_pa
                     await phone_context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                     phone: Page = await phone_context.new_page()
                     await phone.goto(ui_url("127.0.0.1", port, TOKEN))
-                    measured: dict[str, dict[str, float]] = {
-                        "wide": await _gaps(wide, address, ended),
-                        "phone": await _gaps(phone, address, ended),
-                    }
+                    measured: dict[str, dict[str, float]] = {"wide": await _gaps(wide, address, ended)}
+                    await phone.goto(f"{address}/#/runs/{ended.id}")
+                    await expect(phone.locator(".answer .prose")).to_contain_text(_ANSWER)
+                    for foot in (".answer .answer-foot", ".user-message .message-foot"):
+                        box = await phone.locator(foot).bounding_box()
+                        assert box is None or box["height"] <= 1, (foot, box)
                     for look, gaps in measured.items():
                         for where, gap in gaps.items():
                             assert 0.0 <= gap <= _MOST_GAP_PX[look][where], measured
-                    for page in (wide, phone):
-                        under: object = await page.evaluate(_UNDER)
-                        assert isinstance(under, dict), under
-                        assert under["file"] >= 0 and under["block"] >= 4 and under["text"] >= 8, under
+                    under: object = await wide.evaluate(_UNDER)
+                    assert isinstance(under, dict), under
+                    assert under["file"] >= 0 and under["block"] >= 4 and under["text"] >= 8, under
                     await wide.screenshot(path=str(tmp_path / "foot-wide.png"))
                     await phone.screenshot(path=str(tmp_path / "foot-phone.png"))
                 finally:
