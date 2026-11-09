@@ -4,6 +4,10 @@
 // the first paint: one copy of each rule, so that what the page shows once it runs is what it showed at its first paint.
 
 import { readPref, removePref, writePref } from "../prefs.js";
+// The rules themselves, which index.html runs before the first paint; imported here too, so that every page that takes
+// this module has them, a page of a test among them (the nightly run of 2026-11-09 found four whose modules stopped at
+// a missing DOT_APPEARANCE, item 1087). Run twice, the script sets the same rules again.
+import "./rules.js";
 
 const ROOT = document.documentElement;
 const APPEARANCE = globalThis.DOT_APPEARANCE;
