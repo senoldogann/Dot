@@ -34,6 +34,9 @@ const FINISHED = new Set(["done", "failed", "cancelled"]);
 export const RESUME_SOURCE = "resume";
 // The source of a run that tells the chat that its command in the background ended (item 229).
 export const BACKGROUND_SOURCE = "background";
+// The source of a run that goes on with the lead's chat when a work order it gave came back at rest (item 1075): its
+// goal is Dot's note, not the owner's message.
+export const WORK_ORDER_SOURCE = "work_order";
 // The source of an agent's first meeting with the owner (item 993, agent/welcome.py): its goal is Dot's words for that
 // meeting, not the owner's, so the conversation draws none.
 export const WELCOME_SOURCE = "welcome";
@@ -87,6 +90,11 @@ export async function loadHistory(run, signal) {
  */
 export function backgroundNote(goal) {
   return el("div", { class: "note background-note" }, icon("terminal"), el("span", null, goal.split("\n")[0]));
+}
+
+/** What opens a run that a work order coming back started in the lead's chat (item 1075): Dot's note, as a note. */
+export function workOrderNote(goal) {
+  return el("div", { class: "note background-note" }, icon("users"), el("span", null, goal.split("\n")[0]));
 }
 
 /** A stretch of work as a turn's page shows it: one folded line — "Ran 2 commands and read 1 file" — under the mark
@@ -413,7 +421,9 @@ function turn(past, editFromHereOf, known, signal, reactions) {
       ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, "Continued where the task above was cut off"))
       : past.source === BACKGROUND_SOURCE
         ? backgroundNote(past.goal)
-        : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
+        : past.source === WORK_ORDER_SOURCE
+          ? workOrderNote(past.goal)
+          : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
   const element = el("section", { class: ended ? "turn" : "turn turn-working" }, asked, ops, answer);
   if (ended) {
     if (known !== undefined) {

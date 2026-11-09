@@ -205,6 +205,9 @@ QUEUE_CHANGED_EVENT: str = "queue_changed"
 TERMINALS_CHANGED_EVENT: str = "terminals_changed"
 # The source of the run that tells a chat that its command in the background ended (item 229).
 BACKGROUND_SOURCE: str = "background"
+# The source of the run that tells the lead's chat that a work order it gave came back while no run of it worked
+# (item 1075): its goal is Dot's note, and it reads the agent's answer first.
+WORK_ORDER_SOURCE: str = "work_order"
 # How often the daemon stores the ends the store refused and looks for the runs of dotx commands that died
 # (:meth:`RunManager.watch_commands`).
 COMMAND_CHECK_S: float = 30.0
@@ -235,7 +238,7 @@ _THREAD_INSTRUCTION_RUNS: int = 30
 # code review of item 715: a resume of Dot's own run made its words the owner's), and an agent's first meeting with the
 # owner, whose goal is Dot's words around the agent's name and role, which a run may have written (item 993).
 _NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset(
-    {BACKGROUND_SOURCE, INITIATIVE_SOURCE, RESUME_SOURCE, REPLY_SOURCE, WELCOME_SOURCE}
+    {BACKGROUND_SOURCE, INITIATIVE_SOURCE, RESUME_SOURCE, REPLY_SOURCE, WELCOME_SOURCE, WORK_ORDER_SOURCE}
 )
 # The sources of runs and chats nobody watches or that are Dot's own (item 860): a chat one of them opened is not the
 # owner's, and a run one of them started in the owner's chat has no owner there to answer. Not the run that tells a
@@ -4005,6 +4008,78 @@ class RunManager:
                 self._runtime.terminals.put_back_ended(ended)
                 raise
         await self._queue_changed(thread_id, run.id, newest.id, None)
+
+    async def wake_lead(
+        self, thread_id: str, goal: str, note: str, tainted: bool, carried: tuple[str, ...]
+    ) -> RunRecord | None:
+        """Start the run that goes on with the lead's chat ``thread_id`` when a work order it gave came back while no
+        run of the chat worked (item 1075: a lead on the owner's Claude plan ended its turn as it gave the order, and
+        the chat stopped there, the agent's answer told to nobody). Its ``goal`` is Dot's note
+        (:data:`WORK_ORDER_SOURCE`, none of the owner's words), and it reads ``note`` first, the agent's answer; it
+        starts untrusted when ``tainted``, and goes on from the ``carried`` runs, as a run that reads their words does.
+        It starts as the chat's next message would, with its choices and agent, under the guards of a command that ended
+        in the background (:meth:`_tell_ended_commands`): not while a run works on the chat or ends there, or its queue
+        holds or waits, or after the chat's newest run did not end done (a stop or a failure waits for the owner), or
+        under the emergency stop; ``None`` then, and the lead finds the order with ``work_orders``."""
+        if self._stopping or self._leaves_queues:
+            return None
+        if await asyncio.to_thread(failsafe_path().exists):
+            return None
+        store: Store = self._runtime.store
+        async with self._draining:
+            if thread_id in self._claimed or self._active_on(thread_id) is not None or self._ending_on(thread_id):
+                return None
+            runs: list[RunRecord] = await store.list_runs(1, thread_id)
+            if not runs:
+                return None
+            newest: RunRecord = runs[0]
+            if newest.status != "done" or newest.parent_run_id is not None or newest.campaign_id is not None:
+                return None
+            if await store.queue_held(thread_id) or await store.list_queued(thread_id):
+                return None
+            choices: ChatChoices = await self._choices_of(thread_id, newest)
+            info: ModelInfo = await self._runtime.router.model_info(
+                parse_model_ref(choices.model if choices.model is not None else self._main_model)
+            )
+            effort: Effort | None = (
+                choices.effort if choices.effort is not None and _offers(info, choices.effort) else None
+            )
+            # A chat kept in chat mode has no tool to judge the order with.
+            mode: RunMode = resolved_mode(choices.mode, note)
+            # It goes on from the chat's newest run too: a lead that read a stranger's words after it gave the order
+            # left them in the chat, which this run reads (the pre-push review).
+            opening: RunOpening = RunOpening(
+                text=note,
+                files=(),
+                resumed=None,
+                once=None,
+                carried=(*carried, newest.id),
+                picks=NO_PICKS,
+                tainted=tainted,
+            )
+            try:
+                run, _ = await self._launch(
+                    goal,
+                    "task" if mode == "chat" else mode,
+                    choices.model,
+                    thread_id,
+                    WORK_ORDER_SOURCE,
+                    None,
+                    effort,
+                    choices.speed,
+                    choices.approvals,
+                    choices.goal_mode,
+                    opening,
+                    None,
+                    newest.agent_id,
+                )
+            except RunConflict as exc:
+                # A message of the owner's started the chat meanwhile: that run is told instead (WorkDesk._tell_lead).
+                log.info("work_order_left_to_the_run_that_started", thread_id=thread_id, error=exc.message)
+                return None
+        await self._queue_changed(thread_id, run.id, newest.id, None)
+        log.info("work_order_lead_woken", thread_id=thread_id, run_id=run.id)
+        return run
 
     async def _choices_of(self, thread_id: str, newest: RunRecord) -> ChatChoices:
         """What the chat's next message asks for: the choices its composer kept, or, for a chat that kept none, those of
