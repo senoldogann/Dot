@@ -204,7 +204,8 @@ async def _read_after(read: Awaitable[PageView], done: str | None) -> PageView:
 
 _REAP_INTERVAL_S: float = 60.0
 # The screencast of a tab (``screencast``): JPEG quality, the longest edge, and how often a silent cast says so.
-_CAST_QUALITY: int = 50
+# 80 rather than 50 (item 1071): a page's small print zoomed on a phone stayed blotted at 50.
+_CAST_QUALITY: int = 80
 _CAST_MAX_EDGE: int = 1280
 _CAST_POLL_S: float = 1.0
 # The longest a step waits for the tabs Chrome made for its page to be taken in by its thread (item 342).

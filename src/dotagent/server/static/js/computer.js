@@ -2,7 +2,9 @@
 // Nothing is cast while the view is closed or the page is out of sight, and a view whose stream broke comes back by
 // itself (`watchInView`); the card is shown for a run that is going on and keeps its last frame once the run has ended,
 // when Watch goes too (there is no page left to watch). On a phone it also opens over the whole page (item 298), and
-// "Use it here" uses the page from this screen while the reader holds the run (item 475).
+// "Use it here" uses the page from this screen while the reader holds the run (item 475). Zoom, or a tap on the page
+// where it is only watched, opens the view in the full-screen viewer, live (item 1071): two fingers, a double tap or −
+// and + zoom it, to read a page's small print on a phone.
 
 import { api, frameUrl, watchInView } from "./api.js";
 import { createControl } from "./control.js";
@@ -10,6 +12,7 @@ import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 import { toast } from "./ui.js";
+import { openViewer } from "./viewer.js";
 
 // While the view has no frame it keeps the shape of a screen and says why (item 220): a mark, a title and a hint, by
 // the state of the run and of the view. A run that has ended has no page left to watch (item 111): Watch is gone, and
@@ -47,6 +50,14 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   const empty = el("div", { class: "computer-empty" }, emptyMark, emptyTitle, emptyHint);
   const screen = el("div", { class: "computer-screen" }, image, empty);
   const address = el("div", { class: "small muted computer-url" });
+  // The view in the full-screen viewer (item 1071): a picture of its own that takes every frame while it is open.
+  let zoomed = null;
+  let zoomDialog = null;
+  const zoomButton = el(
+    "button",
+    { class: "btn ghost sm icon-only computer-zoom", type: "button", title: "Zoom", "aria-label": "Zoom into Dot's computer", hidden: true, onclick: () => openZoom() },
+    icon("maximize"),
+  );
   const who = el("span", { class: "computer-who" });
   const handButton = el("button", { class: "btn sm primary", type: "button", onclick: () => toggleHold() });
   // Using the page from this screen (item 475): it opens over the whole page and the reader's taps go to it. A screen
@@ -68,7 +79,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     id: "run-computer",
     title: "Dot's computer",
     actions: watchButton,
-    body: el("div", { class: "stack tight computer-body" }, el("div", { class: "computer-toolbar" }, address, sizes), screen, pill),
+    body: el("div", { class: "stack tight computer-body" }, el("div", { class: "computer-toolbar" }, address, zoomButton, sizes), screen, pill),
   });
   const element = card.element;
   element.classList.add("computer");
@@ -86,6 +97,8 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     handButton.textContent = isHeld ? "Return control" : "Take over";
     handButton.title = isHeld ? "Let the task go on; it is told the page may have changed" : "Hold the task at its next step and use the browser yourself";
     useButton.hidden = control !== null;
+    // The view is zoomed while it is only watched: while it is used here, a tap is the page's.
+    zoomButton.hidden = image.hidden || control !== null;
     pill.hidden = !isActive;
     pill.dataset.held = String(isHeld);
   }
@@ -108,10 +121,43 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     }
     objectUrl = url;
     image.src = url;
+    if (zoomed !== null) {
+      zoomed.src = url;
+    }
+    const first = image.hidden;
     image.hidden = false;
     empty.hidden = true;
     address.textContent = frame.url;
+    if (first) {
+      paint();
+    }
   }
+
+  // The view over the whole screen, zoomed (item 1071): the page as it is drawn, frame by frame, until it is closed.
+  function openZoom() {
+    if (zoomed !== null || image.hidden || control !== null) {
+      return;
+    }
+    // The viewer's own picture, fitted to its stage and not dragged by the browser (as ui.js shows a screenshot).
+    const picture = el("img", { class: "viewer-picture-image", alt: "The page of Dot's browser", src: image.src, draggable: "false" });
+    zoomed = picture;
+    zoomDialog = openViewer({
+      title: address.textContent || "Dot's computer",
+      content: picture,
+      page: false,
+      onClose: () => {
+        zoomed = null;
+        zoomDialog = null;
+        zoomButton.focus({ preventScroll: true });
+      },
+    });
+  }
+  // A tap on the page that is only watched zooms it; one on the page used here is the page's (control.js).
+  image.addEventListener("click", () => {
+    if (control === null) {
+      openZoom();
+    }
+  });
 
   function start() {
     if (controller !== null || !isActive) {
@@ -297,6 +343,8 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
       paint();
     },
     dispose() {
+      // A page left with the view zoomed leaves no viewer over the next one.
+      zoomDialog?.close();
       full?.dialog.close();
       stopControl();
       stop();
