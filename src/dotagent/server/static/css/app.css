@@ -7260,6 +7260,22 @@ dialog.message-sheet::backdrop {
   text-align: left;
 }
 
+/* A menu as a sheet (menu.js, item 1079): its groups apart, Cancel at the foot, a choice that destroys in its tone. */
+.menu-sheet .sheet-actions + .sheet-actions,
+.menu-sheet .sheet-menu + .sheet-actions {
+  margin-top: var(--space-2);
+}
+
+.menu-sheet .sheet-action.danger,
+.menu-sheet .sheet-action.danger > .icon {
+  color: var(--bad);
+}
+
+.menu-sheet .sheet-cancel {
+  justify-content: center;
+  font-weight: var(--weight-title);
+}
+
 .sheet-action + .sheet-action {
   border-top: 1px solid var(--border);
 }
@@ -8048,6 +8064,21 @@ dialog.message-sheet::backdrop {
 .queue .icon {
   width: 15px;
   height: 15px;
+}
+
+/* Move up (item 1079): for a finger, which cannot drag a row on an iPhone; a mouse drags. */
+.queue-up {
+  display: none;
+}
+
+.queue-up > .icon {
+  rotate: -90deg;
+}
+
+@media (pointer: coarse) {
+  .queue-up {
+    display: inline-flex;
+  }
 }
 
 .queue button:focus-visible {

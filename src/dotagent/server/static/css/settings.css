@@ -1224,6 +1224,13 @@
   text-decoration: none;
 }
 
+/* A finger's press shows on the row as it does on an iPhone's lists (item 1079), where no pointer rests. */
+@media (hover: none) {
+  .settings-row:active {
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+  }
+}
+
 /* The card clips what lies past its rounded edge, so a row's ring of focus is drawn inside it. */
 .settings-row:focus-visible {
   outline-offset: -2px;

@@ -110,6 +110,14 @@ code** takes its place. The same by hand:
    `Unregistered`, `BadDeviceToken`, `DeviceTokenNotForTopic`) is forgotten, and so are a phone's tokens when it is
    removed.
 
+On a phone Dot works as an iPhone app does (item 1079): a menu (a chat's "…", a row's "…") is a sheet from the foot
+of the screen, its choices in groups and Cancel at the foot; a finger's hold of a chat's row in the sidebar opens the
+same sheet, as a right-click does with a mouse; a swipe from the screen's left edge does what the button at the top
+left does (back, or the list of chats); a row of a list and a chat's row darken while pressed, with no grey box of the
+browser; a queued message goes up a place from its own button (a finger cannot drag a row on an iPhone). Settings ›
+General › Notifications reads again what the iPhone's Settings allow when you come back to Dot: before, a switch
+turned off by iOS stayed off until the page was loaded again, which a Home Screen app cannot be, and it said to reload.
+
 On a phone the page holds still (item 275). Every page fits the screen's width: a long link, path or word breaks, and
 code and tables scroll in their own frame. No page lets the phone zoom into the field that gets the focus: on an iPhone
 and an iPad the viewport allows no scale past the first, so a field has the size it has on the Mac (item 311), and on
