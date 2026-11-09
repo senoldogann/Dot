@@ -5,7 +5,7 @@ import WidgetKit
 @main
 struct DotLiveActivityBundle: WidgetBundle {
     var body: some Widget {
-        DotRunLiveActivity()
+        DotFleetLiveActivity()
     }
 }
 
@@ -17,38 +17,37 @@ enum RunStatus: String {
     case failed
 }
 
-/// The Live Activity of one of the owner's runs: lock screen, Dynamic Island compact, minimal and expanded.
-struct DotRunLiveActivity: Widget {
+/// The phone's one Live Activity (item 1093): every run of the owner's a row, on glass, on the lock
+/// screen and in the Dynamic Island.
+struct DotFleetLiveActivity: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: DotRunAttributes.self) { context in
-            LockScreenView(attributes: context.attributes, state: context.state)
-                .activityBackgroundTint(nil)
-                .activitySystemActionForegroundColor(.primary)
+        ActivityConfiguration(for: DotFleetAttributes.self) { context in
+            LockScreenView(state: context.state)
+                // Clear: the lock screen draws the activity on its own glass, the wallpaper showing through.
+                .activityBackgroundTint(.clear)
+                .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 8) {
                         LiveDotGlyph(size: 22)
-                        Text(context.attributes.agentName)
+                        Text("Dot")
                             .font(.headline)
-                            .lineLimit(1)
                     }
                     .padding(.leading, 6)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    StatusTrailing(state: context.state)
-                        .font(.subheadline)
+                    Text(countText(context.state))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
                         .padding(.trailing, 6)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(context.state.title)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                        DoingRow(state: context.state)
-                            .font(.subheadline)
+                        ForEach(context.state.rows.prefix(3), id: \.runId) { row in
+                            RowView(row: row)
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     // Kept off the island's rounded lower corners, which cut the line's first letter.
                     .padding(.horizontal, 12)
                     .padding(.bottom, 6)
@@ -57,142 +56,119 @@ struct DotRunLiveActivity: Widget {
                 LiveDotGlyph(size: 18)
                     .padding(.leading, 2)
             } compactTrailing: {
-                DoingMark(state: context.state)
-                    .font(.system(size: 14, weight: .semibold))
+                CountMark(state: context.state)
                     .padding(.trailing, 2)
             } minimal: {
-                DoingMark(state: context.state)
-                    .font(.system(size: 13, weight: .semibold))
+                CountMark(state: context.state)
             }
             .keylineTint(.yellow)
         }
     }
 }
 
+/// "2 at work", or "All done" once every row has ended.
+private func countText(_ state: DotFleetAttributes.ContentState) -> String {
+    state.active > 0 ? "\(state.active) at work" : "All done"
+}
+
 private struct LockScreenView: View {
-    let attributes: DotRunAttributes
-    let state: DotRunAttributes.ContentState
+    let state: DotFleetAttributes.ContentState
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            LiveDotGlyph(size: 28)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(attributes.agentName)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    Spacer()
-                    StatusTrailing(state: state)
-                        .font(.subheadline)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                LiveDotGlyph(size: 22)
+                Text("Dot")
+                    .font(.headline)
+                Spacer(minLength: 8)
+                Text(countText(state))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .contentTransition(.numericText())
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(state.rows, id: \.runId) { row in
+                    RowView(row: row)
                 }
-                Text(state.title)
-                    .font(.body.weight(.medium))
-                    .lineLimit(1)
-                DoingRow(state: state)
-                    .font(.subheadline)
             }
         }
-        .padding(16)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
     }
 }
 
-/// The right-hand side: a running timer while working, a word for the other states.
-private struct StatusTrailing: View {
-    let state: DotRunAttributes.ContentState
+/// One run: its title, then what it does or who works on it, and its status at the right.
+private struct RowView: View {
+    let row: DotFleetAttributes.Row
 
     var body: some View {
-        switch RunStatus(rawValue: state.status) {
-        case .working:
-            Text(Date(timeIntervalSince1970: state.startedAt), style: .timer)
-                .monospacedDigit()
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(.secondary)
-        case .waiting:
-            Label("Waiting", systemImage: "hand.raised.fill")
-                .labelStyle(.titleAndIcon)
-                .foregroundStyle(.orange)
-        case .done:
-            Label("Done", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-        case .failed:
-            Label("Failed", systemImage: "xmark.octagon.fill")
-                .foregroundStyle(.red)
-        case nil:
-            Text(state.status)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
-/// What the run does now as the daemon names it (item 1004), and the SF Symbol drawn for it.
-private func doingSymbol(_ state: DotRunAttributes.ContentState) -> String {
-    switch state.kind ?? state.status {
-    case "thinking": "brain"
-    case "answering": "text.cursor"
-    case "browsing": "globe"
-    case "searching": "magnifyingglass"
-    case "command": "terminal"
-    case "reading": "doc.text.magnifyingglass"
-    case "writing": "square.and.pencil"
-    case "mac": "macbook"
-    case "mail": "envelope"
-    case "calendar": "calendar"
-    case "memory": "books.vertical"
-    case "helpers": "person.2"
-    case "app": "square.grid.2x2"
-    case "trading": "chart.line.uptrend.xyaxis"
-    case "waiting": "hand.raised.fill"
-    case "done": "checkmark.circle.fill"
-    case "failed": "xmark.octagon.fill"
-    default: "ellipsis"
-    }
-}
-
-/// The colour of the mark: Dot's yellow at work, orange while it waits, green done, red failed.
-private func doingColor(_ state: DotRunAttributes.ContentState) -> Color {
-    switch RunStatus(rawValue: state.status) {
-    case .waiting: .orange
-    case .done: .green
-    case .failed: .red
-    case .working, nil: Color(red: 1.0, green: 0.78, blue: 0.22)
-    }
-}
-
-/// The mark of what the run does now. A Live Activity plays no repeating animation, only the change from one update to
-/// the next, so the mark turns into the next one as the run moves on.
-private struct DoingMark: View {
-    let state: DotRunAttributes.ContentState
-
-    var body: some View {
-        Image(systemName: doingSymbol(state))
-            .foregroundStyle(doingColor(state))
-            .contentTransition(.symbolEffect(.replace))
-            .accessibilityHidden(true)
-    }
-}
-
-/// The mark and the line of what the run does now, side by side.
-private struct DoingRow: View {
-    let state: DotRunAttributes.ContentState
-
-    var body: some View {
-        HStack(spacing: 8) {
-            DoingMark(state: state)
-                .frame(width: 18)
-            Text(lineText(state))
-                .foregroundStyle(.secondary)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(row.title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .layoutPriority(1)
+            Text(detail(row))
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.6))
                 .lineLimit(1)
                 .contentTransition(.opacity)
+            Spacer(minLength: 6)
+            StatusWord(row: row)
+                .font(.subheadline.weight(.semibold))
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Beside the title: what a run at work does now, and for the others who worked on it (none for Dot itself).
+private func detail(_ row: DotFleetAttributes.Row) -> String {
+    switch RunStatus(rawValue: row.status) {
+    case .working:
+        return row.line
+    case .waiting:
+        return row.line.isEmpty ? "Waiting for you" : row.line
+    case .done, .failed, nil:
+        return row.agent == "Dot" ? "" : row.agent
+    }
+}
+
+/// The status in its colour: Working, Waiting, Done, Failed.
+private struct StatusWord: View {
+    let row: DotFleetAttributes.Row
+
+    var body: some View {
+        switch RunStatus(rawValue: row.status) {
+        case .working:
+            Text("Working").foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+        case .waiting:
+            Text("Waiting").foregroundStyle(.orange)
+        case .done:
+            Text("Done").foregroundStyle(.green)
+        case .failed:
+            Text(row.line == "Stopped" ? "Stopped" : "Failed").foregroundStyle(.red)
+        case nil:
+            Text(row.status).foregroundStyle(.secondary)
         }
     }
 }
 
-/// The status line, or "Waiting for you" when the run waits and the daemon sent no line.
-private func lineText(_ state: DotRunAttributes.ContentState) -> String {
-    if RunStatus(rawValue: state.status) == .waiting && state.line.isEmpty {
-        return "Waiting for you"
+/// The Dynamic Island's mark: how many runs work, in Dot's yellow, or a check once all are done.
+private struct CountMark: View {
+    let state: DotFleetAttributes.ContentState
+
+    var body: some View {
+        if state.active > 0 {
+            Text("\(state.active)")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color(red: 1.0, green: 0.78, blue: 0.22))
+                .contentTransition(.numericText())
+        } else {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.green)
+        }
     }
-    return state.line
 }
 
 /// Dot's mark, drawn small: a yellow dot with two eyes.
@@ -213,16 +189,20 @@ private struct LiveDotGlyph: View {
     }
 }
 
-#Preview("Lock screen", as: .content, using: DotRunAttributes(runId: "run_preview", agentName: "Dot")) {
-    DotRunLiveActivity()
+#Preview("Lock screen", as: .content, using: DotFleetAttributes(fleetId: "fleet")) {
+    DotFleetLiveActivity()
 } contentStates: {
-    DotRunAttributes.ContentState(
-        title: "Compare three flights to Izmir", status: "working", kind: "browsing", line: "Browsing the web",
-        startedAt: Date().addingTimeInterval(-95).timeIntervalSince1970)
-    DotRunAttributes.ContentState(
-        title: "Compare three flights to Izmir", status: "waiting", kind: "waiting", line: "",
-        startedAt: Date().addingTimeInterval(-300).timeIntervalSince1970)
-    DotRunAttributes.ContentState(
-        title: "Compare three flights to Izmir", status: "done", kind: "done", line: "Done",
-        startedAt: Date().addingTimeInterval(-600).timeIntervalSince1970)
+    DotFleetAttributes.ContentState(
+        active: 2,
+        rows: [
+            DotFleetAttributes.Row(
+                runId: "run_a", title: "Compare three flights to Izmir", agent: "Dot", status: "working",
+                kind: "browsing", line: "Browsing the web", startedAt: Date().addingTimeInterval(-95).timeIntervalSince1970),
+            DotFleetAttributes.Row(
+                runId: "run_b", title: "Tez sohbeti", agent: "Scout", status: "waiting", kind: "waiting", line: "",
+                startedAt: Date().addingTimeInterval(-300).timeIntervalSince1970),
+            DotFleetAttributes.Row(
+                runId: "run_c", title: "Summarise the YouTube video", agent: "Dot", status: "done", kind: "done",
+                line: "Done", startedAt: Date().addingTimeInterval(-600).timeIntervalSince1970),
+        ])
 }

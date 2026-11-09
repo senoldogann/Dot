@@ -242,7 +242,7 @@ class ApnsRegistration(FrozenModel):
 
 
 class LiveActivityRegistration(FrozenModel):
-    """The token of a run's Live Activity the app started from a push (item 997)."""
+    """The token of the phone's one Live Activity (item 1093) the app started from a push (item 997)."""
 
     run_id: str = Field(min_length=1, max_length=64)
     token: str = Field(pattern=APNS_TOKEN)

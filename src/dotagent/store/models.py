@@ -923,7 +923,8 @@ class ApnsDevice(FrozenModel):
 
 
 class LiveActivity(FrozenModel):
-    """A Live Activity of a run on a phone (item 997): the token APNs updates and ends it with."""
+    """The token of a phone's Live Activity (item 997), kept under ``fleet`` since item 1093 (one a run before it):
+    the token APNs updates and ends it with."""
 
     run_id: str
     phone_id: str

@@ -17,7 +17,8 @@ from dotagent.core.errors import ConfigError, NotFoundError, PairingRefused, Pho
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path
 from dotagent.events import SYSTEM_RUN_ID
-from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT, follows_live
+from dotagent.notify.apns import FLEET_ID
+from dotagent.notify.apns_watch import LIVE_DISMISSED_EVENT, LIVE_REGISTERED_EVENT
 from dotagent.qr import qr_png
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import PHONE_STATE
@@ -34,7 +35,6 @@ from dotagent.server.views import (
     PhoneDeviceView,
     PhoneView,
 )
-from dotagent.store.models import RunRecord
 from dotagent.tailnet import DOWNLOAD_PAGE, TailnetState, open_tailscale, serve_daemon, tailnet_state
 
 log = get_logger(__name__)
@@ -195,18 +195,35 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
 
     @router.post("/phone/apns/activity", status_code=204)
     async def register_live_activity(registration: LiveActivityRegistration, http: Request) -> Response:
-        """Keep the token of a run's Live Activity on the phone that asks (item 997): its updates and its end go to
-        it. The run must be one that has a Live Activity."""
+        """Keep the token of the phone's Live Activity on the phone that asks (items 997 and 1093): the rows of the
+        owner's runs go to it. An activity of an app from before item 1093, one a run, is not Dot's any more."""
         phone_id: str = asking_phone(http)
-        run: RunRecord = await ctx.runtime.store.get_run(registration.run_id)
-        if not follows_live(run):
-            raise NotFoundError("that run has no Live Activity", {"run_id": registration.run_id})
-        await ctx.runtime.store.set_live_activity(run.id, phone_id, registration.token, time.time())
+        if registration.run_id != FLEET_ID:
+            raise NotFoundError("that Live Activity is not one Dot keeps", {"run_id": registration.run_id})
+        await ctx.runtime.store.set_live_activity(FLEET_ID, phone_id, registration.token, time.time())
+        await ctx.runtime.store.delete_live_activities_but(FLEET_ID, phone_id)
         if all(phone.id != phone_id for phone in phones.listed()):
             await ctx.runtime.store.delete_apns_device(phone_id)
             raise NotFoundError("that phone is not paired", {})
-        # A run that ended before the token came has its activity ended now (notify/apns_watch.py).
-        await ctx.runtime.bus.emit(SYSTEM_RUN_ID, LIVE_REGISTERED_EVENT, {"run_id": run.id}, False)
+        # The rows changed while the token was on its way: the activity is told them now (notify/apns_watch.py).
+        await ctx.runtime.bus.emit(SYSTEM_RUN_ID, LIVE_REGISTERED_EVENT, {"phone_id": phone_id}, False)
+        return Response(status_code=204)
+
+    @router.delete("/phone/apns/activity", status_code=204)
+    async def forget_live_activity(http: Request, token: str | None = None) -> Response:
+        """Forget the token of the phone's Live Activity (item 1093): the app tells it when the owner swiped the
+        activity away, with that activity's ``token``, which is forgotten only while it is the one kept
+        (a newer activity's stays); and with none when it opens and has no activity at all, which forgets any."""
+        phone_id: str = asking_phone(http)
+        forgotten: bool = (
+            await ctx.runtime.store.delete_live_activity(FLEET_ID, phone_id)
+            if token is None
+            else await ctx.runtime.store.delete_live_activity_token(FLEET_ID, phone_id, token)
+        )
+        # The activity the daemon kept was swiped away, or went while the app was closed: none is started again on this
+        # phone before the next run (notify/apns_watch.py). The end of an older one, or of one the daemon ended, is not.
+        if forgotten:
+            await ctx.runtime.bus.emit(SYSTEM_RUN_ID, LIVE_DISMISSED_EVENT, {"phone_id": phone_id}, False)
         return Response(status_code=204)
 
     return router
