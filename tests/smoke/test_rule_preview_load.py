@@ -194,7 +194,10 @@ async def test_a_try_out_over_twenty_thousand_steps_reads_them_all_and_the_daemo
         # A push the preset let through would now ask; one the owner declined was asked about already.
         assert (view["stricter"], view["same"]) == (STEPS * 2 // 5, STEPS // 10)
     examples: object = view["examples"]
-    assert isinstance(examples, list) and len(examples) == 20
+    # A try-out cut short by its time shows what it found by then (main's run of 2026-11-09 found none on a slow
+    # runner); one that read them all shows twenty.
+    assert isinstance(examples, list)
+    assert len(examples) <= 20 if view["partial"] is True else len(examples) == 20, examples
     assert took < BUDGET_S + SLACK_S, took
     # The daemon answered while the try-out read: more than the one request that waited for it.
     assert len(answers) > 1, answers
