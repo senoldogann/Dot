@@ -4,6 +4,11 @@ web app's icons (``static/icons/icon-192.png``, ``icon-512.png``, the home scree
 the desktop shell (``app.png``, 1024 px, for ``npm run icons``) and its menu bar icons, one per state
 (``tray-{state}.png``, 44 px, the 22 pt item at 2x).
 
+On a phone (item 1069, the owner's choice of 2026-11-09) the icon is flat: the two eyes in white, alone, on a tile of
+black, with no ball, light or gold, so that it reads as one plain sign on a home screen. The web app's icons and the
+home screen's touch icons are drawn so (:func:`phone_tile_svg`); the favicon, the desktop app and the menu bar keep the
+ball.
+
 The mark is a dot that looks (item 642, the owner's choice of 2026-10-25, "Obsidian"): a ball of obsidian, lit at its
 upper left, with the two capsule eyes of the character's attentive rest pose (``static/js/character``) in champagne gold
 and a hairline of gold round it, so that it holds on a light page, a dark one and a menu bar of either. The eyes are a
@@ -118,6 +123,26 @@ def tile_svg(rounded: bool, scale: float = 0.0) -> str:
     )
 
 
+# The eyes' middle in the attentive pose, which a phone's tile draws about the tile's middle.
+EYES_MIDDLE: tuple[float, float] = (10.0, -11.0)
+
+
+def phone_tile_svg(scale: float) -> str:
+    """The icon of a phone (item 1069): the eyes of the attentive pose in white, ``scale`` times their size in the disc
+    of radius 100, about the middle of a square tile of black, full bleed (the phone rounds it)."""
+    eyes: str = "".join(f'<path d="{EYE}" transform="{matrix}" fill="#fff"/>' for matrix in ATTENTIVE)
+    x, y = EYES_MIDDLE
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#000"/>'
+        f'<g transform="translate(512 512) scale({scale}) translate({-x} {-y})">{eyes}</g></svg>'
+    )
+
+
+# The eyes on a phone's tile, and on the maskable one, which a phone may cut to a circle: well inside its safe zone.
+PHONE_SCALE: float = 5.2
+MASKABLE_SCALE: float = 4.4
+
+
 def _page(svg: str, size: int) -> str:
     return (
         "<!doctype html><html><head><style>html,body{margin:0;background:transparent}"
@@ -141,13 +166,13 @@ async def render(target: Path, svg: str, size: int) -> None:
 async def main() -> None:
     (STATIC / "favicon.svg").write_text(mark_svg(ATTENTIVE, False) + "\n", encoding="utf-8")
     await render(HERE / "app.png", tile_svg(True), APP_PX)
+    # The web app's and the home screen's icons are a phone's (item 1069).
     for size in WEB_PX:
-        await render(STATIC / "icons" / f"icon-{size}.png", tile_svg(False), size)
-    # The maskable icon: the same tile, the mark well inside the circle a phone may cut it to (its safe zone).
-    await render(STATIC / "icons" / "icon-maskable-512.png", tile_svg(False, scale=2.4), 512)
-    await render(STATIC / "icons" / "icon-96.png", tile_svg(False), 96)
+        await render(STATIC / "icons" / f"icon-{size}.png", phone_tile_svg(PHONE_SCALE), size)
+    await render(STATIC / "icons" / "icon-maskable-512.png", phone_tile_svg(MASKABLE_SCALE), 512)
+    await render(STATIC / "icons" / "icon-96.png", phone_tile_svg(PHONE_SCALE), 96)
     for size in TOUCH_PX:
-        await render(STATIC / "icons" / f"touch-icon-{size}.png", tile_svg(False), size)
+        await render(STATIC / "icons" / f"touch-icon-{size}.png", phone_tile_svg(PHONE_SCALE), size)
     # The 180 px files at the root, which iOS tries by name when a page names no icon: the same artwork.
     tile: bytes = (STATIC / "icons" / "touch-icon-180.png").read_bytes()
     for name in ROOT_TOUCH:
