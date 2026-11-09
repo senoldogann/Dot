@@ -24,7 +24,7 @@ import { PHONE } from "./layout.js";
 import { loopRhythm, nextFiring } from "./rhythm.js";
 import { markContent } from "./marks.js";
 import { closeMenu, closeMenuFrom, menuOpenedBy, openMenu } from "./menu.js";
-import { nestRows } from "./nesting.js";
+import { placeWork } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
 import { buildSettingsNav } from "./settingsnav.js";
 import { requestCompose } from "./shortcuts.js";
@@ -429,29 +429,6 @@ function placeWaiting(rows, chats) {
   return { waiting, byChat };
 }
 
-/**
- * Where the runs at work stand (item 202). `rows` are the rows of Working with the delegated runs that ended under
- * them, `chats` the chats listed. A chat whose latest run is one of them stands once, as that chat, with the runs it
- * delegated: under Working (`working`, `{ chat, row, children }`), unless it is pinned, which keeps it under Pinned
- * (`pinned`, its family by chat id). A row that is no listed chat's (a run whose chat is not listed, a delegated run
- * whose parent is not) stands under Working as it is, its `chat` null.
- */
-function placeWork(rows, chats) {
-  const byRun = new Map(chats.map((chat) => [chat.latest_run_id, chat]));
-  const working = [];
-  const pinned = new Map();
-  for (const { row, children } of nestRows(rows)) {
-    const chat = row.run_id === null ? undefined : byRun.get(row.run_id);
-    if (chat === undefined) {
-      working.push({ chat: null, row, children });
-    } else if (chat.pinned_at === null) {
-      working.push({ chat, row, children });
-    } else {
-      pinned.set(chat.id, { row, children });
-    }
-  }
-  return { working, pinned };
-}
 
 /** A chat as a row to tick while chats are being chosen for deletion, with its creature (`face`) and the mark of its
  * loop as at rest (item 635), its name and its last line: as tall as its row at rest, so the list keeps its place when

@@ -222,6 +222,9 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
     assert next(row for row in activity["working"] if row["kind"] == "campaign")["title"] == "Find leads"
     child = next(row for row in activity["working"] if row["kind"] == "delegated")
     assert child["parent_run_id"] == working.id and child["steps"] >= 1
+    # The chat its work came from at the top (item 1074), which the lists keep it under once its parent ends.
+    assert child["root_thread_id"] == working.thread_id
+    assert all(row["root_thread_id"] is None for row in activity["working"] if row["kind"] != "delegated")
     assert all(row["parent_run_id"] is None for row in activity["working"] if row["kind"] != "delegated")
     assert activity["recent"] == []
     count: httpx.Response = await client.get("/api/activity/count")

@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { nestRows } from "../../src/dotagent/server/static/js/nesting.js";
+import { nestRows, placeWork } from "../../src/dotagent/server/static/js/nesting.js";
 
 function row(id, runId, parentRunId) {
   return { id, run_id: runId, parent_run_id: parentRunId };
@@ -38,4 +38,22 @@ test("a row of no run, or whose parent is not listed, stands on its own", () => 
     nested.map(({ row: shown }) => shown.id),
     ["due", "orphan"],
   );
+});
+
+// Item 1074: a run another run delegated whose parent works no more (a work order's attempt outlives the lead's turn)
+// stands under the chat its work came from, which works while it does, and not as a row of its own.
+test("a delegated run whose parent works no more stands under its chat, which works", () => {
+  const chat = { id: "thr_lead", title: "Plan the launch", latest_run_id: "run_lead", latest_status: "done", pinned_at: null };
+  const attempt = { id: "a", run_id: "run_order", parent_run_id: "run_lead", root_thread_id: "thr_lead", status: "running", title: "Work order" };
+  const own = { id: "b", run_id: "run_alone", parent_run_id: null, root_thread_id: null, status: "running", title: "Alone" };
+  const { working } = placeWork([attempt, own], [chat]);
+  const lead = working.find((entry) => entry.chat !== null);
+  assert.equal(lead.chat.id, "thr_lead");
+  assert.equal(lead.chat.latest_status, "running");
+  assert.deepEqual(
+    lead.children.map((kid) => kid.run_id),
+    ["run_order"],
+  );
+  assert.equal(working.filter((entry) => entry.chat === null && entry.row.run_id === "run_order").length, 0);
+  assert.equal(working.filter((entry) => entry.chat === null).length, 1);
 });

@@ -90,6 +90,16 @@ def _actor_of(run: RunRecord) -> str | None:
     return run.id if run.parent_run_id is not None else None
 
 
+async def _root_thread(store: Store, run: RunRecord) -> str | None:
+    """The chat of the run at the top of ``run``'s delegations (item 1074), None for a run no other run started."""
+    if run.parent_run_id is None:
+        return None
+    top: RunRecord = run
+    while top.parent_run_id is not None:
+        top = await store.get_run(top.parent_run_id)
+    return top.thread_id
+
+
 async def _run_row(store: Store, run: RunRecord, section: str, kind: str, detail: str, title: str) -> ActivityRow:
     """A row for a run; one that ended carries its minutes and its tokens."""
     return ActivityRow(
@@ -108,6 +118,7 @@ async def _run_row(store: Store, run: RunRecord, section: str, kind: str, detail
         steps=run.steps,
         parent_run_id=run.parent_run_id,
         actor_id=_actor_of(run),
+        root_thread_id=await _root_thread(store, run),
     )
 
 
