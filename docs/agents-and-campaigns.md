@@ -102,7 +102,8 @@ message of its chat (item 415): your pick widens the agent's bounds for that cha
 not. An agent with neither `shell` nor `terminal_open` is told in its prompt that no command runs in its run, and to do
 that work with the tools it names (item 936): Dot's ways of working name the shell first. A run it delegates a part to (`delegate`) is bound to the agent's tools too, without the servers picked for a
 message, and carries the agent's id (item 553). Ask the delegated run to end with a `Verification:` section: the
-command or check it ran and the answer. A report without one is marked as a claim, so the sender does not close a plan
+command or check it ran and the answer. A report without one, or with one that holds no check (a word or two,
+"none"), is marked as a claim (item 1065), so the sender does not close a plan
 step on trust alone. The run's page wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on
 the home's Today strip wear the face too. A schedule can run as one of your agents (its **Agent** on Schedules, item
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting an agent leaves its chats, its lessons and its
@@ -399,9 +400,14 @@ may be made), each asking the policy for what a delegation asks:
 - `work_orders(status?, order?)` lists the orders (the open ones by default) with their status, agent, tries, age and
   due time; an order's id gives it in full, with the answer of each try. Dot sees every order; an agent that leads sees
   those its own runs handed out.
-- `review_work(order, verdict, notes, to_agent?)` judges an order: `accept`; `return` (the same agent starts again
-  with the original brief and what done means, its earlier answer in a fence and your notes, which a return must
-  have); `reassign` (the same to `to_agent`, with the first agent's answer); `escalate` (the order waits for you, and
+- `review_work(order, verdict, notes, to_agent?, brief?)` judges an order: `accept`, only when the answer of its
+  newest try has a `Verification:` section that says what was run or checked and what it showed (item 1065: "done"
+  with none, or with one that says only "none", is a claim, and is refused: return it asking for that check, or
+  escalate it; an order past its due time whose run answered nothing yet cannot be accepted either); `return` (the
+  same agent starts again with the original brief and what done means, its earlier answer in a fence and your notes,
+  which a return must have; once the order came back twice, the return must rewrite the order's brief in `brief`
+  instead, and the next try starts afresh on it alone, without the answers sent back or notes on them, item 1065; a
+  reassignment given a `brief` starts afresh on it too, without the first agent's answer); `reassign` (the same to `to_agent`, with the first agent's answer); `escalate` (the order waits for you, and
   you are told on the Mac and the phone as a brief is: its title, and the lead's words unless the order read outside
   content; only an order in review, not one at work); `cancel` (stops the run at work). The third try of an order,
   whoever made the first two, goes to you instead of a fourth when it is sent back, and so does a reassignment after six

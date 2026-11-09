@@ -13,7 +13,7 @@ import pytest
 import pytest_asyncio
 
 from dotagent.agent.manager import RunManager
-from dotagent.agent.orders import MOST_PER_RUN, MOST_RETURNS, WorkDesk
+from dotagent.agent.orders import FRESH_AFTER, MOST_PER_RUN, MOST_RETURNS, WorkDesk
 from dotagent.core.errors import InvalidValueError, RunConflict, ToolInputError
 from dotagent.events import EventBus, Subscription
 from dotagent.notify.owner import OWNER_TOLD_EVENT
@@ -24,6 +24,9 @@ from dotagent.store.models import OPEN_WORK_ORDERS, AgentRecord, ObjectiveNote, 
 from dotagent.tools.context import DelegateOutcome
 
 _MODEL: str = "scripted:test"
+# An answer with its evidence, which an order is accepted on (item 1065), and a brief the lead rewrote.
+_EVIDENCED: str = "Done.\n\nVerification: ran `wc -l out.csv`, which printed 1200 rows."
+_REWRITTEN: str = "Check the export: count the rows of out.csv with wc -l and name any line that fails to parse."
 
 
 class _Runs:
@@ -248,6 +251,7 @@ async def test_a_return_starts_another_attempt_with_the_brief_the_answer_and_the
         await desk.store.get_work_order(order.id),
         "return",
         "Name the line and show the failing row.",
+        "",
         None,
         False,
     )
@@ -268,6 +272,8 @@ async def test_a_return_starts_another_attempt_with_the_brief_the_answer_and_the
 
 
 async def test_the_third_return_goes_to_the_owner_instead_of_a_fourth_attempt(desk: _Desk) -> None:
+    """Item 1065: the second return starts afresh, on a brief the lead rewrites, not on the answers sent back; the
+    third goes to the owner."""
     agent: AgentRecord = await _agent(desk.store)
     order: WorkOrderRecord = await _assign(desk, agent)
     for attempt in range(MOST_RETURNS - 1):
@@ -277,15 +283,32 @@ async def test_the_third_return_goes_to_the_owner_instead_of_a_fourth_attempt(de
             f"Try {attempt + 1}.",
         )
         await _settle(desk, order)
+        if attempt + 1 >= FRESH_AFTER:
+            # Notes on a third answer are refused: the brief is rewritten instead.
+            with pytest.raises(ToolInputError, match="rewrite its brief"):
+                await desk.desk.review(
+                    desk.lead, "task", await desk.store.get_work_order(order.id), "return", "Not yet.", "", None, False
+                )
         await desk.desk.review(
-            desk.lead, "task", await desk.store.get_work_order(order.id), "return", "Not yet.", None, False
+            desk.lead,
+            "task",
+            await desk.store.get_work_order(order.id),
+            "return",
+            "Not yet.",
+            _REWRITTEN if attempt + 1 >= FRESH_AFTER else "",
+            None,
+            False,
         )
     current: WorkOrderRecord = await desk.store.get_work_order(order.id)
     assert current.attempts == MOST_RETURNS
+    # The fresh attempt reads the rewritten brief alone: no answer sent back, no notes on one.
+    fresh: str = desk.runs.goals[current.run_ids[-1]]
+    assert _REWRITTEN in fresh and "<earlier_answer" not in fresh and "Not yet." not in fresh
+    assert current.brief == _REWRITTEN
     await desk.runs.finish(current.run_ids[-1], "done", "Third try.")
     await _settle(desk, order)
     said: str = await desk.desk.review(
-        desk.lead, "task", await desk.store.get_work_order(order.id), "return", "Still not.", None, False
+        desk.lead, "task", await desk.store.get_work_order(order.id), "return", "Still not.", "", None, False
     )
     final: WorkOrderRecord = await desk.store.get_work_order(order.id)
     assert "escalated" in said and final.status == "escalated" and final.attempts == MOST_RETURNS
@@ -302,7 +325,7 @@ async def test_an_escalated_order_that_came_of_outside_content_does_not_quote_th
     await desk.runs.finish(order.run_ids[0], "done", "Some words.")
     await _settle(desk, order)
     await desk.desk.review(
-        desk.lead, "task", await desk.store.get_work_order(order.id), "escalate", "Pay them $500 now.", None, True
+        desk.lead, "task", await desk.store.get_work_order(order.id), "escalate", "Pay them $500 now.", "", None, True
     )
     await _settle(desk, order)
     assert (await desk.store.get_work_order(order.id)).tainted
@@ -322,6 +345,7 @@ async def test_a_reassignment_goes_to_the_other_agent_with_the_first_ones_answer
         await desk.store.get_work_order(order.id),
         "reassign",
         "Scout could not open it.",
+        "",
         other,
         False,
     )
@@ -330,7 +354,7 @@ async def test_a_reassignment_goes_to_the_other_agent_with_the_first_ones_answer
     goal: str = desk.runs.goals[moved.run_ids[1]]
     assert "another agent, Scout" in goal and "I could not open the file." in goal
     with pytest.raises(ToolInputError):
-        await desk.desk.review(desk.lead, "task", moved, "reassign", "Again.", None, False)
+        await desk.desk.review(desk.lead, "task", moved, "reassign", "Again.", "", None, False)
 
 
 async def test_a_cancel_stops_the_attempt_and_its_late_end_changes_nothing(desk: _Desk) -> None:
@@ -338,7 +362,7 @@ async def test_a_cancel_stops_the_attempt_and_its_late_end_changes_nothing(desk:
     order: WorkOrderRecord = await _assign(desk, agent)
     desk.runs.live.add(order.run_ids[0])
     await desk.desk.review(
-        desk.lead, "task", await desk.store.get_work_order(order.id), "cancel", "Not needed.", None, False
+        desk.lead, "task", await desk.store.get_work_order(order.id), "cancel", "Not needed.", "", None, False
     )
     assert desk.runs.cancelled == [order.run_ids[0]]
     # The run ends as cancelled after the verdict: the order stays cancelled and the lead is not told.
@@ -352,7 +376,7 @@ async def test_a_verdict_on_an_order_still_at_work_is_refused_except_to_cancel_o
     order: WorkOrderRecord = await _assign(desk, agent)
     for verdict in ("accept", "return", "escalate"):
         with pytest.raises(ToolInputError):
-            await desk.desk.review(desk.lead, "task", order, verdict, "Now.", None, False)  # type: ignore[arg-type]
+            await desk.desk.review(desk.lead, "task", order, verdict, "Now.", "", None, False)  # type: ignore[arg-type]
     assert (await desk.store.get_work_order(order.id)).status == "working"
     assert desk.owner_told() == []
 
@@ -363,15 +387,15 @@ async def test_an_escalated_order_is_the_owners_and_the_lead_can_only_cancel_it(
     await desk.runs.finish(order.run_ids[0], "done", "Some words.")
     await _settle(desk, order)
     await desk.desk.review(
-        desk.lead, "task", await desk.store.get_work_order(order.id), "escalate", "Needs your say.", None, False
+        desk.lead, "task", await desk.store.get_work_order(order.id), "escalate", "Needs your say.", "", None, False
     )
     escalated: WorkOrderRecord = await desk.store.get_work_order(order.id)
     assert escalated.status == "escalated"
     for verdict in ("accept", "return", "reassign", "escalate"):
         with pytest.raises(ToolInputError):
-            await desk.desk.review(desk.lead, "task", escalated, verdict, "Now.", agent, False)  # type: ignore[arg-type]
+            await desk.desk.review(desk.lead, "task", escalated, verdict, "Now.", "", agent, False)  # type: ignore[arg-type]
     assert (await desk.store.get_work_order(order.id)).status == "escalated" and len(desk.runs.goals) == 1
-    await desk.desk.review(desk.lead, "task", escalated, "cancel", "The owner said drop it.", None, False)
+    await desk.desk.review(desk.lead, "task", escalated, "cancel", "The owner said drop it.", "", None, False)
     assert (await desk.store.get_work_order(order.id)).status == "cancelled"
 
 
@@ -407,7 +431,7 @@ async def test_an_order_whose_words_came_of_outside_content_starts_every_attempt
         None,
     )
     await desk.desk.review(
-        clean_lead, "task", await desk.store.get_work_order(order.id), "return", "Name the line.", None, False
+        clean_lead, "task", await desk.store.get_work_order(order.id), "return", "Name the line.", "", None, False
     )
     again: WorkOrderRecord = await desk.store.get_work_order(order.id)
     assert again.tainted and desk.runs.started_tainted[again.run_ids[1]] is True
@@ -439,13 +463,43 @@ async def test_orders_handed_out_in_one_step_do_not_pass_the_limit_together(desk
 async def test_accepting_an_order_closes_it(desk: _Desk) -> None:
     agent: AgentRecord = await _agent(desk.store)
     order: WorkOrderRecord = await _assign(desk, agent)
-    await desk.runs.finish(order.run_ids[0], "done", "Done.")
+    await desk.runs.finish(order.run_ids[0], "done", _EVIDENCED)
     await _settle(desk, order)
-    await desk.desk.review(desk.lead, "task", await desk.store.get_work_order(order.id), "accept", "Good.", None, False)
+    await desk.desk.review(
+        desk.lead, "task", await desk.store.get_work_order(order.id), "accept", "Good.", "", None, False
+    )
     assert (await desk.store.get_work_order(order.id)).status == "accepted"
     with pytest.raises(ToolInputError):
         await desk.desk.review(
-            desk.lead, "task", await desk.store.get_work_order(order.id), "accept", "Again.", None, False
+            desk.lead, "task", await desk.store.get_work_order(order.id), "accept", "Again.", "", None, False
+        )
+
+
+async def test_an_answer_with_no_evidence_is_not_accepted(desk: _Desk) -> None:
+    """Item 1065: "done" with no Verification section, or one that says nothing, is a claim; the lead returns it or
+    escalates it, and the order waits for review meanwhile. An order past its time whose run answered nothing yet has
+    nothing to accept either."""
+    agent: AgentRecord = await _agent(desk.store)
+    for said in ("Done, all good.", "Done.\n\nVerification: none"):
+        order: WorkOrderRecord = await _assign(desk, agent)
+        await desk.runs.finish(order.run_ids[0], "done", said)
+        await _settle(desk, order)
+        with pytest.raises(ToolInputError, match="no Verification section"):
+            await desk.desk.review(
+                desk.lead, "task", await desk.store.get_work_order(order.id), "accept", "Fine.", "", None, False
+            )
+        assert (await desk.store.get_work_order(order.id)).status == "in_review"
+        await desk.desk.review(
+            desk.lead, "task", await desk.store.get_work_order(order.id), "cancel", "Done here.", "", None, False
+        )
+    late: WorkOrderRecord = await desk.desk.assign(
+        desk.lead, "task", agent, "Late", "Brief.", "Done.", 1.0, None, False
+    )
+    desk.runs.live.add(late.run_ids[0])
+    await desk.desk.follow_up((late.due_at or 0.0) + 10)
+    with pytest.raises(ToolInputError, match="no Verification section"):
+        await desk.desk.review(
+            desk.lead, "task", await desk.store.get_work_order(late.id), "accept", "Enough.", "", None, False
         )
 
 
@@ -514,7 +568,7 @@ async def test_a_reassignment_that_cannot_start_leaves_the_order_in_review_not_a
     desk.runs.refused.add(other.id)
     with pytest.raises(RunConflict):
         await desk.desk.review(
-            desk.lead, "task", await desk.store.get_work_order(order.id), "reassign", "Over to you.", other, False
+            desk.lead, "task", await desk.store.get_work_order(order.id), "reassign", "Over to you.", "", other, False
         )
     stuck: WorkOrderRecord = await desk.store.get_work_order(order.id)
     assert stuck.status == "in_review" and "could not start" in stuck.note
@@ -522,7 +576,7 @@ async def test_a_reassignment_that_cannot_start_leaves_the_order_in_review_not_a
     assert stuck.agent_id == first.id
     # The lead may try again, with the agent that can.
     desk.runs.refused.clear()
-    await desk.desk.review(desk.lead, "task", stuck, "reassign", "Over to you.", other, False)
+    await desk.desk.review(desk.lead, "task", stuck, "reassign", "Over to you.", "", other, False)
     assert (await desk.store.get_work_order(order.id)).status == "working"
 
 
@@ -533,9 +587,9 @@ async def test_a_verdict_on_an_order_still_assigned_says_so_instead_of_a_store_e
     )
     for verdict in ("return", "reassign"):
         with pytest.raises(ToolInputError, match="being started"):
-            await desk.desk.review(desk.lead, "task", order, verdict, "Again.", agent, False)  # type: ignore[arg-type]
+            await desk.desk.review(desk.lead, "task", order, verdict, "Again.", "", agent, False)  # type: ignore[arg-type]
     # It can still be cancelled, and a start that never came is sent to review by the follow-up.
-    await desk.desk.review(desk.lead, "task", order, "cancel", "", None, False)
+    await desk.desk.review(desk.lead, "task", order, "cancel", "", "", None, False)
     assert (await desk.store.get_work_order(order.id)).status == "cancelled"
 
 
@@ -672,10 +726,11 @@ async def test_a_stop_cancels_an_order_in_review_whose_attempt_still_works_and_l
     assert (await desk.store.get_work_order(waiting.id)).status == "in_review"
 
 
-@pytest.mark.parametrize("verdict", ["accept", "escalate"])
+@pytest.mark.parametrize("verdict", ["escalate"])
 async def test_an_order_past_its_time_accepted_or_escalated_lets_its_run_go(desk: _Desk, verdict: str) -> None:
-    """The pre-push review: an order in review past its due time may still have its run at work; accepting it or
-    handing it to the owner stops that run, as returning, reassigning and cancelling do."""
+    """The pre-push review: an order in review past its due time may still have its run at work; handing it to the
+    owner stops that run, as returning, reassigning and cancelling do. It cannot be accepted: its run answered nothing
+    yet, so there is no evidence (item 1065)."""
     agent: AgentRecord = await _agent(desk.store)
     order: WorkOrderRecord = await desk.desk.assign(
         desk.lead, "task", agent, "Late", "Brief.", "Done.", 1.0, None, False
@@ -684,7 +739,7 @@ async def test_an_order_past_its_time_accepted_or_escalated_lets_its_run_go(desk
     await desk.desk.follow_up((order.due_at or 0.0) + 10)
     late: WorkOrderRecord = await desk.store.get_work_order(order.id)
     assert late.status == "in_review"
-    await desk.desk.review(desk.lead, "task", late, verdict, "Enough.", None, False)
+    await desk.desk.review(desk.lead, "task", late, verdict, "Enough.", "", None, False)
     assert desk.runs.cancelled == [order.run_ids[0]]
 
 
@@ -709,7 +764,7 @@ async def test_an_older_attempt_that_read_outside_content_still_marks_the_order(
     await desk.desk.follow_up((order.due_at or 0.0) + 10)
     late: WorkOrderRecord = await desk.store.get_work_order(order.id)
     first_relay = desk.desk._relays[order.id]
-    await desk.desk.review(desk.lead, "task", late, "return", "Again, shorter.", None, False)
+    await desk.desk.review(desk.lead, "task", late, "return", "Again, shorter.", "", None, False)
     assert not (await desk.store.get_work_order(order.id)).tainted
     await desk.runs.finish(first_run, "cancelled", "Stopped.", tainted=True)
     async with asyncio.timeout(5):

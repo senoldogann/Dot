@@ -449,3 +449,24 @@ def _mask_whole(value: JsonValue) -> JsonValue:
 def estimate_text_tokens(text: str) -> int:
     """A cheap overestimate of the tokens of ``text`` (:data:`CHARS_PER_TOKEN`)."""
     return round(len(text) / CHARS_PER_TOKEN)
+
+
+# A report's Verification section (items 802 and 1065): a line that names it, as a heading, in bold or plain, and what
+# follows it.
+_VERIFICATION = re.compile(
+    r"(?im)^[ \t]*(?:#{1,4}[ \t]*)?(?:\*\*|__)?verification\b(?:\*\*|__)?[ \t]*:?(?:\*\*|__)?(.*)$"
+)
+# The least a Verification section says besides its name: a word or two is no check and what it showed.
+_VERIFIED_CHARS: int = 12
+
+
+def has_verification(report: str) -> bool:
+    """Whether ``report`` has a Verification section with something in it: the line that names it and what follows,
+    up to the next heading, holding at least a few characters. A claim of "done" with no such section, or one that
+    says only "none", is no evidence (item 1065)."""
+    found: re.Match[str] | None = _VERIFICATION.search(report)
+    if found is None:
+        return False
+    rest: str = found.group(1) + report[found.end() :]
+    section: str = re.split(r"(?m)^[ \t]*#{1,4}[ \t]", rest, maxsplit=1)[0]
+    return len("".join(section.split()).strip("*_:-")) >= _VERIFIED_CHARS
