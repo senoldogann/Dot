@@ -18,7 +18,15 @@ const FILE_PATH_CHARS = 400;
 const CODE_SUFFIXES = "md|markdown|html?|pdf|txt|csv|tsv|docx?|xlsx?|pptx?|json|ya?ml|toml|png|jpe?g|gif|webp|svg|py|js|mjs|ts|tsx|jsx|css|sh|rs|go|swift|log";
 const WORD_SUFFIXES = "md|markdown|html?|pdf|txt|csv|docx|xlsx|pptx";
 const NAMED_FILE = new RegExp(`^(?:[\\w-][\\w.-]*/)*[\\w-][\\w.-]*\\.(?:${CODE_SUFFIXES})$`, "i");
-const FILE_WORD = new RegExp(`(?<![\\w./~@:-])((?:~?/)?(?:[\\w-][\\w.-]*/)*[\\w-][\\w.-]*\\.(?:${WORD_SUFFIXES}))(?![\\w/-])`, "gi");
+// A path from the home folder or the root may go through folders whose names have words of capitals after spaces, as
+// the Mac's own do (`~/Library/Application Support/Dot/workspace/plan.md`): cut at the space it named no file (item
+// 1088). A path of the workspace has no spaces. Without the `i` flag, which would take any word for a capital's: the
+// suffix is written in either case instead.
+const SPACED_FOLDER = "[\\w-][\\w.-]*(?: [A-Z][\\w.-]*)*/";
+const FILE_WORD = new RegExp(
+  `(?<![\\w./~@:-])((?:~?/(?:${SPACED_FOLDER})*|(?:[\\w-][\\w.-]*/)*)[\\w-][\\w.-]*\\.(?:${WORD_SUFFIXES}|${WORD_SUFFIXES.toUpperCase()}))(?![\\w/-])`,
+  "g",
+);
 
 /** A file's path as a chip of its name (item 832): the whole path in its title and for a screen reader, and in a copy
  * of the message, which takes the text it was written in. */
