@@ -737,7 +737,9 @@ async def test_a_phone_uses_the_page_from_its_screen(
     Keyboard button types into the page's field and Enter submits its form; Return control stops it all."""
     MODEL.script = ScriptedProvider(
         _PROVIDER,
-        [_call("browser_open", {"url": f"{site.base}/play"}), _call("shell", {"command": "sleep 30"}), _FINISH],
+        # The run sleeps past the test's end, which cancels it (the nightly run of 2026-11-09: on a slow runner the
+        # test took more than thirty seconds, the run ended under it, and the page it held went with it).
+        [_call("browser_open", {"url": f"{site.base}/play"}), _call("shell", {"command": "sleep 300"}), _FINISH],
     )
     run: RunRecord = await manager.start(
         "Use the page", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()

@@ -33,6 +33,7 @@ import pytest
 import pytest_asyncio
 from channel_stand_ins import FakeMacos, Osascript
 from composer_choices import show_choices
+from message_hold import HOLD, HOLD_MS
 from messages_db import MessagesDb
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
@@ -599,11 +600,21 @@ async def test_a_chat_its_messages_menus_and_cards_say_what_they_mean(browser: B
         await reader.go(f"/runs/{served.runs['files']}", "A chat that worked", "textarea")
         await reader.opens("The chat's size ring", page.locator("button[title^='Chat size']").first)
         await reader.opens("The task's panel", page.get_by_role("button", name="Task details").first, "Escape")
-        await page.get_by_role("button", name="Copy the answer").first.click()
-        await reader.read("The toast of a copy")
-        await page.locator("button[aria-label='React to this message']").first.click(force=True)
-        await reader.read("The reactions")
-        await page.keyboard.press("Escape")
+        if width < 720:
+            # A phone shows no buttons under a message (item 1064): a hold opens its sheet, whose words are read,
+            # with the reactions and the copy.
+            await page.evaluate(HOLD, [".timeline article.answer .prose", HOLD_MS])
+            sheet: Locator = page.locator("dialog.message-sheet")
+            await expect(sheet).to_be_visible()
+            await reader.read("The reactions")
+            await sheet.get_by_role("button", name="Copy the answer").click()
+            await reader.read("The toast of a copy")
+        else:
+            await page.get_by_role("button", name="Copy the answer").first.click()
+            await reader.read("The toast of a copy")
+            await page.locator("button[aria-label='React to this message']").first.click(force=True)
+            await reader.read("The reactions")
+            await page.keyboard.press("Escape")
         # A chat at work: the stop button's words and the queue.
         await reader.go(f"/runs/{served.runs['slow']}", "A chat at work", "textarea")
         await page.get_by_role("textbox", name="Message for Dot").fill("And then say hello")

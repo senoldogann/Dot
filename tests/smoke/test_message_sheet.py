@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from message_hold import HOLD, HOLD_MS
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -33,21 +34,6 @@ TOKEN: str = "message-sheet-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 ASKED: str = "What does the sea do at night?"
 ANSWER: str = "It keeps moving under the moon."
-# A press that rests this long on a message is a hold (messagesheet.js holds at 450 ms).
-_HOLD_MS: int = 700
-# A touch that rests on `selector`, as a finger's does: pointer events of the touch kind, which Playwright's touch
-# screen has no way to hold.
-_HOLD: str = """async ([selector, ms]) => {
-  const target = document.querySelector(selector);
-  const box = target.getBoundingClientRect();
-  const at = { clientX: box.left + box.width / 2, clientY: box.top + Math.min(12, box.height / 2), bubbles: true,
-    pointerType: "touch", pointerId: 7, isPrimary: true };
-  target.dispatchEvent(new PointerEvent("pointerdown", at));
-  await new Promise((done) => setTimeout(done, ms));
-  target.dispatchEvent(new PointerEvent("pointerup", at));
-}"""
-
-
 # Whether every element `selector` finds under the node is out of sight: a box of a pixel at most, as app.css keeps the
 # buttons under a message on a touch screen, out of sight but in VoiceOver's and the keyboard's reach.
 _OUT_OF_SIGHT: str = """(node, selector) => [...node.querySelectorAll(selector)].every((found) => {
@@ -155,7 +141,7 @@ async def test_holding_a_message_opens_its_sheet_and_a_touch_screen_shows_no_but
             await expect(answer.get_by_role("button", name="Copy the answer")).to_be_attached()
 
             # Dot's answer: the seven reactions and what it can do; a reaction pressed stands under it.
-            await page.evaluate(_HOLD, [".timeline article.answer .prose", _HOLD_MS])
+            await page.evaluate(HOLD, [".timeline article.answer .prose", HOLD_MS])
             sheet: Locator = page.locator("dialog.message-sheet")
             await expect(sheet).to_be_visible()
             await expect(sheet.locator(".sheet-reaction")).to_have_count(7)
@@ -169,7 +155,7 @@ async def test_holding_a_message_opens_its_sheet_and_a_touch_screen_shows_no_but
             assert await answer.evaluate(_OUT_OF_SIGHT, ".answer-foot .btn")
 
             # Your message: Copy, Select text and Edit from here; Select text selects its words.
-            await page.evaluate(_HOLD, [".user-message .bubble.user", _HOLD_MS])
+            await page.evaluate(HOLD, [".user-message .bubble.user", HOLD_MS])
             await expect(sheet).to_be_visible()
             labels = await sheet.locator(".sheet-action").all_inner_texts()
             assert labels == ["Copy the message", "Select text", "Edit from here"], labels
@@ -184,7 +170,7 @@ async def test_holding_a_message_opens_its_sheet_and_a_touch_screen_shows_no_but
             # While its turn's run works, your message's foot is kept back, and its sheet lends none of it: an Edit
             # from here would be refused then.
             await page.evaluate("document.querySelector('.run-thread').classList.add('run-working')")
-            await page.evaluate(_HOLD, [".user-message .bubble.user", _HOLD_MS])
+            await page.evaluate(HOLD, [".user-message .bubble.user", HOLD_MS])
             await expect(sheet).to_be_visible()
             assert await sheet.locator(".sheet-action").all_inner_texts() == ["Select text"]
             await page.keyboard.press("Escape")
@@ -197,7 +183,7 @@ async def test_holding_a_message_opens_its_sheet_and_a_touch_screen_shows_no_but
                 " return getComputedStyle(link).webkitTouchCallout ?? 'default'; }"
             ) in ("default", "")
             # A short press is no hold: no sheet.
-            await page.evaluate(_HOLD, [".timeline article.answer .prose", 100])
+            await page.evaluate(HOLD, [".timeline article.answer .prose", 100])
             await page.wait_for_timeout(600)
             await expect(sheet).to_have_count(0)
             assert errors == []
@@ -209,7 +195,7 @@ async def test_holding_a_message_opens_its_sheet_and_a_touch_screen_shows_no_but
             answer = page.locator(".timeline article.answer")
             await page.mouse.move(*(await _middle(answer)))
             await page.mouse.down()
-            await page.wait_for_timeout(_HOLD_MS)
+            await page.wait_for_timeout(HOLD_MS)
             await page.mouse.up()
             await expect(page.locator("dialog.message-sheet")).to_have_count(0)
             await answer.hover()
