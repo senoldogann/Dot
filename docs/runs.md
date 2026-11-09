@@ -365,7 +365,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   rather than drawn (item 386). A Word document, an Excel
   workbook and a presentation show first as macOS's Quick Look draws them (item 268), as Finder would: their fonts,
   fills, pictures and shapes, a workbook's sheets one tab each (Quick Look leaves hidden sheets out and shows the values
-  the file saved). The daemon asks `qlmanage` for the drawing once per version of the file, keeps it in `looks/` in its
+  the file saved). The daemon asks `qlmanage` for the drawing once per version of the file (twice when the first call
+  hangs past 30 s, item 1084), keeps it in `looks/` in its
   home (emptied at its start) under an id nobody can guess, and serves it at `/looks/<id>/` in a frame that runs Quick
   Look's scripts sandboxed, with an origin of its own that reaches no server; **Contents**, a click away, shows what Dot
   reads of the file, and is what shows when Quick Look cannot draw it, with why. In Contents a workbook, and a CSV or

@@ -68,8 +68,9 @@ def _script(drawing: Path) -> str:
 async def test_a_file_is_drawn_once_a_version_and_a_workbook_a_page_a_sheet(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Quick Look on a busy runner took longer than the thirty seconds the product gives it (item 540).
-    monkeypatch.setattr(quicklook, "DRAW_TIMEOUT_S", 120.0)
+    # Quick Look on a busy runner took longer than the thirty seconds the product gives it (item 540); now and then it
+    # hangs on the workbook, which the product's second try draws (item 1084).
+    monkeypatch.setattr(quicklook, "DRAW_TIMEOUT_S", 60.0)
     looks: QuickLook = open_quick_look(tmp_path / "looks")
     minutes: Path = _written(tmp_path / "minutes.docx", _document("Budget 2027"))
     drawing: str = await looks.look(minutes)
@@ -130,3 +131,38 @@ async def test_a_file_quick_look_cannot_draw_says_so_and_leaves_nothing(
     with pytest.raises(PreviewError, match="Quick Look could not draw this file"):
         await looks.look(minutes)
     assert _names(looks.folder) == []
+
+
+def _stand_in(path: Path, body: str) -> None:
+    """A shell script at ``path`` that Quick Look's place takes: ``qlmanage -p -o <folder> <file>``, so ``$3`` is
+    the folder it draws into."""
+    path.write_text("#!/bin/sh\n" + body, encoding="utf-8")
+    path.chmod(0o755)
+
+
+async def test_a_quick_look_that_hangs_is_tried_again_and_its_drawing_kept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1084: qlmanage now and then hung on a workbook on a CI runner, which a second call drew. A stand-in hangs
+    the first time, leaving a part behind, and draws the second; the drawing is the second's, and nothing of the
+    first's stays. One that hangs every time still says it took too long."""
+    seen: Path = tmp_path / "seen"
+    stand_in: Path = tmp_path / "qlmanage"
+    _stand_in(
+        stand_in,
+        f'if [ ! -e "{seen}" ]; then : > "{seen}"; : > "$3/left-behind.txt"; exec sleep 30; fi\n'
+        'mkdir "$3/minutes.docx.qlpreview" && printf "<p>Drawn</p>" > "$3/minutes.docx.qlpreview/Preview.html"\n',
+    )
+    monkeypatch.setattr(quicklook, "QUICK_LOOK", str(stand_in))
+    monkeypatch.setattr(quicklook, "DRAW_TIMEOUT_S", 3.0)
+    monkeypatch.setattr(quicklook, "RETRY_AFTER_S", 0.01)
+    looks: QuickLook = open_quick_look(tmp_path / "looks")
+    minutes: Path = _written(tmp_path / "minutes.docx", _document("Budget 2027"))
+    drawing: str = await looks.look(minutes)
+    assert _text(looks.folder / drawing / PAGE) == "<p>Drawn</p>"
+    assert sorted(entry.name for entry in (looks.folder / drawing).iterdir()) == [PAGE]
+    hangs: Path = tmp_path / "hangs"
+    _stand_in(hangs, "exec sleep 30\n")
+    monkeypatch.setattr(quicklook, "QUICK_LOOK", str(hangs))
+    with pytest.raises(PreviewError, match="took too long"):
+        await looks.look(_written(tmp_path / "other.docx", _document("Budget 2028")))
