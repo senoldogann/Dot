@@ -445,3 +445,46 @@ async def test_the_shell_of_the_web_app_is_served_and_the_service_worker_registe
             await expect(page).to_have_url(f"http://{host}:{port}/#/runs")
         finally:
             await browser.close()
+
+
+async def test_a_tap_on_a_notification_opens_its_route_in_the_window_brought_to_the_front(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 1070: a tap on a notification brings Dot's window to the front and the service worker tells it the route,
+    which the page opens itself (`navigate` from the worker did nothing for an iPhone's home-screen app in the
+    background). Here the real worker tells the page so; a tap itself cannot be played in a test, as bringing a window
+    to the front needs one. A message that is no route of the page's own changes nothing."""
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            context: BrowserContext = await browser.new_context(viewport={"width": 390, "height": 844})
+            page: Page = await context.new_page()
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.evaluate("navigator.serviceWorker.ready")
+            worker = (
+                context.service_workers[0] if context.service_workers else await context.wait_for_event("serviceworker")
+            )
+            # The worker's message, with the channel the page answers on, as `told` in sw.js sends it: whether the page
+            # said it opened the route.
+            tell: str = (
+                "async (message) => { const windows = await self.clients.matchAll({ type: 'window',"
+                " includeUncontrolled: true }); return await new Promise((resolve) => { const channel = new"
+                " MessageChannel(); const timer = setTimeout(() => resolve(false), 1500); channel.port1.onmessage ="
+                " () => { clearTimeout(timer); resolve(true); };"
+                " windows[0].postMessage(message, [channel.port2]); }); }"
+            )
+            await page.wait_for_function("location.hash.startsWith('#/')")
+            before: str = await page.evaluate("location.hash")
+            # A message that is no route of the page's own changes nothing, and the page does not say it opened it:
+            # the worker would send the window to the route itself.
+            assert await worker.evaluate(tell, {"type": "dot:open-route", "route": "https://example.org/#/x"}) is False
+            assert await worker.evaluate(tell, {"type": "another", "route": "#/settings/memory"}) is False
+            assert await page.evaluate("location.hash") == before
+            assert await worker.evaluate(tell, {"type": "dot:open-route", "route": "#/settings/memory"}) is True
+            await page.wait_for_function("location.hash === '#/settings/memory'")
+            await expect(page.locator("main.page")).to_be_visible()
+        finally:
+            await browser.close()
