@@ -20,7 +20,17 @@ import { createContextMeter } from "../contextmeter.js";
 import { createContextPanel } from "../contextpanelview.js";
 import { clip, debounce, duration, el, modelName, OPEN_FILE_EVENT, plural, setText, showFrom } from "../dom.js";
 import { levelLabel } from "../efforts.js";
-import { BACKGROUND_SOURCE, RESUME_SOURCE, WELCOME_SOURCE, backgroundNote, earlierTurns, followsReaction, loadHistory } from "../history.js";
+import {
+  BACKGROUND_SOURCE,
+  RESUME_SOURCE,
+  WELCOME_SOURCE,
+  WORK_ORDER_SOURCE,
+  backgroundNote,
+  earlierTurns,
+  followsReaction,
+  loadHistory,
+  workOrderNote,
+} from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
@@ -1456,7 +1466,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       ? null
       : run.source === BACKGROUND_SOURCE
         ? backgroundNote(run.goal)
-        : userMessage({ text: run.goal, sentAt: run.created_at, files: [], editFromHere: ownsMessages && run.rewindable ? () => editFromHere(run) : null });
+        : run.source === WORK_ORDER_SOURCE
+          ? workOrderNote(run.goal)
+          : userMessage({ text: run.goal, sentAt: run.created_at, files: [], editFromHere: ownsMessages && run.rewindable ? () => editFromHere(run) : null });
   const actorName = agent !== null ? agent.name : dotName();
   // The width of the panel (item 109): chosen on Dot's computer or dragged on the handle beside the panel.
   const stage = createStageSize({ layout });

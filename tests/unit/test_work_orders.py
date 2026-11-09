@@ -44,6 +44,10 @@ class _Runs:
         self.thread_live: dict[str, str] = {}
         self.ended_tainted_runs: set[str] = set()
         self.refused: set[str] = set()
+        # The lead's chats a run was started in for an order that came back at rest (item 1075), and whether the chat
+        # can go on (a chat whose newest run ended done, with nothing queued).
+        self.woken: list[tuple[str, str, bool, tuple[str, ...]]] = []
+        self.wakes: bool = True
         self.started_tainted: dict[str, bool] = {}
 
     async def delegate(
@@ -97,6 +101,14 @@ class _Runs:
 
     def note(self, run_id: str, text: str, taints: bool) -> None:
         self.told.append((run_id, text, taints))
+
+    async def wake_lead(
+        self, thread_id: str, goal: str, note: str, tainted: bool, carried: tuple[str, ...]
+    ) -> RunRecord | None:
+        if not self.wakes:
+            return None
+        self.woken.append((thread_id, note, tainted, carried))
+        return await self._store.get_run(next(iter(self.parents.values())))
 
     def active_run_ids(self) -> list[str]:
         return sorted(self.live)
@@ -770,3 +782,27 @@ async def test_an_older_attempt_that_read_outside_content_still_marks_the_order(
     async with asyncio.timeout(5):
         await first_relay
     assert (await desk.store.get_work_order(order.id)).tainted
+
+
+async def test_an_order_that_comes_back_while_the_lead_is_at_rest_starts_a_run_of_its_chat(desk: _Desk) -> None:
+    """Item 1075: a lead that ended its turn as it gave the order (a run on the owner's Claude plan did) left its chat
+    stopped and the answer told to nobody. Now a run of the lead's chat starts for it, reading the agent's answer first,
+    going on from the attempt's run, untrusted as the order is; a chat that cannot go on is not told, and its lead finds
+    the order with work_orders."""
+    agent: AgentRecord = await _agent(desk.store)
+    order: WorkOrderRecord = await _assign(desk, agent)
+    desk.runs.live.discard(desk.lead.id)
+    await desk.runs.finish(order.run_ids[0], "done", "Line 12: a date in the wrong format.")
+    await _settle(desk, order)
+    assert desk.runs.told == []
+    ((thread_id, note, tainted, carried),) = desk.runs.woken
+    assert thread_id == desk.lead.thread_id and carried == (order.run_ids[0],) and tainted is False
+    assert "Line 12: a date in the wrong format." in note and "review_work" in note
+    # A chat that cannot go on (the owner stopped its run, its queue holds) is told nothing.
+    desk.runs.wakes = False
+    second: WorkOrderRecord = await _assign(desk, agent, title="Check the import")
+    desk.runs.live.discard(desk.lead.id)
+    await desk.runs.finish(second.run_ids[0], "done", "Fine.")
+    await _settle(desk, second)
+    assert len(desk.runs.woken) == 1 and desk.runs.told == []
+    assert (await desk.store.get_work_order(second.id)).status == "in_review"

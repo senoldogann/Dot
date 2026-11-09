@@ -320,8 +320,11 @@ class WorkDesk:
             return
         agent: str = await self._agent_name(order.agent_id)
         # The order's own taint counts as well as the attempt's: the note quotes its title (the store keeps them both).
-        self._tell_lead(
-            moved, review_note(moved, agent, run, moved.tainted, secrets.token_hex(_NONCE_BYTES)), moved.tainted
+        await self._tell_lead(
+            moved,
+            review_note(moved, agent, run, moved.tainted, secrets.token_hex(_NONCE_BYTES)),
+            moved.tainted,
+            (run.id,),
         )
 
     async def _agent_name(self, agent_id: str) -> str:
@@ -330,15 +333,35 @@ class WorkDesk:
         except NotFoundError:
             return "an agent that is gone"
 
-    def _tell_lead(self, order: WorkOrderRecord, text: str, taints: bool) -> bool:
-        """Tell the lead's run, when it is at work: the run that started the attempt, or the one the chat of the order
-        has now. Dot's note, not the owner's words: it vouches for nothing, and marks the run when ``taints``. A lead
-        that is not at work is not told, and finds the order in ``work_orders``."""
+    async def _tell_lead(self, order: WorkOrderRecord, text: str, taints: bool, carried: tuple[str, ...]) -> bool:
+        """Tell the lead: its run, when it is at work (the run that started the attempt, or the one the chat of the
+        order has now), in a note; else a run started in the lead's chat that reads it first (item 1075,
+        :meth:`RunManager.wake_lead`: a lead that ended its turn as it gave the order left its chat stopped, the answer
+        told to nobody), going on from the ``carried`` runs; else, when a run started there meanwhile, that run. Dot's
+        words, not the owner's: they vouch for nothing, and mark the run when ``taints``. A chat that cannot go on (a
+        run the owner stopped, its queue held) is not told, and its lead finds the order in ``work_orders``."""
+        if self._note_live(order, text, taints):
+            return True
+        if order.thread_id is not None:
+            title: str = one_line(order.title, _LINE_CHARS)
+            goal: str = (
+                f"Work order {order.id} ({title!r}) came back while this chat was at rest: judge it and go on with the "
+                "work."
+            )
+            if await self._manager.wake_lead(order.thread_id, goal, text, taints, carried) is not None:
+                log.info("work_order_lead_told", order_id=order.id, how="a run of its chat started for it")
+                return True
+            if self._note_live(order, text, taints):
+                return True
+        log.info("work_order_lead_not_told", order_id=order.id, why="its chat cannot go on now")
+        return False
+
+    def _note_live(self, order: WorkOrderRecord, text: str, taints: bool) -> bool:
+        """Tell the lead's run in a note, when one is at work; whether it was."""
         live: str | None = order.lead_run_id if order.lead_run_id in self._manager.active_run_ids() else None
         if live is None and order.thread_id is not None:
             live = self._manager.live_run_in(order.thread_id)
         if live is None:
-            log.info("work_order_lead_not_told", order_id=order.id, why="no run of its chat is at work")
             return False
         try:
             self._manager.note(live, text, taints)
@@ -581,11 +604,12 @@ class WorkDesk:
         if moved is None:
             return
         agent: str = await self._agent_name(moved.agent_id)
-        self._tell_lead(
+        await self._tell_lead(
             moved,
             f"[Note from Dot: work order {moved.id} ({one_line(moved.title, _LINE_CHARS)!r}) by "
             f"{one_line(agent, 60)} waits for your review: {moved.note}. Look at it with work_orders, then decide with "
             "review_work.]",
             moved.tainted,
+            (),
         )
         log.info("work_order_sent_to_review", order_id=order_id, why=why)
