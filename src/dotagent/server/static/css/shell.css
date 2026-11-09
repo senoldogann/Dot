@@ -255,9 +255,11 @@
   cursor: pointer;
 }
 
-.icon-btn:hover {
-  background: color-mix(in srgb, var(--text) 6%, transparent);
-  color: var(--text);
+@media (hover: hover) {
+  .icon-btn:hover {
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    color: var(--text);
+  }
 }
 
 .icon-btn .icon {
@@ -277,12 +279,14 @@
   color: var(--text-2);
 }
 
-.side-link:hover,
-.side-run:hover,
-:where(.side-chat:hover) > .side-run {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  color: var(--text);
-  text-decoration: none;
+@media (hover: hover) {
+  .side-link:hover,
+  .side-run:hover,
+  :where(.side-chat:hover) > .side-run {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+    color: var(--text);
+    text-decoration: none;
+  }
 }
 
 /* The row that is open is a surface step up from the sidebar, not a tint (item 74). */
@@ -367,11 +371,18 @@
   cursor: pointer;
 }
 
-.side-more:hover,
 .side-more[aria-expanded="true"] {
   background: color-mix(in srgb, var(--text) 8%, transparent);
   color: var(--text);
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .side-more:hover {
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text);
+    opacity: 1;
+  }
 }
 
 @media (hover: hover) {
@@ -483,8 +494,10 @@
   transform: rotate(0deg);
 }
 
-.side-fold:hover {
-  color: var(--text-2);
+@media (hover: hover) {
+  .side-fold:hover {
+    color: var(--text-2);
+  }
 }
 
 .side-run .status-dot {
@@ -671,9 +684,11 @@
   cursor: pointer;
 }
 
-.side-connect:hover {
-  border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+@media (hover: hover) {
+  .side-connect:hover {
+    border-color: var(--border-strong);
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+  }
 }
 
 .side-connect[data-current] {
@@ -781,10 +796,16 @@
   text-decoration: none;
 }
 
-.side-agent-face:hover,
 .side-agent-face[aria-current="page"] {
   color: var(--text);
   text-decoration: none;
+}
+
+@media (hover: hover) {
+  .side-agent-face:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
 }
 
 /* The open one's name is the heavier too, so that a face hovered does not look like the open one. */
@@ -1303,10 +1324,16 @@
   }
 
   .side-owner,
-  .side-owner:hover,
-  .side-dot-hero,
-  .side-dot-hero:hover {
+  .side-dot-hero {
     text-decoration: none;
+  }
+
+  @media (hover: hover) {
+    .side-owner:hover,
+    .side-dot-hero:hover {
+      text-decoration: none;
+  
+    }
   }
 
   /* The other agents' faces stand centred under Dot's, as many as there are, rather than in four columns from the
@@ -1405,9 +1432,11 @@
   color: var(--muted);
 }
 
-.settings-back:hover {
-  color: var(--text);
-  text-decoration: none;
+@media (hover: hover) {
+  .settings-back:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
 }
 
 /* In the desktop shell the nav's first row is its head, the lights' (item 577, above): it runs from the sidebar's top
@@ -1460,10 +1489,12 @@
   color: var(--text-2);
 }
 
-.settings-nav-link:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  color: var(--text);
-  text-decoration: none;
+@media (hover: hover) {
+  .settings-nav-link:hover {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+    color: var(--text);
+    text-decoration: none;
+  }
 }
 
 /* The open tab is a surface step up from the sidebar, as the open row of the chats is (item 74). */
@@ -1501,8 +1532,10 @@
   color: var(--muted);
 }
 
-.settings-nav-link:hover .settings-nav-value {
-  color: var(--text-2);
+@media (hover: hover) {
+  .settings-nav-link:hover .settings-nav-value {
+    color: var(--text-2);
+  }
 }
 
 .settings-nav-dot {

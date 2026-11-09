@@ -81,10 +81,16 @@
     background-color var(--motion-quick) var(--ease);
 }
 
-.stage-handle:hover::before,
 .stage-handle[data-dragging="true"]::before {
   height: 96px;
   background: var(--border-strong);
+}
+
+@media (hover: hover) {
+  .stage-handle:hover::before {
+    height: 96px;
+    background: var(--border-strong);
+  }
 }
 
 .stage-handle:focus-visible {
@@ -248,8 +254,10 @@
   display: none;
 }
 
-.agent-said-head:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+@media (hover: hover) {
+  .agent-said-head:hover {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+  }
 }
 
 .agent-said-names {
@@ -1010,8 +1018,10 @@
   cursor: pointer;
 }
 
-.lesson-more:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .lesson-more:hover {
+    color: var(--text);
+  }
 }
 
 .lesson-foot {
@@ -1083,8 +1093,10 @@
   display: none;
 }
 
-.steps-head:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+@media (hover: hover) {
+  .steps-head:hover {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+  }
 }
 
 /* As a tool's mark (app.css .tool-state, item 656): centred on a face's column, the words 36 px in. */
@@ -1219,8 +1231,10 @@
   cursor: pointer;
 }
 
-.inspector-tab:hover {
-  color: var(--text-2);
+@media (hover: hover) {
+  .inspector-tab:hover {
+    color: var(--text-2);
+  }
 }
 
 .inspector-tab[aria-selected="true"] {
@@ -1294,8 +1308,10 @@
   text-decoration: none;
 }
 
-.agent-row:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .agent-row:hover {
+    background: var(--surface-2);
+  }
 }
 
 .agent-row:focus-visible {
@@ -1473,10 +1489,12 @@ button.context-row {
   cursor: pointer;
 }
 
-.context-row:hover {
-  background: var(--surface-2);
-  color: var(--text);
-  text-decoration: none;
+@media (hover: hover) {
+  .context-row:hover {
+    background: var(--surface-2);
+    color: var(--text);
+    text-decoration: none;
+  }
 }
 
 /* The tile a mark sits on: a quiet square in the surface's own steps, so it reads in every theme. */
@@ -1492,8 +1510,10 @@ button.context-row {
   color: var(--text-2);
 }
 
-.context-row:hover .context-tile {
-  background: var(--surface-3);
+@media (hover: hover) {
+  .context-row:hover .context-tile {
+    background: var(--surface-3);
+  }
 }
 
 .context-tile .icon {
@@ -1517,10 +1537,16 @@ button.context-row {
 
 /* A language's logo (item 547) stands on a light tile, as a service's mark does (app.css), so that a dark logo reads in
    the dark scheme too; the tile stays light under the pointer, as that mark's does. */
-.context-tile-logo,
-.context-row:hover .context-tile-logo {
+.context-tile-logo {
   background: var(--mark-ground);
   box-shadow: inset 0 0 0 1px var(--mark-ring);
+}
+
+@media (hover: hover) {
+  .context-row:hover .context-tile-logo {
+    background: var(--mark-ground);
+    box-shadow: inset 0 0 0 1px var(--mark-ring);
+  }
 }
 
 .context-logo {
@@ -1569,9 +1595,11 @@ button.context-row {
   text-decoration: none;
 }
 
-.context-more:hover {
-  color: var(--text);
-  text-decoration: underline;
+@media (hover: hover) {
+  .context-more:hover {
+    color: var(--text);
+    text-decoration: underline;
+  }
 }
 
 /* Beside the conversation the panel slides in as it is shown and out before it hides (item 220, inspector.js): the
@@ -2103,8 +2131,10 @@ dialog.modal.file-dialog .file-picture img {
   display: none;
 }
 
-.change-head:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .change-head:hover {
+    background: var(--surface-2);
+  }
 }
 
 .change-path {
@@ -2205,8 +2235,10 @@ dialog.modal.file-dialog .file-picture img {
   height: auto;
 }
 
-.inspector-shot:hover {
-  border-color: var(--border-strong);
+@media (hover: hover) {
+  .inspector-shot:hover {
+    border-color: var(--border-strong);
+  }
 }
 
 /* ---------- Dot's computer: the live page of the browser and the handover ---------- */

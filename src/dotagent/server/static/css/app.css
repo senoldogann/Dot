@@ -286,8 +286,10 @@ a {
   text-underline-offset: 2px;
 }
 
-a:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  a:hover {
+    text-decoration: underline;
+  }
 }
 
 button,
@@ -609,8 +611,10 @@ textarea {
   cursor: pointer;
 }
 
-.look-option:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .look-option:hover {
+    background: var(--surface-2);
+  }
 }
 
 .look-option:has(.look-radio:checked) {
@@ -695,9 +699,11 @@ textarea {
   white-space: nowrap;
 }
 
-a.pill:hover {
-  text-decoration: none;
-  border-color: var(--border-strong);
+@media (hover: hover) {
+  a.pill:hover {
+    text-decoration: none;
+    border-color: var(--border-strong);
+  }
 }
 
 .pill.warn {
@@ -880,8 +886,10 @@ a.pill:hover {
     opacity var(--motion-quick) var(--ease);
 }
 
-.btn:hover:not(:disabled) {
-  background: var(--button-fill-hover);
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    background: var(--button-fill-hover);
+  }
 }
 
 .btn:disabled {
@@ -913,9 +921,11 @@ a.pill:hover {
   color: var(--on-accent);
 }
 
-.btn.primary:hover:not(:disabled) {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
+@media (hover: hover) {
+  .btn.primary:hover:not(:disabled) {
+    background: var(--accent-strong);
+    border-color: var(--accent-strong);
+  }
 }
 
 .btn.danger {
@@ -924,8 +934,10 @@ a.pill:hover {
   background: var(--surface);
 }
 
-.btn.danger:hover:not(:disabled) {
-  background: var(--bad-weak);
+@media (hover: hover) {
+  .btn.danger:hover:not(:disabled) {
+    background: var(--bad-weak);
+  }
 }
 
 .btn.danger.solid {
@@ -934,9 +946,11 @@ a.pill:hover {
   color: var(--on-bad);
 }
 
-.btn.danger.solid:hover:not(:disabled) {
-  background: var(--bad);
-  opacity: 0.9;
+@media (hover: hover) {
+  .btn.danger.solid:hover:not(:disabled) {
+    background: var(--bad);
+    opacity: 0.9;
+  }
 }
 
 .btn.ghost {
@@ -1021,14 +1035,18 @@ a.pill:hover {
   cursor: pointer;
 }
 
-.input[type="file"]:hover::file-selector-button {
-  background: var(--surface-3);
+@media (hover: hover) {
+  .input[type="file"]:hover::file-selector-button {
+    background: var(--surface-3);
+  }
 }
 
-.input:hover,
-.select:hover,
-.textarea:hover {
-  border-color: var(--control);
+@media (hover: hover) {
+  .input:hover,
+  .select:hover,
+  .textarea:hover {
+    border-color: var(--control);
+  }
 }
 
 /* A field in focus: a soft ring of the accent, not a frame (item 95). */
@@ -1519,8 +1537,10 @@ a.pill:hover {
   cursor: pointer;
 }
 
-.fold-toggle:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .fold-toggle:hover {
+    background: var(--surface-2);
+  }
 }
 
 .fold-toggle[aria-expanded="true"] .chev {
@@ -1859,9 +1879,11 @@ a.pill:hover {
   color: inherit;
 }
 
-.customize-tabs a:hover {
-  color: var(--text);
-  text-decoration: none;
+@media (hover: hover) {
+  .customize-tabs a:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
 }
 
 .customize-tabs a[aria-current="page"] {
@@ -1935,8 +1957,10 @@ a.pill:hover {
   border-top: 0;
 }
 
-.skill-grid > .skill-card:hover {
-  background: color-mix(in oklab, var(--surface-2) 60%, transparent);
+@media (hover: hover) {
+  .skill-grid > .skill-card:hover {
+    background: color-mix(in oklab, var(--surface-2) 60%, transparent);
+  }
 }
 
 /* A skill's row: its mark on the line of its name, what it does on one line; a proposal keeps its steps whole. */
@@ -1970,8 +1994,10 @@ a.pill:hover {
   background: var(--surface);
 }
 
-.plugin-tile:not(.plugin-server):hover {
-  border-color: var(--border-strong);
+@media (hover: hover) {
+  .plugin-tile:not(.plugin-server):hover {
+    border-color: var(--border-strong);
+  }
 }
 
 .plugin-main,
@@ -2357,8 +2383,10 @@ a.pill:hover {
     box-shadow var(--motion-base) var(--ease);
 }
 
-.gallery-card:hover {
-  border-color: var(--border-strong);
+@media (hover: hover) {
+  .gallery-card:hover {
+    border-color: var(--border-strong);
+  }
 }
 
 /* A featured card stands up: its mark over its words, its button at its top right, three lines of what it does. */
@@ -2732,9 +2760,11 @@ a.pill:hover {
   cursor: pointer;
 }
 
-.chip.customize-chip:hover {
-  border-color: var(--border-strong);
-  color: var(--text);
+@media (hover: hover) {
+  .chip.customize-chip:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
 }
 
 .chip.customize-chip[aria-pressed="true"] {
@@ -2759,8 +2789,10 @@ a.pill:hover {
     box-shadow var(--motion-base) var(--ease);
 }
 
-.plugin-tile:not(.plugin-server):hover {
-  box-shadow: var(--shadow-raised);
+@media (hover: hover) {
+  .plugin-tile:not(.plugin-server):hover {
+    box-shadow: var(--shadow-raised);
+  }
 }
 
 .plugin-tile:not(.plugin-server) > .plugin-mark {
@@ -3079,8 +3111,10 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-.chat-skill-row:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .chat-skill-row:hover {
+    background: var(--surface-2);
+  }
 }
 
 .chat-skill-goal {
@@ -3417,9 +3451,14 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-.first-name:hover,
 .first-name:focus-visible {
   background: var(--surface-2);
+}
+
+@media (hover: hover) {
+  .first-name:hover {
+    background: var(--surface-2);
+  }
 }
 
 .first-name:disabled {
@@ -3610,8 +3649,10 @@ dialog.modal.versions-dialog {
   transform: rotate(0deg);
 }
 
-.home-today-title:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .home-today-title:hover {
+    color: var(--text);
+  }
 }
 
 .home-today-count {
@@ -3655,9 +3696,14 @@ dialog.modal.versions-dialog {
     background-color var(--motion-quick) var(--ease);
 }
 
-.composer:hover,
 .composer:focus-within {
   border-color: var(--border-strong);
+}
+
+@media (hover: hover) {
+  .composer:hover {
+    border-color: var(--border-strong);
+  }
 }
 
 .composer:focus-within {
@@ -3677,9 +3723,14 @@ dialog.modal.versions-dialog {
    orange and purple two pixels wide, a ring over the hairline that takes no room, so nothing in the frame moves; the
    ring in focus takes its middle colour. The mask keeps the ring and cuts out its middle (any opaque colour does). */
 .composer[data-boost],
-.composer[data-boost]:hover,
 .composer[data-boost]:focus-within {
   border-color: transparent;
+}
+
+@media (hover: hover) {
+  .composer[data-boost]:hover {
+    border-color: transparent;
+  }
 }
 
 .composer[data-boost]::after {
@@ -4051,11 +4102,18 @@ dialog.modal.versions-dialog {
     color var(--motion-quick) var(--ease);
 }
 
-.composer-pill:hover,
 .composer-pill[aria-expanded="true"] {
   background: var(--surface-2);
   border-color: var(--border);
   color: var(--text);
+}
+
+@media (hover: hover) {
+  .composer-pill:hover {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text);
+  }
 }
 
 .composer-pill > .icon:last-child {
@@ -4067,9 +4125,14 @@ dialog.modal.versions-dialog {
     transform var(--motion-quick) var(--ease);
 }
 
-.composer-pill:hover > .icon:last-child,
 .composer-pill[aria-expanded="true"] > .icon:last-child {
   opacity: 0.85;
+}
+
+@media (hover: hover) {
+  .composer-pill:hover > .icon:last-child {
+    opacity: 0.85;
+  }
 }
 
 .composer-pill[aria-expanded="true"] > .icon:last-child {
@@ -4093,10 +4156,16 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-.context-meter:hover,
 .context-meter[aria-expanded="true"] {
   background: var(--surface-2);
   color: var(--text);
+}
+
+@media (hover: hover) {
+  .context-meter:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
 }
 
 .context-meter[data-level="near"] {
@@ -4227,10 +4296,15 @@ dialog.modal.versions-dialog {
   opacity: 0.5;
 }
 
-.composer-pill[data-waiting]:hover,
 .composer-pill[data-waiting]:focus-visible,
 .composer-pill[data-waiting][aria-expanded="true"] {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .composer-pill[data-waiting]:hover {
+    opacity: 1;
+  }
 }
 
 /* The send: round and in ink, quiet while the box holds no text (pressed then, it puts the caret in the box). */
@@ -4254,8 +4328,10 @@ dialog.modal.versions-dialog {
   color: var(--on-bad);
 }
 
-.composer[data-stop] .btn.send:hover:not(:disabled) {
-  opacity: 0.9;
+@media (hover: hover) {
+  .composer[data-stop] .btn.send:hover:not(:disabled) {
+    opacity: 0.9;
+  }
 }
 
 .composer[data-stop] .btn.send .icon {
@@ -4413,8 +4489,10 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-.pop-option:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .pop-option:hover {
+    background: var(--surface-2);
+  }
 }
 
 .pop-option[aria-selected="true"] {
@@ -4502,8 +4580,10 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-.composer-popover .composer-pick.switch-row:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .composer-popover .composer-pick.switch-row:hover {
+    background: var(--surface-2);
+  }
 }
 
 .composer-pick-content {
@@ -4657,8 +4737,10 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-.model-rail-item:hover {
-  background: var(--surface-3);
+@media (hover: hover) {
+  .model-rail-item:hover {
+    background: var(--surface-3);
+  }
 }
 
 .model-rail-item[aria-pressed="true"] {
@@ -4788,9 +4870,11 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-.model-star:hover {
-  background: var(--surface-2);
-  color: var(--text-2);
+@media (hover: hover) {
+  .model-star:hover {
+    background: var(--surface-2);
+    color: var(--text-2);
+  }
 }
 
 /* A favourite's star, filled in the colour of a mark that asks to be seen. */
@@ -4823,9 +4907,11 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-.model-change:hover {
-  background: var(--surface-2);
-  color: var(--text);
+@media (hover: hover) {
+  .model-change:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
 }
 
 /* While the list chooses the default: a tinted bar under the search says so. */
@@ -4851,8 +4937,10 @@ dialog.modal.versions-dialog {
   min-width: 0;
 }
 
-.model-choosing .model-change:hover {
-  background: var(--surface);
+@media (hover: hover) {
+  .model-choosing .model-change:hover {
+    background: var(--surface);
+  }
 }
 
 .slash-option {
@@ -4898,9 +4986,14 @@ dialog.modal.versions-dialog {
   height: 14px;
 }
 
-.slash-option[aria-selected="true"],
-.slash-option:hover {
+.slash-option[aria-selected="true"] {
   background: var(--surface-2);
+}
+
+@media (hover: hover) {
+  .slash-option:hover {
+    background: var(--surface-2);
+  }
 }
 
 .slash-label {
@@ -5519,13 +5612,17 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-.file-word:hover {
-  color: var(--accent);
+@media (hover: hover) {
+  .file-word:hover {
+    color: var(--accent);
+  }
 }
 
-.code-path:hover code {
-  border-color: var(--border-strong);
-  background: var(--surface-3);
+@media (hover: hover) {
+  .code-path:hover code {
+    border-color: var(--border-strong);
+    background: var(--surface-3);
+  }
 }
 
 .prose table {
@@ -5661,8 +5758,10 @@ dialog.modal.versions-dialog {
   display: none;
 }
 
-.tool-head:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+@media (hover: hover) {
+  .tool-head:hover {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+  }
 }
 
 /* A call's mark is in the quiet ink, its kind's once it went well (item 402); a cross and a warning wear theirs. */
@@ -5729,10 +5828,15 @@ dialog.modal.versions-dialog {
   transition: opacity var(--motion-quick) var(--ease);
 }
 
-.tool-head:hover .tool-time,
 .tool-head:focus-visible .tool-time,
 .tool[open] > .tool-head .tool-time {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .tool-head:hover .tool-time {
+    opacity: 1;
+  }
 }
 
 @media (hover: none) {
@@ -5887,14 +5991,18 @@ details:not([open]) > :not(summary) {
   white-space: nowrap;
 }
 
-a.memory-line:hover {
-  color: var(--text);
-  text-decoration: none;
+@media (hover: hover) {
+  a.memory-line:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
 }
 
-a.memory-line:hover .memory-change {
-  text-decoration: underline;
-  text-underline-offset: 2px;
+@media (hover: hover) {
+  a.memory-line:hover .memory-change {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 
 /* A schedule a run made (item 665): a quiet line of the conversation, as a change of the memory is, that leads to it on
@@ -5912,14 +6020,18 @@ a.memory-line:hover .memory-change {
   font-weight: var(--weight-label);
 }
 
-a.schedule-line:hover {
-  color: var(--text);
-  text-decoration: none;
+@media (hover: hover) {
+  a.schedule-line:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
 }
 
-a.schedule-line:hover .schedule-made {
-  text-decoration: underline;
-  text-underline-offset: 2px;
+@media (hover: hover) {
+  a.schedule-line:hover .schedule-made {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 
 /* The schedule a line of a conversation led to, on the Schedules page: its row in the accent's light, fading. */
@@ -6308,8 +6420,10 @@ a.schedule-line:hover .schedule-made {
   text-underline-offset: 2px;
 }
 
-.approval-rule:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .approval-rule:hover {
+    color: var(--text);
+  }
 }
 
 /* The way from a step's "Why it ran" to the rules, when one of them decided it (item 468), as an approval card's. */
@@ -6319,8 +6433,10 @@ a.schedule-line:hover .schedule-made {
   text-underline-offset: 2px;
 }
 
-.why-rules:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .why-rules:hover {
+    color: var(--text);
+  }
 }
 
 .approval-actions .input {
@@ -6473,9 +6589,14 @@ a.schedule-line:hover .schedule-made {
   transition: border-color var(--motion-base) var(--ease);
 }
 
-.choice:hover,
 .choice:has(input:checked) {
   border-color: var(--accent);
+}
+
+@media (hover: hover) {
+  .choice:hover {
+    border-color: var(--accent);
+  }
 }
 
 .choice input {
@@ -6530,8 +6651,10 @@ a.schedule-line:hover .schedule-made {
   list-style: none;
 }
 
-.child > summary:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+@media (hover: hover) {
+  .child > summary:hover {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+  }
 }
 
 .child > summary::-webkit-details-marker {
@@ -6631,8 +6754,10 @@ summary:has(> .chev)::-webkit-details-marker {
   list-style: none;
 }
 
-.helpers > summary:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .helpers > summary:hover {
+    background: var(--surface-2);
+  }
 }
 
 .helpers > summary::-webkit-details-marker {
@@ -6881,8 +7006,10 @@ summary:has(> .chev)::-webkit-details-marker {
   cursor: pointer;
 }
 
-.child-stop:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .child-stop:hover {
+    text-decoration: underline;
+  }
 }
 
 .child-stop .icon {
@@ -7052,8 +7179,10 @@ summary:has(> .chev)::-webkit-details-marker {
   cursor: pointer;
 }
 
-.run-changes-file:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .run-changes-file:hover {
+    color: var(--text);
+  }
 }
 
 .run-changes-more {
@@ -7760,9 +7889,11 @@ dialog.message-sheet::backdrop {
 }
 
 /* The sheet is the toggle's own hover ground, so a hovered head takes a tint of the text over it, as a sidebar row does. */
-.chat-loops > .chat-loops-toggle:hover {
-  background: color-mix(in srgb, var(--text) 6%, transparent);
-  color: var(--text);
+@media (hover: hover) {
+  .chat-loops > .chat-loops-toggle:hover {
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    color: var(--text);
+  }
 }
 
 .chat-loops-count,
@@ -7883,8 +8014,10 @@ dialog.message-sheet::backdrop {
   cursor: pointer;
 }
 
-.queue-head:hover {
-  color: var(--text-2);
+@media (hover: hover) {
+  .queue-head:hover {
+    color: var(--text-2);
+  }
 }
 
 .queue-count {
@@ -8046,12 +8179,14 @@ dialog.message-sheet::backdrop {
   color: var(--text-2);
 }
 
-.queue-grip:hover:not(:disabled),
-.queue-icon:hover:not(:disabled),
-.queue-steer:hover:not(:disabled),
-.queue-cancel:hover {
-  background: var(--surface-3);
-  color: var(--text);
+@media (hover: hover) {
+  .queue-grip:hover:not(:disabled),
+  .queue-icon:hover:not(:disabled),
+  .queue-steer:hover:not(:disabled),
+  .queue-cancel:hover {
+    background: var(--surface-3);
+    color: var(--text);
+  }
 }
 
 .queue-grip:disabled,
@@ -8141,9 +8276,11 @@ dialog.message-sheet::backdrop {
   transform: translateX(-50%);
 }
 
-.jump:hover {
-  background: var(--surface);
-  color: var(--text);
+@media (hover: hover) {
+  .jump:hover {
+    background: var(--surface);
+    color: var(--text);
+  }
 }
 
 /* The slash menu opens over the place of the arrow; the arrow steps aside while it is open (item 116). */
@@ -8190,10 +8327,16 @@ dialog.message-sheet::backdrop {
   color: var(--text-2);
 }
 
-.menu-item:hover,
 .menu-item:focus-visible {
   background: var(--surface-2);
   outline: none;
+}
+
+@media (hover: hover) {
+  .menu-item:hover {
+    background: var(--surface-2);
+    outline: none;
+  }
 }
 
 .menu-item.danger,
@@ -9196,9 +9339,14 @@ dialog.modal.file-dialog[open] {
   transition: opacity var(--motion-quick) var(--ease);
 }
 
-.shown-page:hover .shown-page-tools,
 .shown-page:focus-within .shown-page-tools {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .shown-page:hover .shown-page-tools {
+    opacity: 1;
+  }
 }
 
 @media (pointer: coarse) {
@@ -9227,8 +9375,10 @@ dialog.modal.file-dialog[open] {
   cursor: pointer;
 }
 
-.shown-page-tool:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .shown-page-tool:hover {
+    color: var(--text);
+  }
 }
 
 .shown-page-tool .icon {
@@ -9329,8 +9479,10 @@ dialog.viewer::backdrop {
   cursor: pointer;
 }
 
-.viewer-tool:hover:not(:disabled) {
-  background: color-mix(in srgb, currentcolor 12%, transparent);
+@media (hover: hover) {
+  .viewer-tool:hover:not(:disabled) {
+    background: color-mix(in srgb, currentcolor 12%, transparent);
+  }
 }
 
 .viewer-tool:disabled {
@@ -9525,9 +9677,11 @@ dialog.viewer .viewer-layer-page .shown-page-frame {
   cursor: pointer;
 }
 
-.pick-remove:hover {
-  background: color-mix(in oklab, var(--pick-tint) 20%, var(--surface));
-  color: var(--text);
+@media (hover: hover) {
+  .pick-remove:hover {
+    background: color-mix(in oklab, var(--pick-tint) 20%, var(--surface));
+    color: var(--text);
+  }
 }
 
 .pick-remove .icon {
@@ -9595,8 +9749,10 @@ dialog.viewer .viewer-layer-page .shown-page-frame {
   cursor: pointer;
 }
 
-.sent-picture:hover {
-  border-color: var(--border-strong);
+@media (hover: hover) {
+  .sent-picture:hover {
+    border-color: var(--border-strong);
+  }
 }
 
 .sent-picture-image {
@@ -9613,9 +9769,11 @@ button.attach-chip {
   cursor: pointer;
 }
 
-button.attach-chip:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-3);
+@media (hover: hover) {
+  button.attach-chip:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-3);
+  }
 }
 
 /* A file in the box, once uploaded, shows beside the conversation from its name (item 269). */
@@ -9636,8 +9794,10 @@ button.attach-chip:hover {
   cursor: pointer;
 }
 
-.attach-open:not(:disabled):hover > span:first-of-type {
-  text-decoration: underline;
+@media (hover: hover) {
+  .attach-open:not(:disabled):hover > span:first-of-type {
+    text-decoration: underline;
+  }
 }
 
 /* A file's name takes the chip's one line and is clipped when the box is narrow; its size stays beside it. */
@@ -9816,9 +9976,11 @@ button.attach-chip:hover {
   color: var(--text);
 }
 
-.activity-row:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  text-decoration: none;
+@media (hover: hover) {
+  .activity-row:hover {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+    text-decoration: none;
+  }
 }
 
 .activity-icon {
@@ -9878,9 +10040,11 @@ button.attach-chip:hover {
   color: var(--muted);
 }
 
-.child > summary .child-open:hover {
-  color: var(--text);
-  background: var(--surface-2);
+@media (hover: hover) {
+  .child > summary .child-open:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
 }
 
 /* The way to the run's own page shows under the pointer (item 884); a phone, with no pointer, keeps it. */
@@ -9904,9 +10068,11 @@ button.attach-chip:hover {
   color: inherit;
 }
 
-.agent-row:hover {
-  background: color-mix(in srgb, var(--text) 3%, transparent);
-  text-decoration: none;
+@media (hover: hover) {
+  .agent-row:hover {
+    background: color-mix(in srgb, var(--text) 3%, transparent);
+    text-decoration: none;
+  }
 }
 
 .agent-row .row-text {
@@ -10027,10 +10193,12 @@ button.attach-chip:hover {
   font-size: var(--text-sm);
 }
 
-.agent-card:hover,
-.owned-team:hover {
-  background: color-mix(in srgb, var(--text) 3%, var(--surface));
-  text-decoration: none;
+@media (hover: hover) {
+  .agent-card:hover,
+  .owned-team:hover {
+    background: color-mix(in srgb, var(--text) 3%, var(--surface));
+    text-decoration: none;
+  }
 }
 
 .agent-card:focus-visible,
@@ -10259,9 +10427,11 @@ button.attach-chip:hover {
   margin-bottom: 0;
 }
 
-.team-roster .chip:hover {
-  background: var(--surface-3);
-  text-decoration: none;
+@media (hover: hover) {
+  .team-roster .chip:hover {
+    background: var(--surface-3);
+    text-decoration: none;
+  }
 }
 
 .team-roster .chip .avatar {
@@ -11608,9 +11778,14 @@ dialog.teach {
   -webkit-backdrop-filter: blur(6px);
   will-change: transform;
 }
-.office-tag:hover,
 .office-tag:focus-visible {
   background: var(--office-glass-strong);
+}
+
+@media (hover: hover) {
+  .office-tag:hover {
+    background: var(--office-glass-strong);
+  }
 }
 @media (pointer: coarse) {
   .office-tag {
