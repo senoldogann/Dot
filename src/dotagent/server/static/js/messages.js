@@ -15,7 +15,38 @@ const OUTCOMES = {
   done: { label: "Finished", empty: "The task finished without a written answer." },
   failed: { label: "Failed", empty: "The task failed without saying why." },
   cancelled: { label: "Cancelled", empty: "The task was stopped before it wrote an answer." },
+  // A run that did what it could and stopped for what only the owner gives (item 1061): it is stored failed, and it
+  // said what it needs.
+  waiting: { label: "Waiting on you", empty: "The task stopped for something only you can give." },
 };
+
+/**
+ * How a run ended as the conversation shows it (item 1061): a run stored failed that said what it needs from the owner
+ * (`finish` with `success: false` and `needs_from_user`: an approval to send, a sign-in) waits on them, which is not a
+ * failure of its work; on the owner's Dot five such answers of six "failed" ones in five days said "The task failed".
+ * @param {string} status the run's stored status
+ * @param {string} needs what the run said it needs from the owner, "" for nothing
+ */
+export function outcomeOf(status, needs) {
+  return status === "failed" && needs.trim() !== "" ? "waiting" : status;
+}
+
+/** What a run said, as it ended, it needs from the owner, under its answer. */
+export function needsAside(needs) {
+  const head = el("div", { class: "aside-head" }, icon("hand"), el("span", null, "What Dot needs from you"));
+  return el("div", { class: "needs", "aria-label": "What Dot needs from you" }, head, prose(needs));
+}
+
+// The line over an answer that did not end done: what went wrong, or what it waits for.
+function outcomeAlert(status) {
+  if (status === "failed") {
+    return el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, "The task failed"));
+  }
+  if (status === "waiting") {
+    return el("div", { class: "answer-alert answer-waiting" }, icon("hand"), el("strong", null, "Waiting on you"));
+  }
+  return null;
+}
 
 /** When a message was sent or an answer came, in sight; `title` says more where the pointer rests. */
 function stamp(ts, title) {
@@ -172,9 +203,9 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href,
   }
   return el(
     "article",
-    { class: `answer ${status}`, "aria-label": "Answer" },
-    el("span", { class: "turn-face" }, actorFace(actorId, faceStateAtEnd(status), null)),
-    status === "failed" ? el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, "The task failed")) : null,
+    { class: `answer answer-${status}`, "aria-label": "Answer" },
+    el("span", { class: "turn-face" }, actorFace(actorId, faceStateAtEnd(status === "waiting" ? "blocked" : status), null)),
+    outcomeAlert(status),
     written ? prose(text) : el("div", { class: "muted" }, outcome.empty),
     el(
       "div",
