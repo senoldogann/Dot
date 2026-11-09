@@ -22,6 +22,15 @@ export const REACTIONS = [
   { id: "hold", symbol: "✋", label: "Hold on" },
 ];
 
+/** @type {WeakMap<Element, { has: (id: string) => boolean, pick: (id: string) => void }>} What each message's react
+ * button reacts to (item 1064): a message's sheet puts a reaction on it, or takes it back, as its palette does. */
+const REACTING = new WeakMap();
+
+/** What the react button `button` of a message reacts with, as its sheet uses it (item 1064); undefined for another. */
+export function reactionsOf(button) {
+  return REACTING.get(button);
+}
+
 /** The events that say a reaction was put on a message or taken back, which the lifecycle stream tells every page. */
 export const REACTION_EVENTS = new Set(["reaction_added", "reaction_removed"]);
 
@@ -255,6 +264,12 @@ export function createReactions({ threadId, signal }) {
         has: (id) => standing.get(keyOf(runId, message))?.has(id) === true,
         pick: (id) => press(runId, message, id),
       });
+    });
+    REACTING.set(button, {
+      has: (id) => standing.get(keyOf(runId, message))?.has(id) === true,
+      pick: (id) => {
+        void press(runId, message, id);
+      },
     });
     // The chips are held weakly: a message that leaves the page leaves them to be collected, and the painter drops out.
     const held = new WeakRef(chips);
