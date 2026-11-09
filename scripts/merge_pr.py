@@ -13,6 +13,7 @@ When it was made, not when it began: a run started again (`gh run rerun`) begins
 pull request into `main` that its first attempt made. And a margin before it: GitHub makes that merge when the push's
 event fires and the run some time after, seconds or, with the runners all busy, minutes; a merge into `main` in
 between was not checked. The margin errs one way only, toward bringing a branch up to `main` that did not need it.
+A head that holds `main` as it is now was checked on all of it, the margin aside: it is merged (item 1078).
 
 A pull request that changes only what the gate's `paths-ignore` names (prose) has no run of the gate to wait for, and
 nothing of it can break `main`: it is merged as it stands.
@@ -104,6 +105,24 @@ def _run(argv: list[str]) -> str:
     return done.stdout
 
 
+def _holds(head: str, commit: str) -> bool:
+    """Whether ``commit`` is ``head`` or one of its ancestors."""
+    argv: list[str] = ["git", "merge-base", "--is-ancestor", commit, head]
+    done: subprocess.CompletedProcess[str] = subprocess.run(argv, capture_output=True, text=True, check=False)
+    if done.returncode not in (0, 1):
+        raise MergeRefused(f"{' '.join(argv)} failed ({done.returncode}): {done.stderr.strip()[:600]}")
+    return done.returncode == 0
+
+
+def _moved_since(run: GateRun) -> list[str]:
+    """The files `main`'s commits changed from :data:`MARGIN` before ``run`` was made."""
+    argv: list[str] = [
+        "git", "log", "--first-parent", f"--since={counted_since(run.created_at, MARGIN)}", "--name-only",
+        "--no-renames", "--format=", "origin/main",
+    ]  # fmt: skip
+    return [line for line in _run(argv).splitlines() if line]
+
+
 def _gate_runs(head: str) -> list[GateRun]:
     raw: str = _run(
         [
@@ -176,23 +195,9 @@ def merge(number: int, method: str) -> int:
         raise MergeRefused(
             f"the gate's run {run.run_id} for {head} is {run.status}/{run.conclusion or 'none'}: merge once it passed"
         )
-    _run(["git", "fetch", "--quiet", "origin", "main"])
-    moved: list[str] = [
-        line
-        for line in _run(
-            [
-                "git",
-                "log",
-                "--first-parent",
-                f"--since={counted_since(run.created_at, MARGIN)}",
-                "--name-only",
-                "--no-renames",
-                "--format=",
-                "origin/main",
-            ]
-        ).splitlines()
-        if line
-    ]
+    _run(["git", "fetch", "--quiet", "origin", "main", head])
+    # A head brought up to main since (item 1078): its checks ran on main as it is, every file of it.
+    moved: list[str] = [] if _holds(head, "origin/main") else _moved_since(run)
     shared: list[str] = shared_files(changed, moved)
     if shared:
         _run(["gh", "pr", "update-branch", str(number)])
