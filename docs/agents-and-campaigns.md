@@ -280,6 +280,13 @@ page says which. The API: `GET /api/agents/{id}` gives `usage` (`window`, `runs`
 `enough`, `unused`), and `POST /api/agents/{id}/trim-tools` takes them away (422 before three runs ended, and when
 nothing would go or nothing would be left).
 
+**How its work went** (item 1066), on an agent's page with work orders, reads how they went rather than how much the
+agent wrote: the orders it has (one reassigned is its newest agent's), how many were accepted on their first attempt,
+how many after a return, how many wait for you (escalated: one you drop is cancelled and leaves that count) and how
+many are open, and the returns in all; the attempts of an order reassigned count for the agent that has it now. It is how to tell which
+agent's, or which model's, work holds. `GET /api/agents/{id}` gives it as `work` (`orders`, `accepted`,
+`accepted_first`, `returns`, `escalated`, `open`).
+
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
 agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through

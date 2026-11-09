@@ -1413,6 +1413,34 @@ function suggestedScheduleRow(template, onAdd) {
   );
 }
 
+/** How the agent's work orders went (item 1066): one row, the orders and how many were accepted the first time, and
+ * under it those accepted after a return, waiting for you (escalated) and open, and the returns in all; none for an
+ * agent that has had none. */
+function workRows(work) {
+  if (work === null || work === undefined || work.orders === 0) {
+    return [];
+  }
+  const later = work.accepted - work.accepted_first;
+  const facts = [
+    later > 0 ? `${later} after a return` : null,
+    work.escalated > 0 ? `${work.escalated} waiting for you` : null,
+    work.open > 0 ? `${work.open} open` : null,
+    `${plural(work.returns, "return", "returns")} in all`,
+  ].filter((fact) => fact !== null);
+  return [
+    el(
+      "div",
+      { class: "list-row", dataset: { work: "orders" } },
+      el(
+        "div",
+        { class: "row-main" },
+        el("div", { class: "row-title" }, `${plural(work.orders, "work order", "work orders")}: ${work.accepted_first} accepted the first time`),
+        el("div", { class: "row-meta" }, facts.join(" · ")),
+      ),
+    ),
+  ];
+}
+
 /**
  * What the agent's newest ended runs used (item 874): their count and tokens, the actions they called most, and,
  * once enough of them ended, the actions it may use that none called, with a way to take them away (`onTrim()`). An
@@ -1750,6 +1778,7 @@ function mountPage(root, ctx, agentId) {
       ),
       homeSection("chats", "Chats", detail.runs.map(runRow), folds, toggleFold),
       homeSection("usage", "What it used", usageRows(detail.record, detail.usage, () => attempt(() => trimTools(detail.record, detail.usage))), folds, toggleFold),
+      homeSection("work", "How its work went", workRows(detail.work), folds, toggleFold),
       homeSection("learned", "What it learned", learned, folds, toggleFold),
       homeSection("messages", "Messages", detail.messages.map(messageRow), folds, toggleFold),
     ];
