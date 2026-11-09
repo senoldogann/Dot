@@ -231,20 +231,51 @@ worker.addEventListener("push", (event) => {
   );
 });
 
+// What the worker tells a window of Dot it brought to the front for a tap on a notification: the route to open (main.js).
+const OPEN_ROUTE = "dot:open-route";
+
+// How long a window brought to the front has to say it opened the route it was told before it is sent there instead.
+const OPENED_WAIT_MS = 1500;
+
+/** Tell `client` to open `route`, and resolve whether it said it did within `OPENED_WAIT_MS`: Dot's own page answers
+ * on the channel the message carries (main.js); a page that runs no script of Dot's (the page of a Mac out of reach,
+ * served at Dot's own address) says nothing. */
+function told(client, route) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(false), OPENED_WAIT_MS);
+    channel.port1.onmessage = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    client.postMessage({ type: OPEN_ROUTE, route }, [channel.port2]);
+  });
+}
+
+/**
+ * Bring Dot to the front at `route` (item 1070). A window of Dot that is open is brought to the front first, while the
+ * tap still allows it: `WindowClient.navigate` first, as before, did nothing for a home-screen app of an iPhone in the
+ * background, or failed and left it behind, so a tap opened neither the chat nor Dot. It is then told the route, which
+ * Dot's own page opens itself and says so; a window that does not say so in time (the page of a Mac out of reach runs
+ * no script of Dot's) is sent to the route. With no window of Dot open, one opens at the route.
+ */
+async function openAt(route) {
+  const target = new URL(`/${route}`, worker.location.origin).href;
+  const windows = await worker.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const open = windows.find((client) => "focus" in client);
+  if (open === undefined) {
+    return worker.clients.openWindow(target);
+  }
+  const front = await open.focus();
+  if (await told(front, route)) {
+    return front;
+  }
+  return front.navigate(target);
+}
+
 worker.addEventListener("notificationclick", (event) => {
   event.notification.close();
   // A tap opens one of the page's own routes (`#/…`, as the daemon sends them); anything else opens the home.
   const given = event.notification.data?.route;
-  const route = typeof given === "string" && given.startsWith("#/") ? given : "#/runs";
-  const target = new URL(`/${route}`, worker.location.origin).href;
-  event.waitUntil(
-    worker.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-      const open = windows.find((client) => "focus" in client);
-      if (open !== undefined) {
-        open.navigate(target);
-        return open.focus();
-      }
-      return worker.clients.openWindow(target);
-    }),
-  );
+  event.waitUntil(openAt(typeof given === "string" && given.startsWith("#/") ? given : "#/runs"));
 });

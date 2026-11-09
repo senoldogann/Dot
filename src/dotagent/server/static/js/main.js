@@ -753,6 +753,21 @@ followBarColour();
 // browser that has none (or an insecure address) simply has neither.
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch((error) => console.warn("the service worker could not be registered", error));
+  // A tap on a notification brings this window to the front and tells it the route to open (sw.js, item 1070): the
+  // chat that asks, or the page the notification is about. Only Dot's own worker, of this origin, says so.
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    const data = event.data;
+    if (event.origin !== location.origin || data?.type !== "dot:open-route" || typeof data.route !== "string" || !data.route.startsWith("#/")) {
+      return;
+    }
+    if (location.hash !== data.route) {
+      location.hash = data.route;
+    }
+    // The worker waits for this word; a window that does not give it is sent to the route instead.
+    event.ports[0]?.postMessage("opened");
+  });
+  // The messages a worker sent before this listener was there are given to it now, not held until the page loads.
+  navigator.serviceWorker.startMessages();
 }
 onAuthLost(handleAuthLost);
 // A copy out of the conversation goes on the clipboard as the markdown it was written in (item 206).

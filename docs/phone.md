@@ -62,7 +62,8 @@ code** takes its place. The same by hand:
    keeps nothing of it, item 548), and from then
    on the daemon tells the phone what the desktop notifications say, in the same words, page open or closed, and while
    you look at that run on the phone too: the rule that keeps a notification quiet while you look at its run holds for
-   the notifications of a page, not for a push; a tap opens what it tells of. The phone also hears what no page can, as
+   the notifications of a page, not for a push; a tap opens what it tells of (item 1070: Dot comes to the front and opens the chat that asks, or the page the
+   notification is about, itself; with no window of Dot open, Dot opens there). The phone also hears what no page can, as
    it happens before a page is back: the daemon started again after it did not stop cleanly (it was killed, crashed or
    ended with an error; it leaves `<home>/daemon.running` while it runs), with how many runs that cut off. The daemon
    signs the pushes with a key pair it makes on first start (`<home>/vapid-key.pem`), naming the project's page as
