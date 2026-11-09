@@ -4295,13 +4295,15 @@ class Store:
         agent_id: str | None = None,
         lead_run_id: str | None = None,
         tainted: bool = False,
+        brief: str | None = None,
     ) -> WorkOrderRecord | None:
         """Move a work order to ``status`` when it stands in one of ``expected`` (and, with ``last_run``, when that is
         the run of its newest attempt), else change nothing and return ``None``: the end of an attempt that comes late,
         or two verdicts at once, find the order moved already. A move ``WORK_ORDER_MOVES`` does not allow is an error;
         one to the status the order has changes only the rest.
         ``new_run`` starts an attempt (its run is recorded, the attempts counted); ``agent_id`` gives the order to
-        another agent; ``tainted`` can only mark an order, never clear it; ``note`` replaces the last note."""
+        another agent; ``tainted`` can only mark an order, never clear it; ``note`` replaces the last note; ``brief``
+        replaces the order's words, which the lead rewrites for an attempt that starts afresh (item 1065)."""
         current: WorkOrderRecord = await self.get_work_order(order_id)
         if current.status not in expected or (last_run is not None and current.run_ids[-1:] != (last_run,)):
             return None
@@ -4312,7 +4314,7 @@ class Store:
         run_ids: tuple[str, ...] = current.run_ids if new_run is None else (*current.run_ids, new_run)
         await self._db.execute(
             "UPDATE work_orders SET status = ?, attempts = ?, run_ids = ?, agent_id = ?, lead_run_id = ?, tainted = ?,"
-            " note = ?, updated_at = ? WHERE id = ?",
+            " note = ?, brief = ?, updated_at = ? WHERE id = ?",
             (
                 status,
                 len(run_ids),
@@ -4321,6 +4323,7 @@ class Store:
                 current.lead_run_id if lead_run_id is None else lead_run_id,
                 int(current.tainted or tainted),
                 current.note if note is None else note,
+                current.brief if brief is None else brief,
                 time.time(),
                 order_id,
             ),

@@ -72,7 +72,11 @@ class AssignWorkArgs(ToolArgs):
         max_length=BRIEF_CHARS,
         description="The whole work with every input it needs: the agent cannot see this chat.",
     )
-    acceptance: str = Field(min_length=3, max_length=ACCEPTANCE_CHARS, description="What done means: its checks.")
+    acceptance: str = Field(
+        min_length=3,
+        max_length=ACCEPTANCE_CHARS,
+        description="What done means: the checks whose output its answer must show.",
+    )
     due_hours: Annotated[float, at_most(_MOST_DUE_HOURS)] | None = Field(default=None, gt=0)
     objective: str | None = Field(default=None, description="The id or title of the objective it serves.")
 
@@ -91,6 +95,11 @@ class ReviewWorkArgs(ToolArgs):
         description="Why; for a return, what to fix: the agent cannot see this chat.",
     )
     to_agent: str | None = Field(default=None, description="For reassign: who takes over.")
+    brief: str = Field(
+        default="",
+        max_length=BRIEF_CHARS,
+        description="Its brief rewritten, once it came back twice: the next attempt starts afresh on it.",
+    )
 
 
 async def _leads_for(ctx: ToolContext) -> tuple[RunRecord, Spawner]:
@@ -327,6 +336,7 @@ def _review_tool() -> RegisteredTool:
             order,
             verdict,
             redact_known(args.notes.strip(), held),
+            redact_known(args.brief.strip(), held),
             to_agent,
             ctx.ever_tainted(),
         )
@@ -339,8 +349,8 @@ def _review_tool() -> RegisteredTool:
     return make_tool(
         name=REVIEW_WORK_TOOL,
         description=(
-            "Judge a work order that came back: accept it, return it to its agent with notes (the third return goes "
-            "to the owner), reassign it, escalate it to the owner, or cancel it."
+            "Judge a work order that came back: accept it on its Verification, return it with notes (after two "
+            "attempts with brief; the third goes to the owner), reassign, escalate to the owner, or cancel it."
         ),
         args_model=ReviewWorkArgs,
         modes=ALL_MODES,
