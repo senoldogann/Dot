@@ -5504,6 +5504,25 @@ dialog.modal.versions-dialog {
   text-underline-offset: 3px;
 }
 
+/* A file named in words is a button in the words' own look, underlined (item 1077). */
+.file-word {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.file-word:hover {
+  color: var(--accent);
+}
+
 .code-path:hover code {
   border-color: var(--border-strong);
   background: var(--surface-3);

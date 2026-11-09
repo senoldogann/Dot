@@ -61,9 +61,11 @@ def test_every_frame_of_the_ui_is_sandboxed_and_given_no_permission() -> None:
         for frame in frames:
             attributes: str = frame.group("attributes")
             made.append(script.name)
-            assert re.search(r'\bsandbox:\s*"allow-scripts"', attributes), (script.name, attributes)
+            # Scripts at most (a web page's frame allows nothing, item 1077).
+            assert re.search(r'\bsandbox:\s*"(allow-scripts)?"', attributes), (script.name, attributes)
             assert "allow-same-origin" not in attributes and not re.search(r"\ballow:", attributes), script.name
-    assert sorted(made) == ["filepanel.js", "pageframe.js"]
+    # filepanel.js frames a drawing of Quick Look and a web page (item 1077).
+    assert sorted(made) == ["filepanel.js", "filepanel.js", "pageframe.js"]
 
 
 def test_a_release_refuses_a_bundle_without_the_reasons_or_the_microphone() -> None:

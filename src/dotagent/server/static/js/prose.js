@@ -12,11 +12,18 @@ import { parseBlocks } from "./markdown.js";
 // and no pattern for many files.
 const FILE_PATH = /^(~|\/Users\/[^/\s]+)\/[^\n*?[\]{}$<>|]*[^/\s*?[\]{}$<>|]\.[A-Za-z0-9]{1,8}$/;
 const FILE_PATH_CHARS = 400;
+// A file an agent names by its name or the end of its path, as it names one it made (item 1077), which the daemon
+// finds in the workspace: in code, of a suffix files have and code does not (`os.path` is no file); in words, a
+// document's (`README.md`, `report.pdf`), not a name a text has for other things (`Node.js`, `example.com`).
+const CODE_SUFFIXES = "md|markdown|html?|pdf|txt|csv|tsv|docx?|xlsx?|pptx?|json|ya?ml|toml|png|jpe?g|gif|webp|svg|py|js|mjs|ts|tsx|jsx|css|sh|rs|go|swift|log";
+const WORD_SUFFIXES = "md|markdown|html?|pdf|txt|csv|docx|xlsx|pptx";
+const NAMED_FILE = new RegExp(`^(?:[\\w-][\\w.-]*/)*[\\w-][\\w.-]*\\.(?:${CODE_SUFFIXES})$`, "i");
+const FILE_WORD = new RegExp(`(?<![\\w./~@:-])((?:~?/)?(?:[\\w-][\\w.-]*/)*[\\w-][\\w.-]*\\.(?:${WORD_SUFFIXES}))(?![\\w/-])`, "gi");
 
 /** A file's path as a chip of its name (item 832): the whole path in its title and for a screen reader, and in a copy
  * of the message, which takes the text it was written in. */
 function codeNode(value) {
-  if (value.length > FILE_PATH_CHARS || !FILE_PATH.test(value)) {
+  if (value.length > FILE_PATH_CHARS || !(FILE_PATH.test(value) || NAMED_FILE.test(value))) {
     return el("code", null, value);
   }
   const name = value.slice(value.lastIndexOf("/") + 1);
@@ -34,6 +41,38 @@ function codeNode(value) {
   );
 }
 
+/** The words `text` with the files they name (`FILE_WORD`) as buttons that show them beside the conversation, in the
+ * words' own look but underlined (item 1077); a copy of the message takes them as the words they are. */
+function fileWords(text) {
+  const nodes = [];
+  let last = 0;
+  for (const match of text.matchAll(FILE_WORD)) {
+    if (match[1].length > FILE_PATH_CHARS) {
+      continue;
+    }
+    nodes.push(text.slice(last, match.index));
+    nodes.push(
+      el(
+        "button",
+        {
+          class: "file-word",
+          type: "button",
+          title: `Show the file: ${match[1]}`,
+          dataset: { path: match[1] },
+          onclick: (event) => requestFile(event.currentTarget),
+        },
+        match[1],
+      ),
+    );
+    last = match.index + match[1].length;
+  }
+  if (last === 0) {
+    return text;
+  }
+  nodes.push(text.slice(last));
+  return nodes;
+}
+
 function inlineNode(part) {
   switch (part.type) {
     case "code":
@@ -48,6 +87,8 @@ function inlineNode(part) {
       return el("br");
     case "link":
       return el("a", { href: part.href, target: "_blank", rel: "noopener noreferrer nofollow" }, part.value);
+    case "text":
+      return fileWords(part.value);
     default:
       return part.value;
   }

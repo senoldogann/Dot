@@ -441,10 +441,65 @@ function codeView(file, toolbar, body, cut) {
   fill(body, el("pre", { class: "file-text file-code-editor", "aria-label": `${language} source code` }, code), cut);
 }
 
+// A web page, by its extension (item 1077).
+const WEB_PAGE_NAME = /\.html?$/i;
+
+/** A web page as a browser draws it (item 1077), without its scripts: the frame is sandboxed with nothing allowed, so
+ * no script of the page runs (one could take the frame to another site, which a frame's sandbox allows) and no
+ * refresh moves it; it is served as Quick Look's drawings are, so it reaches no server, nor the pictures and styles
+ * beside it on the disk. Its source is a click away. */
+function webPageView(file, views, toolbar, body, cut) {
+  let page = null;
+  let chosen = "drawn";
+  const show = (id) => {
+    chosen = id;
+    // Drawn, the page fills the panel as a drawing of Quick Look does.
+    body.dataset.view = id;
+    if (id === "source") {
+      codeView(file, toolbar, body, cut);
+      return;
+    }
+    fill(toolbar);
+    fill(body, hint("Loading the page…"));
+    page ??= api.get(`/files/web-page${query({ path: file.path })}`);
+    page.then(
+      (look) => {
+        if (chosen === "drawn") {
+          const frame = el("iframe", { class: "file-look", sandbox: "", referrerpolicy: "no-referrer", title: `${file.name} as a page` });
+          frame.src = look.pages[0].url;
+          fill(body, frame);
+        }
+      },
+      (error) => {
+        if (chosen === "drawn") {
+          fill(body, note("warn", `The page cannot be shown: ${error.message}.`));
+        }
+      },
+    );
+  };
+  const switcher = segmented(
+    [
+      { id: "drawn", label: "Page", hint: "Show the page as a browser draws it" },
+      { id: "source", label: "Source", hint: "Show the page's HTML" },
+    ],
+    "drawn",
+    show,
+  );
+  switcher.element.classList.add("file-tabs");
+  switcher.element.setAttribute("aria-label", "View");
+  fill(views, switcher.element);
+  views.hidden = false;
+  show("drawn");
+}
+
 /** A text as text; a Markdown file formatted as an answer is, its HTML never drawn, with its source a click away; a
- * source file as code. */
-function textView(file, toolbar, body) {
+ * web page drawn as one (item 1077); a source file as code. */
+function textView(file, views, toolbar, body) {
   const cut = file.preview.cut ? hint("The file is longer than this; open it on the Mac to read it all.") : null;
+  if (WEB_PAGE_NAME.test(file.name)) {
+    webPageView(file, views, toolbar, body, cut);
+    return;
+  }
   if (CODE_FILE.test(file.name)) {
     codeView(file, toolbar, body, cut);
     return;
@@ -455,7 +510,7 @@ function textView(file, toolbar, body) {
     return;
   }
   const show = (id) => fill(body, id === "formatted" ? el("div", { class: "file-markdown" }, prose(file.preview.text)) : source(), cut);
-  const views = segmented(
+  const tabs = segmented(
     [
       { id: "formatted", label: "Formatted", hint: "Show the Markdown formatted" },
       { id: "source", label: "Source", hint: "Show the Markdown as it is written" },
@@ -463,9 +518,9 @@ function textView(file, toolbar, body) {
     "formatted",
     show,
   ).element;
-  views.classList.add("file-tabs");
-  views.setAttribute("aria-label", "View");
-  fill(toolbar, views);
+  tabs.classList.add("file-tabs");
+  tabs.setAttribute("aria-label", "View");
+  fill(toolbar, tabs);
   show("formatted");
 }
 
@@ -652,7 +707,7 @@ export function fileView(source, onClose) {
     title.title = file.path;
     element.setAttribute("aria-label", file.name);
     element.dataset.kind = kind;
-    facts.textContent = `${KINDS[kind]}, ${sizeLabel(file.size)}`;
+    facts.textContent = `${kind === "text" && WEB_PAGE_NAME.test(file.name) ? "Web page" : KINDS[kind]}, ${sizeLabel(file.size)}`;
     openButton.hidden = !file.opens;
     textOfFile = textOf(file.preview);
     copy.hidden = textOfFile === null;
@@ -673,7 +728,7 @@ export function fileView(source, onClose) {
         tableView(file.preview, toolbar, body);
         break;
       case "text":
-        textView(file, toolbar, body);
+        textView(file, views, toolbar, body);
         break;
       default:
         fill(body, note(null, `This file is not shown here: ${file.preview.reason}.`), file.opens ? hint("Open it on the Mac to see it.") : null);

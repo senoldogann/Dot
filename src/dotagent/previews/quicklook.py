@@ -5,8 +5,11 @@ a chat to show it as Finder would: its fonts, fills and pictures, a workbook's s
 a page per sheet). Dot keeps each drawing in a folder of its home (``looks/``) named by an id nobody can guess, and
 serves its files at ``/looks/<id>/<file>`` to whoever names the id, sandboxed wherever they open
 (:data:`dotagent.server.guard.LOOK_HEADERS`): the frame runs Quick Look's scripts with an origin of its own and reaches
-no server. A file is drawn once per version (its path, size and time of change) in the daemon's life: the id is keyed
-with a secret the daemon makes at its start, which empties the folder.
+no server. A web page Dot made (an ``.html`` file) is kept the same way, the file itself as the drawing's page (item
+1077): Quick Look draws none of it; it is served under the same sandbox, and the panel frames it with no script allowed,
+so it runs nothing and reaches no server, nor its pictures and styles beside it on the disk. A file is drawn once per
+version (its path, size and time of change) in the daemon's life: the id is keyed with a secret the daemon makes at its
+start, which empties the folder.
 """
 
 import asyncio
@@ -150,6 +153,23 @@ async def _quick_look(path: Path, workshop: Path) -> None:
         )
 
 
+def _keep_page(folder: Path, path: Path, drawing: str) -> list[str]:
+    """Keep the web page at ``path`` as the drawing ``drawing`` of ``folder``; the names of the oldest drawings let go
+    beyond ``KEPT_LOOKS``. Blocking."""
+    workshop: Path = folder / f"{_DRAWING_PREFIX}{secrets.token_hex(8)}"
+    workshop.mkdir(parents=True)
+    try:
+        shutil.copyfile(path, workshop / PAGE)
+        os.replace(workshop, folder / drawing)
+    except OSError:
+        shutil.rmtree(workshop)
+        raise
+    gone: list[Path] = _oldest_beyond(folder, KEPT_LOOKS)
+    for old in gone:
+        shutil.rmtree(old)
+    return [old.name for old in gone]
+
+
 @dataclass
 class QuickLook:
     """The drawings of this daemon's life (module docstring). A file version is drawn by one call at a time, under a
@@ -167,6 +187,19 @@ class QuickLook:
         async with self._drawing.setdefault(drawing, asyncio.Lock()):
             if not await asyncio.to_thread((self.folder / drawing / PAGE).is_file):
                 await self._draw(path, drawing)
+        return drawing
+
+    async def page(self, path: Path) -> str:
+        """The id of the drawing of the web page at ``path`` (resolved, a file the panel shows): the page itself, kept
+        now unless it was already (module docstring)."""
+        status: os.stat_result = await asyncio.to_thread(path.stat)
+        drawing: str = look_id(self.secret, path, status)
+        async with self._drawing.setdefault(drawing, asyncio.Lock()):
+            if not await asyncio.to_thread((self.folder / drawing / PAGE).is_file):
+                # The locks go with the drawings let go, here in the loop that holds them.
+                for gone in await asyncio.to_thread(_keep_page, self.folder, path, drawing):
+                    self._drawing.pop(gone, None)
+                log.info("page_kept", path=str(path), drawing=drawing)
         return drawing
 
     async def pages(self, drawing: str) -> tuple[DrawnPage, ...]:
