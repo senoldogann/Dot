@@ -42,7 +42,9 @@ Under its name, in the line its last words would take, stand the faces of the ru
 work and those that ended: three at most, laid over one another as the marks of the connected apps stand in the foot, the
 rest counted, and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. What works lists too what is no chat's: the session of a campaign
-(which works in a thread of its own). A chat that waits for you (item 836) leaves its day too and stands first, above
+(which works in a thread of its own). A run another run delegated stands under the chat its work came from, never as a
+row of its own, also once the run that delegated it has ended (item 1074: a work order's try outlives the lead's turn
+that gave it): that chat stands at work while it works, and the home's Today strip lists no such run either. A chat that waits for you (item 836) leaves its day too and stands first, above
 what works, as its own row with its menu, its creature waiting: its last line says **Waiting for you:** and what
 has waited longest, with how many more wait ("(+1)"), in the warning's ink, the dot of a run that waits stands in its
 age's place, and its name for a screen reader names each thing and how it waits; a pinned chat stays under Pinned,

@@ -100,7 +100,11 @@ function todaySections(activity) {
   return SECTIONS.map(({ key, title }) => ({ key, title, all: activity[key] }))
     .filter(({ all }) => all.length > 0)
     .map(({ key, title, all }) => {
-      const runs = nestRows(all).map(({ row }) => row);
+      // A run another run delegated is no row of its own, under its parent or not (item 1074: a work order's attempt
+      // outlives the lead's turn that gave it).
+      const runs = nestRows(all)
+        .map(({ row }) => row)
+        .filter((row) => row.parent_run_id === null);
       return { key, title, count: runs.length, rows: runs.slice(0, ROWS_SHOWN), rest: runs.slice(ROWS_SHOWN) };
     });
 }
