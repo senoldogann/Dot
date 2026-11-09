@@ -37,15 +37,16 @@ PROVIDER_MARKS: dict[ProviderId, str] = {"google": "google-icon.svg", "microsoft
 _STATUS_OK: int = 200
 _STATUS_REFUSED: int = 400
 # The wordmark of ``offline.html`` and ``index.html`` (tests/unit/test_callback_page.py keeps it the same), with the
-# mark's gradients in it (item 642, tests/unit/test_mark.py keeps them those of every copy): the ball's obsidian, the
-# eyes' gold and the light on the ball, which app.css's .mark-disc, .mark-eye and .mark-shine take.
+# mark's gradients in it (item 642, tests/unit/test_mark.py keeps them those of every copy): the ball's black, the
+# eyes' white and the light on the ball, at nought since item 1081, which app.css's .mark-disc, .mark-eye and
+# .mark-shine take.
 WORDMARK: str = (
     '<svg class="wordmark" viewBox="-104 -184 600 288" role="img" aria-label="Dot"><defs>'
-    '<radialGradient id="mark-obsidian" cx="0.34" cy="0.28" r="0.8"><stop offset="0" stop-color="#5a5a5e"/>'
-    '<stop offset="0.32" stop-color="#1c1c1f"/><stop offset="1" stop-color="#000000"/></radialGradient>'
-    '<linearGradient id="mark-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1c1"/>'
-    '<stop offset="0.45" stop-color="#e6c26b"/><stop offset="1" stop-color="#a8782b"/></linearGradient>'
-    '<radialGradient id="mark-shine" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff" stop-opacity="0.75"/>'
+    '<radialGradient id="mark-obsidian" cx="0.34" cy="0.28" r="0.8"><stop offset="0" stop-color="#000000"/>'
+    '<stop offset="0.32" stop-color="#000000"/><stop offset="1" stop-color="#000000"/></radialGradient>'
+    '<linearGradient id="mark-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/>'
+    '<stop offset="0.45" stop-color="#ffffff"/><stop offset="1" stop-color="#ffffff"/></linearGradient>'
+    '<radialGradient id="mark-shine" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff" stop-opacity="0"/>'
     '<stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>'
     '<path class="wordmark-letter wordmark-d" d="M83 -163V83M83 0A83 83 0 1 1 -83 0A83 83 0 1 1 83 0"/>'
     '<g transform="translate(244 0)"><g class="wordmark-dot"><circle class="mark-disc" r="100"/>'

@@ -14,7 +14,7 @@ code { font: 12px ui-monospace, "SF Mono", Menlo, monospace; }
 .disc { fill: url(#mark-obsidian); }
 .eye { fill: url(#mark-gold); }
 .shine { fill: url(#mark-shine); }
-.rim { fill: none; stroke: #e6c26b; stroke-opacity: 0.55; stroke-width: 2; }
+.rim { fill: none; stroke: #ffffff; stroke-opacity: 0.3; stroke-width: 2; }
 @media (prefers-color-scheme: dark) {
   html, body { color: #ecebe6; background: #1b1a18; }
   pre { background: #2a2927; }

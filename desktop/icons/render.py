@@ -5,13 +5,15 @@ the desktop shell (``app.png``, 1024 px, for ``npm run icons``) and its menu bar
 (``tray-{state}.png``, 44 px, the 22 pt item at 2x).
 
 On a phone (item 1069, the owner's choice of 2026-11-09) the icon is flat: the two eyes in white, alone, on a tile of
-black, with no ball, light or gold, so that it reads as one plain sign on a home screen. The web app's icons and the
-home screen's touch icons are drawn so (:func:`phone_tile_svg`); the favicon, the desktop app and the menu bar keep the
-ball.
+black, with no ball, light or gold, so that it reads as one plain sign on a home screen. The web app's icons, the home
+screen's touch icons and the iPhone app's are drawn so (:func:`phone_tile_svg`), and the desktop app's on the macOS
+tile (:func:`mac_tile_svg`); the favicon, the wordmark's o and the menu bar keep the ball, in the same black and white
+(item 1081, the owner's ask that the new mark be everywhere).
 
-The mark is a dot that looks (item 642, the owner's choice of 2026-10-25, "Obsidian"): a ball of obsidian, lit at its
-upper left, with the two capsule eyes of the character's attentive rest pose (``static/js/character``) in champagne gold
-and a hairline of gold round it, so that it holds on a light page, a dark one and a menu bar of either. The eyes are a
+The mark is a dot that looks (item 642, made flat by item 1081): a ball of black with the two capsule eyes of the
+character's attentive rest pose (``static/js/character``) in white and a faint white hairline round it, so that it holds
+on a light page, a dark one and a menu bar of either. The gradients keep their names and stops (one flat colour each,
+the light's at nought), which every copy shares. The eyes are a
 little larger than the engine draws them so they hold at 16 px. ``static/index.html`` and ``desktop/ui/down.html`` set
 the same ball and eyes as the o of the wordmark; ``tests/unit/test_mark.py`` keeps them alike. Run this after a
 change of the mark, from the repository: ``uv run python desktop/icons/render.py`` (with the Playwright Chromium
@@ -20,17 +22,18 @@ installed), then ``npm run icons`` in ``desktop/``."""
 import asyncio
 from pathlib import Path
 
+from PIL import Image
 from playwright.async_api import async_playwright
 
 HERE: Path = Path(__file__).resolve().parent
 REPO: Path = HERE.parents[1]
 TRAY_DIR: Path = HERE.parent / "src-tauri" / "icons"
 STATIC: Path = REPO / "src" / "dotagent" / "server" / "static"
-# The obsidian of the ball, from its lit upper left to its edge; the champagne gold of the eyes, top to bottom; the gold
-# of the hairline round the ball and of its light.
-OBSIDIAN: tuple[tuple[str, str], ...] = (("0", "#5a5a5e"), ("0.32", "#1c1c1f"), ("1", "#000000"))
-GOLD: tuple[tuple[str, str], ...] = (("0", "#fff1c1"), ("0.45", "#e6c26b"), ("1", "#a8782b"))
-RIM: str = "#e6c26b"
+# The ball's colour, the eyes' and the hairline's (item 1081: flat black and white; the names and the stops are item
+# 642's, when the ball was obsidian lit at its upper left and the eyes champagne gold, so that every copy keeps them).
+OBSIDIAN: tuple[tuple[str, str], ...] = (("0", "#000000"), ("0.32", "#000000"), ("1", "#000000"))
+GOLD: tuple[tuple[str, str], ...] = (("0", "#ffffff"), ("0.45", "#ffffff"), ("1", "#ffffff"))
+RIM: str = "#ffffff"
 # The pastille of a state that waits for the owner: the character's notification blue.
 PASTILLE: str = "#2496e8"
 # One eye, a capsule 21 wide and 44 tall about its centre, in a disc of radius 100.
@@ -69,7 +72,7 @@ def defs() -> str:
         f'<radialGradient id="mark-obsidian" cx="0.34" cy="0.28" r="0.8">{_stops(OBSIDIAN)}</radialGradient>'
         f'<linearGradient id="mark-gold" x1="0" y1="0" x2="0" y2="1">{_stops(GOLD)}</linearGradient>'
         '<radialGradient id="mark-shine" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff" '
-        'stop-opacity="0.75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>'
+        'stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>'
     )
 
 
@@ -80,7 +83,7 @@ def dot(eyes: tuple[str, str], rim: float = 2.0) -> str:
     return (
         f'<circle r="100" fill="url(#mark-obsidian)"/>{paths}'
         '<ellipse cx="-38" cy="-50" rx="34" ry="18" transform="rotate(-32 -38 -50)" fill="url(#mark-shine)"/>'
-        f'<circle r="{100 - rim / 2}" fill="none" stroke="{RIM}" stroke-opacity="0.55" stroke-width="{rim}"/>'
+        f'<circle r="{100 - rim / 2}" fill="none" stroke="{RIM}" stroke-opacity="0.3" stroke-width="{rim}"/>'
     )
 
 
@@ -90,36 +93,6 @@ def mark_svg(eyes: tuple[str, str], pastille: bool, rim: float = 2.0) -> str:
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="-100 -100 200 200"><defs>{defs()}</defs>'
         f"{dot(eyes, rim)}{spot}</svg>"
-    )
-
-
-def tile_svg(rounded: bool, scale: float = 0.0) -> str:
-    """The mark on a tile of night: the macOS app icon (its rounded body inset on the 1024 grid, with the shadow the
-    system draws no more) or, square and full bleed, the web app's icon, which the phone rounds; ``scale`` a smaller
-    mark for the maskable icon, which a phone may cut to a circle."""
-    ground: str = (
-        '<linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">'
-        '<stop offset="0" stop-color="#232326"/><stop offset="1" stop-color="#050506"/></linearGradient>'
-        '<radialGradient id="shade" cx="0.5" cy="0.5" r="0.5">'
-        '<stop offset="0" stop-color="#000" stop-opacity="0.38"/><stop offset="1" stop-color="#000" stop-opacity="0"/>'
-        "</radialGradient>"
-        '<filter id="drop" x="-20%" y="-20%" width="140%" height="140%">'
-        '<feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.28"/></filter>'
-    )
-    if rounded:
-        body: str = (
-            '<rect x="100" y="100" width="824" height="824" rx="185" fill="url(#ground)" filter="url(#drop)"/>'
-            '<rect x="101" y="101" width="822" height="822" rx="184" fill="none" stroke="#fff" stroke-opacity="0.07"'
-            ' stroke-width="2"/>'
-        )
-        scale = scale or 2.55
-    else:
-        body = '<rect width="1024" height="1024" fill="url(#ground)"/>'
-        scale = scale or 3.1
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs>{defs()}{ground}</defs>{body}'
-        f'<ellipse cx="512" cy="{512 + 112 * scale}" rx="{76 * scale}" ry="{13 * scale}" fill="url(#shade)"/>'
-        f'<g transform="translate(512 {512 - 6 * scale}) scale({scale})">{dot(ATTENTIVE)}</g></svg>'
     )
 
 
@@ -138,9 +111,27 @@ def phone_tile_svg(scale: float) -> str:
     )
 
 
+IOS_ICON: Path = HERE.parents[1] / "ios" / "Dot" / "Assets.xcassets" / "AppIcon.appiconset" / "icon-1024.png"
+
 # The eyes on a phone's tile, and on the maskable one, which a phone may cut to a circle: well inside its safe zone.
 PHONE_SCALE: float = 5.2
 MASKABLE_SCALE: float = 4.4
+
+
+def mac_tile_svg() -> str:
+    """The desktop app's icon (item 1081): the phone's flat eyes on the macOS tile, a black body inset on the 1024
+    grid with the rounding of the system's icons."""
+    eyes: str = "".join(f'<path d="{EYE}" transform="{matrix}" fill="#fff"/>' for matrix in ATTENTIVE)
+    x, y = EYES_MIDDLE
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">'
+        '<rect x="100" y="100" width="824" height="824" rx="185" fill="#000"/>'
+        f'<g transform="translate(512 512) scale({MAC_SCALE}) translate({-x} {-y})">{eyes}</g></svg>'
+    )
+
+
+# The eyes on the desktop app's tile: the phone's, in the proportion of its smaller body.
+MAC_SCALE: float = PHONE_SCALE * 824 / 1024
 
 
 def _page(svg: str, size: int) -> str:
@@ -165,7 +156,7 @@ async def render(target: Path, svg: str, size: int) -> None:
 
 async def main() -> None:
     (STATIC / "favicon.svg").write_text(mark_svg(ATTENTIVE, False) + "\n", encoding="utf-8")
-    await render(HERE / "app.png", tile_svg(True), APP_PX)
+    await render(HERE / "app.png", mac_tile_svg(), APP_PX)
     # The web app's and the home screen's icons are a phone's (item 1069).
     for size in WEB_PX:
         await render(STATIC / "icons" / f"icon-{size}.png", phone_tile_svg(PHONE_SCALE), size)
@@ -173,6 +164,10 @@ async def main() -> None:
     await render(STATIC / "icons" / "icon-96.png", phone_tile_svg(PHONE_SCALE), 96)
     for size in TOUCH_PX:
         await render(STATIC / "icons" / f"touch-icon-{size}.png", phone_tile_svg(PHONE_SCALE), size)
+    # The iPhone app's icon is the same tile (item 1081), opaque, as Xcode wants an app icon.
+    await render(IOS_ICON, phone_tile_svg(PHONE_SCALE), APP_PX)
+    with Image.open(IOS_ICON) as drawn:
+        drawn.convert("RGB").save(IOS_ICON)
     # The 180 px files at the root, which iOS tries by name when a page names no icon: the same artwork.
     tile: bytes = (STATIC / "icons" / "touch-icon-180.png").read_bytes()
     for name in ROOT_TOUCH:

@@ -382,8 +382,8 @@ textarea {
 /* ---------- shell (the frame itself is in shell.css) ---------- */
 
 /* Dot's wordmark (item 114): "dot" with the mark as its o, between a d and a t drawn in one line with round ends, in
-   ink. The mark is a ball of obsidian lit at its upper left with the character's eyes in champagne gold and a hairline
-   of gold round it (item 642; its gradients are the page's .mark-defs, as desktop/icons/render.py draws them).
+   ink. The mark is a dark ball with the character's light eyes and a faint light hairline round it (item 1081, flat;
+   its gradients are the page's .mark-defs, as desktop/icons/render.py draws them).
    index.html holds its one drawing, in the opening; the sign-in card shows a copy (icons.js wordmark). */
 .wordmark {
   display: block;
@@ -421,7 +421,7 @@ textarea {
 .mark-rim {
   fill: none;
   stroke: var(--mark-rim);
-  stroke-opacity: 0.55;
+  stroke-opacity: 0.3;
   stroke-width: 2;
 }
 

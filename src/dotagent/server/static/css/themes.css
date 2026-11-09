@@ -68,11 +68,11 @@
   --bubble: light-dark(#ffcd3c, #e9b93a);
   --on-bubble: #1c1b19;
   /* Dot's yellow: its face's (the character's amber) and its accents', the same in every look and scheme (it was the
-     disc of the mark until item 642). The hairline of gold round the mark, as desktop/icons/render.py draws it, and
-     the ball's own obsidian, which a copy of the mark without its gradients would still be drawn in. */
+     disc of the mark until item 642). The faint hairline round the mark (white since item 1081), as render.py draws
+     it, and the ball's own black, which a copy of the mark without its gradients would still be drawn in. */
   --brand: #ffcd3c;
-  --mark-rim: #e6c26b;
-  --mark-ball: #1c1c1f;
+  --mark-rim: #ffffff;
+  --mark-ball: #000000;
   /* The border of a composer with a choice for one message armed (item 259): green, orange and purple, the same in
      every look and scheme. */
   --boost-start: #35b27a;

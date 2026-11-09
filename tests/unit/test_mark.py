@@ -2,7 +2,8 @@
 numbers; the page's opening (``static/index.html``), the page kept for a Mac out of reach (``static/offline.html``), the
 page a sign-in comes back to (``callback_page.WORDMARK``) and the desktop shell's page for a daemon that is down
 (``desktop/ui/down.html``) set the same ball and eyes as the o of the wordmark between the same d and t; and every copy
-wears the same obsidian, gold and light (item 642), the ball the obsidian and the eyes the gold."""
+wears the same gradients (item 642's names; flat black and white since item 1081), the ball the "obsidian" and the
+eyes the "gold"."""
 
 import re
 from pathlib import Path
@@ -54,7 +55,7 @@ def test_every_copy_of_the_mark_wears_the_same_obsidian_and_gold() -> None:
     assert set(gradients) == {"mark-obsidian", "mark-gold", "mark-shine"}
     for where, text in {**_served(), "down.html": _read(_DOWN)}.items():
         assert _gradients(text) == gradients, where
-    # The light and the hairline of gold lie on the ball of every copy the daemon serves.
+    # The light and the hairline lie on the ball of every copy the daemon serves.
     for where, text in _served().items():
         assert '<ellipse class="mark-shine"' in text, where
         assert '<circle class="mark-rim" r="99"/>' in text, where

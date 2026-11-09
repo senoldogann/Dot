@@ -61,7 +61,8 @@ and 855). Its label folds it, and the fold is kept between visits. **Dot's work*
 above iMessage: one section for the chats of Dot's own initiative (a chat for each thing of its own list and one for
 each look for work, [Proactive](proactive.md#on-its-own)) and of the schedules, folded until you open it, so that the
 days hold your own chats; opened, it stays open as you left it (until item 855 they were two, **On its own** and
-**Scheduled**). The days themselves have no heading and no fold (item 855: a **Chats** label named the list and
+**Scheduled**). **Agents' work** stands so too, under it (item 1082): the chat of each agent, where the work Dot sends
+it goes on, folded until you open it. The days themselves have no heading and no fold (item 855: a **Chats** label named the list and
 folded it); their labels (Pinned, Today, Yesterday…) are small and quiet, and **Select** stands at the right of the
 first of them.
 Folded over a chat you have not read, the label shows the accent's dot after its count. Its chat is a row like any
@@ -1160,12 +1161,13 @@ next to nothing (item 645): the loop mark's glow, a shadow that changed, was dra
 of a core at work in Dot.app with three loops in the sidebar. A unit test holds every endless animation to it, and names
 the few that still redraw while something works in front of you: the ring of the microphone while it listens and of the
 plan's step at work, and the light over the words of a thought being written (a chat being opened has three dots that
-rise and fade, item 643). Dot's mark is a ball of obsidian lit at its upper left, with the character's eyes in champagne
-gold and a hairline of gold round it (item 642, "Obsidian", the owner's choice of five drawn for them), the o of the
-wordmark "dot" between a d and a t drawn in one line (`static/index.html`); the favicon, the app's icon and the menu bar's
-are drawn from it (`desktop/icons/render.py`), and the wordmark heads the sign-in card. On a phone the icon is flat
-(item 1069, the owner's choice of three drawn for them): the two eyes in white on a tile of black, no ball, light or
-gold, the web app's icons and the home screen's alike. A window
+rise and fade, item 643). Dot's mark is a ball of black with the character's eyes in white and a faint white hairline
+round it (item 1081: flat, as the phone's icon, the owner's ask that the new mark be everywhere; item 642's ball of
+obsidian with eyes of gold before it), the o of the wordmark "dot" between a d and a t drawn in one line
+(`static/index.html`); the favicon and the menu bar's icons are drawn from it (`desktop/icons/render.py`), and the
+wordmark heads the sign-in card. The icons of an app are flat (item 1069, the owner's choice of three drawn for them):
+the two eyes in white on a tile of black, no ball, light or gold, the web app's icons, the home screen's, the iPhone
+app's and, on the macOS tile, the desktop app's alike (item 1081). A window
 that opens the UI plays the opening once: the d and the t hop up, the dot drops in with its eyes shut, bounces twice,
 opens its eyes and blinks, and the page shows through, 1.3 s in all; a click or a key cuts it short, it takes no
 pointer, and it plays neither on a reload nor under reduced motion. The look, the scheme and the density you chose are
@@ -1657,9 +1659,9 @@ of Dot.app, which `desktop/fetch-tools.sh` puts in `desktop/src-tauri/resources/
 and shows what it always showed. The app other Macs install, signed with a Developer ID, notarized and
 updating itself, with those tools in its Resources, signed too, is a release's, which `desktop/release.sh` builds (see
 [Releasing](development.md#releasing)). The
-icons come from Dot's mark: `uv run python desktop/icons/render.py` draws the favicon, the app icon (the mark on a tile
-of night), the three menu bar icons (their hairline of gold wider, so the ball holds on a dark bar), the web app's
-icons and its maskable one (the mark inside the circle a phone may cut it to), and `npm run icons` makes the bundle's
+icons come from Dot's mark: `uv run python desktop/icons/render.py` draws the favicon, the app icon (the white eyes on
+the macOS tile of black, item 1081), the three menu bar icons (their hairline wider, so the ball holds on a dark bar),
+the web app's icons and its maskable one (the eyes inside the circle a phone may cut it to), the iPhone app's icon, and `npm run icons` makes the bundle's
 set from the app icon. The manifest names only PNGs, the 180 px touch icon among them (item 661): iOS 26 opens what is
 added to the Home Screen as a web app and takes its icon from the manifest, where an SVG of any size outranked every
 picture and was not drawn, so an iPhone added Dot with the letter D. A phone that had Dot on its Home Screen keeps the
