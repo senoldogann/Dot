@@ -488,3 +488,39 @@ async def test_a_tap_on_a_notification_opens_its_route_in_the_window_brought_to_
             await expect(page.locator("main.page")).to_be_visible()
         finally:
             await browser.close()
+
+
+async def test_a_late_answer_after_the_copy_gave_way_notes_no_newer_build(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 1072: an opening that hung while the Mac was out of reach was answered by the copy of an earlier build; a
+    later opening kept the daemon's build, which took that copy and the note of a newer build away. The hung opening's
+    answer, coming late, noted a newer build all the same, and the note stood, so that every later opening waited for
+    the network (the browser test of a slow network failed on it three times in a day). Played in the real worker: a
+    late answer notes a newer build only while the copy it was answered from is kept."""
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            context: BrowserContext = await browser.new_context(viewport={"width": 390, "height": 844})
+            page: Page = await context.new_page()
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.evaluate("navigator.serviceWorker.ready")
+            worker = (
+                context.service_workers[0] if context.service_workers else await context.wait_for_event("serviceworker")
+            )
+            late: str = """async (copyKept) => {
+              for (const name of await caches.keys()) {
+                if (name !== "dot-offline") { await caches.delete(name); }
+              }
+              if (copyKept) { await caches.open("dot-pages-earlier"); }
+              await caches.open("dot-pages-later");
+              await noteNewer("dot-pages-earlier", new Response("", { headers: { [BUILD_HEADER]: "later" } }));
+              return (await caches.keys()).filter((name) => name.startsWith("dot-newer-"));
+            }"""
+            assert await worker.evaluate(late, False) == []
+            assert await worker.evaluate(late, True) == ["dot-newer-later"]
+        finally:
+            await browser.close()
