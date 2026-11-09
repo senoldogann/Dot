@@ -281,7 +281,8 @@ export function openOnHold(row, menu) {
       if (Date.now() < swallowUntil) {
         swallowUntil = 0;
         event.preventDefault();
-        event.stopPropagation();
+        // Immediate: a click aimed at `row` itself would still reach its own other listeners (item 1089).
+        event.stopImmediatePropagation();
       }
     },
     true,

@@ -432,7 +432,8 @@ The **+** at the left of the box (item 318, after Codex's composer) opens a menu
 picker (documents, photos and screenshots alike; a phone opens its own sheet), **Model and options** in a box whose run
 has choices (item 833, above), and **Teach a task** in a chat (item 423, [Teaching a
 task](browser-and-computer-use.md#teaching-a-task)); its tooltip says so: "Add files, model and options, or teach a
-task". The slash menu picks **Plugins** (the MCP servers with tools) and
+task". On a phone a finger's tap of the **+** opens the file picker at once, so the phone's own menu of the photos, the
+camera, a scan and the files comes up with no second tap, and a finger's hold opens the menu (item 1089). The slash menu picks **Plugins** (the MCP servers with tools) and
 **Skills**, as `GET /api/palette` lists them; the at menu picks the plugins and the Google and Microsoft accounts signed
 in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
 model; one that is no longer signed in is refused). The model is told first what the chips of the message are, each
