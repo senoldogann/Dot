@@ -210,6 +210,35 @@ async def test_a_declined_card_tells_the_run_so(served: tuple[RunManager, httpx.
     assert "did not give" in said and "Do not ask for it in a message" in said
 
 
+async def test_a_short_code_sent_as_a_message_reaches_the_run_in_the_owners_words(
+    served: tuple[RunManager, httpx.AsyncClient],
+) -> None:
+    """Item 1073: a code shorter than a card holds (the owner's 4-digit code) goes as a message instead: the card is
+    declined with the code as its note, and the run is told it in the owner's words, to use as it is."""
+    manager, client = served
+    first = await client.post("/api/runs", json={"goal": "Read the visits", "approvals": "ask"})
+    card = await _card(client)
+    await client.post(f"/api/approvals/{card['id']}/secret", json={"value": VALUE})
+    async with asyncio.timeout(_WAIT_S):
+        await manager.wait(first.json()["id"])
+    second = await client.post("/api/runs", json={"goal": "Sign in with the code", "approvals": "ask"})
+    card = await _card(client)
+    # The card refuses a value too short to mask, as the page says before it is sent.
+    refused = await client.post(f"/api/approvals/{card['id']}/secret", json={"value": "8087"})
+    assert refused.status_code == 422, refused.text
+    sent = await client.post(f"/api/approvals/{card['id']}/decision", json={"approve": False, "note": "8087"})
+    assert sent.status_code == 200, sent.text
+    async with asyncio.timeout(_WAIT_S):
+        await manager.wait(second.json()["id"])
+    events = await manager._runtime.store.list_events(second.json()["id"], 0, 200)
+    (said,) = [
+        str(event.data.get("text", ""))
+        for event in events
+        if event.kind == "tool_result" and event.data.get("tool") == "ask_secret"
+    ]
+    assert "wrote instead: 8087" in said and "use it as it is" in said
+
+
 @pytest.mark.parametrize("served", ["reads"], indirect=True)
 async def test_a_run_of_another_chat_cannot_read_the_folder_the_secrets_are_held_in(
     served: tuple[RunManager, httpx.AsyncClient], monkeypatch: pytest.MonkeyPatch
@@ -283,11 +312,15 @@ async def test_the_card_takes_the_secret_in_a_box_that_shows_no_letter_and_says_
             await expect(card.locator(".secret-foot")).to_contain_text("Kept out of the chat")
             await expect(card.get_by_role("button", name="Decline")).to_be_visible()
             await page.screenshot(path=str(tmp_path / "secret-card.png"))
-            # Too short to mask: the card keeps it and sends nothing.
-            await box.fill("short")
-            await card.get_by_role("button", name="Save securely").click()
-            await expect(box).to_be_focused()
+            # Too short to mask (item 1073): Save waits, and the card says why and offers to send it as a message.
+            await expect(card.get_by_role("button", name="Save securely")).to_be_disabled()
+            await box.fill("8087")
+            await expect(card.get_by_role("button", name="Save securely")).to_be_disabled()
+            await expect(card.locator(".secret-short")).to_contain_text("at least 8 characters")
+            await expect(card.get_by_role("button", name="Send as a message")).to_be_visible()
+            await page.screenshot(path=str(tmp_path / "secret-short.png"))
             await box.fill(VALUE)
+            await expect(card.locator(".secret-short")).to_be_hidden()
             await card.get_by_role("button", name="Save securely").click()
             # Answered, the card leaves the conversation, its box emptied, and the run goes on.
             await expect(page.locator(".approval.secret")).to_have_count(0)
