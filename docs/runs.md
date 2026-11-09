@@ -32,7 +32,8 @@ an agent, and so on, the words for the same work turning every four seconds ("Wo
 step reads as alive. Nothing is said that the run is not doing: while it writes a message, or a card waits for you, the
 line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
 over and has its answer, the line goes and **Show the steps** stands in the answer's foot, beside the copy, the speaker
-and the time, where the pointer rests (item 842; a touch screen always shows it), and turns to *Hide the steps* once
+and the time, where the pointer rests (item 842; on a touch screen it is a row of the sheet a hold of the answer opens, item 1064),
+and turns to *Hide the steps* once
 pressed. Approvals, questions, notes and the messages stay in sight either way; the changes of the memory stand with the
 steps, with **What it is doing** (item 830), and an agent's message is folded until you open it, in either choice
 (item 859). The choice is kept by the browser. A run
@@ -392,7 +393,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 Under Dot's answer, and under the last thing it said in the middle of a run (item 863: not under every line, nor under
 a line of an earlier turn), a button (a smiley with a plus, item 586) opens a small palette of seven reactions, and Dot acts on them while the run works
 and after it ended. With a pointer the button shows on the message the pointer is on, with the keyboard on it, or while
-its palette is open (item 652); a touch screen shows it always. With a pointer, on a message in the middle of a run
+its palette is open (item 652); a touch screen shows no button under a message and opens its sheet when the message is
+held, with the same reactions and the foot's actions (item 1064, [Phone](phone.md)). With a pointer, on a message in the middle of a run
 that holds no reaction yet, the button stands beside the bubble, in the empty place of a face, at its foot, rather than
 holding a line of its own under it (item 843); a line that wears the face (item 859) has it under its words instead, as
 the face has that place; once a reaction stands, it is under the message with the chips. The ones

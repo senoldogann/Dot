@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import secrets
 import time
+from collections.abc import Sequence
 
 from fastapi import APIRouter
 
@@ -47,6 +48,7 @@ from dotagent.server.views import (
     AgentSummary,
     AgentUsage,
     AgentWelcomeRequest,
+    AgentWork,
     TeamMessage,
     TeamUse,
     TeamView,
@@ -145,6 +147,20 @@ def changed_agent_tools(said: list[str] | None, saved: tuple[str, ...]) -> tuple
     if said is None:
         return ()
     return tuple(said) if said else saved
+
+
+def agent_work(orders: Sequence[WorkOrderRecord]) -> AgentWork:
+    """How ``orders``, the work orders an agent has, went (item 1066): accepted, on the first attempt, sent back,
+    escalated, open."""
+    return AgentWork(
+        orders=len(orders),
+        accepted=sum(order.status == "accepted" for order in orders),
+        accepted_first=sum(order.status == "accepted" and order.attempts == 1 for order in orders),
+        returns=sum(max(0, order.attempts - 1) for order in orders),
+        escalated=sum(order.status == "escalated" for order in orders),
+        # Open with the lead or the agent: one escalated is the owner's, counted as such.
+        open=sum(order.status in OPEN_WORK_ORDERS and order.status != "escalated" for order in orders),
+    )
 
 
 def agent_usage(record: AgentRecord, use: AgentToolUse, known: frozenset[str]) -> AgentUsage:
@@ -541,6 +557,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             messages=await team_messages(store, await store.agent_messages(agent_id, _PAGE_MESSAGES)),
             learned=await agent_learning(store, agent_id, ctx.runtime.config.agent.skill_rest_days),
             usage=agent_usage(record, await store.agent_tool_use(agent_id, _USAGE_WINDOW), known()),
+            work=agent_work(await store.agent_work_orders(agent_id)),
         )
 
     @router.put("/agents/{agent_id}")

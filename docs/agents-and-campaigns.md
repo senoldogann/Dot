@@ -102,7 +102,8 @@ message of its chat (item 415): your pick widens the agent's bounds for that cha
 not. An agent with neither `shell` nor `terminal_open` is told in its prompt that no command runs in its run, and to do
 that work with the tools it names (item 936): Dot's ways of working name the shell first. A run it delegates a part to (`delegate`) is bound to the agent's tools too, without the servers picked for a
 message, and carries the agent's id (item 553). Ask the delegated run to end with a `Verification:` section: the
-command or check it ran and the answer. A report without one is marked as a claim, so the sender does not close a plan
+command or check it ran and the answer. A report without one, or with one that holds no check (a word or two,
+"none"), is marked as a claim (item 1065), so the sender does not close a plan
 step on trust alone. The run's page wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on
 the home's Today strip wear the face too. A schedule can run as one of your agents (its **Agent** on Schedules, item
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting an agent leaves its chats, its lessons and its
@@ -279,6 +280,13 @@ page says which. The API: `GET /api/agents/{id}` gives `usage` (`window`, `runs`
 `enough`, `unused`), and `POST /api/agents/{id}/trim-tools` takes them away (422 before three runs ended, and when
 nothing would go or nothing would be left).
 
+**How its work went** (item 1066), on an agent's page with work orders, reads how they went rather than how much the
+agent wrote: the orders it has (one reassigned is its newest agent's), how many were accepted on their first attempt,
+how many after a return, how many wait for you (escalated: one you drop is cancelled and leaves that count) and how
+many are open, and the returns in all; the attempts of an order reassigned count for the agent that has it now. It is how to tell which
+agent's, or which model's, work holds. `GET /api/agents/{id}` gives it as `work` (`orders`, `accepted`,
+`accepted_first`, `returns`, `escalated`, `open`).
+
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
 agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through
@@ -399,9 +407,14 @@ may be made), each asking the policy for what a delegation asks:
 - `work_orders(status?, order?)` lists the orders (the open ones by default) with their status, agent, tries, age and
   due time; an order's id gives it in full, with the answer of each try. Dot sees every order; an agent that leads sees
   those its own runs handed out.
-- `review_work(order, verdict, notes, to_agent?)` judges an order: `accept`; `return` (the same agent starts again
-  with the original brief and what done means, its earlier answer in a fence and your notes, which a return must
-  have); `reassign` (the same to `to_agent`, with the first agent's answer); `escalate` (the order waits for you, and
+- `review_work(order, verdict, notes, to_agent?, brief?)` judges an order: `accept`, only when the answer of its
+  newest try has a `Verification:` section that says what was run or checked and what it showed (item 1065: "done"
+  with none, or with one that says only "none", is a claim, and is refused: return it asking for that check, or
+  escalate it; an order past its due time whose run answered nothing yet cannot be accepted either); `return` (the
+  same agent starts again with the original brief and what done means, its earlier answer in a fence and your notes,
+  which a return must have; once the order came back twice, the return must rewrite the order's brief in `brief`
+  instead, and the next try starts afresh on it alone, without the answers sent back or notes on them, item 1065; a
+  reassignment given a `brief` starts afresh on it too, without the first agent's answer); `reassign` (the same to `to_agent`, with the first agent's answer); `escalate` (the order waits for you, and
   you are told on the Mac and the phone as a brief is: its title, and the lead's words unless the order read outside
   content; only an order in review, not one at work); `cancel` (stops the run at work). The third try of an order,
   whoever made the first two, goes to you instead of a fourth when it is sent back, and so does a reassignment after six

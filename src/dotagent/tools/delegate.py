@@ -1,6 +1,5 @@
 """The delegate tool: hand one self-contained part of the work to a run of its own and read its report."""
 
-import re
 import secrets
 import time
 from collections.abc import Sequence
@@ -10,7 +9,7 @@ from pydantic import Field, JsonValue
 from dotagent.agent.helpers import Roster, current_roster, roster_text
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanItem, PlanPayload, checked_step_number, plan_from_event
 from dotagent.core.errors import ToolExecutionError, ToolInputError
-from dotagent.core.text import truncate_tail, unclosing
+from dotagent.core.text import has_verification, truncate_tail, unclosing
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import AgentRecord, EventRecord, RunMode, RunRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
@@ -24,8 +23,7 @@ _SUMMARY_CHARS: int = 100
 _NO_REPORT: str = "(the run reported nothing)"
 # How much of a delegated run's report goes into the evidence of the plan step it closes.
 _EVIDENCE_REPORT_CHARS: int = 240
-# A delegated report is a claim until it says what was run and what came back (item 802).
-_VERIFICATION = re.compile(r"(?im)^\s*(?:#{1,3}\s*)?verification\b")
+# A delegated report is a claim until it says what was run and what came back (item 802, ``has_verification``).
 _NO_VERIFICATION: str = (
     "No Verification section was reported; treat the report as a claim and check the work before you rely on it."
 )
@@ -181,7 +179,7 @@ def render_outcome(outcome: DelegateOutcome, nonce: str, step: int | None, unpla
     header: str = ended if unplanned is None else f"{unplanned}\n{ended}"
     report: str = run.result.strip() or _NO_REPORT
     body: str = f"{header}\n{_fence(run, report, nonce)}" if outcome.tainted else f"{header}\n{report}"
-    verification: str = "" if _VERIFICATION.search(report) else f"\n{_NO_VERIFICATION}"
+    verification: str = "" if has_verification(report) else f"\n{_NO_VERIFICATION}"
     closing: str = (
         ""
         if step is None

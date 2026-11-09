@@ -7087,6 +7087,160 @@ summary:has(> .chev)::-webkit-details-marker {
   }
 }
 
+/* A screen with no pointer to rest (a phone, an iPad without a trackpad) shows no buttons under a message (item 1064):
+   holding it opens its sheet (messagesheet.js), and only the reactions that stand on it stay in sight. The hold is the
+   sheet's, not the browser's selection: "Select text" in the sheet selects the message's text. A pointer that can rest
+   keeps the buttons that show where it rests (item 832), on an iPad with a trackpad too (the pre-push review). */
+@media (hover: none) {
+  /* Out of sight, not out of reach: VoiceOver reads them and a keyboard reaches them, and one that has the keyboard's
+     focus shows (the pre-push review). */
+  :is(.message-foot, .answer-foot, .say-foot) > :not(.reaction-chips):not(:focus-visible) {
+    position: absolute;
+    width: 1px;
+    min-width: 0;
+    height: 1px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .answer > .answer-foot:not(:has(.reaction-chip, :focus-visible)),
+  .answer > .prose + .answer-foot:not(:has(.reaction-chip, :focus-visible)),
+  .user-message > .message-foot:not(:has(.reaction-chip, :focus-visible)),
+  .bubble.user + .message-foot:not(:has(.reaction-chip, :focus-visible)),
+  :is(.bubble.say, .turn-say) > .say-foot:not(:has(.reaction-chip, :focus-visible)) {
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  :is(.bubble.user, .answer, .bubble.say, .turn-say) {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* A message the focus came back to from its sheet draws no ring. */
+  :is(.user-message, .answer, .bubble.say, .turn-say)[tabindex="-1"]:focus {
+    outline: none;
+  }
+
+  /* A link keeps the phone's own menu of a long press (copy its address, a preview): a hold of it is no message's. */
+  :is(.bubble.user, .answer, .bubble.say, .turn-say) a {
+    -webkit-touch-callout: default;
+  }
+
+  :is(.user-message, .answer, .bubble.say, .turn-say).selecting :is(.bubble.user, .answer, .bubble.say, .turn-say, .prose) {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* A message's sheet (item 1064): from the foot of what is seen, round at the top, the width of a phone at most. */
+dialog.message-sheet {
+  top: auto;
+  bottom: var(--seen-bottom);
+  width: min(560px, 100%);
+  max-width: none;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-3) calc(var(--space-4) + var(--safe-bottom));
+  border: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-modal);
+  animation: sheet-rise var(--motion-base) var(--ease-emphasis);
+  touch-action: none;
+}
+
+dialog.message-sheet:focus {
+  outline: none;
+}
+
+dialog.message-sheet::backdrop {
+  background: var(--scrim);
+}
+
+@keyframes sheet-rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  margin: 0 auto var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+.sheet-facts {
+  margin-bottom: var(--space-3);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  text-align: center;
+}
+
+.sheet-reactions {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.sheet-reaction {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--button-fill);
+  font-size: var(--text-xl);
+  line-height: var(--leading-xl);
+}
+
+.sheet-reaction[aria-pressed="true"] {
+  background: var(--accent-weak);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.sheet-actions {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.sheet-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  text-align: left;
+}
+
+.sheet-action + .sheet-action {
+  border-top: 1px solid var(--border);
+}
+
+.sheet-action:active {
+  background: var(--button-fill-hover);
+}
+
 .answer-foot .btn {
   margin-left: -8px;
 }

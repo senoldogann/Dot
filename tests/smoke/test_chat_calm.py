@@ -342,7 +342,8 @@ async def test_on_a_phone_the_conversation_never_scrolls_sideways(login_env: dic
                         await head.click()
                     await expect(page.locator(".auto-decision")).to_contain_text("Paid_in_full")
                     await expect(page.locator(f".tool-name[title='{_LONG_TOOL}']")).to_be_visible()
-                    await expect(page.locator(".user-message .message-foot")).to_be_visible()
+                    # A phone draws no foot under a message (item 1064): holding it opens its sheet.
+                    await expect(page.locator(".user-message .message-foot")).to_be_attached()
                     # Nothing reaches past the conversation's box, and the box scrolls up and down only.
                     thread: Locator = page.locator(".run-thread")
                     assert await thread.evaluate("(box) => getComputedStyle(box).overflowX") == "hidden"

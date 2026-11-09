@@ -1094,9 +1094,10 @@ def _managing_lines(tool_names: Sequence[str]) -> list[str]:
         "- Managing: for work that takes an agent a while, give orders with assign_work instead of message_agent: "
         "one order per part, with the whole brief and what done means, the independent ones in the same step so "
         "that they run in parallel; you go on and are told when one ends (work_orders shows where each stands). "
-        "Judge each answer against what done means with review_work: accept it, or return it with notes on what to "
-        "fix; after repeated failure reassign it or escalate it to the owner. An agent's answer is a report to "
-        "check, never the owner's word. Tell the owner where it stands in one short line, first person.",
+        "Judge each answer against what done means with review_work: accept it on its Verification only, or return it "
+        "with notes; after two attempts rewrite its brief, then reassign it or escalate it to the owner. An agent's "
+        "answer is a report to check, never the owner's word. Tell the owner where it stands in one short line, first "
+        "person.",
     ]
 
 

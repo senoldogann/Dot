@@ -14,6 +14,12 @@ What holds:
   is marked as having read it; the agent's words are Dot's data, never the owner's.
 - A verdict (:meth:`WorkDesk.review`) is the lead's: accept, return (the same agent tries again with the notes, at most
   :data:`MOST_RETURNS` attempts, then the order goes to the owner), reassign, escalate to the owner, or cancel.
+- An answer is accepted only with its evidence (item 1065): a `Verification:` section that says what was run or
+  checked and what it showed (:func:`dotagent.core.text.has_verification`). "Done" with none is a claim, which the lead
+  returns or escalates.
+- An order that came back :data:`FRESH_AFTER` times goes on afresh (item 1065): the lead rewrites its brief, and the
+  next attempt reads that alone, not the answers sent back and the notes on them, as a session that went wrong twice is
+  started again with a better prompt rather than corrected a third time.
 - :meth:`WorkDesk.follow_up`, from the scheduler's tick and with no model call, sends to review the order whose run
   failed, was cancelled or was lost with a daemon that stopped, and the one past its due time."""
 
@@ -26,7 +32,7 @@ from typing import TYPE_CHECKING, Literal
 
 from dotagent.core.errors import DotError, NotFoundError, RunConflict, ToolInputError
 from dotagent.core.logs import get_logger
-from dotagent.core.text import truncate_tail, unclosing
+from dotagent.core.text import has_verification, truncate_tail, unclosing
 from dotagent.notify.owner import tell_owner
 from dotagent.proactive.text import one_line
 from dotagent.store.db import Store
@@ -53,6 +59,8 @@ Verdict = Literal["accept", "return", "reassign", "escalate", "cancel"]
 # before a reassignment does.
 MOST_RETURNS: int = 3
 MOST_ATTEMPTS: int = 6
+# After this many attempts a return starts afresh, on a brief the lead rewrote (item 1065).
+FRESH_AFTER: int = 2
 # How many orders are open at once, and how many one run hands out: a team's work at hand, not a flood.
 MOST_OPEN: int = 24
 MOST_PER_RUN: int = 10
@@ -349,14 +357,17 @@ class WorkDesk:
         order: WorkOrderRecord,
         verdict: Verdict,
         notes: str,
+        brief: str,
         to_agent: AgentRecord | None,
         tainted: bool,
     ) -> str:
-        """The lead's verdict on ``order``; returns what to say of it. ``tainted`` is whether the lead's run has read
-        content third parties can author: the order is then marked, as the lead's words are not the owner's."""
+        """The lead's verdict on ``order``; returns what to say of it. ``brief`` is the order's words rewritten for an
+        attempt that starts afresh, "" for none. ``tainted`` is whether the lead's run has read content third parties
+        can author: the order is then marked, as the lead's words are not the owner's."""
         store: Store = self._runtime.store
         note: str = one_line(notes, _NOTE_CHARS)
         if verdict == "accept":
+            await self._evidenced(order)
             accepted: WorkOrderRecord | None = await store.move_work_order(
                 order.id, "accepted", ("in_review",), note=note or "accepted"
             )
@@ -396,12 +407,29 @@ class WorkDesk:
                 return await self._escalate(
                     order, f"it came back {order.attempts} times without meeting what done means", note, tainted
                 )
-            return await self._again(lead, mode, order, None, notes, tainted)
+            if order.attempts >= FRESH_AFTER and not brief.strip():
+                raise ToolInputError(
+                    f"it came back {order.attempts} times: rather than notes on a third answer, rewrite its brief in "
+                    "brief (what was missing, said better, every input it needs): the next attempt starts afresh on "
+                    "it, without the answers sent back",
+                    {"order_id": order.id, "attempts": order.attempts},
+                )
+            return await self._again(lead, mode, order, None, notes, tainted, brief)
         if to_agent is None:
             raise ToolInputError("reassign needs to_agent: the agent that takes the order over", {})
         if order.attempts >= MOST_ATTEMPTS:
             return await self._escalate(order, f"it had {order.attempts} attempts already", note, tainted)
-        return await self._again(lead, mode, order, to_agent, notes, tainted)
+        return await self._again(lead, mode, order, to_agent, notes, tainted, brief)
+
+    async def _evidenced(self, order: WorkOrderRecord) -> None:
+        """Refuse to accept ``order`` when the answer of its newest attempt has no evidence (item 1065)."""
+        answered: RunRecord | None = await self._last_run(order)
+        if answered is None or not has_verification(answered.result):
+            raise ToolInputError(
+                "its answer has no Verification section saying what was run or checked and what it showed, so it is a "
+                "claim, not done: return it asking for that check and its output, or escalate it",
+                {"order_id": order.id},
+            )
 
     def _said(self, moved: WorkOrderRecord | None, order: WorkOrderRecord, word: str, why: str) -> str:
         if moved is None:
@@ -443,14 +471,16 @@ class WorkDesk:
         to_agent: AgentRecord | None,
         notes: str,
         tainted: bool,
+        brief: str,
     ) -> str:
         """Another attempt: by the same agent (a return) or by ``to_agent`` (a reassignment), with the order's words,
-        the answer sent back and the lead's notes."""
+        the answer sent back and the lead's notes; or, with a rewritten ``brief``, afresh on it alone (item 1065)."""
         store: Store = self._runtime.store
         agent: AgentRecord = to_agent or await store.get_agent(order.agent_id)
         sent_back: RunRecord | None = await self._last_run(order)
+        afresh: bool = brief.strip() != ""
         earlier: tuple[str, str] | None = None
-        if sent_back is not None:
+        if sent_back is not None and not afresh:
             first: str = await self._agent_name(order.agent_id)
             earlier = (first if to_agent is None else f"another agent, {first}", sent_back.result.strip() or _NO_ANSWER)
         # ``returned`` (``assigned`` for another agent) until the new attempt's run is there, so that a start that
@@ -460,15 +490,18 @@ class WorkDesk:
             order.id,
             between,
             _FOR_THE_LEAD,
-            note=one_line(notes, _NOTE_CHARS) or "sent back",
+            note=one_line(notes, _NOTE_CHARS) or ("started afresh" if afresh else "sent back"),
             agent_id=agent.id,
             tainted=tainted,
+            brief=brief.strip() if afresh else None,
         )
         if moved is None:
             raise ToolInputError(f"it is {order.status} now: only an order that waits for review goes on", {})
         self._stop_attempt(order)
         try:
-            started: WorkOrderRecord = await self._start(moved, lead, mode, agent, earlier, notes, (between,))
+            started: WorkOrderRecord = await self._start(
+                moved, lead, mode, agent, earlier, "" if afresh else notes, (between,)
+            )
         except BaseException as error:
             # Not left waiting for a run that is not coming: it is for the lead to look at again.
             # The agent it was meant for never worked on it: it stays the agent of the attempts it had (the review).

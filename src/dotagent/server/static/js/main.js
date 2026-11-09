@@ -11,6 +11,7 @@ import { setPageTitle, watchAttention } from "./attention.js";
 import { loadMacVoice } from "./macvoice.js";
 import { wireConversationCopy } from "./clipboard.js";
 import { el, OPEN_FILE_EVENT } from "./dom.js";
+import { listenForHolds } from "./messagesheet.js";
 import { explain } from "./errors.js";
 import { fileDialog } from "./filepanel.js";
 import { icon, wordmark } from "./icons.js";
@@ -756,6 +757,8 @@ if ("serviceWorker" in navigator) {
 onAuthLost(handleAuthLost);
 // A copy out of the conversation goes on the clipboard as the markdown it was written in (item 206).
 wireConversationCopy(document);
+// A message held on a touch screen opens its sheet (item 1064).
+listenForHolds(document);
 // A file asked for on a page without the panel beside the conversation shows in a dialog (item 269); a conversation's
 // page shows it in its panel and keeps the request to itself.
 document.addEventListener(OPEN_FILE_EVENT, (event) => {

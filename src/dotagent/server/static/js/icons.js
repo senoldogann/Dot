@@ -18,6 +18,12 @@ const SHAPES = {
     ["path", { d: "m9 12 2 2 4-4" }],
   ],
   x: [["path", { d: "M18 6 6 18" }], ["path", { d: "m6 6 12 12" }]],
+  // Select the text of a message (item 1064): an I-beam.
+  textCursor: [
+    ["path", { d: "M17 22h-1a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h1" }],
+    ["path", { d: "M7 22h1a4 4 0 0 0 4-4v-1" }],
+    ["path", { d: "M7 2h1a4 4 0 0 1 4 4v1" }],
+  ],
   // For the queue of a chat (item 148): a handle to drag, a numbered list, a turn up and on.
   grip: [
     ["circle", { cx: "9", cy: "6", r: "1.2" }],
@@ -505,6 +511,7 @@ const FRAMES = {
   sun: [-0.97, -0.97, 25.95],
   target: [-0.97, -0.97, 25.95],
   terminal: [2.29, 2.29, 19.42],
+  textCursor: [1.09, 1.09, 21.82],
   trendingUp: [1.09, 1.09, 21.82],
   undo: [1.62, 1.62, 20.76],
   user: [1.7, 1.7, 20.59],
