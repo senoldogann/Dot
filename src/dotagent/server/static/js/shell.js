@@ -86,6 +86,39 @@ export const RUN_BACK_EVENT = "dot:run-back";
  * Build the frame. `homeRoute` is where "New chat" leads. Returns the element, the `main` element the pages draw into,
  * `setRoute({ tab, runId, layout, back })`, `setBack(back)`, `paint(snapshot)` and `dispose()`.
  */
+// A swipe from the screen's left edge (item 1079), as an iPhone app goes back: it starts within EDGE_PX of the edge,
+// goes right past EDGE_SWIPE_PX and mostly sideways.
+const EDGE_PX = 24;
+const EDGE_SWIPE_PX = 64;
+
+/** Run `onSwipe()` when a finger swipes `element` from the screen's left edge to the right, on a phone. */
+function backsOnEdgeSwipe(element, onSwipe) {
+  let start = null;
+  element.addEventListener(
+    "touchstart",
+    (event) => {
+      const touch = event.touches.length === 1 ? event.touches[0] : null;
+      start = touch === null || !PHONE.matches || touch.clientX > EDGE_PX ? null : { x: touch.clientX, y: touch.clientY };
+    },
+    { passive: true },
+  );
+  element.addEventListener(
+    "touchend",
+    (event) => {
+      const touch = event.changedTouches[0];
+      if (start !== null && touch !== undefined) {
+        const dx = touch.clientX - start.x;
+        const dy = touch.clientY - start.y;
+        if (dx > EDGE_SWIPE_PX && Math.abs(dy) < dx / 2) {
+          onSwipe();
+        }
+      }
+      start = null;
+    },
+    { passive: true },
+  );
+}
+
 export function buildShell({ homeRoute }) {
   const homeHref = `#${homeRoute}`;
   const narrowQuery = window.matchMedia(NARROW);
@@ -168,6 +201,11 @@ export function buildShell({ homeRoute }) {
   );
   const stage = el("div", { class: "stage" }, stagebar, main);
   trackStagebar(stagebar);
+  backsOnEdgeSwipe(stage, () => {
+    if (!isOpen()) {
+      menu.click();
+    }
+  });
   const stopFollowing = followSeen();
   const scrim = el("div", { class: "scrim", onclick: closeToOpener });
   const frame = el("div", { class: "shell" }, sidebar.element, scrim, stage);

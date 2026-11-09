@@ -684,6 +684,16 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await grips.nth(2).drag_to(rows.nth(0), target_position={"x": 60, "y": 4})
                     await expect(texts).to_have_text([MAIL, SUMMARY, CLOSE])
                     assert await _texts(runtime, first) == [MAIL, SUMMARY, CLOSE]
+                    # A finger moves a message up by its own button (item 1079), shown only to a touch screen: an
+                    # iPhone drags no row. Its press works as the keys do.
+                    up: Locator = rows.nth(2).locator(".queue-up")
+                    await expect(up).to_have_attribute("aria-label", "Move queued message up")
+                    await expect(up).to_be_hidden()
+                    await expect(rows.nth(0).locator(".queue-up")).to_be_disabled()
+                    await up.dispatch_event("click")
+                    await expect(texts).to_have_text([MAIL, CLOSE, SUMMARY])
+                    await grips.nth(2).press("ArrowUp")
+                    await expect(texts).to_have_text([MAIL, SUMMARY, CLOSE])
 
                     # The pencil edits a message in the composer, whose draft comes back when the edit ends.
                     await box.fill("Half a thought")

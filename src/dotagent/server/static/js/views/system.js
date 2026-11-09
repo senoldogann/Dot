@@ -179,6 +179,13 @@ function buildAppNotifications() {
   );
 }
 
+/** Whether the page runs as an iPhone's or an iPad's Home Screen app. */
+function phoneHomeScreen() {
+  const agent = navigator.userAgent;
+  const apple = /iPhone|iPad|iPod/.test(agent) || (/Macintosh/.test(agent) && navigator.maxTouchPoints > 1);
+  return apple && window.matchMedia("(display-mode: standalone)").matches;
+}
+
 /** Notifications, on the desktop and on the phone: the one setting that also depends on what the browser allows. */
 function buildNotifications() {
   if (inPhoneApp()) {
@@ -213,8 +220,13 @@ function buildNotifications() {
         "On an iPhone or an iPad, notifications come to Dot added to the Home Screen: in Safari, Share › Add to Home Screen, open Dot from there and switch this on. You are then told when a task ends or Dot needs you, also when Dot is closed.";
     } else if (!available) {
       setting.note.textContent = "This browser cannot show notifications.";
+    } else if (blocked && phoneHomeScreen()) {
+      // Item 1079: a Home Screen app has no site settings and no reload; what the owner allows in the iPhone's
+      // Settings is read again when they come back to Dot.
+      setting.note.textContent =
+        "Notifications for Dot are off in the iPhone's Settings. Open Settings › Notifications › Dot and switch on Allow Notifications, then come back here: this switch follows.";
     } else if (blocked) {
-      setting.note.textContent = "The browser blocks notifications for this address. Allow them in its site settings, then reload this page.";
+      setting.note.textContent = "The browser blocks notifications for this address. Allow them in its site settings, then come back to this page.";
     } else {
       setting.note.textContent =
         "Tell me when Dot needs an answer or a task ends and I am not looking at that task: the tab hidden, the window inactive or another page open. On a phone, Dot tells you also when it is closed. The tab title always counts the approvals that wait.";
@@ -222,7 +234,23 @@ function buildNotifications() {
   }
 
   paint();
-  return section("Notifications", null, el("div", { class: "card-pad stack" }, setting.element, always.element));
+  // What the owner allowed meanwhile, in the browser's site settings or the iPhone's Settings, shows once they are back
+  // (item 1079): before, the switch stayed as the page was first drawn until it was loaded again, which a Home Screen
+  // app cannot be.
+  const element = el("div", { class: "card-pad stack" }, setting.element, always.element);
+  const again = () => {
+    if (!element.isConnected) {
+      document.removeEventListener("visibilitychange", again);
+      window.removeEventListener("focus", again);
+      return;
+    }
+    if (document.visibilityState === "visible") {
+      paint();
+    }
+  };
+  document.addEventListener("visibilitychange", again);
+  window.addEventListener("focus", again);
+  return section("Notifications", null, element);
 }
 
 /** The composer's keys (item 230), kept in this browser: the key that sends, and what a message to a run at work

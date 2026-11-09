@@ -265,7 +265,14 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
         icon("x"),
       );
       remove.addEventListener("click", () => act(() => api.del(`/queue/${message.id}`)));
-      actions = el("span", { class: "queue-actions" }, edit, steerButton, remove);
+      // A finger cannot drag a row on an iPhone (item 1079): the row goes up a place from its own button there.
+      const up = el(
+        "button",
+        { class: "queue-icon queue-up", type: "button", "data-id": message.id, "data-part": "up", "aria-label": "Move queued message up", title: "Move up", disabled: index === 0 },
+        icon("chevron"),
+      );
+      up.addEventListener("click", () => order(moved(message.id, index - 1)));
+      actions = el("span", { class: "queue-actions" }, up, edit, steerButton, remove);
     }
 
     const item = el("li", { class: "queue-row", draggable: String(messages.length > 1) }, grip, text, clip, actions);

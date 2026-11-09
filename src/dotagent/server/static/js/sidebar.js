@@ -23,7 +23,7 @@ import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
 import { loopRhythm, nextFiring } from "./rhythm.js";
 import { markContent } from "./marks.js";
-import { closeMenu, closeMenuFrom, menuOpenedBy, openMenu } from "./menu.js";
+import { closeMenu, closeMenuFrom, menuOpenedBy, openMenu, openOnHold } from "./menu.js";
 import { placeWork } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
 import { buildSettingsNav } from "./settingsnav.js";
@@ -1110,6 +1110,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       }
     });
     const row = el("div", { class: "side-chat", "data-chat": chat.id }, link, more);
+    // On a phone a finger's hold opens the row's menu (item 1079), as a right-click does with a mouse.
+    openOnHold(row, () => ({ label: chat.title, items: renaming === null ? chatActions(chat) : [], back: link }));
     // While the row holds the name's field, a right-click is the field's own.
     row.addEventListener("contextmenu", (event) => {
       if (renaming !== null) {

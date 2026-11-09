@@ -395,6 +395,13 @@
   .side-chat > .side-run {
     padding-right: 32px;
   }
+
+  /* A hold of a chat's row opens its menu (item 1079), not the phone's preview of the link. */
+  .side-chat > .side-run {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }
 
 /* The name being typed in a chat's row, as tall as the row. */
@@ -1115,6 +1122,18 @@
   background: var(--surface);
   box-shadow: 0 1px 2px var(--shadow-ink);
   color: var(--text);
+}
+
+/* A tap shows as the press each control draws (item 1079), not as the browser's grey box over it, as in an iPhone app;
+   a chat's row is pressed as a row of a list is. */
+@media (hover: none) and (pointer: coarse) {
+  :root {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .side-chat:active {
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+  }
 }
 
 /* A screen used by touch shows no keys to press. */

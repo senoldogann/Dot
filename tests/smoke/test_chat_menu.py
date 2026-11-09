@@ -1,7 +1,8 @@
 """A chat's menu (item 130): the "…" button of a chat's row, a right-click on the row and the context-menu key open the
 same menu, which the arrow keys walk and Escape closes; from it a chat is pinned above the days and stays so after a
 reload, named in its row (Enter keeps the name, Escape leaves it), its link copied, chosen for deletion with others, and
-deleted after a question; on a phone the button always shows, beside the age."""
+deleted after a question; on a phone the button always shows, beside the age, and it and a finger's hold of the row
+open the menu as a sheet from the foot of the screen (item 1079)."""
 
 import asyncio
 import re
@@ -376,7 +377,7 @@ async def test_a_chats_menu_pins_names_copies_chooses_and_deletes_it(
         await context.close()
 
 
-async def test_on_a_phone_the_button_of_a_chats_menu_always_shows_beside_the_age(
+async def test_on_a_phone_the_button_of_a_chats_menu_always_shows_beside_the_age_and_opens_a_sheet(
     browser: Browser, client: httpx.AsyncClient, runtime: Runtime, tmp_path: Path
 ) -> None:
     await _seed(runtime, "Phone chat")
@@ -400,20 +401,69 @@ async def test_on_a_phone_the_button_of_a_chats_menu_always_shows_beside_the_age
         assert age_box is not None and more_box is not None
         assert age_box["x"] + age_box["width"] <= more_box["x"], (age_box, more_box)
 
-        # The menu opens under the button, inside the window, above the drawer, which stays open when an item is chosen.
+        # On a phone the menu is a sheet from the foot of the screen (item 1079), as an iPhone's action sheets are: its
+        # choices, then Cancel; the drawer stays open when one is chosen.
         await more.tap()
-        menu: Locator = page.get_by_role("menu", name="Phone chat")
-        await expect(menu.get_by_role("menuitem")).to_have_text(_ITEMS)
-        placed = await menu.bounding_box()
+        sheet: Locator = page.get_by_role("dialog", name="Phone chat")
+        await expect(sheet.get_by_role("menu", name="Phone chat").get_by_role("menuitem")).to_have_text(_ITEMS)
+        placed = await sheet.bounding_box()
         assert placed is not None
-        assert placed["x"] >= 8 and placed["x"] + placed["width"] <= 390 - 8, placed
+        assert placed["y"] + placed["height"] >= 844 - 1 and placed["width"] <= 390, placed
         await page.screenshot(path=str(tmp_path / "menu-390-light.png"), animations="disabled")
-        await menu.get_by_role("menuitem", name="Pin").tap()
+        await sheet.get_by_role("button", name="Cancel").tap()
+        await expect(sheet).to_have_count(0)
+        # A finger's hold of the row opens the same sheet, and its click opens no chat.
+        link: Locator = row.locator("a.side-run")
+        box = await link.bounding_box()
+        assert box is not None
+        point = {"pointerType": "touch", "isPrimary": True, "clientX": box["x"] + 30, "clientY": box["y"] + 10}
+        await link.dispatch_event("pointerdown", point)
+        await page.wait_for_timeout(600)
+        await link.dispatch_event("pointerup", point)
+        await link.dispatch_event("click", point)
+        await expect(sheet).to_be_visible()
+        await expect(page).not_to_have_url(re.compile("#/runs/"))
+        await sheet.get_by_role("menuitem", name="Pin").tap()
         await expect(page.locator(".side-runs h3.side-label").first).to_have_text("Pinned")
         await expect(row.get_by_role("button", name="More for Phone chat")).to_be_in_viewport()
         assert await page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
         await page.screenshot(path=str(tmp_path / "pinned-390-light.png"), animations="disabled")
         await expect(page.locator(".toast.error")).to_have_count(0)
+        assert errors == []
+    finally:
+        await context.close()
+
+
+async def test_on_a_phone_a_swipe_from_the_left_edge_goes_back_as_an_iphone_app_does(
+    browser: Browser, client: httpx.AsyncClient, runtime: Runtime
+) -> None:
+    """Item 1079: a Home Screen app has no Back of the browser; a finger from the screen's left edge goes back (from a
+    chat opened from the list, to the list), and one from inside the screen does not."""
+    run: RunRecord = await _seed(runtime, "Swipe chat")
+    context: BrowserContext = await browser.new_context(
+        viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, reduced_motion="reduce"
+    )
+    try:
+        page, errors = await _signed_in(context, client)
+        await page.get_by_role("button", name="Show sidebar").tap()
+        await _row(page, "Swipe chat").locator("a.side-run").tap()
+        await expect(page).to_have_url(re.compile(f"#/runs/{run.id}"))
+        shell: Locator = page.locator(".shell")
+        await expect(shell).to_have_attribute("data-sidebar", "closed")
+        swipe: str = """([from, to]) => {
+            const stage = document.querySelector(".stage");
+            const touch = (x) => new Touch({ identifier: 1, target: stage, clientX: x, clientY: 400 });
+            const begin = { touches: [touch(from)], changedTouches: [touch(from)], bubbles: true };
+            stage.dispatchEvent(new TouchEvent("touchstart", begin));
+            const end = { touches: [], changedTouches: [touch(to)], bubbles: true };
+            stage.dispatchEvent(new TouchEvent("touchend", end));
+        }"""
+        await page.evaluate(swipe, [120, 300])
+        await page.wait_for_timeout(300)
+        await expect(shell).to_have_attribute("data-sidebar", "closed")
+        # A chat opened from the list goes back to the list.
+        await page.evaluate(swipe, [6, 200])
+        await expect(shell).to_have_attribute("data-sidebar", "open")
         assert errors == []
     finally:
         await context.close()
