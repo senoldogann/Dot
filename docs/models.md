@@ -330,8 +330,18 @@ answer keeps its words, Ollama's too.
   limit ends the run failed. When the plan's window is used up, the run ends failed and says which window and when it
   resets: nothing moves the run to another model on its own. A program that writes nothing for
   `[providers.claude_code] silence_s` (600 s) while none of Dot's tools works for it is ended, and the run fails saying
-  so. What Dot's own runs bring besides (the memory recalled at the start, the checks of a finish, lessons and
-  playbooks) a run here does not have, and these models cannot be the fast, vision or standby model chosen on the
+  so. A run here ends as Dot's own do (item 1076): the model calls `finish` with its answer (a chat-mode run, which has no `finish`, ends with its last reply), whether it succeeded and
+  what it needs from you, so a run that could not do its work ends failed and one that waits on you says so (before,
+  every run ended done with nothing it needed), and a call it makes after its `finish`, or your message, drops what
+  that `finish` said; a ✋ holds it after its turn until you write or take the ✋ back, within
+  `[reactions] hold_minutes` counted from the turn's end (a tool at work is never cut by it), the pages told as for
+  Dot's own runs; the chat keeps the answer of its `finish`; the emergency stop (the pointer in a corner) that a
+  tool of it meets ends it as the emergency stop, not as an error the model reads; a message sent as it ends is kept or
+  marked unread as Dot's own loop does, not dropped; a resumed run says which it goes on from and is told that the steps
+  of that run are not in its session; and Claude Code's own limit on a call of Dot's tool is a day, so a question or an
+  approval you take long over is not cut short. A Stop ends a call of Dot's tool at work for it too. What Dot's own runs
+  bring besides (the memory recalled at the start, the checks of a finish, lessons and playbooks) a run here does not
+  have, and these models cannot be the fast, vision or standby model chosen on the
   Models page, whose calls include conversations and pictures; they can be the review model (item 1032) and the own
   work model, whose look has its tools there (item 1063). They can be the models of the improvement loop's roles
   (`[harness] proposer`, `composer`, `selector`, `experience`, item 1017): each of those is a single question, which

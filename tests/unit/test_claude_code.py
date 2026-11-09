@@ -129,6 +129,8 @@ def test_the_environment_has_no_api_key_and_none_of_dots_or_gits_variables(tmp_p
     assert env["HOME"] == "/Users/owner" and env["PATH"] == "/usr/bin:/bin"
     assert env["CLAUDE_CONFIG_DIR"] == "/Users/owner/.claude-work"
     assert env["DISABLE_AUTOUPDATER"] == "1" and env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] == "1"
+    # A call of Dot's tool may wait a day for the owner (item 1076): Claude Code's own limit does not cut it short.
+    assert env["MCP_TOOL_TIMEOUT"] == str(24 * 3600 * 1000)
     for gone in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK", "GITHUB_TOKEN"):
         assert gone not in env
     assert not [name for name in env if name.startswith(("DOT_", "GIT_"))]
@@ -158,6 +160,15 @@ def test_the_prompt_says_who_the_model_is_its_tools_and_what_it_knows_of_the_own
     assert "\n\n# Team\n- Ada\n\nWhat you know about the owner:" in prompt
 
 
+def test_the_prompt_names_finish_only_to_a_run_that_has_it() -> None:
+    """Item 1076's pre-push review: a chat-mode run has no finish, and a prompt that told it to call one lost its
+    answer; it ends with its last reply."""
+    task: str = system_prompt("Dot", DOOR, ["finish", "shell"], Path("/w"), "Friday", "", [])
+    chat: str = system_prompt("Dot", DOOR, ["shell"], Path("/w"), "Friday", "", [])
+    assert "call finish" in task and "your last reply" not in task
+    assert "finish" not in chat and "write your answer as your last reply" in chat
+
+
 def test_the_model_gets_every_tool_of_dots_own_loop_but_the_loops_own() -> None:
     """Item 1063, the owner's screenshot of 2026-11-09: a run on the plan said it had no tool to talk to the team. It
     gets what a run of Dot's own loop gets: the team's, the mail's, the drafts'; not the loop's own (finish, the plan,
@@ -173,7 +184,7 @@ def test_the_model_gets_every_tool_of_dots_own_loop_but_the_loops_own() -> None:
         "mail_search",
     ):
         assert door_tool(name, False), name
-    for name in ("finish", "update_plan", "mark_plan_step", "use_tools", "react"):
+    for name in ("update_plan", "mark_plan_step", "use_tools", "react"):
         assert not door_tool(name, False), name
     for name in ("delegate", "message_agent", "ask_user", "ask_secret"):
         assert not door_tool(name, True), name
