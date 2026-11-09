@@ -63,9 +63,13 @@ _WIDE_ANSWER: str = "\n".join(
     (
         "Three invoices:",
         "",
+        # A reference is one word with no hyphen to break at, which a cell keeps whole: the table is wider than a
+        # phone whatever the type's size (item 1062 made the answers' type smaller, and a table of words that wrap
+        # fitted within 40 px of it).
         "| Invoice | Supplier | Filed under | Paid | Note |",
         "|---|---|---|---|---|",
-        "| 2026-0311 | Northwind Traders International | Shared › Invoices › March › Paid in full | 18 March | Twice |",
+        "| NW20260311PAIDINFULLMARCHTWICE | Northwind Traders International | Shared › Invoices › March › Paid in full"
+        " | 18 March | Twice |",
         "| 2026-0412 | Contoso Pharmaceuticals | Shared › Invoices › April › Paid in full | 16 April | Paid by card |",
         "",
         "```",
