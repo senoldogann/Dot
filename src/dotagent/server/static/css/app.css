@@ -6241,6 +6241,14 @@ a.schedule-line:hover .schedule-made {
   overflow-wrap: anywhere;
 }
 
+/* A value shorter than a card holds (item 1073): why, and the way to send a short code as a message instead. */
+.secret-short {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .secret-entry {
   display: flex;
   gap: var(--space-2);

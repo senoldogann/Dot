@@ -577,3 +577,61 @@ async def test_the_view_comes_back_by_itself_after_a_break_and_a_silence_and_res
     async with asyncio.timeout(_RUN_WAIT_S):
         ended: RunRecord = await manager.wait(run.id)
     assert ended.status == "done", ended
+
+
+async def test_the_view_of_dots_computer_zooms_in_the_full_screen_viewer(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """Item 1071, the owner's ask: on a phone the view of Dot's computer is zoomed to read a page's small print. Zoom,
+    shown once a frame is there, and a tap on the page that is only watched, open it in the full-screen viewer, whose
+    + zooms it; Close brings the panel back."""
+    MODEL.script = ScriptedProvider(_PROVIDER, [_shell("echo one"), _FINISH])
+    run: RunRecord = await manager.start(
+        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    assert (await client.post(f"/api/runs/{run.id}/takeover")).status_code == 202
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    shown: str = "http://cast.test/small-print"
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(
+                viewport={"width": 390, "height": 844}, service_workers="block", has_touch=True, is_mobile=True
+            )
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
+            jpeg: bytes = await page.screenshot(type="jpeg", clip={"x": 0, "y": 0, "width": 64, "height": 64})
+            casts: _Casts = _Casts([shown], jpeg)
+            await page.route("**/api/runs/*/screencast", casts.answer)
+            await page.get_by_role("button", name="Task details").click()
+            await page.get_by_role("tab", name="Screen").click()
+            card: Locator = page.locator("section.computer")
+            zoom: Locator = card.get_by_role("button", name="Zoom into Dot's computer")
+            await expect(zoom).to_be_hidden()
+            await card.get_by_role("button", name="Watch").click()
+            await expect(card.locator(".computer-url")).to_have_text(shown)
+            await expect(zoom).to_be_visible()
+            await zoom.click()
+            viewer: Locator = page.locator("dialog.viewer")
+            await expect(viewer).to_be_visible()
+            await expect(viewer.locator(".viewer-title")).to_have_text(shown)
+            src: str | None = await card.locator(".computer-image").get_attribute("src")
+            await expect(viewer.locator("img.viewer-picture-image")).to_have_attribute("src", src or "")
+            await viewer.get_by_role("button", name="Zoom in").click()
+            await expect(viewer.locator(".viewer-level")).to_have_text("150%")
+            await viewer.get_by_role("button", name="Close").click()
+            await expect(viewer).to_have_count(0)
+            # A tap on the page that is only watched opens it too.
+            await card.locator(".computer-image").click()
+            await expect(page.locator("dialog.viewer")).to_be_visible()
+            await page.keyboard.press("Escape")
+            await expect(page.locator("dialog.viewer")).to_have_count(0)
+            await page.unroute_all(behavior="ignoreErrors")
+        finally:
+            await browser.close()
+    assert (await client.post(f"/api/runs/{run.id}/handback")).status_code == 202
+    async with asyncio.timeout(_RUN_WAIT_S):
+        ended: RunRecord = await manager.wait(run.id)
+    assert ended.status == "done", ended

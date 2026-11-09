@@ -115,12 +115,17 @@ async function newerNamed() {
   return (await caches.keys()).some((name) => name.startsWith(NEWER_CACHE));
 }
 
-/** Note the build `response` names when it is not the one of the copy `name`, which answered while the network woke. */
+/** Note the build `response` names when it is not the one of the copy `name`, which answered while the network woke,
+ * and that copy is still kept. A page of the network's build kept since (keepPage) took the copy away and the note
+ * with it: a late answer of an opening that hung meanwhile then has nothing older to note, and noted all the same it
+ * stood for good, so that every later opening waited NEWER_WAIT_MS for the network (item 1072: the browser test of a
+ * slow network failed three times in a day on it). */
 async function noteNewer(name, response) {
   const build = response === undefined ? null : response.headers.get(BUILD_HEADER);
-  if (build !== null && `${PAGES_CACHE}${build}` !== name) {
-    await caches.open(`${NEWER_CACHE}${build}`);
+  if (build === null || `${PAGES_CACHE}${build}` === name || !(await caches.has(name))) {
+    return;
   }
+  await caches.open(`${NEWER_CACHE}${build}`);
 }
 
 /** A promise that resolves with `value` after `ms`. */

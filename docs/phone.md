@@ -198,7 +198,10 @@ as a sheet with a grabber, and a drag of its head down closes it; its Agents tab
 model and what it does now (on a wide window too). The Screen tab with nothing yet says in the same empty panel as the
 other tabs that Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the
 setting that turns it on. Dot's computer opens over the whole screen, with the page's address and who has control (Take
-over), and goes back to the side panel when it closes. **Use it here** holds the run and uses its page from the phone
+over), and goes back to the side panel when it closes. **Zoom** beside the address, or a tap on the page while it is
+only watched (in a Mac's window too), opens the view in the full-screen viewer, live (item 1071): two fingers, a double tap or − and + zoom it,
+to read a page's small print; the frames come at JPEG quality 80 (50 before), so the print holds when zoomed.
+**Use it here** holds the run and uses its page from the phone
 (item 475): a tap clicks, a drag scrolls the page, a finger held still and then dragged drags on it, two fingers zoom
 the picture, and **Keyboard** types into the page; the card of a browser step handed to you offers it too, and **Return
 control** gives the run back and closes the view (item 491). A tab a tap opens is not the one the picture shows.
