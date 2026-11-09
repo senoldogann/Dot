@@ -77,9 +77,10 @@ run needs, sent where the configuration points:
   others among it, so it may repeat what a sender wrote.
 - **To Dot's iPhone app through Apple's push service (APNs), once you set `[apns]`: titles.** Apple reads what APNs
   carries, unlike Web Push: an alert carries one of Dot's fixed titles ("A task is done", "Dot has a message for you")
-  and "Open Dot to see it."; a run's Live Activity carries up to 40 characters of its chat's title, its agent's name, its
-  state and a fixed line of what it does now ("Browsing the web", "Using Gmail": a connected app by its server's name
-  alone; items 997 and 1004, see [Dot on the phone](phone.md#dot-on-the-phone)). An approval's alert carries its id
+  and "Open Dot to see it."; the phone's one Live Activity carries, for each of up to four runs (those at work, and
+  those that ended in the last 15 minutes), up to 40 characters of its chat's title, its agent's name, its state and a
+  fixed line of what it does now ("Browsing the web", "Using Gmail": a connected app by its server's name alone; items
+  997, 1004 and 1093, see [Dot on the phone](phone.md#dot-on-the-phone)). An approval's alert carries its id
   and the app's category, never what it asks; the lock screen answers only a step of low or medium risk, after Face ID
   (item 1008), and a step of high risk opens Dot, where you see the amount or the receiver first.
 - **To your own devices through Apple, once you switch iMessage on: Dot's answers, and what it tells you on its own.**

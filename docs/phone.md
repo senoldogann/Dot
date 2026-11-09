@@ -76,14 +76,15 @@ code** takes its place. The same by hand:
    General › Notifications off drops the subscription.
 
 4. Dot's iPhone app (item 997, `ios/`, installed from Xcode for now) is the same web UI in a native shell, which adds
-   what a page on iOS cannot have: the run at work on the lock screen and in the Dynamic Island (a Live Activity). The
+   what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). The
    app's notifications are its own, through APNs: in the app Settings › General › Notifications says so and opens the
    iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in its web view). The
    app asks once for the tailnet address (`https://<mac>.<tailnet>.ts.net`; it loads nothing else) and is signed in with
    a code as a browser is. Once the daemon has proven the phone's own key, the page hands it to the app (one
    `dot.paired` message, taken from the daemon's own page alone), which keeps it in its Keychain and registers what
    Apple gives it with it: `POST /api/phone/apns` (the device token, the token that starts a Live Activity, the
-   environment) and, for each Live Activity started, `POST /api/phone/apns/activity`. Only a phone's own key registers
+   environment) and, for the Live Activity once started, `POST /api/phone/apns/activity` (`DELETE` once it was swiped
+   away, and when the app opens with none). Only a phone's own key registers
    (403 for the Mac's token). The daemon pushes through APNs with the key of `[apns]` (`key_path`, a `.p8` file outside
    Dot's home, never logged; `key_id`, `team_id`, `topic`), and pushes nothing through it while they are empty. An alert
    says the title Web Push says and a fixed line ("Open Dot to see it."), never the question, the draft or the result,
@@ -98,15 +99,23 @@ code** takes its place. The same by hand:
    add none), through `POST /api/attachments` and `POST /api/runs` with the phone's key; the share sheet reads the
    address the app was given (which a build with `DOT_HOST` held to that host) and its key, and sends nothing until you
    tap Send. A picture is made small without being opened whole (ImageIO), as a large photo opened whole took more than
-   a share sheet may hold. A run of yours
-   (not a helper's, a schedule's, a watcher's or Dot's own) starts a Live Activity on each phone that gave a
-   push-to-start token: its chat's title (40 characters at most) and agent, and what it does now (item 1004), each with
-   a mark of its own that turns into the next as the run moves on: "Thinking", "Browsing the web", "Searching the web",
-   "Running a command", "Reading files", "Writing files", "Using your Mac", "Using <app>" for a connected app, "Working
-   with helpers", "Writing the answer"; never what the step was about (no address, file, command or words of the model).
-   A step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; "Waiting for
-   you" while an approval or a question waits, and the end (done, failed, stopped), go at once and the end stays 15
-   minutes on the lock screen; one whose end never came is marked stale after four hours. A token APNs calls gone (410,
+   a share sheet may hold. The phone has one Live Activity (item 1093): on glass, "Dot" and how many
+   runs are at work ("2 at work", "All done"), and a row for each run of yours (not a helper's, a schedule's, a
+   watcher's or Dot's own), the runs at work first, then those that ended last, four at most: its chat's title (40
+   characters at most), what it does now (item 1004: "Thinking", "Browsing the web", "Searching the web", "Running a
+   command", "Reading files", "Writing files", "Using your Mac", "Using <app>" for a connected app, "Working with
+   helpers", "Writing the answer"; never what the step was about: no address, file, command or words of the model) or,
+   once it ended, the agent that worked on it, and its status in its colour (Working, Waiting, Done, Failed, Stopped).
+   The Dynamic Island shows how many work. Your first run starts the activity on each phone that gave a push-to-start
+   token, a run that starts before the app sent the activity's token opens no second one, and every change goes to that
+   token; a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a
+   start, "Waiting" while an approval waits, and an end go at once. An ended run stays a row 15 minutes, and once no row
+   is left the activity ends and goes. One you swipe away comes back with your next run, not before, once the app has
+   told so (at once while it runs, else when it next opens: until then the changes go to the one that is gone); one
+   older than the eight hours iOS keeps one is replaced at the next change; a daemon that starts again goes on showing
+   the runs still at work on the one it finds, and ends it when none is. A start APNs took and whose token does not
+   come is not sent again until it comes or no row is left; one APNs did not take is sent again at the next change. One with no
+   change for four hours is marked stale. A token APNs calls gone (410,
    `Unregistered`, `BadDeviceToken`, `DeviceTokenNotForTopic`) is forgotten, and so are a phone's tokens when it is
    removed.
 

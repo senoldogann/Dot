@@ -78,7 +78,7 @@ final class PushRegistrar {
     }
 
     private func observeStartTokens() async {
-        for await data: Data in Activity<DotRunAttributes>.pushToStartTokenUpdates {
+        for await data: Data in Activity<DotFleetAttributes>.pushToStartTokenUpdates {
             let token: String = hexString(data)
             logger.info("push-to-start token received: token=\(redactToken(token), privacy: .public)")
             startToken = token
@@ -87,20 +87,45 @@ final class PushRegistrar {
     }
 
     private func observeActivities() async {
-        for activity: Activity<DotRunAttributes> in Activity<DotRunAttributes>.activities {
+        let current: [Activity<DotFleetAttributes>] = Activity<DotFleetAttributes>.activities
+        // None on this phone: one the daemon still has a token of was swiped away or ended while the app was closed,
+        // and the next run must start a new one (item 1093).
+        if current.isEmpty {
+            forget(token: nil)
+        }
+        for activity: Activity<DotFleetAttributes> in current {
             observe(activity)
         }
-        for await activity: Activity<DotRunAttributes> in Activity<DotRunAttributes>.activityUpdates {
+        for await activity: Activity<DotFleetAttributes> in Activity<DotFleetAttributes>.activityUpdates {
             observe(activity)
         }
     }
 
-    private func observe(_ activity: Activity<DotRunAttributes>) {
+    private func observe(_ activity: Activity<DotFleetAttributes>) {
         guard !observedActivities.contains(activity.id) else {
             return
         }
         observedActivities.insert(activity.id)
-        let runId: String = activity.attributes.runId
+        let runId: String = activity.attributes.fleetId
+        tasks.append(
+            Task { [weak self] in
+                for await state: ActivityState in activity.activityStateUpdates {
+                    guard let self else {
+                        return
+                    }
+                    // Swiped away by the owner: its token goes nowhere any more. One that ended was ended by the
+                    // daemon, which forgot it, or by iOS after eight hours, which the daemon tells by its age.
+                    if state == .dismissed {
+                        self.logger.info("activity gone: state=\(String(describing: state), privacy: .public)")
+                        // Its own token: a newer activity's, which the daemon may keep by now, stays. One that never
+                        // had a token gave the daemon none to forget.
+                        if let token: String = activity.pushToken.map(hexString) {
+                            self.forget(token: token)
+                        }
+                        return
+                    }
+                }
+            })
         tasks.append(
             Task { [weak self] in
                 for await data: Data in activity.pushTokenUpdates {
@@ -125,6 +150,12 @@ final class PushRegistrar {
             deviceToken: deviceToken, startToken: startToken, environment: apnsEnvironment())
         withCredentials { (client: DaemonClient, host: DaemonHost, key: String) in
             try await client.registerAPNs(registration, host: host, key: key)
+        }
+    }
+
+    private func forget(token: String?) {
+        withCredentials { (client: DaemonClient, host: DaemonHost, key: String) in
+            try await client.forgetActivity(token: token, host: host, key: key)
         }
     }
 

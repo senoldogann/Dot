@@ -3040,6 +3040,11 @@ class Store:
             raise NotFoundError("run not found", {"run_id": run_id})
         return _run(row)
 
+    async def working_runs(self) -> list[RunRecord]:
+        """The runs at work (:data:`WORKING_STATUSES`), the oldest first."""
+        rows = await self._all(f"SELECT * FROM runs WHERE status IN ({_WORKING_SQL}) ORDER BY created_at", ())
+        return [_run(row) for row in rows]
+
     async def list_runs(self, limit: int, thread_id: str | None) -> list[RunRecord]:
         """The latest ``limit`` runs, of the chat ``thread_id`` when it is given, newest first; the runs a rewind
         took out of their chat (item 282) are left out."""
@@ -5179,7 +5184,7 @@ class Store:
 
     @_writing
     async def set_live_activity(self, run_id: str, phone_id: str, token: str, now: float) -> LiveActivity:
-        """Keep the token of the Live Activity of the run ``run_id`` on the phone ``phone_id``."""
+        """Keep the token of the Live Activity ``run_id`` (``fleet`` since item 1093) on the phone ``phone_id``."""
         await self._db.execute(
             "INSERT INTO live_activities (run_id, phone_id, token, created_at) VALUES (?, ?, ?, ?)"
             " ON CONFLICT(run_id, phone_id) DO UPDATE SET token = excluded.token",
@@ -5193,9 +5198,30 @@ class Store:
         return [LiveActivity.model_validate(dict(row)) for row in rows]
 
     @_writing
-    async def delete_live_activities(self, run_id: str) -> None:
-        """Forget the Live Activities of the run ``run_id``, which ended."""
-        await self._db.execute("DELETE FROM live_activities WHERE run_id = ?", (run_id,))
+    async def delete_live_activity(self, run_id: str, phone_id: str) -> bool:
+        """Forget the token of the Live Activity ``run_id`` (:data:`dotagent.notify.apns.FLEET_ID`) on the phone
+        ``phone_id``: it ended, or it is gone. Whether one was kept."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "DELETE FROM live_activities WHERE run_id = ? AND phone_id = ?", (run_id, phone_id)
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
+    async def delete_live_activity_token(self, run_id: str, phone_id: str, token: str) -> bool:
+        """Forget the token of the Live Activity ``run_id`` on the phone ``phone_id`` when it is still ``token``: the
+        end of an activity that ended does not take the token of the one that came after it. Whether it was."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "DELETE FROM live_activities WHERE run_id = ? AND phone_id = ? AND token = ?", (run_id, phone_id, token)
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
+    async def delete_live_activities_but(self, run_id: str, phone_id: str) -> None:
+        """Forget the tokens of the phone ``phone_id``'s Live Activities other than ``run_id``: those of one run each,
+        from an app before item 1093."""
+        await self._db.execute("DELETE FROM live_activities WHERE run_id != ? AND phone_id = ?", (run_id, phone_id))
         await self._db.commit()
 
     # ----- memories --------------------------------------------------------------------------

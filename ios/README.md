@@ -1,15 +1,15 @@
 # Dot for iPhone
 
 A thin native shell around Dot's web UI (roadmap item 997): a full-screen `WKWebView` that loads only the daemon's
-tailnet address, plus what a web page cannot do on iOS: remote push and a Live Activity of a run on the lock screen and
-in the Dynamic Island.
+tailnet address, plus what a web page cannot do on iOS: remote push and the phone's one Live Activity of the owner's
+runs on the lock screen and in the Dynamic Island.
 
 - `Dot/`: the app (`dev.dotagent.phone`). `Core/` holds the pure rules (address parsing, navigation policy, bridge
   validation), `Adapters/` the Keychain, UserDefaults and the daemon's HTTP API, `Push/` the token registration.
 - `DotLiveActivity/`: the widget extension (`dev.dotagent.phone.live`) that draws the Live Activity.
 - `DotShare/`: the share extension (`dev.dotagent.phone.share`, item 1009): what another app shares goes to Dot as a
   new chat. It reads the host from the app group's defaults and the key from the shared Keychain access group.
-- `Shared/DotRunAttributes.swift`: the activity's attributes, compiled into both targets.
+- `Shared/DotFleetAttributes.swift`: the activity's attributes, compiled into both targets.
 - `project.yml`: the XcodeGen spec. `Dot.xcodeproj` is generated from it and is not committed.
 
 ## Build and install on the iPhone
@@ -61,11 +61,12 @@ enforce it: `scripts/app_bound_domains.sh` writes the host as the only `WKAppBou
 - `POST /api/phone/apns` with `Authorization: Bearer <phone key>` and
   `{"device_token": "<hex>", "start_token": "<hex>" | null, "environment": "sandbox" | "production"}`, sent again
   whenever either token changes.
-- `POST /api/phone/apns/activity` with the same header and `{"run_id": "<run id>", "token": "<hex>"}` for each
-  activity's update token.
-- Live Activity pushes with `attributes-type` `DotRunAttributes`, `attributes` `{runId, agentName}` and
-  `content-state` `{title, status, line, startedAt}` (`status`: `working`, `waiting`, `done`, `failed`; `startedAt` in
-  epoch seconds). Topic `dev.dotagent.phone.push-type.liveactivity`.
+- `POST /api/phone/apns/activity` with the same header and `{"run_id": "fleet", "token": "<hex>"}` for the update
+  token of the phone's one Live Activity (item 1093), and `DELETE /api/phone/apns/activity` once it was swiped away or
+  ended (also sent when the app opens and has none).
+- Live Activity pushes with `attributes-type` `DotFleetAttributes`, `attributes` `{fleetId}` and `content-state`
+  `{active, rows}`, each row `{runId, title, agent, status, kind, line, startedAt}` (`status`: `working`, `waiting`,
+  `done`, `failed`; `startedAt` in epoch seconds), at most four. Topic `dev.dotagent.phone.push-type.liveactivity`.
 - An alert carries `route` (a web UI route such as `#/runs/<id>`, or an absolute path on the daemon) at the top level of the payload; a tap
   opens it in the web view.
 
