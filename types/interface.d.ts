@@ -71,3 +71,24 @@ type ThreePointLight = import("three").PointLight;
 type ThreeVector3 = import("three").Vector3;
 type ThreeGeometry = import("three").BufferGeometry;
 type ThreeMesh = import("three").Mesh;
+
+/** A rule of a setting of Settings › Appearance that paints the page (appearance/rules.js, item 1067). */
+interface DotAppearanceRule {
+  readonly key: string;
+  initial(read: (key: string) => string | null): string | number;
+  parse(stored: string | null): string | number | null;
+  paint(value: string | number, kept: boolean, root: HTMLElement): void;
+  readonly least?: number;
+  readonly most?: number;
+  readonly stacks?: readonly string[];
+}
+
+/** What appearance/rules.js leaves for boot.js and appearance/settings.js: the rules, the weights each face offers,
+ * and the painting of every kept value. */
+interface DotAppearance {
+  readonly rules: Readonly<Record<string, DotAppearanceRule>>;
+  readonly weights: readonly { id: number; label: string }[];
+  paintAll(read: (key: string) => string | null, root: HTMLElement): void;
+}
+
+declare var DOT_APPEARANCE: DotAppearance;
