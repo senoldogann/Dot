@@ -283,9 +283,10 @@ export function buildShell({ homeRoute }) {
     apply();
   }
 
-  // The sidebar answers Escape first when it has a selection to drop; the drawer closes on the next press.
+  // The sidebar answers Escape first when it has a selection to drop; the drawer closes on the next press. A dialog open
+  // over it takes the key (item 1086: a menu's sheet stayed while the drawer under it closed).
   function onEscape(event) {
-    if (event.key === "Escape" && !event.defaultPrevented && narrow && drawer) {
+    if (event.key === "Escape" && !event.defaultPrevented && narrow && drawer && document.querySelector("dialog[open]") === null) {
       event.preventDefault();
       closeToOpener();
     }

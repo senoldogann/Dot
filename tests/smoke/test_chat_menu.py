@@ -410,8 +410,20 @@ async def test_on_a_phone_the_button_of_a_chats_menu_always_shows_beside_the_age
         assert placed is not None
         assert placed["y"] + placed["height"] >= 844 - 1 and placed["width"] <= 390, placed
         await page.screenshot(path=str(tmp_path / "menu-390-light.png"), animations="disabled")
+        # The sheet holds the focus, not its first choice, which a phone drew ringed as if chosen (item 1086).
+        await expect(sheet).to_be_focused()
         await sheet.get_by_role("button", name="Cancel").tap()
         await expect(sheet).to_have_count(0)
+        # The "…" a finger pressed keeps no tint of a pointer resting on it: a phone has none (item 1086).
+        assert await page.evaluate("() => !matchMedia('(hover: hover)').matches")
+        assert await more.evaluate("(button) => getComputedStyle(button).backgroundColor") == "rgba(0, 0, 0, 0)"
+        # Escape closes the sheet, and the drawer under it stays (item 1086: the drawer took the key, and the sheet
+        # stayed half closed).
+        await more.tap()
+        await expect(sheet).to_be_visible()
+        await page.keyboard.press("Escape")
+        await expect(sheet).to_have_count(0)
+        await expect(page.locator(".shell")).to_have_attribute("data-sidebar", "open")
         # A finger's hold of the row opens the same sheet, and its click opens no chat.
         link: Locator = row.locator("a.side-run")
         box = await link.bounding_box()

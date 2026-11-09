@@ -847,8 +847,10 @@
   cursor: pointer;
 }
 
-.provider-item:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .provider-item:hover {
+    background: var(--surface-2);
+  }
 }
 
 .provider-item[aria-current="true"] {
@@ -982,8 +984,10 @@
   cursor: pointer;
 }
 
-.provider-back:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .provider-back:hover {
+    background: var(--surface-2);
+  }
 }
 
 .provider-back .icon {
@@ -1085,8 +1089,10 @@
   text-decoration: none;
 }
 
-.provider-docs:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .provider-docs:hover {
+    text-decoration: underline;
+  }
 }
 
 .provider-filter {
@@ -1138,8 +1144,10 @@
   cursor: pointer;
 }
 
-.provider-show-all:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .provider-show-all:hover {
+    text-decoration: underline;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1219,9 +1227,11 @@
   border-top: 1px solid var(--border);
 }
 
-.settings-row:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  text-decoration: none;
+@media (hover: hover) {
+  .settings-row:hover {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+    text-decoration: none;
+  }
 }
 
 /* A finger's press shows on the row as it does on an iPhone's lists (item 1079), where no pointer rests. */
@@ -1450,8 +1460,10 @@
   cursor: pointer;
 }
 
-.set-link:hover {
-  background: var(--accent-weak);
+@media (hover: hover) {
+  .set-link:hover {
+    background: var(--accent-weak);
+  }
 }
 
 /* What Dot says of the moment stands over the sections while it holds; with nothing to say it takes no room. */
@@ -1911,8 +1923,10 @@
   transition: background-color var(--motion-quick) var(--ease), border-color var(--motion-quick) var(--ease);
 }
 
-.scheme-card:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .scheme-card:hover {
+    background: var(--surface-2);
+  }
 }
 
 .scheme-card[aria-pressed="true"] {
@@ -2069,8 +2083,10 @@
   cursor: pointer;
 }
 
-.theme-card-pick:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .theme-card-pick:hover {
+    background: var(--surface-2);
+  }
 }
 
 .theme-orbs,
@@ -2106,8 +2122,11 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .theme-orb:not([aria-pressed="true"]):hover {
-    transform: scale(1.05);
+  @media (hover: hover) {
+    .theme-orb:not([aria-pressed="true"]):hover {
+      transform: scale(1.05);
+  
+    }
   }
 }
 
@@ -2842,8 +2861,10 @@
   color: var(--muted);
 }
 
-.note-actions .btn:hover:not(:disabled) {
-  color: var(--text);
+@media (hover: hover) {
+  .note-actions .btn:hover:not(:disabled) {
+    color: var(--text);
+  }
 }
 
 .note-foot {
@@ -2856,8 +2877,10 @@
   padding: var(--space-3) var(--space-4);
 }
 
-.note-more:hover:not(:disabled) {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .note-more:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
 }
 
 .note-looked {
@@ -3668,8 +3691,10 @@
   transition: background var(--motion-quick) var(--ease);
 }
 
-.rule-example:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .rule-example:hover {
+    background: var(--surface-2);
+  }
 }
 
 .rule-empty .rule-examples {
@@ -3698,8 +3723,10 @@
   display: inline-flex;
 }
 
-.rule-advanced-head:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .rule-advanced-head:hover {
+    background: var(--surface-2);
+  }
 }
 
 .rule-advanced[open] > .rule-advanced-head {
@@ -3881,9 +3908,14 @@
   transition: opacity var(--motion-quick) var(--ease);
 }
 
-.notes-panel .list-row:hover .row-actions,
 .notes-panel .list-row:focus-within .row-actions {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .notes-panel .list-row:hover .row-actions {
+    opacity: 1;
+  }
 }
 
 @media (hover: none) {
@@ -4188,8 +4220,10 @@
   cursor: pointer;
 }
 
-.harness-write:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .harness-write:hover {
+    background: var(--surface-2);
+  }
 }
 
 /* The button that opens the form, and the one that opens a version's texts, are no `.btn`: on a phone each is as high as
@@ -4279,8 +4313,10 @@
   cursor: pointer;
 }
 
-.version-toggle:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .version-toggle:hover {
+    color: var(--text);
+  }
 }
 
 /* Under a version's row: its id, who made it and when, then its two texts as they stand in the prompt, line by line. */
@@ -5479,8 +5515,10 @@
   cursor: pointer;
 }
 
-.import-choice:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .import-choice:hover {
+    background: var(--surface-2);
+  }
 }
 
 .import-choice:has(.import-radio:checked) {

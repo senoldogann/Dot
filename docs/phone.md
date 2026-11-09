@@ -114,7 +114,9 @@ On a phone Dot works as an iPhone app does (item 1079): a menu (a chat's "…", 
 of the screen, its choices in groups and Cancel at the foot; a finger's hold of a chat's row in the sidebar opens the
 same sheet, as a right-click does with a mouse; a swipe from the screen's left edge does what the button at the top
 left does (back, or the list of chats); a row of a list and a chat's row darken while pressed, with no grey box of the
-browser; a queued message goes up a place from its own button (a finger cannot drag a row on an iPhone). Settings ›
+browser, and nothing stays tinted after a tap (item 1086: every style of a pointer resting on something applies only
+where a pointer can rest, `@media (hover: hover)`, which `tests/unit/test_touch_hover.py` holds), and a sheet takes
+the focus itself, so that its first choice is not drawn ringed; a queued message goes up a place from its own button (a finger cannot drag a row on an iPhone). Settings ›
 General › Notifications reads again what the iPhone's Settings allow when you come back to Dot: before, a switch
 turned off by iOS stayed off until the page was loaded again, which a Home Screen app cannot be, and it said to reload.
 

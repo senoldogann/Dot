@@ -182,7 +182,7 @@ function openSheet({ label, items, back, button }) {
   cancel.addEventListener("click", () => close(true));
   const sheet = el(
     "dialog",
-    { class: "message-sheet menu-sheet", "aria-label": label },
+    { class: "message-sheet menu-sheet", "aria-label": label, tabindex: "-1" },
     el("div", { class: "sheet-handle", "aria-hidden": "true" }),
     el("div", { class: "sheet-facts" }, label),
     // The choices are a menu, as the pointer's menu is, to a screen reader; Cancel is the sheet's own.
@@ -203,6 +203,8 @@ function openSheet({ label, items, back, button }) {
     event.preventDefault();
     close(true);
   });
+  // However it closed (a browser closes a dialog on Escape without a cancel it may skip), the sheet goes with it.
+  sheet.addEventListener("close", () => close(false));
 
   function close(giveBack) {
     if (current !== handle) {
@@ -225,6 +227,9 @@ function openSheet({ label, items, back, button }) {
   current = handle;
   document.body.append(sheet);
   sheet.showModal();
+  // The sheet takes the focus, not its first choice: a phone drew the ring of a focused choice round it, as if it
+  // were chosen (the owner's screenshot of 2026-11-09, item 1086).
+  sheet.focus({ preventScroll: true });
   if (button !== undefined && button !== null) {
     button.setAttribute("aria-expanded", "true");
   }
