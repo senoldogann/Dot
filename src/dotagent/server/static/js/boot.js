@@ -1,9 +1,9 @@
 // The first paint (item 81): a classic script in the document's head that puts the theme, the colour scheme, the
 // density and the settings of the interface, the motion and the type this browser chose on the page element before
 // the body is parsed, so a held dark scheme or a theme never flashes the default while main.js loads. It reads the same
-// keys as theme.js, layout.js and appearance/settings.js and sets only values of the shapes those modules write;
-// everything else (the defaults, the switches, the listeners) stays theirs, and theme.js works the tokens out again
-// once it runs. Storage that is blocked means the default.
+// keys as theme.js and layout.js and sets only values of the shapes those modules write, and paints the settings of
+// Settings › Appearance with appearance/rules.js, which runs before it; everything else (the defaults, the switches,
+// the listeners) stays theirs, and theme.js works the tokens out again once it runs. Storage that is blocked means the default.
 (function boot() {
   var root = document.documentElement;
   var read = function (key) {
@@ -52,116 +52,9 @@
       }
     });
   }
-  // The interface, the motion and the type (item 127): for each value kept, what appearance/settings.js writes for it,
-  // and nothing for the default or for a value it would not keep.
-  var whole = function (key, least, most, step) {
-    var stored = read(key);
-    if (stored === null || !/^\d{1,3}$/.test(stored)) {
-      return null;
-    }
-    var value = Number(stored);
-    return value >= least && value <= most && (value - least) % step === 0 ? value : null;
-  };
-  var contrast = whole("dot.contrast", 50, 200, 5);
-  if (contrast !== null && contrast !== 100) {
-    root.setAttribute("data-contrast", "");
-    root.style.setProperty("--contrast-base", Math.min(contrast, 100) + "%");
-    root.style.setProperty("--contrast-boost", Math.max(contrast - 100, 0) + "%");
-    root.style.setProperty("--contrast-border-boost", Math.max(contrast - 100, 0) / 4 + "%");
-  }
-  var chatWidth = read("dot.chatWidth");
-  if (chatWidth === "wide" || chatWidth === "full") {
-    root.setAttribute("data-chat-width", chatWidth);
-  }
-  var panelMotion = whole("dot.panelMotion", 0, 400, 25);
-  if (panelMotion !== null && panelMotion !== 200) {
-    root.style.setProperty("--motion-panel", panelMotion + "ms");
-  }
-  // The body's size on this device, as appearance/settings.js keeps it (item 331): on a phone (app.css, item 329) 12 to
-  // 20 px (item 347), 16 its own; elsewhere 13 to 17 px, 14 its own.
-  var phoneType = window.matchMedia(
-    "(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)"
-  ).matches;
-  var ownBody = phoneType ? 16 : 14;
-  var interfaceSize = phoneType ? whole("dot.sizeInterface", 12, 20, 1) : whole("dot.sizeInterface", 13, 17, 1);
-  if (interfaceSize !== null && interfaceSize !== ownBody) {
-    root.style.setProperty("--type-scale", String(interfaceSize / ownBody));
-  }
-  // The answers' size (item 1062): a message's scaled with the interface's until a size is kept, then the size kept.
-  var answerSize = whole("dot.sizeAnswers", 12, 24, 1);
-  if (answerSize !== null) {
-    root.style.setProperty("--answer-size", answerSize + "px");
-  }
-  // The weights of the four faces (item 1062): 300 to 600, 400 their own.
-  /** @type {Array<[string, string]>} */ ([
-    ["dot.weightInterface", "--weight-text"],
-    ["dot.weightAnswers", "--answer-weight"],
-    ["dot.weightComposer", "--composer-weight"],
-    ["dot.weightCode", "--code-weight"],
-  ]).forEach(function (weight) {
-    var stored = read(weight[0]);
-    if (stored === "300" || stored === "500" || stored === "600") {
-      root.style.setProperty(weight[1], stored);
-    }
-  });
-  /** @type {Array<[string, string, number, number, number]>} */ ([
-    ["dot.sizeComposer", "--composer-size", 12, 20, 15],
-    ["dot.sizeCode", "--code-size", 10, 18, 13],
-  ]).forEach(function (size) {
-    var value = whole(size[0], size[2], size[3], 1);
-    if (value !== null && value !== size[4]) {
-      root.style.setProperty(size[1], value + "px");
-    }
-  });
-  var typed = /^[\p{L}\p{N} ,'"._-]{1,200}$/u;
-  var quoted = function (name) {
-    var bare = name.split('"').join("").split("'").join("").trim();
-    var plain =
-      /^[a-zA-Z][a-zA-Z0-9-]*$/.test(bare) && !/^(inherit|initial|unset|revert|revert-layer|default)$/i.test(bare);
-    return bare === "" || plain ? bare : '"' + bare + '"';
-  };
-  // The families of the four faces, the same for all (item 1062, appearance/settings.js `FAMILY_STACKS`), the
-  // interface's and the code's too for the answers and the message box, and what a browser kept before then: the
-  // answers' "theme" is their own.
-  var stacks = ["system", "inter", "serif", "geist-mono", "sf-mono", "menlo"];
-  var following = ["interface", "mono"].concat(stacks);
-  /** @type {Record<string, string>} */
-  var legacy = { "dot.fontAnswers:theme": "" };
-  /** @type {Array<[string, string, string, string[]]>} */ ([
-    ["dot.fontInterface", "--font", "var(--family-system)", stacks],
-    ["dot.fontAnswers", "--voice", "var(--theme-voice)", following],
-    ["dot.fontComposer", "--composer-font", "var(--font)", following],
-    ["dot.fontCode", "--mono", "var(--family-geist-mono)", stacks],
-  ]).forEach(function (font) {
-    var kept = read(font[0]);
-    var stored = kept !== null && Object.prototype.hasOwnProperty.call(legacy, font[0] + ":" + kept)
-      ? legacy[font[0] + ":" + kept]
-      : kept;
-    if (stored === null || stored === "") {
-      return;
-    }
-    if (font[3].indexOf(stored) >= 0) {
-      root.style.setProperty(font[1], "var(--family-" + stored + ")");
-      return;
-    }
-    var families = typed.test(stored)
-      ? stored
-          .split(",")
-          .map(quoted)
-          .filter(function (name) {
-            return name !== "";
-          })
-      : [];
-    if (families.length > 0) {
-      root.style.setProperty(font[1], families.join(", ") + ", " + font[2]);
-    }
-  });
-  if (read("dot.smoothing") === "off") {
-    root.setAttribute("data-smoothing", "off");
-  }
-  if (read("dot.wrapCode") === "on") {
-    root.setAttribute("data-wrap-code", "");
-  }
+  // The interface, the motion and the type (items 127, 331 and 1062): each kept value as appearance/rules.js paints it,
+  // the rules appearance/settings.js keeps and paints a choice with (item 1067: one copy of them, not two).
+  globalThis.DOT_APPEARANCE.paintAll(read, root);
   // Inside the desktop shell (Tauri, item 88) the page keeps room for the traffic lights in its top bars.
   if (typeof window.__TAURI__ === "object" && window.__TAURI__ !== null) {
     document.documentElement.dataset.shell = "desktop";

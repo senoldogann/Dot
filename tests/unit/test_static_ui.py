@@ -36,7 +36,7 @@ IMPORT_NAMES_ON_DEMAND: re.Pattern[str] = re.compile(
     r'const\s*\{(?P<names>[^}]*)\}\s*=\s*await\s+import\("(?P<specifier>[^"]+)"\)'
 )
 # The scripts the page loads itself: nothing imports what they export.
-ENTRY_SCRIPTS: frozenset[str] = frozenset({"main.js", "boot.js"})
+ENTRY_SCRIPTS: frozenset[str] = frozenset({"main.js", "boot.js", "rules.js"})
 TESTS_DIR: Path = Path(__file__).resolve().parents[1]
 
 
@@ -131,6 +131,7 @@ def test_the_page_has_no_inline_code_and_loads_only_files_that_exist() -> None:
     page: str = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     scripts: list[re.Match[str]] = list(SCRIPT_TAG.finditer(page))
     assert [script["attributes"].strip() for script in scripts] == [
+        'src="js/appearance/rules.js"',
         'src="js/boot.js"',
         'type="module" src="js/main.js"',
     ]

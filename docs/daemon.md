@@ -1083,7 +1083,8 @@ code blocks, files and changes, 10 to 18 px, 13 by default, and long lines of co
 begins, its own switch wraps just that block). Then font smoothing (on), for every face. What a browser kept before item
 1062 reads as what it is now: the answers' "Theme" is their own and "Interface" the interface's, and the message box's "The
 code's" stays the code's. The choices are kept in the browser only, and
-`boot.js` puts each of them on the page before the first paint. The palettes, the colour arithmetic, the orbs, the
+`boot.js` puts each of them on the page before the first paint, with the same rules (`appearance/rules.js`, a classic
+script loaded before it) that put a choice on the page once it runs: one copy of each rule (item 1067). The palettes, the colour arithmetic, the orbs, the
 contrast's mixing, the families typed, the theme generator, the theme file with its checks and the VS Code import are a
 port of an MIT-licensed project to plain ES modules; its notice is `static/js/appearance/LICENSE`, and Dot is not
 affiliated with that project. The looks are one visual system. Colour: every colour is a token of `themes.css` naming
