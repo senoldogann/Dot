@@ -21,7 +21,7 @@ from picture_files import HEADS
 
 from dotagent.agent.manager import RunManager
 from dotagent.channels.handles import STATE_KEY, ImessageState
-from dotagent.channels.imessage import MARKER
+from dotagent.channels.imessage import MARKER, newest_rowid
 from dotagent.channels.intake import ATTACHMENT, UNREAD_ANSWER, UNREAD_NOTE
 from dotagent.channels.pictures import Pictures
 from dotagent.channels.router import STOPPED
@@ -626,12 +626,11 @@ async def test_a_message_from_the_iphones_other_apple_id_starts_a_run_and_its_an
         poll_s=0.05,
         **own_places(),
     )
-    await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
+    await runtime.store.kv_set(STATE_KEY, _from_now(messages))
     await channels.start()
     try:
         own: int = messages.chat(PHONE)
         owner: int = messages.handle(PHONE)
-        await asyncio.sleep(0.4)
         before: int = len(await runtime.store.list_runs(100, None))
         replies.push(finish("Four, from your other Apple ID."))
         messages.message(own, "what is two and two?", from_me=False, sender=owner, at=time.time())
@@ -684,11 +683,10 @@ async def test_the_link_at_the_end_of_an_answer_is_not_read_back_as_a_command_wh
         poll_s=0.05,
         **own_places(),
     )
-    await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
+    await runtime.store.kv_set(STATE_KEY, _from_now(messages))
     await channels.start()
     try:
         own: int = messages.chat(PHONE)
-        await asyncio.sleep(0.4)
         before: int = len(await runtime.store.list_runs(100, None))
         replies.push(finish("It was in the paper: https://news.example/a"))
         messages.message(own, "where did you read that?", at=time.time())
@@ -709,6 +707,13 @@ async def test_the_link_at_the_end_of_an_answer_is_not_read_back_as_a_command_wh
 # ----- item 611: the emergency stop, the cursor, plain stop words, a picture sent with words, and links ----------
 
 
+def _from_now(messages: MessagesDb) -> str:
+    """The stored state of a channel with the owner's number paired that reads from the database's newest row, as
+    ``start_from_now`` leaves it when the owner switches the channel on (item 1090): a first poll left to set the
+    cursor may come after the test's first message on a slow runner and set it past it."""
+    return ImessageState(handles=(PHONE,), cursor=newest_rowid(messages.path)).model_dump_json()
+
+
 @contextlib.asynccontextmanager
 async def _reading(
     runtime: Runtime,
@@ -719,8 +724,8 @@ async def _reading(
     cursor: int | None = None,
 ) -> AsyncIterator[tuple[Channels, Osascript]]:
     """The channels of a daemon over a ``chat.db`` of the test's own, as a daemon that starts with iMessage on and the
-    owner's number paired finds them: ``cursor`` is where the channel stands in the database (``None``: it sets it at
-    its first poll), ``reach`` the name a phone reaches the Mac by."""
+    owner's number paired finds them: ``cursor`` is where the channel stands in the database (``None``: at its newest
+    row as the block begins, ``_from_now``), ``reach`` the name a phone reaches the Mac by."""
     configured: Runtime = dataclasses.replace(
         runtime,
         config=runtime.config.model_copy(
@@ -742,7 +747,10 @@ async def _reading(
         poll_s=0.05,
         **own_places(),
     )
-    await runtime.store.kv_set(STATE_KEY, ImessageState(handles=(PHONE,), cursor=cursor).model_dump_json())
+    await runtime.store.kv_set(
+        STATE_KEY,
+        _from_now(messages) if cursor is None else ImessageState(handles=(PHONE,), cursor=cursor).model_dump_json(),
+    )
     await channels.start()
     try:
         yield channels, osascript
@@ -772,7 +780,6 @@ async def test_while_the_emergency_stop_is_engaged_a_message_on_the_channel_star
     own: int = db.chat(PHONE)
     try:
         async with _reading(runtime, manager, db) as (channels, osascript):
-            await asyncio.sleep(0.4)
             before: int = len(await runtime.store.list_runs(100, None))
             with _stop_engaged():
                 db.message(own, "what is two and two?", at=time.time())
@@ -859,7 +866,6 @@ async def test_a_message_of_the_word_stop_stops_the_run_at_work(
     replies.gate = asyncio.Event()
     try:
         async with _reading(runtime, manager, db) as (_, osascript):
-            await asyncio.sleep(0.4)
             db.message(own, "tidy up the downloads", at=time.time())
             await _until(lambda: bool(manager.active_run_ids()), "the run is at work")
             db.message(own, "Stop", at=time.time())
@@ -885,7 +891,6 @@ async def test_a_message_with_words_and_a_picture_runs_on_the_words_and_its_answ
     own: int = db.chat(PHONE)
     try:
         async with _reading(runtime, manager, db) as (_, osascript):
-            await asyncio.sleep(0.4)
             replies.push(finish("It looks fine to me."))
             db.message(own, "￼ What is wrong with this screenshot?", at=time.time(), attachment=True)
             await _until(lambda: len(osascript.sent) == 1, "the answer")
@@ -915,7 +920,6 @@ async def test_the_link_in_a_message_is_the_name_a_phone_reaches_the_mac_by_and_
     own: int = db.chat(PHONE)
     try:
         async with _reading(runtime, manager, db, reach=reach) as (channels, osascript):
-            await asyncio.sleep(0.4)
             replies.push(finish("A long answer. " * 200))
             db.message(own, "tell me everything", at=time.time())
             await _until(lambda: len(osascript.sent) == 1, "the answer")
@@ -973,11 +977,10 @@ async def test_a_run_that_works_longer_than_a_moment_tells_what_it_does_while_it
         progress_apart_s=0.5,
         **own_places(),
     )
-    await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
+    await runtime.store.kv_set(STATE_KEY, _from_now(messages))
     await channels.start()
     try:
         own: int = messages.chat(PHONE)
-        await asyncio.sleep(0.4)
         replies.think("I should greet first. Then I will look around.")
         replies.push(
             ScriptedTurn(
@@ -1031,11 +1034,10 @@ async def test_a_run_that_ends_in_a_moment_tells_only_its_answer_whatever_it_did
         progress_first_s=60.0,
         **own_places(),
     )
-    await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
+    await runtime.store.kv_set(STATE_KEY, _from_now(messages))
     await channels.start()
     try:
         own: int = messages.chat(PHONE)
-        await asyncio.sleep(0.4)
         replies.think("A quick one.")
         replies.push(
             ScriptedTurn(text="", calls=(ScriptedCall(tool="list_dir", arguments={"path": "."}),)),
