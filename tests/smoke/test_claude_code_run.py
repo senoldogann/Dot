@@ -7,10 +7,12 @@ done); the run ends done with the program's answer and keeps its session for the
 that is not Dot's, and a plan whose window is used up, end the run failed with why. No model is called."""
 
 import asyncio
+import dataclasses
 import json
 import os
 import stat
 import sys
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,11 +23,16 @@ import pytest_asyncio
 from dotagent.agent.manager import RunManager
 from dotagent.claude_code.run import chat_path
 from dotagent.config import load_config
-from dotagent.core.errors import InvalidValueError
+from dotagent.core.errors import FailSafeTriggered, InvalidValueError
 from dotagent.core.paths import claude_code_dir
+from dotagent.core.types import JsonObject
 from dotagent.memory.service import SavedMemory, save_memory, update_memory_note, words_only
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.scheduler.notices import said_nothing_new
+from dotagent.store.endings import PREFIX_EMERGENCY_STOP
 from dotagent.store.models import EventRecord, RunPicks, RunRecord
+from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult
+from dotagent.tools.context import ToolContext
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -157,6 +164,132 @@ async def test_a_run_goes_whole_to_claude_code_and_its_calls_go_through_the_gate
     # The chat keeps its session, which its next run resumes.
     kept: dict[str, object] = await asyncio.to_thread(_json, chat_path(ended.thread_id))
     assert kept["session_id"] == "ses-standin-1"
+
+
+async def test_a_finish_that_did_not_succeed_ends_the_run_failed_with_what_it_needs(room: Room) -> None:
+    """Item 1076: a run on the plan ended done whatever it said, with nothing under what it needs, so the page never
+    said "Waiting on you" and a schedule's failure was never told. Its finish now ends it as Dot's own loop's does."""
+    started: RunRecord = await room.manager.start(
+        "Pay the bill; it needs a code.", "task", MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    async with asyncio.timeout(30):
+        ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.status == "failed" and ended.result == "The bank asks for a code.", ended.result
+    (finished,) = await room.runtime.store.events_of_kind(ended.id, "run_finished", 5)
+    assert finished.data["needs"] == "The code the bank sent to your phone."
+    # The chat keeps the finish's answer, not the empty line the program wrote after it, for the chat's next run.
+    replies: list[str] = [
+        m.content for m in await room.runtime.store.load_messages(ended.thread_id, 0) if m.role == "assistant"
+    ]
+    assert replies[-1] == "The bank asks for a code.", replies
+
+
+async def test_a_hold_keeps_the_run_waiting_for_the_owners_next_message(room: Room) -> None:
+    """Item 1076: a ✋ was sent to the program as words, and the run ended with the turn. Now it holds the run, as in
+    Dot's own loop: the run stays at work after the turn, waiting, until the owner writes, and the pages are told."""
+    started: RunRecord = await room.manager.start(
+        "Please talk with me.", "task", MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    await asyncio.sleep(0.3)
+    room.manager.tell(started.id, "The owner reacted ✋: hold on.", "hold")
+    await asyncio.sleep(3.0)
+    assert started.id in room.manager.active_run_ids() and room.manager.holding(started.id)
+    held = await room.runtime.store.events_of_kind(started.id, "reaction_hold", 5)
+    assert len(held) == 1
+    room.manager.steer(started.id, "Go on now.", ())
+    async with asyncio.timeout(30):
+        ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.status == "done", ended.result
+    (let_go,) = await room.runtime.store.events_of_kind(started.id, "reaction_hold_ended", 5)
+    assert let_go.data["reason"] == "message"
+
+
+async def test_the_emergency_stop_a_tool_meets_ends_the_run_as_one(room: Room) -> None:
+    """Item 1076: a call of Dot's tool runs in the bridge's task, so the emergency stop it met (the pointer in a corner
+    of the screen) went to Claude Code as a failed call and the run went on. Now it ends the run as the emergency
+    stop."""
+    registry = room.runtime.registry
+    shell: RegisteredTool = registry.tools["shell"]
+
+    async def stopped(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
+        prepared: PreparedCall = await shell.prepare(arguments, ctx)
+
+        async def corner(_: ToolContext) -> ToolResult:
+            raise FailSafeTriggered("the pointer is in a corner of the screen", {})
+
+        return dataclasses.replace(prepared, run=corner)
+
+    registry.tools["shell"] = dataclasses.replace(shell, prepare=stopped)
+    try:
+        started: RunRecord = await room.manager.start(
+            "Run the slow command.", "task", MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(30):
+            ended: RunRecord = await room.manager.wait(started.id)
+    finally:
+        registry.tools["shell"] = shell
+    assert ended.status == "cancelled" and ended.result.startswith(PREFIX_EMERGENCY_STOP), ended.result
+
+
+async def _replies(room: Room, run_id: str) -> int:
+    """How many replies of the model with words the run has stored."""
+    steps: list[EventRecord] = await room.runtime.store.events_of_kind(run_id, "assistant", 50)
+    return sum(1 for step in steps if str(step.data.get("text", "")).strip())
+
+
+async def test_a_finish_then_a_message_ends_as_the_reply_after_it(room: Room) -> None:
+    """Item 1076's pre-push review: a finish before the owner's next message does not decide the run's end once the
+    model went on after it. The model finishes needing a code, the owner holds the run and writes the code, and the
+    model answers plainly: the run ends done with that answer, not failed with the old one."""
+    started: RunRecord = await room.manager.start(
+        "Pay it: finish then talk.", "task", MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    await asyncio.sleep(0.3)
+    room.manager.tell(started.id, "The owner reacted ✋: hold on.", "hold")
+    # Held once its turn, the finish among it, has ended.
+    deadline: float = time.monotonic() + 30
+    while not (room.manager.holding(started.id) and await _replies(room, started.id) >= 2):
+        assert time.monotonic() < deadline, "the run never came to rest held"
+        await asyncio.sleep(0.1)
+    room.manager.steer(started.id, "Here is the code: 8087.", ())
+    async with asyncio.timeout(30):
+        ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.status == "done" and ended.result == "Heard you again.", ended.result
+
+
+async def test_a_call_after_a_finish_drops_what_the_finish_said(room: Room) -> None:
+    """Item 1076's pre-push review: Dot's own runs end at a finish, but the program's turn can go on after it. The
+    model finishes saying it paid, then checks and writes that the payment was declined: the run ends with that, not
+    with the finish's answer."""
+    started: RunRecord = await room.manager.start(
+        "Pay it: finish then check.", "task", MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    async with asyncio.timeout(30):
+        ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.result == "The payment was declined after all.", ended.result
+    # Nor does the finish's "nothing new" keep the end from the phone.
+    assert not await said_nothing_new(room.runtime.store, ended.id)
+
+
+async def test_a_stop_ends_the_call_of_dots_tool_at_work_for_the_program(room: Room) -> None:
+    """Item 1076: a call of Dot's tool runs in the bridge's task, not the run's; a Stop that ends the program cuts it
+    all the same (its request is cancelled as the program goes), which this keeps: stopped while its command sleeps,
+    the command never writes."""
+    started: RunRecord = await room.manager.start(
+        "Run the slow command.", "task", MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    deadline: float = time.monotonic() + 30
+    while not await room.runtime.store.events_of_kind(started.id, "tool_call", 5):
+        assert time.monotonic() < deadline, "the program never called its command"
+        await asyncio.sleep(0.1)
+    await asyncio.sleep(0.5)
+    room.manager.cancel(started.id)
+    async with asyncio.timeout(30):
+        ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.status == "cancelled", ended.result
+    # The command slept 2 s before it would write: well past that, nothing was written.
+    await asyncio.sleep(3)
+    assert not await asyncio.to_thread((room.runtime.workspace / "late.txt").exists)
 
 
 async def test_a_model_given_a_tool_that_is_not_dots_ends_the_run_failed_at_once(room: Room) -> None:

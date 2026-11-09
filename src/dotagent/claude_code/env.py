@@ -9,7 +9,13 @@ from dotagent.repair.claude import worker_env
 # and git's (Self-repair's worker sets some to keep its sessions from GitHub; here the model has no command of its own).
 _CLEARED_PREFIXES: tuple[str, ...] = ("DOT_", "GIT_")
 # No updater, no telemetry and no error report: the program's only network is Anthropic's API.
-_PROGRAM_ENV: dict[str, str] = {"DISABLE_AUTOUPDATER": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
+# A call of Dot's tool may wait a day (a question the owner answers, an approval, a helper at work: item 1076), which
+# Claude Code's own limit on an MCP call would cut short, the model going on without the answer: the limit is a day.
+_PROGRAM_ENV: dict[str, str] = {
+    "DISABLE_AUTOUPDATER": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "MCP_TOOL_TIMEOUT": str(24 * 3600 * 1000),
+}
 
 
 def claude_env(env: Mapping[str, str], scratch: Path) -> dict[str, str]:

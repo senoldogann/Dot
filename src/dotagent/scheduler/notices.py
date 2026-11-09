@@ -17,9 +17,16 @@ async def said_nothing_new(store: Store, run_id: str) -> bool:
     that went through, not one refused before the run went on (the review of item 880), and never in a run that read
     content third parties can author."""
     finished: EventRecord | None = await store.last_ok_call_of(run_id, FINISH_TOOL)
-    args: object = None if finished is None else finished.data.get("args")
+    if finished is None:
+        return False
+    args: object = finished.data.get("args")
     if not (isinstance(args, dict) and args.get("nothing_new") is True):
         return False
+    # A run on the Claude plan can go on after its finish (item 1076): a call or a message after it is newer than what
+    # it said, and the run ends as that goes, so its "nothing new" no longer holds.
+    for later in ("tool_call", "steer"):
+        if await store.events_of_kind_after(run_id, later, finished.id):
+            return False
     # Said by a run that read a mail or a page, it may be what that mail told it to say, so that its end, and what came
     # with it, is not told: such a run is told as any other (the pre-push review of item 880).
     return not await store.run_ever_tainted(run_id)
