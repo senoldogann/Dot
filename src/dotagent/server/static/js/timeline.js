@@ -205,6 +205,8 @@ function drawLive(live) {
   live.body.append(...blocks.slice(kept).map((sourced) => blockNode(sourced.block)));
   live.drawn = blocks.map((sourced) => sourced.source);
   lastLine(live.body).append(live.caret);
+  // A step whose model has sent only spaces so far has nothing to show yet (item 1091): run.css keeps it out of sight.
+  live.node.toggleAttribute("data-blank", blocks.length === 0);
 }
 
 /** Where the reveal of `text` stops after `at`: the end of the word it reaches, so that a word comes whole. */
