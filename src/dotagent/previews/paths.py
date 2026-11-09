@@ -9,13 +9,18 @@ followed, so a link cannot lead out of those places. Dot's own files (its databa
 What the panel draws is told by the file's first bytes, its suffix aside for Office files and tables: a PDF, an image
 of a kind every browser draws, a Word document, an Excel workbook, a presentation, a CSV or TSV table, or text.
 
+A path that is neither absolute nor under ``~/`` is a file of the workspace, as an agent names one it made in a message
+(``README.md``, ``site/index.html``): the workspace's own, else the newest file in it whose path ends so (item 1077).
+
 Only documents open in their application (``OPENED_SUFFIXES``): a script, a page or an application would run.
 """
 
+import os
 from pathlib import Path
 from typing import Literal
 
 from dotagent.core.errors import InvalidValueError, NotFoundError
+from dotagent.core.logs import get_logger
 from dotagent.office import OfficeKind, office_kind, unreadable_office_file
 from dotagent.web.text import document_kind
 
@@ -73,13 +78,53 @@ _LIBRARY: str = "library"
 _CLOUD_FOLDERS: frozenset[str] = frozenset({"cloudstorage", "mobile documents"})
 
 
-def _named(raw: str, home: Path) -> Path:
+log = get_logger(__name__)
+
+# The entries the search of the workspace for a file named by the end of its path looks at at most, so that a name in
+# a big workspace (a project and its packages) is found in a moment or not at all.
+_SEARCHED_ENTRIES: int = 20_000
+
+
+def _named(raw: str, home: Path, workspace: Path) -> Path:
     if raw.startswith("~/"):
         return home / raw.removeprefix("~/")
     path: Path = Path(raw)
-    if not path.is_absolute():
-        raise InvalidValueError("the path is neither absolute nor under ~", {"path": raw})
-    return path
+    return path if path.is_absolute() else _in_workspace(raw, workspace)
+
+
+def _in_workspace(raw: str, workspace: Path) -> Path:
+    """The file of the workspace the relative path ``raw`` names (module docstring): ``workspace / raw`` when it is a
+    file, else the newest file (no link) outside hidden folders whose path ends with ``raw``'s parts, its case aside,
+    among the first ``_SEARCHED_ENTRIES`` entries. ``NotFoundError`` when there is none; ``InvalidValueError`` for a
+    path that climbs out (``..``) or names nothing."""
+    parts: tuple[str, ...] = Path(raw).parts
+    if not parts or ".." in parts:
+        raise InvalidValueError("a path in the workspace names a file in it", {"path": raw})
+    direct: Path = workspace / raw
+    if direct.is_file():
+        return direct
+    wanted: tuple[str, ...] = tuple(part.casefold() for part in parts)
+    found: list[Path] = []
+    seen: int = 0
+    for folder, folders, files in os.walk(workspace):
+        folders[:] = [name for name in folders if not name.startswith(".")]
+        seen += len(folders) + len(files)
+        for name in files:
+            if name.casefold() != wanted[-1]:
+                continue
+            candidate: Path = Path(folder) / name
+            # A link is left out: one that leads nowhere, or to a file the panel refuses, would hide a file it shows.
+            if (
+                not candidate.is_symlink()
+                and tuple(part.casefold() for part in candidate.parts[-len(wanted) :]) == wanted
+            ):
+                found.append(candidate)
+        if seen > _SEARCHED_ENTRIES:
+            log.warning("workspace_search_cut", path=raw, searched=seen, found=len(found))
+            break
+    if not found:
+        raise NotFoundError("there is no such file in the workspace", {"path": raw, "workspace": str(workspace)})
+    return max(found, key=lambda candidate: candidate.stat().st_mtime_ns)
 
 
 def _within(path: Path, root: Path) -> tuple[str, ...] | None:
@@ -95,11 +140,11 @@ def _within(path: Path, root: Path) -> tuple[str, ...] | None:
 
 
 def located_file(raw: str, home: Path, workspace: Path) -> Path:
-    """The file ``raw`` names (``~/`` standing for ``home``), its links followed, when it is in a place the panel shows
-    files of. ``NotFoundError`` when there is no such file; ``InvalidValueError`` when it is no file, is elsewhere (and
-    where), or its path cannot be followed."""
+    """The file ``raw`` names (``~/`` standing for ``home``, a relative path a file of ``workspace``), its links
+    followed, when it is in a place the panel shows files of. ``NotFoundError`` when there is no such file;
+    ``InvalidValueError`` when it is no file, is elsewhere (and where), or its path cannot be followed."""
     try:
-        path: Path = _named(raw, home).resolve(strict=True)
+        path: Path = _named(raw, home, workspace).resolve(strict=True)
     except (FileNotFoundError, NotADirectoryError) as error:
         # A file where the path needs a folder names no file either.
         raise NotFoundError("there is no such file", {"path": raw}) from error

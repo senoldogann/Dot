@@ -355,8 +355,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
 - A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269) and
   a file's path an answer names in code (under `~/` or `/Users/<you>/`; Dot names the files it made by their full
-  paths) open it in the side panel (the Task tab's list of the conversation's files went with item 544), which takes
-  half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
+  paths) open it in the side panel, and so do a file named by its name or the end of its path (item 1077): in code
+  with a suffix files have (`README.md`, `site/index.html`, `total.py`), in words a document's (`notes.md`,
+  `report.pdf`, `page.html`, `.txt`, `.csv`, `.docx`, `.xlsx`, `.pptx`), found in the workspace (the workspace's own
+  path, else the newest file in it outside hidden folders whose path ends so), and the eye on a file's row in the
+  Changes tab, which shows the file as it is now without opening its diff. The Task tab's list of the conversation's files went
+  with item 544. The panel takes half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
   daemon draws with Core Graphics as they come into view; a page more than 20,000 px tall at the width asked is refused
   rather than drawn (item 386). A Word document, an Excel
   workbook and a presentation show first as macOS's Quick Look draws them (item 268), as Finder would: their fonts,
@@ -375,7 +379,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   code, and as it is written a click away (item 269), its HTML never drawn; a source file (Python, JavaScript,
   TypeScript, shell, Rust, Go, Swift, SQL, YAML and the like, by its extension) as code, its lines numbered and its
   words coloured by their kind (keywords, strings, numbers, comments), its language and its path over it (item 624); any
-  other text as text, never as a page. On a page without the panel (the new chat's, an agent's) the file opens in a
+  other text as text, never as a page; a web page (`.html`, `.htm`, up to 10 MB) drawn as a browser draws it, without
+  its scripts (item 1077): kept in `looks/` and served as Quick Look's drawings are, in a frame sandboxed with nothing
+  allowed, so no script of it runs (one could take the frame to another site) and no refresh moves it, and it reaches
+  no server, nor the pictures and styles beside it on the disk; its source is a click away (**Source**). On a page without the panel (the new chat's, an agent's) the file opens in a
   dialog. **Copy the text** in the panel's head takes
   what the panel reads of a text or Markdown file, a PDF (its text, page by page, up to 512 KB), a Word document or a
   presentation (item 403). **Open on the Mac** opens a document in its application (`open`), never a script or a
@@ -386,6 +393,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `~/Library/Mobile Documents`), judged once links are followed; for another file it says why not. The routes are `GET
   /api/files/preview?path=`, `GET /api/attachments/{id}/preview`, `GET /api/files/look?path=` and `GET
   /api/attachments/{id}/look` (where the drawing is served; 422 when Quick Look cannot draw the file), `GET
+  /api/files/web-page?path=` (where a web page is served, item 1077), `GET
   /api/files/page` (a PDF's page as a PNG), `GET /api/files/image` and `POST /api/files/open`.
 
 ### Reactions on Dot's messages

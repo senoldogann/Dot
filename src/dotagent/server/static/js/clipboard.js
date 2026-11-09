@@ -8,7 +8,7 @@ import { el } from "./dom.js";
 // What is not part of what was said: controls, the faces of the actors, the feet under messages and answers (their time
 // and buttons) and what only a screen reader hears. A file's path in code is a button too, but it is text (prose.js).
 const LEFT_OUT = [
-  "button:not(.code-path)",
+  "button:not(.code-path):not(.file-word)",
   "input",
   "select",
   "textarea",
@@ -340,6 +340,10 @@ function cleanHtml(nodes) {
   for (const button of holder.querySelectorAll("button.code-path")) {
     // The path as it was written, not the name its chip shows (item 832).
     button.replaceWith(el("code", null, button.getAttribute("data-path") ?? button.textContent));
+  }
+  for (const button of holder.querySelectorAll("button.file-word")) {
+    // A file named in words is the words it was written as (item 1077).
+    button.replaceWith(button.textContent);
   }
   for (const node of holder.querySelectorAll("*")) {
     for (const name of node.getAttributeNames()) {

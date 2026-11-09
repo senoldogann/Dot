@@ -15,7 +15,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.desktop.apps import open_document
 from dotagent.previews.paths import HEAD_BYTES, OFFICE_KINDS, image_type, located_file, opens_on_mac, shown_kind
 from dotagent.previews.pdfpages import page_png
-from dotagent.previews.quicklook import QuickLook, media_type, part_path
+from dotagent.previews.quicklook import PAGE, QuickLook, media_type, part_path
 from dotagent.previews.shown import MAX_OFFICE_BYTES, ShownFile, shown_file
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import LOOKS_PREFIX
@@ -54,6 +54,20 @@ def _drawable(path: Path) -> Path:
     return path
 
 
+# The web pages the panel shows as pages (item 1077), and the largest it keeps.
+_WEB_PAGE_SUFFIXES: frozenset[str] = frozenset({".html", ".htm"})
+MAX_WEB_PAGE_BYTES: int = 10 * 1024 * 1024
+
+
+def _web_page(path: Path) -> Path:
+    """``path`` when it is a web page the panel shows as a page; ``InvalidValueError`` otherwise, and why."""
+    if path.suffix.lower() not in _WEB_PAGE_SUFFIXES:
+        raise InvalidValueError("only an .html file is shown as a page", {"path": str(path)})
+    if path.stat().st_size > MAX_WEB_PAGE_BYTES:
+        raise InvalidValueError("the page is too large to be shown", {"path": str(path), "max": MAX_WEB_PAGE_BYTES})
+    return path
+
+
 def files_router(ctx: ServerContext, looks: QuickLook) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     workspace: Path = ctx.runtime.workspace
@@ -78,9 +92,16 @@ def files_router(ctx: ServerContext, looks: QuickLook) -> APIRouter:
             )
         )
 
+    @router.get("/files/web-page")
+    async def web_page(path: str) -> LookAnswer:
+        """Where the web page at ``path`` is served for a frame of the panel, sandboxed as a drawing (item 1077)."""
+        found: Path = await asyncio.to_thread(lambda: _web_page(located(path)))
+        drawing: str = await looks.page(found)
+        return LookAnswer(pages=(LookPage(name="", url=f"{LOOKS_PREFIX}{drawing}/{PAGE}"),))
+
     @router.get("/files/preview")
     async def preview_file(path: str) -> ShownFile:
-        """What the panel shows of the file at ``path``: absolute, or under ``~/``."""
+        """What the panel shows of the file at ``path``: absolute, under ``~/``, or relative, in the workspace."""
         return await asyncio.to_thread(shown, path)
 
     @router.get("/attachments/{attachment_id}/preview")

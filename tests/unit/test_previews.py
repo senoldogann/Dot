@@ -3,6 +3,7 @@ are followed; how it shows each, told by the file's first bytes; a CSV table spl
 shown; a long text cut; and a PDF's pages drawn as pictures at the widths asked, in their proportions."""
 
 import io
+import os
 from pathlib import Path
 
 import openpyxl
@@ -58,10 +59,39 @@ def test_the_panel_shows_files_of_the_workspace_and_of_the_home_folder_outside_h
     # A link is judged by where it leads.
     assert _refusal("~/Documents/away.txt", home, workspace) == "the file is outside your home folder"
     assert _refusal(str(elsewhere), home, workspace) == "the file is outside your home folder"
-    assert _refusal("Documents/plan.txt", home, workspace) == "the path is neither absolute nor under ~"
+    # A relative path names a file of the workspace (item 1077), not of wherever the daemon runs.
+    with pytest.raises(NotFoundError):
+        located_file("Documents/plan.txt", home, workspace)
     assert _refusal("~/Documents", home, workspace) == "the path is no file"
     with pytest.raises(NotFoundError):
         located_file("~/Documents/gone.txt", home, workspace)
+
+
+def test_a_file_named_as_an_agent_names_one_is_the_newest_of_the_workspace_whose_path_ends_so(tmp_path: Path) -> None:
+    """Item 1077: a message names a file it made by its name (``README.md``) or the end of its path; the chip opens
+    the workspace's own, else the newest in it whose path ends so, never one in a hidden folder or out of it."""
+    home: Path = tmp_path / "home"
+    workspace: Path = home / "workspace"
+    old: Path = _file(workspace / "a" / "README.md", b"old")
+    new: Path = _file(workspace / "b" / "README.md", b"new")
+    os.utime(old, (1_000_000, 1_000_000))
+    top: Path = _file(workspace / "notes.txt", b"top")
+    _file(workspace / ".cache" / "secret.txt", b"hidden")
+    _file(home / ".ssh" / "key.txt", b"key")
+    (workspace / "c").mkdir()
+    (workspace / "c" / "key.txt").symlink_to(home / ".ssh" / "key.txt")
+    # A link that leads nowhere, newer than the file, hides nothing.
+    (workspace / "c" / "README.md").symlink_to(workspace / "gone.md")
+    assert located_file("README.md", home, workspace) == new.resolve()
+    assert located_file("a/readme.md", home, workspace).samefile(old)
+    assert located_file("notes.txt", home, workspace) == top.resolve()
+    with pytest.raises(NotFoundError):
+        located_file("secret.txt", home, workspace)
+    assert _refusal("../home/workspace/notes.txt", home, workspace) == "a path in the workspace names a file in it"
+    # A link the search finds is left out; one named by its path is judged by where it leads.
+    with pytest.raises(NotFoundError):
+        located_file("key.txt", home, workspace)
+    assert _refusal("c/key.txt", home, workspace) == "the file is in a hidden folder"
 
 
 def test_a_path_through_a_file_is_not_found_and_a_loop_of_links_is_refused(tmp_path: Path) -> None:

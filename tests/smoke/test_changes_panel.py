@@ -1,6 +1,8 @@
 """The Changes of a chat in the side panel (item 368): the file a run created and edited, with its lines added and
-removed, opening on its diff, and the tab counting the files; the same from `GET /api/runs/{id}/changes`. Wide and
-light, and on a phone and dark. A real server on a scripted model."""
+removed, opening on its diff, and the tab counting the files; the same from `GET /api/runs/{id}/changes`. A file there
+shows as it is now from its row, a web page drawn in a sandboxed frame, and a file the answer names by its name, in
+words or in code, from the answer (item 1077). Wide and light, and on a phone and dark. A real server on a scripted
+model."""
 
 import asyncio
 import time
@@ -32,6 +34,13 @@ TOKEN: str = "changes-panel-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _GOAL: str = "Write the notes and fix their second line."
 _RUN_WAIT_S: float = 60.0
+# A page with a script that would write a line and a refresh that would take it elsewhere: the panel draws it with
+# neither (item 1077's pre-push review: a script may take its frame to another site).
+PAGE: str = (
+    '<meta http-equiv="refresh" content="0;url=http://127.0.0.1:9/"><h1>Report</h1><p id="line">as written</p>'
+    '<script>document.getElementById("line").textContent = "ran"; location = "http://127.0.0.1:9/"</script>\n'
+)
+ANSWER: str = "The notes are written in notes.md, and the page in `page.html`."
 
 
 def _call(tool: str, arguments: dict[str, object]) -> ScriptedTurn:
@@ -42,7 +51,8 @@ def _script() -> list[ScriptedTurn]:
     return [
         _call("write_file", {"path": "notes.md", "content": "one\ntwo\nthree\n"}),
         _call("edit_file", {"path": "notes.md", "old": "two", "new": "2"}),
-        _call(FINISH_TOOL, {"answer": "The notes are written.", "success": True}),
+        _call("write_file", {"path": "site/page.html", "content": PAGE}),
+        _call(FINISH_TOOL, {"answer": ANSWER, "success": True}),
     ]
 
 
@@ -117,8 +127,8 @@ async def test_the_api_lists_the_file_with_its_counts_and_its_diff(served: tuple
         answer = await client.get(f"/api/runs/{run.id}/changes")
     assert answer.status_code == 200, answer.text
     view = answer.json()
-    assert (view["added"], view["removed"]) == (3, 0)
-    [file] = view["files"]
+    assert (view["added"], view["removed"]) == (4, 0)
+    [file] = [file for file in view["files"] if file["path"].endswith("notes.md")]
     assert file["path"].endswith("/workspace/notes.md")
     assert (file["created"], file["gone"], file["changes"], file["note"]) == (True, False, 2, None)
     assert "+one\n+2\n+three\n" in file["diff"]
@@ -139,8 +149,10 @@ async def test_the_changes_tab_counts_the_files_and_opens_each_on_its_diff(
                 page: Page = await context.new_page()
                 errors: list[str] = []
                 page.on("pageerror", _kept_in(errors))
+                # The page's own window only: a sandboxed frame of a web page (item 1077) has no storage.
                 await page.add_init_script(
-                    "sessionStorage.setItem('dot.opened', '1'); localStorage.setItem('dot.inspector', 'on')"
+                    "if (window === window.top) {"
+                    " sessionStorage.setItem('dot.opened', '1'); localStorage.setItem('dot.inspector', 'on') }"
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")
@@ -148,11 +160,11 @@ async def test_the_changes_tab_counts_the_files_and_opens_each_on_its_diff(
                 if width < 960:
                     await page.locator("button[aria-label='Task details']").click()
                 tab: Locator = page.get_by_role("tab", name="Changes")
-                await expect(tab).to_contain_text("1")
+                await expect(tab).to_contain_text("2")
                 await tab.click()
                 section: Locator = page.locator("#panel-run-changes")
-                row: Locator = section.locator("details.change")
-                await expect(row).to_have_count(1)
+                await expect(section.locator("details.change")).to_have_count(2)
+                row: Locator = section.locator("details.change").filter(has_text="notes.md")
                 await expect(row.locator(".change-name")).to_have_text("notes.md")
                 await expect(row.locator(".badge")).to_have_text("created")
                 await expect(row.locator(".change-add")).to_have_text("+3")
@@ -164,7 +176,46 @@ async def test_the_changes_tab_counts_the_files_and_opens_each_on_its_diff(
                 box = await row.locator(".diff").bounding_box()
                 assert box is not None and box["x"] + box["width"] <= width, box
                 await page.screenshot(path=str(tmp_path / f"changes-{width}-{scheme}.png"))
+                await _previews(page, section, tmp_path / f"page-{width}-{scheme}.png")
                 assert errors == []
                 await context.close()
         finally:
             await browser.close()
+
+
+async def _previews(page: Page, section: Locator, shot: Path) -> None:
+    """Item 1077: a row shows its file as it is now without opening its diff; a web page is drawn in a frame that runs
+    none of its scripts and follows none of its refreshes, its source a click away; the answer's file names, in words
+    and in code, show their files."""
+    view: Locator = page.locator(".file-view")
+    pages: Locator = section.locator("details.change").filter(has_text="page.html")
+    await pages.get_by_role("button", name="Show page.html as it is now").click()
+    await expect(view).to_have_attribute("data-kind", "text")
+    frame: Locator = view.locator("iframe.file-look")
+    await expect(frame).to_have_attribute("sandbox", "")
+    await expect(view.frame_locator("iframe.file-look").locator("#line")).to_have_text("as written")
+    await page.wait_for_timeout(1000)
+    await expect(view.frame_locator("iframe.file-look").locator("h1")).to_have_text("Report")
+    await expect(view.frame_locator("iframe.file-look").locator("#line")).to_have_text("as written")
+    await page.screenshot(path=str(shot))
+    await view.get_by_role("button", name="Source").click()
+    await expect(view.locator(".file-code-editor")).to_contain_text("<h1>Report</h1>")
+    await expect(pages).not_to_have_attribute("open", "")
+    await view.get_by_role("button", name="Close the file").click()
+    await expect(view).to_have_count(0)
+    if await page.get_by_role("button", name="Close the details").is_visible():
+        # The drawer of the details slides away, the answer under it.
+        await page.get_by_role("button", name="Close the details").click()
+        await expect(page.locator("aside.inspector")).not_to_have_attribute("data-open", "true")
+    # In the answer: the name in words opens the Markdown formatted, the one in code the page.
+    answer: Locator = page.locator(".answer").last
+    word: Locator = answer.locator("button.file-word")
+    await expect(word).to_have_text("notes.md")
+    await word.click()
+    await expect(view.locator(".file-markdown")).to_contain_text("three")
+    await view.get_by_role("button", name="Close the file").click()
+    await expect(view).to_have_count(0)
+    await answer.locator("button.code-path").filter(has_text="page.html").click()
+    await expect(view.frame_locator("iframe.file-look").locator("#line")).to_have_text("as written")
+    await view.get_by_role("button", name="Close the file").click()
+    await expect(view).to_have_count(0)

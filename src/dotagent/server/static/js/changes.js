@@ -3,7 +3,7 @@
 // unified diff; a file without a diff says why. The side panel's Changes tab holds them and counts the files.
 
 import { api } from "./api.js";
-import { el, plural } from "./dom.js";
+import { el, plural, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 
@@ -23,11 +23,33 @@ function counts(added, removed) {
   );
 }
 
+/** The button that shows the file `path` as it is now beside the conversation (item 1077): a page drawn, a PDF's
+ * pages, a Markdown file formatted, a text. A press does not open the diff the row holds. */
+function previewButton(path, name) {
+  return el(
+    "button",
+    {
+      class: "btn ghost sm icon-only change-preview",
+      type: "button",
+      title: `Show ${name} as it is now`,
+      "aria-label": `Show ${name} as it is now`,
+      dataset: { path },
+      onclick: (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        requestFile(event.currentTarget);
+      },
+    },
+    icon("eye"),
+  );
+}
+
 /** A file the chat's runs changed: its name over its folder, as the Files card has them, whether they created it or
- * it is gone, its counts; opened, its diff. */
+ * it is gone, its counts, a button that shows it as it is now unless it is gone; opened, its diff. */
 function fileRow(file, open) {
   const state = file.created ? "created" : file.gone ? "gone" : null;
   const cut = file.path.lastIndexOf("/");
+  const name = file.path.slice(cut + 1);
   const head = el(
     "summary",
     { class: "change-head" },
@@ -35,11 +57,12 @@ function fileRow(file, open) {
     el(
       "span",
       { class: "change-path", title: file.path },
-      el("span", { class: "change-name" }, file.path.slice(cut + 1)),
+      el("span", { class: "change-name" }, name),
       cut <= 0 ? null : el("span", { class: "change-where" }, file.path.slice(0, cut)),
     ),
     state === null ? null : el("span", { class: "badge" }, state),
     counts(file.added, file.removed),
+    file.gone ? null : previewButton(file.path, name),
     el("span", { class: "chev" }, icon("chevron")),
   );
   // The lines of a diff are drawn when the file is first opened (item 674): a chat's diffs run to thousands of lines,
