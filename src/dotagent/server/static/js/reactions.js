@@ -5,7 +5,7 @@
 // keeps the message as a note. A message of a run is told apart by the run and a key: `answer` for the answer the run ended
 // with, `step-<n>` for what it said in its step `n`.
 
-import { api } from "./api.js";
+import { ApiError, api } from "./api.js";
 import { debounce, el } from "./dom.js";
 import { icon } from "./icons.js";
 import { readFailed } from "./state.js";
@@ -197,9 +197,19 @@ export function createReactions({ threadId, signal }) {
     paintAll();
   }
 
-  /** Read them again once a burst of events has settled; a read that fails is told as the pages tell theirs. */
+  /** Read them again once a burst of events has settled; a read that fails is told as the pages tell theirs. A read due
+   * after the page went, or one the daemon answers 404 to (a chat deleted meanwhile, or its run), tells nothing: it
+   * shows nothing anyone still reads (the nightly test of 2026-11-09 saw "The reactions could not be updated" on the
+   * page after a deleted chat's). */
   const refresh = debounce(() => {
-    load().catch((error) => readFailed("The reactions", error));
+    if (signal.aborted) {
+      return;
+    }
+    load().catch((error) => {
+      if (!signal.aborted && !(error instanceof ApiError && error.status === 404)) {
+        readFailed("The reactions", error);
+      }
+    });
   }, REFRESH_MS);
 
   const path = (runId, message) => `/runs/${runId}/messages/${message}/reactions`;
