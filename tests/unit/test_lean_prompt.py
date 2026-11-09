@@ -142,4 +142,4 @@ def test_the_lean_prompt_is_less_than_half_of_the_full_one_which_says_each_tool_
 def test_both_prompts_tell_the_model_to_analyse_thoroughly_and_recommend_boldly() -> None:
     """The owner's rule of 2026-11-07 (item 1023), in the full prompt, the lean one and the Claude plan's."""
     assert THOROUGH_AND_BOLD in _prompt("full", "ask") and THOROUGH_AND_BOLD in _prompt("lean", "ask")
-    assert THOROUGH_AND_BOLD in system_prompt("Dot", "door", ["read_file"], Path("/tmp/work"), "today", [])
+    assert THOROUGH_AND_BOLD in system_prompt("Dot", "door", ["read_file"], Path("/tmp/work"), "today", "", [])

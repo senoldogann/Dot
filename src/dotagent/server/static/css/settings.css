@@ -2301,14 +2301,17 @@
 
 .type-preview[data-preview="interface"] {
   font: var(--text-ui) / var(--leading-ui) var(--font);
+  font-weight: var(--weight-text);
 }
 
 .type-preview[data-preview="answers"] {
-  font: var(--text-md) / var(--leading-md) var(--voice);
+  font: var(--answer-size) / var(--answer-leading) var(--voice);
+  font-weight: var(--answer-weight);
 }
 
 .type-preview[data-preview="composer"] {
   font: var(--composer-size) / var(--composer-leading) var(--composer-font);
+  font-weight: var(--composer-weight);
 }
 
 .type-preview[data-preview="code"] {
@@ -2316,6 +2319,7 @@
   white-space: pre;
   overflow-wrap: normal;
   font: var(--code-size) / var(--code-leading) var(--mono);
+  font-weight: var(--code-weight);
 }
 
 :root[data-wrap-code] .type-preview[data-preview="code"] {

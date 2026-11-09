@@ -134,7 +134,7 @@ the scheme on screen.
 
 On a phone Dot reads at a phone's size and takes a finger (item 329). On a touch screen of a phone's width (720 px and
 under, or under 500 px high on its side) the body is 16 px, as iOS's own text, a hint 15 px, and only the times, badges
-and the like are 13 px; Settings › Appearance's Text size still scales them all, and code keeps the size chosen
+and the like are 13 px; Settings › Appearance's Interface size still scales them all, and code keeps the size chosen
 for it. A phone's buttons and fields are 36 px tall and the small ones 32 (an icon button answers a finger's 44 px around it, and a button keeps its words, item 787), the heads of the steps and the rows of a
 delegated run keep 40, and what sits in a line (a chip, a way to a page) 32; a link inside a line of text is no target
 of its own. A switch's 40 by 24 px track sits in a 48 px box (item 337); a tap anywhere on a setting's row turns its
@@ -163,7 +163,7 @@ own, the bar naming the tab, with no row of the section's tabs over it, and a ca
 card, as a section's title does on the redrawn tabs (item 576); a card that folds keeps its name on its ground. In a
 Mac's window the sidebar is the settings' nav while they are open, the same rows by their names (items 562 and 999); see
 [the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
-Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px
+Appearance draws the colour schemes as phones and puts the themes two a row, and its Interface size starts at a phone's 16 px
 (item 331). A service's page of Customize › Connectors and an agent's editor name their cards the same way, a row of the
 home's Today strip keeps its facts to one line that fades where it runs out of room, and Handoffs' empty page says what
 brings messages there (item 332).

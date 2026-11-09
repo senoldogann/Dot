@@ -63,6 +63,7 @@ from dotagent.agent.handover import (
     tool_context,
     write_chat,
 )
+from dotagent.agent.helpers import Roster, current_roster
 from dotagent.agent.limits import (
     LIMIT_EVENT,
     LimitReached,
@@ -74,6 +75,7 @@ from dotagent.agent.limits import (
     limits_of,
 )
 from dotagent.agent.loop import (
+    NOT_FOR_DELEGATED_RUNS,
     AgentRun,
     HandedNotes,
     RunEnd,
@@ -83,10 +85,13 @@ from dotagent.agent.loop import (
     notes_to_hand,
     opening_text,
     start_notes,
+    team_brief,
+    team_name,
+    withheld_tools,
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
 from dotagent.agent.playbooks import offered_to_run
-from dotagent.agent.prompt import THOROUGH_AND_BOLD, turn_note
+from dotagent.agent.prompt import THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team_sections, turn_note
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
@@ -136,39 +141,31 @@ from dotagent.llm.types import (
 )
 from dotagent.memory.service import Remembered, memory_budget, owner_prompt_lines, owner_section
 from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
-from dotagent.opencode.run import bridged, meanwhile
+from dotagent.opencode.run import meanwhile
 from dotagent.repair.claude import LimitWindow, window_refused
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.endings import PREFIX_CUT_SHORT
-from dotagent.store.models import NO_PICKS, AgentRecord, RunMode, RunRecord
+from dotagent.store.models import NO_PICKS, AgentRecord, RunRecord, ThreadRecord
 from dotagent.tools.base import ToolResult
+from dotagent.tools.campaign import CAMPAIGN_TOOLS
+from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.groups import BROWSER_GROUP, group_of
+from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, REACT_TOOL, UPDATE_PLAN_TOOL, USE_TOOLS_TOOL
+from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
 from dotagent.tools.shell import kill_group
 
 log = get_logger(__name__)
 
-# Dot's core tools the model gets besides those an OpenCode agent gets (:func:`dotagent.opencode.run.bridged`): Claude
-# Code's own tools are off, so the files, the commands and the web are Dot's tools here. Those of Dot's own loop (the
-# plan, finish, the tool groups, helpers, teammates and a campaign's) stay out: the program runs its own loop.
-_OWN_CORE: frozenset[str] = frozenset(
-    {
-        "read_file",
-        "write_file",
-        "edit_file",
-        "list_dir",
-        "search_files",
-        "find_files",
-        "shell",
-        "web_fetch",
-        "web_search",
-        "web_extract",
-        "web_crawl",
-    }
-)
+# The tools of Dot's own loop, which the program does not get: it runs its own loop, so it plans, ends and finds its
+# tools in its own way (finish is its last reply, use_tools its search of the door, item 1053), and a reaction is on a
+# message of the owner's in Dot's own chat. Every other tool of Dot's is the model's, as a run of Dot's own loop has it
+# (item 1063: a run on the plan had no tool to message an agent, give it work or delegate, nor the mail, the drafts,
+# the vault or Dot's own list).
+_LOOP_OWN: frozenset[str] = frozenset({FINISH_TOOL, UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, USE_TOOLS_TOOL, REACT_TOOL})
 # A line of the stream may be long (a step that read a big page): the reader takes lines up to this size.
 _LINE_LIMIT: int = 32 * 1024 * 1024
 _STDERR_KEPT: int = 4000
@@ -220,23 +217,31 @@ def forget_chat(thread_id: str) -> None:
     chat_path(thread_id).unlink(missing_ok=True)
 
 
-def door_tool(name: str) -> bool:
-    """Whether Dot's tool ``name`` is one the model gets: an OpenCode agent's (:func:`dotagent.opencode.run.bridged`)
-    or one of :data:`_OWN_CORE`."""
-    return bridged(name) or name in _OWN_CORE
+def door_tool(name: str, delegated: bool) -> bool:
+    """Whether Dot's tool ``name`` is one the model gets, as Dot's own loop gives it (item 1063): any but the loop's own
+    (:data:`_LOOP_OWN`) and a campaign's, and for a run another run handed its work to (``delegated``) none of those it
+    may not use (:data:`dotagent.agent.loop.NOT_FOR_DELEGATED_RUNS`: it asks the owner nothing and hands nothing on).
+    A campaign's tools stay Dot's own loop's: whether a session reached the goal is judged by the facts and the plan of
+    its steps (``tools/campaign.py``), which that loop keeps and this program's run does not."""
+    return (
+        name not in _LOOP_OWN
+        and name not in CAMPAIGN_TOOLS | POST_TOOLS
+        and not (delegated and name in NOT_FOR_DELEGATED_RUNS)
+    )
 
 
 def door_tools(
-    registry: ToolRegistry, mode: RunMode, bounded: frozenset[str] | None, left_out: frozenset[str]
+    registry: ToolRegistry, run: RunRecord, bounded: frozenset[str] | None, left_out: frozenset[str]
 ) -> ToolRegistry:
-    """The tools of Dot's a run in ``mode`` gives the model: the :func:`door_tool` ones of the mode, of those only the
-    ones ``bounded`` names when the run is an agent's whose tools are bounded (item 86), and none of the groups
-    ``left_out`` (the browser's, when Settings › Browser keeps every run off it, item 354)."""
+    """The tools of Dot's ``run`` gives the model: the :func:`door_tool` ones of its mode, of those only the ones
+    ``bounded`` names when the run is an agent's whose tools are bounded (item 86), and none of the groups ``left_out``
+    (the browser's, when Settings › Browser keeps every run off it, item 354)."""
+    delegated: bool = run.parent_run_id is not None
     return ToolRegistry(
         tools={
             tool.spec.name: tool
-            for tool in tools_for_mode(registry, mode)
-            if door_tool(tool.spec.name)
+            for tool in tools_for_mode(registry, run.mode)
+            if door_tool(tool.spec.name, delegated)
             and (bounded is None or tool.spec.name in bounded)
             and group_of(tool.spec.name) not in left_out
         }
@@ -340,14 +345,18 @@ def claude_argv(
     )
 
 
-def system_prompt(name: str, door: str, tools: Sequence[str], workspace: Path, today: str, known: Sequence[str]) -> str:
+def system_prompt(
+    name: str, door: str, tools: Sequence[str], workspace: Path, today: str, team: str, known: Sequence[str]
+) -> str:
     """What the model is told besides Claude Code's own prompt: who it is (``name``), the door's ``tools``, how a run of
-    Dot's works and ends, and the lines ``known`` of the owner."""
+    Dot's works and ends, what Dot's own prompt says of the ``team`` (item 1063; empty for none), and the lines
+    ``known`` of the owner."""
     lead: str = _PROMPT.format(name=name, door=door, tools=", ".join(tools), workspace=workspace, today=today)
-    if not known:
-        return lead
-    lines: str = "\n".join(f"- {line}" for line in known)
-    return f"{lead}\n\nWhat you know about the owner:\n{lines}"
+    parts: list[str] = [lead, team]
+    if known:
+        lines: str = "\n".join(f"- {line}" for line in known)
+        parts.append(f"What you know about the owner:\n{lines}")
+    return "\n\n".join(part for part in parts if part)
 
 
 @dataclass
@@ -754,14 +763,52 @@ async def _prompt_of(agent: AgentRun, door: Door) -> str:
         name = f"{record.name}, one of Dot's agents ({record.role})"
         if record.instructions.strip():
             known.append(f"Your instructions as {record.name}: {record.instructions.strip()}")
+    tool_names: list[str] = [spec.name for spec in door.specs]
     return system_prompt(
         name,
         door.name,
-        [spec.name for spec in door.specs],
+        tool_names,
         runtime.workspace,
         datetime.now().astimezone().strftime("%A %Y-%m-%d, time zone %Z (UTC%z)"),
+        await _team_text(runtime, agent.run, record, tool_names),
         known,
     )
+
+
+async def _withheld_out(runtime: Runtime, run: RunRecord, tools: ToolRegistry, ref: ModelRef) -> ToolRegistry:
+    """``tools`` without those Dot's own loop withholds from ``run`` as it starts (item 1063, :func:`withheld_tools`),
+    and without consulting a helper when no helper but the run's own model can answer, as there."""
+    team: list[AgentRecord] = [member for member in await runtime.store.list_agents() if member.id != run.agent_id]
+    offered: frozenset[str] = frozenset(tools.tools)
+    withheld: set[str] = set(await withheld_tools(runtime, run, team, offered, bool(await runtime.accounts.accounts())))
+    if CONSULT_TOOL in offered:
+        roster: Roster = await current_roster(runtime.router, runtime.config.providers, runtime.config.models.helpers)
+        if not [model for model in roster.available if model != ref.label]:
+            withheld.add(CONSULT_TOOL)
+    return ToolRegistry(tools={name: tool for name, tool in tools.tools.items() if name not in withheld})
+
+
+def _brief(agent: AgentRecord) -> AgentBrief:
+    """An agent as Dot's own prompt names it among the team: its name, role and ready team."""
+    return AgentBrief(
+        name=agent.name,
+        role=agent.role,
+        instructions="",
+        made_by_dot=agent.made_by is not None,
+        team=team_name(agent.name),
+    )
+
+
+async def _team_text(runtime: Runtime, run: RunRecord, record: AgentRecord | None, tool_names: Sequence[str]) -> str:
+    """What Dot's own prompt says of the team for the run (item 1063): the team its chat is with, which it leads, the
+    agents it may message or give work orders, and when to delegate, as Dot's own loop builds them."""
+    team: tuple[AgentRecord, ...] = tuple(
+        member for member in await runtime.store.list_agents() if member.id != run.agent_id
+    )
+    thread: ThreadRecord = await runtime.store.get_thread(run.thread_id)
+    lead: TeamBrief | None = team_brief(await runtime.store.find_team(thread.team_id), team, run)
+    own: AgentBrief | None = None if record is None else _brief(record)
+    return team_sections(lead, own, [_brief(member) for member in team], tool_names)
 
 
 # What the owner is told of fast mode that ran off, by the program's reason (item 1014): measured on 2.1.318, a plan
@@ -910,12 +957,18 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     # What the message came with stands under it at once, as in Dot's own loop (item 967).
     if agent.opening.picks != NO_PICKS:
         await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(agent.opening.picks), True)
-    tools: ToolRegistry = door_tools(runtime.registry, run.mode, await _bounds_of(agent), left_out)
+    tools: ToolRegistry = await _withheld_out(
+        runtime, run, door_tools(runtime.registry, run, await _bounds_of(agent), left_out), ref
+    )
     quiet: _Quiet = _Quiet(heard=time.monotonic())
     door: Door = new_door(
         CLAUDE_DOOR,
         door_specs(tool.spec for tool in tools.tools.values()),
-        partial(_watched_call, quiet, partial(bridged_call, tools, await tool_context(agent, ref, info), agent.gate)),
+        partial(
+            _watched_call,
+            quiet,
+            partial(bridged_call, tools, await tool_context(agent, ref, info, frozenset(tools.tools)), agent.gate),
+        ),
     )
     chat: ChatSession | None = await asyncio.to_thread(read_chat, chat_path(run.thread_id))
     # The notes the session the run goes on in heard, read from the messages it took in whole, as Dot's own loop reads

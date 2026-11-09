@@ -2953,19 +2953,21 @@ class RunManager:
         ``approvals``, sent from ``source``, could not start with (:func:`picks_problems`): the tools it may use are its
         mode's, within the agent's bounds, which take in the servers the owner picked (item 415), as the loop gives
         them. A run on one of OpenCode's models goes whole to OpenCode's own agent (item 283), whose first message is
-        the owner's words alone, so it takes no picks; one on the Claude plan takes the skills and the servers, which
-        Dot gives it (item 1022), but not the accounts or Plan first, which are Dot's own loop's."""
+        the owner's words alone, so it takes no picks; one on the Claude plan takes the skills, the servers and the
+        accounts, which Dot gives it (items 1022 and 1063: the door has the mail and calendars), but not Plan first,
+        whose plan and ask are Dot's own loop's."""
         if picks == NO_PICKS:
             return
         whole: str | None = WHOLE_RUN_AGENTS.get(model.provider)
-        if model.provider == CLAUDE_CODE_PROVIDER and (picks.accounts or picks.plan_first):
-            # Claude Code takes the picked skills in its first message and the picked servers' tools through Dot's door
-            # (item 1022); the accounts' mail tools and the plan of Plan first are Dot's loop's, which it does not run.
+        if model.provider == CLAUDE_CODE_PROVIDER and picks.plan_first:
+            # Claude Code takes the picked skills and accounts in its first message and the picked servers' and the
+            # accounts' tools through Dot's door (items 1022 and 1063); the plan of Plan first is Dot's loop's, which it
+            # does not run.
             raise InvalidValueError(
                 f"the message cannot start with what was picked for it: {model.label} works as Claude Code, "
-                "which takes skills and connected apps but no accounts or Plan first; send it without them, or on one "
+                "which takes skills, connected apps and accounts but not Plan first; send it without it, or on one "
                 "of Dot's own models",
-                {"model": model.label, "accounts": list(picks.accounts), "plan_first": picks.plan_first},
+                {"model": model.label, "plan_first": picks.plan_first},
             )
         if whole is not None and model.provider != CLAUDE_CODE_PROVIDER:
             raise InvalidValueError(

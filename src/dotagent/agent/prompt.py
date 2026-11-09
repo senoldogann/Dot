@@ -1020,6 +1020,20 @@ def build_system_prompt(inputs: PromptInputs) -> str:
     return "\n\n".join(section for section in sections if section)
 
 
+def team_sections(
+    lead: TeamBrief | None, agent: AgentBrief | None, team: Sequence[AgentBrief], tool_names: Sequence[str]
+) -> str:
+    """What Dot's own prompt says of the team for a run with ``tool_names``: the team the run leads, delegating, and the
+    agents it may message or give work orders, for a run whose prompt is not Dot's own (one on the owner's Claude plan,
+    item 1063). Empty for a run with none of those tools and no team to lead."""
+    sections: list[str] = [
+        _lead_section(lead, tool_names),
+        _delegate_section(tool_names, team),
+        _team_section(agent, team, tool_names),
+    ]
+    return "\n\n".join(section for section in sections if section)
+
+
 def _team_section(agent: AgentBrief | None, team: Sequence[AgentBrief], tool_names: Sequence[str]) -> str:
     """The agents the run may message (item 87): a line each, with the ready team it is in, and when to send one a
     message: a part an agent's role fits is that agent's, not a helper's (item 512). The run's agent's own team comes

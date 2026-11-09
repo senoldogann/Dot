@@ -108,13 +108,11 @@ async def test_a_model_of_the_claude_plan_may_review_but_not_take_steps_read_pic
         assert chosen.status_code == 200, chosen.text
         assert runtime.roles.review() == "claude_code:opus"
         assert load_config(config_path()).models.review == "claude_code:opus"
-        # The look for work is a run whose tools (its list, the owner's mail and calendar) Claude Code's door does not
-        # give it: a model of the plan cannot look.
-        refused_look: httpx.Response = await http.put(
-            "/api/initiative/look-model", json={"model": "claude_code:sonnet"}
-        )
-        assert refused_look.status_code == 422 and "cannot look for work" in refused_look.text, refused_look.text
-        assert runtime.roles.look() == ""
+        # The look for work is a run that keeps Dot's list and reads the owner's mail: a run on the plan has those tools
+        # since item 1063, so a model of the plan may look.
+        taken_look: httpx.Response = await http.put("/api/initiative/look-model", json={"model": "claude_code:sonnet"})
+        assert taken_look.status_code == 200, taken_look.text
+        assert runtime.roles.look() == "claude_code:sonnet"
 
 
 async def test_settings_choose_the_model_of_each_role_of_the_learning_from_its_next_question(

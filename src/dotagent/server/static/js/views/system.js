@@ -47,7 +47,7 @@ import {
   switchRowSetting,
   switchSetting,
 } from "../panels.js";
-import { answersRole, WHOLE_RUN, providerLabel, providerMark, providerOf } from "../providers.js";
+import { answersRole, WHOLE_RUN, providerLabel, providerMark, providerOf, runsDotsTools } from "../providers.js";
 import { modelPicker } from "../modelpicker.js";
 import { anchoredPopover } from "../popover.js";
 import { voiceLanguage } from "../readaloud.js";
@@ -1508,10 +1508,11 @@ function buildModels(isDisposed, asked, head) {
     label: "Own work model",
     hint: "Decides what is worth doing when Dot works on its own while the Mac is idle (Schedules › On its own). The work itself runs on the default model.",
     className: "models-role",
-    // The look is a run with tools no agent program of its own is given (its list, the owner's mail): items 916, 1032.
+    // The look is a run with tools OpenCode's agent is not given (its list, the owner's mail); the Claude plan's run has
+    // every tool (items 916, 1032 and 1063).
     can: (model) => model.tools,
-    takes: (provider) => !WHOLE_RUN.has(provider),
-    refused: "Its look uses tools (its list, your mail and calendar) an agent program of its own is not given.",
+    takes: (provider) => runsDotsTools(provider),
+    refused: "Its look uses tools (its list, your mail and calendar) OpenCode's agent is not given.",
     none: "Default model",
     choose: async (ref) => {
       const view = await api.put("/initiative/look-model", { model: ref });

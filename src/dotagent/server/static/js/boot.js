@@ -87,10 +87,23 @@
   if (interfaceSize !== null && interfaceSize !== ownBody) {
     root.style.setProperty("--type-scale", String(interfaceSize / ownBody));
   }
-  var answers = read("dot.fontAnswers");
-  if (answers === "interface" || answers === "serif") {
-    root.style.setProperty("--voice", answers === "interface" ? "var(--font)" : "var(--family-serif)");
+  // The answers' size (item 1062): a message's scaled with the interface's until a size is kept, then the size kept.
+  var answerSize = whole("dot.sizeAnswers", 12, 24, 1);
+  if (answerSize !== null) {
+    root.style.setProperty("--answer-size", answerSize + "px");
   }
+  // The weights of the four faces (item 1062): 300 to 600, 400 their own.
+  /** @type {Array<[string, string]>} */ ([
+    ["dot.weightInterface", "--weight-text"],
+    ["dot.weightAnswers", "--answer-weight"],
+    ["dot.weightComposer", "--composer-weight"],
+    ["dot.weightCode", "--code-weight"],
+  ]).forEach(function (weight) {
+    var stored = read(weight[0]);
+    if (stored === "300" || stored === "500" || stored === "600") {
+      root.style.setProperty(weight[1], stored);
+    }
+  });
   /** @type {Array<[string, string, number, number, number]>} */ ([
     ["dot.sizeComposer", "--composer-size", 12, 20, 15],
     ["dot.sizeCode", "--code-size", 10, 18, 13],
@@ -107,16 +120,27 @@
       /^[a-zA-Z][a-zA-Z0-9-]*$/.test(bare) && !/^(inherit|initial|unset|revert|revert-layer|default)$/i.test(bare);
     return bare === "" || plain ? bare : '"' + bare + '"';
   };
-  /** @type {Array<[string, string, string[], string]>} */ ([
-    ["dot.fontInterface", "--font", ["inter", "system"], "var(--family-system)"],
-    ["dot.fontComposer", "--composer-font", ["serif", "mono"], "var(--font)"],
-    ["dot.fontCode", "--mono", ["sf-mono", "menlo"], "var(--family-geist-mono)"],
+  // The families of the four faces, the same for all (item 1062, appearance/settings.js `FAMILY_STACKS`), the
+  // interface's and the code's too for the answers and the message box, and what a browser kept before then: the
+  // answers' "theme" is their own.
+  var stacks = ["system", "inter", "serif", "geist-mono", "sf-mono", "menlo"];
+  var following = ["interface", "mono"].concat(stacks);
+  /** @type {Record<string, string>} */
+  var legacy = { "dot.fontAnswers:theme": "" };
+  /** @type {Array<[string, string, string, string[]]>} */ ([
+    ["dot.fontInterface", "--font", "var(--family-system)", stacks],
+    ["dot.fontAnswers", "--voice", "var(--theme-voice)", following],
+    ["dot.fontComposer", "--composer-font", "var(--font)", following],
+    ["dot.fontCode", "--mono", "var(--family-geist-mono)", stacks],
   ]).forEach(function (font) {
-    var stored = read(font[0]);
-    if (stored === null) {
+    var kept = read(font[0]);
+    var stored = kept !== null && Object.prototype.hasOwnProperty.call(legacy, font[0] + ":" + kept)
+      ? legacy[font[0] + ":" + kept]
+      : kept;
+    if (stored === null || stored === "") {
       return;
     }
-    if (font[2].indexOf(stored) >= 0) {
+    if (font[3].indexOf(stored) >= 0) {
       root.style.setProperty(font[1], "var(--family-" + stored + ")");
       return;
     }
@@ -129,7 +153,7 @@
           })
       : [];
     if (families.length > 0) {
-      root.style.setProperty(font[1], families.join(", ") + ", " + font[3]);
+      root.style.setProperty(font[1], families.join(", ") + ", " + font[2]);
     }
   });
   if (read("dot.smoothing") === "off") {

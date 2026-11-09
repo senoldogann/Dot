@@ -11,7 +11,7 @@ from dotagent.core.errors import ConfigError
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel
 from dotagent.llm.router import ModelRef, parse_model_ref
-from dotagent.llm.types import WHOLE_RUN_AGENTS, ModelInfo
+from dotagent.llm.types import WHOLE_RUN_AGENTS, ModelInfo, runs_dots_tools
 from dotagent.oauth.providers import ProviderId
 from dotagent.oauth.tokens import Account
 from dotagent.proactive.brief import BriefRequest, BriefView, brief_view, set_brief
@@ -109,16 +109,17 @@ def proactive_router(ctx: ServerContext) -> APIRouter:
         """Have ``model`` look for work on Dot's own initiative from the next look on, or the default model for ""
         (item 916): the config file keeps it as ``[initiative] look_model``. A model its provider does not offer, one
         that cannot use actions (the look is a run that reads and writes its list) and one of Zen's free models, which
-        answer only as OpenCode's own agent, are refused, as is a config file that cannot be changed; nothing changes
+        answer only as OpenCode's own agent, given a part of Dot's tools, are refused (a model of the owner's Claude
+        plan is taken: its run has every tool, item 1063), as is a config file that cannot be changed; nothing changes
         then. A look under way keeps its model."""
         chosen: str = ""
         if request.model != "":
             ref: ModelRef = parse_model_ref(request.model)
             chosen = ref.label
-            whole: str | None = WHOLE_RUN_AGENTS.get(ref.provider)
-            if whole is not None:
+            if not runs_dots_tools(ref.provider):
                 raise ConfigError(
-                    f"{ref.label} answers only as {whole}, so it cannot look for work; pick another",
+                    f"{ref.label} answers only as {WHOLE_RUN_AGENTS[ref.provider]}, so it cannot look for work; "
+                    "pick another",
                     {"model": request.model},
                 )
             info: ModelInfo = await ctx.runtime.router.model_info(ref)

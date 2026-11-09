@@ -10,11 +10,13 @@ from pathlib import Path
 
 from dotagent.agent.limits import LimitReached, RunLimits
 from dotagent.agent.picks import owner_server_groups
+from dotagent.agent.prompt import AgentBrief, team_sections
 from dotagent.claude_code.run import (
     answered_all,
     claude_argv,
     claude_env,
     door_specs,
+    door_tool,
     dot_finish,
     dot_tool,
     ended_clean,
@@ -148,9 +150,43 @@ def test_the_doors_config_is_a_file_only_the_owner_reads(tmp_path: Path) -> None
 
 
 def test_the_prompt_says_who_the_model_is_its_tools_and_what_it_knows_of_the_owner() -> None:
-    prompt: str = system_prompt("Dot", DOOR, ["notify", "shell"], Path("/w"), "Friday", ["(you said) My name is Ada."])
+    prompt: str = system_prompt(
+        "Dot", DOOR, ["notify", "shell"], Path("/w"), "Friday", "# Team\n- Ada", ["(you said) My name is Ada."]
+    )
     assert prompt.startswith("You are Dot,") and f"MCP server {DOOR}: notify, shell" in prompt
     assert "Dot's workspace, /w" in prompt and prompt.endswith("- (you said) My name is Ada.")
+    assert "\n\n# Team\n- Ada\n\nWhat you know about the owner:" in prompt
+
+
+def test_the_model_gets_every_tool_of_dots_own_loop_but_the_loops_own() -> None:
+    """Item 1063, the owner's screenshot of 2026-11-09: a run on the plan said it had no tool to talk to the team. It
+    gets what a run of Dot's own loop gets: the team's, the mail's, the drafts'; not the loop's own (finish, the plan,
+    use_tools, react); a run handed a part asks the owner nothing and hands nothing on; a campaign's stay Dot's
+    own loop's."""
+    for name in (
+        "message_agent",
+        "assign_work",
+        "review_work",
+        "work_orders",
+        "delegate",
+        "create_agent",
+        "mail_search",
+    ):
+        assert door_tool(name, False), name
+    for name in ("finish", "update_plan", "mark_plan_step", "use_tools", "react"):
+        assert not door_tool(name, False), name
+    for name in ("delegate", "message_agent", "ask_user", "ask_secret"):
+        assert not door_tool(name, True), name
+    assert door_tool("read_file", True)
+    assert not door_tool("campaign_note", False) and not door_tool("campaign_achieved", False)
+
+
+def test_the_prompt_tells_the_team_as_dots_own_does() -> None:
+    """Item 1063: the agents the run may message, by name and role, and how to give them work orders."""
+    ada: AgentBrief = AgentBrief(name="Ada", role="Writes copy", instructions="", made_by_dot=False, team="")
+    said: str = team_sections(None, None, [ada], ["message_agent", "assign_work", "delegate"])
+    assert "# Team" in said and "  - Ada: Writes copy" in said and "assign_work" in said
+    assert team_sections(None, None, [ada], ["read_file"]) == ""
 
 
 def _init(tools: list[str], servers: list[dict[str, str]], extra: dict[str, list[str] | list[dict[str, str]]]) -> Init:
@@ -355,7 +391,7 @@ def test_a_step_that_stops_for_a_tool_ends_as_dots_steps_do() -> None:
     tool_use", as Claude names a stop for a tool; the timeline reads Dot's names, and a cut reply still shows."""
     assert dot_finish("tool_use") == "tool_calls" and dot_finish("end_turn") == "stop"
     assert dot_finish("max_tokens") == "max_tokens"
-    said: str = system_prompt("Dot", DOOR, ("read_file",), Path("/w"), "2026-11-07", ())
+    said: str = system_prompt("Dot", DOOR, ("read_file",), Path("/w"), "2026-11-07", "", ())
     assert "in the language the owner writes in" in said
 
 

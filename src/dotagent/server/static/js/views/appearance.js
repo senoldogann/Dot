@@ -19,16 +19,22 @@ import {
 } from "../appearance/own.js";
 import {
   ANSWER_FONT,
+  ANSWER_SIZE,
+  ANSWER_WEIGHT,
   CHAT_WIDTH,
   CODE_FONT,
   CODE_SIZE,
+  CODE_WEIGHT,
   COMPOSER_FONT,
   COMPOSER_SIZE,
+  COMPOSER_WEIGHT,
   CONTRAST,
   INTERFACE_FONT,
   INTERFACE_SIZE,
+  INTERFACE_WEIGHT,
   PANEL_MOTION,
   SMOOTHING,
+  WEIGHTS,
   WRAP_CODE,
   accepts,
   setValue,
@@ -718,78 +724,95 @@ function motionCard() {
   return { element, dispose: () => REDUCED_MOTION.removeEventListener("change", paintMotion) };
 }
 
-/** The text (item 331): a line of an answer over the size of every text, the body's on this device. */
-function textCard() {
-  const size = rangeOf({
-    label: "Text size",
-    hint: "Messages, labels and headings grow and shrink with it. A phone starts larger than a Mac; each device keeps its own.",
-    setting: INTERFACE_SIZE,
-    min: INTERFACE_SIZE.least,
-    max: INTERFACE_SIZE.most,
+// The names of the families every face offers (item 1062), by their ids in appearance/settings.js (`FOLLOWING_STACKS`).
+const FAMILY_NAMES = {
+  interface: "The interface's",
+  mono: "The code's",
+  system: "System",
+  inter: "Inter",
+  serif: "Serif",
+  "geist-mono": "Geist Mono",
+  "sf-mono": "SF Mono",
+  menlo: "Menlo",
+};
+
+// A weight of one of the faces (item 1062), from the weights every face offers.
+function weightSetting({ label, hint, setting }) {
+  const select = el(
+    "select",
+    { class: "select sm", "aria-label": label },
+    ...WEIGHTS.map((option) => el("option", { value: String(option.id) }, option.label)),
+  );
+  select.value = String(settingValue(setting));
+  select.addEventListener("change", () => setValue(setting, Number(select.value)));
+  const element = el(
+    "div",
+    { class: "setting" },
+    el("div", { class: "row" }, el("span", { class: "grow" }, label), select),
+    el("div", { class: "hint" }, hint),
+  );
+  return { element };
+}
+
+/**
+ * One face of the type (item 1062): its family, its weight and its size, the same three for every face, and a line drawn
+ * in it. `own` names the family it has by default; `size` is its size's setting and range.
+ */
+function faceGroup({ name, own, family, weight, size, sample }) {
+  const familyRow = familySetting({
+    label: `${name} font`,
+    hint: `Its own is ${own}.`,
+    setting: family,
+    stacks: [{ id: "", label: `Default (${own})` }, ...family.stacks.map((id) => ({ id, label: FAMILY_NAMES[id] }))],
+  });
+  const weightRow = weightSetting({ label: `${name} weight`, hint: "Regular is its own.", setting: weight });
+  return [
+    el("h3", { class: "setting-group-name" }, name),
+    familyRow.element,
+    weightRow.element,
+    size.element,
+    sample,
+  ];
+}
+
+/** The type (items 127, 331 and 1062): the interface, the answers, the message box and the code, each with its family,
+ * its weight and its size; then the smoothing of every face and the wrapping of code. */
+function typeCard() {
+  const answersSize = rangeOf({
+    label: "Answers size",
+    hint: "Dot's answers and your messages; until you set it, it grows and shrinks with the interface's size, and set to the size it shows then, it goes on doing so.",
+    setting: ANSWER_SIZE,
+    min: ANSWER_SIZE.least,
+    max: ANSWER_SIZE.most,
     step: 1,
     unit: " px",
   });
-  return section(
-    "Text",
-    el("div", { class: "card-pad stack" }, preview("answers", "Good morning. The weekly report is ready, and two things wait for you."), size.element),
-  );
-}
-
-/** The type (item 127): the families of the interface, the answers, the composer and the code, and the sizes of the last
- * two. */
-function typeCard() {
-  const interfaceFont = familySetting({
-    label: "Interface font",
-    hint: "The menus, the lists and the pages.",
-    setting: INTERFACE_FONT,
-    stacks: [
-      { id: "", label: "The system's" },
-      { id: "inter", label: "Inter" },
-    ],
-  });
-  const answers = choiceSetting({
-    label: "Answers",
-    hint: "The font of Dot's answers.",
-    options: [
-      { id: "theme", label: "Theme", hint: "As the theme says: the interface's font, or a serif in Paper." },
-      { id: "interface", label: "Interface", hint: "The interface's font in every theme." },
-      { id: "serif", label: "Serif", hint: "A serif in every theme." },
-    ],
-    selected: settingValue(ANSWER_FONT),
-    onSelect: (id) => setValue(ANSWER_FONT, id),
-  });
-  const composerFont = familySetting({
-    label: "Message box font",
-    hint: "What you type for Dot.",
-    setting: COMPOSER_FONT,
-    stacks: [
-      { id: "", label: "The interface's" },
-      { id: "serif", label: "Serif" },
-      { id: "mono", label: "The code's" },
-    ],
+  const interfaceSize = rangeSetting({
+    label: "Interface size",
+    hint: "Labels, lists and headings, and the answers until they have their own size. A phone starts larger than a Mac; each device keeps its own.",
+    min: INTERFACE_SIZE.least,
+    max: INTERFACE_SIZE.most,
+    step: 1,
+    format: (value) => `${value} px`,
+    read: () => settingValue(INTERFACE_SIZE),
+    write: (value) => {
+      setValue(INTERFACE_SIZE, value);
+      // The answers' own size is read anew: until set, it follows this one.
+      answersSize.paint();
+    },
   });
   const composerSize = rangeOf({
     label: "Message box size",
-    hint: "15 px is Dot's own.",
+    hint: "15 px is its own.",
     setting: COMPOSER_SIZE,
     min: 12,
     max: 20,
     step: 1,
     unit: " px",
   });
-  const codeFont = familySetting({
-    label: "Code font",
-    hint: "Code, commands and file names.",
-    setting: CODE_FONT,
-    stacks: [
-      { id: "", label: "Geist Mono" },
-      { id: "sf-mono", label: "SF Mono" },
-      { id: "menlo", label: "Menlo" },
-    ],
-  });
   const codeSize = rangeOf({
     label: "Code size",
-    hint: "The code blocks of an answer; 13 px is Dot's own.",
+    hint: "Code blocks, files and changes; 13 px is its own.",
     setting: CODE_SIZE,
     min: 10,
     max: 18,
@@ -811,18 +834,41 @@ function typeCard() {
     el(
       "div",
       { class: "card-pad stack" },
-      interfaceFont.element,
-      preview("interface", "Dot reads the page, fills in the form and asks before it sends."),
-      answers.element,
-      preview("answers", "The report is ready: three files changed, and the tests pass."),
-      composerFont.element,
-      composerSize.element,
-      preview("composer", "Summarise the three newest files on my Desktop"),
-      codeFont.element,
-      codeSize.element,
-      preview("code", 'const files = await list("~/Desktop"); // the three newest, by the time they changed'),
-      smoothing.element,
+      ...faceGroup({
+        name: "Interface",
+        own: "the system's",
+        family: INTERFACE_FONT,
+        weight: INTERFACE_WEIGHT,
+        size: interfaceSize,
+        sample: preview("interface", "Dot reads the page, fills in the form and asks before it sends."),
+      }),
+      ...faceGroup({
+        name: "Answers",
+        own: "the theme's",
+        family: ANSWER_FONT,
+        weight: ANSWER_WEIGHT,
+        size: answersSize,
+        sample: preview("answers", "The report is ready: three files changed, and the tests pass."),
+      }),
+      ...faceGroup({
+        name: "Message box",
+        own: "the interface's",
+        family: COMPOSER_FONT,
+        weight: COMPOSER_WEIGHT,
+        size: composerSize,
+        sample: preview("composer", "Summarise the three newest files on my Desktop"),
+      }),
+      ...faceGroup({
+        name: "Code",
+        own: "Geist Mono",
+        family: CODE_FONT,
+        weight: CODE_WEIGHT,
+        size: codeSize,
+        sample: preview("code", 'const files = await list("~/Desktop"); // the three newest, by the time they changed'),
+      }),
       wrap.element,
+      el("h3", { class: "setting-group-name" }, "Every face"),
+      smoothing.element,
     ),
   );
   return { element };
@@ -835,17 +881,16 @@ export function mount(root, ctx) {
   const motion = motionCard();
   const others = [
     section("Colour scheme", el("div", { class: "card-pad" }, schemes.element)),
-    textCard(),
+    typeCard().element,
     look.element,
     motion.element,
-    typeCard().element,
   ];
   const themes = themesCard((editing) => {
     for (const card of others) {
       card.hidden = editing;
     }
   });
-  ctx.head.setLead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the size of the text, the interface, the motion and the type. Themes of your own are kept by Dot, for every browser.");
+  ctx.head.setLead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the type (the font, weight and size of the interface, the answers, the message box and the code), the interface and the motion. Themes of your own are kept by Dot, for every browser.");
   root.append(
     others[0],
     themes.element,

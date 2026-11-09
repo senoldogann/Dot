@@ -1071,14 +1071,18 @@ light and white in dark, the lines a quarter as far; **Chat width**, how wide th
 (comfortable or compact); and two switches that follow the theme picked for light until you set them yourself: fold the
 steps (on in all but Paper) and the side panel (off in all). **Motion**: **Panel animation**, how long the sidebar and
 the side panel take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never slide), and "Faces
-that move" (below). **Text** (item 331): one **Text size** under a line of an answer, the size of the body on this
-device, every text size scaled with it: on a phone 12 to 20 px around 16 (item 347), as iOS's own, and elsewhere 13 to
-17 px around 14; each device keeps its own. **Type**: the interface's font (the system's by default, San Francisco on
-a Mac and an iPhone, item 1057; Inter; or families typed, which go before the system's so that no glyph goes missing); the answers' font (the theme's, which is a serif in Paper, the
-interface's, or a serif); the composer's font (the interface's, a serif, the code's, or families typed) and size (12 to
-20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed) and the size of an answer's code
-blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on) and long lines of code wrapped
-(off: how a block of code begins, its own switch wraps just that block). The choices are kept in the browser only, and
+that move" (below). **Type** (items 127, 331 and 1062): four faces, each with the same three settings, a family, a weight and a size, and a
+line of preview. The families are the same for every face: its own (Default), System, Inter, Serif, Geist Mono, SF Mono, Menlo, or families typed, which go before the face's own so that no
+glyph goes missing, and the answers and the message box may take the interface's or the code's; the weights are Light, Regular
+(each face's own), Medium and Semibold. The **interface** (its own the system's, San Francisco on a Mac and an iPhone,
+item 1057): its size is the body's on this device, every text size scaled with it, on a phone 12 to 20 px around 16 (item
+347), as iOS's own, and elsewhere 13 to 17 px around 14; each device keeps its own. The **answers**, Dot's and your
+messages (its own family the theme's, a serif in Paper): 12 to 24 px, a message's size scaled with the interface's until
+set (a size kept stays when the interface's moves; set to the size it shows while it follows, it goes on following). The **message box** (its own the interface's): 12 to 20 px, 15 by default. The **code** (its own Geist Mono): the
+code blocks, files and changes, 10 to 18 px, 13 by default, and long lines of code wrapped (off: how a block of code
+begins, its own switch wraps just that block). Then font smoothing (on), for every face. What a browser kept before item
+1062 reads as what it is now: the answers' "Theme" is their own and "Interface" the interface's, and the message box's "The
+code's" stays the code's. The choices are kept in the browser only, and
 `boot.js` puts each of them on the page before the first paint. The palettes, the colour arithmetic, the orbs, the
 contrast's mixing, the families typed, the theme generator, the theme file with its checks and the VS Code import are a
 port of an MIT-licensed project to plain ES modules; its notice is `static/js/appearance/LICENSE`, and Dot is not
