@@ -61,17 +61,19 @@ const CONNECTED_MARKS = 4;
 const OFFERED_LOGOS = ["google-icon.svg", "github-icon.svg", "slack-icon.svg", "notion-icon.svg"];
 // Where Connect apps leads (item 545): the services' tab of Customize.
 const CONNECTORS_PATH = "#/customize/connectors";
-// Which sections at the foot the owner folded, by their ids (`work`, `imessage`), kept between visits; a fold of
+// Which sections at the foot the owner folded, by their ids (`work`, `agents`, `imessage`), kept between visits; a fold of
 // `chats`, `initiative` or `schedule` kept from before item 855, or of `waiting` or `working` from before item 836,
 // whose groups no longer fold, is not read.
 const FOLDS_KEY = "dot.sideFolds";
 // The sections at the foot of the list (item 619), by the `source` of the threads each holds (a channel's id, as the
 // router makes the thread): the section's name and whether it starts folded. Dot's own work, the chats of its own
 // initiative and of its schedules, is one (item 855, after "On its own" and "Scheduled" of their own, items 822 and
-// 827), folded until the owner opens it; iMessage's another. A thread of any other source is a chat among the days. No
-// label has a mark, so that it stands where the days' labels do (items 827, 828 and 855).
+// 827), folded until the owner opens it; the agents' chats, one an agent, the work Dot sends them, another (item 1082:
+// the owner found the list full of them); iMessage's another. A thread of any other source is a chat among the days.
+// No label has a mark, so that it stands where the days' labels do (items 827, 828 and 855).
 const CHANNEL_SECTIONS = {
   work: { label: "Dot's work", folded: true, sources: ["initiative", "schedule"] },
+  agents: { label: "Agents' work", folded: true, sources: ["team"] },
   imessage: { label: "iMessage", folded: false, sources: ["imessage"] },
 };
 const SECTION_OF_SOURCE = new Map(Object.entries(CHANNEL_SECTIONS).flatMap(([id, section]) => section.sources.map((source) => [source, id])));
