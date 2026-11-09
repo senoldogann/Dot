@@ -2192,18 +2192,50 @@ async def _route_step(
     return chosen
 
 
+async def run_skills(runtime: Runtime, run: RunRecord) -> SkillCatalog:
+    """The skills ``run`` is offered (its agent's, item 1022), the same for a run of Dot's own loop and one on the
+    owner's Claude plan (item 1068); a skill that could not be read is logged and left out."""
+    skills: SkillCatalog = await asyncio.to_thread(
+        load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
+    )
+    for problem in skills.problems:
+        log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
+    return skills.model_copy(update={"skills": await offered_to_run(runtime.config, skills, run.agent_id)})
+
+
+async def run_helpers(runtime: Runtime, model: str) -> tuple[str, ...]:
+    """The helper models that can answer as a run on ``model`` starts, besides that model, the same for a run of Dot's
+    own loop and one on the owner's Claude plan (item 1068)."""
+    roster: Roster = await current_roster(runtime.router, runtime.config.providers, runtime.config.models.helpers)
+    return tuple(helper for helper in roster.available if helper != model)
+
+
 async def withheld_tools(
-    runtime: Runtime, run: RunRecord, team: Sequence[AgentRecord], offered: frozenset[str], signed_in: bool
+    runtime: Runtime,
+    run: RunRecord,
+    team: Sequence[AgentRecord],
+    offered: frozenset[str],
+    signed_in: bool,
+    has_skills: bool,
+    helpers: Sequence[str],
 ) -> frozenset[str]:
     """The tools of ``offered`` that ``run`` is not given now, by what Dot holds as it starts, the same for a run of
-    Dot's own loop and one on the owner's Claude plan (item 1063): the mail and calendars (item 424) without an
-    account ``signed_in``; the logins of 1Password (item 493) while it is not connected, and those of Dot's own vault
-    (item 621) while it holds none; messaging and work orders with no teammate, unless the run may make one (item 99:
-    then they stay, so a teammate made mid-run can be messaged at once); the objectives in an agent's run (item 908:
-    they are Dot's own); and consulting a helper where the config allows none."""
+    Dot's own loop and one on the owner's Claude plan (items 1063 and 1068): the browser's while Settings › Browser
+    keeps every run off it (item 354); the mail and calendars (item 424) without an account ``signed_in``; the logins
+    of 1Password (item 493) while it is not connected, and those of Dot's own vault (item 621) while it holds none;
+    messaging and work orders with no teammate, unless the run may make one (item 99: then they stay, so a teammate
+    made mid-run can be messaged at once); the objectives in an agent's run (item 908: they are Dot's own); the skill
+    tool with no skill offered (``has_skills``); and consulting a helper where the config allows none or none of the
+    ``helpers`` can answer."""
     names: set[str] = set(
         withheld_vault_tools(await runtime.vault_items.items(), await asyncio.to_thread(kept_token) is not None)
     )
+    if not runtime.browser.config.enabled:
+        names |= {name for name in offered if group_of(name) == BROWSER_GROUP}
+    if not has_skills:
+        names.add(SKILL_TOOL)
+    if not helpers:
+        names.add(CONSULT_TOOL)
     if not signed_in:
         names |= {name for name in offered if group_of(name) == ACCOUNTS_GROUP}
     if not team and CREATE_AGENT_TOOL not in offered:
@@ -2263,39 +2295,18 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # (item 664): its 👍 would stand on words they never wrote.
     if run.parent_run_id is not None or run.source in _UNASKED_SOURCES:
         specs = tuple(spec for spec in specs if spec.name != REACT_TOOL)
-    # Settings › Browser may keep every run off the browser (item 354).
-    if not runtime.browser.config.enabled:
-        specs = tuple(spec for spec in specs if group_of(spec.name) != BROWSER_GROUP)
     signed_in: list[Account] = await runtime.accounts.accounts()
+    skills: SkillCatalog = await run_skills(runtime, run)
+    # The helpers that can answer as the run starts, besides its own model; only for a run with a tool that uses them.
+    uses_helpers: bool = any(spec.name in (CONSULT_TOOL, DELEGATE_TOOL) for spec in specs)
+    helpers: tuple[str, ...] = await run_helpers(runtime, ref.label) if uses_helpers else ()
     withheld: frozenset[str] = await withheld_tools(
-        runtime, run, team, frozenset(spec.name for spec in specs), bool(signed_in)
+        runtime, run, team, frozenset(spec.name for spec in specs), bool(signed_in), bool(skills.skills), helpers
     )
     specs = tuple(spec for spec in specs if spec.name not in withheld)
     # The agents the run knows of (item 99): the ones at its start; a newcomer is noted at the next step.
     known_agents: set[str] = {member.id for member in team} | ({run.agent_id} if run.agent_id is not None else set())
     may_message: bool = any(spec.name == MESSAGE_AGENT_TOOL for spec in specs)
-    skills: SkillCatalog = await asyncio.to_thread(
-        load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
-    )
-    for problem in skills.problems:
-        log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
-    skills = skills.model_copy(update={"skills": await offered_to_run(runtime.config, skills, run.agent_id)})
-    if not skills.skills:
-        specs = tuple(spec for spec in specs if spec.name != SKILL_TOOL)
-    # The helpers that can answer as the run starts, besides its own model; only for a run with a tool that uses them.
-    helpers: tuple[str, ...] = (
-        tuple(
-            model
-            for model in (
-                await current_roster(runtime.router, runtime.config.providers, runtime.config.models.helpers)
-            ).available
-            if model != ref.label
-        )
-        if any(spec.name in (CONSULT_TOOL, DELEGATE_TOOL) for spec in specs)
-        else ()
-    )
-    if not helpers:
-        specs = tuple(spec for spec in specs if spec.name != CONSULT_TOOL)
     surface, surface_reason = surface_for_tools(surface, surface_reason, len(specs))
     # Every tool group of the run, core first. A run with no group besides core has nothing to turn on.
     groups: tuple[str, ...] = (CORE_GROUP, *groups_of([spec.name for spec in specs]))
