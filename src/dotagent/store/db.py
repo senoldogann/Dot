@@ -4275,6 +4275,14 @@ class Store:
         )
         return [_work_order(row) for row in rows]
 
+    async def agent_work_orders(self, agent_id: str) -> list[WorkOrderRecord]:
+        """The work orders the agent ``agent_id`` has (an order reassigned is its newest agent's), the newest change
+        first: what its page counts (item 1066)."""
+        rows = await self._all(
+            "SELECT * FROM work_orders WHERE agent_id = ? ORDER BY updated_at DESC, rowid DESC", (agent_id,)
+        )
+        return [_work_order(row) for row in rows]
+
     @_writing
     async def mark_work_order_tainted(self, order_id: str) -> None:
         """Mark a work order as holding content third parties can author, whatever its status (item 907): a mark is

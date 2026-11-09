@@ -326,3 +326,37 @@ async def test_a_template_asks_its_questions_at_use_and_its_agent_starts_with_th
 
 def re_agent() -> re.Pattern[str]:
     return re.compile(r"#/agents/agt_[a-z0-9_]+$")
+
+
+async def _order(runtime: Runtime, agent_id: str, title: str, attempts: int, end: str) -> None:
+    """A work order of ``agent_id`` that had ``attempts`` and ended ``end`` (accepted or escalated)."""
+    store = runtime.store
+    order = await store.add_work_order(agent_id, title, "Brief.", "Done means.", None, None, None, None, False)
+    await store.move_work_order(order.id, "working", ("assigned",), new_run=f"run_{title}_1")
+    for attempt in range(2, attempts + 1):
+        await store.move_work_order(order.id, "in_review", ("working",))
+        await store.move_work_order(order.id, "returned", ("in_review",))
+        await store.move_work_order(order.id, "working", ("returned",), new_run=f"run_{title}_{attempt}")
+    await store.move_work_order(order.id, "in_review", ("working",))
+    await store.move_work_order(order.id, "accepted" if end == "accepted" else "escalated", ("in_review",))
+
+
+async def test_the_page_says_how_the_agents_work_orders_went(runtime: Runtime, client: httpx.AsyncClient) -> None:
+    """Item 1066: which agent's work holds is read from its orders, not from how much it wrote: accepted the first
+    time, after a return, waiting for the owner, and the returns in all."""
+    MODEL.script = ScriptedProvider(_PROVIDER, [])
+    desk: JsonObject = await _agent(client, "Desk", ["read_file"])
+    await _order(runtime, desk["id"], "one", 1, "accepted")
+    await _order(runtime, desk["id"], "two", 2, "accepted")
+    await _order(runtime, desk["id"], "three", 1, "escalated")
+    work = (await client.get(f"/api/agents/{desk['id']}")).json()["work"]
+    assert work == {"orders": 3, "accepted": 2, "accepted_first": 1, "returns": 1, "escalated": 1, "open": 0}
+    playwright, browser = await _launch(runtime)
+    try:
+        page: Page = await _open(browser, client, f"/agents/{desk['id']}", 1280)
+        row: Locator = page.locator("[data-section='work'] [data-work='orders']")
+        await expect(row).to_contain_text("3 work orders: 1 accepted the first time")
+        await expect(row).to_contain_text("1 after a return · 1 waiting for you · 1 return in all")
+    finally:
+        await browser.close()
+        await playwright.stop()

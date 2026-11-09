@@ -1200,15 +1200,31 @@ class AgentUsage(FrozenModel):
     own: tuple[str, ...] = ()
 
 
+class AgentWork(FrozenModel):
+    """How the work orders an agent has went (item 1066), as its page shows them, to tell which agent's work holds
+    rather than how much it wrote: ``orders`` in all, ``accepted`` and of those ``accepted_first`` on their first
+    attempt, ``returns`` (the attempts after the first, summed), ``escalated``, waiting for the owner now (an
+    escalated order the owner drops is cancelled, and no longer counted so), and ``open`` still with the lead or the
+    agent."""
+
+    orders: int
+    accepted: int
+    accepted_first: int
+    returns: int
+    escalated: int
+    open: int
+
+
 class AgentDetail(FrozenModel):
-    """An agent's page: the record, its newest runs (newest first), the newest messages it sent or received and what
-    it learned."""
+    """An agent's page: the record, its newest runs (newest first), the newest messages it sent or received, what it
+    learned, what its runs used and how its work orders went."""
 
     record: AgentRecord
     runs: list[RunRecord]
     messages: list[TeamMessage]
     learned: AgentLearning
     usage: AgentUsage | None = None
+    work: AgentWork | None = None
 
 
 class CampaignChip(FrozenModel):
