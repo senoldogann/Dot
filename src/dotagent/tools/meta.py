@@ -29,6 +29,7 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo
+from dotagent.server import UI_SOURCE
 from dotagent.store.models import EventRecord, RunMode
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
@@ -524,6 +525,15 @@ def _ask_secret_tool() -> RegisteredTool:
         held_now = await asyncio.to_thread(held_secrets, ctx.thread_id)
         if outcome.status == "approved" and name in {held.name for held in held_now}:
             return ok(_held_line(name))
+        # A value too short for a card to hold (a code sent by SMS, a PIN: under 8 characters, which no mask reaches)
+        # the user may send as a message instead (item 1073): it comes as the card's note, in their words, from the page
+        # alone (a command that cannot ask declines with a note of its own, which is no word of the user's).
+        if outcome.status == "denied" and outcome.decided_by == UI_SOURCE and outcome.note.strip():
+            return ok(
+                f"The user did not save {args.label} on the card and wrote instead: {outcome.note.strip()}\n"
+                "If that is what you asked for (a short code), use it as it is. It is in this chat now: do not save, "
+                "print or send it anywhere it does not need to go."
+            )
         return ok(
             f"The user did not give {args.label} ({outcome.status}). Do not ask for it in a message; go on without "
             "it, or call finish and say what it would have allowed."
@@ -533,7 +543,8 @@ def _ask_secret_tool() -> RegisteredTool:
         name=ASK_SECRET_TOOL,
         description=(
             "Ask the user for a key, token or password on a card: kept out of the chat and your sight, this chat's "
-            "commands read it as $name for 24 hours. Never ask for a secret in a message or with ask_user."
+            "commands read it as $name for 24 hours. Never ask for a secret in a message or with ask_user. A short "
+            "code may come back in words."
         ),
         args_model=AskSecretArgs,
         modes=ALL_MODES,

@@ -683,6 +683,12 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
 - A run that needs a key, a token or a password of yours asks for it on a card of its own (`ask_secret`, item 857),
   never in a message. The card holds four things: the run's title for what it is, why it needs it and how to make
   it, a box that shows no letter of it, and **Save securely** or **Decline**.
+  - A value under 8 characters is not held: no mask could reach it where a command prints it (it would mask those
+    characters in every text). The card says so as it is typed, Save securely waits, and **Send as a message** sends
+    a short code (an SMS code, a PIN) as the card's answer in words instead, which the run then sees and uses (item
+    1073; before it, Save did nothing and said nothing). Such a code is in the chat, as any message is. A card left
+    for you, which no run waits on, says to write the code in the chat instead, whose next run reads it; a note a
+    command that cannot ask declines a card with is never taken for your words.
   - The value goes to the daemon alone (`POST /api/approvals/{id}/secret`). It is held for that chat's commands
     (`shell`, `terminal_open`) under the name the run asked for, for 24 hours, in a file of the chat's own under
     Dot's home (`held-secrets/<chat>.json`, mode 0600).

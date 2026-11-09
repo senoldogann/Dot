@@ -296,6 +296,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
   const isSecret = approval.severity === "secret";
   // An answer to a question the run left goes on with the work in the run's conversation, so it needs words.
   const isLeft = approval.status === "left";
+  // What a card's own controls paint again after the shared ones are given back (the secret's Save, by its length).
+  let repaint = () => {};
   // A step handed to the owner that nobody answered in time, kept for them until it lapses (item 482).
   const isKept = isLeft && approval.keptUntil !== null;
   let busy = false;
@@ -316,6 +318,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       node.querySelectorAll("button, input").forEach((control) => {
         control.disabled = false;
       });
+      repaint();
       toastError(error);
       if (error.status === 409) {
         onSettled(null);
@@ -439,13 +442,39 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       placeholder: label,
       "aria-label": label,
     });
-    const save = el("button", { class: "btn primary", type: "button" }, "Save securely");
+    const save = el("button", { class: "btn primary", type: "button", disabled: true }, "Save securely");
     const decline = el("button", { class: "btn ghost", type: "button", onclick: () => decide(false, "") }, "Decline");
+    // A value shorter than a card holds (item 1073: the owner typed a 4-digit code and Save did nothing, saying
+    // nothing): the card says why, and a short code goes as a message instead, which Dot then sees.
+    // A card left for the owner (no run waits on it): its answer reaches no run, so a short code is written in the chat,
+    // whose next run reads it.
+    const asMessage = isLeft
+      ? null
+      : el(
+          "button",
+          { class: "btn sm", type: "button", title: "Send it in words: Dot sees it, and the card is closed", onclick: () => decide(false, value.value.trim()) },
+          "Send as a message",
+        );
+    const instead = isLeft ? "A short code (an SMS code, a PIN) can be written in this chat as a message, which Dot reads." : "A short code (an SMS code, a PIN) can go as a message, which Dot sees.";
+    const short = el(
+      "div",
+      { class: "hint secret-short", role: "status", hidden: true },
+      el("span", { class: "grow" }, `A secret is at least ${SECRET_LEAST_CHARS} characters, so that it can be masked where a command prints it. ${instead}`),
+      asMessage,
+    );
+    function paintLength() {
+      const typed = value.value.trim().length;
+      save.disabled = typed < SECRET_LEAST_CHARS;
+      short.hidden = typed === 0 || typed >= SECRET_LEAST_CHARS;
+    }
+    value.addEventListener("input", paintLength);
+    repaint = paintLength;
     async function give() {
       if (busy) {
         return;
       }
       if (value.value.trim().length < SECRET_LEAST_CHARS) {
+        paintLength();
         value.focus();
         return;
       }
@@ -461,6 +490,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         node.querySelectorAll("button, input").forEach((control) => {
           control.disabled = false;
         });
+        paintLength();
         toastError(error);
         if (error.status === 409) {
           onSettled(null);
@@ -483,6 +513,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         el("div", { class: "approval-text secret-label" }, label),
         why === "" ? null : el("div", { class: "secret-why" }, why),
         el("div", { class: "secret-entry" }, value, save),
+        short,
         el(
           "div",
           { class: "secret-foot" },
