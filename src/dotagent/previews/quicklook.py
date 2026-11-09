@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from html import unescape
 from pathlib import Path
 
-from dotagent.core.errors import NotFoundError, PreviewError
+from dotagent.core.errors import NotFoundError, PreviewError, PreviewTimedOut
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 
@@ -32,8 +32,10 @@ log = get_logger(__name__)
 QUICK_LOOK: str = "/usr/bin/qlmanage"
 # The page of a drawing, among its parts.
 PAGE: str = "Preview.html"
-# How long Quick Look may take to draw a file.
+# How long Quick Look may take to draw a file, how often a call that hung is made, and the wait before the next.
 DRAW_TIMEOUT_S: float = 30.0
+DRAW_ATTEMPTS: int = 2
+RETRY_AFTER_S: float = 1.0
 # The drawings kept at most; the oldest go first.
 KEPT_LOOKS: int = 100
 _ID_CHARS: int = 32
@@ -135,7 +137,7 @@ async def _quick_look(path: Path, workshop: Path) -> None:
     try:
         _, stderr = await asyncio.wait_for(process.communicate(), DRAW_TIMEOUT_S)
     except TimeoutError as error:
-        raise PreviewError(
+        raise PreviewTimedOut(
             "Quick Look took too long to draw this file", {"path": str(path), "timeout_s": DRAW_TIMEOUT_S}
         ) from error
     finally:
@@ -151,6 +153,33 @@ async def _quick_look(path: Path, workshop: Path) -> None:
                 "stderr": stderr.decode("utf-8", errors="replace")[-_ERROR_CHARS:],
             },
         )
+
+
+def _empty(folder: Path) -> None:
+    """Remove what ``folder`` holds, folders and files, and keep it. Blocking."""
+    for entry in folder.iterdir():
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+
+
+async def _drawn_by_quick_look(path: Path, workshop: Path) -> None:
+    """:func:`_quick_look`, tried again after a hang (item 1084): ``qlmanage`` now and then hangs on a workbook it draws
+    at once the next time (a CI runner's gate, five times since item 540), so a call that timed out is made again
+    ``DRAW_ATTEMPTS`` times at most, ``RETRY_AFTER_S`` apart and doubling, each one logged; the last one's error is
+    raised. A failure that is no hang is raised at once."""
+    for attempt in range(1, DRAW_ATTEMPTS + 1):
+        try:
+            await _quick_look(path, workshop)
+            return
+        except PreviewTimedOut as error:
+            if attempt == DRAW_ATTEMPTS:
+                raise
+            log.warning("quick_look_hung", path=str(path), attempt=attempt, error=error.message)
+            # What the hung call wrote, if anything, goes: the next one writes its own.
+            await asyncio.to_thread(_empty, workshop)
+            await asyncio.sleep(RETRY_AFTER_S * 2 ** (attempt - 1))
 
 
 def _keep_page(folder: Path, path: Path, drawing: str) -> list[str]:
@@ -211,7 +240,7 @@ class QuickLook:
         workshop: Path = self.folder / f"{_DRAWING_PREFIX}{secrets.token_hex(8)}"
         await asyncio.to_thread(workshop.mkdir, parents=True)
         try:
-            await _quick_look(path, workshop)
+            await _drawn_by_quick_look(path, workshop)
             drawn: Path = await asyncio.to_thread(_drawn_page, workshop)
             await asyncio.to_thread(os.replace, drawn, self.folder / drawing)
             for old in await asyncio.to_thread(_oldest_beyond, self.folder, KEPT_LOOKS):

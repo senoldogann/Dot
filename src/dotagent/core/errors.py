@@ -258,6 +258,10 @@ class PreviewError(DotError):
     """macOS's Quick Look could not draw a file for the panel beside a chat (item 268)."""
 
 
+class PreviewTimedOut(PreviewError):
+    """Quick Look did not end within its time: a hang, which a second try may not meet (item 1084)."""
+
+
 class SkillError(DotError):
     """A skill folder does not follow the Agent Skills layout, so it is left out."""
 
