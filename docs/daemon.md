@@ -767,7 +767,9 @@ with a mark and a title (no page yet, waiting for the page, the view closed, the
 command, item 220). A Screen tab that has had no page at all says instead, in the empty panel the other tabs use, that
 Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the setting under
 Settings › Browser that opens it when a run starts its browser (item 401). **Watch** and **Close the view** open and
-close it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the
+close it by hand; once the run has ended it keeps the last screen and Watch goes. **Zoom** beside the page's address,
+or a click on the page while it is only watched, opens the view in the full-screen viewer, live, to zoom it (item
+1071, [Phone](phone.md)); the frames come at JPEG quality 80 (50 before), a little more to send for each. A pill under it says who has the
 browser ("Dot has control", or the agent's name), on one line, beside Take over and Use it here; a panel too narrow for
 the three puts the words on top and the buttons under them (item 512). Since that view shows the page, Dot's own Chrome stays in the
 background while a run works (`[browser] raise_window`, off by default, items 97 and 118): the tabs Dot opens are opened
