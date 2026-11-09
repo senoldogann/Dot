@@ -34,14 +34,14 @@ Under the roles, the page says how many schedules and agents run on each model, 
 **Night's learning and self-repair** chooses the model of each role of the improvement loop ([The
 harness](harness.md)) and Self-repair's model, as Settings › Self-repair does. Each role's box opens the composer's
 model menu (item 1044): the favourites and every provider on a rail, a search, and the models of the provider pressed,
-starred as in the composer. A role's menu offers only the models that can do its work: the fast, the vision and the
-own work model offer no model of an agent program of its own (OpenCode's free models, the Claude plan), whose
-provider stays on the rail and says why, while the default model, the review model and the night's roles offer the
-Claude plan's too.
+starred as in the composer. A role's menu offers only the models that can do its work: the fast and the vision model
+offer no model of an agent program of its own (OpenCode's free models, the Claude plan), and the own work model none
+of OpenCode's free models, whose provider stays on the rail and says why, while the default model, the review model
+and the night's roles offer the Claude plan's too.
 A model of your Claude plan (`claude_code:opus`, `claude_code:sonnet`, or any other it offers) may be the review model, as every question of it is a single one the
-plan answers (item 1032); not the fast model, which takes a run's steps, nor the vision model, which reads pictures,
-nor the own work model: its look is a run whose tools (its list, your mail and calendar) Claude Code's door to Dot's
-tools does not give.
+plan answers (item 1032), and the own work model, as its look is a run that has every tool of Dot's own loop there
+(its list, your mail and calendar; item 1063); not the fast model, which takes a run's steps, nor the vision model,
+which reads pictures. OpenCode's free models cannot be the own work model: their agent is given a part of Dot's tools.
 
 Under them, **Fallbacks** (item 478, the standby models; drawn as a numbered list since item 563) lists the models a run
 moves to when its own model cannot answer (below), in their order: **Add a fallback model** puts one of the models that
@@ -294,10 +294,16 @@ answer keeps its words, Ollama's too.
   memory recalled for it, as Dot's own loop hands them (item 1055: before it, a run on the plan said it did not know
   what the memory held), and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
   chat (item 1052: the tools' names, in their order, head every chat's prompt the same, so Anthropic's cache of that
-  head is read by a new chat instead of written again), as OpenCode's agent gets them, with Dot's files, commands and
-  web tools besides (Claude Code's own are off, but its search of the door's tools): the browser with your
-  sign-ins, the Mac's applications, memory, schedules, notify, a page in the conversation, skills, a question to you and
-  the apps you connected, as the run's mode and agent allow them. Each call goes through the run's approvals, sandbox,
+  head is read by a new chat instead of written again), every tool a run of Dot's own loop gets (Claude Code's own are
+  off, but its search of the door's tools): the files, commands and the web, the browser with your sign-ins, the Mac's
+  applications, memory, schedules, notify, a page in the conversation, skills, a question to you, the apps you
+  connected, your mail and calendars, drafts, the vault, Dot's own list, and the team, as the run's mode and agent allow
+  them (item 1063: before it, a run on the plan had no tool to message an agent, give it a work order or delegate). Its
+  prompt names the team as Dot's own does: the team its chat is with, the agents it may message by name and role, and
+  how to give them work orders. Only the tools of Dot's own loop stay out (finish, the plan, `use_tools` and a reaction:
+  the program runs its own loop), and a run another run handed its work to asks you nothing and hands nothing on, as
+  in Dot's own loop. An agent a run on the plan messages works on its own model, or on the plan when it names none.
+  Each call goes through the run's approvals, sandbox,
   shell guard and time limit as a call of Dot's own loop does, and shows on the timeline under the tool's own name. The
   program is started with no tool of its own but `ToolSearch` (`--tools ToolSearch`, item 1053: the door's tools are
   named in the prompt and the model looks one up as it needs it: with 296 tools a new chat wrote 10,800 tokens to the
@@ -315,8 +321,8 @@ answer keeps its words, Ollama's too.
   timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
   window; your messages reach it while it works, and Stop ends the program. Skills and connected apps picked in the
   composer come with the message as on Dot's own models (item 1022): each picked skill's instructions in its first
-  message, the apps' tools through the door; a message picked with accounts or Plan first is refused before it runs,
-  as those are Dot's own loop's. A chat keeps its Claude Code session from
+  message, the apps' tools through the door, and so the accounts picked, whose mail and calendars the door gives (item
+  1063); a message picked with Plan first is refused before it runs, as its plan and ask are Dot's own loop's. A chat keeps its Claude Code session from
   run to run (it is resumed, and hears what the chat said on other models since) while each run ends clean; a run that
   fails, is stopped or is cut at its limits lets the session go, and so does a rewind, and the next run starts a new
   one that hears the chat with its first message. The run's limits
@@ -326,8 +332,8 @@ answer keeps its words, Ollama's too.
   `[providers.claude_code] silence_s` (600 s) while none of Dot's tools works for it is ended, and the run fails saying
   so. What Dot's own runs bring besides (the memory recalled at the start, the checks of a finish, lessons and
   playbooks) a run here does not have, and these models cannot be the fast, vision or standby model chosen on the
-  Models page, whose calls include conversations and pictures, nor the own work model, whose look needs tools Claude
-  Code's door does not give; they can be the review model (item 1032). They can be the models of the improvement loop's roles
+  Models page, whose calls include conversations and pictures; they can be the review model (item 1032) and the own
+  work model, whose look has its tools there (item 1063). They can be the models of the improvement loop's roles
   (`[harness] proposer`, `composer`, `selector`, `experience`, item 1017): each of those is a single question, which
   `claude -p` answers in one go with no tool at all (`--tools ""`, no settings file, MCP server, slash command or kept
   session, `--no-session-persistence`), the question on its input, the system prompt in a file only you can read in a

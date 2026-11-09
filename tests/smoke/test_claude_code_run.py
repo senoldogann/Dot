@@ -232,7 +232,7 @@ async def test_a_picked_skill_reaches_claude_code_in_the_first_message(room: Roo
 
 async def test_plan_first_on_claude_code_is_refused_before_the_run(room: Room) -> None:
     """Plan first is Dot's own loop's plan and ask, which Claude Code does not run: refused, with what to do instead."""
-    with pytest.raises(InvalidValueError, match="no accounts or Plan first"):
+    with pytest.raises(InvalidValueError, match="but not Plan first"):
         await room.manager.start_picked(
             "Write a note in the workspace.",
             "task",

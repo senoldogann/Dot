@@ -355,7 +355,7 @@ AGENT_CORE_TOOLS: tuple[str, ...] = (
     RECALL_TOOL,
 )
 # A delegated run asks the owner nothing, a secret neither (item 857): its parent asks, in its own chat.
-_NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
+NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
     {
         DELEGATE_TOOL,
         ASK_USER_TOOL,
@@ -1155,7 +1155,7 @@ def _new_memories_note(live: LiveNotes) -> str:
     )
 
 
-def _team_name(name: str) -> str:
+def team_name(name: str) -> str:
     """The name of the ready team an agent called ``name`` is in (item 512), empty for none."""
     found: AgentTeam | None = team_of(name)
     return "" if found is None else found.name
@@ -1182,7 +1182,7 @@ def step_parallelism(calls: Sequence[ToolCall], group: int, configured: int) -> 
     return group if sends else configured
 
 
-def _team_brief(record: TeamRecord | None, agents: Sequence[AgentRecord], run: RunRecord) -> TeamBrief | None:
+def team_brief(record: TeamRecord | None, agents: Sequence[AgentRecord], run: RunRecord) -> TeamBrief | None:
     """What the prompt tells the run that leads the team of its chat (item 610): the team as it is now, its agents in
     its order and only those that are still agents. Only a run of Dot's leads a team (the owner's message to a chat
     with a team starts one), not a run of an agent that was put in the chat, and not a run delegated to a helper, which
@@ -1199,7 +1199,7 @@ def _team_brief(record: TeamRecord | None, agents: Sequence[AgentRecord], run: R
                 role=member.role,
                 instructions="",
                 made_by_dot=member.made_by is not None,
-                team=_team_name(member.name),
+                team=team_name(member.name),
             )
             for member in (by_id[each] for each in record.agents if each in by_id)
         ),
@@ -2192,6 +2192,29 @@ async def _route_step(
     return chosen
 
 
+async def withheld_tools(
+    runtime: Runtime, run: RunRecord, team: Sequence[AgentRecord], offered: frozenset[str], signed_in: bool
+) -> frozenset[str]:
+    """The tools of ``offered`` that ``run`` is not given now, by what Dot holds as it starts, the same for a run of
+    Dot's own loop and one on the owner's Claude plan (item 1063): the mail and calendars (item 424) without an
+    account ``signed_in``; the logins of 1Password (item 493) while it is not connected, and those of Dot's own vault
+    (item 621) while it holds none; messaging and work orders with no teammate, unless the run may make one (item 99:
+    then they stay, so a teammate made mid-run can be messaged at once); the objectives in an agent's run (item 908:
+    they are Dot's own); and consulting a helper where the config allows none."""
+    names: set[str] = set(
+        withheld_vault_tools(await runtime.vault_items.items(), await asyncio.to_thread(kept_token) is not None)
+    )
+    if not signed_in:
+        names |= {name for name in offered if group_of(name) == ACCOUNTS_GROUP}
+    if not team and CREATE_AGENT_TOOL not in offered:
+        names |= {MESSAGE_AGENT_TOOL, *WORK_ORDER_TOOLS}
+    if run.agent_id is not None:
+        names.update(OBJECTIVE_TOOLS)
+    if runtime.config.agent.consult_max_per_run == 0:
+        names.add(CONSULT_TOOL)
+    return frozenset(names & offered)
+
+
 async def run_agent(agent: AgentRun) -> RunEnd:
     started: float = time.monotonic()
     runtime: Runtime = agent.runtime
@@ -2220,7 +2243,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     surface, surface_reason = surface_for(config, scaffold)
     specs: tuple[ToolSpec, ...] = specs_for_mode(runtime.registry, run.mode) if info.tools else ()
     if run.parent_run_id is not None:
-        specs = tuple(spec for spec in specs if spec.name not in _NOT_FOR_DELEGATED_RUNS)
+        specs = tuple(spec for spec in specs if spec.name not in NOT_FOR_DELEGATED_RUNS)
     if run.campaign_id is None:
         specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS)
     # The agent the run belongs to (item 86) bounds its tools: the ones it names, the core tools in any case, and the
@@ -2243,23 +2266,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # Settings › Browser may keep every run off the browser (item 354).
     if not runtime.browser.config.enabled:
         specs = tuple(spec for spec in specs if group_of(spec.name) != BROWSER_GROUP)
-    # The mail and calendar tools (item 424) are a run's only when the owner signed an account in.
     signed_in: list[Account] = await runtime.accounts.accounts()
-    if not signed_in:
-        specs = tuple(spec for spec in specs if group_of(spec.name) != ACCOUNTS_GROUP)
-    # The logins of 1Password (item 493) are a run's only while the owner has connected it, and the logins,
-    # cards and contacts of Dot's own vault (item 621) only while it holds some.
-    withheld: frozenset[str] = withheld_vault_tools(
-        await runtime.vault_items.items(), await asyncio.to_thread(kept_token) is not None
+    withheld: frozenset[str] = await withheld_tools(
+        runtime, run, team, frozenset(spec.name for spec in specs), bool(signed_in)
     )
     specs = tuple(spec for spec in specs if spec.name not in withheld)
-    # Without a teammate the message tool goes, unless the run may make one (item 99): then it stays, so a teammate
-    # made mid-run can be messaged at once.
-    if not team and all(spec.name != CREATE_AGENT_TOOL for spec in specs):
-        specs = tuple(spec for spec in specs if spec.name not in {MESSAGE_AGENT_TOOL, *WORK_ORDER_TOOLS})
-    # The objectives are Dot's own (item 908): a run of an agent keeps none.
-    if run.agent_id is not None:
-        specs = tuple(spec for spec in specs if spec.name not in OBJECTIVE_TOOLS)
     # The agents the run knows of (item 99): the ones at its start; a newcomer is noted at the next step.
     known_agents: set[str] = {member.id for member in team} | ({run.agent_id} if run.agent_id is not None else set())
     may_message: bool = any(spec.name == MESSAGE_AGENT_TOOL for spec in specs)
@@ -2271,8 +2282,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     skills = skills.model_copy(update={"skills": await offered_to_run(runtime.config, skills, run.agent_id)})
     if not skills.skills:
         specs = tuple(spec for spec in specs if spec.name != SKILL_TOOL)
-    if config.consult_max_per_run == 0:
-        specs = tuple(spec for spec in specs if spec.name != CONSULT_TOOL)
     # The helpers that can answer as the run starts, besides its own model; only for a run with a tool that uses them.
     helpers: tuple[str, ...] = (
         tuple(
@@ -2328,7 +2337,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # (item 256).
     thread: ThreadRecord = await runtime.store.get_thread(run.thread_id)
     # The team the chat is with (item 610): every run of its thread, a follow-up too, leads it as the team is now.
-    lead: TeamBrief | None = _team_brief(await runtime.store.find_team(thread.team_id), team, run)
+    lead: TeamBrief | None = team_brief(await runtime.store.find_team(thread.team_id), team, run)
     # A run that leads a group chat sends every agent its part in one reply, and they work at once (item 831).
     group_parallelism: int = parallel_calls(config.parallel_tools, lead)
     close_to_title, close = (
@@ -2368,7 +2377,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     role=agent_record.role,
                     instructions=agent_record.instructions,
                     made_by_dot=agent_record.made_by is not None,
-                    team=_team_name(agent_record.name),
+                    team=team_name(agent_record.name),
                     refuses=agent_record.refuses,
                     folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
                 ),
@@ -2378,7 +2387,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                         role=member.role,
                         instructions="",
                         made_by_dot=member.made_by is not None,
-                        team=_team_name(member.name),
+                        team=team_name(member.name),
                     )
                     for member in team
                 ],

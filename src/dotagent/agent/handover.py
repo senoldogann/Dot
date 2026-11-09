@@ -78,9 +78,9 @@ async def bridged_call(registry: ToolRegistry, context: ToolContext, gate: RunGa
     return outcomes[0].result
 
 
-async def tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> ToolContext:
-    """What Dot's tools get while they run for the agent: what a run of Dot's own loop gives them, without
-    delegation."""
+async def tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo, run_tools: frozenset[str]) -> ToolContext:
+    """What Dot's tools get while they run for the agent: what a run of Dot's own loop gives them, its ``run_tools``
+    (the tools the agent was given) and the run's spawner, through which the team's tools hand work on (item 1063)."""
     runtime: Runtime = agent.runtime
     run = agent.run
     scaffold: Scaffold = scaffold_for(
@@ -108,7 +108,10 @@ async def tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> ToolC
         cancel=agent.cancel,
         output_chars=scaffold.tool_output_chars,
         facts=lambda: facts,
-        spawner=None,
+        spawner=agent.spawner,
+        run_tools=run_tools,
+        # The owner's words, which a skill saved in their words keeps (skill_save), as in Dot's own loop.
+        user_text=lambda: "\n".join(agent.gate.instructions),
         tainted=lambda: agent.gate.tainted,
         ever_tainted=lambda: agent.gate.ever_tainted,
     )
