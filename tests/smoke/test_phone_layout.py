@@ -1,7 +1,8 @@
 """A phone's run page and list of chats (items 294 to 298), on a served daemon, in WebKit as the owner's iPhone, light
-and dark. The bar names the chat over the agent and the model, and holds its tools in one pill: Dot's computer once the
-run has had a page, the helpers with their count, and the details. A line over the composer says how long the run has
-worked, how its helpers stand and how many messages are queued (item 352), and its parts open where they tell of. The
+and dark. The bar names whom the chat is with in its middle (item 1101), and holds its tools in one pill: Dot's
+computer once the run has had a page, the helpers with their count, and the details. A line over the composer says how
+long the run has worked, how its helpers stand and how many messages are queued (item 352), and its parts open where
+they tell of. The
 details rise from the foot as a sheet with a grabber, and a drag of its head closes it; the Agents tab's rows say each
 helper's state, model and what it does. Dot's computer opens over the whole page with the page's address and the pill of
 who has control, and goes back to the panel when it closes. The sidebar is the list of chats over the whole screen,

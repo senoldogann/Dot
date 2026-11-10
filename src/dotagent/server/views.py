@@ -1249,8 +1249,9 @@ class RunDetail(FrozenModel):
     process that lives drives it at work (a ``dotx`` command): its page follows it and its Stop asks that process to
     stop it, but it is not steered or taken over from here. ``choices`` are what the next follow-up of the run's chat
     starts with (item 199), ``None`` for a chat that has none of its own yet. ``title`` is the title of the run's chat,
-    which a phone's top bar shows (item 295). ``cut_off`` is how the run was cut off (``agent.resume.cut_off_by``),
-    which the line that offers to resume it names (item 299); ``None`` for a run that ended otherwise or works.
+    which the Details of the run's panel show (items 295 and 1101). ``cut_off`` is how the run was cut off
+    (``agent.resume.cut_off_by``), which the line that offers to resume it names (item 299); ``None`` for a run that
+    ended otherwise or works.
     ``team`` is the team the run's chat is with (item 610), ``None`` for any other chat."""
 
     run: RunRecord

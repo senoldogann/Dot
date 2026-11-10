@@ -22,9 +22,12 @@ function fact(label, value) {
  * when it is on. `paint(state)` takes what changes while the run goes, as
  * `{ status, model, calls, failed, compactions, flagged, input, output, finishedAt }`; `finishedAt` is null until the
  * run is over; `compactions` counts the times the run compacted its context and `flagged` those whose check found
- * something (item 260): the list says it once there is one of either.
+ * something (item 260): the list says it once there is one of either. `title` is the chat's, first in the list, or
+ * null for a helper's run; `retitle(text)` names a chat renamed since (item 1101: a phone's bar names whom the chat is
+ * with, and its title is here).
  */
-export function createDetails(run, agent, campaign, keepGoing, team) {
+export function createDetails(run, title, agent, campaign, keepGoing, team) {
+  const titled = el("dd", null, title ?? "");
   const status = el("dd");
   const model = el("dd");
   const calls = el("dd", { class: "meta-facts" });
@@ -55,6 +58,7 @@ export function createDetails(run, agent, campaign, keepGoing, team) {
   const element = el(
     "dl",
     { class: "facts", id: "panel-run-details", "aria-label": "Details" },
+    title === null ? null : fact("Title", titled),
     fact("Status", status),
     agent === null ? null : fact("Agent", el("dd", null, el("a", { href: `#/agents/${agent.id}`, title: agent.role }, agent.name))),
     team === null ? null : fact("Team", el("dd", null, el("a", { href: `#/teams/${team.id}` }, team.name))),
@@ -105,5 +109,9 @@ export function createDetails(run, agent, campaign, keepGoing, team) {
     setText(took, duration(Math.max(0, end - run.created_at)));
   }
 
-  return { element, paint };
+  function retitle(text) {
+    titled.textContent = text;
+  }
+
+  return { element, paint, retitle };
 }

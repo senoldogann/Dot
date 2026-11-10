@@ -11065,8 +11065,8 @@ button.attach-chip {
 
 /* ---------- a phone's run page (items 295 and 297) ---------- */
 
-/* The chat's title over the agent and the model and the bar's quick ways are a phone's; a wider page keeps the face and
-   the name and the panel's switch alone. The line over the composer is every width's (item 352). */
+/* The bar's quick ways are a phone's, and its name in the middle of the bar (item 1101); a wider page keeps the face
+   and the name at the left and the panel's switch alone. The line over the composer is every width's (item 352). */
 .stage-heading,
 .stage-pill > .stage-quick {
   display: none;
@@ -11162,8 +11162,8 @@ button.attach-chip {
 }
 
 @media (max-width: 720px) {
-  /* The bar names the chat (item 295): its title, and under it the agent and the model in small type. The title gives
-     way, the tools keep their room. */
+  /* The bar named the chat (item 295): its title, and under it the agent and the model in small type, which the loading
+     curtain's bar still holds while it is up; a chat's page names whom it is with since item 1101 (below). */
   .stage-title:has(> .stage-heading) {
     flex: 1 1 auto;
   }
