@@ -1487,15 +1487,16 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     plan_reminder() {},
 
     // The run called finish in the same reply as a call that did not work, so its answer was written before it saw the
-    // result: it was sent back once to read it and finish again (item 552).
+    // result: it was sent back once to read it and finish again (item 552). A correction the run makes on its own goes
+    // to the side panel, not the conversation (item 1117, as 852).
     finish_after_failure(scope, record) {
       const calls = record.data.calls.map(toolWords).join(", ");
-      note(scope, record.ts, "list", `Dot wanted to finish in the same reply as a step that did not work (${calls}) and was asked to read its result first`, "warn");
+      setupLine(scope, "correction", "a correction", "list", `Dot wanted to finish in the same reply as a step that did not work (${calls}) and was asked to read its result first`, "warn");
     },
 
     // A session of a campaign wanted to end while the campaign had no targets: it was sent back once to record them.
-    campaign_targets_reminder(scope, record) {
-      note(scope, record.ts, "target", "Dot wanted to end the session before the campaign had targets and was asked to record them first", "warn");
+    campaign_targets_reminder(scope, _record) {
+      setupLine(scope, "correction", "a correction", "target", "Dot wanted to end the session before the campaign had targets and was asked to record them first", "warn");
     },
 
     // The run reached a limit of [agent] run_max_minutes or run_max_tokens: it was told to finish, and its next reply ends it.
@@ -1509,7 +1510,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const missing = record.data.missing;
       const noun = missing.length === 1 ? "a file or folder" : `${missing.length} files or folders`;
       const listed = clip(missing.join(", "), 300);
-      note(scope, record.ts, "file", `Dot's answer named ${noun} that do not exist (${listed}) and was asked to correct it`, "warn");
+      setupLine(scope, "correction", "a correction", "file", `Dot's answer named ${noun} that do not exist (${listed}) and was asked to correct it`, "warn");
     },
 
     // The run goes on from where the run before it was cut off ([agent] resume, Continue or dotx resume): a line with a
@@ -1797,11 +1798,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
     // The progress watchdog saw that the run is not getting anywhere (`detail`) and answered with a rung of its ladder
     // (`action`); the consult rung brings the advice of the review model, or the `error` that ended the run. An event
-    // without `action` comes from the older stall guard, which only counted its `warnings`.
+    // without `action` comes from the older stall guard, which only counted its `warnings`. A rung the run climbs on
+    // its own (nudge, replan, consult) goes to the side panel; the conversation keeps only the question to the owner and
+    // the stop, which change what the owner sees (item 1117).
     stall(scope, record) {
       const data = record.data;
       if (data.action === undefined) {
-        note(scope, record.ts, "alert", `Dot repeated the same step and was told to change its approach (warning ${data.warnings})`, "warn");
+        setupLine(scope, "correction", "a correction", "alert", `Dot repeated the same step and was told to change its approach (warning ${data.warnings})`, "warn");
         return;
       }
       const answers = {
@@ -1823,7 +1826,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         parts.push(`Next: ${steps.map((step, index) => `${index + 1}. ${clip(step, 300)}`).join(" ")}`);
       }
       const ends = data.action === "stop" || data.error !== undefined;
-      note(scope, record.ts, "alert", parts.join(" "), ends ? "bad" : "warn");
+      if (ends) {
+        note(scope, record.ts, "alert", parts.join(" "), "bad");
+      } else if (data.action === "ask") {
+        note(scope, record.ts, "alert", parts.join(" "), "warn");
+      } else {
+        setupLine(scope, "correction", "a correction", "alert", parts.join(" "), "warn");
+      }
     },
   };
 
