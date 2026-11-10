@@ -11,6 +11,8 @@ import { createAsksDock } from "../asksdock.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { createCapsule } from "../capsule.js";
+import { emptyFlow, transition } from "../chatflow.js";
+import { createChatFlowView, decideApproval } from "../chatflowview.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
@@ -1676,9 +1678,42 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     icon("monitor"),
   );
   const helpersCount = el("span", { class: "stage-quick-count" });
+  let sessionsWanted = false;
+  let flow = emptyFlow(runId);
+  const flowView = createChatFlowView({
+    onOpen: (id) => {
+      flow = transition(flow, { type: "open_session", id });
+      paintFlow();
+    },
+    onBack: () => {
+      flow = transition(flow, { type: "close_session" });
+      paintFlow();
+    },
+    onHideRail: () => {
+      sessionsWanted = false;
+      layout.dataset.sessions = "off";
+    },
+    onToggle: (id) => {
+      flow = transition(flow, { type: "toggle_activity", id });
+      paintFlow();
+    },
+    onDecide: (id, approve, note) => {
+      void decideApproval(id, approve, note);
+    },
+  });
   const helpersButton = el(
     "button",
-    { class: "icon-btn stage-quick stage-helpers", type: "button", title: "Helpers", "aria-label": "Show the helpers", hidden: true, onclick: () => inspector.openTab("agents") },
+    {
+      class: "icon-btn stage-quick stage-helpers",
+      type: "button",
+      title: "Sessions",
+      "aria-label": "Show the sessions",
+      hidden: true,
+      onclick: () => {
+        sessionsWanted = layout.dataset.sessions !== "on";
+        layout.dataset.sessions = sessionsWanted ? "on" : "off";
+      },
+    },
     icon("users"),
     helpersCount,
   );
@@ -1696,12 +1731,36 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     earlier,
     goalMessage,
     timeline.element,
+    flowView.sessions,
+    flowView.activity,
+    flowView.drill,
     workStatus.element,
     waitingList,
     lessonsPlace,
   );
   paintWorking();
-  const main = el("div", { class: "run-main" }, thread, dock);
+  layout.dataset.sessions = "off";
+  layout.dataset.hasSessions = "off";
+  function paintFlow() {
+    flowView.paint(flow);
+    const has = flow.sessionOrder.length > 0;
+    const had = layout.dataset.hasSessions === "on";
+    layout.dataset.hasSessions = has ? "on" : "off";
+    thread.dataset.view = flow.view.kind === "session" ? "session" : "chat";
+    if (!has) {
+      layout.dataset.sessions = "off";
+      return;
+    }
+    if (!had && window.matchMedia("(min-width: 721px)").matches) {
+      sessionsWanted = true;
+    }
+    if (sessionsWanted) {
+      layout.dataset.sessions = "on";
+    }
+  }
+  paintFlow();
+  const column = el("div", { class: "run-column" }, thread, dock);
+  const main = el("div", { class: "run-main" }, column, flowView.rail);
   // On a phone the dock floats over the conversation's foot (item 374), a pane of glass with the messages going by
   // under it: its height is kept on the column that holds them both, where the conversation's padding reads it. The
   // dock is measured once it stands in the page and whenever it changes (its first height, the bar over the composer, a
@@ -1798,6 +1857,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       messageRead(message.data.data.owner_text ?? message.data.data.text);
     }
     timeline.push(message.data);
+    flow = transition(flow, { type: "record", record: message.data });
+    paintFlow();
     workStatus.push(message.data);
     recap.onEvent(message.data);
     if (!replaying && message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
