@@ -77,6 +77,9 @@ _DOT: str = "Dot"
 # How long iOS keeps a Live Activity at work (eight hours, then it ends it): a token older than that is of an activity
 # that is no more, and the app opens a new one at the next run it starts.
 ACTIVITY_LIFE_S: float = 8 * 3600.0
+# How long an activity the app opened waits for a row (item 1096): its token may come before the run's start, and a
+# request that started no run after all (a message queued behind a held queue) opened it for nothing, which then ends.
+OPEN_WAIT_S: float = 60.0
 # The title of an alert of a message Dot wrote to the owner.
 TOLD_TITLE: str = "Dot has a message for you"
 
@@ -144,6 +147,8 @@ class ApnsWatch:
         # When the activity was last told, and whether a step came since that waits its turn (item 1004).
         self._told_at: float = 0.0
         self._due: bool = False
+        # When the oldest activity kept with no row to show was registered, while one is (item 1096).
+        self._empty_at: float | None = None
         self._others: set[str] = set()
 
     async def _forget_if_gone(self, device: ApnsDevice, reply: ApnsReply) -> None:
@@ -183,10 +188,12 @@ class ApnsWatch:
         else:
             state = shown.state.model_copy(update={"status": status, "kind": doing.kind, "line": doing.line})
         self._rows[run.id] = _Row(state=state, ended_at=ended_at)
+        self._empty_at = None
 
     async def _tell(self, priority: PushPriority, now: float) -> None:
         """Tell every phone's activity the rows as they stand: an update where the app gave the activity's token, and
-        the end once no row is left. A phone whose app opened none is told nothing (item 1096)."""
+        the end once no row is left, but to one opened less than :data:`OPEN_WAIT_S` ago, which :meth:`flush` ends then
+        if no row came. A phone whose app opened none is told nothing (item 1096)."""
         state: FleetState = fleet_state(self._rows)
         self._told_at = now
         self._due = False
@@ -202,7 +209,10 @@ class ApnsWatch:
                 await self._store.delete_live_activity(FLEET_ID, device.phone_id)
                 activity = None
             if not state.rows:
-                if activity is not None:
+                if activity is not None and now - activity.created_at < OPEN_WAIT_S:
+                    opened: float = activity.created_at
+                    self._empty_at = opened if self._empty_at is None else min(self._empty_at, opened)
+                elif activity is not None:
                     await self._send(device, activity.token, _AT_ONCE, live_end_payload(state, now))
                     await self._store.delete_live_activity(FLEET_ID, device.phone_id)
             elif activity is not None:
@@ -218,9 +228,8 @@ class ApnsWatch:
         """Send what ``event`` says: an alert as Web Push would, and the change of the run's row."""
         if event.kind == LIVE_REGISTERED_EVENT:
             # The app opens the activity as the run it starts is made, and its token may come before the run's start:
-            # an activity of no row yet is not ended, and the start tells it.
-            if self._rows:
-                await self._tell(_AT_ONCE, now)
+            # an activity of no row yet waits for it (:data:`OPEN_WAIT_S`).
+            await self._tell(_AT_ONCE, now)
             return
         if event.run_id == SYSTEM_RUN_ID:
             notice: PushMessage | None = notice_message(event)
@@ -307,8 +316,9 @@ class ApnsWatch:
             await self._tell(_AT_ONCE, now)
 
     async def flush(self, now: float) -> None:
-        """Take off the rows of runs that ended :data:`DISMISS_AFTER_S` ago, and send the step that waited its turn
-        once the last push is :data:`PROGRESS_EVERY_S` old."""
+        """Take off the rows of runs that ended :data:`DISMISS_AFTER_S` ago, send the step that waited its turn once
+        the last push is :data:`PROGRESS_EVERY_S` old, and end an activity that waited :data:`OPEN_WAIT_S` for a row
+        in vain."""
         gone_rows: list[str] = [
             run_id
             for run_id, row in self._rows.items()
@@ -316,7 +326,10 @@ class ApnsWatch:
         ]
         for run_id in gone_rows:
             del self._rows[run_id]
-        if gone_rows or (self._due and now - self._told_at >= PROGRESS_EVERY_S):
+        waited: bool = self._empty_at is not None and now - self._empty_at >= OPEN_WAIT_S
+        if waited:
+            self._empty_at = None
+        if gone_rows or waited or (self._due and now - self._told_at >= PROGRESS_EVERY_S):
             await self._tell(_WHEN_IT_SUITS, now)
 
 

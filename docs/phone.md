@@ -111,8 +111,8 @@ code** takes its place. The same by hand:
    notification (item 1096): the daemon starts none by push, as Apple has a push that starts one bring a notification,
    and a start is not worth one. A run started on the Mac, or by a schedule, opens no activity; you are notified when a
    run of yours ends or waits for you, as you allowed Dot's notifications in the iPhone's Settings. Once the app sent
-   the activity's token every change goes to it, and an activity whose token came before its run started waits for
-   it; a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a start,
+   the activity's token every change goes to it, and an activity whose token came before its run started waits a
+   minute for it (one opened by a request that started no run, a message queued behind a held queue, ends then); a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a start,
    "Waiting" while an approval waits, and an end go at once. An ended run stays a row 15 minutes, and once no row is
    left the activity ends and goes. One you swipe away is forgotten once the app has told so (at once while it runs,
    else when it next opens: until then the changes go to the one that is gone), and the next run you start in the app
