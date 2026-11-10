@@ -305,9 +305,10 @@ what it touched and where its plan stood, and how to go on in the same thread. W
 ladder instead: a nudge; a re-plan, in which the next step may only plan or finish; a second opinion of the review model
 (`[models] review`), given to the model as advice (if that model cannot answer, the run stops and says so); a question
 to you (not in yolo, scheduled, delegated or eval runs, where nobody would answer); and the stop. Twelve steps without
-an alert bring the ladder one rung down again, so a long run is not stopped for hiccups that are hours apart. Every
-alert shows in the timeline with what was seen and what was done. The ladder is off by default until evals show that it
-helps.
+an alert bring the ladder one rung down again, so a long run is not stopped for hiccups that are hours apart. An alert
+the run answers on its own (the nudge, the re-plan, the second opinion) is listed in the side panel's Set up, not in the
+conversation; the question to you and the stop show in the conversation with what was seen and what was done. The
+ladder is off by default until evals show that it helps.
 
 **Checkpoints of a long run** (item 909). A run that keeps changing its steps without getting closer, or that works on
 something its goal does not ask for, shows none of the patterns above. So every `checkpoint_steps` acting steps (`[agent]`,
@@ -316,8 +317,9 @@ page that says it is yours extends nothing), the plan and a digest of the steps,
 the run is still on track: on track, or when it cannot tell, nothing happens (a wrong alarm costs a run that was going
 well); off track, it says why and gives one to three steps back to the goal, which the run is given as a note, and the
 watchdog climbs a rung of its ladder as for a pattern, so a run judged off track again and again is stopped with what it
-tried. The timeline shows the check as a progress alert (`drift`) with the diagnosis and the steps. A checkpoint the
-review model cannot answer is skipped and logged (`checkpoint_failed`): a run is never stopped for a judge that failed.
+tried. The side panel's Set up lists the check as a progress alert (`drift`) with the diagnosis and the steps. A
+checkpoint the review model cannot answer is skipped and logged (`checkpoint_failed`): a run is never stopped for a
+judge that failed.
 A run that ever read content others can author is marked again when the judge's note (or the consult rung's) comes,
 as the judge read what the run read, even after your steer cleared the mark.
 This is the Watchdog of DeepSeek Harness's Super-agent design (2026-11-01), which judges whether each worker makes
