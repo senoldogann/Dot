@@ -58,6 +58,10 @@ def test_a_page_a_test_and_a_lock_run_the_browser_parts_and_a_unit_test_does_not
     assert not browser_ci.runs_browser_tests([])
 
 
+def test_the_desktop_shell_and_ios_do_not_run_the_browser_parts() -> None:
+    assert not browser_ci.runs_browser_tests(["desktop/src-tauri/Cargo.toml", "ios/project.yml"])
+
+
 def _modules() -> dict[str, Path]:
     """Every module of the package, by the name it is imported under."""
     found: dict[str, Path] = {}
