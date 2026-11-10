@@ -258,15 +258,7 @@ function revealAnswer(answer, text) {
     }
     at = revealStop(text, at + step);
     live.text = text.slice(0, at);
-    try {
-      drawLive(live);
-    } catch (error) {
-      // A frame that cannot be drawn ends the writing with the answer drawn whole, rather than leaving its first words
-      // and the caret for good (item 1112: the owner had to leave the chat and come back to read it).
-      console.warn("the answer could not be written in", error);
-      finish();
-      return;
-    }
+    drawLive(live);
     if (at < text.length) {
       requestAnimationFrame(frame);
       return;
