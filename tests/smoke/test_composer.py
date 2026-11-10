@@ -234,7 +234,8 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            for width in (1280, 390):
+            # A phone's box has the model's pill alone (item 1121): `_phone_box_rests_until_used` reads it.
+            for width in (1280,):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
                 await show_choices(page)
                 refused: list[str] = []
@@ -432,7 +433,8 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            for width in (1280, 800, 560, 390):
+            # A phone's line (items 1120 and 1121) is `_phone_box_rests_until_used`'s.
+            for width in (1280, 800):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
                 await show_choices(page)
                 await page.route("**/api/models", _with_a_thinking_model)
@@ -658,6 +660,54 @@ async def test_a_large_photo_goes_smaller_and_a_send_while_it_uploads_says_to_wa
             await browser.close()
 
 
+async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) -> None:
+    """Items 1120 and 1121 on a phone's width: the box at rest is the "+", the words and the send, YOLO's pill and the
+    microphone away too; a touch in the words brings the line under them, the model's pill alone standing for the
+    choices, and its menu holds the approvals and the mode; a touch elsewhere puts the line away, and the "+" menu has
+    no Model and options."""
+    page: Page = await browser.new_page(viewport={"width": 390, "height": 900}, reduced_motion="reduce")
+    await page.goto(ui_url(host, port, TOKEN))
+    composer: Locator = page.locator(".composer").last
+    model: Locator = composer.locator(".composer-pill[data-pill='model']")
+    await expect(composer).to_have_attribute("data-quiet", "")
+    for part in (".plus-button", ".composer-field", ".btn.send"):
+        await expect(composer.locator(part)).to_be_visible()
+    for part in (".mic-button", ".composer-pill[data-pill='model']", ".composer-pill[data-pill='options']"):
+        await expect(composer.locator(part)).to_be_hidden()
+    await composer.locator("textarea").click()
+    await expect(composer).not_to_have_attribute("data-quiet", "")
+    await expect(model).to_be_visible()
+    await expect(composer.locator(".mic-button")).to_be_visible()
+    await expect(composer.locator(".composer-pill[data-pill='options']")).to_be_hidden()
+    # The words over the line; on it the "+", the model, the microphone and the send, on one centre line, the
+    # microphone as tall as the send and left of it (read in one frame).
+    rects: list[list[float]] = await composer.evaluate(
+        "box => ['.composer-field', '.plus-button', \".composer-pill[data-pill='model']\", '.mic-button', '.btn.send']"
+        ".map((part) => { const r = box.querySelector(part).getBoundingClientRect();"
+        " return [r.top, r.bottom, r.left, r.right, r.height]; })"
+    )
+    field, plus, pill, mic, send = rects
+    centres: list[float] = [(part[0] + part[1]) / 2 for part in (plus, pill, mic, send)]
+    assert max(centres) - min(centres) <= 2, rects
+    assert all(part[0] >= field[1] - 1 for part in (plus, pill, mic, send)), rects
+    assert round(mic[4]) == round(send[4]) == 36, rects
+    assert plus[3] <= pill[2] and pill[3] <= mic[2] and mic[3] <= send[2] + 1, rects
+    await model.click()
+    menu: Locator = page.locator(".composer-popover[aria-label='Model']")
+    await expect(menu.get_by_role("listbox", name="Mode", exact=True)).to_be_visible()
+    await menu.locator(".pop-option[data-mode='yolo']").click()
+    await expect(model).to_contain_text("YOLO")
+    await menu.locator(".pop-option[data-mode='ask']").click()
+    await expect(model).not_to_contain_text("YOLO")
+    await page.keyboard.press("Escape")
+    await page.mouse.click(4, 240)
+    await expect(composer).to_have_attribute("data-quiet", "")
+    await composer.locator(".plus-button").click()
+    await expect(page.get_by_role("menuitem", name="Add files")).to_be_visible()
+    await expect(page.get_by_role("menuitem", name="Model and options")).to_have_count(0)
+    await page.close()
+
+
 async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
     runtime: Runtime, client: httpx.AsyncClient
 ) -> None:
@@ -670,7 +720,7 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            for width in (1280, 390):
+            for width in (1280,):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900}, reduced_motion="reduce")
                 await page.goto(ui_url(host, port, TOKEN))
                 composer: Locator = page.locator(".composer").last
@@ -739,5 +789,6 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
                 await options.click()
                 await page.locator(".composer-popover .pop-option[data-mode='ask']").click()
                 await page.close()
+            await _phone_box_rests_until_used(browser, host, port)
         finally:
             await browser.close()

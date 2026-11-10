@@ -11215,11 +11215,30 @@ button.attach-chip {
   }
 
   /* A chat's bar stands on nothing (item 1113, the owner's ask after Grok Bot's): its parts, the way back, the name and
-     the tools' pill, have their own grounds, and the bar no ground and no line under it. A chat's page scrolls between
-     the bar and the composer (item 352), so nothing passes under it. */
+     the tools' pill, have their own grounds of glass, and the bar no ground and no line under it. The conversation
+     passes under it (item 1119, run.css), as under the composer. */
   .stage:has(> .page[data-layout="run"]) > .stagebar {
     background: transparent;
     border-bottom-color: transparent;
+  }
+
+  /* The way back is a round pane of glass, as the name's and the tools' are (item 1119): the conversation goes by under
+     all three. */
+  .stage:has(> .page[data-layout="run"]) .stagebar-left > .icon-btn {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-pill);
+    background: var(--glass-surface);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+
+  .stage:has(> .page[data-layout="run"]) .stage-pill {
+    outline-color: var(--glass-border);
+    background: var(--glass-surface);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
   }
 
   .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) {

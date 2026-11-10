@@ -262,10 +262,14 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                 await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{first.id}")
-                pill: Locator = page.locator(".dock .composer-pill[data-pill='reasoning']")
+                # A phone's box holds the reasoning in the model's menu, once the box is used (items 1120 and 1121).
+                held: str = "model" if width < 720 else "reasoning"
+                if width < 720:
+                    await page.locator(".dock textarea").click()
+                pill: Locator = page.locator(f".dock .composer-pill[data-pill='{held}']")
                 await expect(pill).to_be_visible()
                 await pill.click()
-                menu: Locator = page.locator(".composer-popover[aria-label='Reasoning']")
+                menu: Locator = page.locator(f".composer-popover[aria-label='{held.capitalize()}']")
                 speed: Locator = menu.get_by_role("listbox", name="Speed")
                 await expect(speed.get_by_role("option")).to_have_count(2)
                 fast: Locator = speed.get_by_role("option", name="Fast")

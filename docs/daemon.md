@@ -224,7 +224,8 @@ size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
 the bar is still one line; with the choices shown, a phone keeps the words on their line with the **+** and the send,
-and puts the microphone under them, on the line of the choices. On a phone the bar's buttons are 36 px and answer a
+and puts the microphone under them, on the line of the choices; a phone's box shows its choices while it is used,
+not by the **+** menu ([Phone](phone.md), items 1120 and 1121). On a phone the bar's buttons are 36 px and answer a
 finger's 44 px around them (item
 787, as every icon button of the bars and the lists does), and the box's text is the size chosen for it, at
 least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item

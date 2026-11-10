@@ -223,8 +223,11 @@ async def test_the_agents_box_starts_from_the_agents_bounds_and_a_choice_there_s
             await phone.goto(ui_url("127.0.0.1", int(served.rpartition(":")[2]), TOKEN))
             await phone.goto(f"{served}/#/agents/{scout}")
             await expect(phone.locator(BOX)).to_be_visible()
-            for pill in ("model", "reasoning", "options"):
-                await expect(_pill(phone, pill)).to_be_visible()
+            # The box used, its model's pill stands for the run's choices (items 1120 and 1121).
+            await phone.locator(BOX).click()
+            await expect(_pill(phone, "model")).to_be_visible()
+            for pill in ("reasoning", "options"):
+                await expect(_pill(phone, pill)).to_be_hidden()
             send: FloatRect | None = await phone.locator(".composer .btn.send").bounding_box()
             assert send is not None and send["x"] >= 0 and send["x"] + send["width"] <= 390, send
             assert await phone.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")

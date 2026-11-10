@@ -9,6 +9,7 @@ import { composerPill } from "./composer.js";
 import { el, modelName } from "./dom.js";
 import { allModels, levelLabel, offersChoice, ONE_MESSAGE, oneMessageChoices, SPEED_HINTS } from "./efforts.js";
 import { icon } from "./icons.js";
+import { PHONE } from "./layout.js";
 import { defaultRowText, modelPicker } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
 import { providerMark, providerOf } from "./providers.js";
@@ -85,6 +86,11 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  */
 export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onChange }) {
   let waiting = false;
+  // What the model's pill adds after the name on a phone (item 1121), where it alone stands for the choices: the mode
+  // when one is named, the reasoning level and the approvals. Painted once the pills exist.
+  let approvalsShort = "";
+  let reasoningShort = "";
+  let paintPhonePill = () => undefined;
 
   // A choice of the Options is kept as `kept` keeps it, and told as the others are.
   function told(choice) {
@@ -115,6 +121,8 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     // In YOLO the run asks nothing: the box says so even while its choices are away (item 833).
     optionsPill.element.toggleAttribute("data-yolo", shown === "yolo");
     setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);
+    approvalsShort = badge === null ? "" : badge.short;
+    paintPhonePill();
   }, told(kept.approvals));
   const goalMode = goalModePicker(told(kept.goalMode));
   const executionItems = [];
@@ -153,6 +161,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   let modeId = kept.mode;
   function paintMode() {
     const option = modes.find((candidate) => candidate.id === modeId);
+    paintPhonePill();
     modePill.setValue(option.label, "");
     modePill.setIcon(icon(option.icon));
     setTitle(modePill.element, option.hint);
@@ -174,6 +183,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   function pickMode(id) {
     showMode(id);
     modeMenu.close();
+    modelMenu.repaint();
     onMode(id);
     onChange();
   }
@@ -263,16 +273,19 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     } else {
       frame.element.dataset.boost = boost.id;
     }
+    reasoningShort = "";
     if (shown) {
       const level = choice ? (kept.level.read(info) ?? info.default_effort) : null;
       const words = boost !== null ? boost.label : choice ? (level === null ? "Default" : levelLabel(level)) : "";
-      reasoningPill.setValue(fastOn(info) ? (words === "" ? "Fast" : `${words} · Fast`) : words, "");
+      reasoningShort = fastOn(info) ? (words === "" ? "Fast" : `${words} · Fast`) : words;
+      reasoningPill.setValue(reasoningShort, "");
       reasoningPill.setIcon(icon(boost !== null ? boost.icon : fastOn(info) ? "bolt" : "brain"));
       const typed = boost !== null && once === null ? " (the word in the box)" : "";
       setTitle(reasoningPill.element, boost === null ? "Reasoning level" : `${boost.label}: ${boost.hint}${typed}`);
     } else {
       reasoningMenu.close();
     }
+    paintPhonePill();
     modelMenu.repaint();
     reasoningMenu.repaint();
   }
@@ -394,9 +407,47 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     label: "Model",
     build: () => {
       const fallback = defaultRefOf(getSnapshot());
-      return picker.build({ groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) });
+      const models = picker.build({ groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) });
+      return PHONE.matches ? [...models, ...phoneSections()] : models;
     },
   });
+
+  // A group of the model's menu on a phone, under its heading.
+  function section(title, children) {
+    return el("div", { class: "pop-group pop-phone-section", role: "group", "aria-label": title }, el("div", { class: "pop-heading", "aria-hidden": "true" }, title), ...children);
+  }
+
+  // On a phone the model's menu holds every choice of the run (item 1121, the owner's ask after T3 Code's thread
+  // settings): under the models, the reasoning, the approvals (with their own heading) and how Dot works, and the mode;
+  // their own pills stay on a Mac's wider box.
+  function phoneSections() {
+    const isChat = modeId === "chat";
+    executionGroup.hidden = isChat;
+    executionGroup.replaceChildren(el("div", { class: "pop-heading" }, "How Dot works"), ...executionItems.flatMap((build) => build()), goalMode.element, frame.picks.planRow());
+    const reasoning = reasoningRows();
+    return [
+      ...(reasoning.length === 0 ? [] : [section("Reasoning", reasoning)]),
+      approvals.element,
+      ...(isChat ? [] : [executionGroup]),
+      ...more(),
+      section("Mode", [
+        el(
+          "div",
+          { role: "listbox", "aria-label": "Mode" },
+          ...modes.map((option) => optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) })),
+        ),
+      ]),
+    ];
+  }
+
+  paintPhonePill = () => {
+    const option = modes.find((candidate) => candidate.id === modeId);
+    const named = option === undefined || option.id === AUTO_MODE.id ? "" : option.label;
+    const extra = [named, reasoningShort, approvalsShort].filter((word) => word !== "").join(" · ");
+    const value = modelPill.element.querySelector(".composer-pill-value")?.textContent ?? "";
+    modelPill.setValue(value, extra);
+  };
+  paintPhonePill();
   const reasoningMenu = anchoredPopover({ anchor: reasoningPill.element, frame: frame.element, label: "Reasoning", build: reasoningRows });
 
   // Called on every status update; it only does work when the daemon's default model changed.

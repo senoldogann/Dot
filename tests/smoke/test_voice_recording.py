@@ -358,6 +358,19 @@ def _microphone(page: Page) -> Locator:
     return page.locator(".composer .mic-button")
 
 
+async def _press(mic: Locator) -> None:
+    """Click the microphone ``mic``. A phone's composer shows it only while the box is used (item 1120): its words are
+    touched first, as a finger does."""
+    await _use(mic.locator("xpath=ancestor::section[contains(@class, 'composer')]"))
+    await mic.click()
+
+
+async def _use(composer: Locator) -> None:
+    """Touch the words of ``composer``, as a finger does before it reaches the box's line of choices on a phone (item
+    1120); on a desk it only gives them the focus."""
+    await composer.locator("textarea").click()
+
+
 def _recorder(page: Page) -> Locator:
     return page.locator(".composer .mic-recorder")
 
@@ -377,7 +390,7 @@ async def _mic(page: Page, expression: str) -> Any:
 
 async def _listening(page: Page) -> None:
     """Press the microphone and wait until the page's worklet is sending blocks of its sound."""
-    await _microphone(page).click()
+    await _press(_microphone(page))
     await expect(_recorder(page)).to_be_visible()
     await page.wait_for_function("() => window.__mic.blocks >= 3", timeout=_WAIT_MS)
 
@@ -421,6 +434,7 @@ async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_ev
     page: Page = await _open(browser, address, engine=engine, playwright=playwright_of_the_module)
     box: Locator = page.locator(GOAL)
     mic: Locator = _microphone(page)
+    await _use(mic.locator("xpath=ancestor::section[contains(@class, 'composer')]"))
     await expect(mic).to_be_visible()
     streamed: list[str] = []
     page.on("request", lambda request: streamed.append(f"{request.method} {request.url.partition('/api')[2]}"))
@@ -445,6 +459,7 @@ async def test_on_an_iphone_the_microphone_records_and_the_mac_writes_it_down_ev
         expected: str = " ".join([_WORDS] * round_number)
         await expect(box).to_have_value(expected, timeout=_WAIT_MS)
         await expect(_recorder(page)).to_be_hidden()
+        await _use(mic.locator("xpath=ancestor::section[contains(@class, 'composer')]"))
         await expect(mic).to_be_visible()
         # The microphone is let go at every end: no track is live and the page's audio contexts are closed.
         await _released(page)
@@ -548,7 +563,7 @@ async def test_what_goes_wrong_is_said_in_plain_words_and_the_box_keeps_its_word
 
     async def record_until_it_ends() -> None:
         """A failure of the stream ends the recording while the owner speaks, before any tick (item 969)."""
-        await _microphone(page).click()
+        await _press(_microphone(page))
         await page.evaluate("() => window.__mic.speak(2.0)")
         await expect(_recorder(page)).to_be_hidden(timeout=_WAIT_MS)
         await _released(page)
@@ -590,7 +605,7 @@ async def test_a_microphone_the_browser_refuses_says_where_to_allow_it(
 ) -> None:
     page: Page = await _open(chromium, address)
     await page.evaluate("() => { window.__mic.refuse = 'NotAllowedError'; }")
-    await _microphone(page).click()
+    await _press(_microphone(page))
     toast: Locator = page.locator(".toast.error")
     await expect(toast).to_contain_text("The browser has not allowed the microphone on this page.")
     await expect(toast).to_contain_text("in the device's settings")
@@ -622,7 +637,7 @@ async def test_in_dot_app_a_microphone_macos_refuses_to_the_recording_has_system
     )
     await expect(page.locator("html")).to_have_attribute("data-shell", "desktop")
     await page.evaluate("() => { window.__mic.refuse = 'NotAllowedError'; }")
-    await _microphone(page).click()
+    await _press(_microphone(page))
     calm: Locator = page.locator(".toast.ok")
     await expect(calm).to_contain_text("System Settings is open at Microphone: switch Dot on there")
     await expect(page.locator(".toast.error")).to_have_count(0)
@@ -693,14 +708,14 @@ async def test_where_the_mac_cannot_an_iphone_keeps_safaris_recognition_and_the_
     lacks."""
     page: Page = await _open(chromium, address_without_tools)
     mic: Locator = _microphone(page)
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear('first words')")
     await _recorder(page).locator(".mic-done").click()
     await expect(page.locator(GOAL)).to_have_value("first words")
     assert await page.evaluate("() => window.__voice.starts") == 1
     assert await _mic(page, "mic.asked") == []
     # The next one opens the microphone and hears nothing: Safari's deafness, and the owner's tick answered "aborted".
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.recognitions.at(-1).dispatchEvent(new Event('audiostart'))")
     await _recorder(page).locator(".mic-done").click()
     await page.evaluate("() => window.__voice.fail('aborted')")
@@ -741,6 +756,7 @@ async def test_a_browser_with_no_speech_recognition_shows_the_microphone_when_th
     # the next visit to the home is made after it, and has the microphone this browser never had.
     await page.goto(f"{address}/#/settings/general")
     await page.goto(f"{address}/#/runs")
+    await _use(page.locator(".composer").last)
     await expect(_microphone(page)).to_be_visible()
     await _listening(page)
     await page.evaluate("() => window.__mic.speak(0.6)")
@@ -803,10 +819,11 @@ async def test_the_page_starts_without_waiting_for_the_macs_answer_and_a_press_a
     page: Page = await _open(chromium, address, answered=False, routes=hold_the_answer)
     box: Locator = page.locator(GOAL)
     # The page started, composer and all, and the Mac has not been heard from.
+    await _use(page.locator(".composer").last)
     await expect(_microphone(page)).to_be_visible()
     assert len(held) == 1 and not release.is_set()
     # The composer was made before the answer: the press asks the browser's recognition, as an iPhone did before.
-    await _microphone(page).click()
+    await _press(_microphone(page))
     await page.evaluate("() => window.__voice.hear('browser words')")
     await _tick(page).click()
     await expect(box).to_have_value("browser words")
@@ -874,9 +891,10 @@ async def test_a_mac_that_could_not_be_asked_leaves_the_page_as_it_was_and_the_v
     page: Page = await _open(chromium, address, answered=False, routes=refuse_the_answer)
     box: Locator = page.locator(GOAL)
     # The page starts: no toast, no failure screen, and the microphone listens the browser's way, as before.
+    await _use(page.locator(".composer").last)
     await expect(_microphone(page)).to_be_visible()
     await expect(page.locator(".toast")).to_have_count(0)
-    await _microphone(page).click()
+    await _press(_microphone(page))
     await page.evaluate("() => window.__voice.hear('browser words')")
     await _tick(page).click()
     await expect(box).to_have_value("browser words")

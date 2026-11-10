@@ -605,6 +605,34 @@
     top: var(--space-2);
   }
 
+  /* The chat's bar floats over the conversation (item 1119, the owner's ask after Grok Bot's), as the composer does at
+     its foot: the bar draws no ground, only its parts are panes of glass, and the messages go by under them. The bar
+     lets a touch between its parts through to the conversation. */
+  html.chat-shell .stage:has(> .page[data-layout="run"]) > .stagebar {
+    position: absolute;
+    top: 0;
+    inset-inline: 0;
+    pointer-events: none;
+  }
+
+  html.chat-shell .stage:has(> .page[data-layout="run"]) > .stagebar :is(.stagebar-row > *, .banner) {
+    pointer-events: auto;
+  }
+
+  /* A menu of the composer opens over the bar, not under it. */
+  html.chat-shell .dock:has(.composer-popover:not([hidden])) {
+    z-index: 21;
+  }
+
+  html.chat-shell .page[data-layout="run"] .run-thread {
+    padding-top: calc(var(--safe-top) + var(--stagebar-h) + var(--space-2));
+  }
+
+  /* What the column goes to stands under the bar's glass, not behind it. */
+  html.chat-shell .page[data-layout="run"] .run-thread :is(.answer, .bubble.user) {
+    scroll-margin-top: calc(var(--safe-top) + var(--stagebar-h) + var(--space-2));
+  }
+
   /* The bar's parts are a phone's width together (item 401): the three counters and the way down fit one row. */
   .status-bar .capsule-part {
     padding-inline: var(--space-1);
@@ -679,15 +707,16 @@
     border-color: var(--glass-border);
   }
 
-  /* The box takes the line it types on, the "+" and the send beside it at the thumb, and the choices the quiet line
-     under it with the context meter at its end. */
+  /* While it is used (item 1120, after T3 Code's), the box gives the words their whole line and puts everything else on
+     the line under them: the "+" at the left, the model with its reasoning and approvals (item 1121), then the context
+     meter, the microphone and the send at the thumb. */
   .composer-bar {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "plus field send"
-      "options options meter";
-    align-items: end;
+      "field field field field"
+      "plus options meter send";
+    align-items: center;
     column-gap: var(--space-1);
     row-gap: var(--space-1);
   }
@@ -696,17 +725,23 @@
     grid-area: plus;
   }
 
-  /* With a microphone (item 574) the box keeps the line it had, so that the words of an empty box still fit the narrowest
-     phone, and the microphone stands on the line of the choices, by the context meter's place. */
+  /* The microphone (item 574) stands by the send, as tall as it (item 1121: it was a smaller ghost by the meter). */
   .composer-bar.has-mic {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     grid-template-areas:
-      "plus field field send"
-      "options options mic meter";
+      "field field field field field"
+      "plus options meter mic send";
   }
 
   .composer-bar > .mic-button {
     grid-area: mic;
+    width: var(--composer-control);
+    height: var(--composer-control);
+  }
+
+  .composer-bar > .mic-button .icon {
+    width: 20px;
+    height: 20px;
   }
 
   .composer-bar > .composer-field {
@@ -743,11 +778,57 @@
     min-height: 0;
   }
 
-  /* No bar covers the conversation's top: what the column goes to stands right there. */
-  html.chat-shell .run-thread .answer,
-  html.chat-shell .run-thread .bubble.user {
-    scroll-margin-top: var(--space-2);
+  /* The model's pill stands for the run's choices (item 1121): its menu holds the reasoning, the approvals and the mode,
+     and the pill says them in small words after the name; their own pills are a Mac's. The agent keeps its pill. */
+  .composer-options > .composer-pill:is([data-pill="mode"], [data-pill="reasoning"], [data-pill="options"]) {
+    display: none;
   }
+
+  .composer-pill[data-pill="model"] {
+    min-width: 0;
+  }
+
+  .composer-pill[data-pill="model"] > .composer-pill-value {
+    flex: none;
+  }
+
+  .composer-pill[data-pill="model"] > .composer-pill-extra {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The model's menu holds the run's other choices under the models (item 1121): it is the box's width and as tall as
+     the room over the box, and scrolls as a whole, the models' list keeping its own height and scroll. It stands over
+     the bar. */
+  .composer-popover:has(> .model-picker) {
+    width: calc(100% - 16px);
+    max-height: var(--room, 480px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .composer-popover:has(> .model-picker) > .model-picker {
+    flex: none;
+    height: 300px;
+  }
+
+  .composer:has(> .composer-popover:not([hidden])) {
+    z-index: 21;
+  }
+
+  /* At rest the box is the "+", the words and the send alone (item 1120): the model, the approvals (YOLO's pill too),
+     the context meter and the microphone wait for the box to be used. */
+  .composer[data-quiet] .composer-bar > :is(.composer-options, .mic-button, .context-meter) {
+    display: none;
+  }
+
+  .composer[data-quiet][data-empty]:not([data-stop]):not(:has(> .attach-list:not([hidden]))) > .composer-bar.has-mic > .btn.send {
+    display: inline-flex;
+  }
+
 }
 
 /* The rows of what Dot did sit closer on a phone (the owner's word of 2026-10-20): a call is one line with its icon,
@@ -2850,3 +2931,11 @@ dialog.computer-full::backdrop {
   max-height: none;
   overflow: visible;
 }
+
+/* On a Mac's box the reasoning, the approvals and the mode have pills of their own: the model's says its name alone. */
+@media (min-width: 720.02px) {
+  .composer-pill[data-pill="model"] > .composer-pill-extra {
+    display: none;
+  }
+}
+

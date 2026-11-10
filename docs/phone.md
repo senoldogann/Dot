@@ -198,9 +198,11 @@ brings messages there (item 332).
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, the phone's home (item 991): your initials at its head's left open the settings
 and the **+** of a new chat stands at its right; Dot's face stands large (88 px, item 998) with its name over the faces of the other
-agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, in its middle on glass the face and name of whom the chat is with (item
+agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, round, in its middle the face and name of whom the chat is with (item
 1101; the title and the model are in the panel's Details), and its tools
-in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The line over the
+in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The bar has
+no ground of its own (item 1119): its three parts are panes of glass and the conversation scrolls under them, as under
+the composer. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
 end, in the same pane; it is a row of 40 px, a translucent surface with the page blurred under it, a hairline and a
@@ -215,8 +217,12 @@ phone shows more of what the run did without shrinking the prose. A chat is one 
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
 keyboard move nothing else. The composer floats over the conversation's foot as a pane of glass, with no band of the
 page's colour behind it, and the conversation scrolls under it, its last line kept clear of the bar however tall the
-composer grows (items 374 and 401); the "+" and a compact square stop or the send stand beside the box at 36 px, and the
-choices on the line under it. The conversation scrolls up and down only
+composer grows (items 374 and 401). At rest the composer is the "+", the words and the send (item 1120); once its
+words are touched or typed in, the words take their whole line and the line under them holds the "+", the model, the
+context meter, the microphone and the send, each 36 px, and a touch elsewhere puts that line away again. The model's
+pill stands for every choice of the run (item 1121): after the name it says the mode when one is named, the reasoning
+level and the approvals in small words, and its menu holds, under the models, the reasoning, the approvals, How Dot
+works and the mode. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
 tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A delegated run's row, under the helpers it belongs to, is one line tall at this width:
 its face, its goal, its state and time, and the way to its page, with the goal or the last line cut by an ellipsis
