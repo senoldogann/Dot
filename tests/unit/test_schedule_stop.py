@@ -45,6 +45,8 @@ async def test_the_store_keeps_the_row_of_failed_runs(tmp_path: Path) -> None:
         assert record.runs_failed_in_row == 0
         assert [await store.record_schedule_outcome(record.id, status) for status in ("failed", "failed")] == [1, 2]
         assert await store.record_schedule_outcome(record.id, "cancelled") == 2
+        # A run the daemon's stop cut off counts as a failure (item 1105).
+        assert await store.record_schedule_outcome(record.id, "interrupted") == 3
         assert await store.record_schedule_outcome(record.id, "done") == 0
         await store.record_schedule_outcome(record.id, "failed")
         # Switched on again, the row starts afresh; switched off, it stays.
@@ -57,6 +59,9 @@ async def test_the_store_keeps_the_row_of_failed_runs(tmp_path: Path) -> None:
         assert await store.switch_off_schedule(record.id, "switched off: again") is False
         off: ScheduleRecord = await store.get_schedule(record.id)
         assert (off.enabled, off.next_run_at, off.last_status) == (False, None, "switched off: its last 3 runs failed")
+        # An end that comes after does not write over why it was switched off (item 1105).
+        await store.record_schedule_outcome(record.id, "done")
+        assert (await store.get_schedule(record.id)).last_status == "switched off: its last 3 runs failed"
         # Switched on again, by either way, it no longer says it was switched off.
         await store.set_schedule_enabled(record.id, True, 3.0)
         assert (await store.get_schedule(record.id)).last_status == ""

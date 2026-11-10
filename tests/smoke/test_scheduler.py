@@ -707,6 +707,11 @@ async def test_a_schedule_left_starting_or_running_is_marked_interrupted_and_log
         (await runtime.store.get_schedule(record.id)).last_status for record in (running, starting, ended)
     ]
     assert statuses == ["interrupted", "interrupted", "done"]
+    # The run that was under way counts as a failure in its schedule's row (item 1105); one not yet started does not.
+    rows: list[int] = [
+        (await runtime.store.get_schedule(record.id)).runs_failed_in_row for record in (running, starting)
+    ]
+    assert rows == [1, 0], rows
     told: list[tuple[object, object]] = [
         (entry["schedule_id"], entry["status"]) for entry in logs if entry["event"] == "schedule_interrupted"
     ]
