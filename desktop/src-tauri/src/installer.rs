@@ -25,6 +25,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Read, Write};
+use std::ops::{Deref, DerefMut};
 use std::os::fd::AsRawFd;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
@@ -1151,6 +1152,33 @@ fn shown(line: &str) -> String {
 
 /// Run `plan` in `cwd`: the key on its standard input, its output masked and written to the log and handed to `seen`
 /// line by line, and the program ended when it runs past its limit or `cancel` is set.
+/// A step's program, ended with the step when the step panics (the security review of item 1106): a panic let go of
+/// the install, and a retry would have run the same step beside the program still at work.
+struct EndsOnPanic(Child);
+
+impl Deref for EndsOnPanic {
+    type Target = Child;
+
+    fn deref(&self) -> &Child {
+        &self.0
+    }
+}
+
+impl DerefMut for EndsOnPanic {
+    fn deref_mut(&mut self) -> &mut Child {
+        &mut self.0
+    }
+}
+
+impl Drop for EndsOnPanic {
+    fn drop(&mut self) {
+        if thread::panicking() {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+}
+
 fn run(plan: &Plan, cwd: &Path, log: &Log, cancel: &AtomicBool, mut seen: impl FnMut(&str)) -> Ran {
     let secrets: Vec<&str> = plan.stdin.iter().map(Secret::expose).collect();
     let mut lines = Vec::new();
@@ -1168,8 +1196,8 @@ fn run(plan: &Plan, cwd: &Path, log: &Log, cancel: &AtomicBool, mut seen: impl F
         .stderr(Stdio::piped());
     command.env_clear();
     command.envs(plan.environment(std::env::vars_os()));
-    let mut child: Child = match command.spawn() {
-        Ok(child) => child,
+    let mut child = match command.spawn() {
+        Ok(child) => EndsOnPanic(child),
         Err(error) => {
             let words = mask(&error.to_string(), &secrets);
             log.line(&format!(
@@ -1653,12 +1681,22 @@ impl Drop for WorkerEnd<'_> {
             // The panic may have come while the state was held: what it holds is still the install's state.
             let mut inner = self.0.inner.lock().unwrap_or_else(PoisonError::into_inner);
             if inner.phase == Phase::Running {
-                let step = inner
+                // The step at work, else (a panic between steps) the first not done, which a retry runs anyway: a
+                // step done is never undone, and with every step done the failure names the last.
+                let failed = inner
                     .states
                     .iter()
                     .position(|state| *state == StepState::Running)
-                    .unwrap_or(0);
-                inner.states[step] = StepState::Failed;
+                    .or_else(|| {
+                        inner
+                            .states
+                            .iter()
+                            .position(|state| *state != StepState::Done)
+                    });
+                if let Some(step) = failed {
+                    inner.states[step] = StepState::Failed;
+                }
+                let step = failed.unwrap_or(DAEMON_STEP);
                 inner.phase = Phase::Failed;
                 inner.failure = Some(Failure {
                     step: STEPS[step].0,
