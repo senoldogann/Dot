@@ -12,10 +12,12 @@ from dotagent.core.types import FrozenModel
 from dotagent.policy.spend import find_amounts
 from dotagent.policy.types import Flag, Risk
 
-# An `sk-` key stands at the start of a word: a name that only ends in "sk" ("flask-callers-ensure-sync__B__1.jsonl",
-# item 1094) is none. A key written into other text on purpose is not what this finds, any more than one cut in two.
+# An `sk-` key stands at the start of a word, or right after a percent escape (`%3D`, `%22`, `%20`) or a backslash
+# escape (`\n`, `\t`), whose last character is a letter or a digit: a name that only ends in "sk"
+# ("flask-callers-ensure-sync__B__1.jsonl", item 1094) is none. This decides what a step may send, so it takes a key
+# after `_` or `-` too, which the masking of `core/text.py` (what a record shows) leaves alone.
 _KEY_LIKE: re.Pattern[str] = re.compile(
-    r"(?<![A-Za-z0-9])sk-[A-Za-z0-9_\-]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}"
+    r"(?:(?<![A-Za-z0-9])|(?<=%[0-9A-Fa-f]{2})|(?<=\\[nrt]))sk-[A-Za-z0-9_\-]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}"
     r"|-----BEGIN [A-Z ]*PRIVATE KEY-----"
 )
 # Where a label's own sentence starts: at its start, on a new line, or after a stop or a separator ("Total 9 €. Pay",
