@@ -106,6 +106,9 @@ def test_a_word_that_only_ends_in_sk_is_no_key() -> None:
     shell: ActionInfo = _step("shell")
     note: str = "cat >> notes.md <<'MD'\nSee transcripts/flask-callers-ensure-sync__B__1.jsonl\nMD"
     assert not carries_secret(shell, {"command": note}, ())
+    # Quoted-printable hex is upper case: a word after `=` whose first letters are hex is still a word.
+    desk: str = "https://shop.example/?q=desk-organizer-bamboo-large"
+    assert not carries_secret(_step("network"), {"url": desk}, ())
     assert carries_secret(shell, {"command": f"echo token={_KEY_FORM}"}, ())
     assert carries_secret(shell, {"command": "echo sk-callers-ensure-sync-now"}, ())
     # After an escape whose last character is a letter or a digit: of a URL, of mail text, of a string.
