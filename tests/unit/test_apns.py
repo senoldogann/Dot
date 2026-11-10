@@ -36,6 +36,7 @@ from dotagent.notify.apns import (
 from dotagent.notify.apns_watch import (
     ACTIVITY_LIFE_S,
     LIVE_REGISTERED_EVENT,
+    OPEN_WAIT_S,
     PROGRESS_EVERY_S,
     TOLD_TITLE,
     ApnsWatch,
@@ -214,8 +215,9 @@ async def test_an_activity_whose_token_comes_before_its_run_waits_for_it_and_a_r
     tmp_path: Path,
 ) -> None:
     """Item 1096: the app opens the activity as the run it starts is made, and its token may reach the daemon first;
-    the activity is not ended for having no row yet, and the run's start fills it. And a daemon that starts again ends
-    the activity it finds kept with no row (the pre-push review of item 1093)."""
+    the activity is not ended for having no row yet, and the run's start fills it; one whose request started no run
+    (a message queued behind a held queue) ends after :data:`OPEN_WAIT_S`. And a daemon that starts again ends the
+    activity it finds kept with no row (the pre-push review of item 1093)."""
     store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
     try:
         apple = _Apple({})
@@ -223,10 +225,20 @@ async def test_an_activity_whose_token_comes_before_its_run_waits_for_it_and_a_r
         await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
         await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
         await watch.on_event(_registered(), _NOW)
+        await watch.flush(_NOW + OPEN_WAIT_S - 1)
         assert apple.posted == [] and len(await store.live_activities_of(FLEET_ID)) == 1
+        await watch.flush(_NOW + OPEN_WAIT_S)
+        assert apple.posted[-1][0].endswith(_ACTIVITY) and apple.posted[-1][2]["aps"]["event"] == "end"  # type: ignore[index]  # a JSON payload read back
+        assert await store.live_activities_of(FLEET_ID) == []
+        apple.posted.clear()
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
+        await watch.on_event(_registered(), _NOW)
         run: RunRecord = await _run(store, "chat", None)
         await watch.on_event(_event(run.id, "run_started", {}), _NOW + 1)
         assert apple.posted[-1][0].endswith(_ACTIVITY) and _rows(apple.posted[-1]) == [(run.id, "working")]
+        posted: int = len(apple.posted)
+        await watch.flush(_NOW + OPEN_WAIT_S)
+        assert len(apple.posted) == posted
         # A daemon that starts again goes on showing the run still at work on the activity it finds, and ends it once
         # it finds none at work.
         again = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
@@ -239,7 +251,7 @@ async def test_an_activity_whose_token_comes_before_its_run_waits_for_it_and_a_r
         assert apple.posted[-1][0].endswith(_ACTIVITY) and apple.posted[-1][2]["aps"]["event"] == "end"  # type: ignore[index]  # a JSON payload read back
         assert await store.live_activities_of(FLEET_ID) == []
         # An answer to a question the run left comes after it ended: nothing goes.
-        posted: int = len(apple.posted)
+        posted = len(apple.posted)
         await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 3001)
         alerts: int = len(apple.posted) - posted
         await watch.on_event(_event(run.id, "approval_decided", {}), _NOW + 3002)

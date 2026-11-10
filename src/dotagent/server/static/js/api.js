@@ -263,8 +263,9 @@ export const AGENTS_CHANGED_EVENT = "dot:agents-changed";
 // agent made from a template or a ready team.
 const AGENT_CHANGE = /^\/(agents(\/|$|\?)|agent-templates\/[^/]+\/use$|agent-teams\/[^/]+\/use$)/;
 
-/** A request that starts a run of the owner's, or queues a message that may start one at once (item 1096). */
-const RUN_START = /^\/(runs|runs\/[^/]+\/(resume|loop)|threads\/[^/]+\/queue)$/;
+/** A request that starts a run of the owner's, or queues a message or resumes a queue that may start one at once (item
+ * 1096); one that started none after all opens a card the daemon ends a minute later. */
+const RUN_START = /^\/(runs|runs\/[^/]+\/(resume|loop)|threads\/[^/]+\/queue(\/resume)?)$/;
 
 export async function request(method, path, body) {
   await proven();
