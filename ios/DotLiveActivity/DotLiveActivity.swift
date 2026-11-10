@@ -66,9 +66,12 @@ struct DotFleetLiveActivity: Widget {
     }
 }
 
-/// "2 at work", or "All done" once every row has ended.
+/// "2 at work", "All done" once every row has ended, or "Starting" while the app's new card waits for its run's row.
 private func countText(_ state: DotFleetAttributes.ContentState) -> String {
-    state.active > 0 ? "\(state.active) at work" : "All done"
+    if state.rows.isEmpty {
+        return "Starting"
+    }
+    return state.active > 0 ? "\(state.active) at work" : "All done"
 }
 
 private struct LockScreenView: View {

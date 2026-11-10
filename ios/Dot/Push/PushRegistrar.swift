@@ -18,6 +18,7 @@ final class PushRegistrar {
     private var host: DaemonHost?
     private var deviceToken: String?
     private var started: Bool = false
+    private var opening: Bool = false
     private var observedActivities: Set<String> = []
     private var tasks: [Task<Void, Never>] = []
 
@@ -44,6 +45,7 @@ final class PushRegistrar {
         tasks.forEach { $0.cancel() }
         tasks = []
         started = false
+        opening = false
         host = nil
         deviceToken = nil
         observedActivities = []
@@ -76,19 +78,51 @@ final class PushRegistrar {
 
     /// Opens the phone's one Live Activity, unless one is up (item 1096): from the app in front, which it is when the
     /// owner starts a run here, it comes without a notification. It opens with no row; the daemon fills it once its
-    /// token arrives, and ends it when no run is left.
+    /// token arrives, and ends it when no run is left. The activity the daemon may still keep for this phone (swiped
+    /// away while the app was in the background, its forget not sent yet) is forgotten first, so that the new one's
+    /// token is kept as new, its age counted from now.
     func openActivity() {
-        guard started else {
-            return
-        }
-        let up: Bool = Activity<DotFleetAttributes>.activities.contains { (activity: Activity<DotFleetAttributes>) in
-            activity.activityState == .active || activity.activityState == .stale
-        }
-        guard !up else {
+        guard started, let host, !opening, !activityUp() else {
             return
         }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
             logger.info("live activities are switched off for Dot: no card opened")
+            return
+        }
+        let key: String
+        do {
+            guard let saved: String = try keyStore.read() else {
+                return
+            }
+            key = saved
+        } catch {
+            logger.error("phone key unreadable: error=\(error.description, privacy: .public)")
+            return
+        }
+        // One at a time: a second run started meanwhile must not forget the token the first one's activity gave.
+        opening = true
+        let client: DaemonClient = self.client
+        tasks.append(
+            Task { [weak self] in
+                do {
+                    try await client.forgetActivity(token: nil, host: host, key: key)
+                    self?.requestActivity()
+                } catch {
+                    self?.logger.error(
+                        "forgetting the old activity failed: error=\(String(describing: error), privacy: .public)")
+                }
+                self?.opening = false
+            })
+    }
+
+    private func activityUp() -> Bool {
+        Activity<DotFleetAttributes>.activities.contains { (activity: Activity<DotFleetAttributes>) in
+            activity.activityState == .active || activity.activityState == .stale
+        }
+    }
+
+    private func requestActivity() {
+        guard !activityUp() else {
             return
         }
         do {
