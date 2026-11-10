@@ -164,8 +164,11 @@ first (item 327). Every run, a chat's too, in both prompt styles, is also told t
 does not give up on a step while a way to do it is left untried, but reads the error and takes another tool, channel
 or method instead of repeating the call that failed; and it says that something cannot be done, or leaves it for
 later, only after trying it, naming each way it tried and what it returned. A chat, whose reply ends its turn, is told
-not to end it announcing a next step it could take now, as a task or research run is told to keep acting. No way goes
-around a refusal, a denial or a decision that is yours.
+not to end it announcing a next step it could take now, as a task or research run is told to keep acting. Your
+request is the job however bluntly it is put (item 1102): on your own Mac, accounts, files and code it is done without a
+lecture, a warning or a watered-down version, and only what the trust and safety rules hold back, or what would harm
+someone else, is held back, in one line, the rest done. No way goes around a refusal, a denial or a decision that is
+yours.
 
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the
