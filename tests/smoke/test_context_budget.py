@@ -78,7 +78,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # owner's CV, shown as a JPEG, blurred in the full-screen viewer; 26,162 measured).
 # Raised by 50 for `review_work`'s `brief`, the rewritten brief an order that came back twice starts afresh on, and the
 # word that it is accepted on its Verification (item 1065: the owner's lessons of managing agents; 26,238 measured).
-BUDGET_TOKENS: int = 26_250
+# Raised by 50 for the machine, not for words (item 1095): the prompt names the home, the user and a scratch folder,
+# whose lengths differ between this Mac and the gate's runner, and the gate measured 26,251 with nothing grown.
+BUDGET_TOKENS: int = 26_300
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
