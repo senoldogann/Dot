@@ -58,10 +58,10 @@ struct DotFleetLiveActivity: Widget {
                 LiveDotGlyph(size: 16)
                     .padding(.leading, 6)
             } compactTrailing: {
-                CountMark(state: context.state)
+                DoingMark(state: context.state)
                     .padding(.trailing, 6)
             } minimal: {
-                CountMark(state: context.state)
+                DoingMark(state: context.state)
                     .padding(2)
             }
             .keylineTint(.yellow)
@@ -120,8 +120,13 @@ private struct RowView: View {
                 .lineLimit(1)
                 .contentTransition(.opacity)
             Spacer(minLength: 6)
+            // The status stays whole on one line (item 1113: "Working" wrapped as "Wor king"); the title and the detail
+            // give way to it.
             StatusWord(row: row)
                 .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(2)
         }
         .accessibilityElement(children: .combine)
     }
@@ -159,21 +164,50 @@ private struct StatusWord: View {
     }
 }
 
-/// The Dynamic Island's mark: how many runs work, in Dot's yellow, or a check once all are done.
-private struct CountMark: View {
+/// The Dynamic Island's mark (item 1113, the owner's ask): what the newest run at work does now, as a tool's symbol
+/// that pulses, orange while it waits for the owner; a check once none works. It said how many worked before.
+private struct DoingMark: View {
     let state: DotFleetAttributes.ContentState
 
     var body: some View {
-        if state.active > 0 {
-            Text("\(state.active)")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color(red: 1.0, green: 0.78, blue: 0.22))
-                .contentTransition(.numericText())
+        let row: DotFleetAttributes.Row? = state.rows.first { (row: DotFleetAttributes.Row) in
+            row.status == RunStatus.working.rawValue || row.status == RunStatus.waiting.rawValue
+        }
+        if let row {
+            let waiting: Bool = row.status == RunStatus.waiting.rawValue
+            Image(systemName: waiting ? "hand.raised.fill" : doingSymbol(row.kind))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(waiting ? Color.orange : Color(red: 1.0, green: 0.78, blue: 0.22))
+                .symbolEffect(.pulse, options: .repeating, isActive: !waiting)
+                .contentTransition(.symbolEffect(.replace))
+                .accessibilityLabel(row.line)
         } else {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.green)
         }
+    }
+}
+
+/// The SF Symbol of what a run does now, as the daemon names it (item 1004).
+private func doingSymbol(_ kind: String) -> String {
+    switch kind {
+    case "thinking": "brain"
+    case "answering": "text.cursor"
+    case "browsing": "globe"
+    case "searching": "magnifyingglass"
+    case "command": "terminal"
+    case "reading": "doc.text.magnifyingglass"
+    case "writing": "square.and.pencil"
+    case "mac": "macbook"
+    case "mail": "envelope"
+    case "calendar": "calendar"
+    case "memory": "books.vertical"
+    case "helpers": "person.2"
+    case "app": "square.grid.2x2"
+    case "trading": "chart.line.uptrend.xyaxis"
+    case "working": "gearshape"
+    default: "ellipsis"
     }
 }
 

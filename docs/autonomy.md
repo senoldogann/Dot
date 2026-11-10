@@ -140,8 +140,8 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
   the work now. A campaign's claim is never accepted this way: its sessions are its follow-ups.
 
 A check can only ask for the original goal to be finished: it adds no work and does not clear the untrusted mark. If the
-check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event; the timeline shows the last
-one (reached, stopped, needs you), not a check that sent the run back to work (item 1098).
+check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event, which the conversation
+does not show (items 1098 and 1112): the answer says what came of the work.
 An answer that ends by offering to do a part of the goal that is not done yet, which the run could do with its own
 tools, is `continue`, so that the part is done instead of offered; an offer of work the goal did not ask for (a fix when
 only a diagnosis was asked) changes nothing, and what needs you (a decision, a credential) may stay an offer.

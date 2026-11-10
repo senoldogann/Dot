@@ -495,6 +495,18 @@ async def test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_n
             await browser.close()
 
 
+# The colour the page's bar shows: the ground of the bar, or of the first box under it that has one.
+_SHOWN_GROUND: str = """() => {
+  for (let node = document.querySelector('.stagebar'); node !== null; node = node.parentElement) {
+    const ground = getComputedStyle(node).backgroundColor;
+    if (ground !== 'rgba(0, 0, 0, 0)' && ground !== 'transparent') {
+      return ground;
+    }
+  }
+  return getComputedStyle(document.documentElement).backgroundColor;
+}"""
+
+
 async def test_dot_opened_again_shows_the_chat_in_place_and_the_bar_takes_the_pages_colour(
     own_home: Path, tmp_path: Path
 ) -> None:
@@ -506,13 +518,12 @@ async def test_dot_opened_again_shows_the_chat_in_place_and_the_bar_takes_the_pa
             for scheme in ("light", "dark"):
                 context: BrowserContext = await _phone(browser, playwright, scheme, "allow")
                 page: Page = await _chat_page(context, proxy, run)
-                # The browser's bar takes the colour of the page's own.
+                # The browser's bar takes the colour the page's bar shows: its own ground, or, a chat's bar standing
+                # on nothing since item 1113, the ground of what it stands on.
                 bars: object = await page.evaluate(
                     "() => [...document.querySelectorAll(\"meta[name='theme-color']\")].map((meta) => meta.content)"
                 )
-                ground: str = await page.evaluate(
-                    "getComputedStyle(document.querySelector('.stagebar')).backgroundColor"
-                )
+                ground: str = await page.evaluate(_SHOWN_GROUND)
                 assert isinstance(bars, list) and len(bars) == 1 and _rgb(str(bars[0])) == _rgb(ground), (bars, ground)
                 await _keep_pages_copy(page)
                 await page.close()
@@ -611,6 +622,10 @@ async def test_a_copy_of_an_earlier_build_opened_on_a_slow_network_gives_way_to_
             await _until_true(away, _NOTED_AND_WHOLE, "later")
             await away.close()
             proxy.wake(0)
+            # The network is back as it was: its latency went with the sleep (item 1116). Left on, every one of the
+            # build's two hundred files took 0.6 s more, and a loaded runner passed the 15 s the copy is waited for
+            # (main's gate, 2026-11-10 09:48).
+            proxy.slow(0.0)
             # The next opening waits for the network, and keeps the daemon's build whole.
             second: Page = await context.new_page()
             await second.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")

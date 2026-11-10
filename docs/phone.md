@@ -106,7 +106,10 @@ code** takes its place. The same by hand:
    command", "Reading files", "Writing files", "Using your Mac", "Using <app>" for a connected app, "Working with
    helpers", "Writing the answer"; never what the step was about: no address, file, command or words of the model) or,
    once it ended, the agent that worked on it, and its status in its colour (Working, Waiting, Done, Failed, Stopped).
-   The Dynamic Island shows how many work. The app opens the activity itself when you start a run in it (a message, a
+   The Dynamic Island shows what the newest run at work does now, as the symbol of its tool (a globe browsing, a
+   terminal running a command…), pulsing; an orange hand while a run waits for you, a check once none works (item
+   1113). A row's status stays whole on its line; the title gives way. The app opens the activity itself when you
+   start a run in it (a message, a
    queued message, a resume or a loop: the page posts `{type: "working"}`), unless one is up, and it comes without a
    notification (item 1096): the daemon starts none by push, as Apple has a push that starts one bring a notification,
    and a start is not worth one. A run started on the Mac, or by a schedule, opens no activity; you are notified when a

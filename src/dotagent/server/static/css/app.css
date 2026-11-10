@@ -11214,6 +11214,14 @@ button.attach-chip {
     position: relative;
   }
 
+  /* A chat's bar stands on nothing (item 1113, the owner's ask after Grok Bot's): its parts, the way back, the name and
+     the tools' pill, have their own grounds, and the bar no ground and no line under it. A chat's page scrolls between
+     the bar and the composer (item 352), so nothing passes under it. */
+  .stage:has(> .page[data-layout="run"]) > .stagebar {
+    background: transparent;
+    border-bottom-color: transparent;
+  }
+
   .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) {
     position: absolute;
     left: 50%;

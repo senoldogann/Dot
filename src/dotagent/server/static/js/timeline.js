@@ -205,8 +205,14 @@ function drawLive(live) {
   live.body.append(...blocks.slice(kept).map((sourced) => blockNode(sourced.block)));
   live.drawn = blocks.map((sourced) => sourced.source);
   lastLine(live.body).append(live.caret);
-  // A step whose model has sent only spaces so far has nothing to show yet (item 1091): run.css keeps it out of sight.
-  live.node.toggleAttribute("data-blank", blocks.length === 0);
+}
+
+/** Draw a step's live message: as `drawLive`, and a message whose model has sent only spaces so far is marked blank
+ * (item 1091), which run.css keeps out of sight. An answer written in (`revealAnswer`) is drawn with `drawLive` alone:
+ * it has no bubble of a step to mark, and the mark of its first frame stopped it there (item 1112). */
+function drawStreaming(live) {
+  drawLive(live);
+  live.node.toggleAttribute("data-blank", live.drawn.length === 0);
 }
 
 /** Where the reveal of `text` stops after `at`: the end of the word it reaches, so that a word comes whole. */
@@ -241,6 +247,11 @@ function revealAnswer(answer, text) {
   answer.dataset.revealing = "";
   const step = Math.max(REVEAL_MIN_CHARS, Math.ceil(text.length / REVEAL_MOST_FRAMES));
   let at = 0;
+  function finish() {
+    body.replaceWith(prose(text));
+    answer.style.removeProperty("min-height");
+    delete answer.dataset.revealing;
+  }
   function frame() {
     if (!answer.isConnected) {
       return;
@@ -252,9 +263,7 @@ function revealAnswer(answer, text) {
       requestAnimationFrame(frame);
       return;
     }
-    body.replaceWith(prose(text));
-    answer.style.removeProperty("min-height");
-    delete answer.dataset.revealing;
+    finish();
   }
   requestAnimationFrame(frame);
 }
@@ -1214,7 +1223,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       live.text += data.text;
       if (!live.queued) {
         live.queued = true;
-        requestAnimationFrame(() => drawLive(live));
+        requestAnimationFrame(() => drawStreaming(live));
       }
     },
 
@@ -1384,29 +1393,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       callGroup(scope).body.append(el("div", { class: tone }, icon("shield"), el("span", null, text)));
     },
 
-    // The checker of goal mode compared the answer with the goal: `final` says whether the run ends with this verdict,
-    // and `limit` that it judged the finish of a run past its limit, which cannot be sent back.
-    goal_check(scope, record) {
-      const { decision, reason, patience, final, limit } = record.data;
-      // A check that sends the run back to work is the run's own business, not a line of the chat (item 1098: the owner
-      // read its reason, the checker's words to the model, as a message): the work it asks for shows as it is done.
-      if (decision === "continue" && !final) {
-        return;
-      }
-      const because = reason === "" ? "" : ` — ${clip(reason, 300)}`;
-      const stops = limit === true
-        ? ["bad", "Goal check: not reached, and the task is at its limit, so it stops"]
-        : ["bad", `Goal check: still not reached after ${patience} rounds of further work, so the task stops`];
-      const lines = {
-        achieved: ["ok", "Goal check: the goal is reached"],
-        continue: stops,
-        blocked: ["bad", "Goal check: nothing more can be done without you"],
-        scheduled: ["ok", "Goal check: all that can be done now is done; a scheduled run picks up the rest"],
-        error: ["bad", "Goal check: the check could not run"],
-      };
-      const [tone, text] = lines[decision];
-      note(scope, record.ts, "target", `${text}${because}`, tone);
-    },
+    // The checker of goal mode compared the answer with the goal. Its verdicts are the run's own business, not lines of
+    // the chat (items 1098 and 1112, the owner's ask: "the goal check lines should not show"): the answer says what came
+    // of the work, a run sent back shows the work it does, and one that stops says why in its answer.
+    goal_check() {},
 
     steer(scope, record) {
       const files = record.data.files ?? [];

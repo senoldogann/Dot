@@ -54,32 +54,46 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     }
 
     /// Shows the daemon's alerts while the app is open, too.
+    ///
+    /// The forms with a completion handler (item 1114): the `async` form of these methods completed on a thread of
+    /// Swift's own, and UIKit, which updates the app's snapshot as a tap's handling is done, stopped the app with an
+    /// assertion at every tap of a notification. iOS calls this one on the main thread.
     nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter, willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list, .sound])
     }
 
-    /// Answers an approval from the lock screen (Approve, Deny), or opens the alert's `route` in the web view.
+    /// Answers an approval from the lock screen (Approve, Deny), or opens the alert's `route` in the web view; tells
+    /// iOS it is done on the main thread (item 1114).
     nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
-    ) async {
+        _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping @Sendable () -> Void
+    ) {
         let info: [AnyHashable: Any] = response.notification.request.content.userInfo
         let action: String = response.actionIdentifier
+        let approvalId: String? = info["approval_id"] as? String
+        let route: String? = info["route"] as? String
+        Task { @MainActor in
+            await self.handle(action: action, approvalId: approvalId, route: route)
+            completionHandler()
+        }
+    }
+
+    private func handle(action: String, approvalId: String?, route: String?) async {
         if action == approveAction || action == denyAction {
-            guard let approvalId: String = info["approval_id"] as? String, isApprovalId(approvalId) else {
+            guard let approvalId, isApprovalId(approvalId) else {
                 logger.warning("an approval's answer without a valid approval id")
                 return
             }
             await answer(approvalId: approvalId, approve: action == approveAction)
             return
         }
-        guard let route: String = info["route"] as? String else {
+        guard let route else {
             return
         }
-        await MainActor.run {
-            model.open(route: route)
-        }
+        model.open(route: route)
     }
 
     /// Sends the owner's answer to the daemon with the phone's key; one that does not reach it is said in a notification
