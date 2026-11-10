@@ -53,7 +53,7 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   read outside content (item 525, see [Safety](safety.md#safety)): the review model checks, without asking you, a step a
   planted instruction would be after (a message, a post, an upload, a payment, a credential, a read of your secrets, an
   install, a note it saves), and refuses what your instructions do not call for; and a step whose words would send a
-  secret Dot holds out of the Mac is refused. A refusal is not a question: a `research` run's limit stands, and no rule
+  secret Dot holds out of the Mac is refused, but in free mode (item 1097). A refusal is not a question: a `research` run's limit stands, and no rule
   of yours can refuse — its behaviours are allow, preapproved, ask and hand off.
 
 In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
@@ -81,7 +81,7 @@ preset's and your `ask` rules', money and credentials', a message or a post in y
 refusal of a read of your secrets or of data sent out (items 429 and 433). **What no mode waives** (item 429): a
 `research` run changes nothing but its notes file and memory — a refusal is not a question, so yolo does not waive it
 either — and a run that read outside content has a step refused whose words would send a secret Dot holds out of the Mac
-(item 525). A yolo run that read such content also has the review model's refusal of a step it checks (`[policy]
+(item 525), in every mode but free mode, which you switch (item 1097: it records the step, the secret masked). A yolo run that read such content also has the review model's refusal of a step it checks (`[policy]
 yolo_taint_check`, on by default). (A rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand
 off, and a yolo run waives the last two with every other question.) The modes that ask keep their guard: in
 `supervised`, `ask` and `auto` money and credentials are still yours (Dot stops and asks you to do that step yourself;
