@@ -33,11 +33,13 @@ dependencies = [
     "pillow>=12.3.0",
     "playwright>=1.62.0",
     "pydantic>=2.14.1",
-    "pyobjc-framework-applicationservices>=12.2.2",
-    "pyobjc-framework-cocoa>=12.2.2",
-    "pyobjc-framework-quartz>=12.2.2",
-    "pyobjc-framework-screencapturekit>=12.2.2",
-    "pyobjc-framework-vision>=12.2.2",
+    # PyObjC exists on macOS only. The marker lets the format, lint and type checks install on Linux
+    # (gate.yml); the package still runs on macOS alone, and the tests that import it stay there.
+    "pyobjc-framework-applicationservices>=12.2.2; sys_platform == 'darwin'",
+    "pyobjc-framework-cocoa>=12.2.2; sys_platform == 'darwin'",
+    "pyobjc-framework-quartz>=12.2.2; sys_platform == 'darwin'",
+    "pyobjc-framework-screencapturekit>=12.2.2; sys_platform == 'darwin'",
+    "pyobjc-framework-vision>=12.2.2; sys_platform == 'darwin'",
     "python-docx>=1.2.0",
     "python-pptx>=1.0.2",
     "pywebpush>=2.5.0",
@@ -98,6 +100,9 @@ ignore = ["RUF001", "RUF002", "RUF003", "PLW0603"]
 
 [tool.mypy]
 python_version = "3.13"
+# Dot runs on macOS only. The type check also runs on Linux (gate.yml), and names this platform so the macOS-only
+# attributes of os stay valid there; on a Mac the check was already of this platform.
+platform = "darwin"
 strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
@@ -105,15 +110,27 @@ files = ["src"]
 
 [[tool.mypy.overrides]]
 module = [
+    # The bare name and the star: the star matches submodules only. On Linux, where PyObjC is not
+    # installed, the type check still has to pass; on macOS the modules are installed and checked as before.
+    "Quartz",
     "Quartz.*",
+    "ApplicationServices",
     "ApplicationServices.*",
+    "AppKit",
     "AppKit.*",
+    "Foundation",
     "Foundation.*",
+    "CoreFoundation",
     "CoreFoundation.*",
+    "ScreenCaptureKit",
     "ScreenCaptureKit.*",
+    "Vision",
     "Vision.*",
+    "CoreMedia",
     "CoreMedia.*",
+    "objc",
     "objc.*",
+    "PyObjCTools",
     "PyObjCTools.*",
     "croniter.*",
     "py_vapid.*",

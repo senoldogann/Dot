@@ -1,10 +1,16 @@
-# The gate every change passes before it is merged: the same commands as CONTRIBUTING.md, on macOS because the package
-# depends on PyObjC. The smoke tests here are every one that needs no service, chosen by their marks: a scripted model
-# or a stand-in plays the real loop, tools, policy and store; one that needs the local Ollama server's embedding model
-# skips itself here. Beside it, the `browser` job runs the core of the browser tests (item 486): the URL rules of Dot's
-# Chrome, the sign-in, the secret fields, the attach mode and every phone page, on every change and in the release,
-# which calls this gate; browser.yml runs them all every night and when asked. The tests marked live, internet, desktop
-# or hosted stay on the developer's Mac.
+# The gate every change passes before it is merged. The format check, the lint, mypy and the checks of the interface
+# run on Linux: none of them imports PyObjC, and the marker on those dependencies lets `uv sync` install there. The
+# tests stay on macOS, because the package imports PyObjC and a run of them on Linux does not get past the import.
+# The smoke tests here are every one that needs no service, chosen by their marks: a scripted model or a stand-in
+# plays the real loop, tools, policy and store; one that needs the local Ollama server's embedding model skips itself
+# here. Beside them, the `browser` job runs the core of the browser tests (item 486): the URL rules of Dot's Chrome,
+# the sign-in, the secret fields, the attach mode and every phone page, on a push to main and in the release, which
+# calls this gate. A pull request runs those parts only when a changed file can affect them (scripts/browser_ci.py):
+# the web UI, the daemon and the browser code the tests start, their tests and the helpers they import, the locks and
+# these workflows. A unit test, a smoke test that is not one of theirs, the command line and the desktop shell do not,
+# and the five macOS runners stay free for a pull request that does. What the parts skip, main's own run still tests,
+# on the push that merged it. browser.yml runs every browser test every night and when asked. The tests marked live,
+# internet, desktop or hosted stay on the developer's Mac.
 name: gate
 
 # A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing, as no
@@ -36,10 +42,76 @@ concurrency:
   group: gate-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# The work is spread over five runners at once (item 944), the most macOS runners a free account runs together, so that
-# a change waits on its slowest part, about seven minutes, not on all of it in a row: the checks, the unit tests and the
-# first half of the smoke tests here; the eval references and the second half in `smoke`; the browser tests in three.
+# The work is spread so a change waits on its slowest part. The checks run on Linux and take none of the five macOS
+# runners. The unit tests and the first half of the smoke tests run here, the eval references and the second half in
+# `smoke`, and the browser tests in three parts whose files were dealt by the time they took on run 42895911331
+# (the pages part 12 minutes, the phone's two 6 and 4). The `ci` job is the one a required check can name: a browser
+# part that this pull request skips reports no check of its own, and branch protection would wait for it forever.
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: $/.github/actions/prepare
+        with:
+          node: true
+      - name: Format
+        run: uv run ruff format --check src tests
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Types
+        run: uv run mypy src
+      # The checks of the web interface (package.json): Biome, tsc over the JSDoc, the unit tests of its pure modules.
+      # Node is a development requirement only; nothing of Dot needs it to run.
+      - name: Interface checks
+        run: npm run check
+
+  # What of this pull request can affect a browser part. A push and a release do not ask: they run every part. When
+  # the answer cannot be read, the parts run, which is the failure that still tests the change.
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      browser: ${{ steps.decide.outputs.browser }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Which files run the browser parts
+        id: decide
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          decide() { echo "browser=$1" >> "$GITHUB_OUTPUT"; }
+          if [[ ! "$BASE" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "the base is not a sha; the browser parts run"
+            decide true
+            exit 0
+          fi
+          if ! git fetch --no-tags --depth=1 origin "$BASE"; then
+            echo "the base could not be fetched; the browser parts run"
+            decide true
+            exit 0
+          fi
+          if ! files="$(git diff --name-only --no-renames "$BASE" HEAD)"; then
+            echo "the changed files could not be listed; the browser parts run"
+            decide true
+            exit 0
+          fi
+          if ! answer="$(printf '%s\n' "$files" | python3 scripts/browser_ci.py)"; then
+            echo "the path check failed; the browser parts run"
+            decide true
+            exit 0
+          fi
+          if [[ "$answer" != "true" && "$answer" != "false" ]]; then
+            echo "the path check gave no answer; the browser parts run"
+            decide true
+            exit 0
+          fi
+          decide "$answer"
+
   gate:
     runs-on: macos-latest
     timeout-minutes: 30
@@ -50,36 +122,11 @@ jobs:
       # The runner's /etc/localtime is not a link into the zone database, so the zone is named here.
       TZ: UTC
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: $/.github/actions/prepare
         with:
-          # The job pushes nothing: the checkout's token is not left in .git/config (item 487).
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: true
-      - name: Install
-        run: uv sync --frozen
-      # The checks of the web interface (package.json): Biome, tsc over the JSDoc, the unit tests of its pure modules.
-      # Node is a development requirement only; nothing of Dot needs it to run.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: npm
-      - name: Interface tooling
-        run: npm ci
-      # The search tool runs ripgrep; the runner image has Homebrew but not rg.
-      - name: Ripgrep
-        run: brew install ripgrep
+          ripgrep: true
       - name: Throw-away home
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
-      - name: Format
-        run: uv run ruff format --check src tests
-      - name: Lint
-        run: uv run ruff check src tests
-      - name: Types
-        run: uv run mypy src
-      - name: Interface checks
-        run: npm run check
       - name: Unit tests
         run: uv run pytest tests/unit -q -n auto -p no:cacheprovider
       # The smoke tests' files are dealt to two parts in turn (tests/smoke/conftest.py), the second in `smoke`.
@@ -98,16 +145,9 @@ jobs:
       DOT_CHROME_DIR: ${{ github.workspace }}/.ci/chrome
       TZ: UTC
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: $/.github/actions/prepare
         with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: true
-      - name: Install
-        run: uv sync --frozen
-      - name: Ripgrep
-        run: brew install ripgrep
+          ripgrep: true
       - name: Throw-away home
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Eval references
@@ -120,28 +160,39 @@ jobs:
   # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
   # and the face. In three parts, on runners of their own, each on one worker: a runner has three cores and a worker
-  # drives a Chrome and a daemon of its own, and at two or three workers pages ran out of their time. The phone's two
-  # parts are split by the time their files took (item 944): the first holds the walk through every page, which alone
-  # takes three minutes; a new phone file joins the second.
+  # drives a Chrome and a daemon of its own, and at two or three workers pages ran out of their time. Run 42895911331
+  # spent 12m14s in the pages part and 5m30s and 4m18s in the phone's two, and the ten slowest calls of the pages part
+  # were in five files. The two slowest of those that are not the phone's own walk (the attach mode, the secret fields)
+  # run with the second phone part, and the settings and the data with the first, so a new browser file still joins
+  # the pages part and a new phone file the second. A phone back on a network that wakes measures seconds of grace
+  # against the runner's own clock, which a slow runner does not keep: it runs at night (browser.yml) and on the
+  # developer's Mac.
   browser:
     name: browser (${{ matrix.part.name }})
+    needs: [changes]
+    # Not a pull request (a push to main, a release): every part runs. A pull request whose files cannot affect a
+    # part skips it. A decision that failed runs the parts, so a broken check cannot hide a break.
+    if: >-
+      ${{ !cancelled() && (github.event_name != 'pull_request'
+      || needs.changes.result != 'success'
+      || needs.changes.outputs.browser == 'true') }}
     strategy:
       fail-fast: false
       matrix:
         part:
           - name: pages
             tests: >-
-              tests/smoke/test_browser_*.py tests/smoke/test_secret_fields.py tests/smoke/test_page_guards.py
-              tests/smoke/test_face.py
+              tests/smoke/test_browser_*.py tests/smoke/test_page_guards.py tests/smoke/test_face.py
+              --deselect tests/smoke/test_browser_attach.py --deselect tests/smoke/test_browser_settings.py
+              --deselect tests/smoke/test_browser_data.py
           - name: phone 1
             tests: >-
               tests/smoke/test_phone_all_pages.py tests/smoke/test_phone_screens.py tests/smoke/test_phone_reach.py
               tests/smoke/test_phone_rows.py tests/smoke/test_phone_lists.py tests/smoke/test_phone_pages.py
-          # A phone back on a network that wakes measures seconds of grace against the runner's own clock, which a
-          # slow runner does not keep: it runs at night (browser.yml) and on the developer's Mac.
+              tests/smoke/test_browser_settings.py tests/smoke/test_browser_data.py
           - name: phone 2
             tests: >-
-              tests/smoke/test_phone_*.py
+              tests/smoke/test_phone_*.py tests/smoke/test_browser_attach.py tests/smoke/test_secret_fields.py
               --deselect tests/smoke/test_phone_all_pages.py --deselect tests/smoke/test_phone_screens.py
               --deselect tests/smoke/test_phone_reach.py --deselect tests/smoke/test_phone_rows.py
               --deselect tests/smoke/test_phone_lists.py --deselect tests/smoke/test_phone_pages.py
@@ -154,22 +205,15 @@ jobs:
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
       DOT_CHROME_DIR: ${{ github.workspace }}/.ci/chrome
       TZ: UTC
+      # Where Playwright keeps the browsers the prepare step cached, so the tests find the same ones.
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.ci/playwright
       # The part's files, globs the shell expands.
       PART_TESTS: ${{ matrix.part.tests }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: $/.github/actions/prepare
         with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: true
-      - name: Install
-        run: uv sync --frozen
-      # Google Chrome is on the runner's image; Playwright's own headless shell and WebKit (the phone's engine) are not.
-      - name: Browsers
-        run: uv run playwright install chromium-headless-shell webkit
-      - name: Ripgrep
-        run: brew install ripgrep
+          ripgrep: true
+          browsers: true
       - name: The runner
         run: sysctl -n hw.ncpu hw.memsize
       - name: Throw-away home
@@ -180,3 +224,29 @@ jobs:
           uv run pytest -q -p no:cacheprovider --durations=10
           -m "browser and not live and not internet and not hosted and not desktop"
           $PART_TESTS
+
+  # The check main's protection should require, in place of the five job names. It passes when every job it waits
+  # for passed or did not run, and fails when one failed: a skipped browser part is not a failure, and a red one is.
+  ci:
+    needs: [checks, gate, smoke, browser]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every part passed, or did not run
+        env:
+          CHECKS: ${{ needs.checks.result }}
+          GATE: ${{ needs.gate.result }}
+          SMOKE: ${{ needs.smoke.result }}
+          BROWSER: ${{ needs.browser.result }}
+        run: |
+          fail=0
+          for name in CHECKS GATE SMOKE BROWSER; do
+            result="${!name}"
+            echo "$name $result"
+            case "$result" in
+              success|skipped) ;;
+              *) fail=1 ;;
+            esac
+          done
+          exit "$fail"

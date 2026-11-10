@@ -33,15 +33,28 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     assert set(publish["needs"]) == {"tag", "gate"}
     assert publish["environment"] == "pypi"
     assert jobs["gate"] == {"needs": "tag", "uses": "./.github/workflows/gate.yml"}
-    # The gate the release calls runs the core of the browser tests, in its parts, with nothing that skips them there.
+    # The gate the release calls runs the core of the browser tests, in its parts. A release is a workflow_call, not a
+    # pull request, so the condition that skips a part for a pull request is true there and the parts run.
     gate_jobs = _workflow("gate.yml")["jobs"]
     assert isinstance(gate_jobs, dict)
-    assert "if" not in gate_jobs["browser"]
+    browser_if = str(gate_jobs["browser"].get("if", ""))
+    assert "github.event_name != 'pull_request'" in browser_if
+    assert "needs.changes.outputs.browser == 'true'" in browser_if
     assert [part["name"] for part in gate_jobs["browser"]["strategy"]["matrix"]["part"]] == [
         "pages",
         "phone 1",
         "phone 2",
     ]
+    # The checks that do not import PyObjC run on Linux; the tests stay on macOS. `ci` is what a required check can
+    # name, because a skipped browser part reports no check of its own.
+    assert gate_jobs["checks"]["runs-on"] == "ubuntu-latest"
+    assert gate_jobs["gate"]["runs-on"] == "macos-latest"
+    assert gate_jobs["ci"]["runs-on"] == "ubuntu-latest"
+    assert gate_jobs["ci"]["if"] == "always()"
+    assert set(gate_jobs["ci"]["needs"]) == {"checks", "gate", "smoke", "browser"}
+    assert not any("ruff " in str(step.get("run", "")) for step in gate_jobs["gate"]["steps"])
+    assert any("ruff format" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
+    assert any("npm run check" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
     # And both halves of the smoke tests (item 944), each on its own runner, with nothing that skips them there.
     assert "if" not in gate_jobs["smoke"]
     halves = [
