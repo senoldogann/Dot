@@ -242,8 +242,8 @@ an agent a run of Dot's made, which the line marks "made by Dot". An agent you m
 later messages are told no team.
 
 The chat wears the team: the sidebar's row shows the faces of two of its agents and the team's name ahead of its last
-words while the chat's latest run is Dot's, which leads the team, and the bar of a run of Dot's there (a phone's, under
-the chat's title) the name and the same faces; an agent you put in the chat answers as itself, its run's bar and, while
+words while the chat's latest run is Dot's, which leads the team, and the bar of a run of Dot's there (a phone's in its
+middle, on glass, item 1101) the name and the same faces; an agent you put in the chat answers as itself, its run's bar and, while
 its run is the latest, the row wearing its face. The Task tab's Details name the team, a link to its page. The API: `GET
 /api/teams` (each team with its agents as they are now and its
 newest chat), `GET /api/teams/{id}` (with its chats), `POST /api/teams` (201; `name`, `purpose` and `agents`, the ids of

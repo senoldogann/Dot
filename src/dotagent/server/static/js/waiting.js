@@ -16,8 +16,8 @@ const LOOK_KEY = "dot.chatLook";
 /** The event a page sends up once it shows what it was opened for, or why it cannot. */
 export const PAGE_READY_EVENT = "dot:page-ready";
 
-/** Remember what the page of the chat `runId` shows in its bar (whom it is with, item 1101; and on a wider window its title
- * with the agent and the model under it) and as its composer's placeholder. */
+/** Remember what the page of the chat `runId` shows in its bar (whom it is with, item 1101) and as its composer's
+ * placeholder, and its title with the agent and the model, which the curtain keeps in its hidden heading. */
 export function keepChatLook(runId, name, title, sub, placeholder) {
   const look = JSON.stringify({ runId, name, title, sub, placeholder });
   if (readPref(LOOK_KEY) !== look) {

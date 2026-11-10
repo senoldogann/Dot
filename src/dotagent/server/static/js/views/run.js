@@ -1326,8 +1326,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     run = fresh.run;
     resumable = fresh.resumable;
     cutOff = fresh.cut_off;
-    // A chat renamed since the page opened shows its new title in the bar of a wider window and in the Details (items
-    // 295 and 1101).
+    // A chat renamed since the page opened shows its new title in the Details (item 1101), and in the heading the
+    // loading curtain is drawn from.
     if (parentId === null) {
       headingTitle.textContent = clip(fresh.title, TITLE_CHARS);
       details.retitle(fresh.title);
@@ -1437,7 +1437,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     paintCapsule();
   }
 
-  /** A phone's bar under the chat's title: the agent, or Helper on a helper's page, and the model the run uses now. */
+  /** Under the heading's title: the agent, or Helper on a helper's page, and the model the run uses now. A phone's bar
+   * shows it on a helper's page; a chat's names whom it is with instead (item 1101). */
   function paintHeading() {
     headingSub.textContent = `${parentId === null ? chatWith : "Helper"} · ${modelName(model)}`;
     keepLook();
@@ -1658,8 +1659,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // switch is the bar's one tool (item 120): the run's state, start, agent, model, approvals and campaign are in the
   // Details of the panel's Run tab. The goal, the first message, is the page's heading for a reader of the structure.
   // On a phone the bar names whom the chat is with in its middle, as a wider one does at its left (item 1101; from item
-  // 295 to it, the chat's title over the agent and the model, which the heading keeps for the loading curtain and the
-  // Details keep for the reader); a helper's page names its goal and says it is a helper.
+  // 295 to it, the chat's title over the agent and the model). The heading stays hidden on a chat's page, kept with the
+  // loading curtain's look; the Details name the title. On a helper's page a phone's bar shows the heading: its goal,
+  // and that it is a helper.
   const headingTitle = el("span", { class: "stage-heading-title" }, clip(parentId === null ? detail.title : run.goal, TITLE_CHARS));
   const headingSub = el("span", { class: "stage-heading-sub" });
   const heading = el("span", { class: "stage-heading" }, headingTitle, headingSub);
