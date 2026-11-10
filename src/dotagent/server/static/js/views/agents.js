@@ -24,7 +24,7 @@ import { lookPicker } from "../lookpicker.js";
 import { aboutToggle, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { APPROVAL_OPTIONS, heldChoice, KEPT_GOAL_MODE } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
-import { setStageTitle, setStageTools } from "../stage.js";
+import { setStageGlass, setStageTitle, setStageTools } from "../stage.js";
 import { scoreLine } from "./memory.js";
 import { skillRow } from "./skills.js";
 import { messageRow } from "./team.js";
@@ -1575,12 +1575,18 @@ function mountPage(root, ctx, agentId) {
   function stageOf(record) {
     ctx.setTitle(`${record.name} · Agents`);
     setStageTitle(actorFace(record.id, "idle", record.look), el("h1", { class: "stage-h1 stage-name" }, record.name));
+    // On a phone the bar is a chat's (item 1123): the name in its middle on glass, the tools in one pill of glass.
+    setStageGlass();
     setStageTools(
-      // The Trader's page opens the trading desk (item 847).
-      isTrader(record) ? el("a", { class: "btn ghost sm", href: TRADING_DESK, title: "Open the trading desk" }, icon("trendingUp"), el("span", { class: "label" }, "Trading desk")) : null,
-      // What the agent's page can do of it stands in one "…" (item 993, the owner's ask for a plain page): four buttons
-      // of a row were a toolbar on a phone.
-      agentMenuButton(record),
+      el(
+        "div",
+        { class: "stage-pill" },
+        // The Trader's page opens the trading desk (item 847).
+        isTrader(record) ? el("a", { class: "btn ghost sm", href: TRADING_DESK, title: "Open the trading desk" }, icon("trendingUp"), el("span", { class: "label" }, "Trading desk")) : null,
+        // What the agent's page can do of it stands in one "…" (item 993, the owner's ask for a plain page): four
+        // buttons of a row were a toolbar on a phone.
+        agentMenuButton(record),
+      ),
     );
   }
 

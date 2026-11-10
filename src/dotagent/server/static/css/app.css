@@ -11218,14 +11218,20 @@ button.attach-chip {
   /* A chat's bar stands on nothing (item 1113, the owner's ask after Grok Bot's): its parts, the way back, the name and
      the tools' pill, have their own grounds of glass, and the bar no ground and no line under it. The conversation
      passes under it (item 1119, run.css), as under the composer. */
-  .stage:has(> .page[data-layout="run"]) > .stagebar {
+  .stagebar[data-glass] {
     background: transparent;
     border-bottom-color: transparent;
+    /* A touch between the bar's parts goes through to the page under it (item 1123). */
+    pointer-events: none;
+  }
+
+  .stagebar[data-glass] :is(.stagebar-row > *, .banner) {
+    pointer-events: auto;
   }
 
   /* The way back is a round pane of glass, as the name's and the tools' are (item 1119): the conversation goes by under
      all three. */
-  .stage:has(> .page[data-layout="run"]) .stagebar-left > .icon-btn {
+  .stagebar[data-glass] .stagebar-left > .icon-btn {
     width: 40px;
     height: 40px;
     border: 1px solid var(--glass-border);
@@ -11235,14 +11241,15 @@ button.attach-chip {
     backdrop-filter: var(--glass-blur);
   }
 
-  .stage:has(> .page[data-layout="run"]) .stage-pill {
+  .stagebar[data-glass] .stage-pill {
     outline-color: var(--glass-border);
     background: var(--glass-surface);
     -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
   }
 
-  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) {
+  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)),
+  .stagebar[data-glass] .stage-title:has(> .stage-name):not(:has(> .stage-heading)) {
     position: absolute;
     left: 50%;
     translate: -50% 0;
@@ -11264,8 +11271,12 @@ button.attach-chip {
     max-width: calc(100% - 272px);
   }
 
-  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) > .stage-name {
+  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) > .stage-name,
+  .stagebar[data-glass] .stage-title:has(> .stage-name):not(:has(> .stage-heading)) > .stage-name {
     display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     min-width: 0;
     font-size: var(--text-md);
     font-weight: var(--weight-title);
@@ -11275,7 +11286,17 @@ button.attach-chip {
     display: none;
   }
 
-  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) .avatar {
+  /* An agent's page with two tools in its pill (the Trader's desk and the "…") leaves the name less room. */
+  .stagebar[data-glass] .stagebar-row:has(.stage-pill > :nth-child(2)) > .stage-title:has(> .stage-name):not(:has(> .stage-heading)) {
+    max-width: calc(100% - 272px);
+  }
+
+  .stagebar[data-glass] .stage-pill > .btn > .label {
+    display: none;
+  }
+
+  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) .avatar,
+  .stagebar[data-glass] .stage-title:has(> .stage-name):not(:has(> .stage-heading)) .avatar {
     width: 28px;
     height: 28px;
   }

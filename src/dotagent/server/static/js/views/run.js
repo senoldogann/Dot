@@ -49,7 +49,7 @@ import { messageKeys } from "../sending.js";
 import { changesSection } from "../changes.js";
 import { runChangesCard } from "../runchanges.js";
 import { setupSection } from "../setup.js";
-import { setStageTitle, setStageTools } from "../stage.js";
+import { setStageGlass, setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
 import { RUN_BACK_EVENT } from "../shell.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, breakToldAt, readFailed } from "../state.js";
@@ -1667,6 +1667,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const heading = el("span", { class: "stage-heading" }, headingTitle, headingSub);
   paintHeading();
   setStageTitle(face, crumb, crumbSep, stageName, heading);
+  setStageGlass();
   // A phone's bar holds its tools in one pill (item 295): Dot's computer once the run has had a page, which then opens
   // over the whole page (item 298), the chat's helpers once it has some, and the panel's switch; a wider bar shows the
   // switch alone (app.css).

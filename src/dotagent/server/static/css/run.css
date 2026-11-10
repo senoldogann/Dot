@@ -612,11 +612,6 @@
     position: absolute;
     top: 0;
     inset-inline: 0;
-    pointer-events: none;
-  }
-
-  html.chat-shell .stage:has(> .page[data-layout="run"]) > .stagebar :is(.stagebar-row > *, .banner) {
-    pointer-events: auto;
   }
 
   /* A menu of the composer opens over the bar, not under it. */
