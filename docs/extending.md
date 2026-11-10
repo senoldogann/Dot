@@ -517,7 +517,8 @@ Every other string a tool takes is worked on inside the server and sent nowhere:
 CSS selector, the name of a crawl job, a date or a language code.
 
 **What those rules do not reach.** What Dot's own tools do not reach either: a secret that is not in the shape of a key
-(a password, a token of another kind) and a key cut in pieces over several arguments or calls; a run marked untrusted is
+(a password, a token of another kind) a key cut in pieces over several arguments or calls, and an `sk-` key written straight after a letter or a digit (so
+that a name such as `flask-callers-….jsonl` is not taken for one); a run marked untrusted is
 also refused a step whose words carry a secret that Dot holds (see *Outside content in yolo* in [Safety](safety.md)).
 And what the server does that those tools do not: a redirect it follows to another host (since 1.4.5 a map or a crawl
 whose address, `robots.txt` or sitemap redirects to another site reads only the one page it leads to and says
