@@ -189,6 +189,9 @@ from dotagent.tools.registry import tools_for_mode
 from dotagent.tools.team import TEAM_SOURCE
 
 log = get_logger(__name__)
+# How long after its last session an active campaign with nothing planned is taken as stalled and planned again by the
+# scheduler (item 1104): longer than a session's end takes to plan the next.
+CAMPAIGN_STALL_S: float = 600.0
 # A request of its own sent to a chat at work (item 915): the event of the line that leads to its chat, how long the
 # fast model has to say so (the owner's send waits for it, so a little only), and how much of the message the line says.
 STARTED_BESIDE_EVENT: str = "started_beside"
@@ -1492,6 +1495,29 @@ class RunManager:
                 continue
             died: bool = bool(sessions) and cut_off_by(sessions[-1]) == "daemon_restarted"
             if await store.set_next_session(campaign.id, now + gap_s if died else now):
+                planned += 1
+        return planned
+
+    async def replan_stalled_campaigns(self, now: float) -> int:
+        """Plan the next session of every active campaign left with none planned and none working by a session that
+        ended :data:`CAMPAIGN_STALL_S` ago or more (item 1104): one whose end could not plan the next
+        (``campaign_session_not_followed``) stood still until the daemon started again. It starts after
+        ``[agent] campaign_gap_minutes``. A session that ended less long ago is its end's to follow. For the scheduler's
+        tick; returns how many campaigns got a session."""
+        store: Store = self._runtime.store
+        gap_s: float = self._runtime.config.agent.campaign_gap_minutes * 60
+        planned: int = 0
+        for campaign in await store.list_campaigns():
+            if campaign.status != "active" or campaign.next_session_at is not None:
+                continue
+            sessions: list[RunRecord] = await store.campaign_sessions(campaign.id)
+            if any(session.status in WORKING_STATUSES for session in sessions):
+                continue
+            ended: float = max((session.finished_at or 0.0 for session in sessions), default=campaign.updated_at)
+            if now - ended < CAMPAIGN_STALL_S:
+                continue
+            if await store.set_next_session(campaign.id, now + gap_s):
+                log.warning("campaign_replanned", campaign_id=campaign.id, idle_s=round(now - ended))
                 planned += 1
         return planned
 
