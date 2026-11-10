@@ -219,9 +219,11 @@ function revealStop(text, at) {
 /**
  * The answer `answer` of a run that ended under the reader's eyes, its words `text` written in as a live message is
  * drawn (item 366): a few words a frame, formatted as they will stay, the caret at their end, and the answer's foot
- * once they are all in. The words keep the room they will take from the start, so the page lands on the answer as it
- * will stand and they are written into it in sight; once they are in, the answer is the one drawn at once, so their
- * end moves nothing. An answer the page let go of (the reader went elsewhere) is not written on.
+ * once they are all in. The answer keeps the room it will take from the start, so the page lands on it as it will
+ * stand and the words are written into it in sight; once they are in, the answer is the one drawn at once, so their
+ * end moves nothing. The room is the answer's, not its words': on a phone the words are a bubble, which grows with
+ * them rather than standing empty at its full height (item 1099). An answer the page let go of (the reader went
+ * elsewhere) is not written on.
  */
 function revealAnswer(answer, text) {
   const body = answer.querySelector(":scope > .prose");
@@ -229,10 +231,10 @@ function revealAnswer(answer, text) {
     return;
   }
   const live = { body, text: "", drawn: [], caret: el("span", { class: "stream-caret", "aria-hidden": "true" }), queued: false, ended: false };
-  const room = body.offsetHeight;
+  const room = answer.offsetHeight;
   body.replaceChildren();
   body.classList.add("stream");
-  body.style.minHeight = `${room}px`;
+  answer.style.minHeight = `${room}px`;
   // What stands under the words, the foot and the line of what the run changed (item 597), waits until they are all in.
   answer.dataset.revealing = "";
   const step = Math.max(REVEAL_MIN_CHARS, Math.ceil(text.length / REVEAL_MOST_FRAMES));
@@ -249,6 +251,7 @@ function revealAnswer(answer, text) {
       return;
     }
     body.replaceWith(prose(text));
+    answer.style.removeProperty("min-height");
     delete answer.dataset.revealing;
   }
   requestAnimationFrame(frame);
