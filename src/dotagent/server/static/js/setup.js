@@ -1,6 +1,7 @@
 // How a run was set up (item 365): the notes and the skills it was handed and how they were found, its context budget,
-// its tool groups, the model a step went to, and the corrections the run made on its own (item 1117). The conversation keeps none of these lines; the side panel's Run tab lists
-// them under Set up, in its More (item 452), its head naming them in short. A line that warns (the embedding service
+// its tool groups, the model a step went to, and the corrections the run made on its own (item 1117). The conversation
+// keeps none of these lines; the side panel's Run tab lists them under Set up, in its More (item 452), its head naming
+// them in short. A line that warns (the embedding service
 // failed, so the notes were found by their words alone) keeps its tone there, and More counts it beside its title.
 
 import { el } from "./dom.js";

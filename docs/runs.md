@@ -200,7 +200,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   success and its answer names such paths that do not exist and that no successful call of the run named (a file the
   run removed or moved is not missing), the run is sent back once with the list: to create what is missing, to correct
   the answer, or to finish again with the same answer if it names them on purpose. The check makes no model call. It
-  is off by default until evals show that it helps. The timeline shows each send-back.
+  is off by default until evals show that it helps. The side panel's Set up lists each send-back as a correction.
 - A run has no step limit. Outside a chat, `finish` does not end it while the plan has a step that is not done, failed
   or skipped: the run is sent back, up to `stall_limit` times, and then the goal check or the progress stop takes over
   (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). It ends when the model calls `finish` with the plan closed, when the progress watchdog stops it (see
