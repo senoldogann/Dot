@@ -32,6 +32,29 @@ export function createChatFlowView(actions) {
   const drill = el("div", { class: "flow-drill", hidden: true });
   const railList = el("div", { class: "flow-rail-list" });
   let painting = false;
+  /** @type {Map<string, HTMLButtonElement>} */
+  const sessionNodes = new Map();
+  /** @type {Map<string, HTMLButtonElement>} */
+  const railNodes = new Map();
+  const activityKicker = el("span", { class: "flow-kicker" });
+  const activityNow = el("span", { class: "flow-activity-now" });
+  const thinkingNode = el("pre", { class: "flow-thinking" });
+  const progressList = el("ul", { class: "flow-progress" });
+  const stepsList = el("ol", { class: "flow-steps" });
+  const activityDetails = el(
+    "details",
+    { class: "flow-activity-block" },
+    el("summary", null, activityKicker, activityNow, icon("chevron")),
+    el("div", { class: "flow-activity-body" }, thinkingNode, progressList, stepsList),
+  );
+  activity.append(activityDetails);
+  let activityRun = "";
+  activityDetails.addEventListener("toggle", () => {
+    if (painting || activityRun === "") {
+      return;
+    }
+    actions.onToggle(activityRun);
+  });
   const rail = el(
     "aside",
     { class: "flow-rail", "aria-label": "Sessions" },
@@ -53,72 +76,75 @@ export function createChatFlowView(actions) {
   function paintSessions(state) {
     const rows = childSessions(state, state.rootId);
     sessions.hidden = rows.length === 0 || state.view.kind === "session";
-    sessions.replaceChildren(...rows.map((session) => sessionCard(session, () => actions.onOpen(session.id))));
+    placeSessions(sessions, sessionNodes, rows, (session) => sessionCard(session, () => actions.onOpen(session.id)), fillSession);
   }
 
   /** @param {import("./chatflow.js").FlowState} state */
   function paintActivity(state) {
+    activityRun = state.rootId;
     if (state.view.kind === "session") {
       activity.hidden = true;
       return;
     }
     const raw = state.activity[state.rootId];
-    if (raw === undefined) {
-      activity.hidden = true;
-      activity.replaceChildren();
+    const shown = raw === undefined ? null : presentActivity(raw);
+    const busy = shown !== null && (shown.thinkingPhase === "live" || shown.answerPhase === "live" || shown.current?.status === "running" || shown.wait !== "none");
+    const quiet = shown === null || (!busy && shown.steps.length === 0 && shown.progress.length === 0 && shown.thinking === "");
+    activity.hidden = quiet;
+    if (shown === null || quiet) {
       return;
     }
-    const shown = presentActivity(raw);
-    const busy = shown.thinkingPhase === "live" || shown.answerPhase === "live" || shown.current?.status === "running" || shown.wait !== "none";
-    if (!busy && shown.steps.length === 0 && shown.progress.length === 0 && shown.thinking === "") {
-      activity.hidden = true;
-      activity.replaceChildren();
-      return;
-    }
-    activity.hidden = false;
-    const open = shown.fold === "open";
     const head = shown.current !== null ? shown.current.label : shown.wait === "question" ? "Waiting for your answer" : shown.wait === "approval" ? "Waiting for your approval" : shown.thinkingPhase === "live" ? "Thinking" : "Activity";
-    const details = el("details", { class: "flow-activity-block", open });
-    details.addEventListener("toggle", () => {
-      if (painting) {
-        return;
-      }
-      const now = /** @type {HTMLDetailsElement} */ (details).open ? "open" : "closed";
-      if (now !== shown.fold) {
-        actions.onToggle(state.rootId);
-      }
+    activityKicker.textContent = busy ? "Now" : "Activity";
+    activityNow.textContent = head;
+    if (activityDetails.open !== (shown.fold === "open")) {
+      activityDetails.open = shown.fold === "open";
+    }
+    thinkingNode.hidden = shown.thinking === "";
+    thinkingNode.textContent = shown.thinking;
+    fillLines(progressList, shown.progress, (line) => el("li", null, line), (item, line) => {
+      item.textContent = line;
     });
-    details.append(
-      el("summary", null, el("span", { class: "flow-kicker" }, busy ? "Now" : "Activity"), el("span", { class: "flow-activity-now" }, head), icon("chevron")),
-      el(
-        "div",
-        { class: "flow-activity-body" },
-        shown.thinking === "" ? null : el("pre", { class: "flow-thinking" }, shown.thinking),
-        shown.progress.length === 0 ? null : el("ul", { class: "flow-progress" }, shown.progress.map((line) => el("li", null, line))),
-        shown.steps.length === 0 ? null : el("ol", { class: "flow-steps" }, shown.steps.slice(-8).map(stepRow)),
-      ),
-    );
-    activity.replaceChildren(details);
+    fillLines(stepsList, shown.steps.slice(-8), stepRow, fillStep);
   }
 
   /** @param {import("./chatflow.js").FlowState} state */
   function paintRail(state) {
     const rows = sessionsNewest(state);
     rail.hidden = rows.length === 0;
-    railList.replaceChildren(
-      ...rows.map((session) => {
-        const button = el(
+    placeSessions(
+      railList,
+      railNodes,
+      rows,
+      (session) =>
+        el(
           "button",
           { class: `flow-rail-row s-${session.status}`, type: "button", onclick: () => actions.onOpen(session.id) },
-          el("span", { class: `flow-dot s-${session.status}`, "aria-hidden": "true" }),
+          el("span", { class: "flow-dot", "aria-hidden": "true" }),
           el("span", { class: "flow-rail-title" }, session.title),
-          el("span", { class: `flow-status s-${session.status}` }, STATUS_WORD[session.status]),
-        );
-        if (state.view.kind === "session" && state.view.id === session.id) {
-          button.setAttribute("aria-current", "true");
+          el("span", { class: "flow-status" }, STATUS_WORD[session.status]),
+        ),
+      (node, session) => {
+        node.className = `flow-rail-row s-${session.status}`;
+        const dot = node.querySelector(".flow-dot");
+        if (dot !== null) {
+          dot.className = `flow-dot s-${session.status}`;
         }
-        return button;
-      }),
+        const title = node.querySelector(".flow-rail-title");
+        if (title !== null) {
+          title.textContent = session.title;
+        }
+        const status = node.querySelector(".flow-status");
+        if (status !== null) {
+          status.className = `flow-status s-${session.status}`;
+          status.textContent = STATUS_WORD[session.status];
+        }
+        if (state.view.kind === "session" && state.view.id === session.id) {
+          node.setAttribute("aria-current", "true");
+        } else {
+          node.removeAttribute("aria-current");
+        }
+      },
     );
   }
 
@@ -167,6 +193,85 @@ function isOpenQuestion(card) {
 /** @param {import("./chatflow.js").FlowCard} card @returns {card is import("./chatflow.js").ReportCard} */
 function isReport(card) {
   return card.kind === "report";
+}
+
+/**
+ * Keep one node per session and only move a node when its order changed, so a repaint does not pull a node out of
+ * the page.
+ * @param {HTMLElement} parent
+ * @param {Map<string, HTMLButtonElement>} nodes
+ * @param {import("./chatflow.js").Session[]} rows
+ * @param {(session: import("./chatflow.js").Session) => HTMLButtonElement} make
+ * @param {(node: HTMLButtonElement, session: import("./chatflow.js").Session) => void} fill
+ */
+function placeSessions(parent, nodes, rows, make, fill) {
+  const keep = new Set(rows.map((session) => session.id));
+  for (const [id, node] of nodes) {
+    if (!keep.has(id)) {
+      node.remove();
+      nodes.delete(id);
+    }
+  }
+  rows.forEach((session, index) => {
+    let node = nodes.get(session.id);
+    if (node === undefined) {
+      node = make(session);
+      nodes.set(session.id, node);
+    } else {
+      fill(node, session);
+    }
+    if (parent.children[index] !== node) {
+      parent.insertBefore(node, parent.children[index] ?? null);
+    }
+  });
+}
+
+/** @param {HTMLButtonElement} node @param {import("./chatflow.js").Session} session */
+function fillSession(node, session) {
+  node.className = `flow-session s-${session.status}`;
+  const title = node.querySelector(".flow-session-title");
+  if (title !== null) {
+    title.textContent = session.title;
+  }
+  const status = node.querySelector(".flow-status");
+  if (status !== null) {
+    status.className = `flow-status s-${session.status}`;
+    status.textContent = STATUS_WORD[session.status];
+  }
+}
+
+/**
+ * @template T
+ * @param {HTMLElement} list
+ * @param {T[]} lines
+ * @param {(line: T) => HTMLElement} make
+ * @param {(item: Element, line: T) => void} fill
+ */
+function fillLines(list, lines, make, fill) {
+  while (list.childElementCount > lines.length) {
+    list.lastElementChild?.remove();
+  }
+  lines.forEach((line, index) => {
+    const item = list.children[index];
+    if (item === undefined) {
+      list.append(make(line));
+    } else {
+      fill(item, line);
+    }
+  });
+}
+
+/** @param {Element} item @param {import("./chatflow.js").FlowStep} step */
+function fillStep(item, step) {
+  item.className = `flow-step s-${step.status}`;
+  const label = item.querySelector(".flow-step-label");
+  if (label !== null) {
+    label.textContent = step.label;
+  }
+  const status = item.querySelector(".flow-step-status");
+  if (status !== null) {
+    status.textContent = step.status;
+  }
 }
 
 /** @param {import("./chatflow.js").Session} session @param {() => void} onOpen */

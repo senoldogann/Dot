@@ -204,7 +204,7 @@ export function presentActivity(activity) {
 }
 
 /** @param {FlowStep[]} steps */
-export function currentStep(steps) {
+function currentStep(steps) {
   for (let index = steps.length - 1; index >= 0; index -= 1) {
     if (steps[index].status === "running") {
       return steps[index];

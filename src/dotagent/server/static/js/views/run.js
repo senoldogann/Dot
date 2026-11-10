@@ -1706,8 +1706,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     {
       class: "icon-btn stage-quick stage-helpers",
       type: "button",
-      title: "Sessions",
-      "aria-label": "Show the sessions",
+      title: "Helpers",
+      "aria-label": "Show the helpers",
       hidden: true,
       onclick: () => {
         sessionsWanted = layout.dataset.sessions !== "on";
