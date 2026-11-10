@@ -55,16 +55,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     /// Shows the daemon's alerts while the app is open, too.
     ///
-    /// The completion handler is called on the main thread (item 1114): the `async` form of these methods completed on
-    /// a thread of Swift's own, and UIKit, which updates the app's snapshot as it is told, stopped the app with an
-    /// assertion at every tap of a notification.
+    /// The forms with a completion handler (item 1114): the `async` form of these methods completed on a thread of
+    /// Swift's own, and UIKit, which updates the app's snapshot as a tap's handling is done, stopped the app with an
+    /// assertion at every tap of a notification. iOS calls this one on the main thread.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
     ) {
-        Task { @MainActor in
-            completionHandler([.banner, .list, .sound])
-        }
+        completionHandler([.banner, .list, .sound])
     }
 
     /// Answers an approval from the lock screen (Approve, Deny), or opens the alert's `route` in the web view; tells
