@@ -31,8 +31,15 @@ export function setStageTools(...nodes) {
   tools.replaceChildren(...present(nodes));
 }
 
+/** The bar of a page that wears no ground of its own on a phone (items 1119 and 1123): a chat, an agent's page and a
+ * new chat, whose way back, name and tools are panes of glass over the page. The router takes it away with the rest. */
+export function setStageGlass() {
+  title.closest(".stagebar")?.setAttribute("data-glass", "");
+}
+
 /** Empty the bar's middle and tools (the router, before a page mounts). */
 export function clearStage() {
   title.replaceChildren();
   tools.replaceChildren();
+  title.closest(".stagebar")?.removeAttribute("data-glass");
 }

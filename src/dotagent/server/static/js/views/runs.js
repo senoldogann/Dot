@@ -26,6 +26,7 @@ import { providerLabel, providerOf } from "../providers.js";
 import { KEPT_APPROVALS, KEPT_GOAL_MODE, standingPicker } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { onCompose } from "../shortcuts.js";
+import { setStageGlass } from "../stage.js";
 import { getSnapshot, loadModels, onChange } from "../state.js";
 import { attempt, toast } from "../ui.js";
 
@@ -414,6 +415,8 @@ async function firstChatDue() {
 }
 
 export function mount(root, ctx) {
+  // On a phone a new chat's bar is a chat's (item 1123): its way back a pane of glass, and no ground under it.
+  setStageGlass();
   // A new chat is the greeting and the composer alone, until Settings › General asks for the day: the now line over the
   // composer, and under it what schedules and campaigns did while the owner was away (item 466) over the Today strip.
   const day = settingValue(HOME_DAY) === "shown";
