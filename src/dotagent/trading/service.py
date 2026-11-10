@@ -463,11 +463,12 @@ class Trading:
                     "exchange_id": fill.order_id if fill.order_id != order.id else "",
                 }
             )
-            await self.store.settle_trading_order(filled)
             if request.side == "buy" and request.stop is not None and mode == "paper":
                 # Exits are the paper account's in this item: what Dot sells by itself on the owner's Coinbase account
-                # is a later item's, with a review of its own (the owner's choice after eight pre-push reviews).
-                await self.store.put_trading_exit(
+                # is a later item's, with a review of its own (the owner's choice after eight pre-push reviews). The
+                # fill and its exit are written together (item 1107), so that no position is kept without its stop.
+                await self.store.settle_trading_buy(
+                    filled,
                     TradingExitRecord(
                         id=f"ext_{secrets.token_hex(8)}",
                         mode=mode,
@@ -482,9 +483,11 @@ class Trading:
                         closed_ts=None,
                         sell_id="",
                         note="",
-                    )
+                    ),
                 )
-            elif request.side == "sell" and request.closing is None:
+                return filled
+            await self.store.settle_trading_order(filled)
+            if request.side == "sell" and request.closing is None:
                 await self._shrink_exits(mode, request.product, fill.size, order.id)
             return filled
 
