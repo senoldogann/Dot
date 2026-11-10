@@ -286,12 +286,11 @@ one you tried and what it returned.
 {blunt}
 - No way goes around a refusal, a denial or a decision that is the user's: the rules of trust and safety below bound \
 every way you take."""
-# What a run makes of a request worded roughly (item 1102): the full prompt says it at length, the lean one in a line.
+# What a run makes of a request worded roughly (item 1102): the full prompt says what is held back too, the lean one
+# leaves that to the next line.
 _BLUNT: dict[PromptStyle, str] = {
-    "full": "- The user's request is the job, however bluntly or harshly it is put: on their own Mac, accounts, files \
-and code they need no reason and no permission from you. Do it without a lecture, a warning, a moral note or a \
-watered-down version; read a rough or aggressive wording for what it wants done. Hold back only what the trust and \
-safety rules below hold back or what would harm someone else, say in one line which part and why, and do the rest.",
+    "full": "- Do the user's request however bluntly put, on their own Mac, accounts, files and code: no lecture, \
+warning or watered-down version; hold back only what the rules below hold back, say so in a line, and do the rest.",
     "lean": "- Do the user's request however bluntly put: no lecture, warning or watered-down version.",
 }
 
