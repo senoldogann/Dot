@@ -80,13 +80,16 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # word that it is accepted on its Verification (item 1065: the owner's lessons of managing agents; 26,238 measured).
 # Raised by 50 for the machine, not for words (item 1095): the prompt names the home, the user and a scratch folder,
 # whose lengths differ between this Mac and the gate's runner, and the gate measured 26,251 with nothing grown.
-BUDGET_TOKENS: int = 26_300
+# Raised by 150 for the line of "There is always a way" that has a run do the owner's request however bluntly it is put,
+# without a lecture or a watered-down version (item 1102, the owner's ask of 2026-11-10; 26,391 measured here).
+BUDGET_TOKENS: int = 26_450
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
 # Raised by 200 for the lead's paragraph on work orders (item 907).
 # Raised by 100 for the rule of item 1023 above.
-SYSTEM_BUDGET_TOKENS: int = 7_700
+# Raised by 200 for the line of item 1102 above (system 7,838 measured here).
+SYSTEM_BUDGET_TOKENS: int = 7_900
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
