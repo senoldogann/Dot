@@ -372,7 +372,8 @@ class RunGate:
     ) -> Authorization:
         """Let the action through or raise, as :meth:`authorize`, with what decided it for the step's record (item
         468). A run marked untrusted first refuses a step that would send a secret out of the Mac, read in the call's
-        ``arguments`` when the caller has them and in the step's target and summary (item 525), in every approval mode:
+        ``arguments`` when the caller has them and in the step's target and summary (item 525), in every approval mode
+        but the owner's free mode (item 1097):
         every way a run acts comes through here. A public or social browser action keeps the pace of its site first,
         whatever the approval mode, and counts once it is let through (:mod:`dotagent.policy.pace`), all under the
         site's pace lock. ``weighed`` is the step as the run and the page wrote it, when ``info`` is the step with the
@@ -878,7 +879,8 @@ class RunGate:
     async def _refuse_carried_secret(self, info: ActionInfo, arguments: JsonObject) -> None:
         """Refuse a step of a run that read outside content when its words would send a secret Dot holds, or text in
         the form of a key, out of the Mac (item 525): in every approval mode, yolo too, whatever the preset or the
-        owner's rules say. Its record and its error mask the secrets, as they hold the one refused."""
+        owner's rules say, but the owner's free mode, which refuses none (item 1097: the owner's choice of 2026-11-10,
+        of free alone over yolo and free). Its record and its error mask the secrets, as they hold the one refused."""
         if not self.tainted:
             return
         # A refusal: the values filled into a page are not among the secrets it looks for (item 621); the record of it
@@ -888,6 +890,20 @@ class RunGate:
             return
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         shown: ActionInfo = masked_action(info, known)
+        if self._approvals.free:
+            # Recorded as the other questions free mode waives are, the secret masked (item 1097).
+            await self._approvals.record_automatic(
+                self._run_id,
+                info.tool,
+                f"{shown.summary} — read outside content, and carries a secret out of the Mac",
+                approval_severity(info),
+                _describe(shown),
+                "approved",
+                YOLO_DECIDER,
+                "free mode: a step that carries a secret is not refused",
+            )
+            log.info("secret_egress_free", run_id=self._run_id, tool=info.tool)
+            return
         decision: Decision = Decision(
             verdict="deny",
             source="taint",

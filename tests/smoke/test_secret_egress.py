@@ -227,3 +227,50 @@ async def test_the_answer_to_a_side_question_keeps_no_secret_the_model_quotes(lo
             assert answered.answer == "It used the key ***, and this one: ***."
             stored: list[EventRecord] = await runtime.store.events_of_kind(run.id, "aside_answer", 10)
             assert [event.data["text"] for event in stored] == [answered.answer], stored
+
+
+async def test_in_the_owners_free_mode_a_run_that_read_a_page_runs_a_step_that_holds_a_secret(
+    login_env: dict[str, str],
+) -> None:
+    """Item 1097: the owner's free mode refuses no step for the secret it carries, as the owner chose (a command that
+    measured an OAuth token's length was refused); yolo still does (the first test of this file)."""
+    _Site.asked.clear()
+    site_iterator: Iterator[str] = _serve()
+    site: str = next(site_iterator)
+    try:
+        turns: list[ScriptedTurn] = [
+            _turn("web_fetch", {"url": f"{site}/notes"}),
+            _turn("shell", {"command": f"true # {HELD}"}),
+            _turn(FINISH_TOOL, {"answer": "Done.", "success": True}),
+        ]
+        with scratch_home() as home, eval_environment(home, {}):
+            await asyncio.to_thread(Path(home / ".env").write_text, f"DEMO_SERVICE_KEY={HELD}\n", "utf-8")
+            async with _session(login_env, turns) as (runtime, manager):
+                runtime.approvals.switch_free(True)
+                run: RunRecord = await manager.start(
+                    "Read my notes page.",
+                    "task",
+                    SCRIPTED_MODEL,
+                    None,
+                    UI_SOURCE,
+                    None,
+                    None,
+                    "standard",
+                    None,
+                    "yolo",
+                    False,
+                    (),
+                )
+                async with asyncio.timeout(WAIT_S):
+                    ended: RunRecord = await manager.wait(run.id)
+                assert ended.status == "done", ended
+                results: list[EventRecord] = await runtime.store.events_of_kind(run.id, "tool_result", 10)
+                assert results[0].data["tainted"] is True, results[0].data
+                assert (results[1].data["tool"], results[1].data["ok"]) == ("shell", True), results[1].data
+                # Its record still masks the secret, and the step is recorded as one free mode let through.
+                assert all(HELD not in str(event.data) for event in results), results
+                recorded = [a for a in await runtime.store.run_approvals(run.id) if "carries a secret" in a.summary]
+                assert len(recorded) == 1 and recorded[0].status == "approved", recorded
+                assert HELD not in recorded[0].summary and HELD not in str(recorded[0].args), recorded
+    finally:
+        next(site_iterator, None)

@@ -199,7 +199,7 @@ run needs, sent where the configuration points:
   earns the same flag; and while you have set a list, a `web_scrape` with `archive:
   true` is refused where your lists leave out `web.archive.org`, the site it reaches whatever address it names. These
   rules do not reach what they do not reach in Dot's own tools (a secret that is not in the shape of a key, a key cut in
-  pieces), nor a redirect the server follows to another host (since 1.4.5 a map or a crawl whose address, `robots.txt`
+  pieces, an `sk-` key written straight after a letter or a digit), nor a redirect the server follows to another host (since 1.4.5 a map or a crawl whose address, `robots.txt`
   or sitemap redirects to another site reads only the one page it leads to, and says `redirected_to`), the links a crawl
   follows on the site it starts on, the search engines a search asks, or, while you have no list set, the Internet
   Archive that `archive: true` asks; a crawl goes on after its run has stopped, up to its page limit.
@@ -664,9 +664,11 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   and goes on with the rest, and the record names the review model. Any other answer, `escalate` too, lets the step run
   as yolo runs it. A follow or a like is left to the pace of its site. A review model that cannot answer fails the step
   with its error. `[policy] yolo_taint_check = false` turns the check off.
-- *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, a run marked untrusted has
+- *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, but free mode (item
+  1097, your choice), a run marked untrusted has
   a step refused whose words would send a secret Dot holds out of the Mac: a key read in this process (saved with `dotx
-  auth set` or in Settings), a value of `<home>/.env`, or text in the form of a key or a private key. A request, a
+  auth set` or in Settings), a value of `<home>/.env`, or text in the form of a key or a private key (an `sk-` key
+  where it starts a word or follows an escape such as `%3D`, `=3D` or `\n`, not straight after a letter or a digit). A request, a
   page's address or field, a message, the arguments of an MCP tool, a step that uploads, posts or sends, and what runs
   code or types into an application (a command line, an AppleScript, keystrokes, a script run in a page with
   `browser_eval`, item 561), which may reach the network without saying so, are what it looks at (`policy/egress.py`),
@@ -1262,7 +1264,8 @@ anything, in every chat and every approval mode, from its next step: a payment, 
 public post and a release too, in your chats and in Dot's own, as a `yolo` run of a chat nobody watches does; each step
 is recorded with why it would have asked. A refusal still stands (a research run stays read-only, the pace of a site
 and the limits of trading hold), and so does the review model's check of a `yolo` run that read outside content when
-`yolo_taint_check` is on. A run that starts while it is on is told so; a field of a secret (a page's, a window's, a terminal's password
+`yolo_taint_check` is on. A step of such a run that carries a secret out of the Mac is not refused in it (item 1097:
+your choice, as a command that measured a token's length was refused; in `yolo` it still is). A run that starts while it is on is told so; a field of a secret (a page's, a window's, a terminal's password
 prompt) is typed as in `yolo`, and the sandbox stays as the run's own mode has it. An eval never runs in it (`eval_config`). Off, every run asks as its mode says. A phone may switch it off, not on (item 678, [Phone](phone.md): it would
 outlast the phone's removal).
 

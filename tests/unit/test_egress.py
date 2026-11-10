@@ -99,3 +99,18 @@ def test_a_yolo_run_that_read_outside_content_checks_what_a_planted_instruction_
     flags: tuple[Flag, ...], checked: bool
 ) -> None:
     assert checked_when_tainted(_step("shell", flags)) is checked
+
+
+def test_a_word_that_only_ends_in_sk_is_no_key() -> None:
+    """A note naming `flask-callers-ensure-sync__B__1.jsonl` was refused as a key (item 1094)."""
+    shell: ActionInfo = _step("shell")
+    note: str = "cat >> notes.md <<'MD'\nSee transcripts/flask-callers-ensure-sync__B__1.jsonl\nMD"
+    assert not carries_secret(shell, {"command": note}, ())
+    # Quoted-printable hex is upper case: a word after `=` whose first letters are hex is still a word.
+    desk: str = "https://shop.example/?q=desk-organizer-bamboo-large"
+    assert not carries_secret(_step("network"), {"url": desk}, ())
+    assert carries_secret(shell, {"command": f"echo token={_KEY_FORM}"}, ())
+    assert carries_secret(shell, {"command": "echo sk-callers-ensure-sync-now"}, ())
+    # After an escape whose last character is a letter or a digit: of a URL, of mail text, of a string.
+    for before in ("%3D", "%253D", "=3D", "=20", "\\n", "\\b", "\\042", "\\x3d", "\\u003d"):
+        assert carries_secret(_step("network"), {"url": f"https://example.net/?d={before}{_KEY_FORM}"}, ())
