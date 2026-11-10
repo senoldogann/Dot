@@ -13,8 +13,9 @@ sessions_per_day``) and the plan's window has room (``leave_room``), takes the n
 4. pushes the session's branch through the review hook (a review that stops it goes back to the same session), opens
    the pull request, refuses one that changes a path of REVIEW.md's list (it waits for the owner whatever ``merge``
    says), waits ``checks_minutes`` for its checks, and hands the failed ones back with their logs, ``rounds`` in all;
-5. with every check passed, merges it when ``merge = "on_pass"``, brings the owner's checkout up to main (only when
-   it is on main), ends the night and asks for a restart once Dot is idle; with ``"ask"`` it is the owner's;
+5. with every check passed, merges it when ``merge = "on_pass"`` and goes on to the next problem; with ``"ask"`` it is
+   the owner's. Once the night is over, what it merged is pulled into the owner's checkout (only when it is on main)
+   and a restart asked for once Dot is idle (item 1110);
 6. tells the owner what came of it (the push, the page and the channels), and removes the checkout.
 
 Where ``main`` stands is read before and after each session: one that moved it by itself, through a way to GitHub its
@@ -36,6 +37,7 @@ from typing import Literal
 
 from pydantic import ValidationError
 
+from dotagent.config import RepairConfig
 from dotagent.core.errors import RepairError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path, log_dir
@@ -910,15 +912,9 @@ async def _work(
                         await drop_remote_branch(night.repo, branch, night.env)
                     except RepairError as error:
                         log.warning("repair_branch_not_deleted", branch=branch, error=error.message)
-                    # Merged: whatever the pull does now, the session ends as merged (the fourth review), never failed.
-                    try:
-                        pulled: bool = await pull_main(night.repo, night.env)
-                    except RepairError as error:
-                        log.warning("repair_pull_failed", error=error.message, context=error.context)
-                        return ended("merged_unpulled", f"Merged; pulling your checkout failed: {error.message}")
-                    if pulled:
-                        return ended("merged", "Merged and pulled; Dot restarts once idle.")
-                    return ended("merged_unpulled", "Merged; your checkout is not on main, so it was not pulled.")
+                    # Merged: the owner's checkout is pulled once the night is over (item 1110), and the night goes on
+                    # to the next problem, on a checkout of its own of the new main.
+                    return ended("merged", "Merged; your checkout is pulled once the night is over.")
                 if spent.rounds >= config.rounds:
                     return ended("checks_failed", f"Checks still failing after {spent.rounds} rounds.")
                 failed: list[Check] = [check for check in checks if check.bucket in ("fail", "cancel")]
@@ -1147,10 +1143,10 @@ async def repair_night(
     deadline: float = now + NIGHT_LIMIT_S
 
     async def keep(problem: Problem, session: RepairSession) -> None:
-        """Keep ``session``, the problem as it left it, and tell the owner."""
-        nonlocal book
+        """Keep ``session``, the problem as it left it, and tell the owner. The book is read again first: the night's
+        sessions wrote it since (item 1110), and an older copy would undo what they wrote."""
         done.append(session)
-        book = with_problem(book, problem_after(problem, session))
+        book: Book = with_problem(read_book(await store.kv_get(BOOK_KEY)), problem_after(problem, session))
         await store.kv_set(BOOK_KEY, book.model_dump_json())
         await store.kv_set(SESSIONS_KEY, SessionLog(sessions=(*kept, *done)[-SESSIONS_KEPT:]).model_dump_json())
         log.info("repair_look_ended", problem_id=problem.id, end=session.end, pr=session.pr_url)
@@ -1172,16 +1168,56 @@ async def repair_night(
             return False
         session: RepairSession = looked.session
         await keep(problem, session)
-        if session.end == "merged":
-            await restart()
-        # A merge of the look's own ends the night, as a session's does; one found merged already does not.
-        return session.end in ("merged", "merged_unpulled") and not looked.merged_before
+        return session.end == "merged" and not looked.merged_before
 
     # The pull requests a session left because something moved around it are looked at again first (item 933).
-    for waiting, last in looks_due(book, kept):
-        if await look(waiting, last):
-            return tuple(done)
+    try:
+        for waiting, last in looks_due(book, kept):
+            await look(waiting, last)
+        await _repair_problems(runtime, night, config, kept, done, look, deadline, clock, sleep)
+    finally:
+        # What the night merged reaches the owner's checkout once it is over (item 1110), however it ended (the
+        # emergency stop's cancel, a defect): a merge ended the night before, one problem a night, so that Dot would
+        # not go on in a process whose modules on disk had changed; now the night goes on, each session on a checkout of
+        # its own of the new main, and the pull and the restart come once. Shielded: a cancel does not cut them short.
+        if any(session.end == "merged" for session in done):
+            await asyncio.shield(_pull_and_restart(runtime, night, restart))
+    return tuple(done)
+
+
+async def _pull_and_restart(runtime: Runtime, night: Night, restart: Restart) -> None:
+    """Bring the owner's checkout up to the main the night merged into and restart Dot once idle; a checkout off main
+    or a pull that failed is told to the owner, whose Dot then runs the code it ran (item 1110)."""
+    try:
+        pulled: bool = await pull_main(night.repo, night.env)
+    except RepairError as error:
+        log.warning("repair_pull_failed", error=error.message, context=error.context)
+        await tell_owner(runtime.bus, RESTART_TITLE, f"Tonight's fixes are merged, but pulling your checkout of Dot "
+                         f"failed: {error.message}. Pull it and restart Dot to run them.", _PAGE)  # fmt: skip
+        return
+    if not pulled:
+        await tell_owner(runtime.bus, RESTART_TITLE, "Tonight's fixes are merged, but your checkout of Dot is not on "
+                         "main, so it was not pulled: Dot runs the code it ran.", _PAGE)  # fmt: skip
+        return
+    await restart()
+
+
+async def _repair_problems(
+    runtime: Runtime,
+    night: Night,
+    config: RepairConfig,
+    kept: tuple[RepairSession, ...],
+    done: list[RepairSession],
+    look: Callable[[Problem, RepairSession], Awaitable[bool]],
+    deadline: float,
+    clock: Clock,
+    sleep: Sleep,
+) -> None:
+    """The night's sessions, one problem each, while the day's sessions, the night's time and the plan's window last;
+    each kept in ``done``. The book is read before each, as a second look (``look``) may have written it."""
+    store = runtime.store
     while deadline - clock() >= SESSION_LEAST_S:
+        book: Book = read_book(await store.kv_get(BOOK_KEY))
         # The account is read again before each session: a switcher may have signed another one in (item 921).
         account: ClaudeAccount | None = await asyncio.to_thread(read_account, claude_state(night.env))
         if account is None:
@@ -1228,16 +1264,8 @@ async def repair_night(
             break
         if session.end in ("main_moved", "out_of_time"):
             break
-        if session.end in ("merged", "merged_unpulled"):
-            # A merge ends the night. When it was pulled, the owner's checkout holds new code now: Dot restarts once
-            # idle, rather than going on in a process whose modules on disk have changed (and keeping the restart
-            # waiting past its bound). The next night takes the next problem.
-            if session.end == "merged":
-                await restart()
-            break
         if session.end == "limited" and not await _switched(night, account, sleep):
             break
-    return tuple(done)
 
 
 def _kept_window(raw: str | None) -> KeptWindow | None:
