@@ -349,8 +349,11 @@ async def test_a_yolo_run_fills_the_login_and_no_result_shows_a_value(runtime: R
     # Another page of the same tab: still no script, since going back could bring the filled page back whole.
     with pytest.raises(BrowserError, match="scripts stay off"):
         await _call(ctx, gate, "browser_eval", {"script": "location.href"})
-    # Closed, the tab holds them no more: the new one runs scripts again.
+    # A new tab beside it runs none either, and the refusal names the tab to close by its number (item 1100).
     await _call(ctx, gate, "browser_new_tab", {"url": f"http://127.0.0.1:{site.port}/home"})
+    with pytest.raises(BrowserError, match=r"filled into tab 1 of .* \(browser_close_tab with index 1\)"):
+        await _call(ctx, gate, "browser_eval", {"script": "document.title"})
+    # Closed, the tab holds them no more: the new one runs scripts again.
     await _call(ctx, gate, "browser_close_tab", {"index": 1})
     read: ToolResult = await _call(ctx, gate, "browser_eval", {"script": "document.title"})
     assert "Home" in read.text, read.text

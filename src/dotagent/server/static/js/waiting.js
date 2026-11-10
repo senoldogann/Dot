@@ -10,16 +10,16 @@ import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
 import { RETURN_GRACE_MS } from "./state.js";
 
-// What a chat's page showed last in its bar and its composer: `{ runId, title, sub, placeholder }`.
+// What a chat's page showed last in its bar and its composer: `{ runId, name, title, sub, placeholder }`.
 const LOOK_KEY = "dot.chatLook";
 
 /** The event a page sends up once it shows what it was opened for, or why it cannot. */
 export const PAGE_READY_EVENT = "dot:page-ready";
 
-/** Remember what the page of the chat `runId` shows in its bar (its title, and the agent and the model under it) and as
- * its composer's placeholder. */
-export function keepChatLook(runId, title, sub, placeholder) {
-  const look = JSON.stringify({ runId, title, sub, placeholder });
+/** Remember what the page of the chat `runId` shows in its bar (whom it is with, item 1101) and as its composer's
+ * placeholder, and its title with the agent and the model, which the curtain keeps in its hidden heading. */
+export function keepChatLook(runId, name, title, sub, placeholder) {
+  const look = JSON.stringify({ runId, name, title, sub, placeholder });
   if (readPref(LOOK_KEY) !== look) {
     writePref(LOOK_KEY, look);
   }
@@ -37,6 +37,7 @@ function chatLook(runId) {
     look !== null &&
     typeof look === "object" &&
     look.runId === runId &&
+    typeof look.name === "string" &&
     typeof look.title === "string" &&
     typeof look.sub === "string" &&
     typeof look.placeholder === "string";
@@ -61,6 +62,7 @@ function chatPage(look, frame, note) {
           "div",
           { class: "stage-title" },
           el("span", { class: "avatar" }),
+          el("span", { class: "stage-name" }, look.name),
           el("span", { class: "stage-heading" }, el("span", { class: "stage-heading-title" }, look.title), el("span", { class: "stage-heading-sub" }, look.sub)),
         ),
       ),

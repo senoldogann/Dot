@@ -242,8 +242,8 @@ an agent a run of Dot's made, which the line marks "made by Dot". An agent you m
 later messages are told no team.
 
 The chat wears the team: the sidebar's row shows the faces of two of its agents and the team's name ahead of its last
-words while the chat's latest run is Dot's, which leads the team, and the bar of a run of Dot's there (a phone's, under
-the chat's title) the name and the same faces; an agent you put in the chat answers as itself, its run's bar and, while
+words while the chat's latest run is Dot's, which leads the team, and the bar of a run of Dot's there (a phone's in its
+middle, on glass, item 1101) the name and the same faces; an agent you put in the chat answers as itself, its run's bar and, while
 its run is the latest, the row wearing its face. The Task tab's Details name the team, a link to its page. The API: `GET
 /api/teams` (each team with its agents as they are now and its
 newest chat), `GET /api/teams/{id}` (with its chats), `POST /api/teams` (201; `name`, `purpose` and `agents`, the ids of
@@ -553,6 +553,8 @@ the campaign's own check takes its place, so starting one with goal mode on is r
 off is not resumed as a run: the next session starts once the daemon is back (after `campaign_gap_minutes` when the
 daemon died while it worked, so that a session that brings it down does not run again and again), and its brief says the
 last one was cut off. A session whose `dotx` command died (the first one, from `dotx run --standing`) is closed by the
-daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. The threads of the sessions
+daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. A session whose end could not
+plan the next leaves the campaign planned again by the scheduler 10 minutes after it ended, `campaign_gap_minutes`
+later (item 1104). The threads of the sessions
 after the first are not in the chat list; the campaign's page links them. What you write in the campaign's conversation,
 and your answers to their questions, are instructions of the sessions after it.

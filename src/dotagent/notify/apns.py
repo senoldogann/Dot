@@ -1,5 +1,6 @@
 """Pushes to Dot's iPhone app through APNs (item 997, docs/phone.md): the alerts the web app's Web Push gives, and the
-Live Activity of a run at work on the lock screen and in the Dynamic Island.
+Live Activity of the owner's runs on the lock screen and in the Dynamic Island, which the app opens and the daemon
+updates.
 
 The daemon signs with the APNs key of ``[apns]`` (a .p8 file kept outside Dot's home, which no run reads), whose
 token it makes anew every 50 minutes (APNs refuses one older than an hour and one made too often). The key is read
@@ -43,14 +44,19 @@ TOKEN_EVERY_S: float = 50 * 60.0
 APPROVAL_CATEGORY: str = "DOT_APPROVAL"
 # What an alert says under its title: nothing of what happened, which Apple would read.
 ALERT_BODY: str = "Open Dot to see it."
-# What the banner of a Live Activity's start says: the chat's title is in the activity alone.
-LIVE_START_BODY: str = "A task started"
 # How much of a chat's title a Live Activity shows.
 TITLE_CHARS: int = 40
 # How long a Live Activity of a run whose end never came stays before iOS marks it stale.
 STALE_AFTER_S: float = 4 * 3600.0
-# How long a run's ended Live Activity stays on the lock screen.
+# How long a run that ended stays a row of the Live Activity (item 1093), and how long the activity of runs that all
+# ended stays on the lock screen.
 DISMISS_AFTER_S: float = 15 * 60.0
+# The one Live Activity of a phone (item 1093): every run of the owner's a row of it. The key its token
+# is kept under (``live_activities.run_id``) and the id in its attributes.
+FLEET_ID: str = "fleet"
+# The rows the activity shows at most: the runs at work first, then those that ended last. A lock screen holds about so
+# many lines.
+FLEET_ROWS: int = 4
 # What APNs answers about a token that is no use any more: the app was removed, or the token is of another topic or
 # environment. The device is forgotten.
 _GONE_REASONS: frozenset[str] = frozenset({"BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic"})
@@ -65,13 +71,23 @@ type PushPriority = Literal["10", "5"]
 
 
 class LiveState(FrozenModel):
-    """What a Live Activity of a run shows, as the app's ``DotRunAttributes.ContentState`` reads it."""
+    """One run as a row of the Live Activity, as the app's ``DotFleetAttributes.Row`` reads it."""
 
+    runId: str
     title: str
+    agent: str
     status: LiveStatus
     kind: LiveKind
     line: str
     startedAt: float
+
+
+class FleetState(FrozenModel):
+    """What the Live Activity shows (item 1093), as the app's ``DotFleetAttributes.ContentState`` reads it: how many
+    runs are at work (working or waiting for the owner) and the rows, at most :data:`FLEET_ROWS`."""
+
+    active: int
+    rows: tuple[LiveState, ...]
 
 
 class ApnsReply(FrozenModel):
@@ -123,23 +139,8 @@ def approval_payload(title: str, route: str, approval_id: str) -> JsonObject:
     }
 
 
-def live_start_payload(run_id: str, agent_name: str, state: LiveState, now: float) -> JsonObject:
-    """The push that starts a run's Live Activity (push-to-start), with the alert iOS needs to show it."""
-    return {
-        "aps": {
-            "timestamp": int(now),
-            "event": "start",
-            "content-state": state.model_dump(),
-            "attributes-type": "DotRunAttributes",
-            "attributes": {"runId": run_id, "agentName": agent_name},
-            "alert": {"title": agent_name, "body": LIVE_START_BODY},
-            "stale-date": int(now + STALE_AFTER_S),
-        }
-    }
-
-
-def live_update_payload(state: LiveState, now: float) -> JsonObject:
-    """The push that changes a run's Live Activity."""
+def live_update_payload(state: FleetState, now: float) -> JsonObject:
+    """The push that changes the Live Activity."""
     return {
         "aps": {
             "timestamp": int(now),
@@ -150,14 +151,14 @@ def live_update_payload(state: LiveState, now: float) -> JsonObject:
     }
 
 
-def live_end_payload(state: LiveState, now: float) -> JsonObject:
-    """The push that ends a run's Live Activity, which stays on the lock screen :data:`DISMISS_AFTER_S` more."""
+def live_end_payload(state: FleetState, now: float) -> JsonObject:
+    """The push that ends the Live Activity once no run is left to show: it goes from the lock screen at once."""
     return {
         "aps": {
             "timestamp": int(now),
             "event": "end",
             "content-state": state.model_dump(),
-            "dismissal-date": int(now + DISMISS_AFTER_S),
+            "dismissal-date": int(now),
         }
     }
 

@@ -180,7 +180,9 @@ class Scheduler:
 
     async def start(self) -> asyncio.Task[None]:
         """Begin ticking in the background; what an earlier process left unfinished (a schedule starting or running a
-        run, whose watch went with that process) is marked as interrupted and logged.
+        run, whose watch went with that process) is marked as interrupted and logged. A run that was under way counts
+        as a failure in the schedule's row (item 1105): a schedule whose run brings the daemon down is switched off as
+        one whose runs fail is.
 
         Returns the task of the loop, so the caller can notice when it ends.
         """
@@ -189,7 +191,12 @@ class Scheduler:
         store: Store = self._runtime.store
         for record in await store.list_schedules():
             if record.last_status in _UNFINISHED:
-                await store.set_schedule_status(record.id, "interrupted")
+                if record.last_status == "running":
+                    failed_in_row: int | None = await store.record_schedule_outcome(record.id, "interrupted")
+                    if failed_in_row is not None:
+                        await self._stop_if_failing(record.id, failed_in_row)
+                else:
+                    await store.set_schedule_status(record.id, "interrupted")
                 log.warning("schedule_interrupted", schedule_id=record.id, status=record.last_status)
                 if record.last_status == "starting" and record.cron is None and record.last_run_at is not None:
                     await self._due_again_unless_started(record, record.last_run_at)
@@ -310,8 +317,9 @@ class Scheduler:
             await self._fire_alone(record, now)
 
     async def _start_due_sessions(self, now: float) -> None:
-        """Start the next session of every active campaign that is due at ``now``, while the emergency stop is not
-        engaged."""
+        """Plan again the campaigns a failed end left without a next session (item 1104), and start the next session of
+        every active campaign that is due at ``now``, while the emergency stop is not engaged."""
+        await self._manager.replan_stalled_campaigns(now)
         for campaign in await self._runtime.store.due_campaigns(now):
             if await _emergency_stop_engaged():
                 break

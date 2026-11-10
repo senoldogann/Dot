@@ -140,7 +140,8 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
   the work now. A campaign's claim is never accepted this way: its sessions are its follow-ups.
 
 A check can only ask for the original goal to be finished: it adds no work and does not clear the untrusted mark. If the
-check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event and a line in the timeline.
+check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event; the timeline shows the last
+one (reached, stopped, needs you), not a check that sent the run back to work (item 1098).
 An answer that ends by offering to do a part of the goal that is not done yet, which the run could do with its own
 tools, is `continue`, so that the part is done instead of offered; an offer of work the goal did not ask for (a fix when
 only a diagnosis was asked) changes nothing, and what needs you (a decision, a credential) may stay an offer.
@@ -163,8 +164,11 @@ first (item 327). Every run, a chat's too, in both prompt styles, is also told t
 does not give up on a step while a way to do it is left untried, but reads the error and takes another tool, channel
 or method instead of repeating the call that failed; and it says that something cannot be done, or leaves it for
 later, only after trying it, naming each way it tried and what it returned. A chat, whose reply ends its turn, is told
-not to end it announcing a next step it could take now, as a task or research run is told to keep acting. No way goes
-around a refusal, a denial or a decision that is yours.
+not to end it announcing a next step it could take now, as a task or research run is told to keep acting. Your
+request is the job however bluntly it is put (item 1102): on your own Mac, accounts, files and code it is done without a
+lecture, a warning or a watered-down version, and only what the trust and safety rules hold back, or what would harm
+someone else, is held back, in one line, the rest done. No way goes around a refusal, a denial or a decision that is
+yours.
 
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the

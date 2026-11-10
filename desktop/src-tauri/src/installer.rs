@@ -25,6 +25,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Read, Write};
+use std::ops::{Deref, DerefMut};
 use std::os::fd::AsRawFd;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
@@ -32,7 +33,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -1151,6 +1152,33 @@ fn shown(line: &str) -> String {
 
 /// Run `plan` in `cwd`: the key on its standard input, its output masked and written to the log and handed to `seen`
 /// line by line, and the program ended when it runs past its limit or `cancel` is set.
+/// A step's program, ended with the step when the step panics (the security review of item 1106): a panic let go of
+/// the install, and a retry would have run the same step beside the program still at work.
+struct EndsOnPanic(Child);
+
+impl Deref for EndsOnPanic {
+    type Target = Child;
+
+    fn deref(&self) -> &Child {
+        &self.0
+    }
+}
+
+impl DerefMut for EndsOnPanic {
+    fn deref_mut(&mut self) -> &mut Child {
+        &mut self.0
+    }
+}
+
+impl Drop for EndsOnPanic {
+    fn drop(&mut self) {
+        if thread::panicking() {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+}
+
 fn run(plan: &Plan, cwd: &Path, log: &Log, cancel: &AtomicBool, mut seen: impl FnMut(&str)) -> Ran {
     let secrets: Vec<&str> = plan.stdin.iter().map(Secret::expose).collect();
     let mut lines = Vec::new();
@@ -1168,8 +1196,8 @@ fn run(plan: &Plan, cwd: &Path, log: &Log, cancel: &AtomicBool, mut seen: impl F
         .stderr(Stdio::piped());
     command.env_clear();
     command.envs(plan.environment(std::env::vars_os()));
-    let mut child: Child = match command.spawn() {
-        Ok(child) => child,
+    let mut child = match command.spawn() {
+        Ok(child) => EndsOnPanic(child),
         Err(error) => {
             let words = mask(&error.to_string(), &secrets);
             log.line(&format!(
@@ -1341,12 +1369,9 @@ struct Shared {
 
 impl Shared {
     fn with<T>(&self, change: impl FnOnce(&mut Inner) -> T) -> T {
-        change(
-            &mut self
-                .inner
-                .lock()
-                .expect("nothing panics while it holds the install's state"),
-        )
+        // A worker that panicked while it held the state left it as it was (`WorkerEnd` says so on it): the page still
+        // reads it, and the person may try again.
+        change(&mut self.inner.lock().unwrap_or_else(PoisonError::into_inner))
     }
 }
 
@@ -1645,6 +1670,47 @@ fn run_steps(
     log.line("install of Dot is done");
 }
 
+/// Ends the worker's hold on the install however the worker ends (item 1106): a step that panicked left `running` set
+/// and the phase `Running`, so the page polled a spinner for ever and every retry was refused as "running already".
+/// A panic fails the step at work, as a refusal of it would, and lets the person try again.
+struct WorkerEnd<'a>(&'a Shared);
+
+impl Drop for WorkerEnd<'_> {
+    fn drop(&mut self) {
+        if thread::panicking() {
+            // The panic may have come while the state was held: what it holds is still the install's state.
+            let mut inner = self.0.inner.lock().unwrap_or_else(PoisonError::into_inner);
+            if inner.phase == Phase::Running {
+                // The step at work, else (a panic between steps) the first not done, which a retry runs anyway: a
+                // step done is never undone, and with every step done the failure names the last.
+                let failed = inner
+                    .states
+                    .iter()
+                    .position(|state| *state == StepState::Running)
+                    .or_else(|| {
+                        inner
+                            .states
+                            .iter()
+                            .position(|state| *state != StepState::Done)
+                    });
+                if let Some(step) = failed {
+                    inner.states[step] = StepState::Failed;
+                }
+                let step = failed.unwrap_or(DAEMON_STEP);
+                inner.phase = Phase::Failed;
+                inner.failure = Some(Failure {
+                    step: STEPS[step].0,
+                    title: STEPS[step].1,
+                    message: format!("The install stopped at \"{}\": the installer met an error of its own.", STEPS[step].1),
+                    output: Vec::new(),
+                    fix: "Try again. If it stops here again, send Dot's install log from this window.".to_string(),
+                });
+            }
+        }
+        self.0.running.store(false, Ordering::SeqCst);
+    }
+}
+
 fn fail(shared: &Shared, log: &Log, step: usize, stop: Stop) {
     log.line(&format!("stopped at {}: {}", STEPS[step].0, stop.message));
     shared.with(|inner| {
@@ -1810,11 +1876,11 @@ impl Installer {
         let spawned = thread::Builder::new()
             .name("dot-installer".to_string())
             .spawn(move || {
+                let _end = WorkerEnd(&shared);
                 let log = Log::open(&ctx.log_dir);
                 let refusal = || foreign(&ctx.found());
                 let answered = || (ctx.answers)(&ctx.home);
                 run_steps(&ctx, &shared, &log, &refusal, &answered);
-                shared.running.store(false, Ordering::SeqCst);
             });
         if let Err(error) = spawned {
             self.shared.running.store(false, Ordering::SeqCst);

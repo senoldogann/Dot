@@ -211,8 +211,86 @@
   padding-top: 0;
 }
 
+/* What a call is about makes the words long (item 1091): one line, cut at its end, as a phone is narrow. */
+.work-status-words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* While the run waits for its model, the model is typing (item 1091, the owner's ask): three dots that rise in turn in
+   the face's place, and no dots after the words (item 971). */
+.typing-dots {
+  display: none;
+}
+
+.work-status[data-state="working"][data-kind="typing"] > .turn-face {
+  display: none;
+}
+
+.work-status[data-state="working"][data-kind="typing"] > .typing-dots {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 28px;
+  height: 28px;
+}
+
+.typing-dots > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typing-rise var(--motion-pulse) ease-in-out infinite;
+  animation-play-state: var(--endless);
+}
+
+.typing-dots > span:nth-child(2) {
+  animation-delay: calc(var(--motion-pulse) / 8);
+}
+
+.typing-dots > span:nth-child(3) {
+  animation-delay: calc(var(--motion-pulse) / 4);
+}
+
+@keyframes typing-rise {
+  0%,
+  60%,
+  100% {
+    opacity: 0.45;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* A step whose model has sent only spaces so far holds its caret alone (item 1091): it shows once it has words, and
+   the line under the conversation says the model types until then. */
+.bubble.say.live[data-blank] {
+  display: none;
+}
+
+/* On a phone what Dot says sits in a soft bubble, as a messaging app's (item 1091, the owner's ask): each line along
+   the way its own, and the answer; on a Mac's wide window they stay plain text beside the face (item 854). */
+@media (max-width: 720px) {
+  .run-thread :is(.answer, .bubble.say) > .prose {
+    width: fit-content;
+    max-width: 100%;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-bubble);
+    background: var(--msg-agent);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .work-status-words {
+  .work-status-words,
+  .typing-dots > span {
     animation: none;
   }
 

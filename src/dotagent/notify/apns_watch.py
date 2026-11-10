@@ -1,25 +1,33 @@
 """What Dot's iPhone app hears of the daemon (item 997): the events the web app's Web Push tells as alerts, and the
-Live Activity of each run of the owner's, from its start to its end.
+one Live Activity of the phone, a row for each run of the owner's (item 1093).
 
-A run of the owner's (no run delegated it, and no schedule, watcher, own initiative or reply started it) starts a Live
-Activity on every phone whose app gave a push-to-start token; the app sends back the token of the activity, which the
-updates and the end go to. The activity says the run works, waits for the owner (an approval or a question asks), works
-again once answered, and ends done, failed or stopped. While it works it says what it does now (item 1004: thinking,
-browsing the web, running a command; :mod:`dotagent.notify.live_now`), at most once every
-:data:`PROGRESS_EVERY_S` per run, the latest step kept for the next push rather than each one sent: the steps come
-faster than Apple lets a Live Activity change, and a run that waits or ends is told at once."""
+A run of the owner's (no run delegated it, and no schedule, watcher, own initiative or reply started it) is a row of
+the activity from its start: it works, waits for the owner (an approval asks), works again once answered, and ends
+done, failed or stopped; an ended row stays :data:`DISMISS_AFTER_S`. The activity shows the runs at work first, then
+those that ended last, at most :data:`FLEET_ROWS`, and how many are at work. The app opens it itself when the owner
+starts a run on the phone, which brings no notification (item 1096: a push-to-start must carry one, and the owner wants
+none at a start); it sends back the activity's token, and every change after goes to that token; once no row is left
+the activity ends and goes. A run started on the Mac opens none. While a run works its row says what it does now
+(item 1004: thinking, browsing the web, running a command; :mod:`dotagent.notify.live_now`), the activity changed for
+that at most once every :data:`PROGRESS_EVERY_S`, the latest step kept rather than each one sent: the steps come faster
+than Apple lets a Live Activity change, and a run that starts, waits or ends is told at once."""
 
 import asyncio
 import time
+from collections.abc import Mapping
 
-from dotagent.core.errors import DotError
+from dotagent.core.errors import DotError, NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.events import SYSTEM_RUN_ID, Subscription
 from dotagent.notify.apns import (
+    DISMISS_AFTER_S,
+    FLEET_ID,
+    FLEET_ROWS,
     ApnsReply,
     ApnsSender,
+    FleetState,
     LiveState,
     LiveStatus,
     PushPriority,
@@ -27,7 +35,6 @@ from dotagent.notify.apns import (
     approval_payload,
     gone,
     live_end_payload,
-    live_start_payload,
     live_update_payload,
     short_title,
 )
@@ -36,13 +43,12 @@ from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.notify.push import PUSH_KINDS, PushMessage, notice_message, push_message
 from dotagent.proactive import UNWATCHED_SOURCES
 from dotagent.store.db import Store
-from dotagent.store.models import WORKING_STATUSES, ApnsDevice, EventRecord, RunRecord
+from dotagent.store.models import WORKING_STATUSES, ApnsDevice, EventRecord, LiveActivity, RunRecord
 
 log = get_logger(__name__)
 
-# The app gave the token of a run's Live Activity (``POST /api/phone/apns/activity``), a live event of Dot's own whose
-# ``run_id`` names the run: a run that ended before it came has its activity ended at once, or it would stand at
-# "Working" until it went stale.
+# The app gave the token of the Live Activity (``POST /api/phone/apns/activity``), a live event of Dot's own: the
+# activity is told the rows as they stand now, which changed while the token was on its way.
 LIVE_REGISTERED_EVENT: str = "live_activity_registered"
 # What the app hears: the alerts of Web Push, a run's start, an answer that lets a waiting run work again, and a Live
 # Activity's token.
@@ -68,6 +74,14 @@ _WAIT_S: float = 1.0
 # and a handoff (the owner's hands on the Mac).
 _ANSWERABLE: frozenset[str] = frozenset({"low", "medium"})
 _DOT: str = "Dot"
+# How long iOS keeps a Live Activity at work (eight hours, then it ends it): a token older than that is of an activity
+# that is no more, and the app opens a new one at the next run it starts.
+ACTIVITY_LIFE_S: float = 8 * 3600.0
+# How long an activity the app opened waits for a row (item 1096): its token may come before the run's start, and a
+# request that started no run after all (a message queued behind a held queue) opened it for nothing, which then ends.
+OPEN_WAIT_S: float = 60.0
+# How often the rows at work are read against their runs, which may have ended where the feed did not tell (item 1108).
+CHECK_EVERY_S: float = 60.0
 # The title of an alert of a message Dot wrote to the owner.
 TOLD_TITLE: str = "Dot has a message for you"
 
@@ -86,16 +100,35 @@ def follows_live(run: RunRecord) -> bool:
     return run.parent_run_id is None and run.source not in UNWATCHED_SOURCES and run.source != EVAL_SOURCE
 
 
-def live_state(title: str, status: LiveStatus, now: LiveNow, run: RunRecord) -> LiveState:
-    return LiveState(title=short_title(title), status=status, kind=now.kind, line=now.line, startedAt=run.created_at)
+def live_state(run: RunRecord, title: str, agent: str, status: LiveStatus, now: LiveNow) -> LiveState:
+    return LiveState(
+        runId=run.id,
+        title=short_title(title),
+        agent=agent,
+        status=status,
+        kind=now.kind,
+        line=now.line,
+        startedAt=run.created_at,
+    )
 
 
-class _Shown(FrozenModel):
-    """What a run's Live Activity was last told it does, and when; and the step that came since and waits its turn."""
+class _Row(FrozenModel):
+    """A run as the activity shows it, and when it ended (``None`` while it is at work)."""
 
-    now: LiveNow
-    at: float
-    next: LiveNow | None
+    state: LiveState
+    ended_at: float | None
+
+
+def fleet_state(rows: Mapping[str, _Row]) -> FleetState:
+    """The activity's state of ``rows``: the runs at work, the newest first, then those that ended, the last to end
+    first, at most :data:`FLEET_ROWS`."""
+    working: list[_Row] = sorted(
+        (row for row in rows.values() if row.ended_at is None), key=lambda row: -row.state.startedAt
+    )
+    ended: list[_Row] = sorted(
+        (row for row in rows.values() if row.ended_at is not None), key=lambda row: -(row.ended_at or 0.0)
+    )
+    return FleetState(active=len(working), rows=tuple(row.state for row in [*working, *ended][:FLEET_ROWS]))
 
 
 def apns_message(event: EventRecord, message: PushMessage) -> PushMessage:
@@ -111,9 +144,15 @@ class ApnsWatch:
     def __init__(self, store: Store, sender: ApnsSender) -> None:
         self._store: Store = store
         self._sender: ApnsSender = sender
-        # The runs at work that have a Live Activity, by id, and what each was last told (item 1004): read once per
-        # run, as the steps come many a second.
-        self._live: dict[str, _Shown] = {}
+        # The runs the activity shows, by id (item 1093).
+        self._rows: dict[str, _Row] = {}
+        # When the activity was last told, and whether a step came since that waits its turn (item 1004).
+        self._told_at: float = 0.0
+        self._due: bool = False
+        # When the oldest activity kept with no row to show was registered, while one is (item 1096).
+        self._empty_at: float | None = None
+        # When the rows at work were last read against their runs (item 1108).
+        self._checked_at: float = 0.0
         self._others: set[str] = set()
 
     async def _forget_if_gone(self, device: ApnsDevice, reply: ApnsReply) -> None:
@@ -144,53 +183,57 @@ class ApnsWatch:
         agent: str = _DOT if run.agent_id is None else (await self._store.get_agent(run.agent_id)).name
         return title, agent
 
-    async def start(self, run: RunRecord, now: float) -> None:
-        title, agent = await self._title_and_agent(run)
-        payload = live_start_payload(run.id, agent, live_state(title, "working", THINKING, run), now)
-        self._live[run.id] = _Shown(now=THINKING, at=now, next=None)
-        for device in await self._store.list_apns_devices():
-            if device.start_token is None:
-                continue
-            try:
-                reply: ApnsReply = await self._sender.send(
-                    device.environment, device.start_token, "liveactivity", _AT_ONCE, payload
-                )
-            except DotError as error:
-                log.warning("apns_live_start_failed", phone=device.phone_id, error=error.message)
-                continue
-            # A start token that is gone leaves the device's alerts as they are: only the token is forgotten, until
-            # the app gives a new one.
-            if gone(reply):
-                await self._store.set_apns_device(
-                    device.phone_id, device.device_token, None, device.environment, device.updated_at
-                )
-                log.info("apns_start_token_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
+    async def _row(self, run: RunRecord, status: LiveStatus, doing: LiveNow, ended_at: float | None) -> None:
+        """Make ``run``'s row say ``status`` and ``doing``: its title and agent read once, when it is new."""
+        shown: _Row | None = self._rows.get(run.id)
+        if shown is None:
+            title, agent = await self._title_and_agent(run)
+            state: LiveState = live_state(run, title, agent, status, doing)
+        else:
+            state = shown.state.model_copy(update={"status": status, "kind": doing.kind, "line": doing.line})
+        self._rows[run.id] = _Row(state=state, ended_at=ended_at)
+        self._empty_at = None
 
-    async def _to_activities(
-        self, run: RunRecord, status: LiveStatus, doing: LiveNow, priority: PushPriority, now: float, ended: bool
-    ) -> None:
-        activities = await self._store.live_activities_of(run.id)
-        if not activities:
-            return
-        title, _ = await self._title_and_agent(run)
-        state: LiveState = live_state(title, status, doing, run)
-        payload = live_end_payload(state, now) if ended else live_update_payload(state, now)
-        devices: dict[str, ApnsDevice] = {device.phone_id: device for device in await self._store.list_apns_devices()}
-        for activity in activities:
-            device: ApnsDevice | None = devices.get(activity.phone_id)
-            if device is None:
-                continue
-            try:
-                await self._sender.send(device.environment, activity.token, "liveactivity", priority, payload)
-            except DotError as error:
-                log.warning("apns_live_update_failed", phone=device.phone_id, error=error.message)
-        if ended:
-            await self._store.delete_live_activities(run.id)
+    async def _tell(self, priority: PushPriority, now: float) -> None:
+        """Tell every phone's activity the rows as they stand: an update where the app gave the activity's token, and
+        the end once no row is left, but to one opened less than :data:`OPEN_WAIT_S` ago, which :meth:`flush` ends then
+        if no row came. A phone whose app opened none is told nothing (item 1096)."""
+        state: FleetState = fleet_state(self._rows)
+        self._told_at = now
+        self._due = False
+        activities: dict[str, LiveActivity] = {
+            activity.phone_id: activity for activity in await self._store.live_activities_of(FLEET_ID)
+        }
+        for device in await self._store.list_apns_devices():
+            activity: LiveActivity | None = activities.get(device.phone_id)
+            # Its age counts from its first token (a token that turns keeps it, ``Store.set_live_activity``): a new
+            # activity is told only once the row of the one before is gone (its end, its age, the app's forget).
+            if activity is not None and now - activity.created_at >= ACTIVITY_LIFE_S:
+                # iOS has ended it: the token goes nowhere, and the app opens a new one at the next run it starts.
+                await self._store.delete_live_activity(FLEET_ID, device.phone_id)
+                activity = None
+            if not state.rows:
+                if activity is not None and now - activity.created_at < OPEN_WAIT_S:
+                    opened: float = activity.created_at
+                    self._empty_at = opened if self._empty_at is None else min(self._empty_at, opened)
+                elif activity is not None:
+                    await self._send(device, activity.token, _AT_ONCE, live_end_payload(state, now))
+                    await self._store.delete_live_activity(FLEET_ID, device.phone_id)
+            elif activity is not None:
+                await self._send(device, activity.token, priority, live_update_payload(state, now))
+
+    async def _send(self, device: ApnsDevice, token: str, priority: PushPriority, payload: JsonObject) -> None:
+        try:
+            await self._sender.send(device.environment, token, "liveactivity", priority, payload)
+        except DotError as error:
+            log.warning("apns_live_update_failed", phone=device.phone_id, error=error.message)
 
     async def on_event(self, event: EventRecord, now: float) -> None:
-        """Send what ``event`` says: an alert as Web Push would, and the run's Live Activity's change."""
+        """Send what ``event`` says: an alert as Web Push would, and the change of the run's row."""
         if event.kind == LIVE_REGISTERED_EVENT:
-            await self.catch_up(await self._store.get_run(str(event.data.get("run_id", ""))), now)
+            # The app opens the activity as the run it starts is made, and its token may come before the run's start:
+            # an activity of no row yet waits for it (:data:`OPEN_WAIT_S`).
+            await self._tell(_AT_ONCE, now)
             return
         if event.run_id == SYSTEM_RUN_ID:
             notice: PushMessage | None = notice_message(event)
@@ -208,89 +251,128 @@ class ApnsWatch:
         elif message is not None:
             await self.alert(message)
         if not follows_live(run):
-            # Known as no Live Activity's while it works, so that its steps are passed over without a read.
+            # Known as no row's while it works, so that its steps are passed over without a read.
             if event.kind == "run_finished":
                 self._others.discard(run.id)
             else:
                 self._others.add(run.id)
             return
         if event.kind == "run_started":
-            await self.start(run, now)
+            await self._row(run, "working", THINKING, None)
+        elif event.kind in (*_WAITS, "approval_decided") and run.status not in WORKING_STATUSES:
+            # An answer to a question a run left, or to a step it held, comes after it ended: its row stays as it ended.
+            return
         elif event.kind in _WAITS:
-            self._live[run.id] = _Shown(now=WAITING, at=now, next=None)
-            await self._to_activities(run, "waiting", WAITING, _AT_ONCE, now, False)
+            await self._row(run, "waiting", WAITING, None)
         elif event.kind == "approval_decided":
-            self._live[run.id] = _Shown(now=WORKING, at=now, next=None)
-            await self._to_activities(run, "working", WORKING, _AT_ONCE, now, False)
+            await self._row(run, "working", WORKING, None)
         elif event.kind == "run_finished":
-            await self.end(run, str(event.data.get("status", run.status)), now)
+            self._others.discard(run.id)
+            ended: LiveStatus
+            last: LiveNow
+            ended, last = _ENDED.get(str(event.data.get("status", run.status)), _ENDED_ELSE)
+            await self._row(run, ended, last, now)
+        else:
+            return
+        await self._tell(_AT_ONCE, now)
 
     async def progress(self, event: EventRecord, now: float) -> None:
-        """A step of a run: what it does now (:func:`live_now`) goes to its Live Activity at once when the last push
-        is :data:`PROGRESS_EVERY_S` old, and waits for :meth:`flush` otherwise, a later step taking its place."""
+        """A step of a run: what it does now (:func:`live_now`) goes to the activity at once when its last push is
+        :data:`PROGRESS_EVERY_S` old, and waits for :meth:`flush` otherwise, a later step taking its place."""
         if event.run_id in self._others:
             return
         doing: LiveNow | None = live_now(event)
         if doing is None:
             return
-        shown: _Shown | None = self._live.get(event.run_id)
+        shown: _Row | None = self._rows.get(event.run_id)
         if shown is None:
             run: RunRecord = await self._store.get_run(event.run_id)
             if not follows_live(run):
                 self._others.add(run.id)
                 return
-            # A run the daemon was not told the start of (it started before a restart): what it does is still news.
-            shown = _Shown(now=WORKING, at=0.0, next=None)
-            self._live[run.id] = shown
-        if shown.now.kind == "waiting":
+            # A run the daemon was not told the start of (it started before a restart): it is a row from now on.
+            await self._row(run, "working", doing, None)
+        elif (
+            shown.ended_at is not None
+            or shown.state.status == "waiting"
+            or (shown.state.kind, shown.state.line) == (doing.kind, doing.line)
+        ):
+            # An ended row stays as it ended, a waiting one waits for the owner, and the same step is no news.
             return
-        if doing == shown.now:
-            self._live[event.run_id] = shown.model_copy(update={"next": None})
-            return
-        if now - shown.at < PROGRESS_EVERY_S:
-            self._live[event.run_id] = shown.model_copy(update={"next": doing})
-            return
-        await self._tell(event.run_id, doing, now)
+        else:
+            self._rows[event.run_id] = shown.model_copy(
+                update={"state": shown.state.model_copy(update={"kind": doing.kind, "line": doing.line})}
+            )
+        if now - self._told_at >= PROGRESS_EVERY_S:
+            await self._tell(_WHEN_IT_SUITS, now)
+        else:
+            self._due = True
+
+    async def settle(self, now: float) -> None:
+        """As the daemon starts: take the runs still at work as rows, so that an activity kept from before goes on
+        showing them, and end it when none is, as its rows were of the daemon before and would stand until they went
+        stale."""
+        for run in await self._store.working_runs():
+            if follows_live(run) and run.id not in self._rows:
+                status: LiveStatus = "waiting" if run.status == "blocked" else "working"
+                await self._row(run, status, WAITING if status == "waiting" else WORKING, None)
+        if await self._store.live_activities_of(FLEET_ID):
+            await self._tell(_AT_ONCE, now)
 
     async def flush(self, now: float) -> None:
-        """Send each run's step that waited its turn, once its last push is :data:`PROGRESS_EVERY_S` old."""
-        due: list[tuple[str, LiveNow]] = [
-            (run_id, shown.next)
-            for run_id, shown in self._live.items()
-            if shown.next is not None and now - shown.at >= PROGRESS_EVERY_S
+        """Take off the rows of runs that ended :data:`DISMISS_AFTER_S` ago, send the step that waited its turn once
+        the last push is :data:`PROGRESS_EVERY_S` old, and end an activity that waited :data:`OPEN_WAIT_S` for a row
+        in vain."""
+        gone_rows: list[str] = [
+            run_id
+            for run_id, row in self._rows.items()
+            if row.ended_at is not None and now - row.ended_at >= DISMISS_AFTER_S
         ]
-        for run_id, doing in due:
-            await self._tell(run_id, doing, now)
+        for run_id in gone_rows:
+            del self._rows[run_id]
+        ended_rows: bool = await self._end_rows_of_ended_runs(now)
+        waited: bool = self._empty_at is not None and now - self._empty_at >= OPEN_WAIT_S
+        if waited:
+            self._empty_at = None
+        if gone_rows or waited or (self._due and now - self._told_at >= PROGRESS_EVERY_S):
+            await self._tell(_WHEN_IT_SUITS, now)
+        elif ended_rows:
+            await self._tell(_AT_ONCE, now)
 
-    async def _tell(self, run_id: str, doing: LiveNow, now: float) -> None:
-        self._live[run_id] = _Shown(now=doing, at=now, next=None)
-        await self._to_activities(await self._store.get_run(run_id), "working", doing, _WHEN_IT_SUITS, now, False)
-
-    async def catch_up(self, run: RunRecord, now: float) -> None:
-        """Bring the Live Activities of ``run`` to where it stands now: whatever happened before the app's token came
-        (an approval asked, the end) went to no activity, so the one just registered is told the run's state."""
-        if run.status == "blocked":
-            await self._to_activities(run, "waiting", WAITING, _AT_ONCE, now, False)
-        elif run.status not in WORKING_STATUSES:
-            await self.end(run, run.status, now)
-        else:
-            shown: _Shown | None = self._live.get(run.id)
-            doing: LiveNow = THINKING if shown is None else (shown.next or shown.now)
-            await self._to_activities(run, "working", doing, _AT_ONCE, now, False)
-
-    async def end(self, run: RunRecord, status: str, now: float) -> None:
-        """End the Live Activities of ``run``, which ended with ``status``, and forget them."""
-        self._live.pop(run.id, None)
-        self._others.discard(run.id)
-        ended: LiveStatus
-        last: LiveNow
-        ended, last = _ENDED.get(status, _ENDED_ELSE)
-        await self._to_activities(run, ended, last, _AT_ONCE, now, True)
+    async def _end_rows_of_ended_runs(self, now: float) -> bool:
+        """Every :data:`CHECK_EVERY_S`, end the rows still at work whose run has ended or is gone (item 1108): a run
+        closed by the store alone (the daemon's start, a command's process found gone) or whose end the feed dropped
+        stood "Working" until the daemon started again. Whether a row changed."""
+        if now - self._checked_at < CHECK_EVERY_S:
+            return False
+        self._checked_at = now
+        changed: bool = False
+        for run_id, row in list(self._rows.items()):
+            if row.ended_at is not None:
+                continue
+            try:
+                run: RunRecord = await self._store.get_run(run_id)
+            except NotFoundError:
+                del self._rows[run_id]
+                changed = True
+                continue
+            if run.status in WORKING_STATUSES:
+                continue
+            ended, last = _ENDED.get(run.status, _ENDED_ELSE)
+            await self._row(run, ended, last, run.finished_at or now)
+            self._others.discard(run_id)
+            log.info("apns_row_ended_late", run_id=run_id, status=run.status)
+            changed = True
+        return changed
 
 
 async def watch_apns(watch: ApnsWatch, feed: Subscription, stopping: asyncio.Event) -> None:
     """Send the app what the events of ``feed`` (:data:`APNS_KINDS`) say, until the daemon starts to stop; an event
     that cannot be sent is logged and the next one still goes."""
+    try:
+        await watch.settle(time.time())
+    except DotError as error:
+        log.warning("apns_settle_failed", error=error.message)
     while not stopping.is_set():
         event: EventRecord | None
         try:

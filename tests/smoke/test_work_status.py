@@ -37,8 +37,8 @@ _TURNS: tuple[ScriptedTurn, ...] = (
     ScriptedTurn(text="Listing it now.", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 6"}),)),
     ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
 )
-# The words the line has for a command, whichever of them stands at the moment it is read.
-_COMMAND_WORDS: str = r"^(Running a command|Working in the terminal)…$"
+# The words the line has for the command, with the command it runs (item 1091).
+_COMMAND_WORDS: str = r"^Running sleep 6…$"
 
 
 @pytest.fixture
@@ -128,6 +128,8 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 words = line.locator(".work-status-words")
                 await expect(line).to_have_attribute("data-state", "working")
                 await expect(words).to_have_text(re.compile(_COMMAND_WORDS))
+                # Not the model typing while the command runs: the face, not the three dots (item 1091).
+                await expect(line.locator(".typing-dots")).to_be_hidden()
                 # The agent typing (item 843): its face first, in the answer's face's place, the words where the words
                 # of the messages start, 28 px of face and a gap of 8 on.
                 await expect(line.locator(".turn-face .avatar")).to_have_count(1)
@@ -197,6 +199,21 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 # out of the conversation as wide.
                 phone: Page = await _open(browser, port, address, run.id, "status", 390)
                 await expect(phone.locator(".answer-steps")).to_have_text("Show the steps")
+                # On a phone what Dot says sits in a bubble, the answer and the line along the way; on a Mac's width
+                # it is plain text (item 1091; item 854).
+                fills: list[str] = await phone.locator(".run-thread :is(.answer, .bubble.say) > .prose").evaluate_all(
+                    "nodes => nodes.map((node) => getComputedStyle(node).backgroundColor)"
+                )
+                assert len(fills) == 2 and all(fill != "rgba(0, 0, 0, 0)" for fill in fills), fills
+                # A step whose model has sent only spaces holds no empty bubble: timeline.js marks it blank, and the
+                # rule that hides it is one the browser keeps (a `:has()` inside a `:has()` was dropped whole).
+                blank: str = await phone.locator(".run-thread").first.evaluate(
+                    "thread => { const node = document.createElement('div');"
+                    " node.className = 'bubble say live'; node.toggleAttribute('data-blank', true);"
+                    " node.append(Object.assign(document.createElement('div'), { className: 'prose stream' }));"
+                    " thread.append(node); const shown = getComputedStyle(node).display; node.remove(); return shown; }"
+                )
+                assert blank == "none", blank
                 await expect(phone.locator(".work-status")).to_be_hidden()
                 await expect(phone.locator("details.steps")).to_be_hidden()
                 await phone.screenshot(path=str(tmp_path / "phone.png"))

@@ -112,6 +112,7 @@ from dotagent.store.models import (
     UnattendedRun,
     VaultRecord,
     WorkingRun,
+    WorkingStatus,
     WorkOrderRecord,
     WorkOrderStatus,
 )
@@ -2971,9 +2972,10 @@ class Store:
         return cursor.rowcount > 0
 
     @_writing
-    async def set_run_status(self, run_id: str, status: RunStatus) -> bool:
+    async def set_run_status(self, run_id: str, status: WorkingStatus) -> bool:
         """Move a run that has not ended between its working states (queued, running, blocked on an approval); whether
-        it moved. A run that ended keeps its end (item 1045): an approval answered as the run was cancelled, or a start
+        it moved. An end is no working state, so it cannot be written here, without its time and its event (item
+        1103). A run that ended keeps its end (item 1045): an approval answered as the run was cancelled, or a start
         that comes after a close, never makes it look at work again."""
         cursor = await self._db.execute(
             f"UPDATE runs SET status = ? WHERE id = ? AND status IN ({_WORKING_SQL})", (status, run_id)
@@ -3039,6 +3041,11 @@ class Store:
         if row is None:
             raise NotFoundError("run not found", {"run_id": run_id})
         return _run(row)
+
+    async def working_runs(self) -> list[RunRecord]:
+        """The runs at work (:data:`WORKING_STATUSES`), the oldest first."""
+        rows = await self._all(f"SELECT * FROM runs WHERE status IN ({_WORKING_SQL}) ORDER BY created_at", ())
+        return [_run(row) for row in rows]
 
     async def list_runs(self, limit: int, thread_id: str | None) -> list[RunRecord]:
         """The latest ``limit`` runs, of the chat ``thread_id`` when it is given, newest first; the runs a rewind
@@ -5179,7 +5186,7 @@ class Store:
 
     @_writing
     async def set_live_activity(self, run_id: str, phone_id: str, token: str, now: float) -> LiveActivity:
-        """Keep the token of the Live Activity of the run ``run_id`` on the phone ``phone_id``."""
+        """Keep the token of the Live Activity ``run_id`` (``fleet`` since item 1093) on the phone ``phone_id``."""
         await self._db.execute(
             "INSERT INTO live_activities (run_id, phone_id, token, created_at) VALUES (?, ?, ?, ?)"
             " ON CONFLICT(run_id, phone_id) DO UPDATE SET token = excluded.token",
@@ -5193,9 +5200,30 @@ class Store:
         return [LiveActivity.model_validate(dict(row)) for row in rows]
 
     @_writing
-    async def delete_live_activities(self, run_id: str) -> None:
-        """Forget the Live Activities of the run ``run_id``, which ended."""
-        await self._db.execute("DELETE FROM live_activities WHERE run_id = ?", (run_id,))
+    async def delete_live_activity(self, run_id: str, phone_id: str) -> bool:
+        """Forget the token of the Live Activity ``run_id`` (:data:`dotagent.notify.apns.FLEET_ID`) on the phone
+        ``phone_id``: it ended, or it is gone. Whether one was kept."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "DELETE FROM live_activities WHERE run_id = ? AND phone_id = ?", (run_id, phone_id)
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
+    async def delete_live_activity_token(self, run_id: str, phone_id: str, token: str) -> bool:
+        """Forget the token of the Live Activity ``run_id`` on the phone ``phone_id`` when it is still ``token``: the
+        end of an activity that ended does not take the token of the one that came after it. Whether it was."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "DELETE FROM live_activities WHERE run_id = ? AND phone_id = ? AND token = ?", (run_id, phone_id, token)
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
+    async def delete_live_activities_but(self, run_id: str, phone_id: str) -> None:
+        """Forget the tokens of the phone ``phone_id``'s Live Activities other than ``run_id``: those of one run each,
+        from an app before item 1093."""
+        await self._db.execute("DELETE FROM live_activities WHERE run_id != ? AND phone_id = ?", (run_id, phone_id))
         await self._db.commit()
 
     # ----- memories --------------------------------------------------------------------------
@@ -6254,11 +6282,16 @@ class Store:
     @_writing
     async def record_schedule_outcome(self, schedule_id: str, status: str) -> int | None:
         """How a run of the schedule ``schedule_id`` ended, as its last status, and its row of failed runs with it
-        (item 458): ``done`` sets it to 0, ``failed`` adds one, anything else (``cancelled``) leaves it. The row after
-        the write; ``None`` when the schedule was deleted meanwhile."""
+        (item 458): ``done`` sets it to 0, ``failed`` adds one, and so does ``interrupted``, a run the daemon's stop
+        cut off (item 1105: a run that took the daemon down was never counted); anything else (``cancelled``) leaves
+        it. A schedule switched off for its failures keeps saying so: an end that comes after (a run by hand, a watch
+        late) does not write over it (item 1105). The row after the write; ``None`` when the schedule was deleted
+        meanwhile."""
         row = await self._one(
-            "UPDATE schedules SET last_status = ?, runs_failed_in_row = CASE ? WHEN 'done' THEN 0"
-            " WHEN 'failed' THEN runs_failed_in_row + 1 ELSE runs_failed_in_row END WHERE id = ?"
+            "UPDATE schedules SET"
+            " last_status = CASE WHEN last_status LIKE 'switched off:%' THEN last_status ELSE ? END,"
+            " runs_failed_in_row = CASE ? WHEN 'done' THEN 0 WHEN 'failed' THEN runs_failed_in_row + 1"
+            " WHEN 'interrupted' THEN runs_failed_in_row + 1 ELSE runs_failed_in_row END WHERE id = ?"
             " RETURNING runs_failed_in_row",
             (status, status, schedule_id),
         )
@@ -6956,12 +6989,15 @@ class Store:
     @_writing
     async def settle_trading_order(self, order: TradingOrderRecord) -> None:
         """Write what an order did: its status, what it filled at, the market's id of it and a note."""
+        await self._settle_order(order)
+        await self._db.commit()
+
+    async def _settle_order(self, order: TradingOrderRecord) -> None:
         await self._db.execute(
             "UPDATE trading_orders SET notional = ?, size = ?, price = ?, fee = ?, status = ?, exchange_id = ?, "
             "note = ? WHERE id = ?",
             (order.notional, order.size, order.price, order.fee, order.status, order.exchange_id, order.note, order.id),
         )
-        await self._db.commit()
 
     async def get_trading_order(self, order_id: str) -> TradingOrderRecord | None:
         """The order ``order_id``, or None when there is none of that id."""
@@ -6978,6 +7014,31 @@ class Store:
     @_writing
     async def put_trading_exit(self, exit_: TradingExitRecord) -> None:
         """Keep an exit as it stands now: a new one, or one whose stop, target, size or status changed."""
+        await self._put_exit(exit_)
+        await self._db.commit()
+
+    @_writing
+    async def settle_trading_buy(self, filled: TradingOrderRecord, exit_: TradingExitRecord) -> None:
+        """Write a filled buy and the exit it asked for in one transaction (item 1107): a stop that crashed between
+        the two left a position held with no stop under it."""
+        await self._settle_order(filled)
+        await self._put_exit(exit_)
+        await self._db.commit()
+
+    @_writing
+    async def unknown_pending_orders(self, note: str) -> int:
+        """Mark ``unknown`` the orders left ``pending`` by a process that stopped while it placed them, but those of
+        a run still at work (a ``dotx`` command that lives): whether they reached a market is not known, and they stay
+        counted against the day (item 1107: they stayed pending for ever). Returns how many."""
+        cursor = await self._db.execute(
+            "UPDATE trading_orders SET status = 'unknown', note = CASE WHEN note = '' THEN ? ELSE note || '; ' || ? END"
+            f" WHERE status = 'pending' AND run_id NOT IN (SELECT id FROM runs WHERE status IN ({_WORKING_SQL}))",
+            (note, note),
+        )
+        await self._db.commit()
+        return cursor.rowcount
+
+    async def _put_exit(self, exit_: TradingExitRecord) -> None:
         await self._db.execute(
             "INSERT INTO trading_exits(id, mode, product, size, stop, target, ts, order_id, run_id, status, closed_ts, "
             "sell_id, note) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
@@ -6999,7 +7060,6 @@ class Store:
                 exit_.note,
             ),
         )
-        await self._db.commit()
 
     async def trading_exits(self, status: str, limit: int) -> list[TradingExitRecord]:
         """The exits of ``status``, oldest first, ``limit`` at most."""

@@ -76,14 +76,15 @@ code** takes its place. The same by hand:
    General › Notifications off drops the subscription.
 
 4. Dot's iPhone app (item 997, `ios/`, installed from Xcode for now) is the same web UI in a native shell, which adds
-   what a page on iOS cannot have: the run at work on the lock screen and in the Dynamic Island (a Live Activity). The
+   what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). The
    app's notifications are its own, through APNs: in the app Settings › General › Notifications says so and opens the
    iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in its web view). The
    app asks once for the tailnet address (`https://<mac>.<tailnet>.ts.net`; it loads nothing else) and is signed in with
    a code as a browser is. Once the daemon has proven the phone's own key, the page hands it to the app (one
    `dot.paired` message, taken from the daemon's own page alone), which keeps it in its Keychain and registers what
-   Apple gives it with it: `POST /api/phone/apns` (the device token, the token that starts a Live Activity, the
-   environment) and, for each Live Activity started, `POST /api/phone/apns/activity`. Only a phone's own key registers
+   Apple gives it with it: `POST /api/phone/apns` (the device token and the environment; the token that would start a
+   Live Activity by push is no longer sent, item 1096) and, for the Live Activity once opened, `POST /api/phone/apns/activity` (`DELETE` once it was swiped
+   away, and when the app opens with none). Only a phone's own key registers
    (403 for the Mac's token). The daemon pushes through APNs with the key of `[apns]` (`key_path`, a `.p8` file outside
    Dot's home, never logged; `key_id`, `team_id`, `topic`), and pushes nothing through it while they are empty. An alert
    says the title Web Push says and a fixed line ("Open Dot to see it."), never the question, the draft or the result,
@@ -98,15 +99,27 @@ code** takes its place. The same by hand:
    add none), through `POST /api/attachments` and `POST /api/runs` with the phone's key; the share sheet reads the
    address the app was given (which a build with `DOT_HOST` held to that host) and its key, and sends nothing until you
    tap Send. A picture is made small without being opened whole (ImageIO), as a large photo opened whole took more than
-   a share sheet may hold. A run of yours
-   (not a helper's, a schedule's, a watcher's or Dot's own) starts a Live Activity on each phone that gave a
-   push-to-start token: its chat's title (40 characters at most) and agent, and what it does now (item 1004), each with
-   a mark of its own that turns into the next as the run moves on: "Thinking", "Browsing the web", "Searching the web",
-   "Running a command", "Reading files", "Writing files", "Using your Mac", "Using <app>" for a connected app, "Working
-   with helpers", "Writing the answer"; never what the step was about (no address, file, command or words of the model).
-   A step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; "Waiting for
-   you" while an approval or a question waits, and the end (done, failed, stopped), go at once and the end stays 15
-   minutes on the lock screen; one whose end never came is marked stale after four hours. A token APNs calls gone (410,
+   a share sheet may hold. The phone has one Live Activity (item 1093): on glass, "Dot" and how many
+   runs are at work ("2 at work", "All done"), and a row for each run of yours (not a helper's, a schedule's, a
+   watcher's or Dot's own), the runs at work first, then those that ended last, four at most: its chat's title (40
+   characters at most), what it does now (item 1004: "Thinking", "Browsing the web", "Searching the web", "Running a
+   command", "Reading files", "Writing files", "Using your Mac", "Using <app>" for a connected app, "Working with
+   helpers", "Writing the answer"; never what the step was about: no address, file, command or words of the model) or,
+   once it ended, the agent that worked on it, and its status in its colour (Working, Waiting, Done, Failed, Stopped).
+   The Dynamic Island shows how many work. The app opens the activity itself when you start a run in it (a message, a
+   queued message, a resume or a loop: the page posts `{type: "working"}`), unless one is up, and it comes without a
+   notification (item 1096): the daemon starts none by push, as Apple has a push that starts one bring a notification,
+   and a start is not worth one. A run started on the Mac, or by a schedule, opens no activity; you are notified when a
+   run of yours ends or waits for you, as you allowed Dot's notifications in the iPhone's Settings. Once the app sent
+   the activity's token every change goes to it, and an activity whose token came before its run started waits a
+   minute for it (one opened by a request that started no run, a message queued behind a held queue, ends then); a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a start,
+   "Waiting" while an approval waits, and an end go at once. An ended run stays a row 15 minutes, and once no row is
+   left the activity ends and goes; a run that ended where no event told of it (closed as the daemon started, its
+   command's process gone) is read as ended within a minute (item 1108). One you swipe away is forgotten once the app has told so (at once while it runs,
+   else when it next opens: until then the changes go to the one that is gone), and the next run you start in the app
+   opens a new one; one older than the eight hours iOS keeps one is forgotten; a daemon that starts again goes on
+   showing the runs still at work on the one it finds, and ends it when none is. One with no change for four hours is
+   marked stale. A token APNs calls gone (410,
    `Unregistered`, `BadDeviceToken`, `DeviceTokenNotForTopic`) is forgotten, and so are a phone's tokens when it is
    removed.
 
@@ -182,7 +195,8 @@ brings messages there (item 332).
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, the phone's home (item 991): your initials at its head's left open the settings
 and the **+** of a new chat stands at its right; Dot's face stands large (88 px, item 998) with its name over the faces of the other
-agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, the chat's title over the agent and the model, and its tools
+agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, in its middle on glass the face and name of whom the chat is with (item
+1101; the title and the model are in the panel's Details), and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
@@ -193,7 +207,7 @@ A list row (Campaigns, Schedules, agents, notes) is its face or switch, its titl
 what else it says (chips, text, times) under them across the row's whole width; a card's head with a line beside its
 name puts the line under the name (item 436). The conversation keeps a chat's rhythm (item 401):
 a turn after a turn keeps 8 px and the rows of what a run did 4, a message's bubble holds its words in 4 px above and
-below, a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
+below and is rounded 20 px, so one of a line is a pill and a longer one a rounded box (item 1101), a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
 phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
 keyboard move nothing else. The composer floats over the conversation's foot as a pane of glass, with no band of the

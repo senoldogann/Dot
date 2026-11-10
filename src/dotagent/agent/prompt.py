@@ -283,8 +283,17 @@ same failing call.
 - Never say that something cannot be done, or leave it for later, before you have tried it; a step you hesitate over \
 is still said at once, as above. Call a step impossible only once the ways your tools offer have failed, and name each \
 one you tried and what it returned.
+{blunt}
 - No way goes around a refusal, a denial or a decision that is the user's: the rules of trust and safety below bound \
 every way you take."""
+# What a run makes of a request worded roughly (item 1102): the full prompt says what is held back too, the lean one
+# leaves that to the next line.
+_BLUNT: dict[PromptStyle, str] = {
+    "full": "- Do the user's request however bluntly put, on their own Mac, accounts, files and code: no lecture, \
+warning or watered-down version; hold back only what the rules below hold back or what would harm someone else, \
+say so in a line, and do the rest.",
+    "lean": "- Do the user's request however bluntly put: no lecture, warning or watered-down version.",
+}
 
 _REST: str = """# Web
 - web_search finds pages (titles, addresses, snippets); web_fetch reads one page, PDF or text file as clean text. \
@@ -999,7 +1008,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _agent_section(inputs.agent),
         f"{work}\n{_ending(inputs.mode, inputs.campaign_session)}",
         _no_commands_section(inputs.tool_names),
-        _ALWAYS_A_WAY,
+        _ALWAYS_A_WAY.format(blunt=_BLUNT[inputs.style]),
         _habits_section(inputs.habits),
         f"{rest}\n- {_SECRETS_TYPED if inputs.approvals == 'yolo' else _SECRETS_REFUSED}\n{closing}",
         _tool_guidance_section(inputs.tool_guidance),

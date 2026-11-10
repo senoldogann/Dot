@@ -61,6 +61,9 @@ enum BridgeMessage: Equatable, Sendable {
     case paired(key: String)
     /// The page asks for the app's page of the iPhone's Settings, where its notifications are switched (item 1005).
     case openSettings
+    /// The owner started a run on the phone: the app opens the lock screen's card, which brings no notification from
+    /// the app in front (item 1096).
+    case working
 }
 
 /// The origin of the frame that sent a message, as WebKit reports it.
@@ -84,7 +87,7 @@ func isRunPage(_ path: String) -> Bool {
 ///
 /// Only the main frame of `https://<host>` on the default port is heard. `body` is what WebKit decoded from the
 /// page's JSON value (`WKScriptMessage.body` is untyped, so it is narrowed here at once); anything but
-/// `{type: "paired", key: "phone.…"}` and `{type: "openSettings"}` is refused.
+/// `{type: "paired", key: "phone.…"}`, `{type: "openSettings"}` and `{type: "working"}` is refused.
 func readBridgeMessage(body: Any, origin: MessageOrigin, host: DaemonHost) -> Result<BridgeMessage, BridgeRejection> {
     guard origin.isMainFrame else {
         return .failure(.notMainFrame)
@@ -101,6 +104,9 @@ func readBridgeMessage(body: Any, origin: MessageOrigin, host: DaemonHost) -> Re
     }
     if type == "openSettings" {
         return .success(.openSettings)
+    }
+    if type == "working" {
+        return .success(.working)
     }
     guard type == "paired" else {
         return .failure(.unknownType(type))

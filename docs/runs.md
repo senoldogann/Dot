@@ -26,10 +26,12 @@ chooses between **Every step** and **What it is doing**, the default since item 
 as the owner's screenshots of another agent app showed it): the steps and the thoughts of every turn are out
 of the conversation, and one line under it says what the run does now, in a few words from its latest event. The line
 starts with the face of who works and its words where the words of the messages start, nothing after them (item 971:
-no dots, no "Show the steps", the line itself is the way), close under the last message (item 843); its words are "Thinking…" while the model thinks,
-"Running a command…", "Searching the web…", "Reading a page…", "Working on the Mac…", "Asking Scout…" for a message to
-an agent, and so on, the words for the same work turning every four seconds ("Working in the terminal…") so that a long
-step reads as alive. Nothing is said that the run is not doing: while it writes a message, or a card waits for you, the
+no dots, no "Show the steps", the line itself is the way), close under the last message (item 843). While the run waits for its model the line is the model typing (item 1091):
+three dots that rise in turn in the face's place, and "Typing…"; "Thinking…" while the model streams its thinking. A
+command, a file, a search or a page is said with what it is about ("Running gh repo view…", "Reading README.md…",
+"Searching the web for “Dot”…", "Reading github.com…", one line cut at its end); other work in its own words ("Working
+on the Mac…", "Asking Scout…" for a message to an agent, and so on), turning every four seconds ("Working in the
+terminal…") so that a long step reads as alive. Nothing is said that the run is not doing: while it writes a message, or a card waits for you, the
 line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
 over and has its answer, the line goes and **Show the steps** stands in the answer's foot, beside the copy, the speaker
 and the time, where the pointer rests (item 842; on a touch screen it is a row of the sheet a hold of the answer opens, item 1064),

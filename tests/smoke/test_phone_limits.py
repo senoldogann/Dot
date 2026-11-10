@@ -17,6 +17,7 @@ import pytest
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.core.paths import ensure_layout
+from dotagent.notify.apns import FLEET_ID
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -294,11 +295,24 @@ async def test_only_a_phones_own_key_registers_its_app_for_apns_and_its_removal_
         run = await runtime.store.create_run(
             thread.id, "goal", "task", "m:m", None, "chat", "medium", "standard", None, "ask", False, None, None, None
         )
-        activity: dict[str, str] = {"run_id": run.id, "token": "ef" * 40}
+        # The phone's one Live Activity (item 1093); an activity of one run, from an app before it, is not Dot's.
+        activity: dict[str, str] = {"run_id": FLEET_ID, "token": "ef" * 40}
         assert (await client.post("/phone/apns/activity", json=activity, headers=phone)).status_code == 204
-        assert [kept.token for kept in await runtime.store.live_activities_of(run.id)] == ["ef" * 40]
-        unknown: dict[str, str] = {"run_id": "run_none", "token": "ef" * 40}
-        assert (await client.post("/phone/apns/activity", json=unknown, headers=phone)).status_code == 404
+        assert [kept.token for kept in await runtime.store.live_activities_of(FLEET_ID)] == ["ef" * 40]
+        of_a_run: dict[str, str] = {"run_id": run.id, "token": "ef" * 40}
+        assert (await client.post("/phone/apns/activity", json=of_a_run, headers=phone)).status_code == 404
+        # The end of an older activity leaves the token of the one kept; swiped away, its own token is forgotten.
+        older: dict[str, str] = {"token": "12" * 40}
+        assert (await client.delete("/phone/apns/activity", params=older, headers=phone)).status_code == 204
+        assert [kept.token for kept in await runtime.store.live_activities_of(FLEET_ID)] == ["ef" * 40]
+        own: dict[str, str] = {"token": "ef" * 40}
+        assert (await client.delete("/phone/apns/activity", params=own, headers=phone)).status_code == 204
+        assert await runtime.store.live_activities_of(FLEET_ID) == []
+        # An app that opens with no activity has any token forgotten.
+        assert (await client.post("/phone/apns/activity", json=activity, headers=phone)).status_code == 204
+        assert (await client.delete("/phone/apns/activity", headers=phone)).status_code == 204
+        assert await runtime.store.live_activities_of(FLEET_ID) == []
+        assert (await client.post("/phone/apns/activity", json=activity, headers=phone)).status_code == 204
         assert (await client.delete(f"/phone/phones/{device.phone_id}", headers=mac)).status_code == 204
         assert await runtime.store.list_apns_devices() == []
-        assert await runtime.store.live_activities_of(run.id) == []
+        assert await runtime.store.live_activities_of(FLEET_ID) == []

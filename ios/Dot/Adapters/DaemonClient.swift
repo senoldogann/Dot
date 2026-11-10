@@ -22,7 +22,8 @@ struct APNsRegistration: Encodable, Sendable, Equatable {
     }
 }
 
-/// The body of `POST /api/phone/apns/activity`: the update token of one run's Live Activity.
+/// The body of `POST /api/phone/apns/activity`: the update token of the phone's Live Activity (item 1093), whose
+/// `runId` is the activity's `fleetId`.
 struct ActivityRegistration: Encodable, Sendable, Equatable {
     let runId: String
     let token: String
@@ -119,6 +120,19 @@ struct DaemonClient: Sendable {
         try await post(path: "/api/phone/apns/activity", body: registration, host: host, key: key)
     }
 
+    /// Has the daemon forget the token of the phone's Live Activity (item 1093): `token`, the token of the activity the
+    /// owner swiped away, forgotten only while it is the one the daemon keeps; `nil` when the phone has no
+    /// activity at all, which forgets any. The next run starts a new one.
+    func forgetActivity(token: String?, host: DaemonHost, key: String) async throws {
+        let path: String = "/api/phone/apns/activity"
+        var url: URL = host.url(path: path)
+        // A query item, not a path: `appending(path:)` writes a `?` as `%3F` (the pre-push review).
+        if let token {
+            url.append(queryItems: [URLQueryItem(name: "token", value: token)])
+        }
+        try await perform(method: "DELETE", url: url, path: path, body: nil, key: key)
+    }
+
     /// Answers the approval `approvalId` (an id `isApprovalId` took) with the phone's key, as the app's page does.
     func decide(approvalId: String, approve: Bool, host: DaemonHost, key: String) async throws {
         try await post(
@@ -139,22 +153,30 @@ struct DaemonClient: Sendable {
 
     @discardableResult
     private func post(path: String, body: some Encodable & Sendable, host: DaemonHost, key: String) async throws -> Data {
-        var request: URLRequest = URLRequest(url: host.url(path: path))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try await perform(
+            method: "POST", url: host.url(path: path), path: path, body: try JSONEncoder().encode(body), key: key)
+    }
+
+    @discardableResult
+    private func perform(method: String, url: URL, path: String, body: Data?, key: String) async throws -> Data {
+        var request: URLRequest = URLRequest(url: url)
+        request.httpMethod = method
+        if body != nil {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(body)
+        request.httpBody = body
         request.timeoutInterval = 20
 
         var attempt: Int = 1
         while true {
             do {
                 let answer: Data = try await send(request, path: path)
-                logger.info("posted \(path, privacy: .public) on attempt \(attempt)")
+                logger.info("sent \(method, privacy: .public) \(path, privacy: .public) on attempt \(attempt)")
                 return answer
             } catch {
                 logger.warning(
-                    "post failed: path=\(path, privacy: .public) attempt=\(attempt) of=\(maxAttempts) error=\(error.description, privacy: .public)"
+                    "request failed: method=\(method, privacy: .public) path=\(path, privacy: .public) attempt=\(attempt) of=\(maxAttempts) error=\(error.description, privacy: .public)"
                 )
                 guard error.isRetryable, attempt < maxAttempts else {
                     throw error

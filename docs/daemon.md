@@ -1116,7 +1116,8 @@ composer); section labels are sentence case; the facts of a row are spans a gap 
 string; an empty page or list stands a mark in a quiet ring, a title and one line that says what brings something there,
 in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages in an ink
 bubble (`--msg-me`: the text's colour in light, one surface raised in the dark), and what Dot and its agents say, the
-answer and the lines along the way, as plain text beside the face, on no fill (item 854: a soft bubble until then); the
+answer and the lines along the way, as plain text beside the face, on no fill (item 854: a soft bubble until then), and
+on a phone's width each in a soft bubble of its own (`--msg-agent`, item 1091, the owner's ask); the
 line under an answer that ended well and under your message shows where the pointer rests or the focus is (a reaction
 that stands, a failure and a stop stay in sight; a screen with no pointer to rest shows only the reactions that stand,
 and the rest in the sheet a hold of the message opens, item 1064), an answer that

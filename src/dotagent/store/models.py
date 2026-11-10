@@ -14,6 +14,8 @@ type BrowserMode = Literal["own", "attach"]
 
 RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled"]
 # A run in one of these has not ended.
+# The states a run moves between while it works; only an end (``Store.end_run``) leaves them (item 1103).
+WorkingStatus = Literal["queued", "running", "blocked"]
 WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
 # The events that say whether a run is tainted after them (item 243): it starts so or not (``run_queued``), a tool's
 # result may taint it (``tool_result``), and a message of the owner that steers it clears the taint (``steer``); Dot's
@@ -923,7 +925,8 @@ class ApnsDevice(FrozenModel):
 
 
 class LiveActivity(FrozenModel):
-    """A Live Activity of a run on a phone (item 997): the token APNs updates and ends it with."""
+    """The token of a phone's Live Activity (item 997), kept under ``fleet`` since item 1093 (one a run before it):
+    the token APNs updates and ends it with."""
 
     run_id: str
     phone_id: str

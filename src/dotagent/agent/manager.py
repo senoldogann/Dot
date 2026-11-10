@@ -189,6 +189,11 @@ from dotagent.tools.registry import tools_for_mode
 from dotagent.tools.team import TEAM_SOURCE
 
 log = get_logger(__name__)
+# How long after its last session an active campaign with nothing planned is taken as stalled and planned again by the
+# scheduler (item 1104): longer than a session's end takes to plan the next.
+CAMPAIGN_STALL_S: float = 600.0
+# What an order a stopped process left pending says (item 1107): it may have reached the market.
+ORDER_LEFT_PENDING: str = "Dot stopped while it placed this order, so whether it reached the market is not known"
 # A request of its own sent to a chat at work (item 915): the event of the line that leads to its chat, how long the
 # fast model has to say so (the owner's send waits for it, so a little only), and how much of the message the line says.
 STARTED_BESIDE_EVENT: str = "started_beside"
@@ -559,6 +564,9 @@ class RunManager:
         for decided in await store.expire_pending_approvals(_EXPIRED_ON_START):
             self._runtime.bus.publish(decided)
         await fail_unsettled_drafts(store, self._runtime.bus)
+        unknown: int = await store.unknown_pending_orders(ORDER_LEFT_PENDING)
+        if unknown:
+            log.warning("trading_orders_left_pending", orders=unknown)
         await store.forget_stops_of_ended_runs()
         await self._hold_claims_of_gone(directory)
         # A stop of the daemon is not the owner's stop of the chat: a queue whose run the stop cut goes on once that
@@ -1492,6 +1500,29 @@ class RunManager:
                 continue
             died: bool = bool(sessions) and cut_off_by(sessions[-1]) == "daemon_restarted"
             if await store.set_next_session(campaign.id, now + gap_s if died else now):
+                planned += 1
+        return planned
+
+    async def replan_stalled_campaigns(self, now: float) -> int:
+        """Plan the next session of every active campaign left with none planned and none working by a session that
+        ended :data:`CAMPAIGN_STALL_S` ago or more (item 1104): one whose end could not plan the next
+        (``campaign_session_not_followed``) stood still until the daemon started again. It starts after
+        ``[agent] campaign_gap_minutes``. A session that ended less long ago is its end's to follow. For the scheduler's
+        tick; returns how many campaigns got a session."""
+        store: Store = self._runtime.store
+        gap_s: float = self._runtime.config.agent.campaign_gap_minutes * 60
+        planned: int = 0
+        for campaign in await store.list_campaigns():
+            if campaign.status != "active" or campaign.next_session_at is not None:
+                continue
+            sessions: list[RunRecord] = await store.campaign_sessions(campaign.id)
+            if any(session.status in WORKING_STATUSES for session in sessions):
+                continue
+            ended: float = max((session.finished_at or 0.0 for session in sessions), default=campaign.updated_at)
+            if now - ended < CAMPAIGN_STALL_S:
+                continue
+            if await store.set_next_session(campaign.id, now + gap_s):
+                log.warning("campaign_replanned", campaign_id=campaign.id, idle_s=round(now - ended))
                 planned += 1
         return planned
 
@@ -4106,8 +4137,8 @@ class RunManager:
         emergency stop of desktop control stops the campaign too, and so does running the sessions
         ``[agent] campaign_max_sessions`` allows; otherwise the next session starts as
         :func:`dotagent.agent.campaign.next_session_at` says. A campaign that stops is told to the owner
-        (``campaign_ended``). A failure is logged: the run's end is recorded already, and the daemon plans the campaign
-        again when it starts."""
+        (``campaign_ended``). A failure is logged: the run's end is recorded already, and the scheduler's tick plans the
+        campaign again (:meth:`replan_stalled_campaigns`, item 1104)."""
         runtime: Runtime = self._runtime
         try:
             campaign: CampaignRecord = await runtime.store.get_campaign(campaign_id)
