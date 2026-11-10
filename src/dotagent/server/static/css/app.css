@@ -126,6 +126,9 @@
   --radius-control: 10px;
   --radius: 16px;
   --radius-lg: 24px;
+  /* A message's bubble (item 1101): half the height of one line of it and a little more, so a bubble of one line is a
+     pill and a longer one a rounded box whose corners stay as round, as a messaging app's. */
+  --radius-bubble: 20px;
   --radius-composer: 24px;
   --radius-pill: 999px;
   /* A box of the pages, a card or a settings' group (item 837): no frame, a soft shadow under its surface; the contrast
@@ -5289,7 +5292,7 @@ dialog.modal.versions-dialog {
   max-width: 85%;
   margin-left: auto;
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-bubble);
   background: var(--msg-me);
   color: var(--on-msg-me);
 }
@@ -11203,6 +11206,46 @@ button.attach-chip {
     font-size: var(--text-xs);
     line-height: var(--leading-xs);
     font-weight: var(--weight-text);
+  }
+
+  /* A chat's bar names whom it is with, in the middle of the bar on glass, its face and name (item 1101: the owner's
+     screenshot of Grok Bot's); the chat's title and model are in the panel's Details. A helper's page keeps its goal. */
+  .stagebar-row {
+    position: relative;
+  }
+
+  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) {
+    position: absolute;
+    left: 50%;
+    translate: -50% 0;
+    max-width: calc(100% - 176px);
+    padding: var(--space-1) var(--space-4) var(--space-1) var(--space-1);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-pill);
+    background: var(--glass-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
+
+  /* With Dot's computer or the helpers in the bar's pill there is less room beside the name. */
+  .stagebar-row:has(.stage-quick:not([hidden])) > .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) {
+    max-width: calc(100% - 272px);
+  }
+
+  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) > .stage-name {
+    display: block;
+    min-width: 0;
+    font-size: var(--text-md);
+    font-weight: var(--weight-title);
+  }
+
+  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) > .stage-heading {
+    display: none;
+  }
+
+  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) .avatar {
+    width: 28px;
+    height: 28px;
   }
 
   /* The page's tools in one pill: Dot's computer, the helpers with their count, the panel's switch. Its hairline is drawn

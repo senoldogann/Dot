@@ -161,6 +161,10 @@ async def _at_work(runtime: Runtime, run: RunRecord) -> None:
             await asyncio.sleep(0.2)
 
 
+# The left and right edges of an element, in the page's pixels.
+_EDGES: str = "(node) => { const box = node.getBoundingClientRect(); return { left: box.left, right: box.right }; }"
+
+
 async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_home: Path, tmp_path: Path) -> None:
     with _site() as site:
         async with _served(own_home, site) as (runtime, manager, address), async_playwright() as playwright:
@@ -171,7 +175,6 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
             await runtime.store.add_queued(
                 run.thread_id, _QUEUED, (), "task", None, None, "standard", None, NO_PICKS, None, None, None, "test"
             )
-            title: str = (await runtime.store.get_thread(run.thread_id)).title
             port: int = int(address.rpartition(":")[2])
             browser: Browser = await playwright.webkit.launch(headless=True)
             try:
@@ -184,10 +187,17 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await page.goto(ui_url("127.0.0.1", port, TOKEN))
                     await page.goto(f"{address}/#/runs/{run.id}")
                     bar: Locator = page.locator("header.stagebar")
-                    # The bar: the chat's title over the agent and the model, and the tools in one pill.
-                    await expect(bar.locator(".stage-heading-title")).to_have_text(title)
-                    await expect(bar.locator(".stage-heading-sub")).to_have_text("Dot · scripted")
-                    await expect(bar.locator(".stage-name")).to_be_hidden()
+                    # The bar: whom the chat is with, face and name on glass in its middle (item 1101), and the
+                    # tools in one pill; the name stands clear of the way back and of the tools.
+                    await expect(bar.locator(".stage-name")).to_have_text("Dot")
+                    await expect(bar.locator(".stage-heading")).to_be_hidden()
+                    named: dict[str, float] = await bar.locator(".stage-title").evaluate(_EDGES)
+                    whole: dict[str, float] = await bar.evaluate(_EDGES)
+                    tools: dict[str, float] = await bar.locator(".stage-tools").evaluate(_EDGES)
+                    opener: dict[str, float] = await bar.locator(".stagebar-left").evaluate(_EDGES)
+                    middle: float = (named["left"] + named["right"]) / 2
+                    assert abs(middle - (whole["left"] + whole["right"]) / 2) <= 1, (named, whole)
+                    assert opener["right"] <= named["left"] and named["right"] <= tools["left"], (opener, named, tools)
                     helpers_button: Locator = bar.get_by_role("button", name="Show the helpers")
                     await expect(helpers_button).to_have_text(str(len(_HELPERS)))
                     screen_button: Locator = bar.get_by_role("button", name="Show Dot's computer")
