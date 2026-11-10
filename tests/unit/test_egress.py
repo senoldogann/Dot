@@ -108,3 +108,6 @@ def test_a_word_that_only_ends_in_sk_is_no_key() -> None:
     assert not carries_secret(shell, {"command": note}, ())
     assert carries_secret(shell, {"command": f"echo token={_KEY_FORM}"}, ())
     assert carries_secret(shell, {"command": "echo sk-callers-ensure-sync-now"}, ())
+    # After a percent escape or a backslash escape, whose last character is a letter or a digit.
+    for before in ("%3D", "%22", "%20", "\\n", "\\t"):
+        assert carries_secret(_step("network"), {"url": f"https://example.net/?d={before}{_KEY_FORM}"}, ())
