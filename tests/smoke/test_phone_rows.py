@@ -101,6 +101,16 @@ async def served(runtime: Runtime) -> AsyncIterator[tuple[RunManager, str]]:
         await manager.shutdown()
 
 
+# Whether the page stands as a phone's chat: the class run.css puts the rows' rules under, and its media query.
+_PHONE_QUERY: str = "(pointer: coarse) and (max-width: 720px)"
+_PHONE_RULES: str = f"""() => document.documentElement.classList.contains('chat-shell')
+  && matchMedia('{_PHONE_QUERY}').matches"""
+_PHONE_STATE: str = f"""() => ({{
+  chatShell: document.documentElement.classList.contains('chat-shell'),
+  coarse: matchMedia('(pointer: coarse)').matches,
+  width: innerWidth,
+  query: matchMedia('{_PHONE_QUERY}').matches,
+}})"""
 _ROWS: str = """() => {
   // The calls of the run's flow as the owner sees them: their own heights, and the space between one and the next.
   const rows = [...document.querySelectorAll('.run-main .tool-head')].map((row) => row.getBoundingClientRect());
@@ -168,6 +178,15 @@ async def _settled_rows(page: Page) -> dict[str, object]:
         await page.evaluate(_NEXT_FRAMES)
     else:
         raise AssertionError("the chat's page never said it was shown")
+    # The rows are a phone's only under `html.chat-shell` and the phone's media query (run.css); the gate measured the
+    # pitch of a wide window's rows, 39 px, on 2026-11-10 (item 1115), so both are waited for, and named if they never
+    # come, before a row is measured.
+    for _ in range(_SETTLE_TRIES):
+        if await page.evaluate(_PHONE_RULES):
+            break
+        await page.evaluate(_NEXT_FRAMES)
+    else:
+        raise AssertionError(f"the phone's rules never applied: {await page.evaluate(_PHONE_STATE)}")
     found: dict[str, object] = await page.evaluate(_ROWS)
     for _ in range(_SETTLE_TRIES):
         await page.evaluate(_NEXT_FRAMES)

@@ -117,6 +117,10 @@ async def _daemon(login_env: dict[str, str], *, desktop: bool = True) -> AsyncIt
         await close_runtime(runtime)
 
 
+# How long the agents page may take to boot and show its ready-made agents on a loaded runner (item 1115).
+_BOOTED_MS: int = 30_000
+
+
 async def _open(browser: Browser, address: str, route: str, width: int, scheme: Literal["light", "dark"]) -> Page:
     page: Page = await browser.new_page(
         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
@@ -124,6 +128,11 @@ async def _open(browser: Browser, address: str, route: str, width: int, scheme: 
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     await page.goto(ui_url(host, port, TOKEN))
     await page.goto(f"{address}/#{route}")
+    # The page boots before it reads anything: about two hundred modules, then its proof and its first reads. Under the
+    # gate's four workers that took 7 to 14 s to the first read of the templates (measured 2026-11-10, item 1115), past
+    # the 5 s of an expect, which the gate's 2026-11-09 and 2026-11-10 runs and six runs at once here failed on with no
+    # card drawn. The page is waited for as it shows its ready-made agents, then each test asks what it asks.
+    await expect(page.locator(".template-card").first).to_be_attached(timeout=_BOOTED_MS)
     return page
 
 
