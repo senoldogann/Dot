@@ -30,7 +30,7 @@ from dotagent.agent.attachments import RunInbox
 from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT, Brief
 from dotagent.agent.campaign_control import stop_campaign
 from dotagent.agent.loop import CAMPAIGN_TARGETS_EVENT, RunOpening
-from dotagent.agent.manager import RunHandle, RunManager, thread_title
+from dotagent.agent.manager import CAMPAIGN_STALL_S, RunHandle, RunManager, thread_title
 from dotagent.agent.reflection import REFLECTION_OFF
 from dotagent.agent.review import GOAL_TOOL
 from dotagent.browser.modes import browser_data_dir
@@ -1310,3 +1310,45 @@ async def test_a_claim_that_comes_after_the_owner_stopped_the_campaign_leaves_it
         assert await store.reactivate_campaign(campaign.id, None)
         assert await store.achieve_campaign(campaign.id, "Fifty leads.", only_active=True)
         assert (await store.get_campaign(campaign.id)).status == "achieved"
+
+
+async def test_a_campaign_whose_session_ended_without_planning_the_next_is_planned_again_by_the_tick(
+    login_env: dict[str, str],
+) -> None:
+    """Item 1104: a session's end that failed to plan the next (``campaign_session_not_followed``) left the campaign
+    active with nothing planned until the daemon started again; the scheduler's tick plans it once the end is
+    ``CAMPAIGN_STALL_S`` old, and not before, which is the end's own to follow."""
+    model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, []))
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, manager):
+        store = runtime.store
+        thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
+        campaign: CampaignRecord = await store.create_campaign(
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+        )
+        session: RunRecord = await store.create_run(
+            thread.id,
+            GOAL,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            EVAL_SOURCE,
+            runtime.config.models.effort,
+            "standard",
+            None,
+            "ask",
+            False,
+            campaign.id,
+            None,
+            None,
+        )
+        assert await store.finish_run(session.id, "done", "Checked.")
+        await store.set_next_session(campaign.id, None)
+        ended: float | None = (await store.get_run(session.id)).finished_at
+        assert ended is not None
+        assert await manager.replan_stalled_campaigns(ended + CAMPAIGN_STALL_S - 1) == 0
+        assert (await store.get_campaign(campaign.id)).next_session_at is None
+        assert await manager.replan_stalled_campaigns(ended + CAMPAIGN_STALL_S) == 1
+        planned: float | None = (await store.get_campaign(campaign.id)).next_session_at
+        assert planned is not None and abs(planned - (ended + CAMPAIGN_STALL_S + 3600)) < 1
+        # Planned: nothing more to do.
+        assert await manager.replan_stalled_campaigns(ended + CAMPAIGN_STALL_S + 1) == 0

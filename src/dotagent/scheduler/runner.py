@@ -310,8 +310,9 @@ class Scheduler:
             await self._fire_alone(record, now)
 
     async def _start_due_sessions(self, now: float) -> None:
-        """Start the next session of every active campaign that is due at ``now``, while the emergency stop is not
-        engaged."""
+        """Plan again the campaigns a failed end left without a next session (item 1104), and start the next session of
+        every active campaign that is due at ``now``, while the emergency stop is not engaged."""
+        await self._manager.replan_stalled_campaigns(now)
         for campaign in await self._runtime.store.due_campaigns(now):
             if await _emergency_stop_engaged():
                 break
