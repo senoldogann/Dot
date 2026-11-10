@@ -112,6 +112,7 @@ from dotagent.store.models import (
     UnattendedRun,
     VaultRecord,
     WorkingRun,
+    WorkingStatus,
     WorkOrderRecord,
     WorkOrderStatus,
 )
@@ -2971,9 +2972,10 @@ class Store:
         return cursor.rowcount > 0
 
     @_writing
-    async def set_run_status(self, run_id: str, status: RunStatus) -> bool:
+    async def set_run_status(self, run_id: str, status: WorkingStatus) -> bool:
         """Move a run that has not ended between its working states (queued, running, blocked on an approval); whether
-        it moved. A run that ended keeps its end (item 1045): an approval answered as the run was cancelled, or a start
+        it moved. An end is no working state, so it cannot be written here, without its time and its event (item
+        1103). A run that ended keeps its end (item 1045): an approval answered as the run was cancelled, or a start
         that comes after a close, never makes it look at work again."""
         cursor = await self._db.execute(
             f"UPDATE runs SET status = ? WHERE id = ? AND status IN ({_WORKING_SQL})", (status, run_id)
