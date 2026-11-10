@@ -194,7 +194,8 @@ brings messages there (item 332).
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, the phone's home (item 991): your initials at its head's left open the settings
 and the **+** of a new chat stands at its right; Dot's face stands large (88 px, item 998) with its name over the faces of the other
-agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, the chat's title over the agent and the model, and its tools
+agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, in its middle on glass the face and name of whom the chat is with (item
+1101; the title and the model are in the panel's Details), and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
@@ -205,7 +206,7 @@ A list row (Campaigns, Schedules, agents, notes) is its face or switch, its titl
 what else it says (chips, text, times) under them across the row's whole width; a card's head with a line beside its
 name puts the line under the name (item 436). The conversation keeps a chat's rhythm (item 401):
 a turn after a turn keeps 8 px and the rows of what a run did 4, a message's bubble holds its words in 4 px above and
-below, a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
+below and is rounded 20 px, so one of a line is a pill and a longer one a rounded box (item 1101), a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
 phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
 keyboard move nothing else. The composer floats over the conversation's foot as a pane of glass, with no band of the
