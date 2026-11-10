@@ -417,9 +417,9 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     return el("div", { class: "pop-group pop-phone-section", role: "group", "aria-label": title }, el("div", { class: "pop-heading", "aria-hidden": "true" }, title), ...children);
   }
 
-  // On a phone the model's menu holds every choice of the run (item 1121, the owner's ask after T3 Code's thread
-  // settings): under the models, the reasoning, the approvals (with their own heading) and how Dot works, and the mode;
-  // their own pills stay on a Mac's wider box.
+  // On a phone the model's menu holds every choice of the run (item 1121, the owner's ask after another assistant's
+  // thread settings): under the models, the reasoning, the approvals (with their own heading) and how Dot works, and
+  // the mode; their own pills stay on a Mac's wider box.
   function phoneSections() {
     const isChat = modeId === "chat";
     executionGroup.hidden = isChat;

@@ -312,7 +312,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   const element = el("section", { class: "card composer", "aria-label": label });
   // The box as one line until the owner asks for the run's choices (item 833): the "+" menu shows and hides them, and
   // the choice is kept for every box, those on the page at the time included. On a phone the box is one line until it
-  // is used (item 1120, the owner's ask after T3 Code's): a touch in its words or a key typed there brings the
+  // is used (item 1120, the owner's ask after another app's): a touch in its words or a key typed there brings the
   // choices, the context meter and the microphone on the line under the words, and a touch elsewhere with the words
   // left puts them away. The focus alone does not: a page that gives the box its focus as it opens leaves it at rest.
   let choicesShown = readPref(CHOICES_KEY) === "shown";

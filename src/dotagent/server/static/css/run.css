@@ -707,7 +707,7 @@
     border-color: var(--glass-border);
   }
 
-  /* While it is used (item 1120, after T3 Code's), the box gives the words their whole line and puts everything else on
+  /* While it is used (item 1120, after another assistant's), the box gives the words their whole line and puts everything else on
      the line under them: the "+" at the left, the model with its reasoning and approvals (item 1121), then the context
      meter, the microphone and the send at the thumb. */
   .composer-bar {
