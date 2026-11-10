@@ -32,7 +32,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -1341,12 +1341,9 @@ struct Shared {
 
 impl Shared {
     fn with<T>(&self, change: impl FnOnce(&mut Inner) -> T) -> T {
-        change(
-            &mut self
-                .inner
-                .lock()
-                .expect("nothing panics while it holds the install's state"),
-        )
+        // A worker that panicked while it held the state left it as it was (`WorkerEnd` says so on it): the page still
+        // reads it, and the person may try again.
+        change(&mut self.inner.lock().unwrap_or_else(PoisonError::into_inner))
     }
 }
 
@@ -1645,6 +1642,37 @@ fn run_steps(
     log.line("install of Dot is done");
 }
 
+/// Ends the worker's hold on the install however the worker ends (item 1106): a step that panicked left `running` set
+/// and the phase `Running`, so the page polled a spinner for ever and every retry was refused as "running already".
+/// A panic fails the step at work, as a refusal of it would, and lets the person try again.
+struct WorkerEnd<'a>(&'a Shared);
+
+impl Drop for WorkerEnd<'_> {
+    fn drop(&mut self) {
+        if thread::panicking() {
+            // The panic may have come while the state was held: what it holds is still the install's state.
+            let mut inner = self.0.inner.lock().unwrap_or_else(PoisonError::into_inner);
+            if inner.phase == Phase::Running {
+                let step = inner
+                    .states
+                    .iter()
+                    .position(|state| *state == StepState::Running)
+                    .unwrap_or(0);
+                inner.states[step] = StepState::Failed;
+                inner.phase = Phase::Failed;
+                inner.failure = Some(Failure {
+                    step: STEPS[step].0,
+                    title: STEPS[step].1,
+                    message: format!("The install stopped at \"{}\": the installer met an error of its own.", STEPS[step].1),
+                    output: Vec::new(),
+                    fix: "Try again. If it stops here again, send Dot's install log from this window.".to_string(),
+                });
+            }
+        }
+        self.0.running.store(false, Ordering::SeqCst);
+    }
+}
+
 fn fail(shared: &Shared, log: &Log, step: usize, stop: Stop) {
     log.line(&format!("stopped at {}: {}", STEPS[step].0, stop.message));
     shared.with(|inner| {
@@ -1810,11 +1838,11 @@ impl Installer {
         let spawned = thread::Builder::new()
             .name("dot-installer".to_string())
             .spawn(move || {
+                let _end = WorkerEnd(&shared);
                 let log = Log::open(&ctx.log_dir);
                 let refusal = || foreign(&ctx.found());
                 let answered = || (ctx.answers)(&ctx.home);
                 run_steps(&ctx, &shared, &log, &refusal, &answered);
-                shared.running.store(false, Ordering::SeqCst);
             });
         if let Err(error) = spawned {
             self.shared.running.store(false, Ordering::SeqCst);
