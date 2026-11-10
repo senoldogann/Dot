@@ -4137,8 +4137,8 @@ class RunManager:
         emergency stop of desktop control stops the campaign too, and so does running the sessions
         ``[agent] campaign_max_sessions`` allows; otherwise the next session starts as
         :func:`dotagent.agent.campaign.next_session_at` says. A campaign that stops is told to the owner
-        (``campaign_ended``). A failure is logged: the run's end is recorded already, and the daemon plans the campaign
-        again when it starts."""
+        (``campaign_ended``). A failure is logged: the run's end is recorded already, and the scheduler's tick plans the
+        campaign again (:meth:`replan_stalled_campaigns`, item 1104)."""
         runtime: Runtime = self._runtime
         try:
             campaign: CampaignRecord = await runtime.store.get_campaign(campaign_id)
