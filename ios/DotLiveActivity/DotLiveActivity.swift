@@ -53,13 +53,16 @@ struct DotFleetLiveActivity: Widget {
                     .padding(.bottom, 6)
                 }
             } compactLeading: {
-                LiveDotGlyph(size: 18)
-                    .padding(.leading, 2)
+                // Held off the island's rounded ends, which cut a mark drawn to the edge (item 1098: the owner's
+                // screenshot showed Dot's face and the trailing mark cut).
+                LiveDotGlyph(size: 16)
+                    .padding(.leading, 6)
             } compactTrailing: {
                 CountMark(state: context.state)
-                    .padding(.trailing, 2)
+                    .padding(.trailing, 6)
             } minimal: {
                 CountMark(state: context.state)
+                    .padding(2)
             }
             .keylineTint(.yellow)
         }
