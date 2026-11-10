@@ -41,7 +41,7 @@ import httpx
 from pydantic import JsonValue
 
 from dotagent.config import OpenCodeConfig
-from dotagent.core.errors import JsonParseError, OpenCodeError, OpenCodeMissing
+from dotagent.core.errors import JsonParseError, OpenCodeError, OpenCodeMissing, OpenCodeStartTimedOut
 from dotagent.core.jsonutil import parse_json_object, parse_json_value
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import log_dir, opencode_command, opencode_dir
@@ -69,6 +69,15 @@ _POLL_S: float = 0.25
 _IDLE_CHECK_S: float = 30.0
 _STOP_GRACE_S: float = 10.0
 _REQUEST_TIMEOUT_S: float = 60.0
+# How long one look at a starting server's health may take: a server that took the connection and has not answered yet
+# is looked at again, so that the start's own deadline holds (item 1092).
+_HEALTH_TIMEOUT_S: float = 5.0
+# How many times a server that did not answer in time is started afresh (item 1092): one start on 2026-11-09 stopped
+# writing after it read its config and answered nothing for the 60 s, while the Mac was loaded far past its cores, and
+# the start twelve minutes later answered in half a second; a server started again is a new process.
+_START_ATTEMPTS: int = 2
+# How much of a server's own output the error of a start that timed out keeps.
+_LOG_TAIL_CHARS: int = 2000
 _CONNECT_TIMEOUT_S: float = 10.0
 # The free models whose providers may use what is sent to them to improve or train their models, by the start of their
 # ids (opencode.ai/docs/zen, read 2026-10-15: Big Pickle, Exo and MiMo "collected data may be used to improve the
@@ -278,6 +287,25 @@ def _copy_catalog(source: Path, home: Path) -> None:
         os.close(folder)
 
 
+async def _process_state(pid: int) -> str:
+    """``ps``'s line of the process ``pid``: its state (R running, S sleeping, U waiting on the disk), CPU share, memory
+    in KB and the CPU time it took."""
+    ps: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        "/bin/ps",
+        "-o",
+        "stat=,%cpu=,rss=,time=",
+        "-p",
+        str(pid),
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    out, err = await ps.communicate()
+    if ps.returncode != 0:
+        return f"ps exit {ps.returncode}: {err.decode(errors='replace').strip()}"
+    return " ".join(out.decode(errors="replace").split())
+
+
 def server_environment(login_env: Mapping[str, str], home: Path) -> dict[str, str]:
     """The environment of the server Dot starts, without its password: the login shell's PATH and the variables a
     program expects, and OpenCode's folders and switches that keep the owner's own setup out (module docstring)."""
@@ -341,9 +369,22 @@ class OpenCodeServer:
         return opencode_dir() / _CONFINED_HOME if self._confinement else opencode_dir()
 
     async def _start(self) -> _Live:
+        """The server started, started afresh when one did not answer in time (``_START_ATTEMPTS``, item 1092): each
+        start that timed out is told as a warning, and the last one's error is raised."""
         program: Path | None = self.program()
         if program is None:
             raise OpenCodeMissing(NOT_INSTALLED, {"command": opencode_command(self._config.command)})
+        failed: OpenCodeStartTimedOut | None = None
+        for attempt in range(1, _START_ATTEMPTS + 1):
+            try:
+                return await self._start_once(program)
+            except OpenCodeStartTimedOut as error:
+                log.warning("opencode_server_start_timed_out", attempt=attempt, **error.context)
+                failed = error
+        assert failed is not None
+        raise failed
+
+    async def _start_once(self, program: Path) -> _Live:
         home: Path = await _prepared_home(self._home())
         password: str = secrets.token_urlsafe(24)
         port: int = _free_port()
@@ -384,16 +425,32 @@ class OpenCodeServer:
                     {"program": str(program), "exit": process.returncode, "log": str(log_path)},
                 )
             with suppress(httpx.TransportError):
-                if (await client.get("/global/health")).status_code == 200:
+                if (await client.get("/global/health", timeout=_HEALTH_TIMEOUT_S)).status_code == 200:
                     break
             if time.monotonic() > deadline:
+                # What the process was doing (running or waiting, its CPU and memory) and what it wrote, read before it
+                # is stopped: they tell a server slowed by a loaded Mac from one that waits on something.
+                state: str = await _process_state(process.pid)
                 await self._release(live)
-                raise OpenCodeError(
+                written: str = await asyncio.to_thread(log_path.read_text, encoding="utf-8", errors="replace")
+                raise OpenCodeStartTimedOut(
                     "OpenCode's server did not start in time",
-                    {"program": str(program), "start_timeout_s": self._config.start_timeout_s, "log": str(log_path)},
+                    {
+                        "program": str(program),
+                        "start_timeout_s": self._config.start_timeout_s,
+                        "process": state,
+                        "load": " ".join(f"{value:.1f}" for value in os.getloadavg()),
+                        "output": written[-_LOG_TAIL_CHARS:],
+                        "log": str(log_path),
+                    },
                 )
             await asyncio.sleep(_POLL_S)
-        log.info("opencode_server_started", program=str(program), pid=process.pid)
+        log.info(
+            "opencode_server_started",
+            program=str(program),
+            pid=process.pid,
+            seconds=round(time.monotonic() - started_at, 2),
+        )
         return live
 
     async def _prepare_config(self, program: Path, home: Path) -> None:

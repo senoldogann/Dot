@@ -3957,6 +3957,13 @@ dialog.modal.versions-dialog {
   color: var(--text-2);
 }
 
+/* A finger held on the "+" opens Dot's menu (item 1089), not the phone's own callout. */
+.composer .plus-button {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* The microphone (item 574) while it listens: the accent's tint, and a ring that breathes out from it (none when the page
    asks for reduced motion). The words a dictation may still change are drawn quieter (mirror.js). */
 .composer .mic-button.listening {

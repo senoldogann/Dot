@@ -479,3 +479,40 @@ async def test_on_a_phone_a_swipe_from_the_left_edge_goes_back_as_an_iphone_app_
         assert errors == []
     finally:
         await context.close()
+
+
+async def test_on_a_phone_a_tap_of_the_plus_opens_the_files_and_a_hold_opens_its_menu(
+    browser: Browser, client: httpx.AsyncClient
+) -> None:
+    """Item 1089: a finger's tap of the composer's "+" opens the files at once, as a messaging app's does (the phone's
+    own menu of the photos, the camera and the files), and a finger's hold opens Dot's menu of the "+"."""
+    context: BrowserContext = await browser.new_context(
+        viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, reduced_motion="reduce"
+    )
+    try:
+        page, errors = await _signed_in(context, client)
+        plus: Locator = page.locator(".composer .plus-button").last
+        sheet: Locator = page.locator("dialog.menu-sheet")
+        async with page.expect_file_chooser() as chosen:
+            await plus.tap()
+        assert (await chosen.value).is_multiple()
+        await expect(sheet).to_have_count(0)
+        # A hold's click opens no file picker over the sheet: the picker's clicks are counted, as one dispatched
+        # without a finger's tap would open none.
+        await page.evaluate(
+            "() => { window.pickerClicks = 0; const click = HTMLInputElement.prototype.click;"
+            " HTMLInputElement.prototype.click = function () {"
+            " if (this.type === 'file') { window.pickerClicks += 1; } return click.call(this); }; }"
+        )
+        point = {"pointerType": "touch", "isPrimary": True}
+        await plus.dispatch_event("pointerdown", point)
+        await page.wait_for_timeout(600)
+        await plus.dispatch_event("pointerup", point)
+        await plus.dispatch_event("click", point)
+        await expect(sheet).to_be_visible()
+        await expect(sheet.get_by_role("menuitem", name="Add files")).to_be_visible()
+        assert await page.evaluate("() => window.pickerClicks") == 0
+        await expect(page.locator(".toast.error")).to_have_count(0)
+        assert errors == []
+    finally:
+        await context.close()
