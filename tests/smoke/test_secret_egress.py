@@ -267,7 +267,10 @@ async def test_in_the_owners_free_mode_a_run_that_read_a_page_runs_a_step_that_h
                 results: list[EventRecord] = await runtime.store.events_of_kind(run.id, "tool_result", 10)
                 assert results[0].data["tainted"] is True, results[0].data
                 assert (results[1].data["tool"], results[1].data["ok"]) == ("shell", True), results[1].data
-                # Its record still masks the secret.
+                # Its record still masks the secret, and the step is recorded as one free mode let through.
                 assert all(HELD not in str(event.data) for event in results), results
+                recorded = [a for a in await runtime.store.run_approvals(run.id) if "carries a secret" in a.summary]
+                assert len(recorded) == 1 and recorded[0].status == "approved", recorded
+                assert HELD not in recorded[0].summary and HELD not in str(recorded[0].args), recorded
     finally:
         next(site_iterator, None)

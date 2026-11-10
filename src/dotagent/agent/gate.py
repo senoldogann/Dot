@@ -883,10 +883,6 @@ class RunGate:
         of free alone over yolo and free). Its record and its error mask the secrets, as they hold the one refused."""
         if not self.tainted:
             return
-        if self._approvals.free:
-            # Logged with no word of the step, which may hold the secret.
-            log.info("secret_egress_free", run_id=self._run_id, tool=info.tool)
-            return
         # A refusal: the values filled into a page are not among the secrets it looks for (item 621); the record of it
         # masks them all.
         sendable: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
@@ -894,6 +890,20 @@ class RunGate:
             return
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         shown: ActionInfo = masked_action(info, known)
+        if self._approvals.free:
+            # Recorded as the other questions free mode waives are, the secret masked (item 1097).
+            await self._approvals.record_automatic(
+                self._run_id,
+                info.tool,
+                f"{shown.summary} — read outside content, and carries a secret out of the Mac",
+                approval_severity(info),
+                _describe(shown),
+                "approved",
+                YOLO_DECIDER,
+                "free mode: a step that carries a secret is not refused",
+            )
+            log.info("secret_egress_free", run_id=self._run_id, tool=info.tool)
+            return
         decision: Decision = Decision(
             verdict="deny",
             source="taint",
