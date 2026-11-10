@@ -664,7 +664,8 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   and goes on with the rest, and the record names the review model. Any other answer, `escalate` too, lets the step run
   as yolo runs it. A follow or a like is left to the pace of its site. A review model that cannot answer fails the step
   with its error. `[policy] yolo_taint_check = false` turns the check off.
-- *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, a run marked untrusted has
+- *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, but free mode (item
+  1097, your choice), a run marked untrusted has
   a step refused whose words would send a secret Dot holds out of the Mac: a key read in this process (saved with `dotx
   auth set` or in Settings), a value of `<home>/.env`, or text in the form of a key or a private key (an `sk-` key
   where it starts a word or follows an escape such as `%3D`, `=3D` or `\n`, not straight after a letter or a digit). A request, a
@@ -1263,7 +1264,8 @@ anything, in every chat and every approval mode, from its next step: a payment, 
 public post and a release too, in your chats and in Dot's own, as a `yolo` run of a chat nobody watches does; each step
 is recorded with why it would have asked. A refusal still stands (a research run stays read-only, the pace of a site
 and the limits of trading hold), and so does the review model's check of a `yolo` run that read outside content when
-`yolo_taint_check` is on. A run that starts while it is on is told so; a field of a secret (a page's, a window's, a terminal's password
+`yolo_taint_check` is on. A step of such a run that carries a secret out of the Mac is not refused in it (item 1097:
+your choice, as a command that measured a token's length was refused; in `yolo` it still is). A run that starts while it is on is told so; a field of a secret (a page's, a window's, a terminal's password
 prompt) is typed as in `yolo`, and the sandbox stays as the run's own mode has it. An eval never runs in it (`eval_config`). Off, every run asks as its mode says. A phone may switch it off, not on (item 678, [Phone](phone.md): it would
 outlast the phone's removal).
 

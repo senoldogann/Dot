@@ -14,9 +14,9 @@ from dotagent.policy.types import Flag, Risk
 
 # An `sk-` key stands at the start of a word, or right after an escape whose last character is a letter or a digit: a
 # percent escape, once or twice encoded (`%3D`, `%253D`), quoted-printable mail text, whose hex is upper case (`=3D`,
-# `=20`; `?q=desk-…` is a word), a backslash escape (`\n`, `\b`, `\042`, `\x3d`, `\u003d`): a name that only ends in "sk"
-# ("flask-callers-ensure-sync__B__1.jsonl", item 1094) is none. This decides what a step may send, so it takes a key
-# after `_` or `-` too, which the masking of `core/text.py` (what a record shows) leaves alone.
+# `=20`; `?q=desk-…` is a word), a backslash escape (`\n`, `\b`, `\042`, `\x3d`, `\u003d`): a name that only ends in
+# "sk" ("flask-callers-ensure-sync__B__1.jsonl", item 1094) is none. This decides what a step may send, so it takes a
+# key after `_` or `-` too, which the masking of `core/text.py` (what a record shows) leaves alone.
 _KEY_LIKE: re.Pattern[str] = re.compile(
     r"(?:(?<![A-Za-z0-9])|(?<=%[0-9A-Fa-f]{2})|(?<==[0-9A-F]{2})|(?<=%25[0-9A-Fa-f]{2})|(?<=\\[bfnrt])|(?<=\\[0-7]{3})"
     r"|(?<=\\x[0-9A-Fa-f]{2})|(?<=\\u[0-9A-Fa-f]{4}))"
