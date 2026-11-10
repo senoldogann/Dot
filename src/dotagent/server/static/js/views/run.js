@@ -1746,7 +1746,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   }
   const settled = setTimeout(() => settling.disconnect(), SETTLE_OPEN_MS);
   paintLessons(detail.lessons, detail.disliked ?? null);
-  reactions.load().catch((error) => readFailed("The reactions", error));
+  reactions.start();
   attempt(changes.refresh);
   paintQuestions(detail.questions);
   paintAgents();

@@ -637,7 +637,12 @@ async def test_the_sidebar_and_the_pages_beside_it_say_what_they_mean(browser: B
             await page.wait_for_timeout(400)
             await reader.read("The sidebar on a phone")
         await reader.opens("A chat's menu", page.locator("button[aria-label^='More for']").first)
-        await page.get_by_role("button", name="Select").first.click()
+        # On a phone the Escape that closed the menu's sheet may reach the drawer under it on a slow runner and close it
+        # too (the nightly runs of 2026-11-09 and 2026-11-10 waited for Select there): the drawer is opened again.
+        opener: Locator = page.get_by_role("button", name="Show sidebar")
+        if width < 720 and await opener.is_visible():
+            await opener.click()
+        await page.locator(".side-list-head").get_by_role("button", name="Select").click()
         await reader.read("The sidebar while chats are chosen")
         await page.keyboard.press("Escape")
         await reader.go("/campaigns", "Campaigns", "main.page")
