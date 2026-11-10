@@ -367,8 +367,11 @@ what moved; a schedule switched off is not started so, and the end of such a run
 - A repeating schedule whose runs end failed so many times in a row is switched off, says so as its status ("switched
   off: its last 3 tasks failed") and tells you once (item 458): **Switch off after** in its form (3, 5, 10, 20, never),
   else `[scheduler] stop_after_failures` (0, never, by default). Its row says how many failed in a row. A run done sets
-  the row to 0, a run cancelled (stopped by you, the emergency stop or the daemon) counts neither way, a run started
-  by hand counts as one at its time, and a firing that started no run counts not at all. A recurring schedule that
+  the row to 0, a run cancelled (stopped by you or the emergency stop) counts neither way, a run that was under way
+  when the daemon stopped (a crash, the Mac shut down; Dot's own restarts wait for no run to work) counts as a failure
+  once the daemon starts again (item 1105), a run started by hand counts as one at its time, and a firing that started
+  no run counts not at all. A schedule switched off for its failures keeps saying why until you switch it on again,
+  whatever ends after (item 1105). A recurring schedule that
   cannot fire at all (its time zone or its record cannot be read) is tried again a minute later, then twice as long
   each time, an hour at most, as a one-time one is, its status saying why (item 899). A firing is written only while
   its schedule is still on and still due at that time: a change, a switch-off or a delete made while it was being

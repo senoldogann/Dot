@@ -3420,12 +3420,18 @@ class BrowserSession:
         async with self._locked(thread_id) as thread:
             # A script can read a field a login was filled into, and send it anywhere; a tab of the same thread can
             # reach that page as its opener does (item 493).
-            if any(one.vault_held for one in thread.tabs):
+            # The refusal names the tabs by their numbers (item 1100): told only "close it", a run closed the other
+            # tabs, or opened a new one beside it, and was refused again.
+            held: list[int] = [index for index, one in enumerate(thread.tabs, start=1) if one.vault_held]
+            if held:
+                numbers: str = ", ".join(str(index) for index in held)
+                named: str = f"tab {numbers}" if len(held) == 1 else f"tabs {numbers}"
                 raise BrowserError(
-                    "a login from the password manager was filled into a tab of this chat: scripts stay off in its "
-                    "tabs while that tab is open. Close it (browser_close_tab) and go on in a new one, where the "
+                    f"a login from the password manager was filled into {named} of this chat: scripts stay off in "
+                    "all of the chat's tabs while it is open, a new tab too. Close it by its number "
+                    f"(browser_close_tab with index {held[-1]}), then open the page again (browser_open), where the "
                     "sign-in holds",
-                    {"tabs": len([one for one in thread.tabs if one.vault_held])},
+                    {"held_tabs": numbers, "open_tabs": len(thread.tabs)},
                 )
             tab: Tab = await self._current_tab(thread)
             # No script runs in a page on a URL the rules forbid (item 554): it would read the page, and act in it.

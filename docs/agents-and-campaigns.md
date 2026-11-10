@@ -553,6 +553,8 @@ the campaign's own check takes its place, so starting one with goal mode on is r
 off is not resumed as a run: the next session starts once the daemon is back (after `campaign_gap_minutes` when the
 daemon died while it worked, so that a session that brings it down does not run again and again), and its brief says the
 last one was cut off. A session whose `dotx` command died (the first one, from `dotx run --standing`) is closed by the
-daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. The threads of the sessions
+daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. A session whose end could not
+plan the next leaves the campaign planned again by the scheduler 10 minutes after it ended, `campaign_gap_minutes`
+later (item 1104). The threads of the sessions
 after the first are not in the chat list; the campaign's page links them. What you write in the campaign's conversation,
 and your answers to their questions, are instructions of the sessions after it.

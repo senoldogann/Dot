@@ -1153,3 +1153,26 @@ async def test_the_scan_ranks_what_the_owner_allows_of_the_whole_market(
     finally:
         del _PRICES["ETH-EUR"]
     assert "BTC-EUR" in overview.text and "ETH-EUR" in overview.text and "XRP-EUR" not in overview.text
+
+
+async def test_orders_a_stopped_process_left_pending_are_unknown_but_a_working_runs(store: Store) -> None:
+    """Item 1107: an order is kept pending before it reaches the market and settled after; a process that stopped in
+    between left it pending for ever. The daemon's start marks it unknown, still counted against the day; the order of
+    a run still at work (a command that lives) is its own to settle."""
+    thread = await store.create_thread("Trades", "test")
+    working = await store.create_run(
+        thread.id, "goal", "task", "m:m", None, "test", "medium", "standard", None, "ask", False, None, None, None
+    )
+    await store.set_run_status(working.id, "running")
+    for order_id, run_id in (("ord_gone", "run_gone"), ("ord_live", working.id)):
+        await store.add_trading_order(
+            TradingOrderRecord(
+                id=order_id, mode="paper", product="BTC-EUR", side="buy", notional=10.0, size=0.0, price=0.0,
+                fee=0.0, status="pending", ts=1.0, run_id=run_id, exchange_id="", note="",
+            )
+        )  # fmt: skip
+    assert await store.unknown_pending_orders("Dot stopped") == 1
+    gone = await store.get_trading_order("ord_gone")
+    live = await store.get_trading_order("ord_live")
+    assert gone is not None and (gone.status, gone.note) == ("unknown", "Dot stopped")
+    assert live is not None and live.status == "pending"

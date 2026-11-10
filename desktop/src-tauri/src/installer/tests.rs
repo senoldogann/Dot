@@ -3147,3 +3147,101 @@ fn no_page_but_the_installers_own_can_call_the_install_commands() {
         }
     }
 }
+
+#[test]
+fn a_worker_that_panics_fails_its_step_and_lets_the_install_be_tried_again() {
+    // Item 1106: a panic in a step left the install running for ever, a spinner on the page and every retry refused.
+    let shared = Arc::new(Shared {
+        inner: Mutex::new(Inner::new()),
+        running: AtomicBool::new(true),
+        cancel: AtomicBool::new(false),
+    });
+    shared.with(|inner| {
+        inner.phase = Phase::Running;
+        inner.states[1] = StepState::Running;
+    });
+    let worker = Arc::clone(&shared);
+    let ended = thread::spawn(move || {
+        let _end = WorkerEnd(&worker);
+        // A panic while the state is held poisons its lock: the page must still read it.
+        worker.with(|_| panic!("a step's own error"));
+    })
+    .join();
+    assert!(ended.is_err());
+    assert!(!shared.running.load(Ordering::SeqCst));
+    shared.with(|inner| {
+        assert_eq!(inner.phase, Phase::Failed);
+        assert_eq!(inner.states[1], StepState::Failed);
+        let failure = inner
+            .failure
+            .as_ref()
+            .expect("the panic is told as a failure");
+        assert_eq!(failure.step, STEPS[1].0);
+    });
+}
+
+#[test]
+fn a_worker_that_ends_leaves_its_phase_and_lets_go_of_the_install() {
+    let shared = Shared {
+        inner: Mutex::new(Inner::new()),
+        running: AtomicBool::new(true),
+        cancel: AtomicBool::new(false),
+    };
+    shared.with(|inner| inner.phase = Phase::Done);
+    drop(WorkerEnd(&shared));
+    assert!(!shared.running.load(Ordering::SeqCst));
+    shared.with(|inner| assert_eq!(inner.phase, Phase::Done));
+}
+
+#[test]
+fn a_panic_between_steps_fails_the_first_step_not_done_and_undoes_none() {
+    // The security review of item 1106: with no step at work the panic failed step 0, which may have been done.
+    let shared = Shared {
+        inner: Mutex::new(Inner::new()),
+        running: AtomicBool::new(true),
+        cancel: AtomicBool::new(false),
+    };
+    shared.with(|inner| {
+        inner.phase = Phase::Running;
+        inner.states[0] = StepState::Done;
+    });
+    thread::scope(|scope| {
+        let ended = scope
+            .spawn(|| {
+                let _end = WorkerEnd(&shared);
+                panic!("between two steps");
+            })
+            .join();
+        assert!(ended.is_err());
+    });
+    shared.with(|inner| {
+        assert_eq!(inner.states[0], StepState::Done);
+        assert_eq!(inner.states[1], StepState::Failed);
+        assert_eq!(inner.phase, Phase::Failed);
+    });
+}
+
+#[test]
+fn a_step_that_panics_ends_its_program() {
+    // The security review of item 1106: a panic let go of the install while the step's program still ran, and a retry
+    // ran the same step beside it.
+    let child = Command::new("/bin/sleep")
+        .arg("30")
+        .spawn()
+        .expect("sleep starts");
+    let pid = child.id();
+    let ended = thread::spawn(move || {
+        let _child = EndsOnPanic(child);
+        panic!("a step's own error");
+    })
+    .join();
+    assert!(ended.is_err());
+    let alive = Command::new("/bin/kill")
+        .args(["-0", &pid.to_string()])
+        .status()
+        .expect("kill runs");
+    assert!(
+        !alive.success(),
+        "the program of the step that panicked still runs"
+    );
+}
