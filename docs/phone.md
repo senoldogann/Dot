@@ -82,8 +82,8 @@ code** takes its place. The same by hand:
    app asks once for the tailnet address (`https://<mac>.<tailnet>.ts.net`; it loads nothing else) and is signed in with
    a code as a browser is. Once the daemon has proven the phone's own key, the page hands it to the app (one
    `dot.paired` message, taken from the daemon's own page alone), which keeps it in its Keychain and registers what
-   Apple gives it with it: `POST /api/phone/apns` (the device token, the token that starts a Live Activity, the
-   environment) and, for the Live Activity once started, `POST /api/phone/apns/activity` (`DELETE` once it was swiped
+   Apple gives it with it: `POST /api/phone/apns` (the device token and the environment; the token that would start a
+   Live Activity by push is no longer sent, item 1096) and, for the Live Activity once opened, `POST /api/phone/apns/activity` (`DELETE` once it was swiped
    away, and when the app opens with none). Only a phone's own key registers
    (403 for the Mac's token). The daemon pushes through APNs with the key of `[apns]` (`key_path`, a `.p8` file outside
    Dot's home, never logged; `key_id`, `team_id`, `topic`), and pushes nothing through it while they are empty. An alert
@@ -106,16 +106,19 @@ code** takes its place. The same by hand:
    command", "Reading files", "Writing files", "Using your Mac", "Using <app>" for a connected app, "Working with
    helpers", "Writing the answer"; never what the step was about: no address, file, command or words of the model) or,
    once it ended, the agent that worked on it, and its status in its colour (Working, Waiting, Done, Failed, Stopped).
-   The Dynamic Island shows how many work. Your first run starts the activity on each phone that gave a push-to-start
-   token, a run that starts before the app sent the activity's token opens no second one, and every change goes to that
-   token; a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a
-   start, "Waiting" while an approval waits, and an end go at once. An ended run stays a row 15 minutes, and once no row
-   is left the activity ends and goes. One you swipe away comes back with your next run, not before, once the app has
-   told so (at once while it runs, else when it next opens: until then the changes go to the one that is gone); one
-   older than the eight hours iOS keeps one is replaced at the next change; a daemon that starts again goes on showing
-   the runs still at work on the one it finds, and ends it when none is. A start APNs took and whose token does not
-   come is not sent again until it comes or no row is left; one APNs did not take is sent again at the next change. One with no
-   change for four hours is marked stale. A token APNs calls gone (410,
+   The Dynamic Island shows how many work. The app opens the activity itself when you start a run in it (a message, a
+   queued message, a resume or a loop: the page posts `{type: "working"}`), unless one is up, and it comes without a
+   notification (item 1096): the daemon starts none by push, as Apple has a push that starts one bring a notification,
+   and a start is not worth one. A run started on the Mac, or by a schedule, opens no activity; you are notified when a
+   run of yours ends or waits for you, as you allowed Dot's notifications in the iPhone's Settings. Once the app sent
+   the activity's token every change goes to it, and an activity whose token came before its run started waits for
+   it; a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a start,
+   "Waiting" while an approval waits, and an end go at once. An ended run stays a row 15 minutes, and once no row is
+   left the activity ends and goes. One you swipe away is forgotten once the app has told so (at once while it runs,
+   else when it next opens: until then the changes go to the one that is gone), and the next run you start in the app
+   opens a new one; one older than the eight hours iOS keeps one is forgotten; a daemon that starts again goes on
+   showing the runs still at work on the one it finds, and ends it when none is. One with no change for four hours is
+   marked stale. A token APNs calls gone (410,
    `Unregistered`, `BadDeviceToken`, `DeviceTokenNotForTopic`) is forgotten, and so are a phone's tokens when it is
    removed.
 

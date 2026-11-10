@@ -18,7 +18,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify.apns import FLEET_ID
-from dotagent.notify.apns_watch import LIVE_DISMISSED_EVENT, LIVE_REGISTERED_EVENT
+from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT
 from dotagent.qr import qr_png
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import PHONE_STATE
@@ -215,15 +215,10 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         activity away, with that activity's ``token``, which is forgotten only while it is the one kept
         (a newer activity's stays); and with none when it opens and has no activity at all, which forgets any."""
         phone_id: str = asking_phone(http)
-        forgotten: bool = (
+        if token is None:
             await ctx.runtime.store.delete_live_activity(FLEET_ID, phone_id)
-            if token is None
-            else await ctx.runtime.store.delete_live_activity_token(FLEET_ID, phone_id, token)
-        )
-        # The activity the daemon kept was swiped away, or went while the app was closed: none is started again on this
-        # phone before the next run (notify/apns_watch.py). The end of an older one, or of one the daemon ended, is not.
-        if forgotten:
-            await ctx.runtime.bus.emit(SYSTEM_RUN_ID, LIVE_DISMISSED_EVENT, {"phone_id": phone_id}, False)
+        else:
+            await ctx.runtime.store.delete_live_activity_token(FLEET_ID, phone_id, token)
         return Response(status_code=204)
 
     return router

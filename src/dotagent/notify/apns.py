@@ -1,5 +1,6 @@
 """Pushes to Dot's iPhone app through APNs (item 997, docs/phone.md): the alerts the web app's Web Push gives, and the
-Live Activity of a run at work on the lock screen and in the Dynamic Island.
+Live Activity of the owner's runs on the lock screen and in the Dynamic Island, which the app opens and the daemon
+updates.
 
 The daemon signs with the APNs key of ``[apns]`` (a .p8 file kept outside Dot's home, which no run reads), whose
 token it makes anew every 50 minutes (APNs refuses one older than an hour and one made too often). The key is read
@@ -43,8 +44,6 @@ TOKEN_EVERY_S: float = 50 * 60.0
 APPROVAL_CATEGORY: str = "DOT_APPROVAL"
 # What an alert says under its title: nothing of what happened, which Apple would read.
 ALERT_BODY: str = "Open Dot to see it."
-# What the banner of a Live Activity's start says: the chat's title is in the activity alone.
-LIVE_START_BODY: str = "A task started"
 # How much of a chat's title a Live Activity shows.
 TITLE_CHARS: int = 40
 # How long a Live Activity of a run whose end never came stays before iOS marks it stale.
@@ -137,21 +136,6 @@ def approval_payload(title: str, route: str, approval_id: str) -> JsonObject:
         "aps": {"alert": {"title": title, "body": ALERT_BODY}, "sound": "default", "category": APPROVAL_CATEGORY},
         "route": route,
         "approval_id": approval_id,
-    }
-
-
-def live_start_payload(state: FleetState, now: float) -> JsonObject:
-    """The push that starts the phone's Live Activity (push-to-start), with the alert iOS needs to show it."""
-    return {
-        "aps": {
-            "timestamp": int(now),
-            "event": "start",
-            "content-state": state.model_dump(),
-            "attributes-type": "DotFleetAttributes",
-            "attributes": {"fleetId": FLEET_ID},
-            "alert": {"title": "Dot", "body": LIVE_START_BODY},
-            "stale-date": int(now + STALE_AFTER_S),
-        }
     }
 
 
