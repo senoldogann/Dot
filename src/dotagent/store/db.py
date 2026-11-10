@@ -6989,12 +6989,15 @@ class Store:
     @_writing
     async def settle_trading_order(self, order: TradingOrderRecord) -> None:
         """Write what an order did: its status, what it filled at, the market's id of it and a note."""
+        await self._settle_order(order)
+        await self._db.commit()
+
+    async def _settle_order(self, order: TradingOrderRecord) -> None:
         await self._db.execute(
             "UPDATE trading_orders SET notional = ?, size = ?, price = ?, fee = ?, status = ?, exchange_id = ?, "
             "note = ? WHERE id = ?",
             (order.notional, order.size, order.price, order.fee, order.status, order.exchange_id, order.note, order.id),
         )
-        await self._db.commit()
 
     async def get_trading_order(self, order_id: str) -> TradingOrderRecord | None:
         """The order ``order_id``, or None when there is none of that id."""
@@ -7011,6 +7014,31 @@ class Store:
     @_writing
     async def put_trading_exit(self, exit_: TradingExitRecord) -> None:
         """Keep an exit as it stands now: a new one, or one whose stop, target, size or status changed."""
+        await self._put_exit(exit_)
+        await self._db.commit()
+
+    @_writing
+    async def settle_trading_buy(self, filled: TradingOrderRecord, exit_: TradingExitRecord) -> None:
+        """Write a filled buy and the exit it asked for in one transaction (item 1107): a stop that crashed between
+        the two left a position held with no stop under it."""
+        await self._settle_order(filled)
+        await self._put_exit(exit_)
+        await self._db.commit()
+
+    @_writing
+    async def unknown_pending_orders(self, note: str) -> int:
+        """Mark ``unknown`` the orders left ``pending`` by a process that stopped while it placed them, but those of
+        a run still at work (a ``dotx`` command that lives): whether they reached a market is not known, and they stay
+        counted against the day (item 1107: they stayed pending for ever). Returns how many."""
+        cursor = await self._db.execute(
+            "UPDATE trading_orders SET status = 'unknown', note = CASE WHEN note = '' THEN ? ELSE note || '; ' || ? END"
+            f" WHERE status = 'pending' AND run_id NOT IN (SELECT id FROM runs WHERE status IN ({_WORKING_SQL}))",
+            (note, note),
+        )
+        await self._db.commit()
+        return cursor.rowcount
+
+    async def _put_exit(self, exit_: TradingExitRecord) -> None:
         await self._db.execute(
             "INSERT INTO trading_exits(id, mode, product, size, stop, target, ts, order_id, run_id, status, closed_ts, "
             "sell_id, note) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
@@ -7032,7 +7060,6 @@ class Store:
                 exit_.note,
             ),
         )
-        await self._db.commit()
 
     async def trading_exits(self, status: str, limit: int) -> list[TradingExitRecord]:
         """The exits of ``status``, oldest first, ``limit`` at most."""

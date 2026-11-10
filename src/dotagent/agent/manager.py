@@ -192,6 +192,8 @@ log = get_logger(__name__)
 # How long after its last session an active campaign with nothing planned is taken as stalled and planned again by the
 # scheduler (item 1104): longer than a session's end takes to plan the next.
 CAMPAIGN_STALL_S: float = 600.0
+# What an order a stopped process left pending says (item 1107): it may have reached the market.
+ORDER_LEFT_PENDING: str = "Dot stopped while it placed this order, so whether it reached the market is not known"
 # A request of its own sent to a chat at work (item 915): the event of the line that leads to its chat, how long the
 # fast model has to say so (the owner's send waits for it, so a little only), and how much of the message the line says.
 STARTED_BESIDE_EVENT: str = "started_beside"
@@ -562,6 +564,9 @@ class RunManager:
         for decided in await store.expire_pending_approvals(_EXPIRED_ON_START):
             self._runtime.bus.publish(decided)
         await fail_unsettled_drafts(store, self._runtime.bus)
+        unknown: int = await store.unknown_pending_orders(ORDER_LEFT_PENDING)
+        if unknown:
+            log.warning("trading_orders_left_pending", orders=unknown)
         await store.forget_stops_of_ended_runs()
         await self._hold_claims_of_gone(directory)
         # A stop of the daemon is not the owner's stop of the chat: a queue whose run the stop cut goes on once that
