@@ -58,9 +58,11 @@ enforce it: `scripts/app_bound_domains.sh` writes the host as the only `WKAppBou
   by `DotPhone/<version>` in its user agent.
 - The page's Notifications card posts `{type: "openSettings"}` (no data, item 1005), from the same main frame: the app
   opens its page of the iPhone's Settings, where its notifications are switched.
+- The page posts `{type: "working"}` when the owner starts a run (item 1096): the app opens the Live Activity itself,
+  which comes without a notification, unless one is up.
 - `POST /api/phone/apns` with `Authorization: Bearer <phone key>` and
-  `{"device_token": "<hex>", "start_token": "<hex>" | null, "environment": "sandbox" | "production"}`, sent again
-  whenever either token changes.
+  `{"device_token": "<hex>", "start_token": null, "environment": "sandbox" | "production"}` (the daemon starts no
+  activity by push, item 1096), sent again whenever the device token changes.
 - `POST /api/phone/apns/activity` with the same header and `{"run_id": "fleet", "token": "<hex>"}` for the update
   token of the phone's one Live Activity (item 1093), and `DELETE /api/phone/apns/activity` once it was swiped away or
   ended (also sent when the app opens and has none).

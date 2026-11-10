@@ -1,10 +1,13 @@
 import ActivityKit
 import Foundation
 
+/// The key the daemon keeps the activity's token under, `FLEET_ID` in `notify/apns.py`.
+let fleetActivityId: String = "fleet"
+
 /// The one Live Activity of the phone (item 1093): each of the owner's runs a row of it.
 /// Shared by the app and the widget extension.
 ///
-/// The daemon starts and updates it by push: `attributes-type` is `DotFleetAttributes`, and `attributes` and
+/// The app opens it (item 1096) and the daemon updates it by push: `attributes-type` is `DotFleetAttributes`, and `attributes` and
 /// `content-state` carry exactly these camelCase keys. Renaming a property breaks the daemon's payloads.
 struct DotFleetAttributes: ActivityAttributes {
     /// One run as a row.
