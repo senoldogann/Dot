@@ -238,8 +238,10 @@ answer keeps its words, Ollama's too.
 - **OpenCode** (Zen's free models, item 283): a free model of OpenCode Zen (Big Pickle, Nemotron, Step, Space Bunny and
   the others the day's list has) answers OpenCode's own agent only, so a run on one goes to that agent whole. It needs
   the `opencode` program (`brew install opencode`, or opencode.ai) and no key. Dot starts `opencode serve` on a free
-  loopback port behind a password of its own when a run needs it (about 2 s) and stops it after `[providers.opencode]
-  idle_stop_s` (600 s) with nothing to do; it holds about 340 MB while up. The menu lists every free model that calls
+  loopback port behind a password of its own when a run needs it (about 2 s), starts it afresh once when it has not
+  answered in `start_timeout_s` (60 s; item 1092: a start can hang after reading its config, and the error of a second
+  one says what the process was doing and what it wrote), and stops it after `[providers.opencode] idle_stop_s` (600 s)
+  with nothing to do; it holds about 340 MB while up. The menu lists every free model that calls
   tools, with its reasoning levels, from `opencode models opencode --refresh` (OpenCode's catalog refreshed from
   models.dev first, so a model Zen has just added is there), kept for an hour (`models_ttl_s`). The server keeps to its
   own folders in Dot's home (`opencode/`) and reads none of your own OpenCode setup: no key, plugin, skill, command,
