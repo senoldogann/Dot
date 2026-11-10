@@ -28,7 +28,8 @@ ChatMode = Literal["auto", "task", "chat", "research"]
 # Whose words a chat's last line in the sidebar is: the owner's message, or the answer to it (item 277).
 ChatLineRole = Literal["user", "assistant"]
 # How a run was handed a note: at its start, by a memory_search call, or as a note changed while it ran.
-MemoryUseHow = Literal["start", "search", "live", "site"]
+# ``failure``: a lesson about a tool, handed with that tool's error (item 1111).
+MemoryUseHow = Literal["start", "search", "live", "site", "failure"]
 # ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (answering
 # it carries the work on in its thread; it stays until it is answered, and expires when its chat is rewound to before
 # its run, when its campaign is deleted, or when the time a kept step has runs out: ``kept_until``).

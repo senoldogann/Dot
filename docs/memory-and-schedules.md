@@ -94,7 +94,10 @@ dotx memory reindex      # embed every note again, for example after changing [m
   an application, its next step is handed the lessons tagged with it that it was not handed yet (at most five) and the
   learned skills written there that its instructions did not list (at most three), counted as handed like the notes
   it started with; the side panel's Task tab says under Set up "Recalled 2 memories learned on www.amazon.com", as
-  it says there how many notes the run recalled and the tokens they took (item 365).
+  it says there how many notes the run recalled and the tokens they took (item 365). A call that fails is answered,
+  after its error, with the lessons that name its tool (`browser_act`, `read_file`) and that the run was not handed
+  yet, the most used first, two at most (item 1111: lessons about a tool rarely share the words of a goal); one written
+  after outside content only to a run that has read such content itself, as it would taint the run.
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`

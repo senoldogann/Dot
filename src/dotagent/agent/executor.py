@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotagent.agent.authorization import Authorization, StepDecision
+from dotagent.agent.failure_lessons import hand_failure_lessons
 from dotagent.agent.gate import RunGate, hold_note, masked_action
 from dotagent.agent.held_secrets import all_held_values
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
@@ -385,6 +386,13 @@ async def _execute_one(
     else:
         checked: _Checked = await _run_checked(call, tool, ctx, gate)
         result, action, waited_s, decision = checked.result, checked.action, checked.waited_s, checked.decision
+        if result.is_error and ctx.runtime.config.agent.lessons != "off":
+            # What earlier runs learned about the tool, at the moment it is of use (item 1111).
+            learned: str | None = await hand_failure_lessons(
+                ctx.runtime.store, ctx.run_id, ctx.agent_id, ctx.tainted(), call.name
+            )
+            if learned is not None:
+                result = result.model_copy(update={"text": f"{result.text}\n\n{learned}"})
     if group is not None:
         # A call of a tool whose group was off ran as any call does (its arguments, the policy, the approval): the loop
         # turns the group on for the next step, and the result says so, since the model chose the call blind.
