@@ -199,7 +199,7 @@ run needs, sent where the configuration points:
   earns the same flag; and while you have set a list, a `web_scrape` with `archive:
   true` is refused where your lists leave out `web.archive.org`, the site it reaches whatever address it names. These
   rules do not reach what they do not reach in Dot's own tools (a secret that is not in the shape of a key, a key cut in
-  pieces), nor a redirect the server follows to another host (since 1.4.5 a map or a crawl whose address, `robots.txt`
+  pieces, an `sk-` key written straight after a letter or a digit), nor a redirect the server follows to another host (since 1.4.5 a map or a crawl whose address, `robots.txt`
   or sitemap redirects to another site reads only the one page it leads to, and says `redirected_to`), the links a crawl
   follows on the site it starts on, the search engines a search asks, or, while you have no list set, the Internet
   Archive that `archive: true` asks; a crawl goes on after its run has stopped, up to its page limit.
@@ -666,7 +666,8 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   with its error. `[policy] yolo_taint_check = false` turns the check off.
 - *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, a run marked untrusted has
   a step refused whose words would send a secret Dot holds out of the Mac: a key read in this process (saved with `dotx
-  auth set` or in Settings), a value of `<home>/.env`, or text in the form of a key or a private key. A request, a
+  auth set` or in Settings), a value of `<home>/.env`, or text in the form of a key or a private key (an `sk-` key
+  where it starts a word or follows an escape such as `%3D` or `\n`, not straight after a letter or a digit). A request, a
   page's address or field, a message, the arguments of an MCP tool, a step that uploads, posts or sends, and what runs
   code or types into an application (a command line, an AppleScript, keystrokes, a script run in a page with
   `browser_eval`, item 561), which may reach the network without saying so, are what it looks at (`policy/egress.py`),
