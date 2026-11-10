@@ -1602,20 +1602,30 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     memories(scope, record) {
       const data = record.data;
       const fresh = typeof data.fresh === "number" ? data.fresh : data.ids.length;
-      if (data.live !== true && typeof data.site !== "string" && fresh === 0) {
+      if (data.live !== true && typeof data.site !== "string" && typeof data.tool !== "string" && fresh === 0) {
         return;
       }
       const count = plural(data.ids.length, "memory", "memories");
       const tokens = typeof data.tokens === "number" ? `, about ${plural(Math.round(data.tokens * 0.75), "word", "words")}` : "";
       const newer = fresh < data.ids.length ? ` (${fresh} new)` : "";
-      // Item 308: the lessons of a site the run just reached say where they were learned.
+      // Item 308: the lessons of a site the run just reached say where they were learned; item 1111: those of a tool
+      // that failed, which tool.
       const text =
         data.live === true
           ? `Picked up ${count} saved while the task worked`
           : typeof data.site === "string"
             ? `Recalled ${count} learned on ${data.site}`
-            : `Recalled ${count}${newer}${tokens}`;
-      const short = data.live === true ? `${count} picked up` : typeof data.site === "string" ? `${count} of ${data.site}` : `${count}${newer}`;
+            : typeof data.tool === "string"
+              ? `Recalled ${count} learned about ${data.tool} as it failed`
+              : `Recalled ${count}${newer}${tokens}`;
+      const short =
+        data.live === true
+          ? `${count} picked up`
+          : typeof data.site === "string"
+            ? `${count} of ${data.site}`
+            : typeof data.tool === "string"
+              ? `${count} about ${data.tool}`
+              : `${count}${newer}`;
       setupLine(scope, "memories", short, "database", text, "");
     },
 

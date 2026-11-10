@@ -92,3 +92,36 @@ async def _handed_failure(runtime: Runtime, run_id: str) -> set[str]:
         "SELECT run_id FROM memory_uses WHERE run_id = ? AND how = 'failure'", (run_id,)
     )
     return {str(row["run_id"]) for row in rows}
+
+
+async def test_the_calls_of_one_step_that_fail_at_once_are_handed_a_lesson_once(login_env: dict[str, str]) -> None:
+    """The pre-push review of item 1111: the calls of a step run at once, and each was handed the same lesson."""
+    turns: list[ScriptedTurn] = [
+        ScriptedTurn(
+            text="",
+            calls=tuple(ScriptedCall(tool="read_file", arguments={"path": f"missing-{n}.txt"}) for n in range(3)),
+        ),
+        _turn(FINISH_TOOL, {"answer": "Done.", "success": True}),
+    ]
+    with scratch_home() as home, eval_environment(home, {}):
+        config = eval_config(load_default_config())
+        config = config.model_copy(update={"agent": config.agent.model_copy(update={"lessons": "auto"})})
+        runtime: Runtime = await open_runtime(config, login_env)
+        try:
+            await runtime.router.register(_PROVIDER, _LearningProvider(turns, runtime.store))
+            manager: RunManager = RunManager(runtime)
+            try:
+                run: RunRecord = await manager.start(
+                    "Read my notes.", "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo",
+                    False, (),
+                )  # fmt: skip
+                async with asyncio.timeout(60.0):
+                    await manager.wait(run.id)
+                results: list[EventRecord] = await runtime.store.events_of_kind(run.id, "tool_result", 10)
+                told: list[EventRecord] = await runtime.store.events_of_kind(run.id, "memories", 10)
+                assert sum(_LESSON in str(result.data["text"]) for result in results[:3]) == 1, results
+                assert [event.data.get("tool") for event in told if "tool" in event.data] == ["read_file"]
+            finally:
+                await manager.shutdown()
+        finally:
+            await close_runtime(runtime)

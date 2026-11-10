@@ -13,6 +13,7 @@ only ``memory_search`` finds it). A tool whose name is a plain word (``shell``) 
 here is pure but :func:`hand_failure_lessons`, which reads and writes the store.
 """
 
+import asyncio
 import re
 import time
 from collections.abc import Sequence, Set
@@ -70,9 +71,17 @@ def failure_note(tool: str, lessons: Sequence[MemoryRecord]) -> str:
     )
 
 
-async def hand_failure_lessons(runtime: "Runtime", run_id: str, agent_id: str | None, tool: str) -> str | None:
+async def hand_failure_lessons(
+    runtime: "Runtime", run_id: str, agent_id: str | None, tool: str, lock: asyncio.Lock
+) -> str | None:
     """The note of the lessons about ``tool`` for run ``run_id``, whose call of it just failed, counted as handed to
-    the run (``failure``); ``None`` when there is none to hand."""
+    the run (``failure``) and told to its page as a site's are (``memories``); ``None`` when there is none to hand.
+    ``lock`` is the run's: the calls of one step fail at once, and a lesson is handed to one of them alone."""
+    async with lock:
+        return await _hand(runtime, run_id, agent_id, tool)
+
+
+async def _hand(runtime: "Runtime", run_id: str, agent_id: str | None, tool: str) -> str | None:
     now: float = time.time()
     config: MemoryConfig = runtime.config.memory
     notes: list[MemoryRecord] = [
@@ -90,5 +99,7 @@ async def hand_failure_lessons(runtime: "Runtime", run_id: str, agent_id: str | 
     lessons: list[MemoryRecord] = lessons_for_tool(tool, notes, handed, agent_id, rested)
     if not lessons:
         return None
-    await runtime.store.mark_memories_used(run_id, [lesson.id for lesson in lessons], now, "failure")
+    ids: list[str] = [lesson.id for lesson in lessons]
+    await runtime.store.mark_memories_used(run_id, ids, now, "failure")
+    await runtime.bus.emit(run_id, "memories", {"ids": [*ids], "tool": tool}, True)
     return failure_note(tool, lessons)

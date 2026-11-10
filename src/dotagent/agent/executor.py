@@ -390,7 +390,7 @@ async def _execute_one(
         if result.is_error and ctx.runtime.config.agent.lessons != "off":
             # What earlier runs learned about the tool, at the moment it is of use (item 1111); added after the error
             # is cut to the run's room, so that no lesson is cut in the middle.
-            learned = await hand_failure_lessons(ctx.runtime, ctx.run_id, ctx.agent_id, call.name)
+            learned = await hand_failure_lessons(ctx.runtime, ctx.run_id, ctx.agent_id, call.name, ctx.lessons_lock)
     if group is not None:
         # A call of a tool whose group was off ran as any call does (its arguments, the policy, the approval): the loop
         # turns the group on for the next step, and the result says so, since the model chose the call blind.
