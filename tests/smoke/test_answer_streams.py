@@ -32,7 +32,7 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 TOKEN: str = "answer-streams-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _GOAL: str = "Look at the shelves, then say what is on them."
-_RUNS: int = 3
+_RUNS: int = 4
 # Long enough to take many frames: paragraphs, a list and a closing line.
 _ANSWER: str = "\n\n".join(
     [
@@ -61,6 +61,7 @@ _SAMPLER: str = """() => {
       foot === null ? null : getComputedStyle(foot).visibility,
       answer === null ? null : Math.round(answer.getBoundingClientRect().top),
       changed === null ? null : getComputedStyle(changed).visibility,
+      words === null ? null : Math.round(words.getBoundingClientRect().height),
     ]);
     requestAnimationFrame(sample);
   };
@@ -161,13 +162,14 @@ async def _start(manager: RunManager) -> RunRecord:
 
 
 async def _watch(
-    browser: Browser, address: str, run: RunRecord, reduced: bool, height: int, model: GatedProvider
+    browser: Browser, address: str, run: RunRecord, reduced: bool, width: int, height: int, model: GatedProvider
 ) -> tuple[list[list[int | str | None]], int]:
-    """What the page showed of the answer of `run` frame by frame, from its opening, in a window `height` tall, and the
-    length of its words. A run held at its end (``model.gate``) is let go once the page follows its live stream."""
+    """What the page showed of the answer of `run` frame by frame, from its opening, in a window `width` by `height`,
+    and the length of its words. A run held at its end (``model.gate``) is let go once the page follows its live
+    stream."""
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     context = await browser.new_context(
-        viewport={"width": 1280, "height": height},
+        viewport={"width": width, "height": height},
         color_scheme="light",
         reduced_motion="reduce" if reduced else "no-preference",
     )
@@ -210,21 +212,50 @@ async def test_an_answer_that_ends_a_run_under_the_readers_eyes_is_written_in(
             model.gate.clear()
             run: RunRecord = await _start(manager)
             # A window shorter than the conversation: the page must scroll to land on the answer.
-            seen, whole = await _watch(browser, address, run, reduced=False, height=_SHORT_WINDOW, model=model)
-            lengths: list[int] = [int(length) for length, _, _, _ in seen if isinstance(length, int) and length >= 0]
+            seen, whole = await _watch(
+                browser, address, run, reduced=False, width=1280, height=_SHORT_WINDOW, model=model
+            )
+            lengths: list[int] = [int(length) for length, _, _, _, _ in seen if isinstance(length, int) and length >= 0]
             partial = [frame for frame in seen if isinstance(frame[0], int) and 0 < frame[0] < whole]
             assert len(partial) >= 5, f"the words came at once: {sorted(set(lengths))[:12]} of {whole}"
             assert lengths == sorted(lengths), "the words only ever grew"
             assert lengths[-1] == whole
             # The foot waits until the words are all in.
-            assert all(shown == "hidden" for _, shown, _, _ in partial)
+            assert all(shown == "hidden" for _, shown, _, _, _ in partial)
             # The answer holds no line of what the run changed, which heads the side panel's Changes tab (item 841).
-            assert all(changed is None for _, _, _, changed in seen)
+            assert all(changed is None for _, _, _, changed, _ in seen)
             # The words are written in sight, where the answer stands: its top in the upper half of the window, still
             # once the page has landed on it.
-            tops = [int(top) for _, _, top, _ in partial[2:] if isinstance(top, int)]
+            tops = [int(top) for _, _, top, _, _ in partial[2:] if isinstance(top, int)]
             assert tops and max(tops) < _SHORT_WINDOW / 2, tops
             assert max(tops) - min(tops) <= 2, tops
+        finally:
+            await browser.close()
+
+
+async def test_on_a_phone_the_bubble_of_an_answer_written_in_grows_with_its_words(
+    served: tuple[RunManager, str], model: GatedProvider
+) -> None:
+    """Item 1099: the room an answer keeps while its words are written in is the answer's; on a phone its words are a
+    bubble (item 1091), which stood empty at its full height until the last word came."""
+    manager, address = served
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            model.gate.clear()
+            run: RunRecord = await _start(manager)
+            seen, whole = await _watch(browser, address, run, reduced=False, width=390, height=844, model=model)
+            heights: list[int] = [
+                int(height)
+                for length, _, _, _, height in seen
+                if isinstance(length, int) and 0 < length < whole and isinstance(height, int)
+            ]
+            final: int = int(
+                next(
+                    height for length, _, _, _, height in reversed(seen) if length == whole and isinstance(height, int)
+                )
+            )
+            assert heights and heights[0] < final / 2, (heights[:5], final)
         finally:
             await browser.close()
 
@@ -238,12 +269,12 @@ async def test_under_reduced_motion_and_on_a_run_read_again_the_answer_shows_at_
         try:
             model.gate.clear()
             live: RunRecord = await _start(manager)
-            seen, whole = await _watch(browser, address, live, reduced=True, height=900, model=model)
-            assert next(length for length, _, _, _ in seen if isinstance(length, int) and length >= 0) == whole
+            seen, whole = await _watch(browser, address, live, reduced=True, width=1280, height=900, model=model)
+            assert next(length for length, _, _, _, _ in seen if isinstance(length, int) and length >= 0) == whole
             ended: RunRecord = await _start(manager)
             async with asyncio.timeout(_RUN_WAIT_S):
                 assert (await manager.wait(ended.id)).status == "done"
-            seen, whole = await _watch(browser, address, ended, reduced=False, height=900, model=model)
-            assert next(length for length, _, _, _ in seen if isinstance(length, int) and length >= 0) == whole
+            seen, whole = await _watch(browser, address, ended, reduced=False, width=1280, height=900, model=model)
+            assert next(length for length, _, _, _, _ in seen if isinstance(length, int) and length >= 0) == whole
         finally:
             await browser.close()
