@@ -147,7 +147,7 @@ function showPalette({ anchor, has, pick }) {
 
 /**
  * The reactions of the chat `threadId` as the daemon has them, and the controls that show and change them. The chat's
- * reactions are read once (`load`) and again when the daemon tells that one changed (`refresh`); a press is told to the
+ * reactions are read once (`start`) and again when the daemon tells that one changed (`refresh`); a press is told to the
  * daemon and shown from its answer. Nothing is read or changed once `signal` aborted.
  * @param {{ threadId: string, signal: AbortSignal }} chat
  */
@@ -197,19 +197,22 @@ export function createReactions({ threadId, signal }) {
     paintAll();
   }
 
-  /** Read them again once a burst of events has settled; a read that fails is told as the pages tell theirs. A read due
-   * after the page went, or one the daemon answers 404 to (a chat deleted meanwhile, or its run), tells nothing: it
-   * shows nothing anyone still reads (the nightly test of 2026-11-09 saw "The reactions could not be updated" on the
-   * page after a deleted chat's). */
+  /** A read that failed is told as the pages tell theirs. One the page outlived, or one the daemon answers 404 to (a
+   * chat deleted meanwhile, or its run), tells nothing: it shows nothing anyone still reads (the nightly tests of
+   * 2026-11-09 and 2026-11-10 saw "The reactions could not be updated" on the page after a deleted chat's; the second
+   * time from the first read, which item 1109 has go through here too). */
+  function tell(error) {
+    if (!signal.aborted && !(error instanceof ApiError && error.status === 404)) {
+      readFailed("The reactions", error);
+    }
+  }
+
+  /** Read them again once a burst of events has settled. */
   const refresh = debounce(() => {
     if (signal.aborted) {
       return;
     }
-    load().catch((error) => {
-      if (!signal.aborted && !(error instanceof ApiError && error.status === 404)) {
-        readFailed("The reactions", error);
-      }
-    });
+    load().catch(tell);
   }, REFRESH_MS);
 
   const path = (runId, message) => `/runs/${runId}/messages/${message}/reactions`;
@@ -304,7 +307,10 @@ export function createReactions({ threadId, signal }) {
   }
 
   return {
-    load,
+    /** Read them for the first time, a failure told as a refresh's is. */
+    start: () => {
+      load().catch(tell);
+    },
     refresh,
     controls,
     /** Whether a reaction stands on a message. */
