@@ -6282,11 +6282,16 @@ class Store:
     @_writing
     async def record_schedule_outcome(self, schedule_id: str, status: str) -> int | None:
         """How a run of the schedule ``schedule_id`` ended, as its last status, and its row of failed runs with it
-        (item 458): ``done`` sets it to 0, ``failed`` adds one, anything else (``cancelled``) leaves it. The row after
-        the write; ``None`` when the schedule was deleted meanwhile."""
+        (item 458): ``done`` sets it to 0, ``failed`` adds one, and so does ``interrupted``, a run the daemon's stop
+        cut off (item 1105: a run that took the daemon down was never counted); anything else (``cancelled``) leaves
+        it. A schedule switched off for its failures keeps saying so: an end that comes after (a run by hand, a watch
+        late) does not write over it (item 1105). The row after the write; ``None`` when the schedule was deleted
+        meanwhile."""
         row = await self._one(
-            "UPDATE schedules SET last_status = ?, runs_failed_in_row = CASE ? WHEN 'done' THEN 0"
-            " WHEN 'failed' THEN runs_failed_in_row + 1 ELSE runs_failed_in_row END WHERE id = ?"
+            "UPDATE schedules SET"
+            " last_status = CASE WHEN last_status LIKE 'switched off:%' THEN last_status ELSE ? END,"
+            " runs_failed_in_row = CASE ? WHEN 'done' THEN 0 WHEN 'failed' THEN runs_failed_in_row + 1"
+            " WHEN 'interrupted' THEN runs_failed_in_row + 1 ELSE runs_failed_in_row END WHERE id = ?"
             " RETURNING runs_failed_in_row",
             (status, status, schedule_id),
         )
