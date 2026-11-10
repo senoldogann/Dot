@@ -1143,10 +1143,10 @@ async def repair_night(
     deadline: float = now + NIGHT_LIMIT_S
 
     async def keep(problem: Problem, session: RepairSession) -> None:
-        """Keep ``session``, the problem as it left it, and tell the owner."""
-        nonlocal book
+        """Keep ``session``, the problem as it left it, and tell the owner. The book is read again first: the night's
+        sessions wrote it since (item 1110), and an older copy would undo what they wrote."""
         done.append(session)
-        book = with_problem(book, problem_after(problem, session))
+        book: Book = with_problem(read_book(await store.kv_get(BOOK_KEY)), problem_after(problem, session))
         await store.kv_set(BOOK_KEY, book.model_dump_json())
         await store.kv_set(SESSIONS_KEY, SessionLog(sessions=(*kept, *done)[-SESSIONS_KEPT:]).model_dump_json())
         log.info("repair_look_ended", problem_id=problem.id, end=session.end, pr=session.pr_url)
@@ -1171,14 +1171,17 @@ async def repair_night(
         return session.end == "merged" and not looked.merged_before
 
     # The pull requests a session left because something moved around it are looked at again first (item 933).
-    for waiting, last in looks_due(book, kept):
-        await look(waiting, last)
-    await _repair_problems(runtime, night, config, kept, done, look, deadline, clock, sleep)
-    # What the night merged reaches the owner's checkout once it is over (item 1110): a merge ended the night before,
-    # one problem a night, so that Dot would not go on in a process whose modules on disk had changed; now the night
-    # goes on, each session on a checkout of its own of the new main, and the pull and the restart come once.
-    if any(session.end == "merged" for session in done):
-        await _pull_and_restart(runtime, night, restart)
+    try:
+        for waiting, last in looks_due(book, kept):
+            await look(waiting, last)
+        await _repair_problems(runtime, night, config, kept, done, look, deadline, clock, sleep)
+    finally:
+        # What the night merged reaches the owner's checkout once it is over (item 1110), however it ended (the
+        # emergency stop's cancel, a defect): a merge ended the night before, one problem a night, so that Dot would
+        # not go on in a process whose modules on disk had changed; now the night goes on, each session on a checkout of
+        # its own of the new main, and the pull and the restart come once. Shielded: a cancel does not cut them short.
+        if any(session.end == "merged" for session in done):
+            await asyncio.shield(_pull_and_restart(runtime, night, restart))
     return tuple(done)
 
 
