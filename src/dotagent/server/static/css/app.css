@@ -11162,8 +11162,8 @@ button.attach-chip {
 }
 
 @media (max-width: 720px) {
-  /* The bar named the chat (item 295): its title, and under it the agent and the model in small type, which the loading
-     curtain's bar still holds while it is up; a chat's page names whom it is with since item 1101 (below). */
+  /* The bar named the chat (item 295): its title, and under it the agent and the model in small type. A chat's page and
+     its loading curtain name whom it is with since item 1101 (below), the heading kept hidden; a helper's page keeps it. */
   .stage-title:has(> .stage-heading) {
     flex: 1 1 auto;
   }

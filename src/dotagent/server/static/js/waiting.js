@@ -10,7 +10,7 @@ import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
 import { RETURN_GRACE_MS } from "./state.js";
 
-// What a chat's page showed last in its bar and its composer: `{ runId, title, sub, placeholder }`.
+// What a chat's page showed last in its bar and its composer: `{ runId, name, title, sub, placeholder }`.
 const LOOK_KEY = "dot.chatLook";
 
 /** The event a page sends up once it shows what it was opened for, or why it cannot. */
