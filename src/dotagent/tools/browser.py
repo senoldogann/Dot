@@ -784,7 +784,8 @@ def _eval_tool() -> RegisteredTool:
             "reach a control a click of browser_act did not move (el.click(), or the events it listens for), or give "
             "a CSS selector and let the script click the first element it matches in the same call. A thrown error "
             "fails the call. It is refused on a page that holds a password, code "
-            "or card field, and cookie values come back as [hidden]."
+            "or card field, and in every tab of the chat while a tab a login was filled into is open; cookie values "
+            "come back as [hidden]."
         ),
         args_model=EvalArgs,
         modes=ACTING_MODES,
