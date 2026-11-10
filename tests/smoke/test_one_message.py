@@ -305,10 +305,16 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs")
-                pill: Locator = page.locator(".composer-pill[data-pill='reasoning']")
+                # A phone's box holds the reasoning in the model's menu, once the box is used (items 1120 and 1121).
+                held: str = "model" if width < 720 else "reasoning"
+                if width < 720:
+                    await page.locator(_HOME_GOAL).click()
+                pill: Locator = page.locator(f".composer-pill[data-pill='{held}']")
                 await expect(pill).to_contain_text("Medium")
                 await pill.click()
-                single: Locator = _menu(page, "").get_by_role("listbox", name="This message only")
+                single: Locator = page.locator(f".composer-popover[aria-label='{held.capitalize()}']").get_by_role(
+                    "listbox", name="This message only"
+                )
                 await expect(single.get_by_role("option")).to_have_count(2)
                 thinking: Locator = single.get_by_role("option", name="Ultrathink")
                 await expect(thinking).to_contain_text("Max reasoning for this message only")

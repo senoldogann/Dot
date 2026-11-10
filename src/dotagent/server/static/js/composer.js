@@ -311,11 +311,63 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   });
   const element = el("section", { class: "card composer", "aria-label": label });
   // The box as one line until the owner asks for the run's choices (item 833): the "+" menu shows and hides them, and
-  // the choice is kept for every box, those on the page at the time included.
+  // the choice is kept for every box, those on the page at the time included. On a phone the box is one line until it
+  // is used (item 1120, the owner's ask after another app's): a touch in its words or a key typed there brings the
+  // choices, the context meter and the microphone on the line under the words, and a touch elsewhere with the words
+  // left puts them away. The focus alone does not: a page that gives the box its focus as it opens leaves it at rest.
   let choicesShown = readPref(CHOICES_KEY) === "shown";
+  let engaged = false;
+  // A touch inside the box is under way: the words lose the focus to a pill that iOS does not focus, and the box stays.
+  let pressing = false;
   function paintQuiet() {
-    element.toggleAttribute("data-quiet", !choicesShown);
+    element.toggleAttribute("data-quiet", PHONE.matches ? !engaged : !choicesShown);
   }
+  function engage(on) {
+    if (engaged !== on) {
+      engaged = on;
+      paintQuiet();
+    }
+  }
+  function onPressInside() {
+    pressing = true;
+  }
+  // A touch in the words opens the line once it ended: opened as the finger came down, the line moved the words up and
+  // the touch ended on the model's pill under it. The "+" and the send at rest keep their place for their own press.
+  function onClickInside(event) {
+    if (event.target.closest(".composer-field") !== null) {
+      engage(true);
+    }
+  }
+  function onPressEnded() {
+    setTimeout(() => {
+      pressing = false;
+    }, 0);
+  }
+  // A touch outside the box puts its choices away unless the words keep the focus (the keyboard is up); a menu of the
+  // box's opens inside it, the "+" menu's over the page, and a touch there is the box's own.
+  function onPressAnywhere(event) {
+    if (!engaged || element.contains(event.target) || event.target.closest?.(".menu, .sheet-menu") || textarea === document.activeElement) {
+      return;
+    }
+    engage(false);
+  }
+  function onFocusOut() {
+    setTimeout(() => {
+      const open = element.querySelector(".composer-popover:not([hidden])") !== null;
+      if (!pressing && !open && !element.contains(document.activeElement)) {
+        engage(false);
+      }
+    }, 0);
+  }
+  const onKey = () => engage(true);
+  element.addEventListener("keydown", onKey);
+  element.addEventListener("focusout", onFocusOut);
+  element.addEventListener("pointerdown", onPressInside);
+  element.addEventListener("click", onClickInside);
+  element.addEventListener("pointerup", onPressEnded);
+  element.addEventListener("pointercancel", onPressEnded);
+  document.addEventListener("pointerdown", onPressAnywhere, true);
+  PHONE.addEventListener("change", paintQuiet);
   function choicesChanged() {
     choicesShown = readPref(CHOICES_KEY) === "shown";
     paintQuiet();
@@ -389,8 +441,9 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   // second tap; a finger's hold opens Dot's menu; a mouse's click, and a tablet's tap, as before.
   function plusItems() {
     const items = [{ label: "Add files", icon: "plus", run: () => attachments.openPicker() }];
-    // A box whose run has choices (its mode, agent, model, reasoning and options) offers them here (item 833).
-    if (options.childElementCount > 0) {
+    // A box whose run has choices (its mode, agent, model, reasoning and options) offers them here (item 833); a
+    // phone's box shows them while it is used (item 1120).
+    if (options.childElementCount > 0 && !PHONE.matches) {
       items.push({
         label: choicesShown ? "Hide the model and options" : "Model and options",
         icon: "sliders",
@@ -550,6 +603,8 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       textarea.removeEventListener("focus", onFocus);
       textarea.removeEventListener("blur", onBlur);
       window.removeEventListener(CHOICES_EVENT, choicesChanged);
+      document.removeEventListener("pointerdown", onPressAnywhere, true);
+      PHONE.removeEventListener("change", paintQuiet);
     },
   };
 }

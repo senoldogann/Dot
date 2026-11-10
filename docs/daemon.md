@@ -200,9 +200,10 @@ comes beside the microphone once there are words or a file (it stays where the b
 always in sight. The run's choices wait behind the **+** menu's **Model and options**, which brings them on a bar of
 their own under the words, with the send, and **Hide the model and options** puts them away again; the choice is kept
 in that browser for every box, those open at the time included. While they are away, YOLO still shows as its pill,
-since the run then asks next to nothing (item 860: a payment, a message or a post; by its open lock alone on a phone's
-narrow line, so that the words keep their room),
-and so does the size of the chat once it is near full. The bar of the choices never wraps: the **+** and the mode at
+since the run then asks next to nothing (item 860: a payment, a message or a post), and so does the size of the chat
+once it is near full. A phone's box rests quieter, at the owner's ask (item 1120): the "+", the words and the send
+alone, YOLO's pill too out of sight until the words are touched; then the model's pill says the approvals first, YOLO
+among them, before the mode and the reasoning ([Phone](phone.md)). The bar of the choices never wraps: the **+** and the mode at
 the left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
 reads, when they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir
 şeyi değiştirme", "sadece araştır"; "read-only" or "salt okunur" opening a sentence counts, "stay", "remain", "work", "operate",
@@ -223,8 +224,9 @@ at a thumbnail's size, its name its tooltip and its × at its corner, where anot
 size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
-the bar is still one line; with the choices shown, a phone keeps the words on their line with the **+** and the send,
-and puts the microphone under them, on the line of the choices. On a phone the bar's buttons are 36 px and answer a
+the bar is still one line. A phone's box shows its choices while it is used, not by the **+** menu: the words take
+their own line, and the **+**, the model (whose menu holds the reasoning, the approvals and the mode), the context
+meter, the microphone and the send stand on the line under them ([Phone](phone.md), items 1120 and 1121). On a phone the bar's buttons are 36 px and answer a
 finger's 44 px around them (item
 787, as every icon button of the bars and the lists does), and the box's text is the size chosen for it, at
 least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item

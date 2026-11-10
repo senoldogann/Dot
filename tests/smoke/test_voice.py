@@ -305,6 +305,19 @@ def _microphone(page: Page) -> Locator:
     return page.locator(".composer .mic-button")
 
 
+async def _press(mic: Locator) -> None:
+    """Click the microphone ``mic``. A phone's composer shows it only while the box is used (item 1120): its words are
+    touched first, as a finger does."""
+    await _use(mic.locator("xpath=ancestor::section[contains(@class, 'composer')]"))
+    await mic.click()
+
+
+async def _use(composer: Locator) -> None:
+    """Touch the words of ``composer``, as a finger does before it reaches the box's line of choices on a phone (item
+    1120); on a desk it only gives them the focus."""
+    await composer.locator("textarea").click()
+
+
 def _recorder(page: Page) -> Locator:
     return page.locator(".composer .mic-recorder")
 
@@ -332,11 +345,12 @@ async def test_the_microphone_records_and_puts_the_words_in_the_box_when_the_own
         box: Locator = page.locator(GOAL)
         mic: Locator = _microphone(page)
         recorder: Locator = _recorder(page)
+        await _use(mic.locator("xpath=ancestor::section[contains(@class, 'composer')]"))
         await expect(mic).to_be_visible()
         await expect(recorder).to_be_hidden()
         await expect(mic).to_have_attribute("aria-label", "Dictate your message")
         await expect(mic).to_have_attribute("aria-pressed", "false")
-        await mic.click()
+        await _press(mic)
         await expect(recorder).to_be_visible()
         # The recorder stands in the place of the controls: the microphone, the send and the choices give it their line.
         await expect(mic).to_be_hidden()
@@ -370,6 +384,7 @@ async def test_the_microphone_records_and_puts_the_words_in_the_box_when_the_own
         # The engine settles what it heard and ends a moment later; the words go into the box then.
         await expect(box).to_have_value("hello world how are you")
         await expect(recorder).to_be_hidden()
+        await _use(mic.locator("xpath=ancestor::section[contains(@class, 'composer')]"))
         await expect(mic).to_be_visible()
         await expect(mic).to_have_attribute("aria-pressed", "false")
         assert await _voice(page, "[voice.stops, voice.aborts]") == [1, 0]
@@ -386,7 +401,7 @@ async def test_a_dictated_message_is_sent_as_the_owner_sends_any(
     replies.push(finish("It is sunny in Oulu."))
     runs: int = await _run_count(runtime)
     page: Page = await _open(browser, address, 1280)
-    await _microphone(page).click()
+    await _press(_microphone(page))
     await page.evaluate("() => window.__voice.hear([['what is the weather in Oulu', true]])")
     await _recorder(page).get_by_role("button", name="Put the words in the box").click()
     await expect(page.locator(GOAL)).to_have_value("what is the weather in Oulu")
@@ -411,7 +426,7 @@ async def test_the_box_keeps_what_it_held_and_typing_or_the_cross_drops_the_dict
     mic: Locator = _microphone(page)
     recorder: Locator = _recorder(page)
     await box.fill("Dear Ada,")
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear([['thanks for the plan', true]])")
     await expect(box).to_have_value("Dear Ada,")
     # The cross drops what was heard: the box keeps what it held.
@@ -421,7 +436,7 @@ async def test_the_box_keeps_what_it_held_and_typing_or_the_cross_drops_the_dict
     await asyncio.sleep(0.2)
     await expect(box).to_have_value("Dear Ada,")
     # What the owner types takes over too: the dictation is dropped and what the box holds stays.
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear([['something else entirely', true]])")
     await box.press_sequentially(" and the")
     await expect(recorder).to_be_hidden()
@@ -430,7 +445,7 @@ async def test_the_box_keeps_what_it_held_and_typing_or_the_cross_drops_the_dict
     await asyncio.sleep(0.2)
     await expect(box).to_have_value("Dear Ada, and the")
     # A dictation the owner ends with the tick goes after what the box held.
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear([['plan', true]])")
     await recorder.get_by_role("button", name="Put the words in the box").click()
     await expect(box).to_have_value("Dear Ada, and the plan")
@@ -442,7 +457,7 @@ async def test_the_microphone_ends_by_itself_after_a_pause_with_what_it_heard(br
     six seconds stop only a dictation that heard nothing."""
     page: Page = await _open(browser, address, 1280, clock=True)
     mic: Locator = _microphone(page)
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear([['a few words', true]])")
     await page.clock.run_for(6_600)
     await expect(mic).to_have_attribute("aria-pressed", "true")
@@ -467,7 +482,7 @@ async def test_the_tick_puts_the_words_in_the_box_at_once_and_the_settled_ones_a
     recorder: Locator = _recorder(page)
     done: Locator = recorder.get_by_role("button", name="Put the words in the box")
     await page.evaluate("() => { window.__voice.endAfter = 1000; }")
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear([['hello wor', false]])")
     # The tick pressed by the keyboard.
     await done.focus()
@@ -484,7 +499,7 @@ async def test_the_tick_puts_the_words_in_the_box_at_once_and_the_settled_ones_a
     await page.locator(GOAL).fill("")
     await page.locator(GOAL).blur()
     await page.evaluate("() => { window.__voice.endAfter = 60000; }")
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear([['still here', true]])")
     await done.click()
     await expect(recorder).to_be_hidden()
@@ -497,7 +512,7 @@ async def test_the_tick_puts_the_words_in_the_box_at_once_and_the_settled_ones_a
     await page.locator(GOAL).fill("")
     await page.locator(GOAL).blur()
     await page.evaluate("() => { window.__voice.endAfter = 1000; }")
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear([['good mor', false]])")
     await done.click()
     await expect(page.locator(GOAL)).to_have_value("good mor")
@@ -517,12 +532,12 @@ async def test_a_tick_before_the_engine_began_leaves_no_wait_that_ends_the_next_
     mic: Locator = _microphone(page)
     recorder: Locator = _recorder(page)
     await page.evaluate("() => { window.__voice.startLater = true; }")
-    await mic.click()
+    await _press(mic)
     await recorder.get_by_role("button", name="Put the words in the box").click()
     await expect(recorder).to_be_hidden()
     assert await _voice(page, "voice.aborts") == 1
     await page.evaluate("() => { window.__voice.startLater = false; }")
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear([['still speaking', true]])")
     await page.clock.run_for(3_100)
     await expect(mic).to_have_attribute("aria-pressed", "true")
@@ -553,16 +568,16 @@ async def test_a_microphone_the_browser_refuses_says_so_and_so_does_a_dictation_
     so and what to check; one the owner stops says nothing."""
     page: Page = await _open(browser, address, 1280)
     mic: Locator = _microphone(page)
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.fail('no-speech')")
     await expect(mic).to_have_attribute("aria-pressed", "false")
     await expect(page.locator(".toast.error")).to_contain_text("Nothing was heard. Check that the browser may use")
     await page.locator(".toast").first.click()
-    await mic.click()
+    await _press(mic)
     await _recorder(page).get_by_role("button", name="Put the words in the box").click()
     await expect(mic).to_have_attribute("aria-pressed", "false")
     await expect(page.locator(".toast")).to_have_count(0)
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.fail('not-allowed')")
     await expect(mic).to_have_attribute("aria-pressed", "false")
     await expect(page.locator(".toast.error")).to_contain_text("The browser has not allowed the microphone")
@@ -584,7 +599,7 @@ async def test_on_a_phone_a_refused_microphone_names_no_mac_setting(browser: Bro
     page: Page = await context.new_page()
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     mic: Locator = _microphone(page)
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.fail('not-allowed')")
     toast: Locator = page.locator(".toast.error")
     await expect(toast).to_contain_text("in the device's settings")
@@ -612,13 +627,13 @@ async def test_on_an_iphone_a_later_dictation_that_hears_nothing_says_so_and_rel
     page: Page = await context.new_page()
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     mic: Locator = _microphone(page)
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.hear([['first words', true]])")
     await _recorder(page).locator(".mic-done").click()
     await expect(page.locator(GOAL)).to_have_value("first words")
     # The next one opens the microphone and hears nothing; the owner's tick is answered with "aborted".
     await page.evaluate("() => { window.__voice.endAfter = 60000; }")
-    await mic.click()
+    await _press(mic)
     await page.evaluate("() => window.__voice.recognitions.at(-1).dispatchEvent(new Event('audiostart'))")
     await _recorder(page).locator(".mic-done").click()
     await page.evaluate("() => window.__voice.fail('aborted')")
@@ -648,7 +663,7 @@ async def test_in_dot_app_a_refused_microphone_names_macos_and_dot_not_a_browser
     for allow in (500, None):
         page, asked = await _open_app(browser, address, allow)
         mic: Locator = _microphone(page)
-        await mic.click()
+        await _press(mic)
         await page.evaluate("() => window.__voice.fail('not-allowed')")
         toast: Locator = page.locator(".toast.error")
         await expect(toast).to_contain_text("macOS has not given Dot the microphone or its speech recognition")
@@ -670,7 +685,7 @@ async def test_in_dot_app_a_refused_microphone_has_system_settings_shown_and_say
     unknown: dict[str, object] = {"opened": True, "app": "unknown"}
     for width, answer in ((1280, ready), (390, ready), (1280, unknown)):
         page, asked = await _open_app(browser, address, answer, width)
-        await _microphone(page).click()
+        await _press(_microphone(page))
         await page.evaluate("() => window.__voice.fail('not-allowed', 'Microphone permission check has failed')")
         calm: Locator = page.locator(".toast.ok")
         await expect(calm).to_contain_text(
@@ -687,7 +702,7 @@ async def test_in_dot_app_a_refused_microphone_has_system_settings_shown_and_say
         # Another press, another refusal: one more ask and one more toast, whose words are the same.
         await calm.click()
         await expect(page.locator(".toast")).to_have_count(0)
-        await _microphone(page).click()
+        await _press(_microphone(page))
         await page.evaluate("() => window.__voice.fail('not-allowed')")
         await expect(page.locator(".toast.ok")).to_contain_text("System Settings is open at Microphone")
         await expect(page.locator(".toast")).to_have_count(1)
@@ -700,7 +715,7 @@ async def test_in_dot_app_a_refusal_of_speech_recognition_has_its_pane_shown(bro
     other place to switch Dot on."""
     for code in ("service-not-allowed", "not-allowed"):
         page, asked = await _open_app(browser, address, {"opened": True, "app": "ready"})
-        await _microphone(page).click()
+        await _press(_microphone(page))
         await page.evaluate(
             "(code) => window.__voice.fail(code, 'Speech recognition service permission check has failed')", code
         )
@@ -719,7 +734,7 @@ async def test_in_dot_app_built_before_it_asked_macos_the_toast_says_so_and_noth
     toast says it is an older Dot.app and that a newer one asks. It is an error, since nothing here helps."""
     for width in (1280, 390):
         page, asked = await _open_app(browser, address, {"opened": False, "app": "old"}, width)
-        await _microphone(page).click()
+        await _press(_microphone(page))
         await page.evaluate("() => window.__voice.fail('not-allowed')")
         toast: Locator = page.locator(".toast.error")
         await expect(toast).to_contain_text("This Dot.app was built before Dot asked macOS for the microphone")
@@ -743,7 +758,7 @@ async def test_a_browser_that_is_not_dot_app_keeps_its_words_and_never_asks_for_
     System Settings, a phone its own settings; neither asks the daemon to show anything."""
     mac: Page = await _open(browser, address, 1280)
     mac_asked: list[object] = await _watch_allow(mac)
-    await _microphone(mac).click()
+    await _press(_microphone(mac))
     await mac.evaluate("() => window.__voice.fail('not-allowed', 'Microphone permission check has failed')")
     await expect(mac.locator(".toast.error")).to_contain_text("The browser has not allowed the microphone")
     await expect(mac.locator(".toast")).to_have_count(1)
@@ -759,7 +774,7 @@ async def test_a_browser_that_is_not_dot_app_keeps_its_words_and_never_asks_for_
     phone: Page = await phone_context.new_page()
     phone_asked: list[object] = await _watch_allow(phone)
     await phone.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
-    await _microphone(phone).click()
+    await _press(_microphone(phone))
     await phone.evaluate("() => window.__voice.fail('not-allowed', 'Microphone permission check has failed')")
     await expect(phone.locator(".toast.error")).to_contain_text("in the device's settings")
     await expect(phone.locator(".toast")).to_have_count(1)
@@ -780,7 +795,7 @@ async def test_the_language_is_the_pages_or_the_one_chosen_in_settings(browser: 
     await language.select_option("tr-TR")
     assert await page.evaluate("() => localStorage.getItem('dot.voiceLanguage')") == "tr-TR"
     await page.goto(f"{address}/#/runs")
-    await _microphone(page).click()
+    await _press(_microphone(page))
     assert await _voice(page, "voice.langs") == ["tr-TR"]
     # Back to the page's own language, which the page says: the first dictation was the page's, in English.
     await page.goto(f"{address}/#/settings/general")
@@ -972,7 +987,7 @@ async def test_an_answer_that_comes_in_is_read_aloud_in_the_chosen_language_when
         await page.context.close()
 
 
-async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_box_on_a_phone_and_a_run_page_has_one(
+async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_words_on_a_phone_and_a_run_page_has_one(
     browser: Browser, address: str, runtime: Runtime, replies: Replies
 ) -> None:
     for width in (1280, 390):
@@ -991,6 +1006,27 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_box_on_
             words: Locator = composer.locator("textarea")
             # The microphone is a finger's size on a phone.
             expected: float = 36 if width < 720 else 32
+            if width < 720:
+                # A phone's box at rest is the "+", the words and the send (item 1120); used, the words take their line
+                # and the microphone stands under them, as tall as the send, right beside it (item 1121).
+                await expect(composer).to_have_attribute("data-quiet", "")
+                await expect(composer.locator(".mic-button")).to_be_hidden()
+                await expect(send).to_be_visible()
+                await _use(composer)
+                await expect(composer).not_to_have_attribute("data-quiet", "")
+                box, sent, field = await _rects(composer, ".mic-button", ".btn.send", ".composer-field")
+                assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
+                assert abs(box["height"] - sent["height"]) < 1.5, f"{place} {width}: it is not as tall as the send"
+                assert box["y"] >= field["y"] + field["height"] - 1, f"{place} {width}: it is not under the words"
+                assert box["x"] + box["width"] <= sent["x"] + 1, f"{place} {width}: it is not left of the send"
+                assert abs((box["y"] + box["height"] / 2) - (sent["y"] + sent["height"] / 2)) < 2, (
+                    f"{place} {width}: it is not on the send's line"
+                )
+                await _fits(page, f"{width} {place}")
+                # A touch elsewhere puts the line away.
+                await page.mouse.click(4, 240)
+                await expect(composer).to_have_attribute("data-quiet", "")
+                continue
             # As one line (item 833), on a phone too: the microphone stands right of the words, alone until words are
             # typed, and the send then comes right of it. All three are read in one frame.
             await expect(composer).to_have_attribute("data-quiet", "")

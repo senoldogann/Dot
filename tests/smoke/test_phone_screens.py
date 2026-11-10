@@ -328,6 +328,8 @@ async def test_what_is_tapped_on_a_phone_is_a_fingers_size(browser: Browser, ser
     # The list of models the composer's model opens: a star for each and the word that changes the default.
     page = await _phone(browser, address, f"/runs/{run_id}")
     try:
+        # The box's line of choices shows once it is used (item 1120).
+        await page.locator(".dock textarea").click()
         await page.locator(".dock .composer-pill", has_text="scripted").click()
         await expect(page.locator(".model-star").first).to_be_visible(timeout=15_000)
         small += await _too_small(page, ".model-star")
