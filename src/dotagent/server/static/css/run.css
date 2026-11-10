@@ -779,7 +779,8 @@
   }
 
   /* The model's pill stands for the run's choices (item 1121): its menu holds the reasoning, the approvals and the mode,
-     and the pill says them in small words after the name; their own pills are a Mac's. The agent keeps its pill. */
+     and the pill says them in small words after the name, the approvals first so that YOLO is never the word cut;
+     their own pills are a Mac's. The agent keeps its pill. */
   .composer-options > .composer-pill:is([data-pill="mode"], [data-pill="reasoning"], [data-pill="options"]) {
     display: none;
   }

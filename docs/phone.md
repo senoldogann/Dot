@@ -220,8 +220,8 @@ page's colour behind it, and the conversation scrolls under it, its last line ke
 composer grows (items 374 and 401). At rest the composer is the "+", the words and the send (item 1120); once its
 words are touched or typed in, the words take their whole line and the line under them holds the "+", the model, the
 context meter, the microphone and the send, each 36 px, and a touch elsewhere puts that line away again. The model's
-pill stands for every choice of the run (item 1121): after the name it says the mode when one is named, the reasoning
-level and the approvals in small words, and its menu holds, under the models, the reasoning, the approvals, How Dot
+pill stands for every choice of the run (item 1121): after the name it says the approvals (first, so that YOLO is
+never the word cut), the mode when one is named and the reasoning level in small words, and its menu holds, under the models, the reasoning, the approvals, How Dot
 works and the mode. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
 tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A delegated run's row, under the helpers it belongs to, is one line tall at this width:

@@ -86,8 +86,8 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  */
 export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onChange }) {
   let waiting = false;
-  // What the model's pill adds after the name on a phone (item 1121), where it alone stands for the choices: the mode
-  // when one is named, the reasoning level and the approvals. Painted once the pills exist.
+  // What the model's pill adds after the name on a phone (item 1121), where it alone stands for the choices: the
+  // approvals, the mode when one is named and the reasoning level. Painted once the pills exist.
   let approvalsShort = "";
   let reasoningShort = "";
   let paintPhonePill = () => undefined;
@@ -443,7 +443,8 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   paintPhonePill = () => {
     const option = modes.find((candidate) => candidate.id === modeId);
     const named = option === undefined || option.id === AUTO_MODE.id ? "" : option.label;
-    const extra = [named, reasoningShort, approvalsShort].filter((word) => word !== "").join(" · ");
+    // The approvals first: what is cut on a narrow line is the end, and YOLO must stay in sight (items 833 and 860).
+    const extra = [approvalsShort, named, reasoningShort].filter((word) => word !== "").join(" · ");
     const value = modelPill.element.querySelector(".composer-pill-value")?.textContent ?? "";
     modelPill.setValue(value, extra);
   };

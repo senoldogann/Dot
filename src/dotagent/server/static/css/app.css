@@ -3923,7 +3923,8 @@ dialog.modal.versions-dialog {
    mode, agent, model, reasoning and options) wait behind the "+" menu's "Model and options", and come back on the line
    under the words when chosen. YOLO stays in sight, as the pill it is, with no tint (item 500: YOLO warns of
    nothing): in that mode the run asks nothing, which the box must say. The size of the chat shows once it is near
-   full. */
+   full. A phone's box rests quieter still (item 1120, run.css): the "+", the words and the send, its choices, YOLO
+   among them, on the model's pill once the words are touched. */
 .composer[data-quiet] .composer-bar > .composer-field {
   flex: 1 1 0;
   order: 0;
