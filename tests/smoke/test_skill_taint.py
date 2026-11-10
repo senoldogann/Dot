@@ -252,12 +252,14 @@ SAME_GOAL: str = (
 )
 
 
+@pytest.mark.parametrize("picked", [False, True], ids=["left to the run", "picked in the composer"])
 async def test_a_run_whose_goal_a_learned_skill_was_made_from_reads_it_before_its_first_step(
-    login_env: dict[str, str],
+    login_env: dict[str, str], picked: bool
 ) -> None:
     """The earlier run of the same goal stands in the skill's record: the next run of that goal reads the skill
     through the skill tool before the model's first step, as a call of its own that taints it and counts as a read;
-    the model plays only its own steps."""
+    the model plays only its own steps. A skill the owner picked for the message is in its first message already and is
+    not read again."""
     async with _home(login_env, [*STUMBLE, LESSONS, *STUMBLE, LESSONS]) as home:
         earlier: RunRecord = await home.manager.start_picked(
             SAME_GOAL,
@@ -313,14 +315,18 @@ async def test_a_run_whose_goal_a_learned_skill_was_made_from_reads_it_before_it
             "ask",
             False,
             (),
-            NO_PICKS,
+            RunPicks(plugins=(), skills=(name,), plan_first=False) if picked else NO_PICKS,
         )
         async with asyncio.timeout(_TIME_LIMIT_S):
             assert (await home.manager.wait(run.id)).status == "done"
             await home.manager.learned(run.id)
         results: list[EventRecord] = await _results(home, run)
+        steps: list[str] = ["read_file", "write_file", "read_file", FINISH_TOOL]
+        if picked:
+            assert [event.data["tool"] for event in results] == steps
+            return
         first: EventRecord = results[0]
         assert first.data["tool"] == SKILL_TOOL and first.data["ok"] is True and first.data["tainted"] is True
-        assert [event.data["tool"] for event in results[1:]] == ["read_file", "write_file", "read_file", FINISH_TOOL]
+        assert [event.data["tool"] for event in results[1:]] == steps
         # What counts the use when a run of its own ends (an eval's run counts none).
         assert used_playbooks(await home.runtime.store.tool_calls_named(run.id, SKILL_TOOL)) == (name,)

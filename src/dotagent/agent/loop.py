@@ -1321,12 +1321,10 @@ def _with_restated(restating: Sequence[tuple[int, str]], outcome: RunOutcome) ->
 
 
 def _carries_skill(history: Sequence[Message], name: str) -> bool:
-    """Whether a result in ``history`` holds the instructions of the skill ``name``, fenced by the ``skill`` tool."""
+    """Whether a message of ``history`` holds the instructions of the skill ``name`` as the ``skill`` tool fences them:
+    a result of the tool, or the first message of a run the owner picked the skill for (item 318)."""
     mark: str = f'name="{name}">'
-    return any(
-        message.role == "tool" and "<skill_content nonce=" in message.content and mark in message.content
-        for message in history
-    )
+    return any("<skill_content nonce=" in message.content and mark in message.content for message in history)
 
 
 async def _read_same_goal_skills(
