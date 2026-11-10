@@ -694,7 +694,11 @@ async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) ->
     assert plus[3] <= pill[2] and pill[3] <= mic[2] and mic[3] <= send[2] + 1, rects
     await model.click()
     menu: Locator = page.locator(".composer-popover[aria-label='Model']")
+    # A tab each (item 1122): the models first, the mode and the options a tab away.
+    await expect(menu.get_by_role("tab", name="Model", exact=True)).to_have_attribute("aria-selected", "true")
+    await menu.get_by_role("tab", name="Mode", exact=True).click()
     await expect(menu.get_by_role("listbox", name="Mode", exact=True)).to_be_visible()
+    await menu.get_by_role("tab", name="Options", exact=True).click()
     await menu.locator(".pop-option[data-mode='yolo']").click()
     await expect(model).to_contain_text("YOLO")
     await menu.locator(".pop-option[data-mode='ask']").click()
