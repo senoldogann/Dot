@@ -667,7 +667,7 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
 - *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, a run marked untrusted has
   a step refused whose words would send a secret Dot holds out of the Mac: a key read in this process (saved with `dotx
   auth set` or in Settings), a value of `<home>/.env`, or text in the form of a key or a private key (an `sk-` key
-  where it starts a word or follows an escape such as `%3D` or `\n`, not straight after a letter or a digit). A request, a
+  where it starts a word or follows an escape such as `%3D`, `=3D` or `\n`, not straight after a letter or a digit). A request, a
   page's address or field, a message, the arguments of an MCP tool, a step that uploads, posts or sends, and what runs
   code or types into an application (a command line, an AppleScript, keystrokes, a script run in a page with
   `browser_eval`, item 561), which may reach the network without saying so, are what it looks at (`policy/egress.py`),
