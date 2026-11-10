@@ -12,8 +12,10 @@ from dotagent.core.types import FrozenModel
 from dotagent.policy.spend import find_amounts
 from dotagent.policy.types import Flag, Risk
 
+# An `sk-` key stands at the start of a word: a name that only ends in "sk" ("flask-callers-ensure-sync__B__1.jsonl",
+# item 1094) is none. A key written into other text on purpose is not what this finds, any more than one cut in two.
 _KEY_LIKE: re.Pattern[str] = re.compile(
-    r"sk-[A-Za-z0-9_\-]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}"
+    r"(?<![A-Za-z0-9])sk-[A-Za-z0-9_\-]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}"
     r"|-----BEGIN [A-Z ]*PRIVATE KEY-----"
 )
 # Where a label's own sentence starts: at its start, on a new line, or after a stop or a separator ("Total 9 €. Pay",
