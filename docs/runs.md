@@ -360,7 +360,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   paths) open it in the side panel, and so do a file named by its name or the end of its path (item 1077): in code
   with a suffix files have (`README.md`, `site/index.html`, `total.py`), in words a document's (`notes.md`,
   `report.pdf`, `page.html`, `.txt`, `.csv`, `.docx`, `.xlsx`, `.pptx`), found in the workspace (the workspace's own
-  path, else the newest file in it outside hidden folders whose path ends so), and the eye on a file's row in the
+  path, else the newest file in it whose path ends so, searched folder by folder from the top past hidden folders and
+  the packages and builds of a project such as `node_modules`, item 1088; a full path in words may go through a folder
+  of capitalised words such as `Application Support`), and the eye on a file's row in the
   Changes tab, which shows the file as it is now without opening its diff. The Task tab's list of the conversation's files went
   with item 544. The panel takes half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
   daemon draws with Core Graphics as they come into view; a page more than 20,000 px tall at the width asked is refused

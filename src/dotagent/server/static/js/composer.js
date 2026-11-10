@@ -13,8 +13,8 @@ import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { markContent, wearsDot } from "./marks.js";
-import { touchFirst, trackHeight } from "./layout.js";
-import { openMenu } from "./menu.js";
+import { PHONE, touchFirst, trackHeight } from "./layout.js";
+import { openMenu, openOnHold } from "./menu.js";
 import { createMicrophone } from "./microphone.js";
 import { markdownMirror } from "./mirror.js";
 import { loadPalette } from "./palette.js";
@@ -384,9 +384,10 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   // while it listens, and the words go into the box when it ends (item 605); a message is still sent by the owner's press.
   const microphone = createMicrophone({ textarea, setInterim: wired.setInterim });
   // The "+" opens a menu: the files, and the task the owner shows Dot once (item 423, teach.js). A composer with no chat
-  // behind it (the curtain while Dot opens) adds files alone.
-  function plusMenu() {
-    const box = plusButton.getBoundingClientRect();
+  // behind it (the curtain while Dot opens) adds files alone. A finger's tap opens the files at once (item 1089), as a
+  // messaging app's "+" does: the phone's own menu of the photos, the camera, a scan and the files comes up without a
+  // second tap; a finger's hold opens Dot's menu; a mouse's click, and a tablet's tap, as before.
+  function plusItems() {
     const items = [{ label: "Add files", icon: "plus", run: () => attachments.openPicker() }];
     // A box whose run has choices (its mode, agent, model, reasoning and options) offers them here (item 833).
     if (options.childElementCount > 0) {
@@ -410,7 +411,22 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
         run: () => openTeachPanel({ threadId, onSaved: (name) => listener?.({ kind: "taught", name }) }),
       });
     }
-    openMenu({ label: "Add", items, at: { x: box.left, y: box.top - 4 }, back: plusButton, button: plusButton });
+    return items;
+  }
+
+  // How the press that clicks the "+" was made: `pointerdown` comes before its `click`.
+  let plusPointer = "mouse";
+
+  function plusMenu() {
+    const touched = plusPointer === "touch";
+    // A key's press that clicks it next has no pointer.
+    plusPointer = "mouse";
+    if (touched && PHONE.matches) {
+      attachments.openPicker();
+      return;
+    }
+    const box = plusButton.getBoundingClientRect();
+    openMenu({ label: "Add", items: plusItems(), at: { x: box.left, y: box.top - 4 }, back: plusButton, button: plusButton });
   }
 
   const plusButton = el(
@@ -418,6 +434,14 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     { class: "btn ghost sm plus-button", type: "button", title: PLUS_WORDS, "aria-label": PLUS_WORDS, onclick: plusMenu },
     icon("plus"),
   );
+  plusButton.addEventListener("pointerdown", (event) => {
+    plusPointer = event.pointerType;
+  });
+  // A press that became a scroll clicks nothing: a key's press after it is no finger's.
+  plusButton.addEventListener("pointercancel", () => {
+    plusPointer = "mouse";
+  });
+  openOnHold(plusButton, () => ({ label: "Add", items: plusItems(), back: plusButton }));
   element.append(
     wired.menu,
     attachments.list,

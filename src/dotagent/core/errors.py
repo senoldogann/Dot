@@ -245,6 +245,10 @@ class OpenCodeMissing(OpenCodeError):
     """The ``opencode`` program that runs Zen's free models (item 283) is not installed."""
 
 
+class OpenCodeStartTimedOut(OpenCodeError):
+    """OpenCode's server did not answer within ``[providers.opencode] start_timeout_s`` of its start (item 1092)."""
+
+
 class ClaudeCodeError(DotError):
     """A run on the owner's Claude plan (item 1013) could not start Claude Code, or its session failed, said more than
     the run allows, went silent or met the plan's limit."""

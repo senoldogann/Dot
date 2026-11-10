@@ -12,7 +12,7 @@ from PIL import Image
 
 from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.office import SheetCell, WorkbookContent
-from dotagent.previews import shown
+from dotagent.previews import paths, shown
 from dotagent.previews.paths import located_file, opens_on_mac, shown_kind
 from dotagent.previews.pdfpages import PageSize, page_png, page_sizes, pdf_text
 from dotagent.previews.quicklook import DrawnPage, drawn_pages
@@ -92,6 +92,27 @@ def test_a_file_named_as_an_agent_names_one_is_the_newest_of_the_workspace_whose
     with pytest.raises(NotFoundError):
         located_file("key.txt", home, workspace)
     assert _refusal("c/key.txt", home, workspace) == "the file is in a hidden folder"
+
+
+def test_a_file_named_by_its_name_is_found_past_the_packages_and_deep_folders_of_a_big_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1088: the walk went down into a project's ``node_modules`` first and spent the entries it looks at there,
+    so a file the agent made a folder away was "no such file in the workspace"."""
+    monkeypatch.setattr(paths, "_SEARCHED_ENTRIES", 50)
+    home: Path = tmp_path / "home"
+    workspace: Path = home / "workspace"
+    for index in range(100):
+        _file(workspace / "site" / "node_modules" / f"pkg{index}" / "index.md", b"package")
+        _file(workspace / "deep" / "er" / "still" / f"note{index}.txt", b"deep")
+    made: Path = _file(workspace / "site" / "video-lab" / "storyboard-A.json", b"{}")
+    # A package's file of the same name, newer, is not the agent's.
+    package: Path = _file(workspace / "site" / "node_modules" / "storyboard-A.json", b"{}")
+    os.utime(made, (1_000_000, 1_000_000))
+    assert package.stat().st_mtime > made.stat().st_mtime
+    assert located_file("storyboard-A.json", home, workspace) == made.resolve()
+    with pytest.raises(NotFoundError):
+        located_file("index.md", home, workspace)
 
 
 def test_a_path_through_a_file_is_not_found_and_a_loop_of_links_is_refused(tmp_path: Path) -> None:

@@ -16,6 +16,7 @@ Only documents open in their application (``OPENED_SUFFIXES``): a script, a page
 """
 
 import os
+from collections import deque
 from pathlib import Path
 from typing import Literal
 
@@ -83,6 +84,11 @@ log = get_logger(__name__)
 # The entries the search of the workspace for a file named by the end of its path looks at at most, so that a name in
 # a big workspace (a project and its packages) is found in a moment or not at all.
 _SEARCHED_ENTRIES: int = 20_000
+# The folders the search does not go into: the packages a project installs and the files a build makes, which hold
+# tens of thousands of entries and no file an agent names in a message.
+_SKIPPED_FOLDERS: frozenset[str] = frozenset(
+    {"node_modules", "__pycache__", "venv", "site-packages", "Pods", "DerivedData", "target", "bower_components"}
+)
 
 
 def _named(raw: str, home: Path, workspace: Path) -> Path:
@@ -94,9 +100,11 @@ def _named(raw: str, home: Path, workspace: Path) -> Path:
 
 def _in_workspace(raw: str, workspace: Path) -> Path:
     """The file of the workspace the relative path ``raw`` names (module docstring): ``workspace / raw`` when it is a
-    file, else the newest file (no link) outside hidden folders whose path ends with ``raw``'s parts, its case aside,
-    among the first ``_SEARCHED_ENTRIES`` entries. ``NotFoundError`` when there is none; ``InvalidValueError`` for a
-    path that climbs out (``..``) or names nothing."""
+    file, else the newest file (no link) whose path ends with ``raw``'s parts, its case aside. The search goes folder
+    by folder from the top (item 1088: a walk that went down into a project's packages first spent the
+    ``_SEARCHED_ENTRIES`` there and found none of the agents' own files), past hidden folders and the packages
+    and builds of ``_SKIPPED_FOLDERS``. ``NotFoundError`` when there is none; ``InvalidValueError`` for a path that
+    climbs out (``..``) or names nothing."""
     parts: tuple[str, ...] = Path(raw).parts
     if not parts or ".." in parts:
         raise InvalidValueError("a path in the workspace names a file in it", {"path": raw})
@@ -106,22 +114,28 @@ def _in_workspace(raw: str, workspace: Path) -> Path:
     wanted: tuple[str, ...] = tuple(part.casefold() for part in parts)
     found: list[Path] = []
     seen: int = 0
-    for folder, folders, files in os.walk(workspace):
-        folders[:] = [name for name in folders if not name.startswith(".")]
-        seen += len(folders) + len(files)
-        for name in files:
-            if name.casefold() != wanted[-1]:
-                continue
-            candidate: Path = Path(folder) / name
+    waiting: deque[Path] = deque([workspace])
+    while waiting and seen <= _SEARCHED_ENTRIES:
+        folder: Path = waiting.popleft()
+        try:
+            entries: list[os.DirEntry[str]] = list(os.scandir(folder))
+        except OSError as error:
+            log.warning("workspace_folder_unread", folder=str(folder), error=error.strerror)
+            continue
+        seen += len(entries)
+        for entry in entries:
             # A link is left out: one that leads nowhere, or to a file the panel refuses, would hide a file it shows.
-            if (
-                not candidate.is_symlink()
-                and tuple(part.casefold() for part in candidate.parts[-len(wanted) :]) == wanted
-            ):
-                found.append(candidate)
-        if seen > _SEARCHED_ENTRIES:
-            log.warning("workspace_search_cut", path=raw, searched=seen, found=len(found))
-            break
+            if entry.is_symlink():
+                continue
+            if entry.is_dir():
+                if not entry.name.startswith(".") and entry.name not in _SKIPPED_FOLDERS:
+                    waiting.append(Path(entry.path))
+            elif entry.name.casefold() == wanted[-1]:
+                candidate: Path = Path(entry.path)
+                if tuple(part.casefold() for part in candidate.parts[-len(wanted) :]) == wanted:
+                    found.append(candidate)
+    if waiting:
+        log.warning("workspace_search_cut", path=raw, searched=seen, found=len(found))
     if not found:
         raise NotFoundError("there is no such file in the workspace", {"path": raw, "workspace": str(workspace)})
     return max(found, key=lambda candidate: candidate.stat().st_mtime_ns)
