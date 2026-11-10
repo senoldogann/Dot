@@ -1954,6 +1954,9 @@ function storedFile(key) {
 
 export function mount(root, ctx) {
   const runId = ctx.params[0];
+  // The chat's bar is glass from the page's first frame (item 1123): its curtain, its error and a follow-up's next run,
+  // drawn over the chat that stays, keep it while their reads go on.
+  setStageGlass();
   // Whether this page is the chat the page opened at (item 810), until a read finds it.
   const opening = openingOf(`/runs/${runId}`);
   const controller = new AbortController();

@@ -1558,6 +1558,8 @@ export function homeSection(key, title, rows, folds, toggle) {
 }
 
 function mountPage(root, ctx, agentId) {
+  // The agent's bar is glass from the page's first frame, while the agent is read (item 1123).
+  setStageGlass();
   let disposed = false;
   let ticket = 0;
   let composer = null;
