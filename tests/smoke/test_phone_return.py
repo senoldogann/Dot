@@ -622,6 +622,10 @@ async def test_a_copy_of_an_earlier_build_opened_on_a_slow_network_gives_way_to_
             await _until_true(away, _NOTED_AND_WHOLE, "later")
             await away.close()
             proxy.wake(0)
+            # The network is back as it was: its latency went with the sleep (item 1116). Left on, every one of the
+            # build's two hundred files took 0.6 s more, and a loaded runner passed the 15 s the copy is waited for
+            # (main's gate, 2026-11-10 09:48).
+            proxy.slow(0.0)
             # The next opening waits for the network, and keeps the daemon's build whole.
             second: Page = await context.new_page()
             await second.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
