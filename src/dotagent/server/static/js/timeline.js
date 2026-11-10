@@ -1384,14 +1384,19 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // The checker of goal mode compared the answer with the goal: `final` says whether the run ends with this verdict,
     // and `limit` that it judged the finish of a run past its limit, which cannot be sent back.
     goal_check(scope, record) {
-      const { decision, reason, check, patience, final, limit } = record.data;
+      const { decision, reason, patience, final, limit } = record.data;
+      // A check that sends the run back to work is the run's own business, not a line of the chat (item 1098: the owner
+      // read its reason, the checker's words to the model, as a message): the work it asks for shows as it is done.
+      if (decision === "continue" && !final) {
+        return;
+      }
       const because = reason === "" ? "" : ` — ${clip(reason, 300)}`;
       const stops = limit === true
         ? ["bad", "Goal check: not reached, and the task is at its limit, so it stops"]
         : ["bad", `Goal check: still not reached after ${patience} rounds of further work, so the task stops`];
       const lines = {
         achieved: ["ok", "Goal check: the goal is reached"],
-        continue: final ? stops : ["warn", `Goal check ${check} of ${patience}: not reached yet, back to work`],
+        continue: stops,
         blocked: ["bad", "Goal check: nothing more can be done without you"],
         scheduled: ["ok", "Goal check: all that can be done now is done; a scheduled run picks up the rest"],
         error: ["bad", "Goal check: the check could not run"],
