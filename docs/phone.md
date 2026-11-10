@@ -114,7 +114,8 @@ code** takes its place. The same by hand:
    the activity's token every change goes to it, and an activity whose token came before its run started waits a
    minute for it (one opened by a request that started no run, a message queued behind a held queue, ends then); a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a start,
    "Waiting" while an approval waits, and an end go at once. An ended run stays a row 15 minutes, and once no row is
-   left the activity ends and goes. One you swipe away is forgotten once the app has told so (at once while it runs,
+   left the activity ends and goes; a run that ended where no event told of it (closed as the daemon started, its
+   command's process gone) is read as ended within a minute (item 1108). One you swipe away is forgotten once the app has told so (at once while it runs,
    else when it next opens: until then the changes go to the one that is gone), and the next run you start in the app
    opens a new one; one older than the eight hours iOS keeps one is forgotten; a daemon that starts again goes on
    showing the runs still at work on the one it finds, and ends it when none is. One with no change for four hours is

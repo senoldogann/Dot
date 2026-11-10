@@ -16,7 +16,7 @@ import asyncio
 import time
 from collections.abc import Mapping
 
-from dotagent.core.errors import DotError
+from dotagent.core.errors import DotError, NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
@@ -80,6 +80,8 @@ ACTIVITY_LIFE_S: float = 8 * 3600.0
 # How long an activity the app opened waits for a row (item 1096): its token may come before the run's start, and a
 # request that started no run after all (a message queued behind a held queue) opened it for nothing, which then ends.
 OPEN_WAIT_S: float = 60.0
+# How often the rows at work are read against their runs, which may have ended where the feed did not tell (item 1108).
+CHECK_EVERY_S: float = 60.0
 # The title of an alert of a message Dot wrote to the owner.
 TOLD_TITLE: str = "Dot has a message for you"
 
@@ -149,6 +151,8 @@ class ApnsWatch:
         self._due: bool = False
         # When the oldest activity kept with no row to show was registered, while one is (item 1096).
         self._empty_at: float | None = None
+        # When the rows at work were last read against their runs (item 1108).
+        self._checked_at: float = 0.0
         self._others: set[str] = set()
 
     async def _forget_if_gone(self, device: ApnsDevice, reply: ApnsReply) -> None:
@@ -326,11 +330,40 @@ class ApnsWatch:
         ]
         for run_id in gone_rows:
             del self._rows[run_id]
+        ended_rows: bool = await self._end_rows_of_ended_runs(now)
         waited: bool = self._empty_at is not None and now - self._empty_at >= OPEN_WAIT_S
         if waited:
             self._empty_at = None
         if gone_rows or waited or (self._due and now - self._told_at >= PROGRESS_EVERY_S):
             await self._tell(_WHEN_IT_SUITS, now)
+        elif ended_rows:
+            await self._tell(_AT_ONCE, now)
+
+    async def _end_rows_of_ended_runs(self, now: float) -> bool:
+        """Every :data:`CHECK_EVERY_S`, end the rows still at work whose run has ended or is gone (item 1108): a run
+        closed by the store alone (the daemon's start, a command's process found gone) or whose end the feed dropped
+        stood "Working" until the daemon started again. Whether a row changed."""
+        if now - self._checked_at < CHECK_EVERY_S:
+            return False
+        self._checked_at = now
+        changed: bool = False
+        for run_id, row in list(self._rows.items()):
+            if row.ended_at is not None:
+                continue
+            try:
+                run: RunRecord = await self._store.get_run(run_id)
+            except NotFoundError:
+                del self._rows[run_id]
+                changed = True
+                continue
+            if run.status in WORKING_STATUSES:
+                continue
+            ended, last = _ENDED.get(run.status, _ENDED_ELSE)
+            await self._row(run, ended, last, run.finished_at or now)
+            self._others.discard(run_id)
+            log.info("apns_row_ended_late", run_id=run_id, status=run.status)
+            changed = True
+        return changed
 
 
 async def watch_apns(watch: ApnsWatch, feed: Subscription, stopping: asyncio.Event) -> None:

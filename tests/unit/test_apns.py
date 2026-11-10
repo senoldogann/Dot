@@ -35,6 +35,7 @@ from dotagent.notify.apns import (
 )
 from dotagent.notify.apns_watch import (
     ACTIVITY_LIFE_S,
+    CHECK_EVERY_S,
     LIVE_REGISTERED_EVENT,
     OPEN_WAIT_S,
     PROGRESS_EVERY_S,
@@ -420,5 +421,28 @@ async def test_an_approval_alert_offers_the_lock_screens_answer_and_a_payment_do
             other: JsonObject = {"approval_id": "apr_2", "severity": severity, "summary": "x", "args": {}}
             await watch.on_event(_event(run.id, "approval_requested", other), _NOW)
             assert "category" not in apple.posted[-1][2]["aps"] and "approval_id" not in apple.posted[-1][2]  # type: ignore[operator]  # a JSON payload read back
+    finally:
+        await store.close()
+
+
+async def test_a_row_whose_run_ended_where_the_feed_did_not_tell_is_ended_within_a_minute(tmp_path: Path) -> None:
+    """Item 1108: a run closed by the store alone (the daemon's start, a command's process found gone) sent no
+    ``run_finished`` to the watch, and its row stood "Working" until the daemon started again."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        await watch.on_event(_event(run.id, "run_started", {}), _NOW)
+        await watch.flush(_NOW + 1)
+        assert _rows(apple.posted[-1]) == [(run.id, "working")]
+        assert await store.finish_run(run.id, "failed", "The daemon stopped.")
+        posted: int = len(apple.posted)
+        await watch.flush(_NOW + CHECK_EVERY_S)
+        assert len(apple.posted) == posted
+        await watch.flush(_NOW + 1 + CHECK_EVERY_S)
+        assert _rows(apple.posted[-1]) == [(run.id, "failed")]
     finally:
         await store.close()
