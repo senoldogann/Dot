@@ -312,6 +312,8 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 pill: Locator = page.locator(f".composer-pill[data-pill='{held}']")
                 await expect(pill).to_contain_text("Medium")
                 await pill.click()
+                if width < 720:
+                    await page.get_by_role("tab", name="Reasoning", exact=True).click()
                 single: Locator = page.locator(f".composer-popover[aria-label='{held.capitalize()}']").get_by_role(
                     "listbox", name="This message only"
                 )

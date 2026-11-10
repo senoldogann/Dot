@@ -269,6 +269,8 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                 pill: Locator = page.locator(f".dock .composer-pill[data-pill='{held}']")
                 await expect(pill).to_be_visible()
                 await pill.click()
+                if width < 720:
+                    await page.get_by_role("tab", name="Reasoning", exact=True).click()
                 menu: Locator = page.locator(f".composer-popover[aria-label='{held.capitalize()}']")
                 speed: Locator = menu.get_by_role("listbox", name="Speed")
                 await expect(speed.get_by_role("option")).to_have_count(2)

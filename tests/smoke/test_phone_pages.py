@@ -216,6 +216,8 @@ async def _bar_and_composer(
     await expect(level).to_be_visible()
     await expect(level).to_contain_text("Low")
     await page.locator(f'.composer-pill[data-pill="{held}"]').click()
+    if width < 720:
+        await page.get_by_role("tab", name="Reasoning", exact=True).click()
     await page.get_by_role("listbox", name="Reasoning", exact=True).get_by_role("option", name="High").click()
     await expect(level).to_contain_text("High")
     composer_bar: Locator = page.locator(".composer-bar")
