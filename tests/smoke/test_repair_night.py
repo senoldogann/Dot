@@ -560,6 +560,25 @@ async def test_a_fix_whose_checks_pass_is_merged_and_the_restart_asked(
         assert not list((stand_ins.parent / "Dot" / ".claude" / "worktrees").iterdir())
 
 
+async def test_a_merge_does_not_end_the_night_and_the_checkout_is_pulled_once_it_is_over(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 1110: a merge ended the night, one problem a night while the plan's window had most of its room; the
+    night goes on to the next problem now, and the owner's checkout is pulled and Dot restarted once, at its end."""
+    async with _night(login_env, stand_ins, "pr", "on_pass") as (runtime, restarts):
+        book: Book = read_book(await runtime.store.kv_get(BOOK_KEY))
+        seen: list[Sighting] = [
+            Sighting(kind="daemon", words="watcher_start_failed: no such feed", evidence=f"line {n}", at=30.0 + n)
+            for n in range(3)
+        ]
+        await runtime.store.kv_set(BOOK_KEY, with_sightings(book, seen, 40.0, 0.0).model_dump_json())
+        sessions, _ = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["merged", "merged"]
+        assert restarts == ["restart"]
+        after: Book = read_book(await runtime.store.kv_get(BOOK_KEY))
+        assert [problem.status for problem in after.problems] == ["fixed", "fixed"]
+
+
 async def test_a_fix_that_changes_what_needs_the_owner_waits_for_them_and_is_never_merged(
     login_env: dict[str, str], stand_ins: Path
 ) -> None:

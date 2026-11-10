@@ -162,10 +162,12 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   - `merge = "on_pass"`: Dot merges the pull request into main, squashed (rebased for several items), only while its
     head is still the commit whose files and checks it looked at (`--match-head-commit`). A merge that reports a
     failure is read back from GitHub: merged is merged. Dot then deletes the branch on GitHub and, once the checkout is
-    gone, here. If your checkout (`repo`) is
-    on main, Dot pulls it fast-forward only. The night then ends, and Dot asks for its own restart once it is idle
-    (`dotx service restart --when-idle`, run with `python -P`, item 943). It does not go on in a process whose code
-    on disk has changed, and the next night takes the next problem. A restart that gave up (a run waited for you two
+    gone, here. The night goes on to the next problem (item 1110: a merge ended the night before, one problem a night),
+    each session on a checkout of its own of the new main. Once the night is over, if it merged anything and your
+    checkout (`repo`) is on main, Dot pulls it fast-forward only and asks for its own restart once it is idle
+    (`dotx service restart --when-idle`, run with `python -P`, item 943); a checkout off main or a pull that failed is
+    told to you. Your checkout is not changed while the night works, so Dot never goes on in a process whose code on
+    disk has changed. A restart that gave up (a run waited for you two
     hours) leaves the daemon on the code before: a night whose checkout's commit is newer than its process (by the
     commit's time) then repairs nothing, asks for the restart again and
     tells you (*Dot waits to restart on new code*, item 943).
@@ -228,7 +230,7 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   - your checkout of Dot changes a tracked file, or stands on a commit `main` does not hold.
 
   Otherwise it is merged (squashed, or rebased when it holds several items, so that each can be reverted alone) only
-  while its head is the one looked at, your checkout is pulled when it is on `main`, and Dot restarts once idle. Its
+  while its head is the one looked at; your checkout is pulled and Dot restarted once the night is over (item 1110). Its
   session is kept like any (its note begins `Second look:`); one that held it ends as yours (*Waits for you*, with its
   reason) and is not looked at again. A pull request found merged already counts its problem fixed, and the night
   goes on; a merged or closed one is settled before anything else is read (item 935). A look whose waits left the

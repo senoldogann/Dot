@@ -63,7 +63,6 @@ from dotagent.repair.github import (
     pr_head,
     pr_items,
     pr_number,
-    pull_main,
     review_on_main,
     update_branch,
 )
@@ -402,9 +401,5 @@ async def second_look(
         await drop_remote_branch(repo, head.branch, env)
     except RepairError as error:
         log.warning("repair_branch_not_deleted", branch=head.branch, error=error.message)
-    try:
-        pulled: bool = await pull_main(repo, env)
-    except RepairError as error:
-        log.warning("repair_pull_failed", error=error.message, context=error.context)
-        return LookOutcome(end="merged_unpulled", why=f"{why}; pulling your checkout failed", outcome=outcome)
-    return LookOutcome(end="merged" if pulled else "merged_unpulled", why=why, outcome=outcome)
+    # The owner's checkout is pulled once the night is over (item 1110), not after each merge.
+    return LookOutcome(end="merged", why=why, outcome=outcome)
