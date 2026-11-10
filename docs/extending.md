@@ -789,7 +789,12 @@ kind, or one close in meaning when embeddings are on) updates the skill rather t
 newer run's, the evidence keeps every run. A run updates its owner's skills alone (Dot's runs Dot's, an agent's runs
 the agent's); another owner's skill of the same name keeps its folder, and the new one takes the next free name
 (`learned-<kind>-2`). Later runs see it under Skills like any skill (its source is `learned`) with a note that it is
-advice from Dot's own work, to follow with their own parameters and judgement, and read it with the `skill` tool. Every
+advice from Dot's own work, to follow with their own parameters and judgement, and read it with the `skill` tool. A
+run of its own that acts (not a chat-mode run, not a resumed one) whose goal is, word for word and at least 80
+characters, the goal of a run in a learned skill's record reads that skill before its first step (item 1118; at most
+two, the newest updated first): a `skill` call the run makes itself, so the timeline shows it, its use is counted and a
+skill marked as made from content third parties can author taints the run from the start. Only Dot's own loop does
+this; a run on the Claude plan or on OpenCode's agent reads a skill when its model calls for it. Every
 run that ended done or failed counts the learned skills it read; one read by two runs in a row that then failed (none
 ended done between them, and a run that ended done and rewrote its steps starts the count again) is retired, moved
 under `<home>/playbooks/.retired`, and no longer offered.

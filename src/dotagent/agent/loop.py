@@ -86,7 +86,14 @@ from dotagent.agent.plan import (
     render_plan,
     with_step_status,
 )
-from dotagent.agent.playbooks import date_reads, offered_to_run
+from dotagent.agent.playbooks import (
+    PlaybookEntry,
+    date_reads,
+    evidence_runs,
+    list_playbooks,
+    offered_to_run,
+    same_goal_playbooks,
+)
 from dotagent.agent.progress import (
     SINGLE_ACTION_STEPS,
     ActCall,
@@ -229,6 +236,7 @@ from dotagent.llm.types import (
     ToolCall,
     ToolSpec,
     assistant_from_reply,
+    assistant_message,
     splits_work,
     system_message,
     tool_message,
@@ -1310,6 +1318,63 @@ def _with_restated(restating: Sequence[tuple[int, str]], outcome: RunOutcome) ->
     it left out) stands. Nothing awaits here: the run ends at once after its inbox was found empty."""
     steps: tuple[int, ...] = tuple(step for step, text in restating if restates(text, outcome.result))
     return outcome.model_copy(update={"restated": steps}) if steps else outcome
+
+
+def _carries_skill(history: Sequence[Message], name: str) -> bool:
+    """Whether a result in ``history`` holds the instructions of the skill ``name``, fenced by the ``skill`` tool."""
+    mark: str = f'name="{name}">'
+    return any(
+        message.role == "tool" and "<skill_content nonce=" in message.content and mark in message.content
+        for message in history
+    )
+
+
+async def _read_same_goal_skills(
+    agent: AgentRun,
+    history: list[Message],
+    registry: ToolRegistry,
+    context: ToolContext,
+    offered: Sequence[Skill],
+    can_see: bool,
+) -> None:
+    """Read, before the run's first step, the learned skills made from a run whose goal was word for word this run's
+    (item 1118, :func:`same_goal_playbooks`): the model was told to read a matching skill first and did not (3 of 42
+    such runs did, 2026-11-10). The read is a call of the ``skill`` tool as any, so the timeline shows it, the read is
+    dated, the run's end counts its use and a skill made from content third parties can author taints the run. Its
+    call and result go into ``history`` and the thread. Only a run of its own of a mode that acts, not resumed, with
+    the ``skill`` tool; a skill whose instructions the history already carries is not read again."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    root: Path | None = playbook_root(runtime.config)
+    if (
+        root is None
+        or run.parent_run_id is not None
+        or run.mode == "chat"
+        or agent.opening.resumed is not None
+        or SKILL_TOOL not in registry.tools
+    ):
+        return
+    entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
+    goals: dict[str, str] = await runtime.store.goals_of([r for r in evidence_runs(entries) if r != run.id])
+    names: tuple[str, ...] = tuple(
+        name
+        for name in same_goal_playbooks(run.goal, entries, goals, {skill.name for skill in offered})
+        if not _carries_skill(history, name)
+    )
+    if not names:
+        return
+    calls: tuple[ToolCall, ...] = tuple(
+        ToolCall(id=f"call_skill_{index}_{run.id}", name=SKILL_TOOL, arguments={"name": name})
+        for index, name in enumerate(names)
+    )
+    log.info("same_goal_skills_read", run_id=run.id, skills=list(names))
+    asked: Message = assistant_message("", None, calls)
+    history.append(asked)
+    await runtime.store.append_messages(run.thread_id, [asked])
+    outcomes: list[ToolOutcome] = await execute_calls(calls, registry, {}, context, agent.gate, 1, lambda _: None)
+    results: list[Message] = await _tool_messages(agent, outcomes, can_see)
+    history.extend(results)
+    await runtime.store.append_messages(run.thread_id, results)
 
 
 async def _stored_note(agent: AgentRun, text: str) -> Message:
@@ -2593,6 +2658,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
 
     # A step's stream is masked as its stored message is: a secret split between two deltas is not shown (item 551).
     sink: StreamMask = StreamMask(show)
+    await _read_same_goal_skills(agent, history, callable_tools, context, skills.skills, info.vision)
 
     while True:
         if agent.cancel.is_set():

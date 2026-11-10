@@ -3042,6 +3042,15 @@ class Store:
             raise NotFoundError("run not found", {"run_id": run_id})
         return _run(row)
 
+    async def goals_of(self, run_ids: Sequence[str]) -> dict[str, str]:
+        """The goal of each of ``run_ids``, a run no longer kept left out (item 1118)."""
+        if not run_ids:
+            return {}
+        rows = await self._all(
+            f"SELECT id, goal FROM runs WHERE id IN ({','.join('?' * len(run_ids))})", tuple(run_ids)
+        )
+        return {row["id"]: row["goal"] for row in rows}
+
     async def working_runs(self) -> list[RunRecord]:
         """The runs at work (:data:`WORKING_STATUSES`), the oldest first."""
         rows = await self._all(f"SELECT * FROM runs WHERE status IN ({_WORKING_SQL}) ORDER BY created_at", ())

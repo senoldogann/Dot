@@ -18,6 +18,7 @@ from dotagent.agent.playbooks import (
     META_FILE,
     RETIRED_DIR,
     Playbook,
+    PlaybookEntry,
     PlaybookMeta,
     SkillVersion,
     acting_digest,
@@ -39,6 +40,7 @@ from dotagent.agent.playbooks import (
     redacted_draft,
     render_playbook,
     retires,
+    same_goal_playbooks,
     same_kind,
     slug,
     taught_name,
@@ -807,3 +809,44 @@ async def test_the_skill_work_of_a_long_run_reads_its_newest_steps_and_counts_ev
         assert (root / RETIRED_DIR / name / SKILL_FILE).is_file()
     finally:
         await store.close()
+
+
+_GOAL: str = (
+    "Müşteri postası. 1) Dot'un Chrome'unda webmail'de gelen kutusunu oku, 2) cevapları taslak bırak ve raporla."
+)
+
+
+def _goal_entry(name: str, runs: tuple[str, ...], updated_at: float, retired: bool) -> PlaybookEntry:
+    skill: Skill = parse_skill(Path(f"/p/{name}/SKILL.md"), f"---\nname: {name}\ndescription: d\n---\nsteps", "learned")
+    meta: PlaybookMeta = PlaybookMeta(
+        name=name,
+        kind=name,
+        host="",
+        runs=runs,
+        acting_steps=tuple(3 for _ in runs),
+        written_at=updated_at,
+        updated_at=updated_at,
+        uses=0,
+        failures=0,
+        agent_id=None,
+        shared=False,
+        tainted=True,
+    )
+    return PlaybookEntry(skill=skill, meta=meta, retired=retired)
+
+
+def test_a_run_reads_the_learned_skills_made_from_a_run_of_its_own_goal_the_newest_first() -> None:
+    entries: list[PlaybookEntry] = [
+        _goal_entry("learned-old", ("r1",), 1.0, False),
+        _goal_entry("learned-new", ("r9", "r2"), 3.0, False),
+        _goal_entry("learned-third", ("r3",), 2.0, False),
+        _goal_entry("learned-retired", ("r4",), 4.0, True),
+        _goal_entry("learned-other", ("r5",), 5.0, False),
+    ]
+    goals: dict[str, str] = {"r1": _GOAL, "r2": f"  {_GOAL.replace(' ', '  ')}\n", "r3": _GOAL, "r4": _GOAL, "r5": "x"}
+    offered: set[str] = {entry.meta.name for entry in entries}
+    # Spaces do not count, at most two are read, the newest updated first; a retired one and another goal's are not.
+    assert same_goal_playbooks(_GOAL, entries, goals, offered) == ("learned-new", "learned-third")
+    # A skill the run is not offered (another agent's) is not read, and a short goal reads none.
+    assert same_goal_playbooks(_GOAL, entries, goals, {"learned-old"}) == ("learned-old",)
+    assert same_goal_playbooks("Onaylıyorum", entries, {"r1": "Onaylıyorum"}, offered) == ()

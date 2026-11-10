@@ -58,7 +58,7 @@ import shutil
 import tempfile
 import time
 import unicodedata
-from collections.abc import Collection, Iterator, Sequence
+from collections.abc import Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from itertools import count
@@ -138,6 +138,10 @@ PLAYBOOK_FAILED: str = "playbook_failed"
 PLAYBOOK_RETIRED: str = "playbook_retired"
 # A playbook that this many runs read and then failed is retired.
 MAX_FAILURES: int = 2
+# A run whose goal is word for word that of a run a learned skill was made from reads the skill before its first step
+# (item 1118): a goal this long at least, and at most this many skills.
+SAME_GOAL_MIN_CHARS: int = 80
+SAME_GOAL_MOST: int = 2
 # How many of the newest tool calls and results of a run its skill work reads (item 557): the steps that ended a long
 # run, not the first part of it.
 _EVENTS_READ: int = 2000
@@ -1602,3 +1606,34 @@ async def save_playbook(runtime: "Runtime", run: RunRecord) -> tuple[str, bool]:
         run.id, PLAYBOOK_WRITTEN, {"name": name, "host": host, "path": str(file), "updated": updated}, True
     )
     return name, updated
+
+
+def goal_key(goal: str) -> str:
+    """``goal`` as it is compared with another (item 1118): its words, one space between them."""
+    return " ".join(goal.split())
+
+
+def evidence_runs(entries: Sequence[PlaybookEntry]) -> tuple[str, ...]:
+    """The runs the active learned skills of ``entries`` were made from or updated by, each once."""
+    return tuple(dict.fromkeys(run for entry in entries if not entry.retired for run in entry.meta.runs))
+
+
+def same_goal_playbooks(
+    goal: str, entries: Sequence[PlaybookEntry], goals: Mapping[str, str], offered: Collection[str]
+) -> tuple[str, ...]:
+    """The names of the active learned skills of ``entries`` that a run with ``goal`` reads before its first step
+    (item 1118): those among ``offered`` (the names the run is offered) with a run in their record whose goal
+    (``goals``, by run) is word for word ``goal``, the newest updated first, at most :data:`SAME_GOAL_MOST`; none for a
+    goal shorter than :data:`SAME_GOAL_MIN_CHARS`, which says too little to stand for a task ("Onaylıyorum")."""
+    key: str = goal_key(goal)
+    if len(key) < SAME_GOAL_MIN_CHARS:
+        return ()
+    matching: list[PlaybookEntry] = [
+        entry
+        for entry in entries
+        if not entry.retired
+        and entry.meta.name in offered
+        and any(goal_key(goals.get(run, "")) == key for run in entry.meta.runs)
+    ]
+    matching.sort(key=lambda entry: -entry.meta.updated_at)
+    return tuple(entry.meta.name for entry in matching[:SAME_GOAL_MOST])

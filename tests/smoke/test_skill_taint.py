@@ -22,7 +22,14 @@ import pytest_asyncio
 
 from dotagent.agent.lessons import RunLessons, run_lessons
 from dotagent.agent.manager import RunManager
-from dotagent.agent.playbooks import Playbook, playbook_name, taught_name, trust_playbook, write_playbook
+from dotagent.agent.playbooks import (
+    Playbook,
+    playbook_name,
+    taught_name,
+    trust_playbook,
+    used_playbooks,
+    write_playbook,
+)
 from dotagent.agent.review import LESSONS_TOOL, PlaybookDraft
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.paths import playbooks_dir
@@ -237,3 +244,83 @@ async def test_a_skill_picked_in_the_composer_starts_the_run_tainted_unless_the_
         second: RunRecord = await _played(home, picked)
         queued = await home.runtime.store.last_event(second.id, "run_queued")
         assert queued is not None and queued.data["tainted"] is False
+
+
+# A goal a schedule sends word for word each time it fires: long enough to stand for a task (item 1118).
+SAME_GOAL: str = (
+    "Keep the line hello in draft.txt and read it back, then say in one sentence what the file holds now, as each day."
+)
+
+
+async def test_a_run_whose_goal_a_learned_skill_was_made_from_reads_it_before_its_first_step(
+    login_env: dict[str, str],
+) -> None:
+    """The earlier run of the same goal stands in the skill's record: the next run of that goal reads the skill
+    through the skill tool before the model's first step, as a call of its own that taints it and counts as a read;
+    the model plays only its own steps."""
+    async with _home(login_env, [*STUMBLE, LESSONS, *STUMBLE, LESSONS]) as home:
+        earlier: RunRecord = await home.manager.start_picked(
+            SAME_GOAL,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            EVAL_SOURCE,
+            None,
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            (),
+            NO_PICKS,
+        )
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            assert (await home.manager.wait(earlier.id)).status == "done"
+            await home.manager.learned(earlier.id)
+        name: str = playbook_name(KIND)
+        write_playbook(
+            playbooks_dir(),
+            Playbook(
+                name=name,
+                kind=KIND,
+                host="this Mac",
+                draft=PlaybookDraft(
+                    kind=KIND,
+                    description="Write a line to a notes file and read it back to check it.",
+                    when="A goal that asks to keep a line in a file.",
+                    steps=["Write <line> to <file> with write_file.", "Read <file> back."],
+                    parameters=["<line>: the text to keep"],
+                ),
+                run_id=earlier.id,
+                agent_id=None,
+                goal=SAME_GOAL,
+                written_at=time.time(),
+                acting_steps=3,
+                tainted=True,
+                taught=False,
+            ),
+        )
+        run: RunRecord = await home.manager.start_picked(
+            SAME_GOAL,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            EVAL_SOURCE,
+            None,
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            (),
+            NO_PICKS,
+        )
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            assert (await home.manager.wait(run.id)).status == "done"
+            await home.manager.learned(run.id)
+        results: list[EventRecord] = await _results(home, run)
+        first: EventRecord = results[0]
+        assert first.data["tool"] == SKILL_TOOL and first.data["ok"] is True and first.data["tainted"] is True
+        assert [event.data["tool"] for event in results[1:]] == ["read_file", "write_file", "read_file", FINISH_TOOL]
+        # What counts the use when a run of its own ends (an eval's run counts none).
+        assert used_playbooks(await home.runtime.store.tool_calls_named(run.id, SKILL_TOOL)) == (name,)
