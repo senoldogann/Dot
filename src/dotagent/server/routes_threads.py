@@ -27,7 +27,8 @@ def threads_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/threads")
     async def list_threads(query: Annotated[ThreadsQuery, Query()]) -> list[ThreadSummary]:
-        return await store.list_thread_summaries(query.limit, ctx.runtime.config.scheduler.same_chat)
+        rows = await store.list_thread_summaries(query.limit, ctx.runtime.config.scheduler.same_chat)
+        return [ctx.manager.as_shown_thread(row) for row in rows]
 
     @router.get("/threads/{thread_id}/helpers")
     async def list_helpers(thread_id: str, query: Annotated[HelpersQuery, Query()]) -> list[RunRecord]:

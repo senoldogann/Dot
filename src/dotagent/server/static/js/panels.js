@@ -8,7 +8,7 @@ import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
 import { attempt, detailsFold } from "./ui.js";
 
-const STATUS_LABEL = { blocked: "waiting" };
+const STATUS_LABEL = { blocked: "waiting", ending: "saving the end" };
 const FOLD_KEY_PREFIX = "dot.fold.";
 
 /** The heading of a page: a title, an optional one-line subtitle and optional controls on the right. The subtitle

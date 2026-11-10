@@ -33,9 +33,11 @@ from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import Effort, ImageData, Message, OneMessage, Speed
 from dotagent.policy.types import ApprovalMode, PaceClass
-from dotagent.store.endings import RESULT_RESTARTED
+from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.models import (
     NO_PICKS,
+    OBJECTIVE_MOVES,
+    OCCUPIED_STATUSES,
     TAINT_EVENTS,
     WORK_ORDER_MOVES,
     WORKING_STATUSES,
@@ -651,6 +653,7 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         rewindable=row["history_version"] is not None and row["history_seq"] is not None,
         harness_version=row["harness_version"],
         follows_reaction=row["follows_reaction"],
+        end_reason=None if row["end_reason"] is None else str(row["end_reason"]),
     )
 
 
@@ -1241,6 +1244,8 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("harness_version", "TEXT"),
     # The reaction a follow-up run follows up (item 844), NULL for every other run and for runs from before.
     ("follows_reaction", "TEXT"),
+    # Why the run ended, beside the result text. NULL until it ends, and for every run stored before.
+    ("end_reason", "TEXT"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used, and are Dot's.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -1386,6 +1391,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     if "seen_at" in await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS):
         # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
         await connection.execute("UPDATE threads SET seen_at = ?", (time.time(),))
+    await _add_columns(connection, "queue_holds", (("reason", "TEXT NOT NULL DEFAULT 'owner'"),))
     if "speed" in added_to_runs:
         # A store from before fast mode (item 223): the choices its chats kept are those of the standard speed. Only
         # then, as an UPDATE takes the write lock even when it changes nothing, and a store opens beside other writers.
@@ -1506,6 +1512,8 @@ _OPTIMIZE_AT_OPEN: int = 0x10002
 
 # The working states of a run, as SQL: the ones a run may move between or end from (item 1045).
 _WORKING_SQL: str = ", ".join(f"'{status}'" for status in sorted(WORKING_STATUSES))
+# Working states plus ``ending``: a run whose end is decided still occupies its chat and can still be closed.
+_OCCUPIED_SQL: str = ", ".join(f"'{status}'" for status in sorted(OCCUPIED_STATUSES))
 # Whether the run of the bound id works (item 1047).
 _RUN_WORKS_SQL: str = f"EXISTS (SELECT 1 FROM runs WHERE runs.id = ? AND runs.status IN ({_WORKING_SQL}))"
 
@@ -1806,17 +1814,18 @@ class Store:
     async def create_harness_step(
         self, started_at: float, from_run: str | None, base_version: str | None
     ) -> HarnessStep:
-        """Store the start of a step of the improvement loop (item 391), as failed until :meth:`finish_harness_step`
-        says how it ended: a step the daemon's stop cut off reads so."""
+        """Store the start of a step of the improvement loop (item 391), as ``running`` until
+        :meth:`finish_harness_step` says how it ended. A step still running when the daemon starts again is closed as
+        failed (:meth:`close_unfinished_harness_steps`): failed is an end, not the state a step starts in."""
         step: HarnessStep = HarnessStep(
             id=new_id("hst"),
             started_at=started_at,
             ended_at=None,
             from_run=from_run,
             base_version=base_version,
-            state="failed",
+            state="running",
             outcome="{}",
-            error="the step did not end",
+            error=None,
         )
         await self._db.execute(
             "INSERT INTO harness_steps(id, started_at, ended_at, from_run, base_version, state, outcome, error)"
@@ -1831,13 +1840,28 @@ class Store:
         self, step_id: str, ended_at: float, state: HarnessStepState, outcome: str, error: str | None
     ) -> HarnessStep:
         cursor: aiosqlite.Cursor = await self._db.execute(
-            "UPDATE harness_steps SET ended_at = ?, state = ?, outcome = ?, error = ? WHERE id = ?",
+            "UPDATE harness_steps SET ended_at = ?, state = ?, outcome = ?, error = ?"
+            " WHERE id = ? AND state = 'running'",
             (ended_at, state, outcome, error, step_id),
         )
         await self._db.commit()
         if cursor.rowcount == 0:
-            raise NotFoundError("harness step not found", {"step_id": step_id})
+            current: HarnessStep = await self.get_harness_step(step_id)
+            # A second finish does not overwrite an end already written.
+            log.info("harness_step_already_finished", step_id=step_id, state=current.state, wanted=state)
+            return current
         return await self.get_harness_step(step_id)
+
+    @_writing
+    async def close_unfinished_harness_steps(self) -> int:
+        """Steps still ``running`` when the daemon starts (their process went before :meth:`finish_harness_step`)
+        become failed. Idempotent: a second start finds none running. Returns how many closed."""
+        cursor = await self._db.execute(
+            "UPDATE harness_steps SET state = 'failed', error = ? WHERE state = 'running'",
+            ("the step did not end",),
+        )
+        await self._db.commit()
+        return cursor.rowcount
 
     async def get_harness_step(self, step_id: str) -> HarnessStep:
         row: aiosqlite.Row | None = await self._one("SELECT * FROM harness_steps WHERE id = ?", (step_id,))
@@ -2879,7 +2903,8 @@ class Store:
             rewindable=parent_run_id is None,
             follows_reaction=follows_reaction,
         )
-        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        # ``ending`` occupies the chat too: a run whose end is not stored yet is not a free chat.
+        working: tuple[RunStatus, ...] = tuple(sorted(OCCUPIED_STATUSES))
         # Where the run's first message goes in the chat's history (item 282): the history's version and the place after
         # its last message. Nothing comes in between, as a chat has one run at work at a time and a run stores all it
         # says before it stops working. A delegated run has none: a helper works in a chat of its own, and an agent's
@@ -2972,6 +2997,17 @@ class Store:
         return cursor.rowcount > 0
 
     @_writing
+    async def mark_run_ending(self, run_id: str) -> bool:
+        """The run's end is decided and not stored yet: ``ending``, from a working state. A run already ending, or one
+        that ended, is left as it is. Whether the row moved."""
+        cursor = await self._db.execute(
+            f"UPDATE runs SET status = 'ending' WHERE id = ? AND status IN ({_WORKING_SQL})",
+            (run_id,),
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
     async def set_run_status(self, run_id: str, status: WorkingStatus) -> bool:
         """Move a run that has not ended between its working states (queued, running, blocked on an approval); whether
         it moved. An end is no working state, so it cannot be written here, without its time and its event (item
@@ -3029,10 +3065,14 @@ class Store:
         return await self._unit(statements)
 
     async def _set_end(self, run_id: str, status: RunStatus, result: str, now: float) -> bool:
-        """Write the end of a run that has not ended; whether it was written."""
+        """Write the end of a run that has not ended, including one already marked ``ending``; whether it was written.
+        The reason is stored beside the text, from the same reading :func:`classify_ending` uses, so a later edit of
+        the words does not change what the end was."""
+        reason: str = classify_ending(status, result)
         cursor = await self._db.execute(
-            f"UPDATE runs SET status = ?, result = ?, finished_at = ? WHERE id = ? AND status IN ({_WORKING_SQL})",
-            (status, result, now, run_id),
+            "UPDATE runs SET status = ?, result = ?, finished_at = ?, end_reason = ?"
+            f" WHERE id = ? AND status IN ({_OCCUPIED_SQL})",
+            (status, result, now, reason, run_id),
         )
         return cursor.rowcount > 0
 
@@ -3176,15 +3216,13 @@ class Store:
     async def active_run_owners(self) -> list[str | None]:
         """The owners of the runs that are active (queued, running, or blocked on a question), each once; ``None`` for
         runs made before owners were kept."""
-        rows = await self._all(
-            "SELECT DISTINCT owner FROM runs WHERE status IN ('running', 'queued', 'blocked') ORDER BY owner", ()
-        )
+        rows = await self._all(f"SELECT DISTINCT owner FROM runs WHERE status IN ({_OCCUPIED_SQL}) ORDER BY owner", ())
         return [None if row["owner"] is None else str(row["owner"]) for row in rows]
 
     async def working_runs_of_others(self, owner: str) -> list[WorkingRun]:
         """The runs at work that processes other than ``owner`` drive (``dotx`` commands, for the daemon), oldest
         first."""
-        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        working: tuple[RunStatus, ...] = tuple(sorted(OCCUPIED_STATUSES))
         rows = await self._all(
             "SELECT id, thread_id, owner FROM runs WHERE owner IS NOT NULL AND owner != ?"
             f" AND status IN ({','.join('?' * len(working))}) ORDER BY created_at, id",
@@ -3341,9 +3379,9 @@ class Store:
         pruned since (the run keeps none, and gets none back). The events of delegated runs come first, as a run's
         end follows the ends of the runs it delegated (item 197). Returns how many runs changed."""
         async with self._db.execute(
-            "UPDATE runs SET status = 'failed', result = ?,"
+            "UPDATE runs SET status = 'failed', result = ?, end_reason = 'daemon_restarted',"
             " finished_at = COALESCE((SELECT MAX(ts) FROM events WHERE events.run_id = runs.id), created_at)"
-            " WHERE status IN ('running', 'queued', 'blocked')"
+            f" WHERE status IN ({_OCCUPIED_SQL})"
             f" AND (owner IS NULL OR owner IN ({','.join('?' * len(gone))})) RETURNING id",
             (RESULT_RESTARTED, *gone),
         ) as cursor:
@@ -3367,12 +3405,13 @@ class Store:
         time, the ``run_finished`` event that every other end of a run stores, those of delegated runs first; returns
         those events, for the pages that follow the runs. Unlike :meth:`mark_interrupted_runs`, a run without an owner
         stays as it is."""
+        reason: str = classify_ending("failed", result)
         async with self._db.execute(
-            "UPDATE runs SET status = 'failed', result = ?,"
+            "UPDATE runs SET status = 'failed', result = ?, end_reason = ?,"
             " finished_at = COALESCE((SELECT MAX(ts) FROM events WHERE events.run_id = runs.id), created_at)"
-            f" WHERE status IN ('running', 'queued', 'blocked') AND owner IN ({','.join('?' * len(owners))})"
+            f" WHERE status IN ({_OCCUPIED_SQL}) AND owner IN ({','.join('?' * len(owners))})"
             " RETURNING id, finished_at, parent_run_id",
-            (result, *owners),
+            (result, reason, *owners),
         ) as cursor:
             rows: list[sqlite3.Row] = list(await cursor.fetchall())
         closed: list[tuple[str, float]] = [
@@ -4044,13 +4083,22 @@ class Store:
         self, approval_id: str, status: ApprovalStatus, decided_by: str, note: str
     ) -> ApprovalRecord:
         """Decide an approval that is still open (``pending`` or ``left``); a decided one keeps its decision."""
-        await self._db.execute(
+        cursor = await self._db.execute(
             "UPDATE approvals SET status = ?, decided_at = ?, decided_by = ?, note = ?"
             " WHERE id = ? AND status IN ('pending', 'left')",
             (status, time.time(), decided_by, note, approval_id),
         )
         await self._db.commit()
-        return await self.get_approval(approval_id)
+        decided: ApprovalRecord = await self.get_approval(approval_id)
+        if cursor.rowcount == 0:
+            # The row was already decided. The caller reads what is stored, not the decision that lost the race.
+            log.info(
+                "approval_already_decided",
+                approval_id=approval_id,
+                wanted=status,
+                status=decided.status,
+            )
+        return decided
 
     async def get_approval(self, approval_id: str) -> ApprovalRecord:
         row = await self._one("SELECT * FROM approvals WHERE id = ?", (approval_id,))
@@ -4399,19 +4447,33 @@ class Store:
     async def update_objective(
         self, objective_id: str, status: ObjectiveStatus | None, note: ObjectiveNote | None
     ) -> ObjectiveRecord:
-        """Change where an objective stands, and add a dated line of progress: the notes only grow."""
+        """Change where an objective stands, and add a dated line of progress: the notes only grow. A move
+        :data:`OBJECTIVE_MOVES` does not allow is refused. The write matches the status just read, so a move made
+        meanwhile is not overwritten."""
         current: ObjectiveRecord = await self.get_objective(objective_id)
+        wanted: ObjectiveStatus = current.status if status is None else status
+        if wanted != current.status and wanted not in OBJECTIVE_MOVES[current.status]:
+            raise InvalidValueError(
+                "an objective does not move like that",
+                {"objective_id": objective_id, "from": current.status, "to": wanted},
+            )
         notes: tuple[ObjectiveNote, ...] = current.notes if note is None else (*current.notes, note)
-        await self._db.execute(
-            "UPDATE objectives SET status = ?, notes = ?, updated_at = ? WHERE id = ?",
+        cursor = await self._db.execute(
+            "UPDATE objectives SET status = ?, notes = ?, updated_at = ? WHERE id = ? AND status = ?",
             (
-                current.status if status is None else status,
+                wanted,
                 _OBJECTIVE_NOTES.dump_json(notes).decode(),
                 time.time(),
                 objective_id,
+                current.status,
             ),
         )
         await self._db.commit()
+        if cursor.rowcount == 0:
+            raise InvalidValueError(
+                "the objective moved meanwhile",
+                {"objective_id": objective_id, "from": current.status, "to": wanted},
+            )
         return await self.get_objective(objective_id)
 
     async def get_draft(self, draft_id: str) -> DraftRecord:
@@ -4869,7 +4931,7 @@ class Store:
         claimed message stays in the queue, where it cannot be edited, taken out or steered, until its run has started
         (:meth:`drop_claimed`) or could not start (:meth:`hold_claimed`). Returns it, or ``None`` when none was
         claimed."""
-        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        working: tuple[RunStatus, ...] = tuple(sorted(OCCUPIED_STATUSES))
         async with self._db.execute(
             "INSERT INTO queue_claims(thread_id, message_id, owner, claimed_at)"
             " SELECT thread_id, id, ?, ? FROM queued_messages WHERE thread_id = ?"
@@ -4960,12 +5022,34 @@ class Store:
         await self._db.commit()
 
     @_writing
-    async def hold_queue(self, thread_id: str) -> None:
-        """Keep a chat's queue from starting its next message until :meth:`release_queue`."""
+    async def hold_queue(self, thread_id: str, reason: str = "owner") -> None:
+        """Keep a chat's queue from starting its next message until :meth:`release_queue`. ``reason`` is ``owner``
+        (the owner resumes it) or ``crash`` (the run that goes on from a cut-off releases it when that run ends
+        done). A queue already held keeps the reason it has."""
+        if reason not in ("owner", "crash"):
+            raise InvalidValueError("a queue is held for the owner or for a crash", {"reason": reason})
         await self._db.execute(
-            "INSERT OR IGNORE INTO queue_holds(thread_id, held_at) VALUES(?, ?)", (thread_id, time.time())
+            "INSERT OR IGNORE INTO queue_holds(thread_id, held_at, reason) VALUES(?, ?, ?)",
+            (thread_id, time.time(), reason),
         )
         await self._db.commit()
+
+    async def queue_hold_reason(self, thread_id: str) -> str | None:
+        """Why a chat's queue is held, or ``None`` when it is not."""
+        row: aiosqlite.Row | None = await self._one("SELECT reason FROM queue_holds WHERE thread_id = ?", (thread_id,))
+        if row is None:
+            return None
+        return "owner" if row["reason"] is None else str(row["reason"])
+
+    @_writing
+    async def release_hold(self, thread_id: str, reason: str) -> bool:
+        """Release a hold of ``reason`` only. An ``owner`` hold is not released by a crash's continuation. Whether a
+        row went."""
+        cursor = await self._db.execute(
+            "DELETE FROM queue_holds WHERE thread_id = ? AND reason = ?", (thread_id, reason)
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
 
     @_writing
     async def release_queue(self, thread_id: str) -> None:

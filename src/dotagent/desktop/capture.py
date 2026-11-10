@@ -3,7 +3,6 @@
 Capturing and encoding are separate so that the output size can follow the density the display really delivers.
 """
 
-import io
 import platform
 import threading
 import time
@@ -15,6 +14,7 @@ import ScreenCaptureKit as SCK
 from PIL import Image, ImageDraw
 
 from dotagent.core.errors import DesktopError, DesktopPermissionError
+from dotagent.core.images import render_jpeg as encode_jpeg
 from dotagent.desktop.types import Rect
 
 _USER_DECLINED: int = -3801  # SCStreamErrorUserDeclined: Screen Recording is not granted
@@ -138,10 +138,6 @@ def zoom_size(region: Rect, native: tuple[int, int], max_edge: int) -> tuple[int
 
 
 def render_jpeg(picture: Image.Image, width: int, height: int, quality: int) -> bytes:
-    """``picture`` shrunk to ``width`` x ``height`` and encoded as JPEG."""
-    fitted: Image.Image = picture
-    if picture.size != (width, height):
-        fitted = picture.resize((width, height), Image.Resampling.LANCZOS, reducing_gap=3.0)
-    buffer: io.BytesIO = io.BytesIO()
-    fitted.save(buffer, "JPEG", quality=quality)
-    return buffer.getvalue()
+    """``picture`` shrunk to ``width`` x ``height`` and encoded as JPEG. An unchanged frame returns the JPEG already
+    encoded (:func:`dotagent.core.images.render_jpeg`)."""
+    return encode_jpeg(picture, width, height, quality)

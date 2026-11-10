@@ -12,6 +12,7 @@ from dotagent.agent.failure_lessons import hand_failure_lessons
 from dotagent.agent.gate import RunGate, hold_note, masked_action
 from dotagent.agent.held_secrets import all_held_values
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
+from dotagent.agent.yolo_log import note_checkpoint, yolo_failure_note
 from dotagent.core.errors import (
     ApprovalParked,
     ApprovalRejected,
@@ -320,6 +321,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
             gate.taint()
         handed_off: bool = isinstance(exc, HandedOff)
         failed: ToolResult = _with_approval_note(ok(text) if handed_off else fail(text), note)
+        failed = _record_yolo(ctx, tool.spec.name, action, failed)
         return _Checked(result=failed, action=action, waited_s=at_gate.seconds, decision=decision)
     if action is not None and not result.is_error:
         gate.observe(action)
@@ -331,7 +333,27 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     noted: ToolResult = _with_approval_note(result, note)
     if held_s > 0.0:
         noted = noted.model_copy(update={"text": f"{noted.text}\n\n{hold_note(held_s)}"})
+    noted = _record_yolo(ctx, tool.spec.name, action, noted)
     return _Checked(result=noted, action=action, waited_s=at_gate.seconds, decision=decision)
+
+
+def _record_yolo(ctx: ToolContext, tool_name: str, action: ActionInfo | None, result: ToolResult) -> ToolResult:
+    """Log a yolo call and keep a checkpoint that does not wait. A failed call is told to go on, still without asking.
+    Any other approval mode is unchanged."""
+    if ctx.approvals != "yolo":
+        return result
+    summary: str = action.summary if action is not None else tool_name
+    log.info(
+        "yolo_step",
+        run_id=ctx.run_id,
+        tool=tool_name,
+        ok=not result.is_error,
+        summary=truncate_middle(summary, 160),
+    )
+    note_checkpoint(ctx.runtime.undo_dir, ctx.run_id, tool_name, not result.is_error, summary)
+    if result.is_error:
+        return result.model_copy(update={"text": yolo_failure_note(result.text)})
+    return result
 
 
 def _group_turned_on_note(tool: str, group: str) -> str:

@@ -105,8 +105,23 @@ def _cancelled_ending(result: str) -> Ending:
     return "stopped"
 
 
-def classify_ending(status: RunStatus, result: str) -> Ending:
-    """The reason a run ended, from its stored status and result text."""
+def _stored_ending(stored: str | None) -> Ending | None:
+    """``stored`` when it is a reason a run can end with, else ``None`` (nothing stored, or ``active``)."""
+    if stored is None or stored == "active":
+        return None
+    for ending in ENDING_LABELS:
+        if ending == stored:
+            return ending
+    return None
+
+
+def classify_ending(status: RunStatus, result: str, stored: str | None = None) -> Ending:
+    """The reason a run ended. ``stored`` is the reason written when it ended; it wins over the result text, which a
+    later edit of the words would otherwise reclassify. A run stored before the reason was kept, or one that has not
+    ended, is still read from the text."""
+    known: Ending | None = _stored_ending(stored)
+    if known is not None:
+        return known
     match status:
         case "done":
             return "finished"
@@ -114,5 +129,5 @@ def classify_ending(status: RunStatus, result: str) -> Ending:
             return _failed_ending(result)
         case "cancelled":
             return _cancelled_ending(result)
-        case "queued" | "running" | "blocked":
+        case "queued" | "running" | "blocked" | "ending":
             return "active"

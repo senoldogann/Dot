@@ -12,11 +12,16 @@ from dotagent.vault.cards import Brand
 # Which Chrome the browser tools work in: Dot's own, or the one the user has open (attached over its debugging port).
 type BrowserMode = Literal["own", "attach"]
 
-RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled"]
+RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled", "ending"]
 # A run in one of these has not ended.
 # The states a run moves between while it works; only an end (``Store.end_run``) leaves them (item 1103).
 WorkingStatus = Literal["queued", "running", "blocked"]
 WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
+# A run whose end is decided but not stored yet (``ending``) still occupies its chat: a new run must not start beside
+# it, and a restart closes it as it closes a run left at work. It is not a working state, so a page does not show it
+# as running and nothing moves it back to running.
+OCCUPIED_STATUSES: frozenset[RunStatus] = WORKING_STATUSES | frozenset({"ending"})
+TERMINAL_STATUSES: frozenset[RunStatus] = frozenset({"done", "failed", "cancelled"})
 # The events that say whether a run is tainted after them (item 243): it starts so or not (``run_queued``), a tool's
 # result may taint it (``tool_result``), and a message of the owner that steers it clears the taint (``steer``); Dot's
 # words that the owner did a step kept for them vouch for nothing and keep it as it was (item 482).
@@ -61,6 +66,13 @@ WORK_ORDER_MOVES: dict[WorkOrderStatus, frozenset[WorkOrderStatus]] = {
 OPEN_WORK_ORDERS: tuple[WorkOrderStatus, ...] = ("assigned", "working", "in_review", "returned", "escalated")
 # Where an objective of the owner's stands (item 908).
 ObjectiveStatus = Literal["active", "done", "dropped"]
+# The moves the store allows. A dropped objective stays dropped. Opening a done one again is the one way back, and the
+# tool still applies the cap on how many may be active. A move to the status an objective already has only adds a note.
+OBJECTIVE_MOVES: dict[ObjectiveStatus, frozenset[ObjectiveStatus]] = {
+    "active": frozenset({"done", "dropped"}),
+    "done": frozenset({"active"}),
+    "dropped": frozenset(),
+}
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
 # How the end of a schedule's run is told (item 461): every end, only a first failure or an end that needs the owner,
 # or nothing.
@@ -209,6 +221,9 @@ class RunRecord(FrozenModel):
     rewindable: bool
     harness_version: str | None = None
     follows_reaction: ReactionName | None = None
+    # Why the run ended, stored beside the result text (which stays the words a person reads). ``None`` for a run that
+    # has not ended, and for one stored before the reason was a column of its own.
+    end_reason: str | None = None
 
 
 class RewindCut(FrozenModel):
@@ -354,9 +369,10 @@ class TradingOrderRecord(FrozenModel):
 
 class TradingExitRecord(FrozenModel):
     """The exit of a buy (item 770): Dot sells ``size`` of ``product`` once the bid falls to ``stop`` or rises to
-    ``target``. ``status`` is ``open`` while it is watched (or waits for its account to be in use again), ``stopped``
-    or ``targeted`` once its sell filled, ``closed`` once sells by hand took its size or the paper account started
-    again, ``failed`` when its sell was refused; ``order_id`` is the buy's, ``sell_id`` the sell's that closed it."""
+    ``target``. ``status`` is ``open`` while it is watched, ``stopped`` or ``targeted`` once its sell filled,
+    ``closed`` once sells by hand took its size or the paper account started again, ``failed`` when the sell was
+    refused before it was sent, ``uncertain`` when a sell may have reached the account and must not be sent again.
+    ``order_id`` is the buy's, ``sell_id`` the sell's that closed it."""
 
     id: str
     mode: Literal["paper", "live"]
@@ -367,7 +383,7 @@ class TradingExitRecord(FrozenModel):
     ts: float
     order_id: str
     run_id: str
-    status: Literal["open", "stopped", "targeted", "closed", "failed"]
+    status: Literal["open", "stopped", "targeted", "closed", "failed", "uncertain"]
     closed_ts: float | None
     sell_id: str
     note: str
@@ -983,7 +999,7 @@ class HarnessVersion(FrozenModel):
     retired_at: float | None
 
 
-type HarnessStepState = Literal["done", "keep", "skipped", "failed", "calibrating", "unusable"]
+type HarnessStepState = Literal["running", "done", "keep", "skipped", "failed", "calibrating", "unusable"]
 
 
 class HarnessStep(FrozenModel):

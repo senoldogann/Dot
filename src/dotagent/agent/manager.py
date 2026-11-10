@@ -56,6 +56,7 @@ from dotagent.agent.lessons import (
     undo_lesson,
 )
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
+from dotagent.agent.loop_state import LOOP_STATE_EVENT
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.orders import WorkDesk
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
@@ -69,6 +70,7 @@ from dotagent.agent.parking import (
     parking_for,
     send_parking,
 )
+from dotagent.agent.phases import hold_reason_for_cutoff, shown_status
 from dotagent.agent.picks import picked_groups, picks_problems
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import (
@@ -178,6 +180,7 @@ from dotagent.store.models import (
     RunStatus,
     TeamRecord,
     ThreadRecord,
+    ThreadSummary,
     WorkingRun,
 )
 from dotagent.terminal.session import TerminalSession, ended_notices
@@ -568,14 +571,20 @@ class RunManager:
         if unknown:
             log.warning("trading_orders_left_pending", orders=unknown)
         await store.forget_stops_of_ended_runs()
+        closed_steps: int = await store.close_unfinished_harness_steps()
+        if closed_steps:
+            log.warning("harness_steps_closed_on_start", steps=closed_steps)
         await self._hold_claims_of_gone(directory)
         # A stop of the daemon is not the owner's stop of the chat: a queue whose run the stop cut goes on once that
         # run, continued, ends done (:meth:`_follow_queue`). Any other waits for the owner to resume it: its run
         # failed, was stopped, was cut by a crash, works in a process that lives, or ended done as the daemon stopped.
         for thread_id in await store.queued_threads():
             newest: list[RunRecord] = await store.list_runs(1, thread_id)
-            if not newest or cut_off_by(newest[0]) != "daemon_shutdown":
-                await store.hold_queue(thread_id)
+            # A clean shutdown leaves the queue to the run that goes on from it. A crash holds it until that
+            # resumed run ends done. Anything else waits for the owner (:func:`hold_reason_for_cutoff`).
+            reason: str | None = hold_reason_for_cutoff(None if not newest else cut_off_by(newest[0]))
+            if reason is not None:
+                await store.hold_queue(thread_id, reason)
         await asyncio.to_thread(clear_gone_owners, directory)
         return interrupted
 
@@ -608,7 +617,7 @@ class RunManager:
             if closed.campaign_id is not None and not self._stopping:
                 # The command recorded nothing, so the session left no word of what it needs.
                 await self._follow_session(
-                    closed, closed.campaign_id, classify_ending(closed.status, closed.result), ""
+                    closed, closed.campaign_id, classify_ending(closed.status, closed.result, closed.end_reason), ""
                 )
         await asyncio.to_thread(clear_gone_owners, directory)
         return len(told)
@@ -691,6 +700,25 @@ class RunManager:
                 if stored:
                     log.info("left_ends_stored", runs=stored)
             try:
+                retried: int = await self.retry_left_claims()
+            except DotError as exc:
+                log.warning(
+                    "left_claims_not_ended",
+                    claims=len(self._left_claims),
+                    error=exc.message,
+                    context=exc.context,
+                )
+            except (sqlite3.Error, OSError) as exc:
+                log.warning(
+                    "left_claims_not_ended",
+                    claims=len(self._left_claims),
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
+            else:
+                if retried:
+                    log.info("left_claims_ended", claims=retried)
+            try:
                 closed: int = await self.close_runs_of_dead_commands()
             except DotError as exc:
                 log.warning("dead_commands_not_checked", error=exc.message, context=exc.context)
@@ -748,8 +776,43 @@ class RunManager:
                     log.exception("queue_not_followed", run_id=left.run.id, thread_id=left.run.thread_id)
         return stored
 
+    async def retry_left_claims(self) -> int:
+        """End the claims on queued messages the store refused to end (:meth:`_end_claim`), without waiting for another
+        run to finish. A claim that ends and leaves the queue free is drained, so a store that refused once and then
+        accepts does not leave the chat claimed until some later end. Returns how many claims ended."""
+        store: Store = self._runtime.store
+        ended: int = 0
+        for thread_id, end in list(self._left_claims.items()):
+            await end(thread_id)
+            self._left_claims.pop(thread_id, None)
+            ended += 1
+            if await store.queue_held(thread_id) or self._active_on(thread_id) is not None:
+                continue
+            newest: list[RunRecord] = await store.list_runs(1, thread_id)
+            if newest and newest[0].status not in WORKING_STATUSES and newest[0].status != "ending":
+                try:
+                    await self._drain(thread_id, newest[0].id)
+                except Exception:
+                    log.exception("queue_not_followed", thread_id=thread_id)
+        return ended
+
     def active_run_ids(self) -> list[str]:
         return list(self._handles)
+
+    def as_shown(self, run: RunRecord) -> RunRecord:
+        """``run`` as a page shows it: ``ending`` when its end is waiting to be stored, even if the row still says it
+        works."""
+        status: RunStatus = shown_status(run.status, run.id in self._left_ends)
+        if status == run.status:
+            return run
+        return run.model_copy(update={"status": status})
+
+    def as_shown_thread(self, summary: ThreadSummary) -> ThreadSummary:
+        """A chat as the sidebar shows it, with :meth:`as_shown` applied to its latest run."""
+        status: RunStatus = shown_status(summary.latest_status, summary.latest_run_id in self._left_ends)
+        if status == summary.latest_status:
+            return summary
+        return summary.model_copy(update={"latest_status": status})
 
     def live_run_in(self, thread_id: str) -> str | None:
         """The run at work in the chat ``thread_id`` in this process, ``None`` when none is (item 907: the lead's chat
@@ -2801,6 +2864,7 @@ class RunManager:
     ) -> Resumption:
         """What a run that goes on from ``old`` is handed: the reason, the calls, the newest plan and the ledger ids."""
         plan: EventRecord | None = await self._runtime.store.last_event(old.id, PLAN_EVENT)
+        snapshot: EventRecord | None = await self._runtime.store.last_event(old.id, LOOP_STATE_EVENT)
         return Resumption(
             from_run_id=old.id,
             cut_off=reason,
@@ -2808,6 +2872,7 @@ class RunManager:
             calls=calls,
             plan=EMPTY_PLAN if plan is None else plan_from_event(plan),
             identities=await self._ledger_ids(old.thread_id),
+            ladder="restored" if snapshot is not None else "reset",
         )
 
     async def _continuation(self, thread_id: str) -> tuple[str, Resumption] | None:
@@ -3613,6 +3678,8 @@ class RunManager:
             data["restated"] = list(restated)
         try:
             await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
+            # Before the end itself: if that write is refused, the row is already ``ending``, not running.
+            await runtime.store.mark_run_ending(run.id)
             ended: EventRecord | None = await runtime.store.end_run(run.id, status, clean, data)
         except DotError:
             self._left_ends[run.id] = _LeftEnd(run=run, status=status, result=clean, needs=needed, data=data)
@@ -3643,6 +3710,9 @@ class RunManager:
             return
         store: Store = self._runtime.store
         if status == "done":
+            # A crash held the queue until this continuation ended. An owner hold stays until the owner resumes it.
+            if run.source == RESUME_SOURCE:
+                await store.release_hold(run.thread_id, "crash")
             await self._drain(run.thread_id, run.id)
             await self._tell_ended_commands(run.thread_id)
         elif await store.list_queued(run.thread_id):

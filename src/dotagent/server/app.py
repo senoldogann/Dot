@@ -193,7 +193,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     when it was built (item 309, :mod:`dotagent.server.kept_pages`)."""
     pages: KeptPages = keep_pages(STATIC_DIR)
     app: FastAPI = FastAPI(title="Dot", version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
-    app.include_router(health_router())
+    app.include_router(health_router(ctx.notifications))
     phones: PairedPhones = ctx.phones if ctx.phones is not None else PairedPhones.load(phones_path())
     app.include_router(proof_router(ctx.token, phones))
     app.include_router(system_router(ctx, pages.build))

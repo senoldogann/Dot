@@ -297,7 +297,7 @@ class WorkDesk:
         """An attempt's run ended: the order goes to review, taken by the taint of what the run read, and the lead is
         told. An order the lead moved meanwhile (accepted, returned, cancelled) is left as it is."""
         run: RunRecord = outcome.run
-        if run.status == "cancelled" and classify_ending(run.status, run.result) == "emergency_stop":
+        if run.status == "cancelled" and classify_ending(run.status, run.result, run.end_reason) == "emergency_stop":
             # The owner stopped everything: the order is over, not one to review.
             await self._runtime.store.move_work_order(
                 order.id,

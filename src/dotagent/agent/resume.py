@@ -125,6 +125,9 @@ class Resumption(FrozenModel):
     calls: tuple[InterruptedCall, ...]
     plan: PlanPayload
     identities: tuple[str, ...] = ()
+    # Whether the ledger and the progress ladder are restored from the run this goes on from. ``unsaid`` leaves the
+    # note as it was before that snapshot existed.
+    ladder: Literal["restored", "reset", "unsaid"] = "unsaid"
 
 
 def cut_off_by(run: RunRecord) -> CutOff | None:
@@ -132,7 +135,7 @@ def cut_off_by(run: RunRecord) -> CutOff | None:
     for the run), the daemon was shut down, the ``dotx`` command that drove the run was told to end (its terminal was
     closed, or it got SIGTERM), or that command died (it was killed, or it crashed). ``None`` when anything else ended
     the run, or the run has not ended."""
-    match classify_ending(run.status, run.result):
+    match classify_ending(run.status, run.result, run.end_reason):
         case "daemon_restarted":
             return "daemon_restarted"
         case "daemon_shutdown":
@@ -241,6 +244,13 @@ def resume_note(goal: str, resumption: Resumption) -> str:
             "Ids of Dot's records named so far, which a compaction keeps (read one back with recall): "
             + ", ".join(resumption.identities)
         )
+    if resumption.ladder == "restored":
+        parts.append(
+            "Its ledger of actions and its progress ladder are restored, so do not start them over. Its limit of "
+            "minutes and tokens starts again with this run."
+        )
+    elif resumption.ladder == "reset":
+        parts.append("Its ledger of actions and its progress ladder start again: no snapshot of them was kept.")
     parts.append(
         "Pick up where it left off: do not redo what is done, check what a call that was cut off may have changed, and "
         "finish the goal."

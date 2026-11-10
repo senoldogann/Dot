@@ -56,7 +56,7 @@ _RUN_SCOPE: str = "r.id = ?"
 
 _RUNS_SQL: str = """
 SELECT r.model, r.status, r.result, r.steps, r.input_tokens, r.output_tokens, r.id, r.created_at, r.finished_at,
-       r.harness_version
+       r.harness_version, r.end_reason
 FROM runs r WHERE {scope}
 """
 # One row per model call of the runs: the model of its run, the run, what the call was for, its seconds, the tokens the
@@ -987,7 +987,14 @@ def _model_stats(
     steps: Sequence[StepSample],
 ) -> ModelStats:
     """The numbers of the runs of ``model`` among the rows (every sample given is of its runs)."""
-    endings: Counter[Ending] = Counter(classify_ending(_STATUS.validate_python(row[1]), str(row[2])) for row in runs)
+    endings: Counter[Ending] = Counter(
+        classify_ending(
+            _STATUS.validate_python(row[1]),
+            str(row[2]),
+            None if len(row) < 11 or row[10] is None else str(row[10]),
+        )
+        for row in runs
+    )
     total_steps: int = sum(int(str(row[3])) for row in runs)
     time: TimeStats = time_stats(calls)
     return ModelStats(

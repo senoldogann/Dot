@@ -609,7 +609,9 @@ every mode but `yolo` (item 433).
   the owner's answer it holds the desktop, as they may be doing the step themselves on this screen; a run that asks for
   the desktop meanwhile is told so at once, instead of waiting until its own tool times out.
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels
-  (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920). The windows of password
+  (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920). An unchanged frame is
+  not encoded again: the JPEG just made is returned (a 3024×1964 frame took about 71 ms to shrink and encode, and
+  about 8 ms to recognise as the same frame). The windows of password
   managers and Keychain Access are painted black, known by their application's bundle id and not only by its name,
   which is in the language of the Mac (item 555). It comes with the lines of text on it, read on this Mac by macOS's
   Vision from the picture the model is shown (what is painted black is not read), each with the x, y of its centre

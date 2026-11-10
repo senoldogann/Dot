@@ -205,7 +205,9 @@ async def _fill(runtime: Runtime, port: int) -> str:
         _CAMPAIGN_TITLE, _CAMPAIGN_GOAL, thread.id, SCRIPTED_MODEL, "medium", "standard", None, "ask", (), "own"
     )
     async with httpx.AsyncClient(
-        base_url=f"http://127.0.0.1:{port}", headers={"Authorization": f"Bearer {TOKEN}"}
+        base_url=f"http://127.0.0.1:{port}",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+        timeout=30.0,
     ) as client:
         made: httpx.Response = await client.post(
             "/api/schedules",

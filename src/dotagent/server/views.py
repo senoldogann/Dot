@@ -108,6 +108,9 @@ class ErrorView(FrozenModel):
 class HealthView(FrozenModel):
     ok: bool
     version: str
+    # Whether the tasks that reach a phone are up. ``ok`` on this view is only that the process answers: a phone can
+    # be silent while this is true. ``off`` when no phone watch was started, ``down`` when one that was started died.
+    notifications: Literal["ok", "down", "off"] = "off"
 
 
 class ProofView(FrozenModel):
@@ -2080,6 +2083,8 @@ class StatusView(FrozenModel):
     # ``claude_code:opus``): every page reads the status first, so a page that names one names it so before the slower
     # model listing is read.
     model_labels: dict[str, str]
+    # The phone watches (:class:`dotagent.notify.health.NotifyHealth`). ``down`` means HTTP is up and the phone is not.
+    notifications: Literal["ok", "down", "off"] = "off"
 
 
 # The sections: what waits for the user, what works now, what ended today, what was learned today (item 72: the
