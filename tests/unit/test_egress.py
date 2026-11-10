@@ -99,3 +99,12 @@ def test_a_yolo_run_that_read_outside_content_checks_what_a_planted_instruction_
     flags: tuple[Flag, ...], checked: bool
 ) -> None:
     assert checked_when_tainted(_step("shell", flags)) is checked
+
+
+def test_a_word_that_only_ends_in_sk_is_no_key() -> None:
+    """A note naming `flask-callers-ensure-sync__B__1.jsonl` was refused as a key (item 1094)."""
+    shell: ActionInfo = _step("shell")
+    note: str = "cat >> notes.md <<'MD'\nSee transcripts/flask-callers-ensure-sync__B__1.jsonl\nMD"
+    assert not carries_secret(shell, {"command": note}, ())
+    assert carries_secret(shell, {"command": f"echo token={_KEY_FORM}"}, ())
+    assert carries_secret(shell, {"command": "echo sk-callers-ensure-sync-now"}, ())
