@@ -11218,6 +11218,8 @@ button.attach-chip {
     position: absolute;
     left: 50%;
     translate: -50% 0;
+    /* Twice the wider side: the way back or the tools' pill with the panel's switch alone (40 px), the bar's padding
+       (8 px) and room to breathe (40 px), so that the name, in the middle, reaches neither. */
     max-width: calc(100% - 176px);
     padding: var(--space-1) var(--space-4) var(--space-1) var(--space-1);
     border: 1px solid var(--glass-border);
@@ -11227,7 +11229,9 @@ button.attach-chip {
     -webkit-backdrop-filter: var(--glass-blur);
   }
 
-  /* With Dot's computer or the helpers in the bar's pill there is less room beside the name. */
+  /* With Dot's computer or the helpers in the bar's pill there is less room beside the name: up to three buttons of
+     40 px, the pill's padding and the bar's, on each side as the name stays in the middle. test_phone_layout.py checks
+     that the name stays clear of both. */
   .stagebar-row:has(.stage-quick:not([hidden])) > .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) {
     max-width: calc(100% - 272px);
   }
