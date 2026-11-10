@@ -5859,7 +5859,8 @@ class Store:
     @_writing
     async def mark_memories_used(self, run_id: str, memory_ids: Sequence[str], when: float, how: MemoryUseHow) -> None:
         """Count one more use of each note, at ``when``, and record that run ``run_id`` was handed it (``how``: at its
-        start, by a search, as a changed note, or as a lesson of a site it reached); the note's ``updated_at`` stays.
+        start, by a search, as a changed note, as a lesson of a site it reached, or as one of a tool that failed, item
+        1111); the note's ``updated_at`` stays.
         The use is scored once the run ends (:meth:`close_memory_uses`)."""
         if not memory_ids:
             return

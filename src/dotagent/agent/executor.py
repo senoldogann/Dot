@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotagent.agent.authorization import Authorization, StepDecision
+from dotagent.agent.failure_lessons import hand_failure_lessons
 from dotagent.agent.gate import RunGate, hold_note, masked_action
 from dotagent.agent.held_secrets import all_held_values
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
@@ -369,6 +370,7 @@ async def _execute_one(
     waited_s: float = 0.0
     decision: StepDecision | None = None
     group: str | None = hidden.get(call.name)
+    learned: str | None = None
     if refused is not None:
         result: ToolResult = fail(refused)
     elif tool is None:
@@ -385,6 +387,10 @@ async def _execute_one(
     else:
         checked: _Checked = await _run_checked(call, tool, ctx, gate)
         result, action, waited_s, decision = checked.result, checked.action, checked.waited_s, checked.decision
+        if result.is_error and ctx.runtime.config.agent.lessons != "off":
+            # What earlier runs learned about the tool, at the moment it is of use (item 1111); added after the error
+            # is cut to the run's room, so that no lesson is cut in the middle.
+            learned = await hand_failure_lessons(ctx.runtime, ctx.run_id, ctx.agent_id, call.name, ctx.lessons_lock)
     if group is not None:
         # A call of a tool whose group was off ran as any call does (its arguments, the policy, the approval): the loop
         # turns the group on for the next step, and the result says so, since the model chose the call blind.
@@ -397,6 +403,8 @@ async def _execute_one(
     known = (*await asyncio.to_thread(known_secrets, filled=True), *await asyncio.to_thread(all_held_values))
     seen: str = mask_known(result.text, known)
     clipped: ToolResult = result.model_copy(update={"text": truncate_middle(seen, ctx.output_chars)})
+    if learned is not None:
+        clipped = clipped.model_copy(update={"text": f"{clipped.text}\n\n{learned}"})
     seconds: float = time.monotonic() - started
     files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
     # The step as its record shows it: a command or an address carries the secrets Dot holds as the call's arguments do,

@@ -147,6 +147,9 @@ class ToolContext:
     refused_hosts: RefusedHosts = field(default_factory=RefusedHosts)
     # The documents this run's web_fetch read (item 956), which the next part of one is cut from.
     read_documents: ReadDocuments = field(default_factory=ReadDocuments)
+    # Held while the lessons of a failed call are chosen and counted as handed (item 1111): the calls of one step run
+    # at once, and each would else be handed the same lesson.
+    lessons_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 def run_sandbox(ctx: ToolContext) -> Sandbox:
