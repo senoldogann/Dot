@@ -14,6 +14,7 @@ from dotagent.core.errors import ConfigError
 from dotagent.core.text import until_text
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.router import ModelRouter, Pause, parse_model_ref, unavailable_reason
+from dotagent.llm.types import WHOLE_RUN_AGENTS
 from dotagent.secrets import secret_state
 
 # A helper model could not answer the question a run asked it.
@@ -21,6 +22,9 @@ HELPER_UNAVAILABLE_EVENT: str = "helper_unavailable"
 # A run moved to a standby model because its own model could not answer.
 MODEL_SWITCHED_EVENT: str = "model_switched"
 _NO_KEY: str = "no key"
+# Why OpenCode's agent and the Claude plan stand by for nothing: each works a whole run in its own program, and no step
+# of Dot's own loop can be asked of it (llm/types.py WHOLE_RUN_AGENTS).
+_WHOLE_RUN: str = "it works whole runs only, and cannot take over a step"
 
 
 class Unavailable(FrozenModel):
@@ -47,7 +51,9 @@ def roster_for(models: Sequence[str], keyed: Collection[str], paused: Mapping[st
     for label in dict.fromkeys(parse_model_ref(model).label for model in models):
         provider: str = parse_model_ref(label).provider
         pause: Pause | None = paused.get(label)
-        if provider not in keyed:
+        if provider in WHOLE_RUN_AGENTS:
+            unavailable.append(Unavailable(model=label, reason=_WHOLE_RUN, until=None))
+        elif provider not in keyed:
             unavailable.append(Unavailable(model=label, reason=_NO_KEY, until=None))
         elif pause is not None:
             unavailable.append(Unavailable(model=label, reason=pause.reason, until=pause.until))
@@ -85,7 +91,11 @@ def _keyed(providers: ProvidersConfig, names: frozenset[str]) -> frozenset[str]:
 
 async def keyed_providers(providers: ProvidersConfig, models: Sequence[str]) -> frozenset[str]:
     """The providers of ``models`` that have the key they need, from wherever Dot reads keys."""
-    names: frozenset[str] = frozenset(parse_model_ref(model).provider for model in models)
+    names: frozenset[str] = frozenset(
+        provider
+        for provider in (parse_model_ref(model).provider for model in models)
+        if provider not in WHOLE_RUN_AGENTS
+    )
     if not names:
         return names
     return await asyncio.to_thread(_keyed, providers, names)
