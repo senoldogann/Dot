@@ -528,7 +528,9 @@ function asOption(option) {
  */
 function ask(state, runId, data, holds) {
   const id = stringField(data, "approval_id");
-  if (id === "" || state.cards.some((card) => card.id === id)) {
+  // A question the run left for later (`question_left`) is answered where the conversation shows it (the asks over
+  // the composer, which outlive the run): a card of the flow would stay open once the run's stream has ended.
+  if (!holds || id === "" || state.cards.some((card) => card.id === id)) {
     return state;
   }
   const args = data.args !== null && typeof data.args === "object" ? /** @type {Record<string, unknown>} */ (data.args) : {};
@@ -548,18 +550,12 @@ function ask(state, runId, data, holds) {
       answer: "",
     };
     next = { ...state, cards: [...state.cards, card] };
-    if (!holds) {
-      return next;
-    }
     next = setSessionStatus(next, runId, "blocked");
     return mapActivity(next, runId, (activity) => ({ ...activity, wait: "question" }));
   }
   /** @type {ApprovalCard} */
   const card = { kind: "approval", id, runId, summary: stringField(data, "summary"), severity: severity || "medium", phase: "pending", note: "" };
   next = { ...state, cards: [...state.cards, card] };
-  if (!holds) {
-    return next;
-  }
   if (runId !== state.rootId) {
     next = setSessionStatus(next, runId, "blocked");
   }

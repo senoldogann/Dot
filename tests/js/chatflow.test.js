@@ -120,7 +120,7 @@ test("a question is a card with options, and the answer is the user's reply", ()
   assert.equal(transition(answered, record("approval_decided", ROOT, { approval_id: "apr_1", status: "denied", note: "" })), answered);
 });
 
-test("a question the run left does not block the session", () => {
+test("a question the run left blocks no session and draws no card of the flow", () => {
   const state = apply(
     emptyFlow(ROOT),
     record("run_queued", "run_child", { parent_run_id: ROOT, goal: "Ask later" }),
@@ -128,7 +128,7 @@ test("a question the run left does not block the session", () => {
     record("question_left", "run_child", { approval_id: "apr_2", severity: "question", summary: "Go on?", args: { question: "Go on?", options: ["Yes"] } }),
   );
   assert.equal(state.sessions.run_child.status, "running");
-  assert.equal(state.cards[0].phase, "open");
+  assert.equal(state.cards.length, 0);
   assert.equal(state.activity.run_child, undefined);
 });
 
