@@ -55,7 +55,7 @@ const DETAILED = {
 
 /** What a step's message says it does next, as the line says it (item 1131): its first line, without the marks of
  * markdown or the stop at its end ("Kanıt netleşti. Son bir kontrol yapıp sonucu yazıyorum." stays whole). */
-export function toldWords(text) {
+function toldWords(text) {
   const first = text.trim().split("\n")[0] ?? "";
   return first
     .replace(/[*_`#>]+/g, "")
