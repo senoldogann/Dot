@@ -29,7 +29,11 @@ const STATUS_WORD = {
 export function createChatFlowView(actions) {
   const sessions = el("div", { class: "flow-sessions" });
   const activity = el("div", { class: "flow-activity" });
-  const drill = el("div", { class: "flow-drill", hidden: true });
+  // The drill-in: its head and lines, drawn again at each paint, and its open questions, each kept in place (a node
+  // taken out and put back loses the focus and what is typed in it).
+  const drillTop = el("div", { class: "flow-drill-top" });
+  const drillAsks = el("div", { class: "flow-drill-asks" });
+  const drill = el("div", { class: "flow-drill", hidden: true }, drillTop, drillAsks);
   const railList = el("div", { class: "flow-rail-list" });
   let painting = false;
   /** The open question cards of the drill-in by their id, kept as they are while the flow repaints, so that what is
@@ -53,8 +57,12 @@ export function createChatFlowView(actions) {
   );
   activity.append(activityDetails);
   let activityRun = "";
+  // The fold the state last painted: a toggle the browser fires later for a paint of its own (it comes after `paint`
+  // returned) finds the block as the state has it, and is not the reader's.
+  let paintedFold = "closed";
   activityDetails.addEventListener("toggle", () => {
-    if (painting || activityRun === "") {
+    const now = activityDetails.open ? "open" : "closed";
+    if (painting || activityRun === "" || now === paintedFold) {
       return;
     }
     actions.onToggle(activityRun);
@@ -101,6 +109,7 @@ export function createChatFlowView(actions) {
     const head = shown.current !== null ? shown.current.label : shown.wait === "question" ? "Waiting for your answer" : shown.wait === "approval" ? "Waiting for your approval" : shown.thinkingPhase === "live" ? "Thinking" : "Activity";
     activityKicker.textContent = busy ? "Now" : "Activity";
     activityNow.textContent = head;
+    paintedFold = shown.fold;
     if (activityDetails.open !== (shown.fold === "open")) {
       activityDetails.open = shown.fold === "open";
     }
@@ -154,21 +163,18 @@ export function createChatFlowView(actions) {
 
   /** @param {import("./chatflow.js").FlowState} state */
   function paintDrill(state) {
-    if (state.view.kind !== "session") {
-      drill.hidden = true;
-      drill.replaceChildren();
-      return;
-    }
-    const session = state.sessions[state.view.id];
+    const session = state.view.kind === "session" ? state.sessions[state.view.id] : undefined;
     if (session === undefined) {
       drill.hidden = true;
+      drillTop.replaceChildren();
+      placeQuestions([]);
       return;
     }
     const activityOf = presentActivity(state.activity[session.id] ?? blankActivity());
     const questions = cardsOf(state, session.id).filter(isOpenQuestion);
     const reports = cardsOf(state, session.id).filter(isReport);
     drill.hidden = false;
-    drill.replaceChildren(
+    drillTop.replaceChildren(
       el(
         "div",
         { class: "flow-drill-bar" },
@@ -182,11 +188,27 @@ export function createChatFlowView(actions) {
       activityOf.steps.length === 0 ? null : el("ol", { class: "flow-steps" }, activityOf.steps.map(stepRow)),
       ...reports.map((card) => el("a", { class: "flow-report", href: card.href }, el("span", { class: "flow-kicker" }, "Page"), el("span", null, card.title))),
       ...childSessions(state, session.id).map((child) => sessionCard(child, () => actions.onOpen(child.id))),
-      ...questions.map((card) => keptQuestion(card)),
     );
-    for (const id of [...questionNodes.keys()]) {
-      if (!questions.some((card) => card.id === id)) {
+    placeQuestions(questions);
+  }
+
+  /**
+   * The open questions `questions` under the drill-in, in their order: a card already there stays where it is, a new
+   * one is added, and one no longer open is taken away.
+   * @param {import("./chatflow.js").QuestionCard[]} questions
+   */
+  function placeQuestions(questions) {
+    const open = new Set(questions.map((card) => card.id));
+    for (const [id, node] of [...questionNodes]) {
+      if (!open.has(id)) {
+        node.remove();
         questionNodes.delete(id);
+      }
+    }
+    for (const card of questions) {
+      const node = keptQuestion(card);
+      if (node.parentElement !== drillAsks) {
+        drillAsks.append(node);
       }
     }
   }
@@ -324,13 +346,22 @@ function stepRow(step) {
 function questionCard(card, onDecide) {
   const note = el("input", { class: "input", type: "text", maxlength: "2000", placeholder: card.options.length > 0 ? "Or write your own answer" : "Your answer", "aria-label": "Your answer" });
   const ticks = card.multiple ? card.options.map((option) => el("input", { type: "checkbox", value: option.label })) : [];
+  // One answer per card: a second press while it goes would be refused (409) and told as an error.
+  let sent = false;
+  const decide = (approve, answer) => {
+    if (sent) {
+      return;
+    }
+    sent = true;
+    onDecide(card.id, approve, answer);
+  };
   const send = (labels) => {
     const answer = questionAnswer(labels, note.value);
     if (answer === "") {
       note.focus();
       return;
     }
-    onDecide(card.id, true, answer);
+    decide(true, answer);
   };
   const options = card.multiple
     ? card.options.map((option, index) => el("label", { class: "choice" }, ticks[index], option.label))
@@ -345,7 +376,7 @@ function questionCard(card, onDecide) {
       "div",
       { class: "flow-question-actions" },
       note,
-      el("button", { class: "btn", type: "button", onclick: () => onDecide(card.id, false, "") }, "Skip"),
+      el("button", { class: "btn", type: "button", onclick: () => decide(false, "") }, "Skip"),
       el(
         "button",
         {

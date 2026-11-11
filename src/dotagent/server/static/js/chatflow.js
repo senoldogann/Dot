@@ -372,9 +372,6 @@ function finishRun(state, runId, data) {
     answer: { text: result !== "" ? result : activity.answer.text, phase: "done" },
     wait: "none",
   }));
-  if (runId === state.rootId) {
-    return next;
-  }
   return next;
 }
 
