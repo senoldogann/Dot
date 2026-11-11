@@ -726,11 +726,7 @@ provider's mark, model and state, what it does now (or did last, from the conver
 took, and a row opens its page (item 296); the pointer at rest on a row, or the focus on it, shows the helper's card as
 the conversation's rows do, with its whole goal, and a phone has none (item 426). It stays closed until the panel button
 in the head of the run opens it (the choice is kept in the browser); open, it sits beside the conversation from 960 px,
-is a drawer below that, and on a phone a sheet that rises from the foot (item 296).
-
-A delegated run is also a session card in the conversation: its title, and whether it is running, done, failed, waiting or stopped. Opening the card keeps you in the conversation and shows the prompt it was given, its thinking, each progress line on its own, and each tool step. The Sessions rail lists this run's sessions, newest first, to the right of the conversation: it opens by itself with the first one, and its × puts it away until the next. The helpers button of the bar opens the chat's helpers in the side panel, as it did. While a run works, a collapsible activity block under the line of what it does names the current step and lists progress apart from the answer. The cards, the rail and the activity block are a wide window's: a phone's chat keeps the conversation it had, its helpers button opening the helpers in the side panel. A question a session is waiting on is a card of option buttons and a line to write; sending it posts to the same approval route as the card already in the transcript, and the stored note is the user's reply. A page the run shows is a report card with a link. None of this changes what an approval allows.
-
-The run's head is the top bar
+is a drawer below that, and on a phone a sheet that rises from the foot (item 296). The run's head is the top bar
 itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a hairline under it, so
 nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. Every other page names
 itself in the same bar (Agents, Campaigns, Settings) and opens with one line of description. A run's page, live or over, opens at
