@@ -11,6 +11,8 @@ import { createAsksDock } from "../asksdock.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { createCapsule } from "../capsule.js";
+import { emptyFlow, transition } from "../chatflow.js";
+import { createChatFlowView, decideApproval } from "../chatflowview.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
@@ -1677,9 +1679,43 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     icon("monitor"),
   );
   const helpersCount = el("span", { class: "stage-quick-count" });
+  // The sessions, the activity block and the drill-in are a wide window's (a phone's chat keeps the conversation it
+  // had, item 1119: on a phone the page opened again from the home screen kept its curtain with them).
+  const flowOn = !PHONE.matches;
+  let sessionsWanted = false;
+  let sessionsSeen = 0;
+  let flow = emptyFlow(runId);
+  const flowView = createChatFlowView({
+    onOpen: (id) => {
+      flow = transition(flow, { type: "open_session", id });
+      paintFlow();
+    },
+    onBack: () => {
+      flow = transition(flow, { type: "close_session" });
+      paintFlow();
+    },
+    onHideRail: () => {
+      sessionsWanted = false;
+      layout.dataset.sessions = "off";
+    },
+    onToggle: (id) => {
+      flow = transition(flow, { type: "toggle_activity", id });
+      paintFlow();
+    },
+    onDecide: (id, approve, note) => decideApproval(id, approve, note),
+  });
   const helpersButton = el(
     "button",
-    { class: "icon-btn stage-quick stage-helpers", type: "button", title: "Helpers", "aria-label": "Show the helpers", hidden: true, onclick: () => inspector.openTab("agents") },
+    {
+      class: "icon-btn stage-quick stage-helpers",
+      type: "button",
+      title: "Helpers",
+      "aria-label": "Show the helpers",
+      hidden: true,
+      // The helpers of the whole chat, in the side panel, as it always did: the sessions rail lists this run's alone,
+      // and opens by itself with its first session.
+      onclick: () => inspector.openTab("agents"),
+    },
     icon("users"),
     helpersCount,
   );
@@ -1697,12 +1733,43 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     earlier,
     goalMessage,
     timeline.element,
+    flowOn ? flowView.sessions : null,
+    flowOn ? flowView.drill : null,
     workStatus.element,
+    // Under the line of what the run does, so that it grows below the line and never moves it.
+    flowOn ? flowView.activity : null,
     waitingList,
     lessonsPlace,
   );
   paintWorking();
-  const main = el("div", { class: "run-main" }, thread, dock);
+  layout.dataset.sessions = "off";
+  layout.dataset.hasSessions = "off";
+  function paintFlow() {
+    if (!flowOn) {
+      return;
+    }
+    flowView.paint(flow);
+    const has = flow.sessionOrder.length > 0;
+    // A new session opens the rail again, also after its × put it away.
+    const grew = flow.sessionOrder.length > sessionsSeen;
+    sessionsSeen = flow.sessionOrder.length;
+    layout.dataset.hasSessions = has ? "on" : "off";
+    thread.dataset.view = flow.view.kind === "session" ? "session" : "chat";
+    if (!has) {
+      layout.dataset.sessions = "off";
+      return;
+    }
+    if (grew) {
+      sessionsWanted = true;
+    }
+    if (sessionsWanted) {
+      layout.dataset.sessions = "on";
+    }
+  }
+  paintFlow();
+  const main = flowOn
+    ? el("div", { class: "run-main" }, el("div", { class: "run-column" }, thread, dock), flowView.rail)
+    : el("div", { class: "run-main" }, thread, dock);
   // On a phone the dock floats over the conversation's foot (item 374), a pane of glass with the messages going by
   // under it: its height is kept on the column that holds them both, where the conversation's padding reads it. The
   // dock is measured once it stands in the page and whenever it changes (its first height, the bar over the composer, a
@@ -1799,6 +1866,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       messageRead(message.data.data.owner_text ?? message.data.data.text);
     }
     timeline.push(message.data);
+    flow = transition(flow, { type: "record", record: message.data });
+    paintFlow();
     workStatus.push(message.data);
     recap.onEvent(message.data);
     if (!replaying && message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
