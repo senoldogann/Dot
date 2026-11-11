@@ -32,6 +32,10 @@ export function createChatFlowView(actions) {
   const drill = el("div", { class: "flow-drill", hidden: true });
   const railList = el("div", { class: "flow-rail-list" });
   let painting = false;
+  /** The open question cards of the drill-in by their id, kept as they are while the flow repaints, so that what is
+   * written in one, ticked and focused stays: every event of the run repaints it. */
+  /** @type {Map<string, HTMLElement>} */
+  const questionNodes = new Map();
   /** @type {Map<string, HTMLButtonElement>} */
   const sessionNodes = new Map();
   /** @type {Map<string, HTMLButtonElement>} */
@@ -178,8 +182,28 @@ export function createChatFlowView(actions) {
       activityOf.steps.length === 0 ? null : el("ol", { class: "flow-steps" }, activityOf.steps.map(stepRow)),
       ...reports.map((card) => el("a", { class: "flow-report", href: card.href }, el("span", { class: "flow-kicker" }, "Page"), el("span", null, card.title))),
       ...childSessions(state, session.id).map((child) => sessionCard(child, () => actions.onOpen(child.id))),
-      ...questions.map((card) => questionCard(card, actions.onDecide)),
+      ...questions.map((card) => keptQuestion(card)),
     );
+    for (const id of [...questionNodes.keys()]) {
+      if (!questions.some((card) => card.id === id)) {
+        questionNodes.delete(id);
+      }
+    }
+  }
+
+  /**
+   * The question card of `card`, the one already drawn when there is one.
+   * @param {import("./chatflow.js").QuestionCard} card
+   * @returns {HTMLElement}
+   */
+  function keptQuestion(card) {
+    const kept = questionNodes.get(card.id);
+    if (kept !== undefined) {
+      return kept;
+    }
+    const made = questionCard(card, actions.onDecide);
+    questionNodes.set(card.id, made);
+    return made;
   }
 
   return { sessions, activity, drill, rail, paint };
