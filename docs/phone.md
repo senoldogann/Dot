@@ -202,7 +202,8 @@ agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid 
 1101; the title and the model are in the panel's Details), and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The bar has
 no ground of its own (item 1119): its three parts are panes of glass and the conversation scrolls under them, as under
-the composer. The line over the
+the composer. A new chat and an agent's page wear the same bar (item 1123): the way back round, an agent's face and
+name in the middle, its tools (the Trader's desk and the "…") in one pill, all on glass over the page. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
 end, in the same pane; it is a row of 40 px, a translucent surface with the page blurred under it, a hairline and a
