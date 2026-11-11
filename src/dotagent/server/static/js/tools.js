@@ -404,3 +404,9 @@ export function toolRow({ tool, args }) {
 
   return { node, finish, settle };
 }
+
+/** Whether a step's message, with `calls` the names of the tools the step called, is said on the way to them (item
+ * 1131): any call but the finish, which the answer says. */
+export function narrates(calls) {
+  return calls.some((name) => name !== "finish");
+}

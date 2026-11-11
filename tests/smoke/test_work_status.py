@@ -38,7 +38,8 @@ _TURNS: tuple[ScriptedTurn, ...] = (
     ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
 )
 # The words the line has for the command, with the command it runs (item 1091).
-_COMMAND_WORDS: str = r"^Running sleep 6…$"
+# What the step said it does next, which the line says while its command runs (item 1131).
+_TOLD_WORDS: str = r"^Listing it now…$"
 
 
 @pytest.fixture
@@ -127,7 +128,9 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 line = page.locator(".work-status")
                 words = line.locator(".work-status-words")
                 await expect(line).to_have_attribute("data-state", "working")
-                await expect(words).to_have_text(re.compile(_COMMAND_WORDS))
+                await expect(words).to_have_text(re.compile(_TOLD_WORDS))
+                # The message it said on the way folds with the steps (item 1131).
+                await expect(page.locator(".bubble.say.say-progress")).to_be_hidden()
                 # Not the model typing while the command runs: the face, not the three dots (item 1091).
                 await expect(line.locator(".typing-dots")).to_be_hidden()
                 # The agent typing (item 843): its face first, in the answer's face's place, the words where the words
@@ -146,20 +149,8 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 await expect(line).to_have_accessible_name(re.compile(r"Show the steps$"))
                 more_box = await line.locator(".work-status-more").bounding_box()
                 assert more_box is not None and more_box["width"] <= 1 and more_box["height"] <= 1, more_box
-                # Under the pointer, the reaction of the message before the line stands under its words, where they
-                # start (item 863), and covers none of the line: a press on the line's face shows the steps (the
-                # pre-push review of item 843).
-                said: Locator = page.locator(".bubble.say").first
-                await said.hover()
-                react = await said.locator(".react-button").bounding_box()
-                bubble = await said.locator(".prose").bounding_box()
                 face = await line.locator(".turn-face").bounding_box()
-                assert react is not None and bubble is not None and face is not None
-                assert react["y"] >= bubble["y"] + bubble["height"] - 1 and react["x"] >= bubble["x"] - 1, (
-                    react,
-                    bubble,
-                )
-                assert react["y"] + react["height"] <= face["y"] + 1, (react, face)
+                assert face is not None
                 await page.mouse.click(face["x"] + face["width"] / 2, face["y"] + face["height"] / 2)
                 await expect(line).to_have_attribute("aria-pressed", "true")
                 await line.click()
@@ -199,12 +190,13 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 # out of the conversation as wide.
                 phone: Page = await _open(browser, port, address, run.id, "status", 390)
                 await expect(phone.locator(".answer-steps")).to_have_text("Show the steps")
-                # On a phone what Dot says sits in a bubble, the answer and the line along the way; on a Mac's width
-                # it is plain text (item 1091; item 854).
+                # On a phone the answer sits in a bubble; on a Mac's width it is plain text (item 1091; item 854).
+                # What the run said on the way is no bubble: it folds with the steps, a note among them (item 1131).
                 fills: list[str] = await phone.locator(".run-thread :is(.answer, .bubble.say) > .prose").evaluate_all(
                     "nodes => nodes.map((node) => getComputedStyle(node).backgroundColor)"
                 )
-                assert len(fills) == 2 and all(fill != "rgba(0, 0, 0, 0)" for fill in fills), fills
+                assert len(fills) == 2 and fills[0] == "rgba(0, 0, 0, 0)" and fills[1] != "rgba(0, 0, 0, 0)", fills
+                await expect(phone.locator(".bubble.say.say-progress")).to_be_hidden()
                 # A step whose model has sent only spaces holds no empty bubble: timeline.js marks it blank, and the
                 # rule that hides it is one the browser keeps (a `:has()` inside a `:has()` was dropped whole).
                 blank: str = await phone.locator(".run-thread").first.evaluate(

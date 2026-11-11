@@ -23,7 +23,7 @@ import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
-import { callKind, describeArguments, flowIcon, flowWords, shortPaths, toolRow, toolWords } from "./tools.js";
+import { callKind, describeArguments, flowIcon, flowWords, narrates, shortPaths, toolRow, toolWords } from "./tools.js";
 import { detailsFold } from "./ui.js";
 
 const GOAL_CHARS = 160;
@@ -1170,7 +1170,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       scope.turnGroup = null;
       scope.boundary = record.ts;
       const target = bubble ?? (settled !== undefined ? { node: settled.node, body: settled.body } : newBubble(scope, data.step, false));
-      target.node.className = "bubble say";
+      // A message said on the way to a step's calls is the run telling what it does next (item 1131): it folds with the
+      // steps, and the line of the work says it while the run is at it. A message with no call after it stays one.
+      target.node.className = narrates(data.tool_calls) ? "bubble say say-progress" : "bubble say";
       target.body.replaceWith(prose(data.text));
       scope.replies.push({ node: target.node, text: data.text, step: data.step });
       if (!ORDINARY_ENDS.has(data.finish)) {

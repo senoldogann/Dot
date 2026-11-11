@@ -157,6 +157,9 @@ async def _open(browsers: Browsers, served: Served, look: Look, path: str) -> Pa
             **browsers.playwright.devices["iPhone 17 Pro Max"], reduced_motion="reduce"
         )
     await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    # Every step shown: what a run says on the way to its calls folds with the steps by default (item 1131), and the
+    # reactions here are on such lines.
+    await context.add_init_script("localStorage.setItem('dot.work', 'steps')")
     page: Page = await context.new_page()
     await page.goto(ui_url("127.0.0.1", served.port, TOKEN))
     await page.goto(f"{served.address}/#{path}")
