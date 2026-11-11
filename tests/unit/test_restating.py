@@ -72,3 +72,6 @@ def test_a_name_the_answer_wrote_more_exactly_is_restated() -> None:
         "| Nameserver | `pns61-64.cloudns.*` (ücretsiz DNS) | kurumsal |\nDomain 3 gün önce kaydedildi.",
     )
     assert not restates("Domain 3 gün önce kaydedildi.", "Domain 30 gün önce kaydedildi.")
+    # A number after a mark in a name is still a number (the review of item 1129).
+    assert not restates("Server up on localhost:8080.", "Server up on localhost:8081.")
+    assert not restates("Pinned web-research v1.4.8.", "Pinned web-research v1.4.9.")
