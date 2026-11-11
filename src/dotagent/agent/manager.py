@@ -790,7 +790,7 @@ class RunManager:
             if await store.queue_held(thread_id) or self._active_on(thread_id) is not None:
                 continue
             newest: list[RunRecord] = await store.list_runs(1, thread_id)
-            if newest and newest[0].status not in WORKING_STATUSES and newest[0].status != "ending":
+            if newest and newest[0].status not in WORKING_STATUSES:
                 try:
                     await self._drain(thread_id, newest[0].id)
                 except Exception:
@@ -1663,8 +1663,8 @@ class RunManager:
             await _uncancelled(handle.finished.wait())
             raise
         child: RunRecord = await self._runtime.store.get_run(handle.run_id)
-        # A run whose end the store refused stays ``ending`` (its mark was written before the end): it is no outcome.
-        if child.status in WORKING_STATUSES or child.status == "ending":
+        # A run whose end the store refused stays ``ending``, a working state (its mark was written before the end).
+        if child.status in WORKING_STATUSES:
             raise StoreError(
                 "the delegated run ended, but the store could not record its end",
                 {"run_id": child.id, "stored_status": child.status},

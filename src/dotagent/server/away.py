@@ -6,7 +6,7 @@ from dotagent.core.text import plain_line, redact_secrets
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server.views import AwayDecisionRun, AwayDecisions, AwayRun, AwayView
 from dotagent.store.db import Store
-from dotagent.store.models import AutoDecisionCount, UnattendedCount, UnattendedRun
+from dotagent.store.models import WORKING_STATUSES, AutoDecisionCount, UnattendedCount, UnattendedRun
 
 # How far back the card reads at most: a week.
 AWAY_WINDOW_S: float = 7 * 86_400.0
@@ -107,7 +107,7 @@ def away_view(
         done=_counted(counts, frozenset({"done"})),
         failed=_counted(counts, frozenset({"failed"})),
         cancelled=_counted(counts, frozenset({"cancelled"})),
-        working=_counted(counts, frozenset({"queued", "running", "blocked"})),
+        working=_counted(counts, WORKING_STATUSES),
         campaign_sessions=sum(count.count for count in counts if count.campaign),
         runs=[away_run(run) for run in runs],
         decisions=_decisions(decisions),

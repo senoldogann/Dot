@@ -16,6 +16,7 @@ import { onLifecycle, onStreamBack } from "../state.js";
 import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 import { homeSection, startComposer } from "./agents.js";
+import { WORKING_STATES } from "../runstates.js";
 
 const TITLE_CHARS = 90;
 const LAST_CHARS = 140;
@@ -26,7 +27,7 @@ const FOLDS_KEY = "dot.teamFolds";
 // The team's runs are Dot's, with Dot's own bounds: the box starts where the home's does.
 const DOTS_BOUNDS = { model: "", effort: null, approvals: null };
 // The runs that have not ended.
-const WORKING = new Set(["queued", "running", "blocked"]);
+const WORKING = WORKING_STATES;
 
 /** A chat of the team in its list: its title as a link to the chat, how it stands, its last words and when it moved. */
 function chatRow(chat) {

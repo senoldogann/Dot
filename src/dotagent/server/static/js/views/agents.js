@@ -32,6 +32,7 @@ import { getSnapshot, loadModels, onChange, onLifecycle, onStreamBack } from "..
 import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 import { workOrdersPart } from "../workorders.js";
+import { WORKING_STATES } from "../runstates.js";
 
 const DOT_ID = "dot";
 // The template of the trading desk's agent (item 847, agent/templates.py).
@@ -41,7 +42,7 @@ const MAX_GOAL_PX = 320;
 // How many of a team's agents a card shows the face of, the rest counted (item 610).
 const MOST_TEAM_FACES = 4;
 // The face an agent wears in its row: working while its newest run works, at rest otherwise.
-const WORKING = new Set(["queued", "running", "blocked"]);
+const WORKING = WORKING_STATES;
 // The largest agent file Import reads: its instructions take at most 50,000 characters, of up to four bytes each.
 const MOST_AGENT_FILE_BYTES = 256 * 1024;
 // How often the cards' "5m ago" are written again while the list stays open (item 633).

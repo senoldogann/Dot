@@ -87,7 +87,7 @@ const MEMORY_WORDS_CHARS = 120;
 // How the helpers of a group stand, in the order a reader scans them: those under way first, then how
 // the others ended.
 const FLOCK_WORDS = [
-  ["working", ["queued", "running"]],
+  ["working", ["queued", "running", "ending"]],
   ["waiting for you", ["blocked"]],
   ["done", ["done"]],
   ["failed", ["failed"]],

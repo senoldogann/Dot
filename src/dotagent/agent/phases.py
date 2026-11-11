@@ -4,7 +4,7 @@ Each function is pure: it names the next state or refuses the move. The store wr
 still in the state the function left, so a second writer finds the move already made and does not make it again.
 """
 
-from typing import Literal
+from typing import Literal, get_args
 
 from dotagent.core.errors import InvalidValueError
 from dotagent.store.models import (
@@ -14,6 +14,7 @@ from dotagent.store.models import (
     WORKING_STATUSES,
     ObjectiveStatus,
     RunStatus,
+    WorkingStatus,
 )
 
 # Why a chat's queue is held. ``crash`` is released when the run that goes on from the cut-off ends done.
@@ -34,7 +35,7 @@ def transition_run(status: RunStatus, event: RunEvent, terminal: RunStatus | Non
         return "blocked"
     if event == "unblock" and status == "blocked":
         return "running"
-    if event == "begin_end" and status in WORKING_STATUSES:
+    if event == "begin_end" and status in get_args(WorkingStatus):
         return "ending"
     if event == "finish" and status in OCCUPIED_STATUSES and terminal in TERMINAL_STATUSES:
         return terminal

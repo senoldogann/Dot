@@ -4589,7 +4589,7 @@ class Store:
         async with self._db.execute(
             "UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
             " WHERE status = 'pending' AND run_id NOT IN"
-            " (SELECT id FROM runs WHERE status IN ('running', 'queued', 'blocked')) RETURNING id, run_id",
+            f" (SELECT id FROM runs WHERE status IN ({_WORKING_SQL})) RETURNING id, run_id",
             (now, note),
         ) as cursor:
             expired: list[sqlite3.Row] = list(await cursor.fetchall())

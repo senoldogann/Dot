@@ -91,7 +91,7 @@ const BUSY_MESSAGE = "A chat with a task under way cannot be deleted. Wait for t
 // How often the ages at the right of the chats are read again, so a "5m" does not stay while the page rests.
 const AGE_REFRESH_MS = 60_000;
 // The states of a run that works; one that waits for you is "blocked" and keeps its dot and its age.
-const WORKING = new Set(["queued", "running"]);
+const WORKING = new Set(["queued", "running", "ending"]);
 // How often the time of a row that works is read again: its seconds count.
 const WORKING_REFRESH_MS = 1000;
 

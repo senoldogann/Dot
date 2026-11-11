@@ -10,11 +10,12 @@ import { emptyPanel, errorPanel, loadingPanel, pageHead, statusBadge } from "../
 import { onLifecycle, onStreamBack } from "../state.js";
 import { attempt } from "../ui.js";
 import { plainText } from "../markdown.js";
+import { WORKING_STATES } from "../runstates.js";
 
 const DOT_ID = "dot";
 const MESSAGE_CHARS = 240;
 const REPLY_CHARS = 300;
-const WORKING = new Set(["queued", "running", "blocked"]);
+const WORKING = WORKING_STATES;
 
 function faceOf(id, working) {
   const state = working ? "working" : "idle";
