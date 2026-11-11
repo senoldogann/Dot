@@ -16,11 +16,12 @@ RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled
 # A run in one of these has not ended.
 # The states a run moves between while it works; only an end (``Store.end_run``) leaves them (item 1103).
 WorkingStatus = Literal["queued", "running", "blocked"]
-WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
-# A run whose end is decided but not stored yet (``ending``) still occupies its chat: a new run must not start beside
-# it, and a restart closes it as it closes a run left at work. It is not a working state, so a page does not show it
-# as running and nothing moves it back to running.
-OCCUPIED_STATUSES: frozenset[RunStatus] = WORKING_STATUSES | frozenset({"ending"})
+# A run whose end is decided but not stored yet (``ending``) is one of them: whatever asks whether a run works on a
+# chat, a campaign or a restart reads it as at work, so a new run does not start beside it, a chat is not deleted under
+# it, and a restart closes it as a run left at work. Its own name keeps a page from showing it running, and nothing
+# moves it back to running (phases.py).
+WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked", "ending"})
+OCCUPIED_STATUSES: frozenset[RunStatus] = WORKING_STATUSES
 TERMINAL_STATUSES: frozenset[RunStatus] = frozenset({"done", "failed", "cancelled"})
 # The events that say whether a run is tainted after them (item 243): it starts so or not (``run_queued``), a tool's
 # result may taint it (``tool_result``), and a message of the owner that steers it clears the taint (``steer``); Dot's

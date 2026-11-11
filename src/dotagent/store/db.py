@@ -19,7 +19,7 @@ import tempfile
 import time
 from collections.abc import Awaitable, Callable, Coroutine, Iterable, Sequence
 from pathlib import Path
-from typing import Concatenate, Literal, cast
+from typing import Concatenate, Literal, cast, get_args
 
 import aiosqlite
 from pydantic import JsonValue, TypeAdapter
@@ -1510,11 +1510,13 @@ def _writing[**P, R](
 _OPTIMIZE_AT_OPEN: int = 0x10002
 
 
-# The working states of a run, as SQL: the ones a run may move between or end from (item 1045).
 # Why a step still running as the daemon starts is closed failed. A ``dotx harness step`` of its own process may still
 # be at work then: its own end, when it comes, is written over this one (:meth:`finish_harness_step`).
 _STEP_DID_NOT_END: str = "the step did not end"
+# The working states of a run, as SQL: the ones a run may end from (item 1045), ``ending`` among them.
 _WORKING_SQL: str = ", ".join(f"'{status}'" for status in sorted(WORKING_STATUSES))
+# The states a run moves between while it works, as SQL: ``ending`` is not one, so nothing moves a run back from it.
+_MOVING_SQL: str = ", ".join(f"'{status}'" for status in sorted(get_args(WorkingStatus)))
 # Working states plus ``ending``: a run whose end is decided still occupies its chat and can still be closed.
 _OCCUPIED_SQL: str = ", ".join(f"'{status}'" for status in sorted(OCCUPIED_STATUSES))
 # Whether the run of the bound id works (item 1047).
@@ -3019,7 +3021,7 @@ class Store:
         """The run's end is decided and not stored yet: ``ending``, from a working state. A run already ending, or one
         that ended, is left as it is. Whether the row moved."""
         cursor = await self._db.execute(
-            f"UPDATE runs SET status = 'ending' WHERE id = ? AND status IN ({_WORKING_SQL})",
+            f"UPDATE runs SET status = 'ending' WHERE id = ? AND status IN ({_MOVING_SQL})",
             (run_id,),
         )
         await self._db.commit()
@@ -3032,7 +3034,7 @@ class Store:
         1103). A run that ended keeps its end (item 1045): an approval answered as the run was cancelled, or a start
         that comes after a close, never makes it look at work again."""
         cursor = await self._db.execute(
-            f"UPDATE runs SET status = ? WHERE id = ? AND status IN ({_WORKING_SQL})", (status, run_id)
+            f"UPDATE runs SET status = ? WHERE id = ? AND status IN ({_MOVING_SQL})", (status, run_id)
         )
         await self._db.commit()
         return cursor.rowcount > 0
