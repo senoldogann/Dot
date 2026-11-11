@@ -406,7 +406,7 @@ export function toolRow({ tool, args }) {
 }
 
 /** Whether a step's message, with `calls` the names of the tools the step called, is said on the way to them (item
- * 1131): any call but the finish, which the answer says. */
+ * 1131): any call but the finish, which the answer says, and the reaction on your message. */
 export function narrates(calls) {
-  return calls.some((name) => name !== "finish");
+  return calls.some((name) => name !== "finish" && name !== "react");
 }
