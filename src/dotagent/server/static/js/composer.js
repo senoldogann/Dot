@@ -343,18 +343,31 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       pressing = false;
     }, 0);
   }
-  // A touch outside the box puts its choices away unless the words keep the focus (the keyboard is up); a menu of the
-  // box's opens inside it, the "+" menu's over the page, and a touch there is the box's own.
-  function onPressAnywhere(event) {
+  // A touch outside the box puts its choices away once it ended (its click), unless the words keep the focus (the
+  // keyboard is up): put away as the finger came down, the line went and moved what stands over the box, a queued
+  // message's Resume among it, from under the finger. A menu of the box's opens inside it, the "+" menu's over the
+  // page, and a touch there is the box's own.
+  let pointerDown = false;
+  function onPressAnywhere() {
+    pointerDown = true;
+  }
+  function onPressAnywhereEnded() {
+    setTimeout(() => {
+      pointerDown = false;
+    }, 0);
+  }
+  function onClickAnywhere(event) {
     if (!engaged || element.contains(event.target) || event.target.closest?.(".menu, .sheet-menu") || textarea === document.activeElement) {
       return;
     }
     engage(false);
   }
+  // The words losing the focus put the line away, when no touch is under way: the keyboard put down. A touch's own
+  // click decides (onClickAnywhere).
   function onFocusOut() {
     setTimeout(() => {
       const open = element.querySelector(".composer-popover:not([hidden])") !== null;
-      if (!pressing && !open && !element.contains(document.activeElement)) {
+      if (!pressing && !pointerDown && !open && !element.contains(document.activeElement)) {
         engage(false);
       }
     }, 0);
@@ -367,6 +380,9 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   element.addEventListener("pointerup", onPressEnded);
   element.addEventListener("pointercancel", onPressEnded);
   document.addEventListener("pointerdown", onPressAnywhere, true);
+  document.addEventListener("pointerup", onPressAnywhereEnded, true);
+  document.addEventListener("pointercancel", onPressAnywhereEnded, true);
+  document.addEventListener("click", onClickAnywhere);
   PHONE.addEventListener("change", paintQuiet);
   function choicesChanged() {
     choicesShown = readPref(CHOICES_KEY) === "shown";
@@ -604,6 +620,9 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       textarea.removeEventListener("blur", onBlur);
       window.removeEventListener(CHOICES_EVENT, choicesChanged);
       document.removeEventListener("pointerdown", onPressAnywhere, true);
+      document.removeEventListener("pointerup", onPressAnywhereEnded, true);
+      document.removeEventListener("pointercancel", onPressAnywhereEnded, true);
+      document.removeEventListener("click", onClickAnywhere);
       PHONE.removeEventListener("change", paintQuiet);
     },
   };

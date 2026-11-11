@@ -171,6 +171,9 @@ async def _run_page(browser: Browser, address: str, run_id: str, width: int, sch
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     await page.goto(ui_url(host, port, TOKEN))
     await page.goto(f"{address}/#/runs/{run_id}")
+    # A phone's box shows the ring once its words are touched (item 1120).
+    if width < 720:
+        await page.locator(".dock textarea").click()
     return page
 
 

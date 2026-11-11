@@ -583,10 +583,18 @@ async def test_a_chat_its_messages_menus_and_cards_say_what_they_mean(browser: B
             ("slow", "A chat at work", "textarea"),
         ):
             await reader.go(f"/runs/{served.runs[key]}", label, settle)
-        # The composer's menus, on the home.
+        # The composer's menus, on the home. A phone's box shows its choices once its words are touched (item 1120),
+        # and its model's menu holds the options in a tab (items 1121 and 1122).
         await reader.go("/runs", "New chat", "textarea")
+        if width < 720:
+            await page.get_by_role("textbox", name="Goal").click()
         await reader.opens("The model menu", page.locator("button[title='ollama:scripted']").first)
-        await reader.opens("The options menu", page.locator("button[title^='Approvals:']").first)
+        if width < 720:
+            await page.get_by_role("textbox", name="Goal").click()
+            await page.locator("button[title='ollama:scripted']").first.click()
+            await reader.opens("The options menu", page.get_by_role("tab", name="Options", exact=True))
+        else:
+            await reader.opens("The options menu", page.locator("button[title^='Approvals:']").first)
         await reader.opens(
             "The plus menu", page.get_by_role("button", name="Add files, model and options, or teach a task")
         )
@@ -598,6 +606,8 @@ async def test_a_chat_its_messages_menus_and_cards_say_what_they_mean(browser: B
             await goal.fill("")
         # The chat that worked: its side panel, the ring of how full it is, a reaction, a copy.
         await reader.go(f"/runs/{served.runs['files']}", "A chat that worked", "textarea")
+        if width < 720:
+            await page.get_by_role("textbox", name="Message for Dot").click()
         await reader.opens("The chat's size ring", page.locator("button[title^='Chat size']").first)
         await reader.opens("The task's panel", page.get_by_role("button", name="Task details").first, "Escape")
         if width < 720:
