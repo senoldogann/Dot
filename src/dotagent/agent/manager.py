@@ -2099,7 +2099,8 @@ class RunManager:
         store: Store = self._runtime.store
         await store.put_back_queued(message)
         newest: list[RunRecord] = await store.list_runs(1, message.thread_id)
-        if newest and newest[0].status not in WORKING_STATUSES:
+        # A run ``ending`` has not ended: its own end moves the queue on.
+        if newest and newest[0].status not in OCCUPIED_STATUSES:
             await self._follow_queue(newest[0], newest[0].status)
 
     async def resume_queue(self, thread_id: str) -> None:

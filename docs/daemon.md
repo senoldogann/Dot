@@ -853,7 +853,8 @@ what Dot improves around its model, in plain words: what Dot follows now, a form
 versions, fifty at a time, with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
 harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a sign-in code for its home-screen app; see
 [Dot on the phone](phone.md#dot-on-the-phone)) and
-**System** (item 564: three tiles say how Dot, the permissions and the health checks stand; the **Emergency
+**System** (item 564: three tiles say how Dot, the permissions and the health checks stand; its "What it works with"
+lists **Phone notifications**, reaching the phone, down when the last push to a paired phone failed, or off with none; the **Emergency
 stop** is a card with **Stop everything**, or **Release** once it is engaged; the **Health checks** are what needs a
 look first, then the checks that passed in their groups (setup, desktop control, providers and models, browser, memory,
 tools and plugins), with a filter and **Run again**, a card that folds, shut until it is opened (item 625), and says how many checks
@@ -1358,7 +1359,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 
 | Route                                                                           | Purpose                                                      |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `GET /health` (public), `GET /status`, `GET /models`, `GET /doctor`             | liveness, state of the daemon, models per provider (with their reasoning levels), checks |
+| `GET /health` (public), `GET /status`, `GET /models`, `GET /doctor`             | liveness (and `notifications`: `ok`, `down` when the last push to a phone failed, `off` with none paired), state of the daemon (the same `notifications`), models per provider (with their reasoning levels), checks |
 | `POST /models/main` (`{"model": "provider:model"}`)                            | make the default model, kept in `config.toml` (422 for one that cannot call tools or of no known provider; the provider's error, 502, for one it does not know) |
 | `POST /models/roles` (`{"role": "review", "model": "provider:model"}`)         | make the fast, review or vision model, kept in `config.toml` (422 for one that cannot do that work) |
 | `GET\|PUT /policy/free` (`{"free": true}`) | the owner's free mode (item 922): on, no run asks anything; kept in `config.toml` as `[policy] free`; a phone may switch it off, and gets 403 switching it on |

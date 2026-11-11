@@ -27,8 +27,9 @@ PLAN_MOVES: dict[StepStatus, frozenset[StepStatus]] = {
     "pending": frozenset({"in_progress", "done", "failed", "skipped"}),
     "in_progress": frozenset({"done", "failed", "skipped", "pending"}),
     "done": frozenset(),
-    "failed": frozenset({"pending", "skipped"}),
-    "skipped": frozenset({"pending"}),
+    # A step tried again may end done at once (a delegated run's report, with its evidence).
+    "failed": frozenset({"pending", "skipped", "done"}),
+    "skipped": frozenset({"pending", "done"}),
 }
 # What ``reopen`` adds. A done step is not failed or skipped by a mark; the plan is rewritten for that.
 _REOPEN_MOVES: dict[StepStatus, frozenset[StepStatus]] = {
