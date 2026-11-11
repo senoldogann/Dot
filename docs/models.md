@@ -92,7 +92,8 @@ that step had, on the first standby model that can take it over, the model is to
 which the model chip follows. The run's reasoning level becomes the nearest one the new model offers. A run takes each
 model once at most, in the order of the list, and never goes back to one it left. A standby model that cannot call tools
 while the run offers them, whose window cannot hold the instructions and the tools, or whose details cannot be read is
-passed over; when every one is, the run fails and says why for each. Without a standby model that can answer, the error
+passed over, and so is one of OpenCode's agent or the Claude plan named in `config.toml`, as a helper model is too: each
+works whole runs in its own program and takes no step of Dot's (item 1124; the Models page offers neither); when every one is, the run fails and says why for each. Without a standby model that can answer, the error
 ends the run (one that comes back by itself is waited for first: a spent quota, below), and its message is the run's
 result (what the timeline, a notification and `dotx run` show); its context, the request and the answer of the provider,
 is kept with the run's `run_finished` event and in the log. A transport error or a timeout moves nothing (the run waits

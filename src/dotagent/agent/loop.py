@@ -2134,7 +2134,8 @@ async def _to_standby(
     The run's reasoning level follows the move: the level of the new model that is nearest to it.
 
     ``None`` when ``error`` says nothing about the model being unable to answer, or when no standby model is left that
-    is available (each one the run has not worked on lacks its key or is paused): the run then ends with ``error``. A
+    is available (each one the run has not worked on lacks its key, is paused, or is OpenCode's agent or the Claude
+    plan, which take no step of Dot's: item 1124): the run then ends with ``error``. A
     standby model that cannot take the run over (:func:`_fitted`) is passed over; when every available one is, the
     run fails with a :class:`ConfigError` whose message, the run's result, says why for each."""
     runtime: Runtime = agent.runtime
