@@ -195,7 +195,9 @@ async def _bar_and_composer(
     show: Locator = bar.get_by_role("button", name="Show sidebar")
     await expect(show).to_be_visible()
     await expect(bar.get_by_role("button", name="Emergency stop")).to_have_count(0)
-    assert await _size(show) == _SWITCH_PX
+    # On a phone a new chat's bar is a chat's (item 1123): its way back a 40 px circle of glass, as tall as the name's
+    # and the tools' panes; the sidebar's close keeps the switch's size.
+    assert await _size(show) == ((40, 40, 19) if width < 720 else _SWITCH_PX)
     await show.click()
     await expect(sidebar.get_by_role("button", name="Hide sidebar")).to_be_visible()
     await expect(sidebar.get_by_role("button", name="Emergency stop")).to_have_count(0)
@@ -216,6 +218,8 @@ async def _bar_and_composer(
     await expect(level).to_be_visible()
     await expect(level).to_contain_text("Low")
     await page.locator(f'.composer-pill[data-pill="{held}"]').click()
+    if width < 720:
+        await page.get_by_role("tab", name="Reasoning", exact=True).click()
     await page.get_by_role("listbox", name="Reasoning", exact=True).get_by_role("option", name="High").click()
     await expect(level).to_contain_text("High")
     composer_bar: Locator = page.locator(".composer-bar")

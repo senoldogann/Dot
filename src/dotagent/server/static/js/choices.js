@@ -408,36 +408,70 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     build: () => {
       const fallback = defaultRefOf(getSnapshot());
       const models = picker.build({ groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) });
-      return PHONE.matches ? [...models, ...phoneSections()] : models;
+      return PHONE.matches ? phoneMenu(models) : models;
     },
   });
 
-  // A group of the model's menu on a phone, under its heading.
-  function section(title, children) {
-    return el("div", { class: "pop-group pop-phone-section", role: "group", "aria-label": title }, el("div", { class: "pop-heading", "aria-hidden": "true" }, title), ...children);
-  }
-
   // On a phone the model's menu holds every choice of the run (item 1121, the owner's ask after another assistant's
-  // thread settings): under the models, the reasoning, the approvals (with their own heading) and how Dot works, and
-  // the mode; their own pills stay on a Mac's wider box.
-  function phoneSections() {
+  // thread settings), a tab each under a bar of tabs at its top (item 1122, the owner's ask: one long list scrolled
+  // past the models): Model, Reasoning when the model offers a choice, Options (the approvals and how Dot works) and
+  // Mode. The menu keeps its height as the tabs change; their own pills stay on a Mac's wider box. The menu opens on
+  // Model, and a pick in a tab keeps that tab.
+  let phoneTab = "model";
+  // Before the press opens the menu, so that it opens on the models.
+  modelPill.element.addEventListener("pointerdown", () => {
+    phoneTab = "model";
+  });
+
+  function phoneTabs() {
     const isChat = modeId === "chat";
     executionGroup.hidden = isChat;
     executionGroup.replaceChildren(el("div", { class: "pop-heading" }, "How Dot works"), ...executionItems.flatMap((build) => build()), goalMode.element, frame.picks.planRow());
     const reasoning = reasoningRows();
     return [
-      ...(reasoning.length === 0 ? [] : [section("Reasoning", reasoning)]),
-      approvals.element,
-      ...(isChat ? [] : [executionGroup]),
-      ...more(),
-      section("Mode", [
-        el(
-          "div",
-          { role: "listbox", "aria-label": "Mode" },
-          ...modes.map((option) => optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) })),
-        ),
-      ]),
+      { id: "model", label: "Model", build: (models) => models },
+      ...(reasoning.length === 0 ? [] : [{ id: "reasoning", label: "Reasoning", build: () => reasoning }]),
+      { id: "options", label: "Options", build: () => [approvals.element, ...(isChat ? [] : [executionGroup]), ...more()] },
+      {
+        id: "mode",
+        label: "Mode",
+        build: () => [
+          el(
+            "div",
+            { role: "listbox", "aria-label": "Mode" },
+            ...modes.map((option) => optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) })),
+          ),
+        ],
+      },
     ];
+  }
+
+  function phoneMenu(models) {
+    const tabs = phoneTabs();
+    const shown = tabs.find((tab) => tab.id === phoneTab) ?? tabs[0];
+    const bar = el(
+      "div",
+      { class: "pop-tabs", role: "tablist", "aria-label": "Choices" },
+      ...tabs.map((tab) =>
+        el(
+          "button",
+          {
+            class: "pop-tab",
+            type: "button",
+            role: "tab",
+            "aria-selected": String(tab.id === shown.id),
+            // The models' tab gives the keys to its search, as the menu always did; another tab keeps them on itself.
+            "data-autofocus": tab.id === shown.id && tab.id !== "model" ? "" : null,
+            onclick: () => {
+              phoneTab = tab.id;
+              modelMenu.repaint();
+            },
+          },
+          tab.label,
+        ),
+      ),
+    );
+    return [bar, el("div", { class: "pop-tab-panel", role: "tabpanel", "aria-label": shown.label }, ...shown.build(models))];
   }
 
   paintPhonePill = () => {

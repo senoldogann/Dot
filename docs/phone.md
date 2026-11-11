@@ -202,7 +202,8 @@ agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid 
 1101; the title and the model are in the panel's Details), and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The bar has
 no ground of its own (item 1119): its three parts are panes of glass and the conversation scrolls under them, as under
-the composer. The line over the
+the composer. A new chat and an agent's page wear the same bar (item 1123): the way back round, an agent's face and
+name in the middle, its tools (the Trader's desk and the "…") in one pill, all on glass over the page. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
 end, in the same pane; it is a row of 40 px, a translucent surface with the page blurred under it, a hairline and a
@@ -221,8 +222,9 @@ composer grows (items 374 and 401). At rest the composer is the "+", the words a
 words are touched or typed in, the words take their whole line and the line under them holds the "+", the model, the
 context meter, the microphone and the send, each 36 px, and a touch elsewhere puts that line away again. The model's
 pill stands for every choice of the run (item 1121): after the name it says the approvals (first, so that YOLO is
-never the word cut), the mode when one is named and the reasoning level in small words, and its menu holds, under the models, the reasoning, the approvals, How Dot
-works and the mode. The conversation scrolls up and down only
+never the word cut), the mode when one is named and the reasoning level in small words, and its menu holds them in
+tabs under a bar at its top (item 1122): Model, Reasoning when the model offers a choice, Options (the approvals and
+How Dot works) and Mode, the menu keeping one height as the tabs change and opening on Model. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
 tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A delegated run's row, under the helpers it belongs to, is one line tall at this width:
 its face, its goal, its state and time, and the way to its page, with the goal or the last line cut by an ellipsis

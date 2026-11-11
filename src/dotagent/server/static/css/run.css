@@ -612,11 +612,6 @@
     position: absolute;
     top: 0;
     inset-inline: 0;
-    pointer-events: none;
-  }
-
-  html.chat-shell .stage:has(> .page[data-layout="run"]) > .stagebar :is(.stagebar-row > *, .banner) {
-    pointer-events: auto;
   }
 
   /* A menu of the composer opens over the bar, not under it. */
@@ -801,19 +796,69 @@
     white-space: nowrap;
   }
 
-  /* The model's menu holds the run's other choices under the models (item 1121): it is the box's width and as tall as
-     the room over the box, and scrolls as a whole, the models' list keeping its own height and scroll. It stands over
-     the bar. */
-  .composer-popover:has(> .model-picker) {
+  /* The model's menu holds the run's choices in tabs (items 1121 and 1122): a bar of tabs at its top, and under it the
+     tab shown, which scrolls on its own. It is the box's width and keeps one height whichever tab is shown, as much of
+     the room over the box as 560 px allows, and stands over the bar. */
+  .composer-popover:has(> .pop-tabs) {
     width: calc(100% - 16px);
-    max-height: var(--room, 480px);
+    height: min(560px, var(--room, 480px));
+    max-height: none;
+    padding: 0;
+    overflow: hidden;
+    gap: 0;
+  }
+
+  .pop-tabs {
+    display: flex;
+    flex: none;
+    gap: var(--space-1);
+    margin: var(--space-2);
+    padding: var(--space-half);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+  }
+
+  .pop-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 34px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    color: var(--text-2);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-label);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+
+  .pop-tab[aria-selected="true"] {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .pop-tab-panel {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+    padding: 0 var(--space-2) var(--space-2);
     overflow-y: auto;
     overscroll-behavior: contain;
   }
 
-  .composer-popover:has(> .model-picker) > .model-picker {
-    flex: none;
-    height: 300px;
+  .pop-tab-panel > .model-picker {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    margin: 0 calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
+    border-top: 1px solid var(--border);
   }
 
   .composer:has(> .composer-popover:not([hidden])) {
