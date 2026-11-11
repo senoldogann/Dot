@@ -113,3 +113,17 @@ def test_an_eval_run_has_no_helper_or_standby_model_of_the_owner() -> None:
     )
     measured: AppConfig = eval_config(owner.model_copy(update={"models": models}))
     assert (measured.models.helpers, measured.models.standby) == ([], [])
+
+
+def test_opencodes_agent_and_the_claude_plan_stand_by_for_nothing() -> None:
+    """A standby of OpenCode's agent or of the Claude plan is unavailable, with why: each works whole runs in its own
+    program, and a step of Dot's loop cannot be handed to it (before, the roster raised "unknown provider" and the run
+    that moved to it failed)."""
+    roster: Roster = roster_for(
+        ["opencode:deepseek-v4.1-flash-free", "claude_code:sonnet", "ollama:gemma4"], frozenset({"ollama"}), {}
+    )
+    assert roster.available == ("ollama:gemma4",)
+    assert [(entry.model, entry.reason) for entry in roster.unavailable] == [
+        ("opencode:deepseek-v4.1-flash-free", "it works whole runs only, and cannot take over a step"),
+        ("claude_code:sonnet", "it works whole runs only, and cannot take over a step"),
+    ]
