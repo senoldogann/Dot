@@ -1511,6 +1511,9 @@ _OPTIMIZE_AT_OPEN: int = 0x10002
 
 
 # The working states of a run, as SQL: the ones a run may move between or end from (item 1045).
+# Why a step still running as the daemon starts is closed failed. A ``dotx harness step`` of its own process may still
+# be at work then: its own end, when it comes, is written over this one (:meth:`finish_harness_step`).
+_STEP_DID_NOT_END: str = "the step did not end"
 _WORKING_SQL: str = ", ".join(f"'{status}'" for status in sorted(WORKING_STATUSES))
 # Working states plus ``ending``: a run whose end is decided still occupies its chat and can still be closed.
 _OCCUPIED_SQL: str = ", ".join(f"'{status}'" for status in sorted(OCCUPIED_STATUSES))
@@ -1841,8 +1844,8 @@ class Store:
     ) -> HarnessStep:
         cursor: aiosqlite.Cursor = await self._db.execute(
             "UPDATE harness_steps SET ended_at = ?, state = ?, outcome = ?, error = ?"
-            " WHERE id = ? AND state = 'running'",
-            (ended_at, state, outcome, error, step_id),
+            " WHERE id = ? AND (state = 'running' OR (state = 'failed' AND error = ?))",
+            (ended_at, state, outcome, error, step_id, _STEP_DID_NOT_END),
         )
         await self._db.commit()
         if cursor.rowcount == 0:
@@ -1873,7 +1876,7 @@ class Store:
         become failed. Idempotent: a second start finds none running. Returns how many closed."""
         cursor = await self._db.execute(
             "UPDATE harness_steps SET state = 'failed', error = ? WHERE state = 'running'",
-            ("the step did not end",),
+            (_STEP_DID_NOT_END,),
         )
         await self._db.commit()
         return cursor.rowcount
@@ -2415,7 +2418,7 @@ class Store:
         """Raise ``RunConflict`` with the message ``refusal`` when a run of any process works on one of the chats
         ``named``, itself or through a run it delegated to, or when a queued message of one is starting as its next run
         (:meth:`claim_queued`); the chats it names are those given."""
-        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        working: tuple[RunStatus, ...] = tuple(sorted(OCCUPIED_STATUSES))
         rows: list[aiosqlite.Row] = await self._all(
             "WITH RECURSIVE doomed(id, chat) AS ("
             f" SELECT id, thread_id FROM runs WHERE thread_id IN ({','.join('?' * len(named))})"
@@ -6580,7 +6583,7 @@ class Store:
     async def due_campaigns(self, now: float) -> list[CampaignRecord]:
         """The active campaigns whose next session is due at ``now`` and none of whose sessions is still working (in
         any process), the longest due first."""
-        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        working: tuple[RunStatus, ...] = tuple(sorted(OCCUPIED_STATUSES))
         rows = await self._all(
             "SELECT * FROM campaigns WHERE status = 'active' AND next_session_at IS NOT NULL AND next_session_at <= ?"
             " AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.campaign_id = campaigns.id"

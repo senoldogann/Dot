@@ -40,14 +40,12 @@ def test_a_crash_hold_is_not_a_clean_shutdown_and_not_an_owner_hold() -> None:
     assert hold_reason_for_cutoff("blocked") == "owner"
 
 
-def test_an_objective_does_not_leave_dropped_and_a_done_one_may_be_opened() -> None:
+def test_a_done_or_dropped_objective_may_be_opened_again_and_a_done_one_dropped() -> None:
     assert transition_objective("active", "done") == "done"
     assert transition_objective("done", "active") == "active"
     assert transition_objective("active", "active") == "active"
-    with pytest.raises(InvalidValueError):
-        transition_objective("dropped", "active")
-    with pytest.raises(InvalidValueError):
-        transition_objective("done", "dropped")
+    assert transition_objective("dropped", "active") == "active"
+    assert transition_objective("done", "dropped") == "dropped"
 
 
 def test_a_done_step_stays_done_and_a_failed_dependency_blocks_in_progress() -> None:
@@ -153,13 +151,9 @@ async def test_the_store_refuses_an_objective_move_the_table_does_not_have(tmp_p
         made = await store.add_objective("Ship it", "because", "it is live", False)
         done = await store.update_objective(made.id, "done", None)
         assert done.status == "done"
-        with pytest.raises(InvalidValueError, match="does not move"):
-            await store.update_objective(done.id, "dropped", None)
-        opened = await store.update_objective(done.id, "active", None)
-        dropped = await store.update_objective(opened.id, "dropped", None)
+        dropped = await store.update_objective(done.id, "dropped", None)
         assert dropped.status == "dropped"
-        with pytest.raises(InvalidValueError, match="does not move"):
-            await store.update_objective(dropped.id, "active", None)
+        assert (await store.update_objective(dropped.id, "active", None)).status == "active"
     finally:
         await store.close()
 

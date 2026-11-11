@@ -164,6 +164,7 @@ from dotagent.store.endings import (
 )
 from dotagent.store.models import (
     NO_PICKS,
+    OCCUPIED_STATUSES,
     WORKING_STATUSES,
     AgentRecord,
     ApprovalRecord,
@@ -1559,7 +1560,7 @@ class RunManager:
             if campaign.status != "active" or campaign.next_session_at is not None:
                 continue
             sessions: list[RunRecord] = await store.campaign_sessions(campaign.id)
-            if any(session.status in WORKING_STATUSES for session in sessions):
+            if any(session.status in OCCUPIED_STATUSES for session in sessions):
                 continue
             died: bool = bool(sessions) and cut_off_by(sessions[-1]) == "daemon_restarted"
             if await store.set_next_session(campaign.id, now + gap_s if died else now):
@@ -1579,7 +1580,7 @@ class RunManager:
             if campaign.status != "active" or campaign.next_session_at is not None:
                 continue
             sessions: list[RunRecord] = await store.campaign_sessions(campaign.id)
-            if any(session.status in WORKING_STATUSES for session in sessions):
+            if any(session.status in OCCUPIED_STATUSES for session in sessions):
                 continue
             ended: float = max((session.finished_at or 0.0 for session in sessions), default=campaign.updated_at)
             if now - ended < CAMPAIGN_STALL_S:

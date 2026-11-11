@@ -5,16 +5,19 @@ reads that run's newest event and continues from it. A run with no such event st
 The limit clock is not in the snapshot: a resumed run starts its own minutes and tokens.
 """
 
+import asyncio
 import sqlite3
 
-from pydantic import ValidationError
+from pydantic import JsonValue, ValidationError
 
 from dotagent.agent.continuity import RunLedger
 from dotagent.agent.progress import WatchState
 from dotagent.core.errors import DotError
 from dotagent.core.logs import get_logger
-from dotagent.core.types import FrozenModel
+from dotagent.core.text import redact_json
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.events import EventBus
+from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
 
 log = get_logger(__name__)
@@ -36,8 +39,13 @@ class LoopState(FrozenModel):
 
 async def remember_loop_state(bus: EventBus, run_id: str, state: LoopState) -> None:
     """Store ``state`` for ``run_id``. A store that refuses is logged: the step goes on, and the next one tries."""
+    # The ledger keeps each call's arguments as the model sent them: masked as a call's own event masks them (item 551),
+    # since the snapshot is an event the store, the API and the page read.
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+    masked: JsonValue = redact_json(state.model_dump(mode="json"), known)
+    data: JsonObject = masked if isinstance(masked, dict) else {}
     try:
-        await bus.emit(run_id, LOOP_STATE_EVENT, state.model_dump(mode="json"), True)
+        await bus.emit(run_id, LOOP_STATE_EVENT, data, True)
     except (DotError, sqlite3.Error, OSError) as exc:
         log.warning(
             "loop_state_not_stored",

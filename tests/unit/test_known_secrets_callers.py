@@ -28,6 +28,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/aside.py:answer_aside": (True,),
     # The events of a call, then what its tool returned (item 857: before the run reads it).
     "agent/executor.py:_execute_one": (True, True),
+    "agent/executor.py:_record_yolo": (True,),
+    "agent/loop_state.py:remember_loop_state": (True,),
     "agent/gate.py:_shown": (True,),
     "agent/loop.py:_compact": (True,),
     "agent/manager.py:RunManager._record_end": (True,),

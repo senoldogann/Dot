@@ -70,8 +70,9 @@ ObjectiveStatus = Literal["active", "done", "dropped"]
 # tool still applies the cap on how many may be active. A move to the status an objective already has only adds a note.
 OBJECTIVE_MOVES: dict[ObjectiveStatus, frozenset[ObjectiveStatus]] = {
     "active": frozenset({"done", "dropped"}),
-    "done": frozenset({"active"}),
-    "dropped": frozenset(),
+    # A done or dropped objective may be opened again, and a done one dropped (the objectives tool's word, item 907).
+    "done": frozenset({"active", "dropped"}),
+    "dropped": frozenset({"active"}),
 }
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
 # How the end of a schedule's run is told (item 461): every end, only a first failure or an end that needs the owner,
