@@ -6,10 +6,10 @@ one that says what the answer does not (a warning the finish left out, the revie
 A reply is restated when the answer is at least half its length (an answer that only points at it, "see above", leaves
 it to be read), when every line of it that holds words has most of its words in the answer (a reworded line keeps its
 names and the words that carry it, and a line the answer left out shares next to none), and when every number and every
-word that turns a line's sense ("not", "değil") of the reply is in the answer too (a name with a digit in it is a word):
-an answer that lost one says another thing, and the reply stays, as the comparison of words keeps such a reply (item
-569). A Turkish verb made negative by its ending (bitmedi) is a word of its own, which the share of words weighs like
-any other."""
+word that turns a line's sense ("not", "değil") of the reply is in the answer too (a digit after a mark is a number, one
+in a name's letters a word): an answer that lost one says another thing, and the reply stays, as the comparison of words
+keeps such a reply (item 569). A Turkish verb made negative by its ending (bitmedi) is a word of its own, which the
+share of words weighs like any other."""
 
 import re
 

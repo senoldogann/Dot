@@ -75,3 +75,5 @@ def test_a_name_the_answer_wrote_more_exactly_is_restated() -> None:
     # A number after a mark in a name is still a number (the review of item 1129).
     assert not restates("Server up on localhost:8080.", "Server up on localhost:8081.")
     assert not restates("Pinned web-research v1.4.8.", "Pinned web-research v1.4.9.")
+    # The price of the rule: digits in a name's letters are its words, and a name changed there is reworded.
+    assert restates("Pinned web-research v4.", "Pinned web-research v5.")
