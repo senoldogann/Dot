@@ -1189,6 +1189,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // which stay put (`html.chat-shell`, run.css); on a wider window the window, as before. The conversation's box is
   // known once it is built.
   let threadBox = null;
+  // The button last pressed in the conversation (an answer's Show the steps, or the line of what the run does).
+  let lastPressed = null;
 
   function scroller() {
     return PHONE.matches && threadBox !== null ? threadBox : document.scrollingElement;
@@ -1646,7 +1648,24 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     active,
     face: actorFace(agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id, "working", null),
     onToggle: (shown) => {
+      // The steps open or fold above what was pressed: it stays where the reader's finger is, and the conversation
+      // moves around it (the owner's word: Show the steps threw the chat up). The press is the line or an answer's
+      // button; iOS gives neither the focus, so the last one pressed in the conversation is read.
+      // The browser's own scroll anchoring (Chrome's; Safari has none) is put off for the move, which would count it
+      // twice.
+      const anchor = lastPressed?.isConnected ? lastPressed : workStatus.element;
+      const box = scroller();
+      const anchoring = box.style.overflowAnchor;
+      box.style.overflowAnchor = "none";
+      const before = anchor.getBoundingClientRect().top;
       threadBox?.classList.toggle("steps-shown", shown);
+      const moved = anchor.getBoundingClientRect().top - before;
+      if (moved !== 0) {
+        box.scrollTop += moved;
+      }
+      requestAnimationFrame(() => {
+        box.style.overflowAnchor = anchoring;
+      });
       for (const button of threadBox?.querySelectorAll(".answer-steps") ?? []) {
         setText(button, shown ? "Hide the steps" : "Show the steps");
         button.setAttribute("aria-pressed", String(shown));
@@ -1775,6 +1794,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // dock is measured once it stands in the page and whenever it changes (its first height, the bar over the composer, a
   // queued message, a draft of several lines), and a reader at the end stays there as the foot moves with it (item 446).
   threadBox = thread;
+  thread.addEventListener(
+    "pointerdown",
+    (event) => {
+      lastPressed = event.target instanceof Element ? event.target.closest("button") : null;
+    },
+    true,
+  );
   const dockWatch = new ResizeObserver(() => {
     main.style.setProperty("--dock-h", `${dock.offsetHeight}px`);
     if (following) {
