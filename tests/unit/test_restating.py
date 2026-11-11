@@ -62,3 +62,13 @@ def test_a_number_or_a_not_the_answer_lost_keeps_the_reply() -> None:
     assert not restates("Rapor dosyası klasörde yok, yeniden yazılmalı.", "Rapor dosyası klasörde, yeniden yazılmalı.")
     # The same number written another way, and a "not" kept, are held.
     assert restates("Saat 16:17, pil %81; dosya hâlâ yok.", "Pil 81%, saat 16.17 itibarıyla; dosya hâlâ yok.")
+
+
+def test_a_name_the_answer_wrote_more_exactly_is_restated() -> None:
+    """Item 1129, the owner's chat of 2026-11-11: the finish wrote a name server's name more exactly; the digit in a
+    name is not a number the answer lost, and the reply showed as a second answer."""
+    assert restates(
+        "| Nameserver | `pns6x.cloudns.*` (ücretsiz DNS) | kurumsal |\nDomain 3 gün önce kaydedildi.",
+        "| Nameserver | `pns61-64.cloudns.*` (ücretsiz DNS) | kurumsal |\nDomain 3 gün önce kaydedildi.",
+    )
+    assert not restates("Domain 3 gün önce kaydedildi.", "Domain 30 gün önce kaydedildi.")
