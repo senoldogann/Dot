@@ -232,9 +232,9 @@ async def test_the_emergency_stop_a_tool_meets_ends_the_run_as_one(room: Room) -
 
 
 async def _replies(room: Room, run_id: str) -> int:
-    """How many replies of the model with words the run has stored."""
+    """How many steps of the model the run has stored: a reply after a finish shows no words (item 1125)."""
     steps: list[EventRecord] = await room.runtime.store.events_of_kind(run_id, "assistant", 50)
-    return sum(1 for step in steps if str(step.data.get("text", "")).strip())
+    return len(steps)
 
 
 async def test_a_finish_then_a_message_ends_as_the_reply_after_it(room: Room) -> None:
@@ -269,6 +269,30 @@ async def test_a_call_after_a_finish_drops_what_the_finish_said(room: Room) -> N
     assert ended.result == "The payment was declined after all.", ended.result
     # Nor does the finish's "nothing new" keep the end from the phone.
     assert not await said_nothing_new(room.runtime.store, ended.id)
+
+
+async def test_a_reply_after_a_finish_is_not_shown_as_a_second_answer(room: Room) -> None:
+    """Item 1125: the program's turn ends, after the finish it called, with a reply that says the answer again: the
+    run's answer is the finish's, and the step of that reply shows no text of its own (the chat showed both)."""
+    started: RunRecord = await room.manager.start(
+        "How are you: finish then restate.",
+        "task",
+        MODEL,
+        None,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "yolo",
+        False,
+        (),
+    )
+    async with asyncio.timeout(30):
+        ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.result == "I am well, thanks.", ended.result
+    steps = await room.runtime.store.events_of_kind(ended.id, "assistant", 10)
+    assert [step.data["text"] for step in steps] == ["", ""], [step.data for step in steps]
 
 
 async def test_a_stop_ends_the_call_of_dots_tool_at_work_for_the_program(room: Room) -> None:

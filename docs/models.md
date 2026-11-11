@@ -336,7 +336,8 @@ answer keeps its words, Ollama's too.
   so. A run here ends as Dot's own do (item 1076): the model calls `finish` with its answer (a chat-mode run, which has no `finish`, ends with its last reply), whether it succeeded and
   what it needs from you, so a run that could not do its work ends failed and one that waits on you says so (before,
   every run ended done with nothing it needed), and a call it makes after its `finish`, or your message, drops what
-  that `finish` said; a ✋ holds it after its turn until you write or take the ✋ back, within
+  that `finish` said, while a reply it writes after it without a call shows no text: it says the answer again (item
+  1125); a ✋ holds it after its turn until you write or take the ✋ back, within
   `[reactions] hold_minutes` counted from the turn's end (a tool at work is never cut by it), the pages told as for
   Dot's own runs; the chat keeps the answer of its `finish`; the emergency stop (the pointer in a corner) that a
   tool of it meets ends it as the emergency stop, not as an error the model reads; a message sent as it ends is kept or

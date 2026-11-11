@@ -8,6 +8,8 @@ first message on its input, and answers as the message says:
   pre-push review: what comes after it decides the run's end);
 - ``finish then check``: a call of ``finish`` that succeeded and found nothing new, then a call of ``shell`` and a
   plain answer that the work failed after all (item 1076's pre-push review: a call after a finish drops it);
+- ``finish then restate``: a call of ``finish`` that succeeded, then a plain answer that says it again in other words
+  (the owner's screenshot of 2026-11-11: the chat showed both);
 - ``talk with me``: an init line, a second's pause, an answer and a ``result``; then the same for each message that
   comes on its input, taken in first (item 1076: a run the owner holds waits for their next message);
 - ``needs a code``: an init line, then a call of ``finish`` that did not succeed and needs a code from the owner, and
@@ -142,6 +144,13 @@ async def _work(server: dict[str, object], door: str, said: str) -> None:
             await client.call_tool("finish", args)
             _step([("text", "")], "end_turn")
             _say({"type": "result", "subtype": "success", "is_error": False, "result": "", "session_id": SESSION})
+            return
+        if "finish then restate" in said:
+            _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
+            await client.call_tool("finish", {"answer": "I am well, thanks.", "success": True})
+            again: str = "I'm well, thank you!"
+            _step([("text", again)], "end_turn")
+            _say({"type": "result", "subtype": "success", "is_error": False, "result": again, "session_id": SESSION})
             return
         if "finish then check" in said:
             _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
