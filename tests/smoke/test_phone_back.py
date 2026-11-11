@@ -311,7 +311,9 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     await wide.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                     await wide.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
                     await wide.goto(ui_url("127.0.0.1", port, TOKEN))
-                    await wide.goto(f"{address}/#/customize/connectors/notion")
+                    # The hero is drawn only after the catalogue's reads return; until then the page says Loading.
+                    async with wide.expect_response("**/api/plugins"):
+                        await wide.goto(f"{address}/#/customize/connectors/notion")
                     await expect(wide.locator(".plugin-hero")).to_be_visible()
                     await expect(wide.get_by_role("button", name="Back")).to_have_count(0)
                     # The page's link back shows with the sidebar beside it (item 380), and with the sidebar hidden.

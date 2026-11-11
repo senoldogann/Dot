@@ -20,8 +20,16 @@ from dotagent.config import TradingConfig, load_default_config
 from dotagent.runtime import Runtime
 from dotagent.store.db import Store
 from dotagent.store.models import TradingOrderRecord
-from dotagent.trading.engine import ENGINE_RUN_ID, TrendEngine, closed_days
-from dotagent.trading.engine_state import EngineResult, EngineState, pause, read_pause, read_state, resume
+from dotagent.trading.engine import ENGINE_LOOK_S, ENGINE_RUN_ID, TrendEngine, closed_days
+from dotagent.trading.engine_state import (
+    STATE_KEY,
+    EngineResult,
+    EngineState,
+    pause,
+    read_pause,
+    read_state,
+    resume,
+)
 from dotagent.trading.market import CoinbaseMarket
 from dotagent.trading.service import Trading, TradingSettings
 from dotagent.trading.trend import DAYS_NEEDED, backtest, steps_toward, strength, target_weights, volatility
@@ -396,3 +404,32 @@ async def test_the_engine_keeps_what_the_account_made_beside_holding_its_first_c
         _DOWN.clear()
     again: EngineState = await engine.look(trading.config(), _NOW + 7200)
     assert again.result is not None and (again.result.started_at, again.result.account) == (_NOW + 7200, 0.0)
+
+
+async def test_a_restart_does_not_look_when_the_last_look_was_a_minute_ago(store: Store, tmp_path: Path) -> None:
+    """The hour lives in the store. A new process a minute after a look places nothing."""
+    _PRICES.update({"BTC-EUR": _rising(230, start=50_000.0), "ETH-EUR": _falling(230)})
+    kept: EngineState = EngineState(looked_at=_NOW - 60, shares=(), placed=(), notes=())
+    await store.kv_set(STATE_KEY, kept.model_dump_json())
+    engine, trading = _engine(store, tmp_path)
+    await engine.tick(_NOW)
+    assert await _engine_orders(trading) == []
+    await engine.tick(_NOW - 60 + ENGINE_LOOK_S)
+    assert len(await _engine_orders(trading)) == 1
+
+
+async def test_a_look_that_raises_puts_the_hour_back(store: Store, tmp_path: Path) -> None:
+    engine, _trading = _engine(store, tmp_path)
+    calls: list[float] = []
+
+    async def boom(config: object, now: float) -> EngineState:
+        calls.append(now)
+        raise RuntimeError("the market could not be read")
+
+    engine.look = boom  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await engine.tick(_NOW)
+    # Within the hour of a clock that had moved, this would not look. The hour was put back, so it does.
+    with pytest.raises(RuntimeError):
+        await engine.tick(_NOW + 60)
+    assert calls == [_NOW, _NOW + 60]

@@ -641,16 +641,17 @@ class Trading:
                     # pre-push review of item 770: it was failed for good, and the position left without its stop).
                     _log.info("trading_exit_sell_not_sent", exit_id=exit_.id, error=str(error)[:200])
                     return ExitEnd(exit=exit_, order=None, held=f"its sell could not go out: {str(error)[:200]}")
-                # Sent, perhaps: a second sell could sell twice, so the exit is not tried again; the owner is told.
+                # Sent, perhaps: a second sell could sell twice, so it is not tried again. ``uncertain`` is that
+                # state. A sell that never went out leaves the exit open. ``failed`` is a sell the exchange refused.
                 return await self._ended(
-                    exit_.id, "failed", note=f"its sell may have gone through, look at the account: {error}"
+                    exit_.id, "uncertain", note=f"its sell may have gone through, look at the account: {error}"
                 )
             return await self._ended(exit_.id, reached, sell_id=order.id, order=order)
 
     async def _ended(
         self,
         exit_id: str,
-        status: Literal["stopped", "targeted", "failed"],
+        status: Literal["stopped", "targeted", "failed", "uncertain"],
         note: str = "",
         sell_id: str = "",
         order: TradingOrderRecord | None = None,

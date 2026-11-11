@@ -24,7 +24,7 @@ import {
 } from "../panels.js";
 
 const FACE_STATES = ["idle", "working", "waiting", "done", "failed"];
-const RUN_STATUSES = ["queued", "running", "blocked", "done", "failed", "cancelled"];
+const RUN_STATUSES = ["queued", "running", "blocked", "ending", "done", "failed", "cancelled"];
 const BADGE_TONES = ["b-ok", "b-warn", "b-bad", "b-info", "b-muted"];
 const COLOUR_TOKENS = [
   "bg", "sidebar", "surface", "surface-2", "surface-3", "border", "border-strong", "text", "text-2", "muted",

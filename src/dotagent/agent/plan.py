@@ -20,6 +20,23 @@ type StepStatus = Literal["pending", "in_progress", "done", "failed", "skipped"]
 
 # A step in one of these states needs no more work.
 CLOSED_STATES: frozenset[StepStatus] = frozenset({"done", "failed", "skipped"})
+# The moves ``mark_plan_step`` may make. A step marked done or skipped stays there until the plan is rewritten;
+# ``reopen`` is the only way back to pending or in progress. A failed step may be tried again (pending) or let go
+# (skipped). Pending may be marked done in one move: a step the run finishes without first calling it in progress.
+PLAN_MOVES: dict[StepStatus, frozenset[StepStatus]] = {
+    "pending": frozenset({"in_progress", "done", "failed", "skipped"}),
+    "in_progress": frozenset({"done", "failed", "skipped", "pending"}),
+    "done": frozenset(),
+    # A step tried again may end done at once (a delegated run's report, with its evidence).
+    "failed": frozenset({"pending", "skipped", "done"}),
+    "skipped": frozenset({"pending", "done"}),
+}
+# What ``reopen`` adds. A done step is not failed or skipped by a mark; the plan is rewritten for that.
+_REOPEN_MOVES: dict[StepStatus, frozenset[StepStatus]] = {
+    "done": frozenset({"pending", "in_progress"}),
+    "failed": frozenset({"in_progress"}),
+    "skipped": frozenset({"in_progress"}),
+}
 
 
 # What a step marked done must carry, named in the error a mark without it gets.
@@ -94,10 +111,33 @@ def checked_step_number(steps: Sequence[PlanItem], number: int) -> int:
     return number
 
 
-def with_step_status(steps: Sequence[PlanItem], number: int, status: StepStatus, evidence: str) -> tuple[PlanItem, ...]:
+def with_step_status(
+    steps: Sequence[PlanItem], number: int, status: StepStatus, evidence: str, reopen: bool = False
+) -> tuple[PlanItem, ...]:
     """The plan with step ``number`` (1-based) set to ``status`` and carrying ``evidence`` (empty clears what the step
-    held: a step opened again has nothing shown yet)."""
+    held: a step opened again has nothing shown yet). A move :data:`PLAN_MOVES` does not allow is refused. ``reopen``
+    is the only way from a done, failed or skipped step back to pending or in progress. A step is not marked in
+    progress while a step it waits for has failed."""
     checked_step_number(steps, number)
+    current: PlanItem = steps[number - 1]
+    if status != current.status:
+        allowed: frozenset[StepStatus] = PLAN_MOVES[current.status]
+        if reopen:
+            allowed = allowed | _REOPEN_MOVES.get(current.status, frozenset())
+        if status not in allowed:
+            raise ToolInputError(
+                f"step {number} is {current.status} and cannot be marked {status}",
+                {"step": number, "from": current.status, "to": status},
+            )
+    if status == "in_progress":
+        blocked: tuple[int, ...] = tuple(
+            wanted for wanted in current.depends_on if steps[wanted - 1].status == "failed"
+        )
+        if blocked:
+            raise ToolInputError(
+                f"step {number} waits for step {blocked[0]}, which failed",
+                {"step": number, "waiting_for": list(blocked)},
+            )
     checked: str = _checked_evidence(number, status, evidence)
     return tuple(
         step.model_copy(update={"status": status, "evidence": checked}) if index == number - 1 else step

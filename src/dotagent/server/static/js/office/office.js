@@ -19,6 +19,7 @@ import { planFor } from "./layout.js";
 import { gridFor } from "./nav.js";
 import { buildRoom, isNight } from "./scene.js";
 import { THREE, canDraw, loadThree } from "./three.js";
+import { WORKING_STATES } from "../runstates.js";
 
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)");
 // A phone's frame is taller than it is wide (item 894, the owner's look at it on a phone): the room is seen more from
@@ -524,7 +525,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         const latest = actors.get(id)?.summary.latest ?? null;
         if (freshChat.has(id) || !continues(latest)) return { threadId: null, working: null };
         // Waiting for the owner (blocked) is at work too: the message reaches that run, as in its chat (the review).
-        const working = latest.status === "running" || latest.status === "queued" || latest.status === "blocked";
+        const working = WORKING_STATES.has(latest.status);
         return { threadId: latest.thread_id, working: working ? latest.id : null };
       };
     }
@@ -594,7 +595,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         // The run at work's own: what the owner sent it as it worked, read from its events, and what waits for it.
         const said = feeds.feed(latest.id)?.said ?? [];
         // What waits is let go once the run has read it, or has ended (a queued one is a turn of its own then).
-        const atWork = latest.status === "running" || latest.status === "queued" || latest.status === "blocked";
+        const atWork = WORKING_STATES.has(latest.status);
         const waiting = atWork ? (pending.get(latest.id) ?? []).filter((text) => !said.includes(text)) : [];
         if (waiting.length === 0) pending.delete(latest.id);
         else pending.set(latest.id, waiting);

@@ -39,6 +39,7 @@ from dotagent.store.models import RunStatus
         ("running", "", "active"),
         ("queued", "", "active"),
         ("blocked", "", "active"),
+        ("ending", "", "active"),
     ],
 )
 def test_a_run_is_classified_by_its_status_and_the_text_it_was_closed_with(

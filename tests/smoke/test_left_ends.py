@@ -76,9 +76,9 @@ async def test_a_chat_whose_last_run_has_an_end_the_store_refused_takes_no_run_u
         first: RunRecord = await _send(manager, None)
         async with asyncio.timeout(WAIT_S):
             await manager.wait(first.id)
-        # The store still has the run at work: it was refused its end.
+        # The store has the run ``ending``: its end was refused after the mark.
         assert refused == [first.id]
-        assert (await store.get_run(first.id)).status in ("queued", "running")
+        assert (await store.get_run(first.id)).status == "ending"
         with pytest.raises(RunConflict, match="its end is stored as soon as the database takes it"):
             await _send(manager, first.thread_id)
         # Stored, its chat takes the next run.

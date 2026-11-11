@@ -30,6 +30,7 @@ from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
 from dotagent.notify.apns import ApnsSender, HttpTransport, apns_set, read_key
 from dotagent.notify.apns_watch import APNS_KINDS, ApnsWatch, watch_apns
+from dotagent.notify.health import NotifyHealth
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
 from dotagent.proactive.watching import watch_loop
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -171,11 +172,16 @@ def _end_with_scheduler(server: DotServer, scheduler_loop: asyncio.Task[None]) -
     server.should_exit = True
 
 
-def _log_push_end(pusher: asyncio.Task[None]) -> None:
-    """Pushes that stop before the daemon does are logged, so the phone's silence has a cause on record."""
+def _log_push_end(health: NotifyHealth, channel: str, pusher: asyncio.Task[None]) -> None:
+    """Pushes that stop before the daemon does are logged, and the health check says the phone is down, so a process
+    that still answers HTTP is not taken for a phone that can hear."""
     if pusher.cancelled() or pusher.exception() is None:
         return
-    log.error("push_watch_ended", error=repr(pusher.exception()))
+    if channel == "apns":
+        health.mark_down("apns")
+    else:
+        health.mark_down("push")
+    log.error("push_watch_ended", channel=channel, error=repr(pusher.exception()))
 
 
 def _log_watch_end(watcher: asyncio.Task[None]) -> None:
@@ -276,11 +282,13 @@ async def run_daemon(config: AppConfig) -> int:
             stopping: asyncio.Event = asyncio.Event()
             # The phone hears what the desktop notifications say, from before the start's own work (the restart below,
             # the firings the scheduler's first tick finds missed) until the runs are stopped on the way out.
+            phone: NotifyHealth = NotifyHealth()
             feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(PUSH_KINDS))
             pusher: asyncio.Task[None] = asyncio.create_task(
                 watch_pushes(runtime.store, feed, runtime.push_keys, stopping), name="push"
             )
-            pusher.add_done_callback(_log_push_end)
+            phone.mark_live("push")
+            pusher.add_done_callback(functools.partial(_log_push_end, phone, "push"))
             cleanup.push_async_callback(_cancelled, pusher)
             # The iPhone app hears the same through APNs, and a run's Live Activity too (item 997), once a key is set.
             if apns_set(config.apns):
@@ -291,7 +299,8 @@ async def run_daemon(config: AppConfig) -> int:
                 apns: asyncio.Task[None] = asyncio.create_task(
                     watch_apns(ApnsWatch(runtime.store, sender), apns_feed, stopping), name="apns"
                 )
-                apns.add_done_callback(_log_push_end)
+                phone.mark_live("apns")
+                apns.add_done_callback(functools.partial(_log_push_end, phone, "apns"))
                 cleanup.push_async_callback(_cancelled, apns)
             # The skills' embeddings are made now, in the background, so that the first run finds them (item 404).
             warming: asyncio.Task[None] = asyncio.create_task(warm_help_vectors(runtime), name="help-vectors")
@@ -366,6 +375,7 @@ async def run_daemon(config: AppConfig) -> int:
                 channels=channels,
                 reactions=reactions,
                 phones=await asyncio.to_thread(PairedPhones.load, phones_path()),
+                notifications=phone,
             )
             server: DotServer = DotServer(serving_config(create_app(context)), stopping)
             scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))

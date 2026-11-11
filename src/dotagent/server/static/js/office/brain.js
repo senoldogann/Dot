@@ -36,7 +36,7 @@ export function modeOf(latest, waitingRuns) {
   if (latest.status === "blocked" || waitingRuns.has(latest.id)) {
     return "waiting";
   }
-  return latest.status === "running" || latest.status === "queued" ? "working" : "free";
+  return latest.status === "running" || latest.status === "queued" || latest.status === "ending" ? "working" : "free";
 }
 
 /** A new agent of the room at `start`, with its own desk, free and standing. */

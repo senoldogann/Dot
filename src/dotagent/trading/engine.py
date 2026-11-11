@@ -56,18 +56,41 @@ class TrendEngine:
     def __init__(self, runtime: Runtime) -> None:
         self._runtime: Runtime = runtime
         self._looked_at: float = 0.0
+        # False until the first tick has read the last look from the store. A process that just started must not
+        # look again because this field began at 0.
+        self._clock_ready: bool = False
 
     @property
     def _trading(self) -> Trading:
         return self._runtime.trading
 
+    async def _read_clock(self) -> None:
+        """Take the hour from the last look the store kept. Once, on the first tick of this process."""
+        if self._clock_ready:
+            return
+        before: EngineState | None = await read_state(self._runtime.store)
+        if before is not None:
+            self._looked_at = before.looked_at
+        self._clock_ready = True
+
     async def tick(self, now: float) -> None:
-        """Look and trade when an hour has passed since the last look; nothing while the engine is off."""
+        """Look and trade when an hour has passed since the last look; nothing while the engine is off.
+
+        The hour is the one the store kept, so a restart does not look again a minute after the last look. A look
+        that raises puts the hour back: the next tick tries again, instead of waiting out an hour that never
+        finished.
+        """
         config: TradingConfig = self._trading.config()
+        await self._read_clock()
         if config.engine != "trend" or now - self._looked_at < ENGINE_LOOK_S:
             return
+        previous: float = self._looked_at
         self._looked_at = now
-        await self.look(config, now)
+        try:
+            await self.look(config, now)
+        except Exception:
+            self._looked_at = previous
+            raise
 
     async def look(self, config: TradingConfig, now: float) -> EngineState:
         """One look: the shares the rule wants, and the orders that bring the account toward them."""

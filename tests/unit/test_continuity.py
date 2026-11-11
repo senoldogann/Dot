@@ -275,9 +275,12 @@ def test_a_step_is_done_only_with_evidence_and_a_reopened_step_drops_it() -> Non
     done = with_step_status(plan, 1, "done", "wc -l a.txt printed 3")
     assert done[0].evidence == "wc -l a.txt printed 3"
     assert unevidenced_done(done) == 0
-    # Failed and skipped steps may carry evidence or not; a step opened again holds nothing shown yet.
-    assert with_step_status(done, 1, "failed", "")[0].evidence == ""
-    assert with_step_status(done, 1, "in_progress", "")[0] == PlanItem(text="a", status="in_progress", evidence="")
+    # A done step stays done until it is reopened. Reopening drops the evidence it carried.
+    with pytest.raises(ToolInputError, match="cannot be marked failed"):
+        with_step_status(done, 1, "failed", "")
+    assert with_step_status(done, 1, "in_progress", "", reopen=True)[0] == PlanItem(
+        text="a", status="in_progress", evidence=""
+    )
     # A plan stored before evidence existed counts its done steps as unevidenced.
     assert unevidenced_done((PlanItem(text="a", status="done"), PlanItem(text="b", status="done", evidence="e"))) == 1
 

@@ -72,6 +72,7 @@ from dotagent.agent.limits import (
     limit_result,
     limits_of,
 )
+from dotagent.agent.loop_state import LoopState, load_loop_state, remember_loop_state
 from dotagent.agent.peers import peers_note
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picked_groups, picks_event_data, with_picks
 from dotagent.agent.plan import (
@@ -2594,17 +2595,22 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     parts_told: bool = False
     step_origin: CallOrigin = CallOrigin(run_id=run.id, purpose="step")
     ratio: float = 1.0
-    nudges: int = 0
     # The text replies the loop told to finish (``_NO_TOOL_NOTE``) since the run last acted: their steps and texts. A
     # finish that follows them with no other call may restate them (item 620).
     noted_replies: list[tuple[int, str]] = []
-    sent_back: int = 0
     used_tools: bool = False
+    # A run that goes on from another keeps that run's ledger and progress ladder when a snapshot was stored. The
+    # limit clock is this run's own either way.
+    restored: LoopState | None = None
+    if opening.resumed is not None and opening.resumed.ladder == "restored":
+        restored = await load_loop_state(runtime.store, opening.resumed.from_run_id)
+    nudges: int = 0 if restored is None else restored.nudges
+    sent_back: int = 0 if restored is None else restored.sent_back
     # How many times a finish was sent back because the plan still had open steps. It is not one reminder: the finish
     # does not end the run while steps are open, until stall_limit reminders, and then the goal check or the progress
     # stop does.
-    plan_reminders: int = 0
-    plan_handed: bool = False
+    plan_reminders: int = 0 if restored is None else restored.plan_reminders
+    plan_handed: bool = False if restored is None else restored.plan_handed
     failure_reminded: bool = False
     targets_reminded: bool = False
     paths_reminded: bool = False
@@ -2613,7 +2619,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # Acting steps in a row whose acts carried one step each on one page or application, and what the last one was.
     single_streak: int = 0
     single_last: SingleAction | None = None
-    ledger: RunLedger = new_ledger(run.goal)
+    ledger: RunLedger = (
+        new_ledger(run.goal) if restored is None else restored.ledger.model_copy(update={"goal": run.goal})
+    )
     limits: Limits = limits_for(config)
     ladder: tuple[Rung, ...] = ladder_for(config.stall_escalation, can_ask)
     consultant: ProgressConsultant = progress_consultant_for(
@@ -2623,7 +2631,22 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         f"{run.thread_id}:progress",
         run.id,
     )
-    watch: WatchState = new_watch()
+    watch: WatchState = new_watch() if restored is None else restored.watch
+
+    async def _keep_loop() -> None:
+        await remember_loop_state(
+            runtime.bus,
+            run.id,
+            LoopState(
+                ledger=ledger,
+                watch=watch,
+                nudges=nudges,
+                sent_back=sent_back,
+                plan_reminders=plan_reminders,
+                plan_handed=plan_handed,
+            ),
+        )
+
     # The run's acting steps, for its checkpoints (item 909), and the judge asked at each.
     acted: int = 0
     judge: CheckpointJudge = checkpoint_judge_for(
@@ -2747,6 +2770,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             plan_told = None
         compactions_before: int = ledger.compactions
         history, estimated, ledger = await _fit_context(agent, history, system, offered, ratio, ledger, scaffold)
+        await _keep_loop()
         # A compaction folded messages away, and with them the notes recalled for this message that they carried, this
         # message's own or an earlier one's: those the context no longer carries are handed again after the summary
         # (item 404), as they stand now, stored, so that the next message's prefix holds them too.
@@ -3033,6 +3057,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             ledger = with_actions(
                 ledger, [(outcome.call, not outcome.result.is_error, outcome.result.text) for outcome in outcomes]
             )
+            await _keep_loop()
             facts = with_outcomes(facts, outcomes)
             failed_now: int = sum(1 for outcome in outcomes if outcome.result.is_error)
             failures += failed_now

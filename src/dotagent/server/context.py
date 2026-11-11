@@ -2,12 +2,13 @@
 
 import asyncio
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.reactions import Reactions
 from dotagent.channels.service import Channels
 from dotagent.core.errors import ConfigError
+from dotagent.notify.health import NotifyHealth
 from dotagent.runtime import Runtime
 from dotagent.scheduler.runner import Scheduler
 from dotagent.server.phones import PairedPhones
@@ -44,3 +45,4 @@ class ServerContext:
     channels: Channels | None = None
     reactions: Reactions | None = None
     phones: PairedPhones | None = None
+    notifications: NotifyHealth = field(default_factory=NotifyHealth)

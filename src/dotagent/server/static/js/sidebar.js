@@ -78,14 +78,20 @@ const CHANNEL_SECTIONS = {
 };
 const SECTION_OF_SOURCE = new Map(Object.entries(CHANNEL_SECTIONS).flatMap(([id, section]) => section.sources.map((source) => [source, id])));
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
-const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
+const STATUS_WORD = {
+  queued: "queued",
+  running: "running",
+  blocked: "waiting for you",
+  failed: "failed",
+  ending: "saving the end",
+};
 // The states of a run that is over: only such a chat can be marked unread (item 131).
 const ENDED = new Set(["done", "failed", "cancelled"]);
 const BUSY_MESSAGE = "A chat with a task under way cannot be deleted. Wait for the task to end, or stop it, and try again.";
 // How often the ages at the right of the chats are read again, so a "5m" does not stay while the page rests.
 const AGE_REFRESH_MS = 60_000;
 // The states of a run that works; one that waits for you is "blocked" and keeps its dot and its age.
-const WORKING = new Set(["queued", "running"]);
+const WORKING = new Set(["queued", "running", "ending"]);
 // How often the time of a row that works is read again: its seconds count.
 const WORKING_REFRESH_MS = 1000;
 

@@ -112,6 +112,7 @@ from dotagent.llm.roles import ModelRoles
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS, Effort, ModelInfo, answers_role
+from dotagent.notify.health import NotifyHealth
 from dotagent.opencode.server import learns_from_data
 from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
@@ -247,12 +248,14 @@ async def _provider_models(
     )
 
 
-def health_router() -> APIRouter:
+def health_router(notifications: NotifyHealth | None = None) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
+    watch: NotifyHealth = notifications if notifications is not None else NotifyHealth()
 
     @router.get("/health")
     async def health() -> HealthView:
-        return HealthView(ok=True, version=__version__)
+        # ``ok`` is the process. ``notifications`` is the phone: a dead push task leaves HTTP answering.
+        return HealthView(ok=True, version=__version__, notifications=watch.summary())
 
     return router
 
@@ -346,6 +349,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             resume=resume_now(),
             night_work=[] if ctx.scheduler is None else list(ctx.scheduler.night_work()),
             model_labels={f"{CLAUDE_CODE_PROVIDER}:{model}": model_label(model) for model in CLAUDE_CODE_MODELS},
+            notifications=ctx.notifications.summary(),
         )
 
     @router.get("/models")

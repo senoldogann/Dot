@@ -162,7 +162,12 @@ out, never short, never on credit. A share less than `engine_band` (10 points) o
 its fee twice over a round trip; a trade the band starts goes on to the target, within a point of it, over as many looks
 as the limits take (item 819), as the backtest's does in one step. Once an hour the daemon's scheduler reads the daily
 closes (only the days that ended), the shares the rule wants and what the paper account holds, and places the steps
-toward them through the same limits as a run's order, the emergency stop included: no order over `max_order`, no day
+toward them through the same limits as a run's order, the emergency stop included.
+The hour is read from the last look the store kept, so a restart a minute after a look does not look again. A look
+that raises puts the hour back and the next tick tries again. A sell that may have reached the account is `uncertain`
+and is not sent again. A sell that never went out leaves the exit open, so the next look tries it. `failed` is a sell
+the exchange refused.
+No order over `max_order`, no day
 over `max_day`, no coin over `max_position`, so that with the default limits the engine reaches its shares over days.
 Each of `engine_coins` in `quote` must be allowed by `products` too (named there, or trading `min_volume` a day with
 `*`): one that is not is refused at every look. A sell names what it brings, so that a bid a little higher when it is

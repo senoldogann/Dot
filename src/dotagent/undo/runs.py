@@ -44,7 +44,7 @@ async def runs_with_children(store: Store, run: RunRecord) -> list[RunRecord]:
 
 def active_run_ids(runs: Sequence[RunRecord]) -> list[str]:
     """The runs among ``runs`` that are still working: their changes cannot be taken back yet."""
-    return [run.id for run in runs if classify_ending(run.status, run.result) == "active"]
+    return [run.id for run in runs if classify_ending(run.status, run.result, run.end_reason) == "active"]
 
 
 def run_changes(root: Path, runs: Sequence[RunRecord]) -> list[RunChange]:

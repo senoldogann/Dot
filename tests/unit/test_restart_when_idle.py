@@ -145,8 +145,9 @@ async def test_the_check_counts_every_run_at_work_while_the_store_holds_the_data
             await _run_in(store, status, number) for number, status in enumerate(get_args(RunStatus))
         ]
         assert count_working_runs(database) == len(WORKING_STATUSES)
+        # Each ends as a run ends (an ``ending`` one is not moved back by a status of work).
         for run in runs:
-            await store.set_run_status(run.id, "done")
+            await store.end_run(run.id, "done", "", {})
         assert count_working_runs(database) == 0
     finally:
         await store.close()

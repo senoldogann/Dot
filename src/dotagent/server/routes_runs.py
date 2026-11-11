@@ -165,12 +165,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         # with its end; read the other way round, a run that ends in between would show as neither active nor ended.
         active: bool = run_id in ctx.manager.active_run_ids()
         elsewhere: bool = run_id in ctx.manager.elsewhere_run_ids()
-        run: RunRecord = await store.get_run(run_id)
+        run: RunRecord = ctx.manager.as_shown(await store.get_run(run_id))
         thread: ThreadRecord = await store.get_thread(run.thread_id)
         return RunDetail(
             run=run,
             title=thread.title,
-            children=await store.list_child_runs(run_id),
+            children=[ctx.manager.as_shown(child) for child in await store.list_child_runs(run_id)],
             active=active,
             elsewhere=elsewhere,
             resumable=await ctx.manager.resumable(run),
@@ -189,7 +189,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/runs")
     async def list_runs(query: Annotated[RunsQuery, Query()]) -> list[RunRecord]:
-        return await store.list_runs(query.limit, query.thread_id)
+        return [ctx.manager.as_shown(run) for run in await store.list_runs(query.limit, query.thread_id)]
 
     @router.post("/runs", status_code=201)
     async def start_run(request: StartRunRequest) -> RunRecord:

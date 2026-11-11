@@ -413,7 +413,10 @@ def _mark_plan_step_tool() -> RegisteredTool:
 
     async def run(args: MarkPlanStepArgs, ctx: ToolContext) -> ToolResult:
         current: PlanPayload = await _latest_plan(ctx)
-        steps: tuple[PlanItem, ...] = with_step_status(current.steps, args.step, args.status, args.evidence)
+        # The run may open a done or failed step again (reopen): it marks what it sees, as it always could.
+        steps: tuple[PlanItem, ...] = with_step_status(
+            current.steps, args.step, args.status, args.evidence, reopen=True
+        )
         return await _record_plan(ctx, current.model_copy(update={"steps": steps}))
 
     return make_tool(

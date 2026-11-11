@@ -101,7 +101,9 @@ is the answer (a small model that is offered both writes the call out as text).
 evidence (`evidence`, cut at 400 characters): what the run observed that shows it, such as the path and what it read
 back, the count or the line of output, or what the page showed. A mark without it is refused with what counts as
 evidence, and a rewritten plan that keeps a done step keeps its evidence; a failed or skipped step may carry what
-happened. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal check. A
+happened. A step moves as the work does: a done step may be opened again (pending or in progress), a failed or
+skipped one tried again or marked done with its evidence, but a done step is not marked failed or skipped; the plan is
+rewritten for that. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal check. A
 step that must wait for others names them (`depends_on`, step numbers; a cycle or a number outside the plan is refused),
 the plan reads `(after 1, 2)` and the web UI shows the same, and the result of every plan change says which steps are
 ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that are ready together
@@ -268,12 +270,17 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   shows each of them ended (the attempts of its chat's work orders too, item 907: a Stop of the lead, or the emergency
   stop, stops them and cancels their orders, while a turn that ends on its own leaves them going); the page of a run stored the other way, before item 197, reads how they ended from the
   database. An end the database refused (a full disk, say) is tried again every half minute until it is stored, with the
-  event that tells of it and what follows it (the chat's next message, a campaign's next session); until then the run
-  stays as the database has it, and a Stop says its end is on its way. A run that could not be started is stored as
+  event that tells of it and what follows it (the chat's next message, a campaign's next session). The row is marked
+  `ending` before that write, so the page says the end is being saved rather than that the run is still working, and
+  a Stop does not add a second end. If even that mark is refused, the page still shows `ending` from the end this
+  process is holding, and a Stop says the end is on its way. A run that could not be started is stored as
   failed with that event too, so a page that showed it queued sees it end. A run that a crashed daemon left behind is
   marked as failed the next time Dot starts, as ended at its last event (the runs it delegated before it), and so is one
   that a `dotx` command left when it died, by the daemon within half a minute when it runs. Either can be resumed, and
-  so can a run that a shutdown of the daemon cut off (see
+  so can a run that a shutdown of the daemon cut off. A queue held because the daemon crashed stays held while that
+  resumed run works, and opens when the resumed run ends done; a queue held because a run failed stays held until you
+  resume it. A resumed run keeps the ledger and the progress ladder of the run it goes on from when those were stored,
+  and its note says so; when they were not, the note says they start again (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A message sent to a running run (steering) reaches the model at once: a step whose model is still answering is cut
   short and asked again with the message (item 509); a tool already at work finishes first, and a step past the run's

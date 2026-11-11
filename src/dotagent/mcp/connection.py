@@ -238,6 +238,9 @@ class McpConnection:
         self._log_path: Path = log_path
         self._lock: asyncio.Lock = asyncio.Lock()
         self._live: _Live | None = None
+        # Copied out under ``_lock`` when the session is replaced, so :meth:`instructions` does not read ``_live``
+        # while a reconnect clears it.
+        self._instructions: str | None = None
 
     @property
     def name(self) -> str:
@@ -375,9 +378,9 @@ class McpConnection:
             if current is not None:
                 log.warning("mcp_server_restart", server=self.name)
                 await _release(current, self.name)
-                self._live = None
+                self._set_live(None)
             started: _Live = await self._start()
-            self._live = started
+            self._set_live(started)
             return started
 
     async def _answers(self, live: _Live) -> bool:
@@ -422,11 +425,16 @@ class McpConnection:
             {**self._context(), "code": error.code, "error": error.message, **await self._tail_since(0)},
         )
 
+    def _set_live(self, live: _Live | None) -> None:
+        """Remember the session and the instructions it sent. Called with ``_lock`` held."""
+        self._live = live
+        self._instructions = None if live is None else live.client.instructions
+
     def instructions(self) -> str | None:
         """What the server said of itself when it connected: the ``instructions`` of its initialize result, ``None``
-        when it sent none or is not connected. Third-party words (item 659)."""
-        live: _Live | None = self._live
-        return None if live is None else live.client.instructions
+        when it sent none or is not connected. Third-party words (item 659). The string was copied under ``_lock``
+        (:meth:`_set_live`), so a reconnect cannot hand back a session that is already gone."""
+        return self._instructions
 
     async def list_tools(self) -> tuple[McpTool, ...]:
         """Every tool the server offers, following its pagination."""
@@ -495,6 +503,6 @@ class McpConnection:
     async def close(self) -> None:
         async with self._lock:
             live: _Live | None = self._live
-            self._live = None
+            self._set_live(None)
         if live is not None:
             await _release(live, self.name)
