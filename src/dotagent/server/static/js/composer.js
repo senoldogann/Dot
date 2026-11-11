@@ -356,8 +356,11 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       pointerDown = false;
     }, 0);
   }
+  // Where the touch was is read from the click's path, fixed as it began: a pick in the model's menu repaints the menu,
+  // and the row touched is no longer in the box by the time the click reaches the page (item 1128).
   function onClickAnywhere(event) {
-    if (!engaged || element.contains(event.target) || event.target.closest?.(".menu, .sheet-menu") || textarea === document.activeElement) {
+    const path = event.composedPath();
+    if (!engaged || path.includes(element) || event.target.closest?.(".menu, .sheet-menu") || textarea === document.activeElement) {
       return;
     }
     engage(false);

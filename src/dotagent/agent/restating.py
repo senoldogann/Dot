@@ -6,15 +6,18 @@ one that says what the answer does not (a warning the finish left out, the revie
 A reply is restated when the answer is at least half its length (an answer that only points at it, "see above", leaves
 it to be read), when every line of it that holds words has most of its words in the answer (a reworded line keeps its
 names and the words that carry it, and a line the answer left out shares next to none), and when every number and every
-word that turns a line's sense ("not", "değil") of the reply is in the answer too: an answer that lost one says another
-thing, and the reply stays, as the comparison of words keeps such a reply (item 569). A Turkish verb made negative by
-its ending (bitmedi) is a word of its own, which the share of words weighs like any other."""
+word that turns a line's sense ("not", "değil") of the reply is in the answer too (a digit after a mark is a number, one
+in a name's letters a word): an answer that lost one says another thing, and the reply stays, as the comparison of words
+keeps such a reply (item 569). A Turkish verb made negative by its ending (bitmedi) is a word of its own, which the
+share of words weighs like any other."""
 
 import re
 
 # The words of a line: letters and digits with the marks that hold inside a word or a number (16:17, %81, 2.6, +178,
 # web-research, Dock'ta), in any script.
 _WORD: re.Pattern[str] = re.compile(r"[\w%+]+(?:[.:'’/-][\w%+]+)*")
+# The marks inside a word that part it (16:17, localhost:8080, v1.4.8).
+_PARTS: re.Pattern[str] = re.compile(r"[.:'/-]")
 # Words too common to tell two lines apart, in the languages the owner writes and Dot answers in.
 _COMMON: frozenset[str] = frozenset(
     {
@@ -45,6 +48,16 @@ def _number(word: str) -> str:
     return "".join(c for c in word if c.isdigit())
 
 
+def _quantity(word: str) -> str:
+    """The digits of ``word`` when it holds a number: it begins with a digit, % or +, or a part of it after a mark does
+    (16:17, %81, +178, 3'ü, localhost:8080, v1.4.8); else nothing. A name whose digits sit in its letters (pns6x, T3)
+    is weighed as a word, so an answer that wrote it more exactly (pns61-64, the owner's chat of 2026-11-11) still
+    restates the line (item 1129)."""
+    parts: list[str] = _PARTS.split(word)
+    held: bool = word[:1] in "%+" or any(part[:1].isdigit() for part in parts)
+    return _number(word) if held else ""
+
+
 def _words(text: str) -> list[str]:
     """The words of ``text`` that tell it apart: in lower case, the common ones and the words of one or two letters
     left out (as, is, ve, da); a word with a digit always counts (T3, 16:17)."""
@@ -59,13 +72,13 @@ def restates(reply: str, answer: str) -> bool:
         return False
     tokens: list[str] = _tokens(answer)
     held: set[str] = set(_words(answer))
-    numbers: set[str] = {_number(word) for word in tokens if _number(word)}
+    numbers: set[str] = {_quantity(word) for word in tokens if _quantity(word)}
     nots: set[str] = {word for word in tokens if word in _NOT}
     for line in reply.splitlines():
         said: list[str] = _tokens(line)
         if any(word in _NOT and word not in nots for word in said):
             return False
-        if any(_number(word) and _number(word) not in numbers for word in said):
+        if any(_quantity(word) and _quantity(word) not in numbers for word in said):
             return False
         words: list[str] = _words(line)
         if words and sum(word in held for word in words) < _HELD * len(words):

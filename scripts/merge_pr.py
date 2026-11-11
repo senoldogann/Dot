@@ -15,22 +15,19 @@ event fires and the run some time after, seconds or, with the runners all busy, 
 between was not checked. The margin errs one way only, toward bringing a branch up to `main` that did not need it.
 A head that holds `main` as it is now was checked on all of it, the margin aside: it is merged (item 1078).
 
-A pull request that changes only what the gate's `paths-ignore` names (prose) has no run of the gate to wait for, and
-nothing of it can break `main`: it is merged as it stands.
+A pull request that changes only prose has a run of the gate to wait for too, since the gate starts for every pull
+request and its `prose` job skips the heavy work and reports `ci` for a change that is prose alone: it is merged once
+that run passed, as any other is.
 
 Usage: uv run python scripts/merge_pr.py <number> <rebase|squash>
 Exit 0: merged. Exit 2: brought up to main, run it again once its checks pass. Exit 1: it cannot be merged as it stands.
 """
 
 import json
-import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
-
-import yaml
 
 _METHODS: tuple[str, ...] = ("rebase", "squash")
 # How long before its run was made the merge a pull request's checks run on may have been made.
@@ -55,34 +52,6 @@ class MergeRefused(Exception):
 def shared_files(changed: list[str], moved: list[str]) -> list[str]:
     """The files the pull request changes that `main` changed too since its checks began, sorted."""
     return sorted(set(changed) & set(moved))
-
-
-def path_pattern(pattern: str) -> re.Pattern[str]:
-    """A GitHub workflow path filter as a regular expression: ``**`` any characters, ``*`` any but ``/``."""
-    parts: list[str] = [
-        ".*" if piece == "**" else "[^/]*" if piece == "*" else re.escape(piece)
-        for piece in re.split(r"(\*\*|\*)", pattern)
-    ]
-    return re.compile("".join(parts) + r"\Z")
-
-
-def gate_runs_for(files: list[str], ignored: list[str]) -> bool:
-    """Whether the gate runs for a pull request changing ``files``, its ``paths-ignore`` being ``ignored``: when one
-    of them is not ignored."""
-    patterns: list[re.Pattern[str]] = [path_pattern(pattern) for pattern in ignored]
-    return any(not any(pattern.match(path) for pattern in patterns) for path in files)
-
-
-def _gate_ignored(workflow: Path) -> list[str]:
-    """The ``paths-ignore`` of the gate's ``pull_request`` trigger, read from ``workflow``."""
-    loaded: object = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-    # PyYAML reads the key ``on`` as True.
-    triggers: object = loaded.get(True) if isinstance(loaded, dict) else None
-    pull: object = triggers.get("pull_request") if isinstance(triggers, dict) else None
-    ignored: object = pull.get("paths-ignore") if isinstance(pull, dict) else None
-    if not isinstance(ignored, list) or not all(isinstance(item, str) for item in ignored):
-        raise MergeRefused(f"{workflow} names no paths-ignore of its pull_request trigger")
-    return [str(item) for item in ignored]
 
 
 def counted_since(created_at: str, margin: timedelta) -> str:
@@ -183,13 +152,6 @@ def merge(number: int, method: str) -> int:
         raise MergeRefused(f"pull request {number} is {state}, not open")
     if not changed:
         raise MergeRefused(f"pull request {number} changes no file")
-    workflow: Path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "gate.yml"
-    if not gate_runs_for(changed, _gate_ignored(workflow)):
-        _run(["gh", "pr", "merge", str(number), f"--{method}", "--delete-branch", "--match-head-commit", head])
-        print(
-            f"merged pull request {number} at {head} ({method}): it changes only prose, which the gate does not run for"
-        )
-        return 0
     run: GateRun = latest_gate_run(_gate_runs(head), head)
     if run.status != "completed" or run.conclusion != "success":
         raise MergeRefused(
