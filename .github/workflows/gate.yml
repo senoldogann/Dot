@@ -161,12 +161,12 @@ jobs:
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
   # and the face. In three parts, on runners of their own, each on one worker: a runner has three cores and a worker
   # drives a Chrome and a daemon of its own, and at two or three workers pages ran out of their time. Run 42895911331
-  # spent 12m14s in the pages part and 5m30s and 4m18s in the phone's two, and the ten slowest calls of the pages part
-  # were in five files. The two slowest of those that are not the phone's own walk (the attach mode, the secret fields)
-  # run with the second phone part, and the settings and the data with the first, so a new browser file still joins
-  # the pages part and a new phone file the second. A phone back on a network that wakes measures seconds of grace
-  # against the runner's own clock, which a slow runner does not keep: it runs at night (browser.yml) and on the
-  # developer's Mac.
+  # spent 12m14s in the pages part. Run 42926928204, after the attach mode and the secret fields had moved to the
+  # second phone part, spent 5m44s of tests in pages, 8m54s in the first phone part and 7m29s in the second: the
+  # settings file was four of that first part's ten slowest calls, on top of the walk through every page (3m25s by
+  # itself), so the settings went back to pages. A new browser file still joins pages and a new phone file the second
+  # part. A phone back on a network that wakes measures seconds of grace against the runner's own clock, which a slow
+  # runner does not keep: it runs at night (browser.yml) and on the developer's Mac.
   browser:
     name: browser (${{ matrix.part.name }})
     needs: [changes]
@@ -183,13 +183,12 @@ jobs:
           - name: pages
             tests: >-
               tests/smoke/test_browser_*.py tests/smoke/test_page_guards.py tests/smoke/test_face.py
-              --deselect tests/smoke/test_browser_attach.py --deselect tests/smoke/test_browser_settings.py
-              --deselect tests/smoke/test_browser_data.py
+              --deselect tests/smoke/test_browser_attach.py --deselect tests/smoke/test_browser_data.py
           - name: phone 1
             tests: >-
               tests/smoke/test_phone_all_pages.py tests/smoke/test_phone_screens.py tests/smoke/test_phone_reach.py
               tests/smoke/test_phone_rows.py tests/smoke/test_phone_lists.py tests/smoke/test_phone_pages.py
-              tests/smoke/test_browser_settings.py tests/smoke/test_browser_data.py
+              tests/smoke/test_browser_data.py
           - name: phone 2
             tests: >-
               tests/smoke/test_phone_*.py tests/smoke/test_browser_attach.py tests/smoke/test_secret_fields.py

@@ -128,9 +128,10 @@ in turn by their sorted paths (`--part k/n`, `tests/smoke/conftest.py`), the fir
 tests, the second by `gate (part 2)` after `dotx eval check`. Beside them, the `browser` job runs the core of the
 browser tests (item 486) in three parts, each on a runner of its own and one worker (a runner has three cores and a
 worker drives a Chrome and a daemon; at two or three workers pages ran out of their time). On run 42895911331 the pages
-part spent twelve minutes in the tests and the phone's two spent about six and four, so the slow files of the pages
-part run with the phone's parts and the three finish near one another; a new file whose name starts `test_browser_`
-joins the pages part, and a new `test_phone_` the second phone part. A pull request runs the browser parts only when a
+part spent twelve minutes in the tests. The attach mode and the secret fields run with the second phone part; the
+settings stayed with the pages after run 42926928204, where the first phone part (the walk through every page, plus
+the settings) took 9m51s and the pages part 6m40s. A new file whose name starts `test_browser_` joins the pages part,
+and a new `test_phone_` the second phone part. A pull request runs the browser parts only when a
 changed file can affect them (the web UI, the daemon and the browser code the tests start, their tests and helpers,
 the locks, the workflows: `scripts/browser_ci.py`). The daemon imports almost all of the package, so a change under
 `src/dotagent` still runs them, except the command line and a few modules the tests never import. A unit test, a smoke
