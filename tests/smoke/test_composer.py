@@ -703,6 +703,16 @@ async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) ->
     await expect(model).to_contain_text("YOLO")
     await menu.locator(".pop-option[data-mode='ask']").click()
     await expect(model).not_to_contain_text("YOLO")
+    # A pick repaints the menu (item 1128): the box keeps its line, and the menu stays over it, its tabs in sight.
+    await menu.locator(".pop-option[data-mode='yolo']").click()
+    await expect(composer).not_to_have_attribute("data-quiet", "")
+    await menu.locator(".pop-option[data-mode='ask']").click()
+    await expect(composer).not_to_have_attribute("data-quiet", "")
+    await expect(model).to_be_visible()
+    tabs = await menu.locator(".pop-tabs").bounding_box()
+    shown = await menu.bounding_box()
+    assert tabs is not None and shown is not None
+    assert tabs["y"] >= 0 and shown["y"] + shown["height"] <= 900, (tabs, shown)
     await page.keyboard.press("Escape")
     await page.mouse.click(4, 240)
     await expect(composer).to_have_attribute("data-quiet", "")
