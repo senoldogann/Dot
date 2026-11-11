@@ -40,11 +40,3 @@ def test_the_newest_run_of_the_gate_counts_and_none_refuses_the_merge() -> None:
 
 def test_commits_count_from_a_margin_before_the_run_was_made() -> None:
     assert merge_pr.counted_since("2026-11-03T10:00:00Z", timedelta(minutes=15)) == "2026-11-03T09:45:00+00:00"
-
-
-def test_a_pull_request_of_prose_alone_has_no_gate_to_wait_for() -> None:
-    ignored: list[str] = ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
-    assert not merge_pr.gate_runs_for(["README.md", "docs/repair.md", ".github/ISSUE_TEMPLATE/bug.md"], ignored)
-    # A roadmap entry is not at the root, and code runs it whatever else is prose.
-    assert merge_pr.gate_runs_for(["roadmap/945.md"], ignored)
-    assert merge_pr.gate_runs_for(["docs/repair.md", "src/dotagent/repair/night.py"], ignored)
