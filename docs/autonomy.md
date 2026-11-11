@@ -47,8 +47,8 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   `~/.ssh`, the files of a password manager) or of data sent out. Each step the policy stopped at is written into the
   record with the reason it would have asked for, so you can read afterwards what went through and why. Each call a
   yolo run makes is also a line in the log (`yolo_step`) and a line in `yolo.jsonl` under that run's undo folder: a
-  record of what it did, written without asking and without holding the run up. A call that fails tells the run to
-  check what changed and go on by another way, still without asking. A yolo run types
+  record of what it did, written without asking and without holding the run up. The result the run reads is the
+  tool's own. A yolo run types
   the password, one-time code or card number it has — one you gave it, or one it read from the mail that carried it —
   into the browser or the desktop itself, and into a terminal program that asks for one. Only the desktop tools stay
   away from password managers and Keychain Access in every mode. The rest is the price of the mode: a run that has read

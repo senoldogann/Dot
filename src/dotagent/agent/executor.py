@@ -12,7 +12,7 @@ from dotagent.agent.failure_lessons import hand_failure_lessons
 from dotagent.agent.gate import RunGate, hold_note, masked_action
 from dotagent.agent.held_secrets import all_held_values
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
-from dotagent.agent.yolo_log import note_checkpoint, yolo_failure_note
+from dotagent.agent.yolo_log import note_checkpoint
 from dotagent.core.errors import (
     ApprovalParked,
     ApprovalRejected,
@@ -338,8 +338,8 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
 
 
 def _record_yolo(ctx: ToolContext, tool_name: str, action: ActionInfo | None, result: ToolResult) -> ToolResult:
-    """Log a yolo call and keep a checkpoint that does not wait. A failed call is told to go on, still without asking.
-    Any other approval mode is unchanged."""
+    """Log a yolo call and keep a checkpoint that does not wait. The result the run reads is unchanged, and a runtime
+    that keeps no undo folder (a test's stand-in) only loses the line. Any other approval mode is unchanged."""
     if ctx.approvals != "yolo":
         return result
     summary: str = action.summary if action is not None else tool_name
@@ -350,9 +350,9 @@ def _record_yolo(ctx: ToolContext, tool_name: str, action: ActionInfo | None, re
         ok=not result.is_error,
         summary=truncate_middle(summary, 160),
     )
-    note_checkpoint(ctx.runtime.undo_dir, ctx.run_id, tool_name, not result.is_error, summary)
-    if result.is_error:
-        return result.model_copy(update={"text": yolo_failure_note(result.text)})
+    undo = getattr(ctx.runtime, "undo_dir", None)
+    if isinstance(undo, Path):
+        note_checkpoint(undo, ctx.run_id, tool_name, not result.is_error, summary)
     return result
 
 

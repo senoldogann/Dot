@@ -16,17 +16,6 @@ log = get_logger(__name__)
 YOLO_LOG: str = "yolo.jsonl"
 _PRIVATE_DIR: int = 0o700
 _PRIVATE_FILE: int = 0o600
-# Appended to a failed call's result. It names no question and adds no wait.
-YOLO_FAILURE_NOTE: str = (
-    "\n\n[yolo] Nothing is waiting for anyone. Check what this changed, then go on by another way. Do not stop to ask."
-)
-
-
-def yolo_failure_note(text: str) -> str:
-    """``text`` plus the note that a yolo run goes on after a failed call. One that already has it is unchanged."""
-    if "[yolo]" in text:
-        return text
-    return f"{text}{YOLO_FAILURE_NOTE}"
 
 
 def note_checkpoint(root: Path, run_id: str, tool: str, ok: bool, summary: str) -> None:
