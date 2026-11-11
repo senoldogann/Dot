@@ -117,18 +117,32 @@ polls it with `page.evaluate`: Playwright's `wait_for_function` takes the promis
 once, and waits for nothing (item 359).
 
 The gate runs on every pull request and every push to `main` that changes more than prose, and, called by the release,
-on the tagged commit (`.github/workflows/gate.yml`, on macOS because the package depends on PyObjC; a change to the
-Markdown at the root, `docs/` or the issue and pull request templates alone skips it): the format check, the lint, mypy,
-the checks of the interface (`npm run check`), the unit tests, `dotx eval check` and every smoke test that needs no
-service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not hosted"`). The
-tests run spread over the cores with `-n auto` (pytest-xdist), and over two runners at once (item 944): the smoke
-tests' files are dealt to two parts in turn by their sorted paths (`--part k/n`, `tests/smoke/conftest.py`), the first
-run by the `gate` job after the checks and the unit tests, the second by `gate (part 2)` after `dotx eval check`. Beside
-them, the `browser` job runs the core of the browser tests (item 486) in three parts, the pages and the phone's two (the
-first with the walk through every page, the slowest file; a new phone file joins the second), each on a runner of its
-own and one worker (a runner has three cores and a worker drives a Chrome and a daemon; at two or three workers pages
-ran out of their time): five runners in all, the most macOS runners a free account runs together, so that a pull
-request waits on its slowest part, not on all of it in a row. The browser files are those whose names start
+on the tagged commit (`.github/workflows/gate.yml`; a change to the Markdown at the root, `docs/` or the issue and pull
+request templates alone skips it). The format check, the lint, mypy and the checks of the interface (`npm run check`)
+run on Linux. PyObjC is a dependency on macOS only (`sys_platform == 'darwin'` in `pyproject.toml`), so `uv sync`
+installs the rest on Linux; the package still runs on macOS alone, and the unit tests, `dotx eval check` and the smoke
+tests stay on macOS, where that import succeeds. Those tests are every smoke test that needs no service, chosen by its
+marks (`-m "not live and not browser and not internet and not desktop and not hosted"`). They run spread over the cores
+with `-n auto` (pytest-xdist), and over two runners at once (item 944): the smoke tests' files are dealt to two parts
+in turn by their sorted paths (`--part k/n`, `tests/smoke/conftest.py`), the first run by the `gate` job after the unit
+tests, the second by `gate (part 2)` after `dotx eval check`. Beside them, the `browser` job runs the core of the
+browser tests (item 486) in three parts, each on a runner of its own and one worker (a runner has three cores and a
+worker drives a Chrome and a daemon; at two or three workers pages ran out of their time). On run 42895911331 the pages
+part spent twelve minutes in the tests. The attach mode and the secret fields run with the second phone part; the
+settings stayed with the pages after run 42926928204, where the first phone part (the walk through every page, plus
+the settings) took 9m51s and the pages part 6m40s. A new file whose name starts `test_browser_` joins the pages part,
+and a new `test_phone_` the second phone part. A pull request runs the browser parts only when a
+changed file can affect them (the web UI, the daemon and the browser code the tests start, their tests and helpers,
+the locks, the workflows: `scripts/browser_ci.py`). The daemon imports almost all of the package, so a change under
+`src/dotagent` still runs them, except the command line and a few modules the tests never import. A unit test, a smoke
+test that is not one of theirs, or the desktop shell does not, and the macOS runners stay free for that pull request.
+A push to `main` and the release run every part. The macOS runners are five at most, the most a free account runs
+together, and the Linux jobs do not take one. The job `ci` always runs and passes when every other job passed or was
+skipped: that is the status check `main`'s protection should require (`ci`), in place of `gate`, `gate (part 2)`,
+`browser (pages)`, `browser (phone 1)` and `browser (phone 2)`. A skipped part reports no check of its own, and a
+required check that never arrives blocks the merge. The token this repository's workflows use could not read the
+protection (the rulesets list is empty; item 944 records those five names). Ripgrep and Playwright's browsers are
+cached, so a job does not download them when a previous run already did. The browser files are those whose names start
 `test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards and the face, in
 Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides nothing of the
 gate's. `.github/workflows/browser.yml` runs every browser test every night and when asked (`gh workflow run
