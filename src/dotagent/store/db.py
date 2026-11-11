@@ -1853,6 +1853,21 @@ class Store:
         return await self.get_harness_step(step_id)
 
     @_writing
+    async def amend_harness_step(
+        self, step_id: str, ended_at: float, state: HarnessStepState, outcome: str, error: str | None
+    ) -> HarnessStep:
+        """Write over the end of a step that already ended: the night's week adds its word to the digest's step, or
+        records it ``unusable`` or ``failed`` (harness/weekly.py). Unlike :meth:`finish_harness_step`, this is the
+        step's own later part, not a second end."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE harness_steps SET ended_at = ?, state = ?, outcome = ?, error = ? WHERE id = ?",
+            (ended_at, state, outcome, error, step_id),
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("harness step not found", {"step_id": step_id})
+        return await self.get_harness_step(step_id)
+
     async def close_unfinished_harness_steps(self) -> int:
         """Steps still ``running`` when the daemon starts (their process went before :meth:`finish_harness_step`)
         become failed. Idempotent: a second start finds none running. Returns how many closed."""

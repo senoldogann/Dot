@@ -1662,7 +1662,8 @@ class RunManager:
             await _uncancelled(handle.finished.wait())
             raise
         child: RunRecord = await self._runtime.store.get_run(handle.run_id)
-        if child.status in WORKING_STATUSES:
+        # A run whose end the store refused stays ``ending`` (its mark was written before the end): it is no outcome.
+        if child.status in WORKING_STATUSES or child.status == "ending":
             raise StoreError(
                 "the delegated run ended, but the store could not record its end",
                 {"run_id": child.id, "stored_status": child.status},

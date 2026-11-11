@@ -189,7 +189,8 @@ async def test_an_end_the_store_refuses_in_part_is_not_kept_at_all(login_env: di
         manager: RunManager = RunManager(runtime)
         try:
             ended: RunRecord = await _ended(manager, await _start(manager))
-            assert (ended.status, ended.finished_at) == ("running", None)
+            # Marked ``ending`` before the end was refused: not at work, and not over either.
+            assert (ended.status, ended.finished_at) == ("ending", None)
             assert await runtime.store.last_event(ended.id, "run_finished") is None
         finally:
             await manager.shutdown()
@@ -225,7 +226,7 @@ async def test_a_delegated_run_whose_end_was_not_kept_is_an_error_for_the_run_th
             with pytest.raises(StoreError, match="could not record its end") as refused:
                 await manager.delegate(parent.id, GOAL, "task", None, None)
             child: RunRecord = await runtime.store.get_run(str(refused.value.context["run_id"]))
-            assert (child.parent_run_id, child.status) == (parent.id, "running")
+            assert (child.parent_run_id, child.status) == (parent.id, "ending")
         finally:
             await manager.shutdown()
 
@@ -279,7 +280,7 @@ async def test_an_end_the_store_refused_is_stored_once_it_takes_it_again(
         watcher: asyncio.Task[None] = asyncio.create_task(manager.watch_commands())
         try:
             run: RunRecord = await _ended(manager, await _start(manager))
-            assert run.status == "running"
+            assert run.status == "ending"
             with pytest.raises(RunConflict, match="its end is stored as soon as the database takes it"):
                 manager.cancel(run.id)
             async with runtime.bus.subscribe(run.id) as subscription:

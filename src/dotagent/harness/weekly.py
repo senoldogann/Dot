@@ -178,12 +178,12 @@ async def night(runtime: Runtime, now: float) -> HarnessStep:
         kept: JsonObject = json.loads(step.outcome)
         kept["week"] = unusable
         kept["unusable"] = [unusable]
-        return await runtime.store.finish_harness_step(step.id, now, "unusable", json.dumps(kept), None)
+        return await runtime.store.amend_harness_step(step.id, now, "unusable", json.dumps(kept), None)
     except DotError as error:
-        await runtime.store.finish_harness_step(step.id, now, "failed", step.outcome, error.message)
+        await runtime.store.amend_harness_step(step.id, now, "failed", step.outcome, error.message)
         raise
     if not said:
         return step
     record: JsonObject = json.loads(step.outcome)
     record["week"] = said
-    return await runtime.store.finish_harness_step(step.id, now, step.state, json.dumps(record), None)
+    return await runtime.store.amend_harness_step(step.id, now, step.state, json.dumps(record), None)
