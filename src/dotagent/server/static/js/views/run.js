@@ -1701,9 +1701,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       flow = transition(flow, { type: "toggle_activity", id });
       paintFlow();
     },
-    onDecide: (id, approve, note) => {
-      void decideApproval(id, approve, note);
-    },
+    onDecide: (id, approve, note) => decideApproval(id, approve, note),
   });
   const helpersButton = el(
     "button",

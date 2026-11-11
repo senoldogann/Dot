@@ -23,7 +23,7 @@ const STATUS_WORD = {
  *   onBack: () => void,
  *   onHideRail: () => void,
  *   onToggle: (id: string) => void,
- *   onDecide: (id: string, approve: boolean, note: string) => void,
+ *   onDecide: (id: string, approve: boolean, note: string) => Promise<boolean>,
  * }} actions
  */
 export function createChatFlowView(actions) {
@@ -341,19 +341,23 @@ function stepRow(step) {
  * Option buttons and a free-text line. Sending uses the note the approval route already stores; it does not
  * change what an approval means.
  * @param {import("./chatflow.js").QuestionCard} card
- * @param {(id: string, approve: boolean, note: string) => void} onDecide
+ * @param {(id: string, approve: boolean, note: string) => Promise<boolean>} onDecide
  */
 function questionCard(card, onDecide) {
   const note = el("input", { class: "input", type: "text", maxlength: "2000", placeholder: card.options.length > 0 ? "Or write your own answer" : "Your answer", "aria-label": "Your answer" });
   const ticks = card.multiple ? card.options.map((option) => el("input", { type: "checkbox", value: option.label })) : [];
-  // One answer per card: a second press while it goes would be refused (409) and told as an error.
-  let sent = false;
-  const decide = (approve, answer) => {
-    if (sent) {
+  // One answer per card while it goes: a second press would be refused (409) and told as an error. One that failed
+  // (told by its toast) leaves the card to be answered again.
+  let sending = false;
+  const decide = async (approve, answer) => {
+    if (sending) {
       return;
     }
-    sent = true;
-    onDecide(card.id, approve, answer);
+    sending = true;
+    const taken = await onDecide(card.id, approve, answer);
+    if (!taken) {
+      sending = false;
+    }
   };
   const send = (labels) => {
     const answer = questionAnswer(labels, note.value);
@@ -394,7 +398,9 @@ function questionCard(card, onDecide) {
 export async function decideApproval(id, approve, note) {
   try {
     await api.post(`/approvals/${encodeURIComponent(id)}/decision`, { approve, note });
+    return true;
   } catch (error) {
     toastError(error);
+    return false;
   }
 }
