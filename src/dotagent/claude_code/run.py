@@ -615,6 +615,10 @@ class _Follow:
         await self.runtime.store.set_run_steps(run_id, self.steps)
         thinking: str = step.text("thinking")
         text: str = step.text("text")
+        # The program's turn may end, after the finish it called, with a reply of its own that says the answer again in
+        # other words: the finish's answer is the run's, and the chat showed both (the owner's screenshot of
+        # 2026-11-11). A step that calls a tool after it is work, which clears the finish (``_watched_call``).
+        shown: str = "" if self.quiet.finished is not None and not step.tools else text
         if text.strip():
             self.answer = text.strip()
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
@@ -622,7 +626,7 @@ class _Follow:
             "assistant",
             {
                 "step": self.steps,
-                "text": redact_known(text, known),
+                "text": redact_known(shown, known),
                 "thinking": truncate_middle(redact_known(thinking, known), _THINKING_CHARS),
                 "thinking_chars": len(thinking),
                 "tool_calls": list(step.tools),
