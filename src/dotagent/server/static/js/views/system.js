@@ -127,7 +127,7 @@ function statusGroups(status) {
         entry("Scheduler", status.scheduler_running ? "running" : "stopped"),
         entry(
           "Phone notifications",
-          status.notifications === "down" ? "down" : status.notifications === "ok" ? "reaching the phone" : "off",
+          status.notifications === "down" ? "stopped" : status.notifications === "ok" ? "watching" : "off",
         ),
         entry("Desktop control", desktopText(status)),
         entry("Actions from connected apps", String(status.mcp_tools)),
