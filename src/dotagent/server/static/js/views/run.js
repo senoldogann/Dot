@@ -1683,6 +1683,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // had, item 1119: on a phone the page opened again from the home screen kept its curtain with them).
   const flowOn = !PHONE.matches;
   let sessionsWanted = false;
+  let sessionsSeen = 0;
   let flow = emptyFlow(runId);
   const flowView = createChatFlowView({
     onOpen: (id) => {
@@ -1711,15 +1712,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       title: "Helpers",
       "aria-label": "Show the helpers",
       hidden: true,
-      // A wide window shows the sessions rail; a phone opens the helpers in the side panel, as it did.
-      onclick: () => {
-        if (!flowOn) {
-          inspector.openTab("agents");
-          return;
-        }
-        sessionsWanted = layout.dataset.sessions !== "on";
-        layout.dataset.sessions = sessionsWanted ? "on" : "off";
-      },
+      // The helpers of the whole chat, in the side panel, as it always did: the sessions rail lists this run's alone,
+      // and opens by itself with its first session.
+      onclick: () => inspector.openTab("agents"),
     },
     icon("users"),
     helpersCount,
@@ -1755,14 +1750,16 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
     flowView.paint(flow);
     const has = flow.sessionOrder.length > 0;
-    const had = layout.dataset.hasSessions === "on";
+    // A new session opens the rail again, also after its × put it away.
+    const grew = flow.sessionOrder.length > sessionsSeen;
+    sessionsSeen = flow.sessionOrder.length;
     layout.dataset.hasSessions = has ? "on" : "off";
     thread.dataset.view = flow.view.kind === "session" ? "session" : "chat";
     if (!has) {
       layout.dataset.sessions = "off";
       return;
     }
-    if (!had && window.matchMedia("(min-width: 721px)").matches) {
+    if (grew) {
       sessionsWanted = true;
     }
     if (sessionsWanted) {
