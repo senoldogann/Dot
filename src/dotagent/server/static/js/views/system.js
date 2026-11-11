@@ -1799,7 +1799,9 @@ function buildModels(isDisposed, asked, head) {
         const name = model === null || model === "" ? "the default model" : modelName(model);
         counts.set(name, (counts.get(name) ?? 0) + 1);
       }
-      return [...counts].map(([name, many]) => `${many} on ${name}`).join(", ");
+      // The most used first, then by name: the order the store lists them in says nothing.
+      const ordered = [...counts].sort(([one, oneMany], [other, otherMany]) => otherMany - oneMany || one.localeCompare(other));
+      return ordered.map(([name, many]) => `${many} on ${name}`).join(", ");
     };
     // A schedule names its model in its options; one that names none runs on its agent's, and on the default model
     // when it has no agent or its agent names none either (scheduler/runner.py).
