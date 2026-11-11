@@ -16,6 +16,8 @@ import re
 # The words of a line: letters and digits with the marks that hold inside a word or a number (16:17, %81, 2.6, +178,
 # web-research, Dock'ta), in any script.
 _WORD: re.Pattern[str] = re.compile(r"[\w%+]+(?:[.:'’/-][\w%+]+)*")
+# The marks inside a word that part it (16:17, localhost:8080, v1.4.8).
+_PARTS: re.Pattern[str] = re.compile(r"[.:'/-]")
 # Words too common to tell two lines apart, in the languages the owner writes and Dot answers in.
 _COMMON: frozenset[str] = frozenset(
     {
@@ -47,10 +49,13 @@ def _number(word: str) -> str:
 
 
 def _quantity(word: str) -> str:
-    """The digits of ``word`` when it is a number (16:17, %81, +178, 3'ü, 1366x888), else nothing: a name with a digit
-    in it (pns6x.cloudns, T3, v4.1) is weighed as a word, and an answer that wrote it more exactly (pns61-64.cloudns,
-    the owner's chat of 2026-11-11) still restates the line (item 1129)."""
-    return _number(word) if word[:1].isdigit() or word[:1] in "%+" else ""
+    """The digits of ``word`` when it holds a number: it begins with a digit, % or +, or a part of it after a mark does
+    (16:17, %81, +178, 3'ü, localhost:8080, v1.4.8); else nothing. A name whose digits sit in its letters (pns6x, T3)
+    is weighed as a word, so an answer that wrote it more exactly (pns61-64, the owner's chat of 2026-11-11) still
+    restates the line (item 1129)."""
+    parts: list[str] = _PARTS.split(word)
+    held: bool = word[:1] in "%+" or any(part[:1].isdigit() for part in parts)
+    return _number(word) if held else ""
 
 
 def _words(text: str) -> list[str]:
