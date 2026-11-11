@@ -1679,6 +1679,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     icon("monitor"),
   );
   const helpersCount = el("span", { class: "stage-quick-count" });
+  // The sessions, the activity block and the drill-in are a wide window's (a phone's chat keeps the conversation it
+  // had, item 1119: on a phone the page opened again from the home screen kept its curtain with them).
+  const flowOn = !PHONE.matches;
   let sessionsWanted = false;
   let flow = emptyFlow(runId);
   const flowView = createChatFlowView({
@@ -1710,7 +1713,12 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       title: "Helpers",
       "aria-label": "Show the helpers",
       hidden: true,
+      // A wide window shows the sessions rail; a phone opens the helpers in the side panel, as it did.
       onclick: () => {
+        if (!flowOn) {
+          inspector.openTab("agents");
+          return;
+        }
         sessionsWanted = layout.dataset.sessions !== "on";
         layout.dataset.sessions = sessionsWanted ? "on" : "off";
       },
@@ -1732,10 +1740,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     earlier,
     goalMessage,
     timeline.element,
-    flowView.sessions,
-    flowView.activity,
-    flowView.drill,
+    flowOn ? flowView.sessions : null,
+    flowOn ? flowView.drill : null,
     workStatus.element,
+    // Under the line of what the run does, so that it grows below the line and never moves it.
+    flowOn ? flowView.activity : null,
     waitingList,
     lessonsPlace,
   );
@@ -1743,6 +1752,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   layout.dataset.sessions = "off";
   layout.dataset.hasSessions = "off";
   function paintFlow() {
+    if (!flowOn) {
+      return;
+    }
     flowView.paint(flow);
     const has = flow.sessionOrder.length > 0;
     const had = layout.dataset.hasSessions === "on";
@@ -1760,8 +1772,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
   }
   paintFlow();
-  const column = el("div", { class: "run-column" }, thread, dock);
-  const main = el("div", { class: "run-main" }, column, flowView.rail);
+  const main = flowOn
+    ? el("div", { class: "run-main" }, el("div", { class: "run-column" }, thread, dock), flowView.rail)
+    : el("div", { class: "run-main" }, thread, dock);
   // On a phone the dock floats over the conversation's foot (item 374), a pane of glass with the messages going by
   // under it: its height is kept on the column that holds them both, where the conversation's padding reads it. The
   // dock is measured once it stands in the page and whenever it changes (its first height, the bar over the composer, a
