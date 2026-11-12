@@ -35,7 +35,14 @@ from dotagent.agent.parking import (
 )
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
 from dotagent.config import PaceConfig, SpendCap
-from dotagent.core.errors import ApprovalParked, ApprovalRejected, HandedOff, PolicyDenied, RunConflict
+from dotagent.core.errors import (
+    ApprovalNoted,
+    ApprovalParked,
+    ApprovalRejected,
+    HandedOff,
+    PolicyDenied,
+    RunConflict,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_known
 from dotagent.core.types import JsonObject
@@ -360,9 +367,11 @@ class RunGate:
         self._parking = parking
 
     def taint(self) -> None:
-        """Record that the run has read content that third parties can author."""
+        """Record that the run has read content that third parties can author. A yes the owner gave with a note is let
+        go (item 1140): what the run read since may be what calls for the step now, not the note."""
         self.tainted = True
         self.ever_tainted = True
+        self._noted_yes = frozenset()
 
     def observe(self, info: ActionInfo) -> None:
         """Taint the run when a finished action read content that third parties can author."""
@@ -1012,4 +1021,4 @@ class RunGate:
         self._noted_yes = self._noted_yes | {info.model_dump_json()}
         self.add_instruction(note)
         log.info("noted_yes_held", run_id=self._run_id, tool=info.tool)
-        raise ApprovalRejected(noted_text(note), {"action": _describe(shown), "note": note})
+        raise ApprovalNoted(noted_text(note), {"action": _describe(shown), "note": note})

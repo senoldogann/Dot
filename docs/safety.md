@@ -1237,7 +1237,8 @@ untrusted reading raised, nor one about Dot's own files) is kept too, and your *
 step once in that conversation, within `[policy] permit_hours`, after the policy decided it again (item 483). The note
 you write with your answer reaches the model, and comes first (item 1140): a yes with a note does not take the step;
 the run is told the note, and if it still calls for that exact step, the run does it again and it goes through once
-without asking you again (a kept step's **Allow once** with a note tells the run to read the note before the step).
+without asking you again, unless the run read content others write since (a page, a mail), when you are asked once more
+(a kept step's **Allow once** with a note tells the run to read the note before the step).
 Your no stands for the rest of the run (item 456): the same action, as its
 card showed it, is refused at once, with no new card, nor a question to the review model in `auto`, until you write to
 the run again (a steer, the answer to its question); the policy's event records the refusal, as it does the first. Only

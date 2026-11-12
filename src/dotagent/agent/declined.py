@@ -70,9 +70,11 @@ def refusal_text(earlier: Declined) -> str:
 
 def noted_text(note: str) -> str:
     """What the run is told of a step the owner said yes to with a note (item 1140): the step was not taken, so that
-    the note is read first; done again exactly so, it goes through once without asking."""
+    the note is read first; done again exactly so, it goes through once without asking, unless the run read content
+    others write since (:meth:`RunGate.taint` lets the yes go)."""
     return (
         f"the user said yes with a note, so this step was not taken yet; their note comes first: “{note}”. Do what the "
         "note says. If it still calls for this exact step, do it again exactly so: it goes through once without asking "
-        "them again. If the note says otherwise, do not do it"
+        "them again, unless you read outside content since, when they are asked once more. If the note says otherwise, "
+        "do not do it"
     )

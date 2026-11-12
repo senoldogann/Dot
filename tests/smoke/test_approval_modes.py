@@ -17,7 +17,7 @@ from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import REVIEWER_DECIDER, YOLO_DECIDER, RunGate, SiteLocks
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict
 from dotagent.config import PaceConfig, SpendCap
-from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
+from dotagent.core.errors import ApprovalNoted, ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.events import EventBus
 from dotagent.policy.paths import CHANGES_DOT
 from dotagent.policy.types import ActionInfo, Amount, ApprovalMode, Preset
@@ -223,6 +223,21 @@ async def test_a_yes_with_a_note_waits_until_the_run_read_the_note(room: Room) -
     assert await asyncio.wait_for(gate.authorize(WRITE), WAIT_S) == ""
     assert await room.store.list_approvals("pending", 10) == []
     # Once: the same step after that is asked again.
+    again: Question = await _ask(room, gate, WRITE)
+    await room.broker.resolve(again.record.id, False, UI_SOURCE, "")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(again.answer, WAIT_S)
+
+
+async def test_a_yes_with_a_note_is_let_go_once_the_run_read_outside_content(room: Room) -> None:
+    """Item 1140 (the pre-push review): what the run read after the note may be what calls for the step now, so the
+    same step asks the owner again."""
+    gate: RunGate = _gate(room, "task", "cautious", "ask", _nobody)
+    question: Question = await _ask(room, gate, WRITE)
+    await room.broker.resolve(question.record.id, True, UI_SOURCE, "send nothing")
+    with pytest.raises(ApprovalNoted):
+        await asyncio.wait_for(question.answer, WAIT_S)
+    gate.taint()
     again: Question = await _ask(room, gate, WRITE)
     await room.broker.resolve(again.record.id, False, UI_SOURCE, "")
     with pytest.raises(ApprovalRejected):

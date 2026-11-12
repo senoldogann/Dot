@@ -20,6 +20,7 @@ from pathlib import Path
 
 from dotagent.config import DesktopConfig
 from dotagent.core.errors import (
+    ApprovalNoted,
     ApprovalParked,
     ApprovalRejected,
     DesktopError,
@@ -848,6 +849,12 @@ class DesktopSession:
                 continue
             try:
                 effect: Effect = await self._run_step(env, step, index, reviewer)
+            except ApprovalNoted as error:
+                # A yes with a note (item 1140): the step waits for the note to be read, and may be done again once.
+                noted: str = f"Not done yet: {error.message}."
+                reports.append(StepReport(index=index, description=description, outcome="failed", detail=noted))
+                stopped = "a step waits for the user's note to be read"
+                continue
             except ApprovalParked as error:
                 # Kept for the owner (item 482): its words say that it did not happen and waits for them.
                 reports.append(StepReport(index=index, description=description, outcome="failed", detail=error.message))
