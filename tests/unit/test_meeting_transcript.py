@@ -121,6 +121,9 @@ def test_a_post_is_one_paragraph_with_nothing_hidden_in_it() -> None:
     assert post_refused("one\r\n\r\ntwo") == "a post is one line"
     assert post_refused("pay \u202eevil") is not None
     assert post_refused("a\u0007bell") is not None
+    assert post_refused("We agree.\U000e0041\U000e0042") is not None  # Unicode's invisible tags
+    assert post_refused("We\u200bagree.") is not None
+    assert post_refused("Ça va, à vendredi.") is None
     assert post_refused("x" * 501) is not None
 
 

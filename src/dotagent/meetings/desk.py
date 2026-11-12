@@ -20,6 +20,7 @@ import contextlib
 import re
 import sqlite3
 import time
+import unicodedata
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -109,8 +110,9 @@ class _Live:
     left: asyncio.Event = field(default_factory=asyncio.Event)
     # Whether the summary is made of the notes as they stand, with no model asked again (the emergency stop).
     no_model: bool = False
-    # The notes as they last stood, which a summary after a failure gives.
+    # The notes as they last stood, which a summary after a failure gives, and the note maker at work, if it is.
     notes: MeetingNotes = NO_NOTES
+    making: "asyncio.Task[tuple[MeetingNotes, str | None]] | None" = None
     task: asyncio.Task[None] | None = None
 
 
@@ -147,6 +149,10 @@ async def launch_meeting_chrome(profile: Path, browser: BrowserConfig, config: M
             "Dot's meeting browser did not start: is the meetings-login window still open?",
             {"profile": str(profile), "error": str(error)[:400]},
         ) from error
+    except BaseException:
+        # A stop while Chrome starts: its driver goes with it.
+        await asyncio.shield(playwright.stop())
+        raise
     page: Page = context.pages[0] if context.pages else await context.new_page()
 
     async def close() -> None:
@@ -157,16 +163,20 @@ async def launch_meeting_chrome(profile: Path, browser: BrowserConfig, config: M
     return MeetingChrome(context=context, page=page, close=close)
 
 
-# Characters that would make the owner's card show other words than the meeting gets: controls (but the line break)
-# and the marks that turn the direction of text.
-_HIDDEN: re.Pattern[str] = re.compile("[\u0000-\u0009\u000b-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 _LINE_BREAK: re.Pattern[str] = re.compile(r"[\r\n\u2028\u2029]")
+
+
+def _hidden(text: str) -> bool:
+    """Whether ``text`` holds a character the owner's card would not show as the meeting gets it: a control, a format
+    mark (the ones that turn the direction of text, zero-width ones, Unicode's invisible tags), a private one or an
+    unassigned one: every category ``C`` of Unicode, as the words of a meeting are cleaned of them when they come in."""
+    return any(unicodedata.category(character)[0] == "C" for character in text)
 
 
 def post_refused(text: str) -> str | None:
     """Why ``text`` is no post Dot types into a meeting, or ``None``: empty, longer than :data:`POST_CHARS`, more than
-    one line (Enter sends it in Meet's chat), or holding a control or a mark that turns the direction of text, which
-    would show the owner other words than the meeting gets."""
+    one line (Enter sends it in Meet's chat), or holding a character the owner's card would not show as the meeting gets
+    it (:func:`_hidden`): an invisible one could carry what the owner never saw out of the Mac."""
     words: str = text.strip()
     if words == "":
         return "a post needs words"
@@ -174,8 +184,8 @@ def post_refused(text: str) -> str | None:
         return f"a post is {POST_CHARS} characters at most ({len(words)} given)"
     if _LINE_BREAK.search(words):
         return "a post is one line"
-    if _HIDDEN.search(words):
-        return "a post holds no control characters or marks that turn the direction of text"
+    if _hidden(words):
+        return "a post holds no control, invisible or unassigned characters"
     return None
 
 
@@ -275,8 +285,10 @@ class MeetingDesk:
             meeting: MeetingRecord = await self._store.add_meeting(address, thread_id, run_id)
             try:
                 live: _Live = await self._open(meeting)
-            except DotError as error:
-                await self._store.set_meeting_status(meeting.id, "failed", error.message)
+            except BaseException as error:
+                # A stop or a timeout while Chrome starts leaves no meeting standing open.
+                why: str = error.message if isinstance(error, DotError) else "the join was stopped"
+                await asyncio.shield(self._store.set_meeting_status(meeting.id, "failed", why))
                 raise
             self._live = live
         try:
@@ -449,13 +461,12 @@ class MeetingDesk:
         again every ``notes_minutes`` while lines come, and the summary at the end. The notes are made beside the
         reading, never in its way: a stop is seen within :data:`_READ_EVERY_S` while the note maker works, and cuts it.
         Whatever ends the watch, Dot leaves the call and closes its browser."""
-        making: asyncio.Task[tuple[MeetingNotes, str | None]] | None = None
         end_note: str = "the meeting ended"
         status: str = "ended"
         try:
-            end_note, making = await self._read_until_over(live)
-            if making is not None and making.done() and not making.cancelled():
-                live.notes = making.result()[0]
+            end_note = await self._read_until_over(live)
+            if live.making is not None and live.making.done() and not live.making.cancelled():
+                live.notes = live.making.result()[0]
         except DotError as error:
             log.error("meeting_watch_failed", meeting_id=live.meeting_id, error=error.message, context=error.context)
             status, end_note = "failed", error.message
@@ -466,20 +477,19 @@ class MeetingDesk:
             status, end_note = "failed", f"Dot could not keep the meeting's lines ({error})"
             log.error("meeting_watch_failed", meeting_id=live.meeting_id, error=end_note)
         finally:
-            if making is not None and not making.done():
-                making.cancel()
+            if live.making is not None and not live.making.done():
+                live.making.cancel()
             if not live.left.is_set():
                 await self._close(live, status, end_note)
         # A meeting that ended in a failure (its page lost, the store refusing) is summed up all the same: its notes and
         # lines so far are kept, and the summary says why Dot left.
         await self._sum_up(live, live.notes, end_note)
 
-    async def _read_until_over(self, live: _Live) -> tuple[str, asyncio.Task[tuple[MeetingNotes, str | None]] | None]:
-        """The reading of the call until it is over for Dot: why it ended, and the note maker still at work, if it is.
-        The notes as they stand are kept on ``live`` as they come."""
+    async def _read_until_over(self, live: _Live) -> str:
+        """The reading of the call until it is over for Dot: why it ended. The notes as they stand, and the note maker
+        at work, are kept on ``live``, so that whatever ends the reading cuts the one and sums up the other."""
         book: CaptionBook = CaptionBook()
         seen_chat: frozenset[str] = frozenset()
-        making: asyncio.Task[tuple[MeetingNotes, str | None]] | None = None
         noted: int = 0
         next_notes: float = time.monotonic() + self._config.notes_minutes * 60.0
         ends: float = time.monotonic() + self._config.most_hours * 3600.0
@@ -507,11 +517,13 @@ class MeetingDesk:
             seen_chat, chat = new_chat(seen_chat, batch.chat)
             theirs, live.posted = not_dots(chat, live.posted)
             total: int = await self._keep(live, (*captions, *theirs))
-            if making is not None and making.done():
-                live.notes = making.result()[0]
-                making = None
-            if making is None and total > noted and time.monotonic() >= next_notes:
-                making = asyncio.create_task(self._noted(live, live.notes), name=f"meeting-notes-{live.meeting_id}")
+            if live.making is not None and live.making.done():
+                live.notes = live.making.result()[0]
+                live.making = None
+            if live.making is None and total > noted and time.monotonic() >= next_notes:
+                live.making = asyncio.create_task(
+                    self._noted(live, live.notes), name=f"meeting-notes-{live.meeting_id}"
+                )
                 noted = total
                 next_notes = time.monotonic() + self._config.notes_minutes * 60.0
             with contextlib.suppress(TimeoutError):
@@ -527,7 +539,7 @@ class MeetingDesk:
         await self._keep(live, rest)
         if live.why:
             end_note = live.why[-1]
-        return end_note, making
+        return end_note
 
     async def _keep(self, live: _Live, lines: tuple[MeetingLine, ...]) -> int:
         return await self._store.add_meeting_lines(
