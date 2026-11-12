@@ -16,6 +16,7 @@ from playwright.async_api import Browser, BrowserContext, Page, Playwright, Rout
 
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.config import MeetingsConfig
+from dotagent.core.errors import RunConflict
 from dotagent.events import EventBus
 from dotagent.meetings.desk import ANNOUNCEMENT, MeetingChrome, MeetingDesk, MeetingError
 from dotagent.meetings.notes import MeetingNotes, NoteAction
@@ -40,6 +41,8 @@ class Room:
     told: list[tuple[str, str]]
     pages: list[Page]
     desk: MeetingDesk
+    # Whether a run works in the meeting's chat now: the chat then takes no line (RunConflict), as keep_notice does.
+    working: list[bool]
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -48,8 +51,12 @@ async def playwright() -> AsyncIterator[Playwright]:
         yield running
 
 
+NOTED: list[str] = []
+
+
 async def _noter(lines: Sequence[MeetingLineRecord], earlier: MeetingNotes, meeting_id: str) -> MeetingNotes:
-    """Notes made of the lines by code, as the note maker would give them back."""
+    """Notes made of the lines by code, as the note maker would give them back; each call is counted."""
+    NOTED.append(meeting_id)
     return MeetingNotes(
         decisions=tuple(line.text for line in lines if "decide" in line.text),
         actions=(NoteAction(who="Bo", what="send the deck", when="Friday"),),
@@ -96,11 +103,15 @@ async def room(tmp_path: Path, playwright: Playwright) -> AsyncIterator[Room]:
             pages.append(page)
             return MeetingChrome(context=context, page=page, close=context.close)
 
+        working: list[bool] = [False]
+
         async def notice(thread_id: str, goal: str, text: str) -> None:
+            if working[0]:
+                raise RunConflict("a run works in the chat", {"thread_id": thread_id})
             told.append((goal, text))
 
         desk: MeetingDesk = MeetingDesk(store, broker, _noter, _CONFIG, launch, lambda: OWNER, notice)
-        yield Room(store=store, broker=broker, run=run, told=told, pages=pages, desk=desk)
+        yield Room(store=store, broker=broker, run=run, told=told, pages=pages, desk=desk, working=working)
         await desk.aclose()
     finally:
         await browser.close()
@@ -157,13 +168,39 @@ async def test_a_meeting_is_told_kept_posted_in_on_a_yes_and_summed_up(room: Roo
     shown: str = await page.evaluate("document.querySelector('[aria-live=polite]').innerText")
     assert "Ship it Friday." in shown and "We agree." not in shown
 
-    left: MeetingRecord = await room.desk.leave(meeting.id, "the owner asked Dot to leave")
+    # The run that asks Dot to leave works in the chat: Dot is out of the call at once, and the notes wait for the chat.
+    room.working[0] = True
+    left: MeetingRecord = await asyncio.wait_for(room.desk.leave(meeting.id, "the owner asked Dot to leave"), 10.0)
     assert left.status == "ended" and left.ended_at is not None
     assert room.desk.busy() is None
+    await asyncio.sleep(1.0)
+    assert room.told == []
+    room.working[0] = False
+    await _told(room, 1)
     goal, text = room.told[-1]
     assert goal == "The notes of the meeting"
     assert "we decide to ship on Friday" in text and "Bo: send the deck (Friday)" in text
     assert (await room.store.get_meeting(meeting.id)).summary == text
+
+
+async def _told(room: Room, count: int) -> None:
+    for _ in range(int(_WAIT_S * 10)):
+        if len(room.told) >= count:
+            return
+        await asyncio.sleep(0.1)
+    raise AssertionError("the chat was not told")
+
+
+async def test_the_emergency_stop_leaves_at_once_and_asks_no_model_again(room: Room) -> None:
+    joining: asyncio.Task[MeetingRecord] = asyncio.create_task(room.desk.join(URL, room.run.thread_id, room.run.id))
+    await _answer(room, True)
+    meeting: MeetingRecord = await joining
+    asked: int = len(NOTED)
+    room.desk.stop_all("the emergency stop")
+    await _told(room, 1)
+    assert len(NOTED) == asked
+    assert (await room.store.get_meeting(meeting.id)).status == "ended"
+    assert "not made again" in room.told[-1][1]
 
 
 async def test_free_mode_does_not_skip_the_question_of_a_post(room: Room) -> None:

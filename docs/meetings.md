@@ -36,7 +36,10 @@ Say "join my call https://meet.google.com/abc-defg-hij" in a chat. Then:
    meeting desk's own, not the gate's. A post is one paragraph of at most 500 characters. Your no, or no answer, posts
    nothing.
 7. **Leaving.** Dot leaves when the call ends, when it is removed, when you say "leave the call" (`meeting_leave`), at
-   the emergency stop, when the daemon stops, and after `[meetings] most_hours` (3). The notes come to the chat then.
+   the emergency stop, when the daemon stops, and after `[meetings] most_hours` (3). The notes are made once more from
+   every line and come to the chat as soon as no task works there (the one that asked Dot to leave ends first); if
+   the note maker fails, the summary says so and gives the notes as they last stood. After the emergency stop no model
+   is asked again: the summary holds the notes as they stood.
 
 ## What Dot keeps, and what it never does
 

@@ -2273,8 +2273,8 @@ class RunManager:
         closed: int = await self._runtime.terminals.close_all()
         if closed:
             log.info("emergency_stop_closed_terminals", sessions=closed)
-        # A meeting Dot is in is left at once, its notes kept (item 1138).
-        await self._runtime.meetings.leave_all("the emergency stop")
+        # A meeting Dot is in is left at once, its notes kept as they stand (item 1138); the stop does not wait for it.
+        self._runtime.meetings.stop_all("the emergency stop")
         elsewhere: list[str] = [run_id for run_id in self.elsewhere_run_ids() if run_id not in self._handles]
         await self._ask_to_end_by_emergency_stop(elsewhere)
         return [*active, *elsewhere]

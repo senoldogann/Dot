@@ -63,8 +63,11 @@ _MEETING_ARGS: tuple[str, ...] = (
 )
 # How long a page Dot does not know may stand while it waits to be let in.
 _UNKNOWN_S: float = 30.0
-# How long the summary waits for the chat to be free of a working run before it is kept anyway as a log line.
-_SUMMARY_WAIT_S: float = 600.0
+# How long the summary waits for the chat to be free of a working run (the run that asked Dot to leave, the owner's
+# next one); past it the summary stays on the meeting's record, which meeting_read gives.
+_SUMMARY_WAIT_S: float = 3600.0
+# How long leaving waits for Dot to be out of the call and its browser closed.
+_LEAVE_WAIT_S: float = 30.0
 # How often the lines of meetings over for ``keep_days`` are looked for.
 _FORGET_EVERY_S: float = 6 * 3600.0
 
@@ -96,6 +99,10 @@ class _Live:
     stop: asyncio.Event
     why: list[str] = field(default_factory=list)
     posted: set[str] = field(default_factory=set)
+    # Set once Dot is out of the call and its browser closed; the notes and the summary may still be on their way.
+    left: asyncio.Event = field(default_factory=asyncio.Event)
+    # Whether the summary is made of the notes as they stand, with no model asked again (the emergency stop).
+    no_model: bool = False
     task: asyncio.Task[None] | None = None
 
 
@@ -187,6 +194,8 @@ class MeetingDesk:
         self._live: _Live | None = None
         self._lock: asyncio.Lock = asyncio.Lock()
         self._forgetter: asyncio.Task[None] | None = None
+        # The watches of the meetings, kept until they told their summary, after Dot left the call.
+        self._finishing: set[asyncio.Task[None]] = set()
 
     def tell_with(self, notice: Notice) -> None:
         """Keep the meetings' summaries in their chats with ``notice``, once the daemon's run manager is there."""
@@ -201,8 +210,12 @@ class MeetingDesk:
         self._forgetter = asyncio.create_task(self._forget_forever(), name="meetings-forget")
 
     async def aclose(self) -> None:
-        """Leave the meeting Dot is in, as the daemon stops."""
+        """Leave the meeting Dot is in, as the daemon stops: out of the call at once, the summary of the notes as they
+        stand, and what is still on its way cut after :data:`_LEAVE_WAIT_S`."""
         await self.leave_all("Dot stopped")
+        for task in list(self._finishing):
+            with contextlib.suppress(TimeoutError, asyncio.CancelledError):
+                await asyncio.wait_for(task, _LEAVE_WAIT_S)
         if self._forgetter is not None:
             self._forgetter.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -260,6 +273,8 @@ class MeetingDesk:
             await self._close(live, "failed", note)
             raise
         live.task = asyncio.create_task(self._watch(live), name=f"meeting-{meeting.id}")
+        self._finishing.add(live.task)
+        live.task.add_done_callback(self._finishing.discard)
         return await self._store.set_meeting_status(meeting.id, "in_call", "Dot is in the call and takes notes")
 
     async def _open(self, meeting: MeetingRecord) -> _Live:
@@ -319,6 +334,8 @@ class MeetingDesk:
             raise MeetingError(
                 "Dot left without taking notes: the meeting was not told Dot is there", {"answer": outcome.status}
             )
+        if live.stop.is_set():
+            raise MeetingError(_why(live, "the join was stopped"), {"answer": outcome.status})
         live.posted.add(line)
         await live.page.post(line)
 
@@ -358,19 +375,29 @@ class MeetingDesk:
         return "Posted in the meeting's chat."
 
     async def leave(self, meeting_id: str, why: str) -> MeetingRecord:
-        """Leave the meeting ``meeting_id`` for ``why``; its summary goes to its chat."""
+        """Leave the meeting ``meeting_id`` for ``why``: returns once Dot is out of the call (:data:`_LEAVE_WAIT_S` at
+        most). The last notes and the summary come after, to the chat, once no run works there."""
         live: _Live = self._the_live(meeting_id)
         live.why.append(why)
         live.stop.set()
-        if live.task is not None:
-            with contextlib.suppress(asyncio.CancelledError):
-                await live.task
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(live.left.wait(), _LEAVE_WAIT_S)
         return await self._store.get_meeting(meeting_id)
 
     async def leave_all(self, why: str) -> None:
-        """Leave the meeting Dot is in, if it is in one (the emergency stop, the daemon's stop)."""
+        """Leave the meeting Dot is in, if it is in one, at once (the emergency stop, the daemon's stop): no model is
+        asked for the notes again, and the summary is made of them as they stand."""
         if self._live is not None:
+            self._live.no_model = True
             await self.leave(self._live.meeting_id, why)
+
+    def stop_all(self, why: str) -> None:
+        """Have Dot leave the meeting it is in, if it is in one, without waiting (the emergency stop): its watch sees
+        the stop within :data:`_READ_EVERY_S`, leaves the call and closes its browser, and asks no model again."""
+        if self._live is not None:
+            self._live.no_model = True
+            self._live.why.append(why)
+            self._live.stop.set()
 
     def _the_live(self, meeting_id: str) -> _Live:
         if self._live is None or self._live.meeting_id != meeting_id:
@@ -407,7 +434,7 @@ class MeetingDesk:
                 theirs: tuple[MeetingLine, ...] = tuple(line for line in chat if line.text not in live.posted)
                 total: int = await self._keep(live, (*captions, *theirs))
                 if total > noted and time.monotonic() >= next_notes:
-                    notes = await self._noted(live, notes)
+                    notes, _ = await self._noted(live, notes)
                     noted = total
                     next_notes = time.monotonic() + self._config.notes_minutes * 60.0
                 with contextlib.suppress(TimeoutError):
@@ -434,25 +461,31 @@ class MeetingDesk:
             live.meeting_id, [(line.kind, line.speaker, line.text, line.at) for line in lines]
         )
 
-    async def _noted(self, live: _Live, earlier: MeetingNotes) -> MeetingNotes:
-        """The notes made again from the meeting's lines; a note maker that fails leaves the earlier ones, logged."""
+    async def _noted(self, live: _Live, earlier: MeetingNotes) -> tuple[MeetingNotes, str | None]:
+        """The notes made again from the meeting's lines, and ``None``; a note maker that fails leaves the earlier ones,
+        with what went wrong, logged."""
         meeting: MeetingRecord = await self._store.get_meeting(live.meeting_id)
         lines = await self._store.meeting_lines(live.meeting_id, 0, meeting.lines)
         try:
             notes: MeetingNotes = await self._noter(lines, earlier, live.meeting_id)
         except DotError as error:
             log.warning("meeting_notes_failed", meeting_id=live.meeting_id, error=error.message, context=error.context)
-            return earlier
+            return earlier, error.message
         await self._store.set_meeting_notes(live.meeting_id, notes.model_dump_json())
-        return notes
+        return notes, None
 
     async def _sum_up(self, live: _Live, notes: MeetingNotes, end_note: str) -> None:
-        """The notes made once more from every line, and left in the chat as the meeting's summary."""
-        final: MeetingNotes = await self._noted(live, notes)
+        """The notes made once more from every line (as they stand, after the emergency stop), and left in the chat as
+        the meeting's summary, which says when they could not be made again."""
+        final: MeetingNotes = notes
+        unmade: str | None = "Dot was stopped, so they were not made again" if live.no_model else None
+        if not live.no_model:
+            final, unmade = await self._noted(live, notes)
         meeting: MeetingRecord = await self._store.get_meeting(live.meeting_id)
+        stale: str = "" if unmade is None else f"These are the notes as they last stood: {unmade}.\n\n"
         text: str = (
             f"Dot left the meeting ({end_note}). {meeting.lines} lines were kept for "
-            f"{self._config.keep_days} days.\n\n{notes_text(final, self._owner())}"
+            f"{self._config.keep_days} days.\n\n{stale}{notes_text(final, self._owner())}"
         )
         await self._store.set_meeting_summary(live.meeting_id, text)
         await self._tell(live, "The notes of the meeting", text)
@@ -472,14 +505,18 @@ class MeetingDesk:
             await asyncio.sleep(5.0)
 
     async def _close(self, live: _Live, status: str, note: str) -> None:
-        """Leave the call and close the meeting's browser; the meeting is ``ended`` or ``failed`` with ``note``."""
-        with contextlib.suppress(PlaywrightError, DotError):
-            await live.page.leave()
-        with contextlib.suppress(PlaywrightError):
-            await live.chrome.close()
-        if self._live is live:
-            self._live = None
-        await self._store.set_meeting_status(live.meeting_id, "ended" if status == "ended" else "failed", note)
+        """Leave the call and close the meeting's browser; the meeting is ``ended`` or ``failed`` with ``note``, and
+        whoever waits for Dot to be out of the call is told."""
+        try:
+            with contextlib.suppress(PlaywrightError, DotError):
+                await live.page.leave()
+            with contextlib.suppress(PlaywrightError):
+                await live.chrome.close()
+            if self._live is live:
+                self._live = None
+            await self._store.set_meeting_status(live.meeting_id, "ended" if status == "ended" else "failed", note)
+        finally:
+            live.left.set()
 
 
 def _why(live: _Live, otherwise: str) -> str:

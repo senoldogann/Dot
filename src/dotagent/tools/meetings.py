@@ -149,7 +149,10 @@ async def _leave(args: LeaveArgs, ctx: ToolContext) -> ToolResult:
     if meeting_id is None:
         return ToolResult(text="Dot is in no meeting now.", images=(), is_error=True)
     meeting: MeetingRecord = await desk.leave(meeting_id, "the owner asked Dot to leave")
-    return ok(f"Dot left the meeting ({meeting.lines} lines); its notes are in this chat.")
+    return ok(
+        f"Dot left the meeting ({meeting.lines} lines). Its notes come to this chat once this task ends; "
+        "meeting_read gives them now."
+    )
 
 
 def build_meeting_tools() -> tuple[RegisteredTool, ...]:
