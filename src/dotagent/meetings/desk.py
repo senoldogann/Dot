@@ -384,8 +384,18 @@ class MeetingDesk:
             )
         if live.stop.is_set():
             raise MeetingError(_why(live, "the join was stopped"), {"answer": outcome.status})
-        live.posted = live.posted | {clean_words(line, MAX_TEXT_CHARS)}
-        await live.page.post(line)
+        await self._post_as_dot(live, line)
+
+    async def _post_as_dot(self, live: _Live, text: str) -> None:
+        """Type ``text`` in the meeting's chat. Its words are marked as Dot's before it goes, since the watch may read
+        it back while the page confirms it, and unmarked when it did not go, so that someone else's same words count."""
+        words: str = clean_words(text, MAX_TEXT_CHARS)
+        live.posted = live.posted | {words}
+        try:
+            await live.page.post(text)
+        except BaseException:
+            live.posted = live.posted - {words}
+            raise
 
     async def _ask(self, live: _Live, text: str, why: str) -> ApprovalOutcome:
         """The owner's answer to a post of ``text`` in the meeting, asked in the run that asked for the meeting."""
@@ -418,8 +428,7 @@ class MeetingDesk:
             return f"Not posted: the owner's answer was {outcome.status}{note}."
         if self._live is not live or live.stop.is_set():
             return "Not posted: Dot left the meeting before the owner's yes."
-        live.posted = live.posted | {clean_words(text, MAX_TEXT_CHARS)}
-        await live.page.post(text.strip())
+        await self._post_as_dot(live, text.strip())
         return "Posted in the meeting's chat."
 
     async def leave_asked(self, meeting_id: str, run_id: str) -> bool:
@@ -537,7 +546,9 @@ class MeetingDesk:
             theirs, live.posted = not_dots(chat, live.posted)
             total: int = await self._keep(live, (*captions, *theirs))
             if live.making is not None and live.making.done():
-                live.notes = live.making.result()[0]
+                # A note maker the stop cut leaves the notes as they stood.
+                if not live.making.cancelled():
+                    live.notes = live.making.result()[0]
                 live.making = None
             if live.making is None and total > noted and time.monotonic() >= next_notes:
                 live.making = asyncio.create_task(

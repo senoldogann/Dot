@@ -291,12 +291,16 @@ async def test_a_stop_while_the_notes_are_made_leaves_the_call_at_once(room: Roo
     meeting: MeetingRecord = await joining
     await room.pages[-1].evaluate("standIn.caption(9, 'Bo', 'a long meeting')")
     await asyncio.wait_for(started.wait(), _WAIT_S)
+    told: int = len(room.told)
     desk.stop_all("the emergency stop")
     for _ in range(100):
         if (await room.store.get_meeting(meeting.id)).status == "ended":
             break
         await asyncio.sleep(0.1)
     assert (await room.store.get_meeting(meeting.id)).status == "ended"
+    # The note maker the stop cut leaves a summary all the same, of the notes as they stood.
+    await _told(room, told + 1)
+    assert "not made again" in room.told[-1][1]
     await desk.aclose()
 
 
