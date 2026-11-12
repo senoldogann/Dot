@@ -163,8 +163,9 @@ def _profile(record: AgentRecord) -> JsonObject:
 
 # Resolves once nothing on the page has scrolled for 300 ms.
 _STILL: str = (
-    "() => new Promise((done) => { let wait = setTimeout(done, 300);"
-    " addEventListener('scroll', () => { clearTimeout(wait); wait = setTimeout(done, 300); }, true); })"
+    "() => new Promise((done) => { const again = () => { clearTimeout(wait); wait = setTimeout(end, 300); };"
+    " const end = () => { removeEventListener('scroll', again, true); done(); }; let wait = setTimeout(end, 300);"
+    " addEventListener('scroll', again, true); })"
 )
 
 
@@ -174,21 +175,24 @@ async def _import_opens_a_chooser(page: Page) -> None:
     more: Locator = page.get_by_role("button", name="More actions")
     await more.scroll_into_view_if_needed()
     await page.evaluate(_STILL)
-    await more.focus()
-    await page.keyboard.press("Enter")
-    menu: Locator = page.get_by_role("menu", name="More actions")
-    await expect(menu.get_by_role("menuitem", name="New team")).to_be_focused()
-    await page.keyboard.press("ArrowDown")
-    await expect(menu.get_by_title(IMPORT_TITLE)).to_be_focused()
+    # The wait for the chooser starts before the menu opens. Playwright asks for choosers without waiting for the answer
+    # (`updateSubscription` is sent with no reply): a key pressed at once could reach the page before Chrome was told to
+    # hand the chooser over, and the chooser then went to headless Chrome, which shows none (CI, 2026-11-09 to 11-12).
+    # The checks of the menu in between are round trips to the same page, after which the hand-over is in place.
     async with page.expect_file_chooser() as choosing:
+        await more.focus()
+        await page.keyboard.press("Enter")
+        menu: Locator = page.get_by_role("menu", name="More actions")
+        await expect(menu.get_by_role("menuitem", name="New team")).to_be_focused()
+        await page.keyboard.press("ArrowDown")
+        await expect(menu.get_by_title(IMPORT_TITLE)).to_be_focused()
         await page.keyboard.press("Enter")
     await (await choosing.value).set_files([])
 
 
 async def _import(page: Page, file: Path) -> None:
-    """Import ``file`` through the Agents page's file field, the one Import an agent opens (`_import_opens_a_chooser`):
-    a page asked for a third chooser in a row sometimes got none from headless Chrome, though the page asked for it
-    with the press still in force (measured 2026-11-12)."""
+    """Import ``file`` through the Agents page's file field, the one Import an agent opens (`_import_opens_a_chooser`
+    shows that it opens a chooser)."""
     await page.get_by_label("Agent file").set_input_files(file)
 
 
