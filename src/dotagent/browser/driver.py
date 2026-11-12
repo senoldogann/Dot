@@ -49,6 +49,12 @@ _FIELD_PROBE_TIMEOUT_MS: int = 1500
 # How long a page may take to count the elements a locator names (item 471): Playwright's count takes no timeout, and
 # a frame whose script holds its main thread never answers.
 _COUNT_TIMEOUT_S: float = 2.0
+# How long a page that has already answered may take to hand over an element for a script, and then its frame.
+# The count's two seconds say a page that answers nothing is stuck. A page that just answered can still be slow to
+# hand an element over when Chrome is busy: one budget of those two seconds for both calls cancels the second while
+# it is running, and a free page (a fixture of a few lines) is reported as stuck. Each call is given as long as an
+# action, the default of ``action_timeout_s``, and a page that never hands the element over still fails.
+_ELEMENT_TIMEOUT_S: float = 8.0
 # The shortest cookie value that the value of a script is searched for (item 533).
 _MIN_HIDDEN_VALUE_CHARS: int = 8
 # A cookie value that is a word of lower case letters (a consent: ``dismissed``) is no session.
@@ -1421,16 +1427,21 @@ async def _elements_of(page: Page, refs: Sequence[str]) -> tuple[Frame, list[Ele
     handles: list[ElementHandle] = []
     frames: list[Frame] = []
     for ref in refs:
+        # The count inside live_locator is what says the page is stuck: it answers nothing within two seconds.
+        # Handing over the element is a further call, and so is asking which frame it belongs to. A busy Chrome
+        # answers both, later than those two seconds; cancelling them on the count's clock reports that page as stuck.
         locator: Locator = await live_locator(page, ref, "script")
         try:
-            # Both ask the page, which a script still running from before may hold: as long as a count waits.
-            async with asyncio.timeout(_COUNT_TIMEOUT_S):
-                handle: ElementHandle | None = await locator.element_handle(timeout=_COUNT_TIMEOUT_S * 1000)
+            # Each call has its own bound. One shared clock cancels the frame query when the element was slow to
+            # arrive, which is the cancelled script a loaded runner reports for a page that is not stuck.
+            async with asyncio.timeout(_ELEMENT_TIMEOUT_S):
+                handle: ElementHandle | None = await locator.element_handle(timeout=int(_ELEMENT_TIMEOUT_S * 1000))
+            async with asyncio.timeout(_ELEMENT_TIMEOUT_S):
                 frame: Frame | None = None if handle is None else await handle.owner_frame()
-        except TimeoutError as error:
+        except (TimeoutError, PlaywrightTimeoutError) as error:
             raise BrowserError(
                 "the page did not answer in time (a script may be holding it); wait, then take a new snapshot",
-                {"action": "script", "ref": ref, "url": page.url, "waited_s": _COUNT_TIMEOUT_S},
+                {"action": "script", "ref": ref, "url": page.url, "waited_s": _ELEMENT_TIMEOUT_S},
             ) from error
         except PlaywrightError as error:
             raise _failure("finding the element for the script failed", page, {"ref": ref}, error) from error

@@ -287,7 +287,9 @@ Both modes share what follows.
   is the Fast-Track click a snapshot, a find and a step would take three calls to reach.
   selector written for it, as a button that a click of `browser_act` does not move because it listens for other events
   (some of Slack's). A ref gone since the snapshot, of another shape, or refs of two frames fail the call with what to
-  do. A script that throws fails the call with its message; one still running when the wait ends goes on in the page,
+  do. A page that answers nothing fails that lookup within two seconds, as a step does; one that has answered is given
+  as long as an action to hand the element over, so a busy Chrome is not told the page is stuck. A script that throws
+  fails the call with its message; one still running when the wait ends goes on in the page,
   and the call says so. The page is settled after every script as after a step, so a script that leads the tab elsewhere
   lets it land, also when the page answers after the script's value came back (item 270), and says where, and the URL
   rules hold after it as after a step: a forbidden address resets the tab and fails the call. The value is fenced as the

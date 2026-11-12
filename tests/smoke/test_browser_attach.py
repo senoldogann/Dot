@@ -8,6 +8,8 @@ opened.
 """
 
 import asyncio
+import base64
+import contextlib
 import io
 import json
 import os
@@ -121,21 +123,77 @@ class ScratchChrome:
     process: asyncio.subprocess.Process
 
 
+async def _devtools_accepts(port: int, path: str, timeout_s: float) -> bool:
+    """Whether Chrome's browser DevTools socket completes a WebSocket opening handshake within ``timeout_s``.
+
+    ``/json/version`` answers before that socket does. ``path`` is the secret browser path: it is sent on the wire and
+    never logged. A handshake that does not finish in time is not an acceptance.
+    """
+    if timeout_s <= 0:
+        return False
+    deadline: float = time.monotonic() + timeout_s
+
+    def left() -> float:
+        return max(deadline - time.monotonic(), 0.001)
+
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", port), left())
+    except (OSError, TimeoutError):
+        return False
+    try:
+        key: str = base64.b64encode(os.urandom(16)).decode("ascii")
+        writer.write(
+            (
+                f"GET {path} HTTP/1.1\r\n"
+                f"Host: 127.0.0.1:{port}\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Key: {key}\r\n"
+                "Sec-WebSocket-Version: 13\r\n"
+                "\r\n"
+            ).encode()
+        )
+        await asyncio.wait_for(writer.drain(), left())
+        line: bytes = await asyncio.wait_for(reader.readline(), left())
+        return line.startswith(b"HTTP/1.1 101")
+    except (OSError, TimeoutError):
+        return False
+    finally:
+        writer.close()
+        with contextlib.suppress(OSError, TimeoutError):
+            await asyncio.wait_for(writer.wait_closed(), 0.2)
+
+
 async def wait_for_port(data_dir: Path) -> int:
-    """The debugging port that the Chrome on ``data_dir`` writes into its port file, once it answers on it."""
+    """The debugging port that the Chrome on ``data_dir`` writes into its port file, once its browser DevTools socket
+    accepts a connection.
+
+    The HTTP list (``/json/version``) answers while the browser socket is still opening. A connection started then, and
+    given up after the attach timeout, reports a Chrome that is still starting as one that refused.
+    """
     port_file: Path = data_dir / _PORT_FILE
     deadline: float = time.monotonic() + _READY_TIMEOUT_S
+    last: Exception | None = None
     async with httpx.AsyncClient() as client:
         while True:
+            remaining: float = deadline - time.monotonic()
+            if remaining <= 0:
+                break
             try:
                 text: str = await asyncio.to_thread(port_file.read_text, encoding="utf-8")
                 endpoint: DebugEndpoint = parse_port_file(text, port_file)
-                await client.get(f"http://127.0.0.1:{endpoint.port}/json/version")
-                return endpoint.port
-            except (OSError, BrowserError, httpx.TransportError):
+                await client.get(f"http://127.0.0.1:{endpoint.port}/json/version", timeout=min(2.0, remaining))
+                if await _devtools_accepts(endpoint.port, endpoint.path, remaining):
+                    return endpoint.port
+            except (OSError, BrowserError, httpx.HTTPError, TimeoutError) as error:
+                last = error
                 if time.monotonic() > deadline:
                     raise
-                await asyncio.sleep(_POLL_S)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            await asyncio.sleep(min(_POLL_S, remaining))
+    raise AssertionError(f"Chrome on {data_dir} did not accept a DevTools connection") from last
 
 
 async def spawn_chrome(data_dir: Path, url: str) -> asyncio.subprocess.Process:
