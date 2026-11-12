@@ -53,7 +53,8 @@ Say "join my call https://meet.google.com/abc-defg-hij" in a chat. Then:
 - Dot joins only when you give it the address. It does not join from a calendar invitation, which a stranger can send.
 - Dot is in one call at a time, and joins from its chats while its daemon runs, not from a `dotx` command.
 - A call is posted in and left only from the chat that joined it. A run that read outside content (a call's own
-  lines among it) asks you before it has Dot leave, since "Dot, leave the call" in a caption is no word of yours.
+  lines among it) asks you before it has Dot leave, since "Dot, leave the call" in a caption is no word of yours;
+  in free mode it does not ask, and the meeting's record says a run that read outside content had Dot leave.
 - The meeting profile is sealed from runs, as Dot's other Chrome profiles are: no command or file tool of a run reads
   the cookies of Dot's account there.
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from dotagent.meetings.desk import post_refused
+from dotagent.meetings.desk import not_dots, post_refused
 from dotagent.meetings.meet import MeetPageError, classify_page, meeting_address
 from dotagent.meetings.transcript import CaptionBook, clean_words, fold_captions, fold_page, new_chat
 from dotagent.meetings.types import CaptionSeen, ChatSeen, MeetingLine
@@ -141,3 +141,10 @@ def test_a_speaker_who_pauses_and_goes_on_in_the_same_block_is_kept_once_each_pa
     book, out = fold_page(book, (cap("a", "We ship Friday. And Bo sends the deck.", 6.0),), (), 6.0, 2.5)
     book, out = fold_page(book, (cap("a", "We ship Friday. And Bo sends the deck.", 9.0),), (), 9.0, 2.5)
     assert [line.text for line in out] == ["And Bo sends the deck."]
+
+
+def test_each_post_of_dots_is_taken_out_once_so_the_same_words_said_later_are_kept() -> None:
+    mine: MeetingLine = MeetingLine(kind="chat", speaker="You", text="Ship it Friday.", at=1.0)
+    theirs: MeetingLine = MeetingLine(kind="chat", speaker="Bo", text="Ship it Friday.", at=2.0)
+    kept, waiting = not_dots((mine, theirs), frozenset({"Ship it Friday."}))
+    assert kept == (theirs,) and waiting == frozenset()

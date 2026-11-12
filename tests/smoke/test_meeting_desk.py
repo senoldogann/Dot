@@ -309,3 +309,23 @@ async def test_leaving_asked_by_a_run_that_read_outside_content_waits_for_the_ow
     assert await asked is False
     assert room.desk.busy() == meeting.id
     await room.desk.leave(meeting.id, "the test ends")
+
+
+async def test_a_call_whose_page_is_lost_is_summed_up_with_the_notes_it_had(room: Room) -> None:
+    quick: MeetingsConfig = _CONFIG.model_copy(update={"notes_minutes": 0.01})
+    desk: MeetingDesk = MeetingDesk(room.store, room.broker, _noter, quick, room.launch, lambda: OWNER)
+    desk.tell_with(room.notice)
+    joining: asyncio.Task[MeetingRecord] = asyncio.create_task(desk.join(URL, room.run.thread_id, room.run.id))
+    await _answer(room, True)
+    meeting: MeetingRecord = await joining
+    await room.pages[-1].evaluate("standIn.caption(5, 'Bo', 'we decide on the budget')")
+    for _ in range(100):
+        if (await room.store.get_meeting(meeting.id)).notes:
+            break
+        await asyncio.sleep(0.1)
+    told: int = len(room.told)
+    await room.pages[-1].close()
+    await _told(room, told + 1)
+    assert (await room.store.get_meeting(meeting.id)).status == "failed"
+    assert "we decide on the budget" in room.told[-1][1]
+    await desk.aclose()

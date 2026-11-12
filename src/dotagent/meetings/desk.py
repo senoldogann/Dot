@@ -104,11 +104,13 @@ class _Live:
     page: MeetPage
     stop: asyncio.Event
     why: list[str] = field(default_factory=list)
-    posted: set[str] = field(default_factory=set)
+    posted: frozenset[str] = frozenset()
     # Set once Dot is out of the call and its browser closed; the notes and the summary may still be on their way.
     left: asyncio.Event = field(default_factory=asyncio.Event)
     # Whether the summary is made of the notes as they stand, with no model asked again (the emergency stop).
     no_model: bool = False
+    # The notes as they last stood, which a summary after a failure gives.
+    notes: MeetingNotes = NO_NOTES
     task: asyncio.Task[None] | None = None
 
 
@@ -288,14 +290,14 @@ class MeetingDesk:
                     {"url": address},
                 )
             await live.page.watch()
+            # In the call before the watch starts: a stop that comes at once is the watch's to record, after this.
+            in_call: MeetingRecord = await self._store.set_meeting_status(
+                meeting.id, "in_call", "Dot is in the call and takes notes"
+            )
         except BaseException as error:
             note: str = error.message if isinstance(error, DotError) else "the join was stopped"
             await self._close(live, "failed", note)
             raise
-        # In the call before the watch starts: a stop that comes at once is the watch's to record, after this.
-        in_call: MeetingRecord = await self._store.set_meeting_status(
-            meeting.id, "in_call", "Dot is in the call and takes notes"
-        )
         live.task = asyncio.create_task(self._watch(live), name=f"meeting-{meeting.id}")
         self._finishing.add(live.task)
         live.task.add_done_callback(self._finishing.discard)
@@ -360,7 +362,7 @@ class MeetingDesk:
             )
         if live.stop.is_set():
             raise MeetingError(_why(live, "the join was stopped"), {"answer": outcome.status})
-        live.posted.add(line)
+        live.posted = live.posted | {line}
         await live.page.post(line)
 
     async def _ask(self, live: _Live, text: str, why: str) -> ApprovalOutcome:
@@ -394,7 +396,7 @@ class MeetingDesk:
             return f"Not posted: the owner's answer was {outcome.status}{note}."
         if self._live is not live or live.stop.is_set():
             return "Not posted: Dot left the meeting before the owner's yes."
-        live.posted.add(text.strip())
+        live.posted = live.posted | {text.strip()}
         await live.page.post(text.strip())
         return "Posted in the meeting's chat."
 
@@ -447,14 +449,13 @@ class MeetingDesk:
         again every ``notes_minutes`` while lines come, and the summary at the end. The notes are made beside the
         reading, never in its way: a stop is seen within :data:`_READ_EVERY_S` while the note maker works, and cuts it.
         Whatever ends the watch, Dot leaves the call and closes its browser."""
-        notes: MeetingNotes = NO_NOTES
         making: asyncio.Task[tuple[MeetingNotes, str | None]] | None = None
         end_note: str = "the meeting ended"
         status: str = "ended"
         try:
-            end_note, notes, making = await self._read_until_over(live)
+            end_note, making = await self._read_until_over(live)
             if making is not None and making.done() and not making.cancelled():
-                notes = making.result()[0]
+                live.notes = making.result()[0]
         except DotError as error:
             log.error("meeting_watch_failed", meeting_id=live.meeting_id, error=error.message, context=error.context)
             status, end_note = "failed", error.message
@@ -471,16 +472,13 @@ class MeetingDesk:
                 await self._close(live, status, end_note)
         # A meeting that ended in a failure (its page lost, the store refusing) is summed up all the same: its notes and
         # lines so far are kept, and the summary says why Dot left.
-        await self._sum_up(live, notes, end_note)
+        await self._sum_up(live, live.notes, end_note)
 
-    async def _read_until_over(
-        self, live: _Live
-    ) -> tuple[str, MeetingNotes, asyncio.Task[tuple[MeetingNotes, str | None]] | None]:
-        """The reading of the call until it is over for Dot: why it ended, the notes as they stand, and the note maker
-        still at work, if it is."""
+    async def _read_until_over(self, live: _Live) -> tuple[str, asyncio.Task[tuple[MeetingNotes, str | None]] | None]:
+        """The reading of the call until it is over for Dot: why it ended, and the note maker still at work, if it is.
+        The notes as they stand are kept on ``live`` as they come."""
         book: CaptionBook = CaptionBook()
         seen_chat: frozenset[str] = frozenset()
-        notes: MeetingNotes = NO_NOTES
         making: asyncio.Task[tuple[MeetingNotes, str | None]] | None = None
         noted: int = 0
         next_notes: float = time.monotonic() + self._config.notes_minutes * 60.0
@@ -507,24 +505,29 @@ class MeetingDesk:
                 log.warning("meeting_page_dropped", meeting_id=live.meeting_id, dropped=batch.dropped)
             book, captions = fold_page(book, batch.captions, batch.vanished, time.time(), self._config.settle_s)
             seen_chat, chat = new_chat(seen_chat, batch.chat)
-            # Dot's own posts come back in the chat: they are not the meeting's words.
-            theirs: tuple[MeetingLine, ...] = tuple(line for line in chat if line.text not in live.posted)
+            theirs, live.posted = not_dots(chat, live.posted)
             total: int = await self._keep(live, (*captions, *theirs))
             if making is not None and making.done():
-                notes = making.result()[0]
+                live.notes = making.result()[0]
                 making = None
             if making is None and total > noted and time.monotonic() >= next_notes:
-                making = asyncio.create_task(self._noted(live, notes), name=f"meeting-notes-{live.meeting_id}")
+                making = asyncio.create_task(self._noted(live, live.notes), name=f"meeting-notes-{live.meeting_id}")
                 noted = total
                 next_notes = time.monotonic() + self._config.notes_minutes * 60.0
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(live.stop.wait(), _READ_EVERY_S)
-        # What stood on the page last is a line too.
+        # What the page said since the last read, and what stood on it last, are lines too.
+        with contextlib.suppress(PlaywrightError, DotError):
+            last: PageBatch = await live.page.drain()
+            book, captions = fold_page(book, last.captions, last.vanished, time.time(), self._config.settle_s)
+            seen_chat, chat = new_chat(seen_chat, last.chat)
+            theirs, live.posted = not_dots(chat, live.posted)
+            await self._keep(live, (*captions, *theirs))
         _, rest = fold_captions(book, (), time.time() + self._config.settle_s, self._config.settle_s)
         await self._keep(live, rest)
         if live.why:
             end_note = live.why[-1]
-        return end_note, notes, making
+        return end_note, making
 
     async def _keep(self, live: _Live, lines: tuple[MeetingLine, ...]) -> int:
         return await self._store.add_meeting_lines(
@@ -594,6 +597,19 @@ class MeetingDesk:
             await self._store.set_meeting_status(live.meeting_id, "ended" if status == "ended" else "failed", note)
         finally:
             live.left.set()
+
+
+def not_dots(chat: tuple[MeetingLine, ...], posted: frozenset[str]) -> tuple[tuple[MeetingLine, ...], frozenset[str]]:
+    """The chat lines that are not Dot's own posts coming back, and the posts not seen back yet: each post of Dot's is
+    taken out once, by its words, so that someone who writes the same words later is kept."""
+    kept: list[MeetingLine] = []
+    waiting: set[str] = set(posted)
+    for line in chat:
+        if line.text in waiting:
+            waiting.discard(line.text)
+            continue
+        kept.append(line)
+    return tuple(kept), frozenset(waiting)
 
 
 def _why(live: _Live, otherwise: str) -> str:

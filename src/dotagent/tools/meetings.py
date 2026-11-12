@@ -179,9 +179,12 @@ async def _leave(args: LeaveArgs, ctx: ToolContext) -> ToolResult:
         return found
     meeting_id: str = found
     # A run that read outside content (a meeting's own lines among it) asks the owner first: "Dot, leave the call" in a
-    # caption is no word of the owner's. The meeting's record says who asked.
+    # caption is no word of the owner's; in free mode it does not ask. The meeting's record says who asked.
     why: str = "the owner asked Dot to leave"
-    if ctx.tainted():
+    if ctx.tainted() and ctx.runtime.approvals.free:
+        # Free mode asks nothing but a post (the owner's choice, item 922): the record says who asked.
+        why = "a run that read outside content had Dot leave, in free mode"
+    elif ctx.tainted():
         try:
             if not await desk.leave_asked(meeting_id, ctx.run_id):
                 return ToolResult(text="Dot stays in the meeting: the owner did not say yes.", images=(), is_error=True)
