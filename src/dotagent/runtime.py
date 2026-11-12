@@ -3,6 +3,7 @@
 import asyncio
 import os
 import sys
+from collections.abc import Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from functools import partial
@@ -43,6 +44,7 @@ from dotagent.core.paths import (
     failsafe_path,
     log_dir,
     mcp_sign_ins_dir,
+    meetings_profile_dir,
     opencode_dir,
     phones_path,
     pid_path,
@@ -74,6 +76,8 @@ from dotagent.llm.router import ModelRouter
 from dotagent.mcp.builtin import builtin_servers
 from dotagent.mcp.connected import ConnectedServers, read_connected
 from dotagent.mcp.hub import McpHub, open_hub
+from dotagent.meetings.desk import MeetingDesk, launch_meeting_chrome, untold
+from dotagent.meetings.notes import MeetingNotes, make_notes
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
 from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.oauth.accounts import Accounts
@@ -86,6 +90,7 @@ from dotagent.scheduler.timing import resolve_zone
 from dotagent.secrets import env_lock_path, optional_secret
 from dotagent.store.backup import backup_folder, partial_folder
 from dotagent.store.db import Store
+from dotagent.store.models import MeetingLineRecord
 from dotagent.terminal.session import Terminals
 from dotagent.tools.apple import build_apple_tool
 from dotagent.tools.base import RegisteredTool
@@ -102,6 +107,7 @@ from dotagent.tools.help import build_find_help_tool
 from dotagent.tools.judge_items import build_judge_items_tool
 from dotagent.tools.mail_calendar import build_mail_calendar_tools
 from dotagent.tools.mcp import build_mcp_tools
+from dotagent.tools.meetings import build_meeting_tools
 from dotagent.tools.memory import build_memory_tools
 from dotagent.tools.meta import build_meta_tools
 from dotagent.tools.notes import build_notes_tools
@@ -237,6 +243,8 @@ class Runtime:
     peers: Peers
     # Trading on Coinbase (docs/trading.md): the paper account or the owner's, under the limits of [trading].
     trading: Trading
+    # Dot in the owner's calls (item 1138, docs/meetings.md): the meeting it is in, watched with no model.
+    meetings: MeetingDesk
 
     @property
     def search_key_present(self) -> bool:
@@ -279,6 +287,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_page_tools(),
         (build_skill_tool(), build_find_help_tool(), build_skill_save_tool()),
         build_contacts_tools(),
+        build_meeting_tools(),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),
         *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
@@ -582,6 +591,8 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
         router.on_retire(partial(_refresh_search_key, config, search_keys))
         approvals: ApprovalBroker = ApprovalBroker(store, bus, config.policy.approval_timeout_s)
         approvals.switch_free(config.policy.free)
+        assistant: Assistant = Assistant(config.assistant, await asyncio.to_thread(mac_first_name))
+        roles: ModelRoles = ModelRoles(config.models, config.initiative.look_model, learning_of(config.harness))
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -589,12 +600,12 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             approvals=approvals,
             site_locks=SiteLocks(),
             awake=KeepAwake(),
-            assistant=Assistant(config.assistant, await asyncio.to_thread(mac_first_name)),
+            assistant=assistant,
             accounts=Accounts(store, Keychain(keychain_file()), None),
             vault=OnePassword(None),
             vault_items=VaultItems(store, LoginKeychain(keychain_file())),
             router=router,
-            roles=ModelRoles(config.models, config.initiative.look_model, learning_of(config.harness)),
+            roles=roles,
             context_sizes=router.context_sizes,
             judge=judge_for(config, typesafe),
             typesafe=typesafe,
@@ -626,12 +637,36 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             notify=show_notification,
             peers=peers,
             trading=_trading(config, store, schedule_zone),
+            meetings=MeetingDesk(
+                store,
+                approvals,
+                partial(_meeting_notes, router, roles, assistant, config.agent.model_call_timeout_s),
+                config.meetings,
+                partial(launch_meeting_chrome, meetings_profile_dir(), config.browser, config.meetings),
+                lambda: assistant.owner_name() or "the owner",
+                untold,
+            ),
         )
         # Chrome asks for its Allow again when Dot connects again to the Chrome of the user it lost, maybe behind
         # another window while a step waits on it: the owner is told on the Mac (item 341).
         browsers.main.tell_reconnects(partial(show_notification, "Chrome asks to allow Dot", RECONNECT_NOTICE))
         cleanup.pop_all()
     return runtime
+
+
+async def _meeting_notes(
+    router: ModelRouter,
+    roles: ModelRoles,
+    assistant: Assistant,
+    timeout_s: float,
+    lines: Sequence[MeetingLineRecord],
+    earlier: MeetingNotes,
+    meeting_id: str,
+) -> MeetingNotes:
+    """The notes of a meeting (item 1138), written by the fast model with no tool but its answer's."""
+    return await make_notes(
+        router, roles.fast(), assistant.owner_name() or "the owner", lines, earlier, timeout_s, f"meeting-{meeting_id}"
+    )
 
 
 async def close_runtime(runtime: Runtime) -> None:
@@ -650,6 +685,7 @@ async def close_runtime(runtime: Runtime) -> None:
         closing.push_async_callback(runtime.web.aclose)
         closing.push_async_callback(runtime.mcp.close)
         closing.push_async_callback(runtime.browsers.aclose)
+        closing.push_async_callback(runtime.meetings.aclose)
         closing.push_async_callback(runtime.desktop.close)
         closing.push_async_callback(runtime.awake.stop)
         closing.push_async_callback(runtime.terminals.aclose)

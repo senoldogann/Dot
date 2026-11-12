@@ -181,6 +181,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Dot comes to you](docs/proactive.md): the morning brief and the watchers
 - [Agents and campaigns](docs/agents-and-campaigns.md)
 - [Trading](docs/trading.md): crypto on Coinbase, paper or live, under limits no run can change
+- [Meetings](docs/meetings.md): notes of your Google Meet calls, posts in their chat only on your yes
 - [Recon](docs/recon.md): what a site says about itself, and the open ports of a host you own
 - [Security scan](docs/security.md): the forms of a host you own, tried with benign payloads
 - [Captcha and human checks](docs/captcha.md): hCaptcha, reCAPTCHA and Cloudflare solved in Dot's own Chrome

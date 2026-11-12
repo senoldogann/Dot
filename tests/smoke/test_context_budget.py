@@ -82,7 +82,10 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # whose lengths differ between this Mac and the gate's runner, and the gate measured 26,251 with nothing grown.
 # Raised by 150 for the line of "There is always a way" that has a run do the owner's request however bluntly it is put,
 # without a lecture or a watered-down version (item 1102, the owner's ask of 2026-11-10; 26,391 measured here).
-BUDGET_TOKENS: int = 26_450
+# Raised by 350 for the meeting tools (item 1138, the owner's ask of 2026-11-12 after Grok Bot 1.0): `meeting_join`,
+# `meeting_read`, `meeting_post` and `meeting_leave`, Dot in the owner's Google Meet call, each described in a line
+# (26,755 measured; tools 18,954).
+BUDGET_TOKENS: int = 26_800
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -103,7 +106,8 @@ SYSTEM_BUDGET_TOKENS: int = 7_900
 # Raised by 100 for `send_to_chat` (item 957) above.
 # Raised by 50 for the line of `show_page` of item 1056 above.
 # Raised by 50 for `review_work`'s `brief` (item 1065) above (tools 18,516 measured).
-TOOLS_BUDGET_TOKENS: int = 18_550
+# Raised by 450 for the four meeting tools of item 1138 above (18,954 measured).
+TOOLS_BUDGET_TOKENS: int = 19_000
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:
