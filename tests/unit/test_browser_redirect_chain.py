@@ -62,3 +62,11 @@ async def test_another_failure_is_not_tried_again() -> None:
     with pytest.raises(BrowserError):
         await driver.measure_viewport(cast(Page, page))
     assert page.reads == 1
+
+
+async def test_the_page_text_is_read_on_the_page_that_replaced_it_while_it_was_read() -> None:
+    """A job ad that sent itself on as it loaded failed ``browser_act``'s read with "reading the page text failed"
+    (item 1135)."""
+    page: _Hopping = _Hopping(2, "Senior developer")
+    assert await driver.visible_text(cast(Page, page), None, 1000) == "Senior developer"
+    assert (page.reads, page.waits) == (3, 2)

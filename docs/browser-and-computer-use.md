@@ -200,7 +200,7 @@ Both modes share what follows.
   answers later stops the batch with a line that it is opening. Then Dot waits until the page has settled (no DOM change
   for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared (two
   downloads of one name at once are saved as `name` and `name-1`, item 800). A read
-  of the page (its settling, its size, its snapshot) whose document is replaced under it, as a sign-in that hops through
+  of the page (its settling, its size, its snapshot, its whole text, item 1135) whose document is replaced under it, as a sign-in that hops through
   several pages replaces it, is made again on the new document once it is parsed, five times at most (item 752). The
   result is the part of the page that changed, with the refs of the last snapshot still valid; a page that did not
   change comes back as one line that says so. A click, a double click, a click at a point and Enter are watched for what
