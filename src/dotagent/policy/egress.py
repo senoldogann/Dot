@@ -4,9 +4,10 @@ A run that read content third parties can author may have been told by it to sen
 refused in every approval mode, yolo too, whatever its preset or the owner's rules say: no task the owner gives needs
 a run that read a stranger's words to send their keys anywhere, and the owner can do that step themselves.
 
-A step that names a host and puts a secret in its words is refused in yolo too, even when the run read nothing of the
-sort, unless that host is one Dot already sends keys to or one the owner named. A command that names no host is not
-that step: ``gh`` with a token on its line still runs.
+:func:`secret_to_unknown_host` says whether those words name a host Dot does not already send keys to. The gate
+refuses a carried secret only once the run has read outside content, and the refusal says the step would send a
+secret out of the Mac, whichever host it names. A run that read nothing of the sort may still send a key where it
+was told.
 """
 
 import ipaddress

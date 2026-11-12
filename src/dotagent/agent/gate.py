@@ -48,7 +48,7 @@ from dotagent.core.text import redact_known
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
 from dotagent.policy.chat_permits import CHAT_PERMIT_DECIDER, key_of_action, may_remember
-from dotagent.policy.egress import KEY_HOSTS, carries_secret, secret_to_unknown_host
+from dotagent.policy.egress import carries_secret
 from dotagent.policy.engine import (
     approval_severity,
     checked_when_tainted,
@@ -63,7 +63,7 @@ from dotagent.policy.engine import (
 )
 from dotagent.policy.pace import DAY_S, PacedAction, pace_refusal, paced_action, spacing_wait
 from dotagent.policy.spend import SpendState, render_amount, spend_allowance, spend_host, spend_state
-from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, DecisionSource, Preset, Route
+from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
 from dotagent.store.models import TAINT_EVENTS as STORED_TAINT_EVENTS
@@ -229,7 +229,6 @@ class RunGate:
         owners_chat: bool = False,
         owner_there: bool = True,
         chat_id: str | None = None,
-        key_hosts: Sequence[str] = (),
     ) -> None:
         self._store: Store = store
         # Whether the run is of a chat Dot opened on its own initiative (item 850), whose messages, posts and releases
@@ -244,9 +243,6 @@ class RunGate:
         # The chat whose "don't ask again" yeses answer this run's questions (item 866): its own chat's, or for a
         # delegated run its parent's; ``None``: none answer them.
         self.chat_id: str | None = chat_id
-        # Hosts a secret in a step's words may be sent to, besides :data:`KEY_HOSTS`: the owner's
-        # ``[browser] allowed_hosts`` when that list is set. An empty list adds none.
-        self._key_hosts: tuple[str, ...] = (*KEY_HOSTS, *key_hosts)
         # Whether a yolo run that read outside content has the review model check the steps an instruction planted in
         # that content is after, before it does them (item 525, ``[policy] yolo_taint_check``).
         self._taint_check: bool = taint_check
@@ -396,9 +392,8 @@ class RunGate:
         """Let the action through or raise, as :meth:`authorize`, with what decided it for the step's record (item
         468). A run marked untrusted first refuses a step that would send a secret out of the Mac, read in the call's
         ``arguments`` when the caller has them and in the step's target and summary (item 525), in every approval mode
-        but the owner's free mode (item 1097). A secret sent to a host Dot does not send keys to is refused the same
-        way in every mode but free, yolo included, whether or not the run read outside content. Every way a run acts
-        comes through here. A public or social browser action keeps the pace of its site first,
+        but the owner's free mode (item 1097):
+        every way a run acts comes through here. A public or social browser action keeps the pace of its site first,
         whatever the approval mode, and counts once it is let through (:mod:`dotagent.policy.pace`), all under the
         site's pace lock. ``weighed`` is the step as the run and the page wrote it, when ``info`` is the step with the
         values a login filled masked (the browser and web tools, item 621): the owner's rules are matched against it,
@@ -908,35 +903,26 @@ class RunGate:
         )
 
     async def _refuse_carried_secret(self, info: ActionInfo, arguments: JsonObject) -> None:
-        """Refuse a step whose words would send a secret out of the Mac (item 525).
-
-        Two cases, both in every approval mode, yolo too, whatever the preset or the owner's rules say, and neither in
-        the owner's free mode, which refuses none (item 1097: the owner's choice of 2026-11-10, of free alone over yolo
-        and free). A run that read outside content is refused when the words carry a secret at all. Any run, marked or
-        not, is refused when those words name a host Dot does not send keys to. The record and the error mask the
-        secrets, as they hold the one refused."""
+        """Refuse a step of a run that read outside content when its words would send a secret Dot holds, or text in
+        the form of a key, out of the Mac (item 525): in every approval mode, yolo too, whatever the preset or the
+        owner's rules say, but the owner's free mode, which refuses none (item 1097: the owner's choice of 2026-11-10,
+        of free alone over yolo and free). A run that read nothing of the sort may still send a key to the host it was
+        told to use. Its record and its error mask the secrets, as they hold the one refused."""
+        if not self.tainted:
+            return
         # A refusal: the values filled into a page are not among the secrets it looks for (item 621); the record of it
         # masks them all.
         sendable: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-        unknown: bool = secret_to_unknown_host(info, arguments, sendable, self._key_hosts)
-        if not unknown and (not self.tainted or not carries_secret(info, arguments, sendable)):
+        if not carries_secret(info, arguments, sendable):
             return
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         shown: ActionInfo = masked_action(info, known)
-        if unknown:
-            note: str = "carries a secret to a host Dot does not send keys to"
-            reason: str = "the step would send a secret to a host Dot does not send keys to"
-            source: DecisionSource = "guard"
-        else:
-            note = "read outside content, and carries a secret out of the Mac"
-            reason = "this run read outside content, and the step would send a secret out of the Mac"
-            source = "taint"
         if self._approvals.free:
             # Recorded as the other questions free mode waives are, the secret masked (item 1097).
             await self._approvals.record_automatic(
                 self._run_id,
                 info.tool,
-                f"{shown.summary} — {note}",
+                f"{shown.summary} — read outside content, and carries a secret out of the Mac",
                 approval_severity(info),
                 _describe(shown),
                 "approved",
@@ -945,13 +931,14 @@ class RunGate:
             )
             log.info("secret_egress_free", run_id=self._run_id, tool=info.tool)
             return
-        decision: Decision = Decision(verdict="deny", source=source, reason=reason, rule_id=None)
-        await self._emit_policy(shown, decision, self.tainted)
-        log.warning(
-            "secret_unknown_host_refused" if unknown else "secret_egress_refused",
-            run_id=self._run_id,
-            tool=info.tool,
+        decision: Decision = Decision(
+            verdict="deny",
+            source="taint",
+            reason="this run read outside content, and the step would send a secret out of the Mac",
+            rule_id=None,
         )
+        await self._emit_policy(shown, decision, True)
+        log.warning("secret_egress_refused", run_id=self._run_id, tool=info.tool)
         raise PolicyDenied(decision.reason, {"action": _describe(shown), "source": decision.source})
 
     async def _review(self, info: ActionInfo, decision: Decision, tainted: bool, unkept: bool) -> tuple[str, Answerer]:

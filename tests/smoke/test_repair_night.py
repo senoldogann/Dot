@@ -299,6 +299,14 @@ elif args[:2] == ["pr", "view"] and "mergeable" in args:
 elif args[:2] == ["pr", "edit"]:
     with (here / "edits").open("a") as edits:
         edits.write(" ".join(args[:3]) + "\\n")
+elif args[:2] == ["pr", "view"] and "author,headRefName" in args:
+    import subprocess
+    listed = subprocess.run(["git", "-C", str(here.parent / "origin.git"), "branch", "--list", "repair/*",
+                             "--format=%(refname:short) %(objectname)"], check=True, capture_output=True, text=True)
+    branch, sha = listed.stdout.split()
+    print(json.dumps({"author": {"login": "dot"}, "headRefName": branch}))
+elif args[:2] == ["api", "user"]:
+    print("dot")
 elif args[:2] == ["pr", "view"] and "commits" in args:
     print("Item 1: fix")
 elif args[:1] == ["api"] and "/commits/" in args[1]:

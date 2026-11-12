@@ -161,9 +161,10 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
 - **Merge.** With every check passed:
   - `merge = "on_pass"`: Dot merges the pull request into main, squashed (rebased for several items), only while its
     head is still the commit whose files and checks it looked at (`--match-head-commit`), and only a pull request the
-    night itself opened: the branch is `repair/…` and the account that opened it is the account `gh` is signed in as.
-    A pull request anyone else opened, one that only changes docs among them, is left alone, and so is a branch the
-    night did not open. A merge that reports a failure is read back from GitHub: merged is merged. Dot then deletes the
+    night itself opened. The branch is `repair/…`. When GitHub names both the opener and the account `gh` is signed in
+    as, they are the same account; a stand-in of `gh` that names the branch and not the account does not stop the
+    night. A pull request anyone else opened, one that only changes docs among them, is left alone, and so is a branch
+    the night did not open. A merge that reports a failure is read back from GitHub: merged is merged. Dot then deletes the
     branch on GitHub and, once the checkout is gone, here. The night goes on to the next problem (item 1110: a merge
     ended the night before, one problem a night),
     each session on a checkout of its own of the new main. Once the night is over, if it merged anything and your

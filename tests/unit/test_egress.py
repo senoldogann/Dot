@@ -111,9 +111,10 @@ def _shell(command: str) -> tuple[ActionInfo, dict[str, str]]:
     return _step("shell", target=command), {"command": command}
 
 
-def test_a_yolo_step_may_send_a_secret_only_to_a_host_dot_already_sends_keys_to() -> None:
-    """Ordinary shell, file and browser steps carry no secret out. A secret sent to an unknown host is refused,
-    in yolo too; one sent to GitHub or a cloud Dot already names, or one on a line that names no host, is not."""
+def test_a_secret_names_an_unknown_host_apart_from_one_dot_already_sends_keys_to() -> None:
+    """A run that read nothing outside may still send where it was told. The gate refuses a carried secret, and its
+    words include ``send a secret out of the Mac``, only after the run has read outside content. This classifies the
+    host either way: an unknown host, a host Dot already uses, a line that names no host, a file, and a browser open."""
     listed, listed_args = _shell("ls")
     assert not secret_to_unknown_host(listed, listed_args, (), KEY_HOSTS)
     assert not secret_to_unknown_host(

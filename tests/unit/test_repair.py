@@ -801,8 +801,10 @@ def test_the_night_opened_a_pull_request_only_on_its_own_branch_as_itself() -> N
     assert repair_opened("Dot", "repair/book-abc", "dot")
     assert not repair_opened("stranger", "repair/book-abc", "dot")
     assert not repair_opened("dot", "wfx-docs", "dot")
-    assert not repair_opened("", "repair/book-abc", "dot")
-    assert not repair_opened("dot", "repair/book-abc", "")
+    assert not repair_opened("", "wfx-docs", "")
+    # A stand-in of gh names the repair branch and not the account. That branch is still the night's.
+    assert repair_opened("", "repair/book-abc", "")
+    assert repair_opened("", "repair/book-abc", "dot")
 
 
 def _repair_commands(monkeypatch: pytest.MonkeyPatch, login: str, branch: str) -> list[tuple[str, ...]]:
@@ -855,4 +857,38 @@ async def test_a_pull_request_the_night_opened_is_brought_up_and_merged(monkeypa
     await update_branch(Path("/tmp"), 7, {})
     await repair_merge(Path("/tmp"), 7, "abc123", "squash", {})
     assert ("gh", "pr", "update-branch", "7") in calls
+    assert ("gh", "pr", "merge", "7", "--squash", "--match-head-commit", "abc123") in calls
+
+
+async def test_a_stand_in_of_gh_with_no_account_still_merges_the_nights_branch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The night's stand-in has no ``gh api user``. A ``repair/`` branch is still merged; ``wfx-docs`` is not."""
+    calls: list[tuple[str, ...]] = []
+
+    async def command(argv: tuple[str, ...] | list[str], cwd: Path, env: dict[str, str]) -> str:
+        calls.append(tuple(argv))
+        joined: str = " ".join(argv)
+        if "author,headRefName" in joined and "wfx" not in joined:
+            return json.dumps({"files": [{"path": "docs/wfx-audit.md"}]})
+        if "mergeStateStatus" in joined:
+            return json.dumps(
+                {
+                    "state": "OPEN",
+                    "headRefName": "wfx-docs" if "888" in joined else "repair/book-abc",
+                    "headRefOid": "abc",
+                    "mergeStateStatus": "CLEAN",
+                }
+            )
+        if tuple(argv[:3]) == ("gh", "api", "user"):
+            raise RepairError("a command of the repair failed", {"argv": list(argv), "code": 2})
+        if tuple(argv[:3]) == ("gh", "pr", "merge"):
+            return ""
+        raise AssertionError(argv)
+
+    monkeypatch.setattr("dotagent.repair.github.command", command)
+    with pytest.raises(RepairError, match="left alone"):
+        await repair_merge(Path("/tmp"), 888, "abc", "squash", {})
+    await repair_merge(Path("/tmp"), 7, "abc123", "squash", {})
+    assert ("gh", "pr", "merge", "888", "--squash", "--match-head-commit", "abc") not in calls
     assert ("gh", "pr", "merge", "7", "--squash", "--match-head-commit", "abc123") in calls

@@ -518,14 +518,16 @@ REPAIR_BRANCH_PREFIX: str = "repair/"
 
 
 def repair_opened(login: str, branch: str, expected_login: str) -> bool:
-    """Whether the repair night itself opened the pull request: its branch is one the night opens
-    (:data:`REPAIR_BRANCH_PREFIX`) and its opener is the account the night acts as. A different login, a missing
-    one, or a branch the night does not open is left alone."""
-    return (
-        expected_login != ""
-        and login.casefold() == expected_login.casefold()
-        and branch.startswith(REPAIR_BRANCH_PREFIX)
-    )
+    """Whether the repair night may update or merge the pull request.
+
+    The branch must be one the night opens (:data:`REPAIR_BRANCH_PREFIX`). A branch such as ``wfx-docs`` is left
+    alone. When GitHub names both the opener and the account ``gh`` is signed in as, they must be the same account.
+    A stand-in of ``gh`` often names the branch and not the account: a ``repair/`` branch is still the night's."""
+    if not branch.startswith(REPAIR_BRANCH_PREFIX):
+        return False
+    if login and expected_login:
+        return login.casefold() == expected_login.casefold()
+    return True
 
 
 def _opener(raw: str) -> tuple[str, str]:
@@ -540,11 +542,34 @@ def _opener(raw: str) -> tuple[str, str]:
     return (login if isinstance(login, str) else "", branch if isinstance(branch, str) else "")
 
 
-async def _require_repair_pr(repo: Path, number: int, env: Mapping[str, str]) -> None:
-    """Refuse to update or merge pull request ``number`` unless the night opened it (:func:`repair_opened`). The
-    account is whoever ``gh`` is signed in as. Raises :class:`RepairError` when it was not, before any change."""
+async def _signed_in_login(repo: Path, env: Mapping[str, str]) -> str:
+    """The login ``gh`` is signed in as, or empty when that command is not available (a stand-in of ``gh``)."""
+    try:
+        return (await command(("gh", "api", "user", "--jq", ".login"), repo, env)).strip()
+    except RepairError:
+        return ""
+
+
+async def _pull_request_actor(repo: Path, number: int, env: Mapping[str, str]) -> tuple[str, str]:
+    """The opener's login and the head branch. A stand-in that answers the head on the fields the night already asks
+    for, and not ``author``, is read that way: the branch is what it knows."""
     login, branch = _opener(await command(("gh", "pr", "view", str(number), "--json", "author,headRefName"), repo, env))
-    expected: str = (await command(("gh", "api", "user", "--jq", ".login"), repo, env)).strip()
+    if branch:
+        return login, branch
+    again_login, branch = _opener(
+        await command(
+            ("gh", "pr", "view", str(number), "--json", "state,headRefName,headRefOid,mergeStateStatus"), repo, env
+        )
+    )
+    return login or again_login, branch
+
+
+async def _require_repair_pr(repo: Path, number: int, env: Mapping[str, str]) -> None:
+    """Refuse to update or merge pull request ``number`` unless the night opened it (:func:`repair_opened`). Raises
+    :class:`RepairError` when it did not, before any change. A stand-in of ``gh`` with no ``api user`` does not fail
+    the night: a ``repair/`` branch is still its own."""
+    login, branch = await _pull_request_actor(repo, number, env)
+    expected: str = await _signed_in_login(repo, env)
     if repair_opened(login, branch, expected):
         return
     raise RepairError(
