@@ -92,6 +92,21 @@ def fold_captions(
     return CaptionBook(open=opened, changed_at=changed, done=done), tuple(lines)
 
 
+def fold_page(
+    book: CaptionBook,
+    present: tuple[CaptionSeen, ...],
+    vanished: tuple[CaptionSeen, ...],
+    now: float,
+    settle_s: float,
+) -> tuple[CaptionBook, tuple[MeetingLine, ...]]:
+    """One drain of the page folded in: the blocks ``present`` on it now (all of them) and those that ``vanished``
+    since the last drain, with their last words. A vanished block is taken at its last words and committed as gone;
+    the present ones are folded as :func:`fold_captions` does."""
+    book, first = fold_captions(book, (*present, *vanished), now, settle_s)
+    book, second = fold_captions(book, present, now, settle_s)
+    return book, (*first, *second)
+
+
 def new_chat(known: frozenset[str], seen: tuple[ChatSeen, ...]) -> tuple[frozenset[str], tuple[MeetingLine, ...]]:
     """Each chat message once, by key: the keys now known, and the lines of the keys that were not known."""
     keys: set[str] = set(known)

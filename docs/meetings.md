@@ -39,7 +39,8 @@ Say "join my call https://meet.google.com/abc-defg-hij" in a chat. Then:
    the emergency stop, when the daemon stops, and after `[meetings] most_hours` (3). The notes are made once more from
    every line and come to the chat as soon as no task works there (the one that asked Dot to leave ends first); if
    the note maker fails, the summary says so and gives the notes as they last stood. After the emergency stop no model
-   is asked again: the summary holds the notes as they stood.
+   is asked again: the summary holds the notes as they stood. A call that ends in a failure (its page lost) is summed up
+   too, and the summary says why Dot left.
 
 ## What Dot keeps, and what it never does
 

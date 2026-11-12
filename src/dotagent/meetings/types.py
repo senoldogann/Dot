@@ -38,12 +38,15 @@ class ChatSeen(FrozenModel):
 
 
 class PageBatch(FrozenModel):
-    """What one drain of the page returned.
+    """What one drain of the page returned: the caption blocks on the page now, each with its words as they stand
+    (the whole set, not what changed), the blocks that left the page since the last drain with their last words, and
+    the chat messages that came since.
 
-    ``dropped`` counts the entries the page's bounded buffer had to drop since the last drain.
+    ``dropped`` counts the chat messages the page's bounded buffer had to drop since the last drain.
     """
 
     captions: tuple[CaptionSeen, ...]
+    vanished: tuple[CaptionSeen, ...]
     chat: tuple[ChatSeen, ...]
     dropped: int = Field(ge=0)
 

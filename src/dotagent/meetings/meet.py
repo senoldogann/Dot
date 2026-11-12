@@ -56,15 +56,15 @@ _STATE_TEXT: Final[dict[str, tuple[str, ...]]] = {
 }
 _JOIN_BUTTON: Final[re.Pattern[str]] = re.compile(r"^(Join now|Ask to join)$")
 
-# The one script that reads Meet's captions and chat. It watches the page for changes, and keeps keyed snapshots of
-# every caption block (Meet rewrites a block's words as the speaker goes on) and every chat message in a buffer on
-# ``window``, at most ``cap`` entries of each, counting what it had to drop. A block's key is a data attribute the
-# script puts on the element the first time it sees it. The block layout (a speaker element, then a text element) and
-# the chat layout (a sender, then the words) are read in ``blockOf`` only.
+# The one script that reads Meet's captions and chat. It watches the page for changes and keeps, for each caption block
+# on the page, its last words (Meet rewrites a block's words as the speaker goes on, and takes old blocks away after a
+# while), and every chat message once, in a buffer on ``window`` of at most ``cap`` messages, counting what it had to
+# drop. A block's key is a data attribute the script puts on the element the first time it sees it. The block layout (a
+# speaker element, then a text element) and the chat layout (a sender, then the words) are read in ``blockOf`` only.
 _WATCH_SCRIPT: Final[str] = """
 (spec) => {
   if (window.__dotMeet) { return; }
-  const state = { caps: [], chat: [], dropped: 0, last: {}, chatKeys: {}, next: 1, timer: null };
+  const state = { spec, blocks: {}, chat: [], dropped: 0, chatKeys: {}, next: 1, timer: null };
   window.__dotMeet = state;
   const blockOf = (el) => {
     const kids = Array.from(el.children);
@@ -78,24 +78,23 @@ _WATCH_SCRIPT: Final[str] = """
     if (!el.dataset.dotKey) { el.dataset.dotKey = 'b' + state.next++; }
     return el.dataset.dotKey;
   };
-  const push = (list, item) => {
-    if (list.length >= spec.cap) { list.shift(); state.dropped += 1; }
-    list.push(item);
-  };
-  const scan = () => {
-    state.timer = null;
-    const now = Date.now() / 1000;
+  // The caption blocks on the page now, each with its words as they stand.
+  state.present = () => {
     const region = document.querySelector(spec.captions);
+    const now = Date.now() / 1000;
+    const out = [];
     if (region) {
       for (const el of Array.from(region.children)) {
         const b = blockOf(el);
-        const key = keyOf(el);
-        const sig = b.who + '\\u0000' + b.text;
-        if (state.last[key] === sig) { continue; }
-        state.last[key] = sig;
-        push(state.caps, { key, speaker: b.who, text: b.text, at: now });
+        out.push({ key: keyOf(el), speaker: b.who, text: b.text, at: now });
       }
     }
+    return out;
+  };
+  const scan = () => {
+    state.timer = null;
+    for (const block of state.present()) { state.blocks[block.key] = block; }
+    const region = document.querySelector(spec.captions);
     for (const live of Array.from(document.querySelectorAll(spec.chat))) {
       if (region && region.contains(live)) { continue; }
       for (const el of Array.from(live.children)) {
@@ -104,7 +103,8 @@ _WATCH_SCRIPT: Final[str] = """
         const b = blockOf(el);
         if (!b.text) { continue; }
         state.chatKeys[key] = true;
-        push(state.chat, { key, sender: b.who, text: b.text, at: now });
+        if (state.chat.length >= spec.cap) { state.chat.shift(); state.dropped += 1; }
+        state.chat.push({ key, sender: b.who, text: b.text, at: Date.now() / 1000 });
       }
     }
   };
@@ -114,12 +114,21 @@ _WATCH_SCRIPT: Final[str] = """
 }
 """
 
+# What one drain returns: the blocks on the page now, the blocks that left it since the last drain (with the last words
+# the script saw), and the chat messages that came; the chat buffer is emptied.
 _DRAIN_SCRIPT: Final[str] = """
 () => {
   const s = window.__dotMeet;
   if (!s) { return null; }
-  const out = { captions: s.caps, chat: s.chat, dropped: s.dropped };
-  s.caps = []; s.chat = []; s.dropped = 0;
+  const present = s.present();
+  const here = new Set(present.map((b) => b.key));
+  const vanished = [];
+  for (const key of Object.keys(s.blocks)) {
+    if (!here.has(key)) { vanished.push(s.blocks[key]); delete s.blocks[key]; }
+  }
+  for (const block of present) { s.blocks[block.key] = block; }
+  const out = { captions: present, vanished, chat: s.chat, dropped: s.dropped };
+  s.chat = []; s.dropped = 0;
   return out;
 }
 """
@@ -185,6 +194,15 @@ def _entries(value: object) -> tuple[dict[str, object], ...]:
     if not isinstance(value, list):
         return ()
     return tuple(item for item in value if isinstance(item, dict))
+
+
+def _captions(value: object) -> tuple[CaptionSeen, ...]:
+    return tuple(
+        CaptionSeen(
+            key=_text(e.get("key")), speaker=_text(e.get("speaker")), text=_text(e.get("text")), at=_number(e.get("at"))
+        )
+        for e in _entries(value)
+    )
 
 
 class MeetPage:
@@ -272,15 +290,8 @@ class MeetPage:
                 "The page has no watcher: watch() was not called, or the page was reloaded.",
                 {"url": self._page.url},
             )
-        captions: tuple[CaptionSeen, ...] = tuple(
-            CaptionSeen(
-                key=_text(e.get("key")),
-                speaker=_text(e.get("speaker")),
-                text=_text(e.get("text")),
-                at=_number(e.get("at")),
-            )
-            for e in _entries(raw.get("captions"))
-        )
+        captions: tuple[CaptionSeen, ...] = _captions(raw.get("captions"))
+        vanished: tuple[CaptionSeen, ...] = _captions(raw.get("vanished"))
         chat: tuple[ChatSeen, ...] = tuple(
             ChatSeen(
                 key=_text(e.get("key")),
@@ -290,7 +301,7 @@ class MeetPage:
             )
             for e in _entries(raw.get("chat"))
         )
-        return PageBatch(captions=captions, chat=chat, dropped=int(_number(raw.get("dropped"))))
+        return PageBatch(captions=captions, vanished=vanished, chat=chat, dropped=int(_number(raw.get("dropped"))))
 
     async def post(self, text: str) -> None:
         """Type ``text`` in the chat, send it with Enter, and check that it appears in the chat. Opens the chat
@@ -299,11 +310,15 @@ class MeetPage:
         try:
             if not await box.is_visible():
                 await self._page.locator(SELECTORS["chat_open"]).first.click(timeout=_STEP_MS)
+            before: int = await self._chat_count()
             await box.fill(text, timeout=_STEP_MS)
             await box.press("Enter")
+            # A new message must come with the words: the same words someone wrote before are no proof the post went.
             await self._page.wait_for_function(
-                "([sel, words]) => Array.from(document.querySelectorAll(sel)).some((e) => e.innerText.includes(words))",
-                arg=[SELECTORS["chat_region"], text],
+                "([sel, words, before]) => {"
+                " const items = Array.from(document.querySelectorAll(sel)).flatMap((e) => Array.from(e.children));"
+                " return items.length > before && items.slice(before).some((e) => e.innerText.includes(words)); }",
+                arg=[SELECTORS["chat_region"], text, before],
                 timeout=_STEP_MS,
             )
         except PlaywrightError as error:
@@ -316,6 +331,14 @@ class MeetPage:
                     "error": str(error),
                 },
             ) from error
+
+    async def _chat_count(self) -> int:
+        """How many messages the chat shows now."""
+        counted: object = await self._page.evaluate(
+            "(sel) => Array.from(document.querySelectorAll(sel)).reduce((n, e) => n + e.children.length, 0)",
+            SELECTORS["chat_region"],
+        )
+        return int(counted) if isinstance(counted, int) else 0
 
     async def leave(self) -> None:
         """Press Leave call."""

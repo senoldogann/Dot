@@ -36,7 +36,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.meetings.meet import MEET_HOST, MeetPage, MeetPageError, meeting_address
 from dotagent.meetings.notes import NO_NOTES, MeetingNotes, notes_text
-from dotagent.meetings.transcript import CaptionBook, fold_captions, new_chat
+from dotagent.meetings.transcript import CaptionBook, fold_captions, fold_page, new_chat
 from dotagent.meetings.types import MeetingLine, MeetState, PageBatch
 from dotagent.store.db import Store
 from dotagent.store.models import MeetingLineRecord, MeetingRecord
@@ -292,10 +292,14 @@ class MeetingDesk:
             note: str = error.message if isinstance(error, DotError) else "the join was stopped"
             await self._close(live, "failed", note)
             raise
+        # In the call before the watch starts: a stop that comes at once is the watch's to record, after this.
+        in_call: MeetingRecord = await self._store.set_meeting_status(
+            meeting.id, "in_call", "Dot is in the call and takes notes"
+        )
         live.task = asyncio.create_task(self._watch(live), name=f"meeting-{meeting.id}")
         self._finishing.add(live.task)
         live.task.add_done_callback(self._finishing.discard)
-        return await self._store.set_meeting_status(meeting.id, "in_call", "Dot is in the call and takes notes")
+        return in_call
 
     async def _open(self, meeting: MeetingRecord) -> _Live:
         """The meeting's Chrome (:attr:`_launch`), with one tab that may only stay on Meet."""
@@ -465,10 +469,9 @@ class MeetingDesk:
                 making.cancel()
             if not live.left.is_set():
                 await self._close(live, status, end_note)
-        if status == "ended":
-            await self._sum_up(live, notes, end_note)
-        else:
-            await self._tell(live, "Dot left the meeting", f"Dot left the meeting: {end_note}")
+        # A meeting that ended in a failure (its page lost, the store refusing) is summed up all the same: its notes and
+        # lines so far are kept, and the summary says why Dot left.
+        await self._sum_up(live, notes, end_note)
 
     async def _read_until_over(
         self, live: _Live
@@ -502,7 +505,7 @@ class MeetingDesk:
             batch: PageBatch = await live.page.drain()
             if batch.dropped:
                 log.warning("meeting_page_dropped", meeting_id=live.meeting_id, dropped=batch.dropped)
-            book, captions = fold_captions(book, batch.captions, time.time(), self._config.settle_s)
+            book, captions = fold_page(book, batch.captions, batch.vanished, time.time(), self._config.settle_s)
             seen_chat, chat = new_chat(seen_chat, batch.chat)
             # Dot's own posts come back in the chat: they are not the meeting's words.
             theirs: tuple[MeetingLine, ...] = tuple(line for line in chat if line.text not in live.posted)
