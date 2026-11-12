@@ -76,7 +76,7 @@ from dotagent.llm.router import ModelRouter
 from dotagent.mcp.builtin import builtin_servers
 from dotagent.mcp.connected import ConnectedServers, read_connected
 from dotagent.mcp.hub import McpHub, open_hub
-from dotagent.meetings.desk import MeetingDesk, launch_meeting_chrome, untold
+from dotagent.meetings.desk import MeetingDesk, launch_meeting_chrome
 from dotagent.meetings.notes import MeetingNotes, make_notes
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
 from dotagent.notify.push import PushKeys, read_or_create_keys
@@ -323,7 +323,8 @@ def _trading(config: AppConfig, store: Store, zone: ZoneInfo) -> Trading:
 def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     """What the agent must neither read nor change: secrets and the lock of their file, the paired phones' keys' hashes
     (item 670: a row written there would be a key the guard takes), what signing in to an MCP server
-    gave Dot (its tokens), the browser profiles (Dot's own and the Chrome of the user), the settings that decide what it
+    gave Dot (its tokens), the browser profiles (Dot's own, the Chrome of the user, and the one of its meetings, where
+    Dot's own Google account is signed in: item 1138), the settings that decide what it
     may do (policy, rules, MCP servers), its own database and its copies (item 526: a copy is the whole database, and
     one planted in their folder would be what the owner goes back to), the journals of file changes (``dotx undo``
     writes back what a journal says), the locks that tell which process drives a run, the ledger of the tabs Dot has
@@ -349,6 +350,7 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         browser_incognito_dir(),
         browser_profiles_dir(),
         chrome_data_dir(),
+        meetings_profile_dir(),
         config_path(),
         database,
         database.with_name(f"{database.name}-wal"),
@@ -644,7 +646,6 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
                 config.meetings,
                 partial(launch_meeting_chrome, meetings_profile_dir(), config.browser, config.meetings),
                 lambda: assistant.owner_name() or "the owner",
-                untold,
             ),
         )
         # Chrome asks for its Allow again when Dot connects again to the Chrome of the user it lost, maybe behind

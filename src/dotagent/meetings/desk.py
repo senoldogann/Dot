@@ -61,6 +61,9 @@ _MEETING_ARGS: tuple[str, ...] = (
     "--no-default-browser-check",
     "--disable-blink-features=AutomationControlled",
 )
+# How long the captions may stay off in the call (the host turned them off) before Dot leaves: it takes no notes
+# another way.
+_CAPTIONS_OFF_S: float = 60.0
 # How long a page Dot does not know may stand while it waits to be let in.
 _UNKNOWN_S: float = 30.0
 # How long the summary waits for the chat to be free of a working run (the run that asked Dot to leave, the owner's
@@ -171,8 +174,8 @@ def on_meet(url: str) -> bool:
 
 class MeetingDesk:
     """The daemon's meetings: joins one, watches it with no model, keeps its lines and notes, posts only on the owner's
-    yes, and leaves. ``owner`` gives the owner's name as Settings has it now, ``notes_model`` the model the notes are
-    written with, and ``notice`` keeps a line in a chat ``(thread_id, goal, text)``."""
+    yes, and leaves. ``noter`` writes the notes, ``launch`` opens the meeting's Chrome, ``owner`` gives the owner's name
+    as Settings has it now; :meth:`tell_with` gives it the way to keep a line in a chat."""
 
     def __init__(
         self,
@@ -182,7 +185,6 @@ class MeetingDesk:
         config: MeetingsConfig,
         launch: "Launcher",
         owner: Callable[[], str],
-        notice: Notice,
     ) -> None:
         self._store: Store = store
         self._approvals: ApprovalBroker = approvals
@@ -190,16 +192,20 @@ class MeetingDesk:
         self._config: MeetingsConfig = config
         self._launch: Launcher = launch
         self._owner: Callable[[], str] = owner
-        self._notice: Notice = notice
+        self._notice: Notice = untold
         self._live: _Live | None = None
         self._lock: asyncio.Lock = asyncio.Lock()
         self._forgetter: asyncio.Task[None] | None = None
+        # Whether the daemon handed the desk its way to tell the chats (:meth:`tell_with`).
+        self._told: bool = False
         # The watches of the meetings, kept until they told their summary, after Dot left the call.
         self._finishing: set[asyncio.Task[None]] = set()
 
     def tell_with(self, notice: Notice) -> None:
-        """Keep the meetings' summaries in their chats with ``notice``, once the daemon's run manager is there."""
+        """Keep the meetings' summaries in their chats with ``notice``, once the daemon's run manager is there: only
+        then may Dot join a meeting (a ``dotx`` command has no chat to tell)."""
         self._notice = notice
+        self._told = True
 
     # ------------------------------------------------------------------ the daemon's start and stop
 
@@ -245,6 +251,8 @@ class MeetingDesk:
             address: str = meeting_address(url)
         except MeetPageError as error:
             raise MeetingError(error.message, error.context) from error
+        if not self._told:
+            raise MeetingError("Dot joins meetings from its chats, while its daemon runs: ask there", {"url": address})
         async with self._lock:
             if self._live is not None:
                 raise MeetingError(
@@ -416,6 +424,7 @@ class MeetingDesk:
         next_notes: float = time.monotonic() + self._config.notes_minutes * 60.0
         ends: float = time.monotonic() + self._config.most_hours * 3600.0
         end_note: str = "the meeting ended"
+        captions_off_since: float | None = None
         try:
             while not live.stop.is_set():
                 if time.monotonic() > ends:
@@ -425,6 +434,13 @@ class MeetingDesk:
                 if state in ("ended", "removed"):
                     end_note = _STATE_WORDS[state]
                     break
+                if await live.page.captions_on():
+                    captions_off_since = None
+                else:
+                    captions_off_since = captions_off_since if captions_off_since is not None else time.monotonic()
+                    if time.monotonic() - captions_off_since > _CAPTIONS_OFF_S:
+                        end_note = "the meeting's captions were turned off, and Dot takes no notes without them"
+                        break
                 batch: PageBatch = await live.page.drain()
                 if batch.dropped:
                     log.warning("meeting_page_dropped", meeting_id=live.meeting_id, dropped=batch.dropped)

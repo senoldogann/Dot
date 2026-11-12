@@ -4436,15 +4436,20 @@ class Store:
         return [_meeting_line(row) for row in rows]
 
     async def forget_meeting_lines(self, ended_before: float) -> int:
-        """Delete the lines of the meetings that were over before ``ended_before`` (``[meetings] keep_days``): their
-        summary and notes stay. Returns how many lines went."""
+        """Delete the lines of the meetings that were over before ``ended_before`` (``[meetings] keep_days``), and their
+        count: their summary and notes stay. Returns how many lines went."""
         cursor = await self._db.execute(
             "DELETE FROM meeting_lines WHERE meeting_id IN"
             " (SELECT id FROM meetings WHERE ended_at IS NOT NULL AND ended_at < ?)",
             (ended_before,),
         )
+        gone: int = cursor.rowcount
+        # Their count goes with them: a meeting whose lines are gone has none to read; its summary says how many.
+        await self._db.execute(
+            "UPDATE meetings SET lines = 0 WHERE ended_at IS NOT NULL AND ended_at < ? AND lines > 0", (ended_before,)
+        )
         await self._db.commit()
-        return cursor.rowcount
+        return gone
 
     async def add_work_order(
         self,

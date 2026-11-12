@@ -50,7 +50,9 @@ Say "join my call https://meet.google.com/abc-defg-hij" in a chat. Then:
 - Nothing of a call is saved to memory by itself, and no schedule or work order is made from it. Ask in the chat if you
   want one, in your own words.
 - Dot joins only when you give it the address. It does not join from a calendar invitation, which a stranger can send.
-- Dot is in one call at a time.
+- Dot is in one call at a time, and joins from its chats while its daemon runs, not from a `dotx` command.
+- The meeting profile is sealed from runs, as Dot's other Chrome profiles are: no command or file tool of a run reads
+  the cookies of Dot's account there.
 
 ## Settings
 

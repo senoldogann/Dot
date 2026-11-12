@@ -18,6 +18,7 @@ from dotagent.agent.approvals import ApprovalBroker
 from dotagent.config import MeetingsConfig
 from dotagent.core.errors import RunConflict
 from dotagent.events import EventBus
+from dotagent.meetings import desk as desk_module
 from dotagent.meetings.desk import ANNOUNCEMENT, MeetingChrome, MeetingDesk, MeetingError
 from dotagent.meetings.notes import MeetingNotes, NoteAction
 from dotagent.store.db import Store
@@ -110,7 +111,8 @@ async def room(tmp_path: Path, playwright: Playwright) -> AsyncIterator[Room]:
                 raise RunConflict("a run works in the chat", {"thread_id": thread_id})
             told.append((goal, text))
 
-        desk: MeetingDesk = MeetingDesk(store, broker, _noter, _CONFIG, launch, lambda: OWNER, notice)
+        desk: MeetingDesk = MeetingDesk(store, broker, _noter, _CONFIG, launch, lambda: OWNER)
+        desk.tell_with(notice)
         yield Room(store=store, broker=broker, run=run, told=told, pages=pages, desk=desk, working=working)
         await desk.aclose()
     finally:
@@ -232,3 +234,29 @@ async def test_a_post_that_is_too_long_or_two_paragraphs_is_refused_before_any_q
         await room.desk.post("mtg_none", room.run.id, "one\n\ntwo")
     with pytest.raises(MeetingError, match="this is not one"):
         await room.desk.join("https://evil.example/abc-defg-hij", room.run.thread_id, room.run.id)
+
+
+async def test_captions_turned_off_in_the_call_have_dot_leave_and_say_why(
+    room: Room, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(desk_module, "_CAPTIONS_OFF_S", 0.5)
+    joining: asyncio.Task[MeetingRecord] = asyncio.create_task(room.desk.join(URL, room.run.thread_id, room.run.id))
+    await _answer(room, True)
+    meeting: MeetingRecord = await joining
+    told: int = len(room.told)
+    # The host turns the captions off: the stand-in's toggle, as Meet's.
+    await room.pages[-1].click("button[aria-label='Turn off captions']")
+    await _told(room, told + 1)
+    ended: MeetingRecord = await room.store.get_meeting(meeting.id)
+    assert ended.status == "ended" and "captions were turned off" in ended.note
+    assert "captions were turned off" in room.told[-1][1]
+
+
+async def test_a_desk_the_daemon_did_not_hand_its_chats_joins_nothing(room: Room) -> None:
+    lone: MeetingDesk = MeetingDesk(room.store, room.broker, _noter, _CONFIG, _no_chrome, lambda: OWNER)
+    with pytest.raises(MeetingError, match="while its daemon runs"):
+        await lone.join(URL, room.run.thread_id, room.run.id)
+
+
+async def _no_chrome() -> MeetingChrome:
+    raise AssertionError("no browser is opened for a desk that cannot tell its chats")
