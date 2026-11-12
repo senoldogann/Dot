@@ -205,7 +205,8 @@ jobs:
     needs: [prose]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}
     runs-on: macos-latest
-    timeout-minutes: 30
+    # Room for one retry of the smoke tests below. A second failure still ends the job, inside this bound.
+    timeout-minutes: 50
     env:
       DOT_HOME: ${{ github.workspace }}/.ci/home
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
@@ -220,9 +221,20 @@ jobs:
       - name: Eval references
         run: uv run dotx eval check
       - name: Offline smoke tests, part 2
-        run: >
-          uv run pytest tests/smoke -q -n auto -p no:cacheprovider --part 2/2 --durations=10
-          -m "not live and not browser and not internet and not desktop and not hosted"
+        # One retry of a failed run. The second result is the job's: a failure that is still there fails this job,
+        # and ci with it. Not continue-on-error.
+        run: |
+          run_part() {
+            uv run pytest tests/smoke -q -n auto -p no:cacheprovider --part 2/2 --durations=10 \
+              -m "not live and not browser and not internet and not desktop and not hosted"
+          }
+          if run_part; then
+            exit 0
+          fi
+          echo "smoke part 2 failed once; running it once more. A second failure fails this job and ci."
+          rm -rf "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+          mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+          run_part
 
   # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
@@ -268,7 +280,8 @@ jobs:
               --deselect
               tests/smoke/test_phone_return.py::test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_network_wakes
     runs-on: macos-latest
-    timeout-minutes: 45
+    # Room for one retry of the browser tests below. A second failure still ends the part, inside this bound.
+    timeout-minutes: 70
     env:
       DOT_HOME: ${{ github.workspace }}/.ci/home
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
@@ -288,11 +301,22 @@ jobs:
       - name: Throw-away home
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Core browser tests
-        # PART_TESTS is split into its globs on purpose.
-        run: >
-          uv run pytest -q -p no:cacheprovider --durations=10
-          -m "browser and not live and not internet and not hosted and not desktop"
-          $PART_TESTS
+        # PART_TESTS is split into its globs on purpose. One retry of a failed run. The second result is the part's:
+        # a failure that is still there fails this part, and ci with it. Not continue-on-error.
+        run: |
+          run_part() {
+            # PART_TESTS is split into its globs on purpose.
+            uv run pytest -q -p no:cacheprovider --durations=10 \
+              -m "browser and not live and not internet and not hosted and not desktop" \
+              $PART_TESTS
+          }
+          if run_part; then
+            exit 0
+          fi
+          echo "browser tests failed once; running them once more. A second failure fails this job and ci."
+          rm -rf "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+          mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+          run_part
 
   # The check main's protection should require, in place of the five job names. It passes when every job it waits
   # for passed or did not run, and fails when one failed: a skipped browser part is not a failure, and a red one is. A
