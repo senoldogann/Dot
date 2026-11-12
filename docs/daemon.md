@@ -428,7 +428,8 @@ vercel puts a project's change live"); why Dot asks once: the line under the box
 initiative and for what yolo asks you, and the words above leave out only that sentence; any other reason (a payment's
 amount and caps, a guard's why) and what the review model passed on to you stay under the words; and no chip that the
 words say already, in whole words. On a phone the note has its row, and Deny and Approve share the
-next one.
+next one. While a note is written, Approve says **Send note** (item 1140): the step waits until Dot read the note, and
+is taken only if the note still calls for it ([Safety](safety.md#safety)).
 
 The **+** at the left of the box (item 318, after Codex's composer) opens a menu: **Add files**, which opens the file
 picker (documents, photos and screenshots alike; a phone opens its own sheet), **Model and options** in a box whose run

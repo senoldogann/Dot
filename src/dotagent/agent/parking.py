@@ -180,9 +180,15 @@ def allowed_send_text(approval_id: str, summary: str, note: str, exact: bool) ->
         "of this conversation name them) and do each as it stands: the step itself asks them once more, as its page is "
         "new."
     )
+    if said != "":
+        # Their note comes first (item 1140): it may take the yes back or change the message.
+        return (
+            f"The user said yes to the step that waited for them ({approval_id}): {summary}.{said} Read that first: if "
+            f"it says otherwise, send nothing. Else: {how} Send or publish nothing else."
+        )
     return (
         f"The user said yes to the step that waited for them ({approval_id}): {summary}. {how} Send or publish "
-        f"nothing else.{said}"
+        "nothing else."
     )
 
 
@@ -234,10 +240,16 @@ def kept_ask_text(approval_id: str, created: bool) -> str:
 def allowed_text(approval_id: str, note: str) -> str:
     """What the run is told when the owner allowed a step kept for their yes (item 483): Dot's words, as
     :func:`handed_back_text`'s are; the step may be done once, as it was."""
-    said: str = "" if note.strip() == "" else f" They wrote: {note.strip()}"
+    if note.strip() != "":
+        # Their note comes first (item 1140): it may take the yes back or change the step.
+        return (
+            f"The user allowed the step that waited for their yes ({approval_id}) and wrote: {note.strip()} Read "
+            "that first: if it says otherwise, do not do the step. Else do it now, exactly as it was, once; it is not "
+            "allowed again."
+        )
     return (
         f"The user allowed the step that waited for their yes ({approval_id}): do it now, exactly as it was, once; "
-        f"it is not allowed again.{said}"
+        "it is not allowed again."
     )
 
 

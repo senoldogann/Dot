@@ -1235,7 +1235,10 @@ it** on it gives the run no authority, and the words it sends restore no trust. 
 step that reaches nobody (a command, a file read or a folder listing, a page read or a web search; never one the run's
 untrusted reading raised, nor one about Dot's own files) is kept too, and your **Allow once** lets the run do that exact
 step once in that conversation, within `[policy] permit_hours`, after the policy decided it again (item 483). The note
-you write with your answer reaches the model. Your no stands for the rest of the run (item 456): the same action, as its
+you write with your answer reaches the model, and comes first (item 1140): a yes with a note does not take the step;
+the run is told the note, and if it still calls for that exact step, the run does it again and it goes through once
+without asking you again (a kept step's **Allow once** with a note tells the run to read the note before the step).
+Your no stands for the rest of the run (item 456): the same action, as its
 card showed it, is refused at once, with no new card, nor a question to the review model in `auto`, until you write to
 the run again (a steer, the answer to its question); the policy's event records the refusal, as it does the first. Only
 your no is kept, given in the web UI or the terminal: a refusal of the review model, of the eval harness and an approval

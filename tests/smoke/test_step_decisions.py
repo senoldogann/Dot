@@ -104,7 +104,7 @@ async def _answered_by_the_owner(room: Room, gate: RunGate, action: ActionInfo) 
             event = await events.queue.get()
         approval_id: object = event.data["approval_id"]
         assert isinstance(approval_id, str)
-        await room.broker.resolve(approval_id, True, "user", "go ahead")
+        await room.broker.resolve(approval_id, True, "user", "")
         return await authorizing
 
 
@@ -129,7 +129,7 @@ async def test_a_step_nobody_was_asked_about_names_the_preset_or_the_owners_rule
 
 async def test_who_answered_a_question_is_kept_with_the_step(room: Room) -> None:
     owner: Authorization = await _answered_by_the_owner(room, _gate(room, "cautious", "ask", _nobody), WRITE)
-    assert (owner.note, owner.decision.verdict, owner.decision.answered_by) == ("go ahead", "ask", "user")
+    assert (owner.note, owner.decision.verdict, owner.decision.answered_by) == ("", "ask", "user")
     reviewed: StepDecision = (
         await _gate(room, "cautious", "auto", _answering("approve")).authorize_recorded(WRITE)
     ).decision
