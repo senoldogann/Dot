@@ -3358,6 +3358,7 @@ class RunManager:
                 chat_id=(parent.gate.chat_id if parent is not None else None)
                 if parent_run_id is not None
                 else thread_id,
+                key_hosts=runtime.config.browser.allowed_hosts,
             )
             if starts_tainted:
                 gate.taint()

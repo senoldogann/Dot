@@ -677,8 +677,13 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   refused before it runs, and its `policy` event says why, with the secret masked. A command that reads a secret from a
   file or a variable as it runs (`curl -d @file`) carries none in its words, and is not seen here: the shell guard's
   flags (an upload, a read of a secret), the questions they raise or the taint check in yolo, and the sandbox are what
-  stand there. A run you start with your own message is not marked, so it can still send a key where you tell it to. A
-  path, an address or a command line with a NUL character in it names no file, host or command: the step is refused for
+  stand there. A run you start with your own message is not marked, so it can still send a key to a host Dot already
+  sends keys to (GitHub, the model providers, Coinbase, the search APIs, the clouds those keys are for, and the
+  loopback) or to a host you named in `[browser] allowed_hosts`. A step whose words would send a secret to any other
+  host is refused in every mode, `yolo` too, whether or not the run is marked: the address is read from the step's
+  target, its summary, its body and its arguments. A command that names no host (`gh` with a token on its line) is
+  not that step. Free mode still refuses none of this (item 1097). A path, an address or a command line with a NUL
+  character in it names no file, host or command: the step is refused for
   what it gave, on every way a run acts, and the run goes on (item 727).
 
 **Secrets.**

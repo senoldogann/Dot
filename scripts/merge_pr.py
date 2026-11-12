@@ -19,6 +19,10 @@ A pull request that changes only prose has a run of the gate to wait for too, si
 request and its `prose` job skips the heavy work and reports `ci` for a change that is prose alone: it is merged once
 that run passed, as any other is.
 
+The pull request has to be one this automation opened. Its opener is read from GitHub and must be the account `gh`
+is signed in as. A pull request anyone else opened is left alone, one that only changes docs included: looking like
+docs is not a reason to update its branch or to merge it.
+
 Usage: uv run python scripts/merge_pr.py <number> <rebase|squash>
 Exit 0: merged. Exit 2: brought up to main, run it again once its checks pass. Exit 1: it cannot be merged as it stands.
 """
@@ -120,8 +124,17 @@ def _gate_runs(head: str) -> list[GateRun]:
     return runs
 
 
-def _state_and_head(raw: str) -> tuple[str, str]:
-    """The state and the head of a pull request as `gh pr view --json headRefOid,state` says them."""
+def opened_by_us(login: str, expected: str) -> bool:
+    """Whether ``login`` is the account this automation acts as (``expected``, whoever `gh` is signed in as).
+
+    An empty login, an empty account, or any other login is not. A pull request that only looks like docs is judged
+    the same way: the opener is what matters."""
+    return bool(expected) and login.casefold() == expected.casefold()
+
+
+def _state_head_author(raw: str) -> tuple[str, str, str]:
+    """The state, the head and the opener's login of a pull request, as `gh pr view --json
+    headRefOid,state,author` says them. A missing opener is an empty login, which :func:`opened_by_us` refuses."""
     view: object = json.loads(raw)
     if not isinstance(view, dict):
         raise MergeRefused(f"gh pr view gave no object: {raw[:400]}")
@@ -129,7 +142,14 @@ def _state_and_head(raw: str) -> tuple[str, str]:
     head: object = view.get("headRefOid")
     if not isinstance(state, str) or not isinstance(head, str) or not head:
         raise MergeRefused(f"gh pr view gave no state or head: {raw[:400]}")
-    return state, head
+    author: object = view.get("author")
+    login: object = author.get("login") if isinstance(author, dict) else ""
+    return state, head, login if isinstance(login, str) else ""
+
+
+def _actor() -> str:
+    """The login `gh` is signed in as. Empty when it names none, which refuses every pull request."""
+    return _run(["gh", "api", "user", "--jq", ".login"]).strip()
 
 
 def _changed_files(number: int) -> list[str]:
@@ -145,8 +165,21 @@ def _changed_files(number: int) -> list[str]:
 
 
 def merge(number: int, method: str) -> int:
-    """Merge the pull request ``number`` by ``method``, or bring it up to main; the script's exit code."""
-    state, head = _state_and_head(_run(["gh", "pr", "view", str(number), "--json", "headRefOid,state"]))
+    """Merge the pull request ``number`` by ``method``, or bring it up to main; the script's exit code.
+
+    A pull request opened by anyone but the account this automation acts as is left alone: no update of its branch
+    and no merge."""
+    state, head, login = _state_head_author(
+        _run(["gh", "pr", "view", str(number), "--json", "headRefOid,state,author"])
+    )
+    expected: str = _actor()
+    if not opened_by_us(login, expected):
+        who: str = login or "an unknown actor"
+        account: str = f" ({expected})" if expected else ""
+        raise MergeRefused(
+            f"pull request {number} was opened by {who}, not by the account this automation acts as{account}: "
+            "left alone"
+        )
     changed: list[str] = _changed_files(number)
     if state != "OPEN":
         raise MergeRefused(f"pull request {number} is {state}, not open")

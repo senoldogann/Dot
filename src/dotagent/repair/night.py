@@ -65,6 +65,7 @@ from dotagent.repair.claude import (
     worker_env,
 )
 from dotagent.repair.github import (
+    REPAIR_BRANCH_PREFIX,
     Check,
     UnreviewedPush,
     all_passed,
@@ -633,7 +634,7 @@ async def _work(
     spent: _Spent = _Spent(rounds=0, input_tokens=0, output_tokens=0, cost_usd=0.0, session_id=None, window=None)
     # A name of its own each session: a problem tried again (a refused session, one opened again) gets a new branch.
     name: str = f"{problem.id}-{secrets.token_hex(3)}"
-    branch: str = f"repair/{name}"
+    branch: str = f"{REPAIR_BRANCH_PREFIX}{name}"
     folder: Path = night.repo / ".claude" / "worktrees" / f"repair-{name}"
     # The pull request of the session, once one is: a branch with none is removed with the checkout.
     url: str = ""

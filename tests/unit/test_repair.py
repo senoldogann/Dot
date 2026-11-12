@@ -39,7 +39,12 @@ from dotagent.repair.github import (
     is_ancestor,
     needs_the_owner,
     pr_number,
+    repair_opened,
     settled,
+    update_branch,
+)
+from dotagent.repair.github import (
+    merge_pr as repair_merge,
 )
 from dotagent.repair.night import (
     LIVE_KEY,
@@ -789,3 +794,65 @@ def test_a_pull_request_merged_or_closed_on_github_settles_its_problem_and_its_s
     # Read merged once, it is not read again; a session Dot merged itself never is.
     assert urls_to_read(merged, (merged_session,)) == ()
     assert urls_to_read(book, (left.model_copy(update={"end": "merged"}),)) == ()
+
+
+def test_the_night_opened_a_pull_request_only_on_its_own_branch_as_itself() -> None:
+    assert repair_opened("dot", "repair/book-abc", "dot")
+    assert repair_opened("Dot", "repair/book-abc", "dot")
+    assert not repair_opened("stranger", "repair/book-abc", "dot")
+    assert not repair_opened("dot", "wfx-docs", "dot")
+    assert not repair_opened("", "repair/book-abc", "dot")
+    assert not repair_opened("dot", "repair/book-abc", "")
+
+
+def _repair_commands(monkeypatch: pytest.MonkeyPatch, login: str, branch: str) -> list[tuple[str, ...]]:
+    """``command`` answers a pull request opened by ``login`` on ``branch``, and records every command."""
+    calls: list[tuple[str, ...]] = []
+    view: str = json.dumps({"author": {"login": login}, "headRefName": branch, "title": "docs: dependency audit notes"})
+
+    async def command(argv: tuple[str, ...] | list[str], cwd: Path, env: dict[str, str]) -> str:
+        calls.append(tuple(argv))
+        if tuple(argv[:3]) == ("gh", "pr", "view") and "author,headRefName" in argv:
+            return view
+        if tuple(argv[:3]) == ("gh", "api", "user"):
+            return "dot\n"
+        if tuple(argv[:3]) == ("gh", "pr", "update-branch"):
+            return ""
+        if tuple(argv[:3]) == ("gh", "pr", "merge"):
+            return ""
+        raise AssertionError(argv)
+
+    monkeypatch.setattr("dotagent.repair.github.command", command)
+    return calls
+
+
+def _changed(calls: list[tuple[str, ...]]) -> list[tuple[str, ...]]:
+    return [argv for argv in calls if argv[:3] in {("gh", "pr", "update-branch"), ("gh", "pr", "merge")}]
+
+
+async def test_a_docs_pull_request_another_actor_opened_is_left_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A stranger's pull request, docs-only or not, is not brought up to main and is not merged."""
+    calls: list[tuple[str, ...]] = _repair_commands(monkeypatch, "stranger", "wfx-docs")
+    with pytest.raises(RepairError, match="left alone"):
+        await update_branch(Path("/tmp"), 888, {})
+    with pytest.raises(RepairError, match="left alone"):
+        await repair_merge(Path("/tmp"), 888, "abc", "squash", {})
+    assert _changed(calls) == []
+
+
+async def test_a_docs_pull_request_on_someone_elses_branch_is_left_alone_even_under_our_login(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PR #888 was on ``wfx-docs``. The night opens ``repair/…`` only, so that branch is left alone."""
+    calls: list[tuple[str, ...]] = _repair_commands(monkeypatch, "dot", "wfx-docs")
+    with pytest.raises(RepairError, match="left alone"):
+        await update_branch(Path("/tmp"), 888, {})
+    assert _changed(calls) == []
+
+
+async def test_a_pull_request_the_night_opened_is_brought_up_and_merged(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, ...]] = _repair_commands(monkeypatch, "dot", "repair/book-abc")
+    await update_branch(Path("/tmp"), 7, {})
+    await repair_merge(Path("/tmp"), 7, "abc123", "squash", {})
+    assert ("gh", "pr", "update-branch", "7") in calls
+    assert ("gh", "pr", "merge", "7", "--squash", "--match-head-commit", "abc123") in calls
