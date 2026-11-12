@@ -161,15 +161,20 @@ def _profile(record: AgentRecord) -> JsonObject:
     return {field: dumped[field] for field in PROFILE}
 
 
-async def _import(page: Page, file: Path) -> None:
-    """Import ``file`` with Import an agent, under the Agents page's "…" (item 1136), from the keyboard: a scroll closes
-    the menu, and the scroll a press makes to bring a button into view is told a frame after the menu opened."""
-    # On a phone the toasts stand under the bar, over the page's "…": a press puts each away first, as a person would.
-    for shown in await page.locator(".toast").all():
-        await shown.click()
-    await expect(page.locator(".toast")).to_have_count(0)
-    await page.get_by_role("button", name="More actions").focus()
-    await page.evaluate("() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))")
+# Resolves once nothing on the page has scrolled for 300 ms.
+_STILL: str = (
+    "() => new Promise((done) => { let wait = setTimeout(done, 300);"
+    " addEventListener('scroll', () => { clearTimeout(wait); wait = setTimeout(done, 300); }, true); })"
+)
+
+
+async def _import_opens_a_chooser(page: Page) -> None:
+    """Import an agent, under the Agents page's "…" (item 1136), asks for a file. Pressed from the keyboard once the
+    page stands still: a scroll closes the menu, and the scroll that brings a button into view is told later."""
+    more: Locator = page.get_by_role("button", name="More actions")
+    await more.scroll_into_view_if_needed()
+    await page.evaluate(_STILL)
+    await more.focus()
     await page.keyboard.press("Enter")
     menu: Locator = page.get_by_role("menu", name="More actions")
     await expect(menu.get_by_role("menuitem", name="New team")).to_be_focused()
@@ -177,7 +182,14 @@ async def _import(page: Page, file: Path) -> None:
     await expect(menu.get_by_title(IMPORT_TITLE)).to_be_focused()
     async with page.expect_file_chooser() as choosing:
         await page.keyboard.press("Enter")
-    await (await choosing.value).set_files(file)
+    await (await choosing.value).set_files([])
+
+
+async def _import(page: Page, file: Path) -> None:
+    """Import ``file`` through the Agents page's file field, the one Import an agent opens (`_import_opens_a_chooser`):
+    a page asked for a third chooser in a row sometimes got none from headless Chrome, though the page asked for it
+    with the press still in force (measured 2026-11-12)."""
+    await page.get_by_label("Agent file").set_input_files(file)
 
 
 def _toast(page: Page, kind: Literal["ok", "error"], words: str) -> Locator:
@@ -419,6 +431,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await chief.locator(".template-tools > summary").click()
                 await expect(chief.locator(".template-tool-chips .chip.missing")).to_have_text(["apple_script"])
                 await expect(phone.locator(".template-card").first.locator(".chip.missing")).to_have_count(0)
+                await _import_opens_a_chooser(phone)
                 await _import(phone, broken)
                 await expect(_toast(phone, "error", "broken.json is not an agent file")).to_be_visible()
                 await _import(phone, stranger)

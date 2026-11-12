@@ -10750,11 +10750,11 @@ button.attach-chip {
   }
 }
 
-.agents-tabs ~ .agents-part {
+.page-head ~ .agents-part {
   margin-top: 0;
 }
 
-.agents-tabs ~ .agents-part:not([hidden]) + .agents-part:not([hidden]) {
+.page-head ~ .agents-part:not([hidden]) ~ .agents-part:not([hidden]) {
   margin-top: var(--space-5);
 }
 
