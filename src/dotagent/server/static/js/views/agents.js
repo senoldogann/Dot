@@ -897,7 +897,7 @@ function mountList(root, ctx) {
     const joined = used.joined.length === 0 ? "" : ` ${AND_LIST.format(used.joined)} can message ${used.joined.length === 1 ? "its" : "their"} teammates now.`;
     // The team under Your teams: made now, or found with the agents it lacked put back (item 610).
     const placed = used.created
-      ? ` ${used.team.name} is under Your teams.`
+      ? ` ${used.team.name} is under Your teams, on the Teams tab.`
       : used.added.length === 0
         ? ""
         : ` ${AND_LIST.format(used.added)} ${used.added.length === 1 ? "is" : "are"} back in ${used.team.name}.`;
@@ -914,11 +914,9 @@ function mountList(root, ctx) {
     } else {
       toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${placed}${joined}${off}${already}`);
     }
-    // The list shows the team and the agents, and the cards mark them Yours; the team that was made is brought into view.
+    // The lists show the team and the agents, and the cards mark them Yours. The page stays on the ready-made ones, where
+    // the owner was choosing; the toast says the Teams tab holds the team (item 1136).
     await Promise.all([reload(), reloadTeams(), loadTemplates()]);
-    if (used.created) {
-      teamsHolder.querySelector(`[data-owned-team="${used.team.id}"]`)?.scrollIntoView({ block: "nearest" });
-    }
   }
 
   async function reload() {
@@ -954,7 +952,7 @@ function mountList(root, ctx) {
       teamsCount.textContent = String(teams.length);
       teamsHolder.replaceChildren(
         teams.length === 0
-          ? el("div", { class: "card empty-teams" }, el("p", { class: "muted" }, "No teams yet. Start from a ready team below, or put your own agents together with New team."))
+          ? el("div", { class: "card empty-teams" }, el("p", { class: "muted" }, "No teams yet. Start from a ready team on the Agents tab, or put your own agents together with New team under “…”."))
           : el("div", { class: "team-grid" }, teams.map(teamTile)),
       );
     } catch (error) {

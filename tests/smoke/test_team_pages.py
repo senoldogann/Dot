@@ -1,9 +1,9 @@
 """The pages of teams (item 610) in a real Chrome, over a real daemon whose model is the scripted one: the Agents page
-shows Your teams above Your agents, a team a card with its agents' faces (four, the rest counted) and its newest chat,
-and the agents a grid of compact cards, two to four across a wide window and one on a phone; a team's page takes a
-message that starts a run of Dot's in a chat with the team, which the sidebar and the chat's bar name, and the chat's
-next message goes on in it; a team with no agent left takes none; a removed team leaves its agents and its chats, and
-its page says it is gone; and the owner puts agents together as a team and changes it."""
+shows Your teams on a tab beside Your agents (item 1136), a team a card with its agents' faces (four, the rest counted)
+and its newest chat, and the agents a grid of compact cards, two to four across a wide window and one on a phone; a
+team's page takes a message that starts a run of Dot's in a chat with the team, which the sidebar and the chat's bar
+name, and the chat's next message goes on in it; a team with no agent left takes none; a removed team leaves its agents
+and its chats, and its page says it is gone; and the owner puts agents together as a team and changes it."""
 
 import asyncio
 import re
@@ -289,7 +289,9 @@ async def test_use_team_puts_the_team_under_your_teams_and_a_second_use_keeps_it
         gallery: Locator = page.locator(".team-card[data-team='content']")
         use: Locator = gallery.get_by_role("button", name="Use the team Content team")
         await use.click()
-        await expect(page.locator(".toast.ok", has_text="Content team is under Your teams.")).to_be_visible()
+        await expect(
+            page.locator(".toast.ok", has_text="Content team is under Your teams, on the Teams tab.")
+        ).to_be_visible()
         card: Locator = page.locator(".owned-team")
         await expect(card).to_have_count(1)
         await expect(card.locator(".owned-team-name")).to_have_text("Content team")

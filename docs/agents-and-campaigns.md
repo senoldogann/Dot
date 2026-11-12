@@ -127,13 +127,13 @@ schedules' rows "<name> is paused" on their one line (see [Memory and schedules]
 now** of one of its schedules and the messages of other agents still reach it, and runs already working go on, each with
 its Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
 
-The page is in three parts (items 509 and 610): **Your teams** and **Your agents**, each with its count, and under
-them **Add ready-made agents**, which shows the teams or the single agents, one of the two at a time (**Teams** first;
-the one chosen last while the app is open). Your agents are a grid of compact cards, as many across as the page has
+The Agents tab holds **Your agents**, with its count, and under it **Add ready-made agents**, which shows the teams or
+the single agents, one of the two at a time (**Teams** first; the one chosen last while the app is open); **Your
+teams**, with their count, are the Teams tab (items 509, 610 and 1136). Your agents are a grid of compact cards, as many across as the page has
 room for, two to four, and one on a phone: the face, the name over the role, each on one line ("Made by Dot" and
 "Paused" go under a name too long to share its line, item 782), and under them the title of the agent's newest chat
 (the chat's own, as you may have renamed it) with how long ago it began, or that it has none. Your teams are wider
-cards, two across at most, each as wide as two of the agents' columns, so that the two grids end at the same edge. Dot's card names Dot's newest chat of its own (item 633): one that is not an agent's, a campaign's or a team's,
+cards, two across at most, each as wide as two of the agents' columns. Dot's card names Dot's newest chat of its own (item 633): one that is not an agent's, a campaign's or a team's,
 which their own cards name. How long ago keeps up with the clock while the page stays open, and the list is read again
 when a run starts or ends. The card is the way to the agent's page, and says "Paused" and "Made by Dot" as the page
 does; Dot's opens the chats.
@@ -209,9 +209,9 @@ now and `added` for the agents it put back; 404 for a team that is not there, 42
 
 **Your teams** (item 610) are the teams you have, each a record of a name, what it is for (500 characters at most) and
 agents of yours in an order, which holds nothing else: removing a team keeps its agents and its chats, and an agent that
-is deleted leaves the teams that had it. Use team makes one from a ready team, **New team** on the Agents page puts
-agents of yours together (at least one, each once; Dot is no agent to put in a team), **Select** at the head of Your
-agents turns their cards into boxes to tick (item 867), and the bar under them counts the picked ones and opens that
+is deleted leaves the teams that had it. Use team makes one from a ready team, **New team** under the Agents page's
+"…" puts agents of yours together (at least one, each once; Dot is no agent to put in a team), **Select** at the head of
+Your agents turns their cards into boxes to tick (item 867), and the bar under them counts the picked ones and opens that
 form with them ticked, first, in the order picked (**Make a team**; Cancel leaves the cards as links), and **Edit** in
 the bar of a
 team's page changes its name, purpose and agents (the agents it has first, in its order, then the others; Save writes
