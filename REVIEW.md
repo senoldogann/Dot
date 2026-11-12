@@ -29,6 +29,10 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/unit/test_noted_yes_words.py::test_a_yes_with_a_note_is_no_refusal_to_the_model` — a yes with a note
+  was told to the model as a refusal ("do not retry") while asking it to do the step again (item 1140).
+- `tests/unit/test_noted_yes_words.py::test_a_batched_step_says_the_owner_is_asked_once_more` — a batched browser
+  or desktop step told the run its noted yes would go through, while the batch's own page read let it go (item 1140).
 - `tests/unit/test_apns.py::test_the_apns_key_is_guarded_from_the_runs_once_it_is_set` — the APNs key of
   `[apns] key_path` was said to be sealed from the runs and was not (item 997).
 - `tests/smoke/test_secret_fields.py::test_ask_mode_types_a_one_time_code_the_user_gave` — a one-time code the user

@@ -9,7 +9,13 @@ from typing import TYPE_CHECKING, NoReturn
 
 from dotagent.agent.approvals import TIMEOUT_DECIDER, ApprovalBroker, ApprovalOutcome, Kept
 from dotagent.agent.authorization import Answerer, Authorization, step_decision
-from dotagent.agent.declined import OWNER_DECIDERS, Declined, declined_key, refusal_text, still_declined
+from dotagent.agent.declined import (
+    OWNER_DECIDERS,
+    Declined,
+    declined_key,
+    refusal_text,
+    still_declined,
+)
 from dotagent.agent.parking import (
     EXACT_KEY,
     KEPT_SEND_KEY,
@@ -28,8 +34,16 @@ from dotagent.agent.parking import (
 )
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
 from dotagent.config import PaceConfig, SpendCap
-from dotagent.core.errors import ApprovalParked, ApprovalRejected, HandedOff, PolicyDenied, RunConflict
+from dotagent.core.errors import (
+    ApprovalNoted,
+    ApprovalParked,
+    ApprovalRejected,
+    HandedOff,
+    PolicyDenied,
+    RunConflict,
+)
 from dotagent.core.logs import get_logger
+from dotagent.core.noted import noted_text
 from dotagent.core.text import redact_known
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
@@ -245,6 +259,9 @@ class RunGate:
         self._locks: SiteLocks = locks
         # The actions the owner refused in this run, by how their card showed them (item 456).
         self._declined: Mapping[str, Declined] = {}
+        # The actions the owner said yes to with a note (item 1140), whole: each was held so that the run read the note
+        # first, and goes through once, without asking again, if the run still does it exactly so.
+        self._noted_yes: frozenset[str] = frozenset()
         self.tainted: bool = False
         # Whether the run read such content at any point: a fresh instruction clears ``tainted``, never this.
         self.ever_tainted: bool = False
@@ -350,9 +367,11 @@ class RunGate:
         self._parking = parking
 
     def taint(self) -> None:
-        """Record that the run has read content that third parties can author."""
+        """Record that the run has read content that third parties can author. A yes the owner gave with a note is let
+        go (item 1140): what the run read since may be what calls for the step now, not the note."""
         self.tainted = True
         self.ever_tainted = True
+        self._noted_yes = frozenset()
 
     def observe(self, info: ActionInfo) -> None:
         """Taint the run when a finished action read content that third parties can author."""
@@ -599,6 +618,13 @@ class RunGate:
             await self._emit_policy(shown, said, tainted)
             log.warning("declined_again_refused", run_id=self._run_id, tool=info.tool)
             raise ApprovalRejected(refusal_text(earlier), {"action": _describe(shown), "note": earlier.note})
+        # The step the owner said yes to with a note, done after the run read the note (item 1140): their yes stands,
+        # once.
+        noted: str = info.model_dump_json()
+        if noted in self._noted_yes:
+            self._noted_yes = self._noted_yes - {noted}
+            log.info("noted_yes_used", run_id=self._run_id, tool=info.tool)
+            return "", "user"
         # A message, a post or a release (item 922): the owner's yes to one kept for them lets it through once in the
         # run it reached; in a chat of Dot's own initiative, a run nobody is there for keeps it for their yes, its
         # draft with it, rather than waits.
@@ -986,4 +1012,13 @@ class RunGate:
             raise ApprovalRejected(_rejection(outcome), {"action": _describe(shown), "note": outcome.note})
         if decision.verdict == "handoff":
             raise HandedOff(outcome.note or "the user completed this step themselves", {"action": _describe(shown)})
-        return outcome.note.strip()
+        note: str = outcome.note.strip()
+        if note == "":
+            return ""
+        # A yes with a note is the note first (item 1140, the owner's word: a mail went out before Dot read "send
+        # nothing" written beside the yes): the step waits, the run reads the note, and the same step goes through once
+        # if the note still calls for it, exactly as it was asked (the whole step, not only what its card showed).
+        self._noted_yes = self._noted_yes | {info.model_dump_json()}
+        self.add_instruction(note)
+        log.info("noted_yes_held", run_id=self._run_id, tool=info.tool)
+        raise ApprovalNoted(noted_text(note), {"action": _describe(shown), "note": note}, note)

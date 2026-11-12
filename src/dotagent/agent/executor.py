@@ -14,6 +14,7 @@ from dotagent.agent.held_secrets import all_held_values
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
 from dotagent.agent.yolo_log import note_checkpoint
 from dotagent.core.errors import (
+    ApprovalNoted,
     ApprovalParked,
     ApprovalRejected,
     DotError,
@@ -138,6 +139,9 @@ def _describe_failure(exc: Exception, tool: RegisteredTool) -> str:
         # Kept for the owner (item 482): its words say it did not happen, that it waits, and how to go on. It opens as
         # the owner's say does, which the repair night does not take for a defect of Dot's (item 972).
         return f"Nothing was done: {exc.message}"
+    if isinstance(exc, ApprovalNoted):
+        # A yes with a note (item 1140): its words say the step waits for the note, and may be done again once.
+        return f"Not done yet: {exc.message}."
     if isinstance(exc, PolicyDenied | ApprovalRejected):
         return f"Not allowed: {exc.message}. Do not retry this action or look for a way around it."
     if isinstance(exc, HandedOff):
