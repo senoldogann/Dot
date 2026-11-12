@@ -26,6 +26,7 @@ from dotagent.agent.compact import (
     estimate_tokens,
     kept_as,
     last_settled,
+    render_recent_steps,
     render_transcript,
     repair_history,
     shrink_old_tool_results,
@@ -1756,6 +1757,11 @@ async def _consult(
     return StallAnswer(note=consult_note(alert, diagnosis, next_steps), allowed=None)
 
 
+# The steps a checkpoint's judge reads (item 1132): the newest that fit, under the digest's own cut at 30,000
+# characters, so that none is cut out of the middle.
+_CHECKPOINT_DIGEST_CHARS: int = 28_000
+
+
 @dataclass(frozen=True)
 class _Drift:
     """What the checkpoint judge said of a run off track: why, and the steps back to the goal."""
@@ -1774,7 +1780,7 @@ async def _checkpoint(
         goal=agent.run.goal,
         owner_words=agent.gate.instructions,
         plan=plan_lines(await _current_plan(agent)) or _NO_PLAN,
-        digest=goal_digest(render_transcript(_since_goal(history, goal))),
+        digest=goal_digest(render_recent_steps(_since_goal(history, goal), _CHECKPOINT_DIGEST_CHARS)),
     )
     try:
         verdict: CheckpointVerdict = await judge(request)
