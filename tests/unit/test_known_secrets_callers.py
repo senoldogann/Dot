@@ -36,6 +36,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/loop.py:_route_step": (True,),
     "agent/recap.py:_write": (True,),
     "agent/review.py:_attempt": (True,),
+    # The words of a meeting, to the note maker (item 1138).
+    "meetings/notes.py:make_notes": (True,),
     "mcp/hub.py:_failure": (True,),
     "mcp/masking.py:shown_command": (True,),
     "mcp/masking.py:masked_context": (True,),

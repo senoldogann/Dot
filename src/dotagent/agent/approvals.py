@@ -51,7 +51,8 @@ class ApprovalBroker:
     the run too, until the user answers or skips it.
 
     ``timeout_s`` is how long a question waits for its answer. ``free`` is the owner's free mode (item 922, ``[policy]
-    free``), which every run's gate reads as it decides a step: on, no run asks anything.
+    free``), which every run's gate reads as it decides a step: on, no run asks anything; the meeting desk's question of
+    a post in a meeting's chat is asked through :meth:`request` all the same (item 1138).
     """
 
     def __init__(self, store: Store, bus: EventBus, timeout_s: float) -> None:
@@ -64,7 +65,7 @@ class ApprovalBroker:
 
     @property
     def free(self) -> bool:
-        """Whether the owner's free mode is on (item 922): no run asks anything."""
+        """Whether the owner's free mode is on (item 922): no run's gate asks anything."""
         return self._free
 
     def switch_free(self, on: bool) -> None:

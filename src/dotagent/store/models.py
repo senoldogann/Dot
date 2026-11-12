@@ -52,6 +52,10 @@ TodoStatus = Literal["open", "doing", "done", "dropped"]
 # ``returned`` the lead sent it back and the next attempt has not started; ``accepted`` and ``cancelled`` are final;
 # ``escalated`` waits for the owner: the lead can only cancel it.
 WorkOrderStatus = Literal["assigned", "working", "in_review", "returned", "accepted", "escalated", "cancelled"]
+# Where a meeting Dot was asked to join stands (item 1138): asked in, waiting to be let in, in the call, or over (it
+# ended, Dot left, or it failed: its note says which).
+MeetingStatus = Literal["joining", "waiting", "in_call", "ended", "failed"]
+MeetingLineKind = Literal["caption", "chat"]
 # The moves between them: the store refuses any other, so that a late end of an attempt cannot undo a verdict. A move
 # to the status an order has changes only its note and the rest.
 WORK_ORDER_MOVES: dict[WorkOrderStatus, frozenset[WorkOrderStatus]] = {
@@ -479,6 +483,39 @@ class TodoRecord(FrozenModel):
     note: str
     created_at: float
     updated_at: float
+
+
+class MeetingRecord(FrozenModel):
+    """A call Dot was asked to join (item 1138): its address on Meet, the chat and the run that asked, where it stands,
+    and the last thing said of it (``note``: why it ended or failed, or what it waits for). ``notes`` are the notes of
+    its words as the note maker last wrote them (JSON of ``meetings.notes.MeetingNotes``, empty before the first), and
+    ``summary`` the line it left in the chat when it ended. A meeting's words are third parties' content."""
+
+    id: str
+    url: str
+    thread_id: str
+    run_id: str
+    status: MeetingStatus
+    note: str
+    notes: str
+    summary: str
+    lines: int
+    created_at: float
+    admitted_at: float | None
+    ended_at: float | None
+    updated_at: float
+
+
+class MeetingLineRecord(FrozenModel):
+    """One line of a meeting (item 1138): a caption once it stood still, or a chat message; ``seq`` orders a meeting's
+    lines. ``speaker`` is the name the page showed, which anyone in the call can choose."""
+
+    meeting_id: str
+    seq: int
+    kind: MeetingLineKind
+    speaker: str
+    text: str
+    at: float
 
 
 class WorkOrderRecord(FrozenModel):

@@ -81,6 +81,12 @@ class BrowserLoginCommand(FrozenModel):
     url: str | None
 
 
+class BrowserMeetingsLoginCommand(FrozenModel):
+    """Sign Dot's own Google account in to the Chrome profile of its meetings (item 1138)."""
+
+    name: Literal["browser-meetings-login"]
+
+
 class DesktopCheckCommand(FrozenModel):
     name: Literal["desktop-check"]
 
@@ -539,6 +545,7 @@ type Command = Annotated[
     | HarnessStepsCommand
     | HarnessExperiencesCommand
     | BrowserLoginCommand
+    | BrowserMeetingsLoginCommand
     | BrowserImportChromeCommand
     | BrowserAttachCommand
     | BrowserDetachCommand

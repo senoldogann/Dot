@@ -1173,6 +1173,20 @@ class JudgeConfig(FrozenModel):
     draft_check_threshold: float = Field(ge=0, le=1)
 
 
+class MeetingsConfig(FrozenModel):
+    """Dot in the owner's calls (item 1138, docs/meetings.md): how it shows, how long it waits to be let in and stays,
+    when a caption is a line, how often the notes are made again, how long a meeting's lines are kept, and whether its
+    Chrome shows a window."""
+
+    name: str = Field(max_length=60)
+    admit_minutes: float = Field(gt=0, le=60, allow_inf_nan=False)
+    most_hours: float = Field(gt=0, le=12, allow_inf_nan=False)
+    settle_s: float = Field(gt=0, le=30, allow_inf_nan=False)
+    notes_minutes: float = Field(gt=0, le=60, allow_inf_nan=False)
+    keep_days: int = Field(ge=0, le=365)
+    headless: bool
+
+
 class AppConfig(FrozenModel):
     mcp: list[McpServerConfig]
     builtin_mcp: BuiltinMcpConfig
@@ -1204,6 +1218,7 @@ class AppConfig(FrozenModel):
     repair: RepairConfig
     recon: ReconConfig
     trading: TradingConfig
+    meetings: MeetingsConfig
 
     @field_validator("mcp")
     @classmethod

@@ -1243,3 +1243,17 @@ engine = "off"
 engine_coins = ["BTC", "ETH", "SOL"]
 engine_target_vol = 0.5
 engine_band = 0.1
+
+[meetings]
+# Dot in the owner's calls (item 1138, docs/meetings.md): Google Meet, joined in a Chrome of its own whose profile holds
+# only Dot's own Google account, with camera and microphone off. name is how Dot shows in the call (empty: "Dot");
+# admit_minutes how long it waits to be let in; most_hours how long it stays at most; settle_s how long a caption must
+# stand unchanged to be a line; notes_minutes how often the notes are made again while lines come; keep_days how long
+# a meeting's lines are kept after it ends (its summary stays in the chat); headless whether its Chrome shows no window.
+name = ""
+admit_minutes = 10.0
+most_hours = 3.0
+settle_s = 2.5
+notes_minutes = 5.0
+keep_days = 7
+headless = true
