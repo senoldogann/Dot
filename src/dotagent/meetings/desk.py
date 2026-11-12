@@ -299,6 +299,8 @@ class MeetingDesk:
                 await asyncio.shield(self._store.set_meeting_status(meeting.id, "failed", why))
                 raise
             self._live = live
+            # A stop from here on reaches this meeting, while it joins too.
+            self._lives.add(live)
         try:
             await self._let_in(live, address)
             await self._announce(live)
@@ -317,10 +319,10 @@ class MeetingDesk:
         except BaseException as error:
             note: str = error.message if isinstance(error, DotError) else "the join was stopped"
             await self._close(live, "failed", note)
+            self._lives.discard(live)
             raise
         live.task = asyncio.create_task(self._watch(live), name=f"meeting-{meeting.id}")
         self._finishing.add(live.task)
-        self._lives.add(live)
         live.task.add_done_callback(self._finishing.discard)
         live.task.add_done_callback(lambda _: self._lives.discard(live))
         return in_call
@@ -550,7 +552,13 @@ class MeetingDesk:
                 if not live.making.cancelled():
                     live.notes = live.making.result()[0]
                 live.making = None
-            if live.making is None and total > noted and time.monotonic() >= next_notes:
+            if (
+                live.making is None
+                and not live.no_model
+                and not live.stop.is_set()
+                and total > noted
+                and time.monotonic() >= next_notes
+            ):
                 live.making = asyncio.create_task(
                     self._noted(live, live.notes), name=f"meeting-notes-{live.meeting_id}"
                 )
@@ -579,14 +587,17 @@ class MeetingDesk:
     async def _noted(self, live: _Live, earlier: MeetingNotes) -> tuple[MeetingNotes, str | None]:
         """The notes made again from the meeting's lines, and ``None``; a note maker that fails leaves the earlier ones,
         with what went wrong, logged."""
-        meeting: MeetingRecord = await self._store.get_meeting(live.meeting_id)
-        lines = await self._store.meeting_lines(live.meeting_id, 0, meeting.lines)
         try:
+            meeting: MeetingRecord = await self._store.get_meeting(live.meeting_id)
+            lines = await self._store.meeting_lines(live.meeting_id, 0, meeting.lines)
             notes: MeetingNotes = await self._noter(lines, earlier, live.meeting_id)
+            await self._store.set_meeting_notes(live.meeting_id, notes.model_dump_json())
         except DotError as error:
             log.warning("meeting_notes_failed", meeting_id=live.meeting_id, error=error.message, context=error.context)
             return earlier, error.message
-        await self._store.set_meeting_notes(live.meeting_id, notes.model_dump_json())
+        except sqlite3.Error as error:
+            log.warning("meeting_notes_failed", meeting_id=live.meeting_id, error=str(error))
+            return earlier, f"the store refused ({error})"
         return notes, None
 
     async def _sum_up(self, live: _Live, notes: MeetingNotes, end_note: str) -> None:
