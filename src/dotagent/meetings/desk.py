@@ -37,8 +37,8 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.meetings.meet import MEET_HOST, MeetPage, MeetPageError, meeting_address
 from dotagent.meetings.notes import NO_NOTES, MeetingNotes, notes_text
-from dotagent.meetings.transcript import CaptionBook, fold_captions, fold_page, new_chat
-from dotagent.meetings.types import MeetingLine, MeetState, PageBatch
+from dotagent.meetings.transcript import CaptionBook, clean_words, fold_captions, fold_page, new_chat
+from dotagent.meetings.types import MAX_TEXT_CHARS, MeetingLine, MeetState, PageBatch
 from dotagent.store.db import Store
 from dotagent.store.models import MeetingLineRecord, MeetingRecord
 
@@ -94,7 +94,8 @@ async def untold(thread_id: str, goal: str, text: str) -> None:
     raise MeetingError("the meeting's chat cannot be told yet: the daemon is starting", {"thread_id": thread_id})
 
 
-@dataclass
+# Compared and kept in sets by identity: one meeting is one record.
+@dataclass(eq=False)
 class _Live:
     """A meeting Dot is in: its record's id, its chat, the run that asked, its browser and page, and its watch."""
 
@@ -153,7 +154,12 @@ async def launch_meeting_chrome(profile: Path, browser: BrowserConfig, config: M
         # A stop while Chrome starts: its driver goes with it.
         await asyncio.shield(playwright.stop())
         raise
-    page: Page = context.pages[0] if context.pages else await context.new_page()
+    try:
+        page: Page = context.pages[0] if context.pages else await context.new_page()
+    except BaseException:
+        await asyncio.shield(context.close())
+        await asyncio.shield(playwright.stop())
+        raise
 
     async def close() -> None:
         with contextlib.suppress(PlaywrightError):
@@ -222,6 +228,8 @@ class MeetingDesk:
         self._forgetter: asyncio.Task[None] | None = None
         # Whether the daemon handed the desk its way to tell the chats (:meth:`tell_with`).
         self._told: bool = False
+        # The meetings not done yet: in the call, or summing up after Dot left it.
+        self._lives: set[_Live] = set()
         # The watches of the meetings, kept until they told their summary, after Dot left the call.
         self._finishing: set[asyncio.Task[None]] = set()
 
@@ -312,7 +320,9 @@ class MeetingDesk:
             raise
         live.task = asyncio.create_task(self._watch(live), name=f"meeting-{meeting.id}")
         self._finishing.add(live.task)
+        self._lives.add(live)
         live.task.add_done_callback(self._finishing.discard)
+        live.task.add_done_callback(lambda _: self._lives.discard(live))
         return in_call
 
     async def _open(self, meeting: MeetingRecord) -> _Live:
@@ -374,7 +384,7 @@ class MeetingDesk:
             )
         if live.stop.is_set():
             raise MeetingError(_why(live, "the join was stopped"), {"answer": outcome.status})
-        live.posted = live.posted | {line}
+        live.posted = live.posted | {clean_words(line, MAX_TEXT_CHARS)}
         await live.page.post(line)
 
     async def _ask(self, live: _Live, text: str, why: str) -> ApprovalOutcome:
@@ -408,7 +418,7 @@ class MeetingDesk:
             return f"Not posted: the owner's answer was {outcome.status}{note}."
         if self._live is not live or live.stop.is_set():
             return "Not posted: Dot left the meeting before the owner's yes."
-        live.posted = live.posted | {text.strip()}
+        live.posted = live.posted | {clean_words(text, MAX_TEXT_CHARS)}
         await live.page.post(text.strip())
         return "Posted in the meeting's chat."
 
@@ -435,19 +445,28 @@ class MeetingDesk:
         return await self._store.get_meeting(meeting_id)
 
     async def leave_all(self, why: str) -> None:
-        """Leave the meeting Dot is in, if it is in one, at once (the emergency stop, the daemon's stop): no model is
-        asked for the notes again, and the summary is made of them as they stand."""
+        """Leave the meeting Dot is in, if it is in one, at once (the daemon's stop), and stop the note maker of every
+        meeting still summing up: no model is asked for the notes again, the summaries are made of them as they
+        stand."""
+        self._no_more_models()
         if self._live is not None:
-            self._live.no_model = True
             await self.leave(self._live.meeting_id, why)
 
     def stop_all(self, why: str) -> None:
         """Have Dot leave the meeting it is in, if it is in one, without waiting (the emergency stop): its watch sees
-        the stop within :data:`_READ_EVERY_S`, leaves the call and closes its browser, and asks no model again."""
+        the stop within :data:`_READ_EVERY_S`, leaves the call and closes its browser. No model is asked again, for it
+        or for a meeting Dot left that is still summing up: the note maker at work is cut."""
+        self._no_more_models()
         if self._live is not None:
-            self._live.no_model = True
             self._live.why.append(why)
             self._live.stop.set()
+
+    def _no_more_models(self) -> None:
+        """Every meeting not done yet makes no notes again, and the note maker at work for one is cut."""
+        for live in self._lives:
+            live.no_model = True
+            if live.making is not None and not live.making.done():
+                live.making.cancel()
 
     def _the_live(self, meeting_id: str) -> _Live:
         if self._live is None or self._live.meeting_id != meeting_id:
@@ -563,9 +582,13 @@ class MeetingDesk:
         """The notes made once more from every line (as they stand, after the emergency stop), and left in the chat as
         the meeting's summary, which says when they could not be made again."""
         final: MeetingNotes = notes
-        unmade: str | None = "Dot was stopped, so they were not made again" if live.no_model else None
+        unmade: str | None = _STOPPED
         if not live.no_model:
-            final, unmade = await self._noted(live, notes)
+            # The last notes are the meeting's own note maker at work, which a stop cuts (:meth:`_no_more_models`).
+            live.making = asyncio.create_task(self._noted(live, notes), name=f"meeting-summary-{live.meeting_id}")
+            await asyncio.wait({live.making})
+            if not live.making.cancelled():
+                final, unmade = live.making.result()
         meeting: MeetingRecord = await self._store.get_meeting(live.meeting_id)
         stale: str = "" if unmade is None else f"These are the notes as they last stood: {unmade}.\n\n"
         text: str = (
@@ -622,6 +645,9 @@ def not_dots(chat: tuple[MeetingLine, ...], posted: frozenset[str]) -> tuple[tup
             continue
         kept.append(line)
     return tuple(kept), frozenset(waiting)
+
+
+_STOPPED: str = "Dot was stopped, so they were not made again"
 
 
 def _why(live: _Live, otherwise: str) -> str:

@@ -329,3 +329,27 @@ async def test_a_call_whose_page_is_lost_is_summed_up_with_the_notes_it_had(room
     assert (await room.store.get_meeting(meeting.id)).status == "failed"
     assert "we decide on the budget" in room.told[-1][1]
     await desk.aclose()
+
+
+async def test_a_stop_after_dot_left_cuts_the_note_maker_of_the_summary(room: Room) -> None:
+    """The owner asks Dot to leave, the last notes are slow, and the emergency stop comes: no model is asked to the
+    end, and the summary holds the notes as they stood (the pre-push review)."""
+    started: asyncio.Event = asyncio.Event()
+
+    async def slow(lines: Sequence[MeetingLineRecord], earlier: MeetingNotes, meeting_id: str) -> MeetingNotes:
+        started.set()
+        await asyncio.sleep(600)
+        return earlier
+
+    desk: MeetingDesk = MeetingDesk(room.store, room.broker, slow, _CONFIG, room.launch, lambda: OWNER)
+    desk.tell_with(room.notice)
+    joining: asyncio.Task[MeetingRecord] = asyncio.create_task(desk.join(URL, room.run.thread_id, room.run.id))
+    await _answer(room, True)
+    meeting: MeetingRecord = await joining
+    told: int = len(room.told)
+    await desk.leave(meeting.id, "the owner asked Dot to leave")
+    await asyncio.wait_for(started.wait(), _WAIT_S)
+    desk.stop_all("the emergency stop")
+    await _told(room, told + 1)
+    assert "not made again" in room.told[-1][1]
+    await desk.aclose()
