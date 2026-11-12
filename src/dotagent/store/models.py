@@ -706,6 +706,10 @@ class MergedSource(FrozenModel):
     tainted: bool
 
 
+# The Memory page's correction of a note a run wrote. Not a run id: run ids are ``run_`` plus a time.
+OWNER_EDIT: str = "owner"
+
+
 class MemoryRecord(FrozenModel):
     """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``agent_id`` is the
     agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and
@@ -715,7 +719,8 @@ class MemoryRecord(FrozenModel):
     that saved it had read content third parties can author: a search that returns it taints the run that read it.
     The fields with a default are NULL in a note written before them (item 584): ``merged_from`` names the notes a
     merged note was made of, ``merged_into`` the merged note a resting one was merged into, ``pinned_at`` is when the
-    owner pinned the note (it never rests) and ``rested_at`` when it began to rest."""
+    owner pinned the note (it never rests) and ``rested_at`` when it began to rest. ``edited_by`` is
+    :data:`OWNER_EDIT` when the owner later corrected a note a run wrote."""
 
     id: str
     content: str
@@ -733,6 +738,10 @@ class MemoryRecord(FrozenModel):
     merged_from: tuple[MergedSource, ...] = ()
     pinned_at: float | None = None
     rested_at: float | None = None
+    # ``owner`` when the owner rewrote the note on the Memory page. The author (``source_run``) stays, and a run
+    # that saved the note is still handed the correction. A run's own rewrite clears it. NULL on a note the owner
+    # has not rewritten, including every note stored before the column.
+    edited_by: str | None = None
 
 
 class ResultStep(FrozenModel):

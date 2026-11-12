@@ -389,9 +389,8 @@ class OwnerSection(FrozenModel):
 EMPTY_OWNER: OwnerSection = OwnerSection(dot_lines=(), owner_lines=(), updated_at=0.0)
 
 
-async def owner_section(store: Store) -> OwnerSection:
-    """The owner section the store holds, empty before the first reflection wrote one."""
-    raw: str | None = await store.kv_get(OWNER_KEY)
+def _owner_section_from(raw: str | None) -> OwnerSection:
+    """The owner section stored as ``raw``, empty when nothing is stored."""
     if raw is None:
         return EMPTY_OWNER
     try:
@@ -400,8 +399,40 @@ async def owner_section(store: Store) -> OwnerSection:
         raise StoreError("the owner section cannot be read", {"key": OWNER_KEY, "error": str(exc)}) from exc
 
 
+async def owner_section(store: Store) -> OwnerSection:
+    """The owner section the store holds, empty before the first reflection wrote one."""
+    return _owner_section_from(await store.kv_get(OWNER_KEY))
+
+
 async def set_owner_section(store: Store, section: OwnerSection) -> None:
     await store.kv_set(OWNER_KEY, section.model_dump_json())
+
+
+async def set_dot_lines(store: Store, lines: tuple[str, ...], now: float) -> OwnerSection:
+    """Replace Dot's lines of the owner section and keep the owner's lines as they stand at this write (item 1141). The
+    reflection calls this after its model answers, so a save of the owner's lines while it was writing is not put back
+    to the lines the night started with. ``now`` does not move the section's time backwards past a later save."""
+
+    def update(raw: str | None) -> str:
+        current: OwnerSection = _owner_section_from(raw)
+        return OwnerSection(
+            dot_lines=lines, owner_lines=current.owner_lines, updated_at=max(current.updated_at, now)
+        ).model_dump_json()
+
+    return _owner_section_from(await store.kv_update(OWNER_KEY, update))
+
+
+async def set_owner_lines(store: Store, lines: tuple[str, ...], now: float) -> OwnerSection:
+    """Replace the owner's lines and keep Dot's lines as they stand at this write (item 1141), so a save from the Memory
+    page does not put back the Dot lines the page read before the reflection wrote new ones."""
+
+    def update(raw: str | None) -> str:
+        current: OwnerSection = _owner_section_from(raw)
+        return OwnerSection(
+            dot_lines=current.dot_lines, owner_lines=lines, updated_at=max(current.updated_at, now)
+        ).model_dump_json()
+
+    return _owner_section_from(await store.kv_update(OWNER_KEY, update))
 
 
 def owner_lines_within(lines: Sequence[str], owner_chars: int) -> tuple[str, ...]:
@@ -601,7 +632,8 @@ async def live_memories(
 async def update_memory_note(index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str]) -> MemoryRecord:
     """The user's rewrite of a note in place (text and tags): it keeps its id, its author and its use count and is
     embedded again. The user vouches for the text they saved, so a note saved while reading outside content no longer
-    counts as such, and goes back among the notes a run starts with (item 384)."""
+    counts as such, and goes back among the notes a run starts with (item 384). A run that wrote the note is handed
+    the correction at its next step; the author stays the run."""
     existing: MemoryRecord = await index.store.get_memory(memory_id)
     text, vector = await _embedded(index, content)
     return await index.store.update_memory_vouched(memory_id, text, normalize_tags(tags), vector, existing.source_run)

@@ -113,7 +113,10 @@ dotx memory reindex      # embed every note again, for example after changing [m
   language, hours, the tools and sites you use by their names, the ways you ask, the limits you set), rewritten each
   night from its previous version, your notes and the day's runs. The Memory page shows it first; the lines you write
   under it are yours, kept as they are, marked "(you said)" in the prompt, never rewritten, and the reflection never
-  contradicts them (`GET`/`PUT /api/memories/owner`). The reflection's own lines go through the one gate for learned
+  contradicts them (`GET`/`PUT /api/memories/owner`). A save of your lines changes only your lines, and the
+  reflection's rewrite changes only its own, each from the lines as they stand at that write: saving yours while the
+  reflection is writing does not put yours back to what the night started with, and does not put the reflection's new
+  lines back to what the page had read (item 1141). The reflection's own lines go through the one gate for learned
   texts first ([The harness](harness.md#one-gate-for-every-text-dot-learns), item 587): one that holds a secret, a link,
   an e-mail address, a path in somebody's home folder, an account name or a character that does not print, one that
   starts like a heading of the prompt, and one that wears the mark "(you said)" (which the prompt says outranks the
@@ -131,7 +134,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   as much as a fresh use would, and a negative balance rests it at once, before the nightly reflection retires it.
 - A note saved or changed while a run works reaches that run at its next step, when the run would be handed it at its
   start: not another agent's lesson, not a resting note, and only as many as fit the budget of the starting notes (the
-  run is told how many more changed; `memory_search` finds them). A change of tags alone, such as the nightly `rest` or
+  run is told how many more changed; `memory_search` finds them). A note the run itself just saved or rewrote is not
+  handed again, since that tool's answer already says it. An edit you make on the Memory page of a note that run saved
+  still reaches it, and the note keeps the run as its author (item 1141). A change of tags alone, such as the nightly `rest` or
   merged tags, is no change: the note keeps its date, so an old fact retagged at night does not pass for newer than its
   correction.
 - Three tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
