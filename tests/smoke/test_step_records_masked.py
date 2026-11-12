@@ -152,7 +152,7 @@ async def _asked(room: Room, gate: RunGate, action: ActionInfo, approve: bool) -
             shown.append(event)
         approval_id: object = event.data["approval_id"]
         assert isinstance(approval_id, str)
-        await room.broker.resolve(approval_id, approve, "user", "go ahead")
+        await room.broker.resolve(approval_id, approve, "user", "")
         await authorizing
     return shown
 
