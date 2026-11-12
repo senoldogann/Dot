@@ -1,6 +1,6 @@
 // The system page: how the daemon is doing, the emergency stop, the health checks and the models each provider offers.
 
-import { DOT_ID, lookOf, rememberLook } from "../actors.js";
+import { DOT_ID, dotFace, lookOf, rememberLook } from "../actors.js";
 import { api, clearToken, inPhoneApp, openPhoneAppSettings } from "../api.js";
 import {
   AUTO_COMPUTER,
@@ -2786,16 +2786,31 @@ function buildNameCard() {
   );
 }
 
-/** Dot's own face (item 102): the picker and Save, kept by the daemon for every browser. */
+/** Dot's own face (item 102), kept by the daemon for every browser: the face it wears and Change (item 1136), which
+ * opens the picker and Save; the picker is made the first time it opens. */
 function buildDotLookCard() {
-  const picker = lookPicker({ look: lookOf(DOT_ID, null), uid: "dot" });
+  let picker = null;
+  const face = el("span", { class: "dot-look-face" }, dotFace("idle"));
+  const pickerSlot = el("div", { class: "card-pad stack", hidden: true });
+  const change = el("button", { class: "btn sm", type: "button", "aria-expanded": "false" }, "Change");
   const save = el("button", { class: "btn primary", type: "button" }, icon("check"), "Save the look");
+  change.addEventListener("click", () => {
+    const opening = pickerSlot.hidden;
+    if (opening && picker === null) {
+      picker = lookPicker({ look: lookOf(DOT_ID, null), uid: "dot" });
+      pickerSlot.replaceChildren(picker.element, el("div", { class: "cluster end" }, save));
+    }
+    pickerSlot.hidden = !opening;
+    change.textContent = opening ? "Close" : "Change";
+    change.setAttribute("aria-expanded", String(opening));
+  });
   save.addEventListener("click", () =>
     attempt(async () => {
       save.disabled = true;
       try {
         const record = await api.put(`/agents/${DOT_ID}/look`, picker.value());
         rememberLook(DOT_ID, record.look);
+        face.replaceChildren(dotFace("idle"));
         toast("ok", "Dot's look saved.");
       } finally {
         save.disabled = false;
@@ -2805,10 +2820,10 @@ function buildDotLookCard() {
   const element = el(
     "section",
     { class: "card", "aria-label": "Dot's look" },
-    el("div", { class: "card-head" }, el("span", null, "Dot's look")),
-    el("div", { class: "card-pad stack" }, picker.element, el("div", { class: "cluster end" }, save)),
+    el("div", { class: "card-pad row dot-look-row" }, face, el("span", { class: "grow" }, "Dot's look"), change),
+    pickerSlot,
   );
-  return { element, dispose: picker.dispose };
+  return { element, dispose: () => picker?.dispose() };
 }
 
 export function mountGeneral(root, ctx) {

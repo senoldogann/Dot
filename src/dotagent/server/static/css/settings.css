@@ -3847,6 +3847,41 @@
   display: block;
 }
 
+/* A schedule's Details (item 1136): how its tasks start, its goal and its history, under the row's line. */
+.schedule-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+/* The row's line sits close under its name, and an open row keeps its switch and face by its name. */
+.schedule-list .row-meta.when-line {
+  margin-top: var(--space-half);
+}
+
+.schedule-list > .list-row:has(> .row-main > .schedule-details:not([hidden])) {
+  align-items: start;
+}
+
+/* With a mouse, Details reads as a quiet word of the line; a finger keeps the button's full height. */
+@media (pointer: fine) {
+  .when-line > .schedule-details-toggle {
+    min-height: 0;
+    padding: 0 var(--space-1);
+    margin-left: var(--space-half);
+  }
+}
+
+.schedule-details-label {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  color: var(--muted);
+}
+
 /* The list rows of a page: hairlines between them, no card inside a card. A note of Settings › Memory reads as one
    row: the sentence first, then a quiet line of what it carries (who saved it, when, how it scored), its actions at the
    end of that line. */
@@ -5735,4 +5770,15 @@
   cursor: pointer;
   color: var(--muted);
   margin-bottom: var(--space-2);
+}
+
+/* Dot's look in Settings › General (item 1136): its face and Change on one line; the picker opens under them. */
+.dot-look-row {
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dot-look-face {
+  display: inline-flex;
+  flex: none;
 }

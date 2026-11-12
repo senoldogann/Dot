@@ -247,9 +247,9 @@ export function mount(root, ctx) {
     toast("ok", `${plugin.name} is back at its earlier version.`);
   }
 
-  /** A proposal's card: its mark and name, whether it is new or an update and where it comes from, its risk and how
-   * near it is to the owner's work, what it does and why the risk is what it is (the review's words), the details
-   * folded (its skills, what the scan found, its source), and Install or Update with Skip. */
+  /** A proposal's card: its mark and name, whether it is new or an update and where it comes from, its risk, what it
+   * does, the details folded (why the risk is what it is in the review's words, what it needs, how near it is to the
+   * owner's work, its skills, what the scan found, its source), and Install or Update with Skip. */
   function proposalCard(proposal) {
     const key = `scout:${proposal.kind}:${proposal.id}`;
     const working = busy.has(key);
@@ -269,7 +269,14 @@ export function mount(root, ctx) {
       "details",
       { class: "scout-details" },
       el("summary", null, "Details"),
+      // Why its risk is what it is and what its skills need (item 949) open the card's details (item 1136): the card
+      // says what it does, its risk and the one action.
+      proposal.why ? el("p", { class: "hint scout-why" }, proposal.why) : null,
+      // What its skills need that it does not bring: installed alone, they would only describe it.
+      proposal.needs ? el("p", { class: "hint scout-needs" }, `Needs: ${proposal.needs}`) : null,
       el("dl", { class: "gallery-facts" }, [
+        el("dt", null, "Fits your work"),
+        el("dd", { class: "scout-fit", title: "How close its skills are to the tasks you gave Dot lately" }, `${Math.round(proposal.fit * 100)}%`),
         el("dt", null, "Source"),
         el("dd", null, el("a", { href: proposal.homepage, target: "_blank", rel: "noopener noreferrer" }, `github.com/${proposal.repository}`, icon("external")), ` · ${proposal.source}`),
         el("dt", null, "Version checked"),
@@ -299,12 +306,8 @@ export function mount(root, ctx) {
           "div",
           { class: "scout-badges" },
           el("span", { class: `badge ${risk.tone}`, title: proposal.why }, risk.label),
-          el("span", { class: "badge b-info", title: "How close its skills are to the tasks you gave Dot lately" }, `Fits your work ${Math.round(proposal.fit * 100)}%`),
         ),
         el("p", { class: "gallery-card-does" }, proposal.does || proposal.name),
-        proposal.why ? el("p", { class: "hint scout-why" }, proposal.why) : null,
-        // What its skills need that it does not bring (item 949): installed alone, they would only describe it.
-        proposal.needs ? el("p", { class: "hint scout-needs" }, `Needs: ${proposal.needs}`) : null,
         details,
       ),
       el("div", { class: "gallery-action scout-actions" }, takeButton, skipButton),

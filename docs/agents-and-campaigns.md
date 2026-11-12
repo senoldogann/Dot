@@ -2,8 +2,13 @@
 
 ## Agents
 
-**The office** (item 885, the owner's ask of 2026-10-31) opens the Agents page: Dot and your agents in a room drawn in
-3D, each living its day by what it does. An agent whose run works goes to its own desk (its name on a plate), sits and
+**The Agents page** is in four parts, one shown at a time and the last one kept in this browser (item 1136): **Agents**
+(Dot and your agents as cards, then the ready-made agents and teams), **Teams**, **Orders** (the work orders) and
+**Office**. **New agent** stands beside the tabs; **New team**, **Import an agent** and **Handoffs** are under the "…"
+next to it.
+
+**The office** (item 885, the owner's ask of 2026-10-31) is the Office part of the Agents page: Dot and your agents in a
+room drawn in 3D, each living its day by what it does. An agent whose run works goes to its own desk (its name on a plate), sits and
 types, and its screen lights up; one whose run waits for you (a question, a step to approve) stands at its desk, turns
 to you and waves, its tag pulsing orange; a free one has a coffee at the bar, sits on the sofa, looks out of a window,
 thinks at the whiteboard, browses the shelf or sits at its desk, and in the small hours naps. The figures are Dot's own,
@@ -70,7 +75,8 @@ you were there or when you send. Many help offers scroll in their own part, and 
 the box is never out of reach. The button at the top corner shows the office full screen, over the whole window, and takes
 it back, as Escape does (item 901). The names over the heads glide when one must stand above another, and their sizes
 are read when their words change, not at every frame (item 898: they moved jerkily). three.js 0.187.0 (MIT,
-`static/vendor/three/`, its licence beside it) draws it and is loaded only when the office opens.
+`static/vendor/three/`, its licence beside it) draws it, loaded only when the office opens and drawn only while its part is
+shown.
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
 model, a reasoning level, approvals, the actions it may use (its tools); each left out takes the configured one, and **All actions**,
@@ -80,7 +86,7 @@ tick All actions yourself, and none ticked is refused, item 512) and a look: a s
 the character (see the design system), picked in the editor's Look field with a moving preview, worn as a still face
 wherever the agent shows, and until you choose one the shape and colour its id's hue gives it (`PUT
 /api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look" card of Settings › General, kept by the daemon
-for every browser). **Agents** in the sidebar lists Dot first and then your agents, each with its newest chat; **New
+for every browser: its face and **Change**, which opens the picker and Save). **Agents** in the sidebar lists Dot first and then your agents, each with its newest chat; **New
 agent** opens the editor; an agent's page greets with its face and role, takes a message for it ("Message Scout") and
 lists its chats, with Edit and Delete in the bar. The box of that page has the home's Mode, Model, Reasoning and Options
 pickers (item 426), starting from the agent's own: its model, its reasoning level and its approvals, not what this
@@ -117,17 +123,17 @@ as the page's heading, as the tab does ("Scout · Agents · Dot"), and holds one
 **Export**, **Pause** (or **Resume**) and **Delete**. Edit opens the editor at the top of the page, not
 where the greeting stood. **Pause** (item 465; `POST /api/agents/<id>/pause`, and `/resume`) keeps the
 agent's schedules from starting anything by themselves until **Resume**: the list and the page say "Paused", and its
-schedules' rows "<name> is paused" (see [Memory and schedules](memory-and-schedules.md)). What you send the agent, **Run
+schedules' rows "<name> is paused" on their one line (see [Memory and schedules](memory-and-schedules.md)). What you send the agent, **Run
 now** of one of its schedules and the messages of other agents still reach it, and runs already working go on, each with
 its Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
 
-The page is in three parts (items 509 and 610): **Your teams** and **Your agents**, each with its count, and under
-them **Add ready-made agents**, which shows the teams or the single agents, one of the two at a time (**Teams** first;
-the one chosen last while the app is open). Your agents are a grid of compact cards, as many across as the page has
+The Agents tab holds **Your agents**, with its count, and under it **Add ready-made agents**, which shows the teams or
+the single agents, one of the two at a time (**Teams** first; the one chosen last while the app is open); **Your
+teams**, with their count, are the Teams tab (items 509, 610 and 1136). Your agents are a grid of compact cards, as many across as the page has
 room for, two to four, and one on a phone: the face, the name over the role, each on one line ("Made by Dot" and
 "Paused" go under a name too long to share its line, item 782), and under them the title of the agent's newest chat
 (the chat's own, as you may have renamed it) with how long ago it began, or that it has none. Your teams are wider
-cards, two across at most, each as wide as two of the agents' columns, so that the two grids end at the same edge. Dot's card names Dot's newest chat of its own (item 633): one that is not an agent's, a campaign's or a team's,
+cards, two across at most, each as wide as two of the agents' columns. Dot's card names Dot's newest chat of its own (item 633): one that is not an agent's, a campaign's or a team's,
 which their own cards name. How long ago keeps up with the clock while the page stays open, and the list is read again
 when a run starts or ends. The card is the way to the agent's page, and says "Paused" and "Made by Dot" as the page
 does; Dot's opens the chats.
@@ -170,8 +176,9 @@ there, **Suggested by its template** with **Add it**, which adds it switched off
 model, reasoning level, approvals, tools and look (`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An
 agent whose name, role or instructions hold a secret is not exported, and the page says to take it out first: a value
 Dot holds (any value of the home's `.env`, and a key the daemon has read from the Keychain), or a key, a token or a
-password by its form, as the masking of secrets finds them. **Import** on the Agents page makes the same agent from such
-a file, in this home or another, and opens it; a file that names a tool this home lacks is refused with the tool's name.
+password by its form, as the masking of secrets finds them. **Import an agent**, under the "…" of the Agents page, makes
+the same agent from such a file, in this home or another, and opens it; a file that names a tool this home lacks is
+refused with the tool's name.
 The API: `GET /api/agent-templates` (each with `cron` and `task`, empty for one that suggests no schedule, and its
 `questions`), `POST /api/agent-templates/{id}/use` (with `answers`, in the questions' order, 500 characters each), `GET /api/agents/{id}/export` and `POST /api/agents/import` (422 for Dot, for a secret,
 and for a file that is not an agent's or names tools not here); a template's schedule is `POST /api/schedules` with
@@ -202,9 +209,9 @@ now and `added` for the agents it put back; 404 for a team that is not there, 42
 
 **Your teams** (item 610) are the teams you have, each a record of a name, what it is for (500 characters at most) and
 agents of yours in an order, which holds nothing else: removing a team keeps its agents and its chats, and an agent that
-is deleted leaves the teams that had it. Use team makes one from a ready team, **New team** on the Agents page puts
-agents of yours together (at least one, each once; Dot is no agent to put in a team), **Select** at the head of Your
-agents turns their cards into boxes to tick (item 867), and the bar under them counts the picked ones and opens that
+is deleted leaves the teams that had it. Use team makes one from a ready team, **New team** under the Agents page's
+"…" puts agents of yours together (at least one, each once; Dot is no agent to put in a team), **Select** at the head of
+Your agents turns their cards into boxes to tick (item 867), and the bar under them counts the picked ones and opens that
 form with them ticked, first, in the order picked (**Make a team**; Cancel leaves the cards as links), and **Edit** in
 the bar of a
 team's page changes its name, purpose and agents (the agents it has first, in its order, then the others; Save writes
@@ -374,7 +381,7 @@ answer of a run that ended done is shown so; it stays in sight when the chat sho
 folded there too until you open it (item 859: item 830 had it open, and each return to the chat opened it again); one
 you opened stays open in that tab when the chat is drawn again.
 The run that answers a message names the agent in its `run_queued` event (`agent_name`), which the page reads; a
-helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (a button on the Agents page, `#/team`) lists today's messages: who to whom, the
+helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (under the "…" of the Agents page, `#/team`) lists today's messages: who to whom, the
 message and the reply (their words, with no markdown marks: item 778), the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
 gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
 which older tool output is shortened, once, to 700 characters; a step's request to Anthropic also marks the end of the
