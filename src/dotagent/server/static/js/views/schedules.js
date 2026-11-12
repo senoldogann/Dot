@@ -229,17 +229,27 @@ function firingsList(firings) {
 function scheduleRow(view, handlers) {
   const { record, agent } = view;
   const open = handlers.firingsOpen(record.id);
-  const firings = el("div", { class: "firings", hidden: !open, dataset: { firings: record.id } });
-  const firingsToggle = el(
+  // A row is its name and one line of when and how it went (item 1136); how its tasks start, its goal and its history
+  // stand behind Details, which a repaint keeps open.
+  const firings = el("div", { class: "firings", dataset: { firings: record.id } });
+  const details = el(
+    "div",
+    { class: "schedule-details", hidden: !open },
+    el("div", { class: "row-meta" }, optionChips(record, agent)),
+    goalText(record.goal),
+    el("h4", { class: "schedule-details-label" }, "History"),
+    firings,
+  );
+  const detailsToggle = el(
     "button",
     {
-      class: "btn ghost sm",
+      class: "btn ghost sm schedule-details-toggle",
       type: "button",
       "aria-expanded": String(open),
-      "aria-label": `History of ${record.name}`,
-      onclick: () => handlers.onFirings(record, firingsToggle, firings),
+      "aria-label": `Details of ${record.name}`,
+      onclick: () => handlers.onFirings(record, detailsToggle, details),
     },
-    "History",
+    "Details",
   );
   // A one-time schedule that ran at its moment, as the daemon says (item 723): it read "switched off", as one the owner
   // had switched off, and switching it on was refused.
@@ -300,8 +310,6 @@ function scheduleRow(view, handlers) {
           ? el("span", { class: "badge b-info", title: `Its runs start with the skill ${record.options.skills.join(", ")}` }, "Taught task")
           : null,
       ),
-      el("div", { class: "row-meta" }, optionChips(record, agent)),
-      goalText(record.goal),
       // One line of when and how it went, its parts kept by a dot: a phone wraps it in two lines, not one a part.
       el(
         "div",
@@ -316,9 +324,9 @@ function scheduleRow(view, handlers) {
             ? null
             : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
         ]),
-        firingsToggle,
+        detailsToggle,
       ),
-      firings,
+      details,
     ),
     el("div", { class: "row-actions" }, more),
   );
@@ -747,7 +755,7 @@ export function mount(root, ctx) {
     }
     count.textContent = plural(views.length, "schedule", "schedules");
     for (const list of holder.querySelectorAll("[data-firings]")) {
-      if (!list.hidden) {
+      if (openFirings.has(list.dataset.firings)) {
         attempt(() => loadFirings(list.dataset.firings, list));
       }
     }
@@ -760,7 +768,8 @@ export function mount(root, ctx) {
     }
   }
 
-  async function toggleFirings(record, button, list) {
+  // A row's Details: how its tasks start, its goal, and its history, read when they open.
+  async function toggleFirings(record, button, details) {
     const open = !openFirings.has(record.id);
     if (open) {
       openFirings.add(record.id);
@@ -768,8 +777,9 @@ export function mount(root, ctx) {
       openFirings.delete(record.id);
     }
     button.setAttribute("aria-expanded", String(open));
-    list.hidden = !open;
+    details.hidden = !open;
     if (open) {
+      const list = details.querySelector("[data-firings]");
       list.replaceChildren(loadingPanel());
       await loadFirings(record.id, list);
     }

@@ -1,8 +1,8 @@
 // Agents (item 86): the profiles the owner makes, each with a face in its own hue, a name, a role in one line,
 // instructions that open the prompt of its runs, and bounds for them (a model, a reasoning level, approvals, tools).
-// The list (#/agents) shows the owner's teams (item 610), each a card with its agents' faces, then Dot and the agents as
-// a grid of compact cards, each with its newest chat, and under them the ready teams (item 504) and the templates (item
-// 315) agents start from in one click; an agent's page (#/agents/<id>) greets with its face and role, takes a message
+// The list (#/agents) is in parts, one shown at a time (item 1136): Dot and the agents as a grid of compact cards, each
+// with its newest chat, and under them the ready teams (item 504) and the templates (item 315) agents start from in one
+// click; the owner's teams (item 610), each a card with its agents' faces; the work orders; and the office; an agent's page (#/agents/<id>) greets with its face and role, takes a message
 // for it and lists its chats; the editor makes or changes an agent. An agent goes out as a file from its page and comes
 // back, in this home or another, from the list's Import. A team's own page is views/teams.js.
 
@@ -21,7 +21,7 @@ import { openMenu } from "../menu.js";
 import { mountOffice } from "../office/office.js";
 import { readFolds, readPref, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
-import { aboutToggle, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
+import { aboutToggle, errorPanel, field, loadingPanel, pageHead, segmented, statusBadge } from "../panels.js";
 import { APPROVAL_OPTIONS, heldChoice, KEPT_GOAL_MODE } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { setStageGlass, setStageTitle, setStageTools } from "../stage.js";
@@ -1007,20 +1007,7 @@ function mountList(root, ctx) {
   }
 
   const newButton = el("button", { class: "btn primary", type: "button", "aria-label": "New agent", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
-  const newTeamButton = el(
-    "button",
-    { class: "btn", type: "button", title: "Put agents of yours together as a team", "aria-label": "New team", onclick: () => attempt(() => openTeamEditor()) },
-    icon("users"),
-    el("span", { class: "label" }, "New team"),
-  );
-  const teamLink = el("a", { class: "btn ghost", href: "#/team", title: "Today's messages between agents" }, icon("branch"), el("span", { class: "label" }, "Handoffs"));
   const chooser = el("input", { type: "file", accept: ".json,application/json", hidden: true, "aria-label": "Agent file" });
-  const importButton = el(
-    "button",
-    { class: "btn ghost", type: "button", title: "Make an agent from a file exported from Dot", onclick: () => chooser.click() },
-    icon("upload"),
-    el("span", { class: "label" }, "Import"),
-  );
   chooser.addEventListener("change", () => {
     const [file] = chooser.files;
     chooser.value = "";
@@ -1031,16 +1018,30 @@ function mountList(root, ctx) {
       });
     }
   });
-  // The office (the owner's ask of 2026-10-31): the agents in a 3D room, living their day by what they do; shown unless
-  // it was hidden, which this browser keeps.
+  // The page's other actions sit behind one button beside New agent (item 1136), as an agent's page keeps its own
+  // behind More (item 993): one primary action in sight, the rest a click away.
+  const moreButton = el("button", { class: "btn ghost icon-only", type: "button", title: "More", "aria-label": "More actions", "aria-haspopup": "menu" }, icon("ellipsis"));
+  moreButton.addEventListener("click", () => {
+    const box = moreButton.getBoundingClientRect();
+    openMenu({
+      label: "More actions",
+      at: { x: box.right - 220, y: box.bottom + 4 },
+      back: moreButton,
+      button: moreButton,
+      items: [
+        { label: "New team", icon: "users", title: "Put agents of yours together as a team", run: () => attempt(() => openTeamEditor()) },
+        { label: "Import an agent", icon: "upload", title: "Make an agent from a file exported from Dot", run: () => chooser.click() },
+        "separator",
+        { label: "Handoffs", icon: "branch", title: "Today's messages between agents", run: () => ctx.navigate("/team") },
+      ],
+    });
+  });
+  // The office (the owner's ask of 2026-10-31): the agents in a 3D room, living their day by what they do. It is a
+  // part of its own (item 1136), drawn only while it is open: its room and its labels are a view to look at, not the
+  // list to work from, and WebGL costs nothing while another part is shown.
   const officeHolder = el("div", { class: "office-holder" });
   let office = null;
-  const officeToggle = el("button", { class: "btn ghost sm", type: "button", onclick: () => showOffice(officeHolder.hidden) });
   function showOffice(on) {
-    writePref(OFFICE_KEY, on ? "on" : "off");
-    officeHolder.hidden = !on;
-    officeToggle.textContent = on ? "Hide" : "Show";
-    officeToggle.setAttribute("aria-expanded", String(on));
     if (on && office === null) {
       office = mountOffice(officeHolder, {
         composerFor: (record, onStarted, follow, onSteered) => officeComposer(record, ctx, onStarted, follow, onSteered),
@@ -1049,30 +1050,53 @@ function mountList(root, ctx) {
     } else if (!on && office !== null) {
       office.dispose();
       office = null;
+      // Its canvas goes with it, and with the canvas the browser's WebGL context.
+      officeHolder.replaceChildren();
     }
   }
-  const officePart = el(
-    "section",
-    { class: "agents-part office-part", "aria-label": "The office" },
-    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Office"), officeToggle),
-    officeHolder,
-  );
-  showOffice(readPref(OFFICE_KEY) !== "off");
+  const officePart = el("section", { class: "agents-part office-part", "aria-label": "The office" }, officeHolder);
   // What Dot handed out to the agents and the objectives it keeps (items 907, 908), read only.
   const work = workOrdersPart();
+  // The page in parts (item 1136): the agents the owner has and the ready-made ones first, then the teams, the work
+  // orders and the office, one part at a time; the part shown is kept in this browser.
+  const parts = [
+    { id: "agents", label: "Agents", sections: [yours, templates] },
+    { id: "teams", label: "Teams", sections: [yourTeams] },
+    { id: "orders", label: "Orders", sections: [work.element] },
+    { id: "office", label: "Office", sections: [officePart] },
+  ];
+  const kept = readPref(PART_KEY);
+  const tabs = segmented(
+    parts.map(({ id, label }) => ({ id, label, hint: null })),
+    parts.some(({ id }) => id === kept) ? kept : "agents",
+    (id) => showPart(id),
+  );
+  tabs.element.classList.add("agents-tabs");
+  tabs.element.setAttribute("aria-label", "Parts of the Agents page");
+  function showPart(id) {
+    writePref(PART_KEY, id);
+    tabs.set(id);
+    for (const part of parts) {
+      for (const section of part.sections) {
+        section.hidden = part.id !== id;
+      }
+    }
+    showOffice(id === "office");
+  }
   root.append(
     pageHead(
       "Agents",
       "Dot, your teams, and the agents you or Dot made, each with a role and its own chats.",
-      el("div", { class: "cluster" }, teamLink, importButton, chooser, newTeamButton, newButton),
+      el("div", { class: "agents-head" }, tabs.element, el("span", { class: "spacer" }), chooser, moreButton, newButton),
     ),
     editorSlot,
-    officePart,
-    work.element,
-    yourTeams,
     yours,
     templates,
+    yourTeams,
+    work.element,
+    officePart,
   );
+  showPart(tabs.value());
   const stopLifecycle = onLifecycle((event) => {
     if (event.kind === "run_started" || event.kind === "run_finished") {
       attempt(reload);
@@ -1106,8 +1130,8 @@ function mountList(root, ctx) {
   };
 }
 
-// Whether the office shows on the Agents page, kept in this browser ("off" when hidden).
-const OFFICE_KEY = "dot.agents.office";
+// The part of the Agents page shown (item 1136), kept in this browser: "agents", "teams", "orders" or "office".
+const PART_KEY = "dot.agents.part";
 
 /**
  * The box of the office's panel that messages `record` (Dot, or an agent): the composer of the agent's page, whose

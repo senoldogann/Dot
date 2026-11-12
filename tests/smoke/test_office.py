@@ -1,6 +1,6 @@
 """The office of the Agents page (the owner's ask of 2026-10-31): Dot and the agents in a 3D room, each with a tag that
-says what it does; a click opens a panel with a box to message it; Hide keeps it hidden in this browser; a browser
-without WebGL 2 is told so and keeps the lists. A real daemon in Chrome, wide and on a phone."""
+says what it does; a click opens a panel with a box to message it; its tab is kept in this browser (item 1136); a
+browser without WebGL 2 is told so, the lists a tab away. A real daemon in Chrome, wide and on a phone."""
 
 import asyncio
 import json
@@ -120,9 +120,17 @@ async def _stream(route: Route) -> None:
 
 
 async def _agents_page(page: Page, address: str) -> None:
+    """The Agents page with its Office part shown (item 1136: the office is a tab of its own)."""
     port: int = int(address.rpartition(":")[2])
     await page.goto(ui_url("127.0.0.1", port, TOKEN))
     await page.goto(f"{address}/#/agents")
+    await _tab(page, "Office")
+
+
+async def _tab(page: Page, name: str) -> None:
+    await (
+        page.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name=name, exact=True).click()
+    )
 
 
 async def test_the_office_shows_every_agent_and_dot_and_a_click_opens_the_box_to_message_one(
@@ -183,8 +191,11 @@ async def test_the_office_shows_every_agent_and_dot_and_a_click_opens_the_box_to
                 await expect(panel).to_be_visible()
                 await panel.get_by_role("button", name="Close").click()
                 await expect(panel).to_have_count(0)
-                # The lists stay under the office.
+                # The lists are a tab away, and the office stops drawing while they show.
+                await _tab(page, "Agents")
                 await expect(page.get_by_role("region", name="Your agents", exact=True)).to_be_visible()
+                await expect(page.locator("canvas.office-canvas")).to_have_count(0)
+                await _tab(page, "Office")
                 # Away and back: the office is drawn again, its old room and context given back.
                 for _ in range(3):
                     await page.goto(f"{address}/#/settings")
@@ -197,7 +208,7 @@ async def test_the_office_shows_every_agent_and_dot_and_a_click_opens_the_box_to
             await browser.close()
 
 
-async def test_hide_keeps_the_office_hidden_and_a_browser_without_webgl_is_told_so(login_env: dict[str, str]) -> None:
+async def test_the_office_tab_is_kept_and_a_browser_without_webgl_is_told_so(login_env: dict[str, str]) -> None:
     async with _daemon(login_env) as address, async_playwright() as playwright:
         browser = await playwright.chromium.launch(args=_ARGS)
         try:
@@ -206,12 +217,15 @@ async def test_hide_keeps_the_office_hidden_and_a_browser_without_webgl_is_told_
             await _agents_page(page, address)
             part = page.get_by_role("region", name="The office")
             await expect(part.locator(".office-tag")).to_have_count(1 + len(_TEMPLATES), timeout=20_000)
-            await part.get_by_role("button", name="Hide").click()
-            await expect(part.locator(".office-holder")).to_be_hidden()
+            # The part shown is kept in this browser: the office opens again after a reload, the agents after theirs.
             await page.reload()
-            await expect(
-                page.get_by_role("region", name="The office").get_by_role("button", name="Show")
-            ).to_be_visible()
+            await expect(page.get_by_role("region", name="The office").locator(".office-tag")).to_have_count(
+                1 + len(_TEMPLATES), timeout=20_000
+            )
+            await _tab(page, "Agents")
+            await page.reload()
+            await expect(page.get_by_role("region", name="Your agents", exact=True)).to_be_visible()
+            await expect(page.get_by_role("region", name="The office")).to_be_hidden()
             await expect(page.locator("canvas.office-canvas")).to_have_count(0)
             await context.close()
             blind = await browser.new_context(viewport={"width": 1280, "height": 860})
@@ -225,6 +239,7 @@ async def test_hide_keeps_the_office_hidden_and_a_browser_without_webgl_is_told_
             await expect(
                 page.get_by_text("This browser draws no 3D, so the office cannot be shown here.")
             ).to_be_visible()
+            await _tab(page, "Agents")
             await expect(page.get_by_role("region", name="Your agents", exact=True)).to_be_visible()
             await blind.close()
         finally:

@@ -208,12 +208,14 @@ async def test_proposals_are_shown_installed_and_skipped_wide_and_on_a_phone(
                     reports: Locator = cards.first
                     await expect(reports.locator(".gallery-card-name")).to_have_text("Sales Reports")
                     await expect(reports.locator(".scout-badges .badge").first).to_have_text("Low risk")
-                    await expect(reports.locator(".scout-badges")).to_contain_text("Fits your work 82%")
                     await expect(reports.locator(".gallery-card-does")).to_have_text(
                         "CRM verilerinden haftalık satış raporunu yazar ve özetler."
                     )
                     await expect(reports.locator(".gallery-card-by")).to_contain_text("Anthropic or its maker")
+                    # Why the risk is what it is, what it needs and how it fits stand in its details (item 1136).
+                    await expect(reports.locator(".scout-why")).to_be_hidden()
                     await reports.locator(".scout-details > summary").click()
+                    await expect(reports.locator(".scout-fit")).to_have_text("82%")
                     await expect(reports.locator(".scout-findings")).to_contain_text("weekly-report/pull.py")
                     await expect(section.locator(".scout-line")).to_contain_text("Dot looks every night at 03:30")
                     await expect(section.locator(".scout-refused > summary")).to_have_text(

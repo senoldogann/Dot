@@ -162,9 +162,21 @@ def _profile(record: AgentRecord) -> JsonObject:
 
 
 async def _import(page: Page, file: Path) -> None:
-    """Import ``file`` with the Agents page's Import button."""
+    """Import ``file`` with Import an agent, under the Agents page's "…" (item 1136), from the keyboard: a scroll closes
+    the menu, and the scroll a press makes to bring a button into view is told a frame after the menu opened."""
+    # On a phone the toasts stand under the bar, over the page's "…": a press puts each away first, as a person would.
+    for shown in await page.locator(".toast").all():
+        await shown.click()
+    await expect(page.locator(".toast")).to_have_count(0)
+    await page.get_by_role("button", name="More actions").focus()
+    await page.evaluate("() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))")
+    await page.keyboard.press("Enter")
+    menu: Locator = page.get_by_role("menu", name="More actions")
+    await expect(menu.get_by_role("menuitem", name="New team")).to_be_focused()
+    await page.keyboard.press("ArrowDown")
+    await expect(menu.get_by_title(IMPORT_TITLE)).to_be_focused()
     async with page.expect_file_chooser() as choosing:
-        await page.get_by_title(IMPORT_TITLE).click()
+        await page.keyboard.press("Enter")
     await (await choosing.value).set_files(file)
 
 

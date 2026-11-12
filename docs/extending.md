@@ -110,7 +110,7 @@ work.
    refuse the plugin, what it lets Dot do, why the risk is what it is and what its skills need that it does not bring
    (item 949: an MCP server whose tools they call, a program a Mac lacks, an account; a gallery plugin installs its
    skills alone, so Desktop Commander's skills, for one, only describe its server), in the language of your own words;
-   the card says it under **Needs:**. A file too
+   the card's Details say it under **Needs:**. A file too
    long for the review (more than 8,000 characters, or past 24,000 for a skill or 80,000 for the plugin) is named to it
    as not shown, and is an **unread** finding on the card. The risk is never lower than the scan's: a high finding or an
    unread file makes it at least medium, a refusal high. A review that does not come, or comes without a verdict, leaves
@@ -119,8 +119,8 @@ work.
    embeddings on, by shared words otherwise), shown as "Fits your work".
 
 **A proposal's card** shows whether it is new or an update, who publishes it and how far that source is trusted, its
-risk (its reason on the badge), its fit, what it does and why in the review's words, and under **Details** where it
-comes from (the repository at the commit checked), its licence and stars, its skills, the files an update changes and
+risk (its reason on the badge) and what it does; under **Details** (item 1136) stand why in the review's words, what it
+**Needs:**, its fit, where it comes from (the repository at the commit checked), its licence and stars, its skills, the files an update changes and
 everything the scan found. **Install** (`POST /api/plugin-scout/{id}/install`) installs exactly the commit and the files
 that were checked, through the gallery's own install: files that differ install nothing. The plugin then joins the
 gallery's list, and one you remove there installs again from it, at the same commit and files. **Skip** (`POST

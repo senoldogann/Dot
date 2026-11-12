@@ -2,8 +2,13 @@
 
 ## Agents
 
-**The office** (item 885, the owner's ask of 2026-10-31) opens the Agents page: Dot and your agents in a room drawn in
-3D, each living its day by what it does. An agent whose run works goes to its own desk (its name on a plate), sits and
+**The Agents page** is in four parts, one shown at a time and the last one kept in this browser (item 1136): **Agents**
+(Dot and your agents as cards, then the ready-made agents and teams), **Teams**, **Orders** (the work orders) and
+**Office**. **New agent** stands beside the tabs; **New team**, **Import an agent** and **Handoffs** are under the "…"
+next to it.
+
+**The office** (item 885, the owner's ask of 2026-10-31) is the Office part of the Agents page: Dot and your agents in a
+room drawn in 3D, each living its day by what it does. An agent whose run works goes to its own desk (its name on a plate), sits and
 types, and its screen lights up; one whose run waits for you (a question, a step to approve) stands at its desk, turns
 to you and waves, its tag pulsing orange; a free one has a coffee at the bar, sits on the sofa, looks out of a window,
 thinks at the whiteboard, browses the shelf or sits at its desk, and in the small hours naps. The figures are Dot's own,
@@ -70,7 +75,8 @@ you were there or when you send. Many help offers scroll in their own part, and 
 the box is never out of reach. The button at the top corner shows the office full screen, over the whole window, and takes
 it back, as Escape does (item 901). The names over the heads glide when one must stand above another, and their sizes
 are read when their words change, not at every frame (item 898: they moved jerkily). three.js 0.187.0 (MIT,
-`static/vendor/three/`, its licence beside it) draws it and is loaded only when the office opens.
+`static/vendor/three/`, its licence beside it) draws it, loaded only when the office opens and drawn only while its part is
+shown.
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
 model, a reasoning level, approvals, the actions it may use (its tools); each left out takes the configured one, and **All actions**,
@@ -80,7 +86,7 @@ tick All actions yourself, and none ticked is refused, item 512) and a look: a s
 the character (see the design system), picked in the editor's Look field with a moving preview, worn as a still face
 wherever the agent shows, and until you choose one the shape and colour its id's hue gives it (`PUT
 /api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look" card of Settings › General, kept by the daemon
-for every browser). **Agents** in the sidebar lists Dot first and then your agents, each with its newest chat; **New
+for every browser: its face and **Change**, which opens the picker and Save). **Agents** in the sidebar lists Dot first and then your agents, each with its newest chat; **New
 agent** opens the editor; an agent's page greets with its face and role, takes a message for it ("Message Scout") and
 lists its chats, with Edit and Delete in the bar. The box of that page has the home's Mode, Model, Reasoning and Options
 pickers (item 426), starting from the agent's own: its model, its reasoning level and its approvals, not what this

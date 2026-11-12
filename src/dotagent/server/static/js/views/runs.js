@@ -10,6 +10,7 @@ import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
 import { el, modelName } from "../dom.js";
+import { serviceWords } from "../errors.js";
 import { dotName } from "../face.js";
 import { buildFirstChat } from "../firstchat.js";
 import { buildFirstSteps } from "../firststeps.js";
@@ -353,6 +354,9 @@ function mainProblem(providers, main) {
 function buildSetup() {
   const what = el("p", null);
   const why = el("p", { class: "hint" });
+  // The service's words as it recorded them, when the sentence above left its code and reference out (item 1136), in
+  // the card's one fold with the other way to a model.
+  const recorded = el("p", { class: "small muted", hidden: true });
   const element = el(
     "section",
     { class: "card home-setup", hidden: true, "aria-labelledby": "home-setup-title" },
@@ -371,8 +375,9 @@ function buildSetup() {
       el(
         "details",
         { class: "error-details" },
-        el("summary", null, "Another way"),
-        el("p", { class: "small muted" }, "In Terminal, run ", el("code", null, "dotx setup"), ": it checks this Mac, saves a key and chooses the model."),
+        el("summary", null, "Details"),
+        recorded,
+        el("p", { class: "small muted" }, "Another way: in Terminal, run ", el("code", null, "dotx setup"), ". It checks this Mac, saves a key and chooses the model."),
       ),
     ),
   );
@@ -388,7 +393,10 @@ function buildSetup() {
     element.hidden = problem === null;
     if (problem !== null) {
       what.textContent = `New chats start on ${modelName(main)} from ${providerLabel(providerOf(main))}, which cannot answer now.`;
-      why.textContent = problem;
+      const said = serviceWords(problem);
+      why.textContent = said.text;
+      recorded.textContent = said.details;
+      recorded.hidden = said.details === "";
     }
   }
 

@@ -79,3 +79,25 @@ export function explain(error) {
   }
   return { text: message, details: "" };
 }
+
+// A model service's failure as a run records it (`llm/provider_errors.py`): "provider answered HTTP 410", then the
+// service's own words, which may end in a reference of its log ("(ref: 645db52d-…)").
+const SERVICE_ANSWER = /^provider answered HTTP (\d{3})(?::\s*([\s\S]*))?$/;
+const SERVICE_REF = /\s*\(ref: [0-9a-f-]+\)\s*$/i;
+const SERVICE_SILENT = "The AI service refused the request.";
+
+/**
+ * A line that may be a model service's failure (a failed chat's last words, why the default model cannot answer), as
+ * a person reads it (item 1136): `text` the service's own sentence with the code and the log's reference left out,
+ * `details` the line as it was recorded ("" when nothing was left out). Any other line is itself.
+ * @param {string} line
+ * @returns {{ text: string, details: string }}
+ */
+export function serviceWords(line) {
+  const found = SERVICE_ANSWER.exec(line.trim());
+  if (found === null) {
+    return { text: line, details: "" };
+  }
+  const words = (found[2] ?? "").replace(SERVICE_REF, "").trim();
+  return { text: words === "" ? SERVICE_SILENT : sentence(words), details: line.trim() };
+}

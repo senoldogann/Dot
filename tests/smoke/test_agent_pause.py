@@ -357,6 +357,7 @@ async def test_the_pages_say_an_agent_is_paused_and_pause_turns_into_resume(
                 await expect(row.locator(".badge", has_text="Paused")).to_be_visible()
                 await page.goto(f"http://127.0.0.1:{port}/#/schedules")
                 scheduled: Locator = page.locator(f'[data-schedule="{schedule.id}"]')
+                await scheduled.get_by_role("button", name=f"Details of {schedule.name}").click()
                 await expect(scheduled.locator(".badge", has_text="Rester is paused")).to_be_visible()
                 await page.goto(f"http://127.0.0.1:{port}/#/agents/{resting.id}")
                 await more.click()

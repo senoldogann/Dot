@@ -336,7 +336,9 @@ Nothing of when the schedule fires next nor of whether it is switched on changes
 its moment. It does not start while the emergency stop is engaged, nor while a run of the schedule is at work or being
 started (409), in a daemon that runs no scheduler either; a repeating schedule's firing whose time comes meanwhile is
 skipped as for a run still going, and a one-time schedule waits, still due, and fires once that run has ended. A start
-the daemon refuses leaves no chat behind and is no missed firing. **History** under a schedule lists its last runs, at
+the daemon refuses leaves no chat behind and is no missed firing. A schedule's row is its name and one line of when it
+runs, when next and last, and how it last went (item 1136); **Details** at the end of that line opens how its tasks
+start (its mode, agent, approvals, model, reasoning and the rest), its goal and its **History**, which lists its last runs, at
 its time and by hand, newest first, one at work among them, each with how it went, when, its chat and the first line of
 its answer (`GET /api/schedules/<id>/firings?limit=`, up to 50); a later firing's digest counts a run by hand among its
 earlier runs.
