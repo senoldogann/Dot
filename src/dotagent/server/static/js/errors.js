@@ -84,7 +84,6 @@ export function explain(error) {
 // service's own words, which may end in a reference of its log ("(ref: 645db52d-…)").
 const SERVICE_ANSWER = /^provider answered HTTP (\d{3})(?::\s*([\s\S]*))?$/;
 const SERVICE_REF = /\s*\(ref: [0-9a-f-]+\)\s*$/i;
-const SERVICE_SILENT = "The AI service did not answer the request.";
 
 /**
  * A line that may be a model service's failure (a failed chat's last words, why the default model cannot answer), as
@@ -99,5 +98,5 @@ export function serviceWords(line) {
     return { text: line, details: "" };
   }
   const words = (found[2] ?? "").replace(SERVICE_REF, "").trim();
-  return { text: words === "" ? SERVICE_SILENT : sentence(words), details: line.trim() };
+  return { text: words === "" ? `The AI service answered with an error (HTTP ${found[1]}).` : sentence(words), details: line.trim() };
 }

@@ -761,6 +761,8 @@ async def test_the_settings_open_in_a_dialog_set_the_brief_the_list_labels_it_an
                 # The list shows it as the brief, a read-only run; its Edit opens the settings, not a form in the row.
                 row: Locator = page.locator(f'[data-schedule="{saved["schedule_id"]}"]')
                 await expect(row.locator(".badge", has_text="Brief")).to_be_visible()
+                # How its tasks start stands under the row's Details (item 1136).
+                await row.get_by_role("button", name=re.compile(r"^Details of ")).click()
                 await expect(row.locator(".chip", has_text="research")).to_be_visible()
                 await choose(row, "Edit the brief's settings")
                 await expect(dialog).to_be_visible()
