@@ -1270,11 +1270,11 @@ async def test_a_new_accounts_password_is_made_filled_and_kept_in_the_vault_and_
         },
     )
     # The username went in as a value of the vault too, so the chat's views hide it as they hide the password.
-    assert made.text.startswith("Made a password of 20 characters for [filled from your vault] on "), made.text
+    assert made.text.startswith("Made a password of 16 characters for [filled from your vault] on "), made.text
     (login,) = [item for item in await vault.of_kind("login") if item.username == "ada@example.com"]
     assert login.website == f"https://shop.example.localhost:{sites.shop.port}"
     password: str = keychain.kept[login.id]["password"]
-    assert len(password) == 20 and any(char.isdigit() for char in password) and any(char.isupper() for char in password)
+    assert len(password) == 16 and any(char.isdigit() for char in password) and any(char.isupper() for char in password)
     assert password not in made.text and password in known_secrets(filled=True)
     seen: ToolResult = await _call(ctx, gate, "browser_snapshot", {})
     assert seen.text.count("[hidden]") >= 2 and password not in seen.text
