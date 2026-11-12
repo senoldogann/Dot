@@ -176,8 +176,9 @@ there, **Suggested by its template** with **Add it**, which adds it switched off
 model, reasoning level, approvals, tools and look (`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An
 agent whose name, role or instructions hold a secret is not exported, and the page says to take it out first: a value
 Dot holds (any value of the home's `.env`, and a key the daemon has read from the Keychain), or a key, a token or a
-password by its form, as the masking of secrets finds them. **Import** on the Agents page makes the same agent from such
-a file, in this home or another, and opens it; a file that names a tool this home lacks is refused with the tool's name.
+password by its form, as the masking of secrets finds them. **Import an agent**, under the "…" of the Agents page, makes
+the same agent from such a file, in this home or another, and opens it; a file that names a tool this home lacks is
+refused with the tool's name.
 The API: `GET /api/agent-templates` (each with `cron` and `task`, empty for one that suggests no schedule, and its
 `questions`), `POST /api/agent-templates/{id}/use` (with `answers`, in the questions' order, 500 characters each), `GET /api/agents/{id}/export` and `POST /api/agents/import` (422 for Dot, for a secret,
 and for a file that is not an agent's or names tools not here); a template's schedule is `POST /api/schedules` with
@@ -380,7 +381,7 @@ answer of a run that ended done is shown so; it stays in sight when the chat sho
 folded there too until you open it (item 859: item 830 had it open, and each return to the chat opened it again); one
 you opened stays open in that tab when the chat is drawn again.
 The run that answers a message names the agent in its `run_queued` event (`agent_name`), which the page reads; a
-helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (a button on the Agents page, `#/team`) lists today's messages: who to whom, the
+helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (under the "…" of the Agents page, `#/team`) lists today's messages: who to whom, the
 message and the reply (their words, with no markdown marks: item 778), the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
 gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
 which older tool output is shortened, once, to 700 characters; a step's request to Anthropic also marks the end of the

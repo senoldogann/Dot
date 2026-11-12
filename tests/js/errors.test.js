@@ -84,6 +84,6 @@ test("a model service's failure reads as its own sentence, the code and the log'
     text: "minimax-m2.7 was retired on November 9, 2026. Try glm-5.3-flash:cloud.",
     details: line,
   });
-  assert.deepEqual(serviceWords("provider answered HTTP 503"), { text: "The AI service refused the request.", details: "provider answered HTTP 503" });
+  assert.deepEqual(serviceWords("provider answered HTTP 503"), { text: "The AI service did not answer the request.", details: "provider answered HTTP 503" });
   assert.deepEqual(serviceWords("No OpenAI key is set."), { text: "No OpenAI key is set.", details: "" });
 });
