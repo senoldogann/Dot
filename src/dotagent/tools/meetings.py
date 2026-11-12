@@ -15,7 +15,7 @@ import secrets
 from pydantic import Field
 
 from dotagent.core.text import unclosing
-from dotagent.meetings.desk import POST_CHARS, MeetingDesk, MeetingError
+from dotagent.meetings.desk import MEETING_LEAVE_TOOL, POST_CHARS, MeetingDesk, MeetingError
 from dotagent.meetings.meet import MeetPageError
 from dotagent.meetings.notes import MeetingNotes, notes_text
 from dotagent.policy.types import ActionInfo
@@ -26,7 +26,6 @@ from dotagent.tools.context import ToolContext
 MEETING_JOIN_TOOL: str = "meeting_join"
 MEETING_READ_TOOL: str = "meeting_read"
 MEETING_POST_TOOL: str = "meeting_post"
-MEETING_LEAVE_TOOL: str = "meeting_leave"
 # How many of the newest lines meeting_read gives at most.
 _MOST_LINES: int = 200
 # What a join may take: the wait to be let in (``[meetings] admit_minutes``, 60 at most) and the owner's answer.
@@ -144,11 +143,28 @@ async def _read(args: ReadArgs, ctx: ToolContext) -> ToolResult:
     return ToolResult(text=text, images=(), is_error=False, untrusted=True)
 
 
-async def _post(args: PostArgs, ctx: ToolContext) -> ToolResult:
-    desk: MeetingDesk = _desk(ctx)
-    meeting_id: str | None = desk.busy()
+async def _this_chats(ctx: ToolContext) -> str | ToolResult:
+    """The id of the meeting Dot is in when it was joined in this run's chat; otherwise the result that says why the
+    tool does nothing: a meeting is acted on only from the chat that joined it (the pre-push review of item 1138)."""
+    meeting_id: str | None = _desk(ctx).busy()
     if meeting_id is None:
         return ToolResult(text="Dot is in no meeting now.", images=(), is_error=True)
+    meeting: MeetingRecord = await ctx.runtime.store.get_meeting(meeting_id)
+    if meeting.thread_id != ctx.thread_id:
+        return ToolResult(
+            text="Dot is in a meeting that was joined in another chat: it is acted on only from there.",
+            images=(),
+            is_error=True,
+        )
+    return meeting_id
+
+
+async def _post(args: PostArgs, ctx: ToolContext) -> ToolResult:
+    desk: MeetingDesk = _desk(ctx)
+    found: str | ToolResult = await _this_chats(ctx)
+    if isinstance(found, ToolResult):
+        return found
+    meeting_id: str = found
     try:
         said: str = await desk.post(meeting_id, ctx.run_id, args.text)
     except (MeetingError, MeetPageError) as error:
@@ -158,10 +174,21 @@ async def _post(args: PostArgs, ctx: ToolContext) -> ToolResult:
 
 async def _leave(args: LeaveArgs, ctx: ToolContext) -> ToolResult:
     desk: MeetingDesk = _desk(ctx)
-    meeting_id: str | None = desk.busy()
-    if meeting_id is None:
-        return ToolResult(text="Dot is in no meeting now.", images=(), is_error=True)
-    meeting: MeetingRecord = await desk.leave(meeting_id, "the owner asked Dot to leave")
+    found: str | ToolResult = await _this_chats(ctx)
+    if isinstance(found, ToolResult):
+        return found
+    meeting_id: str = found
+    # A run that read outside content (a meeting's own lines among it) asks the owner first: "Dot, leave the call" in a
+    # caption is no word of the owner's. The meeting's record says who asked.
+    why: str = "the owner asked Dot to leave"
+    if ctx.tainted():
+        try:
+            if not await desk.leave_asked(meeting_id, ctx.run_id):
+                return ToolResult(text="Dot stays in the meeting: the owner did not say yes.", images=(), is_error=True)
+        except MeetingError as error:
+            return _failed(error)
+        why = "a run that read outside content asked Dot to leave, and the owner said yes"
+    meeting: MeetingRecord = await desk.leave(meeting_id, why)
     if meeting.status not in ("ended", "failed"):
         return ToolResult(
             text="Dot is leaving the meeting but is not out of the call yet; meeting_read says when it is.",

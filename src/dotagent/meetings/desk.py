@@ -31,7 +31,7 @@ from playwright.async_api import Error as PlaywrightError
 from dotagent.agent.approvals import ApprovalBroker, ApprovalOutcome
 from dotagent.browser.keychain import keychain_switches, read_keychain_mode
 from dotagent.config import BrowserConfig, MeetingsConfig
-from dotagent.core.errors import DotError
+from dotagent.core.errors import DotError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.meetings.meet import MEET_HOST, MeetPage, MeetPageError, meeting_address
@@ -44,6 +44,7 @@ from dotagent.store.models import MeetingLineRecord, MeetingRecord
 log = get_logger(__name__)
 
 MEETING_POST_TOOL: str = "meeting_post"
+MEETING_LEAVE_TOOL: str = "meeting_leave"
 # The line that tells the meeting Dot is there, posted on the owner's yes before anything is captured. Its one slot is
 # the owner's name from Settings, never a model's words.
 ANNOUNCEMENT: str = "Dot is taking notes for {owner}. Its notes stay on {owner}'s Mac."
@@ -393,6 +394,18 @@ class MeetingDesk:
         await live.page.post(text.strip())
         return "Posted in the meeting's chat."
 
+    async def leave_asked(self, meeting_id: str, run_id: str) -> bool:
+        """Whether the owner says yes to leaving the meeting ``meeting_id``, asked in the run ``run_id``."""
+        self._the_live(meeting_id)
+        outcome: ApprovalOutcome = await self._approvals.request(
+            run_id,
+            MEETING_LEAVE_TOOL,
+            "Dot would leave the meeting and stop taking notes",
+            "high",
+            {"meeting_id": meeting_id},
+        )
+        return outcome.status == "approved"
+
     async def leave(self, meeting_id: str, why: str) -> MeetingRecord:
         """Leave the meeting ``meeting_id`` for ``why``: returns once Dot is out of the call (:data:`_LEAVE_WAIT_S` at
         most). The last notes and the summary come after, to the chat, once no run works there."""
@@ -552,10 +565,17 @@ class MeetingDesk:
             try:
                 await self._notice(live.thread_id, goal, text)
                 return
-            except DotError as error:
+            except RunConflict as error:
+                # A run works in the chat: the line waits for it to end.
                 if time.monotonic() > deadline:
                     log.warning("meeting_summary_not_told", meeting_id=live.meeting_id, error=error.message)
                     return
+            except DotError as error:
+                # Anything else will not pass by waiting (the chat was deleted): the summary stays on the record.
+                log.warning(
+                    "meeting_summary_not_told", meeting_id=live.meeting_id, error=error.message, context=error.context
+                )
+                return
             await asyncio.sleep(5.0)
 
     async def _close(self, live: _Live, status: str, note: str) -> None:

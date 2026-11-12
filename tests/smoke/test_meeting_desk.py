@@ -298,3 +298,14 @@ async def test_a_stop_while_the_notes_are_made_leaves_the_call_at_once(room: Roo
         await asyncio.sleep(0.1)
     assert (await room.store.get_meeting(meeting.id)).status == "ended"
     await desk.aclose()
+
+
+async def test_leaving_asked_by_a_run_that_read_outside_content_waits_for_the_owner(room: Room) -> None:
+    joining: asyncio.Task[MeetingRecord] = asyncio.create_task(room.desk.join(URL, room.run.thread_id, room.run.id))
+    await _answer(room, True)
+    meeting: MeetingRecord = await joining
+    asked: asyncio.Task[bool] = asyncio.create_task(room.desk.leave_asked(meeting.id, room.run.id))
+    await _answer(room, False)
+    assert await asked is False
+    assert room.desk.busy() == meeting.id
+    await room.desk.leave(meeting.id, "the test ends")
