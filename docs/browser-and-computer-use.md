@@ -312,8 +312,9 @@ Both modes share what follows.
   that does not answer where it stands, is waited for one second at most.
 - `browser_wait_text` waits until a text is visible and says after how long. A wait that begins while the page is
   leaving for another (a click that went to a slow page) waits for that page within its time first (item 1035): the
-  page answers nothing while it goes, and the wait failed after 2 s. When the text does not come in time the
-  call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A dialog
+  page answers nothing while it goes, and the wait failed after 2 s. A page whose script holds its main thread (X or
+  Google Cloud building a view) is asked again within the wait's time too (item 1134). When the text does not come in
+  time the call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A dialog
   that opens in front of the page during the wait ends it at once, saying so (item 698): the text would not come until
   the dialog is answered. A dialog that holds the text is the text appearing; a cookie banner ends no wait. A wait that
   has gone on for 5 s ends too once the page has stood still for 3 s, no change in its documents (those of its first ten

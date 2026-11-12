@@ -1559,12 +1559,14 @@ _MODALS: str = f":is([role='dialog'], [role='alertdialog'], dialog[open], [aria-
 TextWaitEnd = Literal["text", "dialog", "timeout"]
 
 
-async def no_dialog_open(page: Page) -> bool:
-    """Whether no dialog stands in front of ``page`` (:data:`_MODALS`): one that opens then ends a wait for a text."""
+async def no_dialog_open(page: Page) -> bool | None:
+    """Whether no dialog stands in front of ``page`` (:data:`_MODALS`): one that opens then ends a wait for a text.
+    ``None`` when the page did not say within ``_COUNT_TIMEOUT_S`` (item 1134): its script holds its main thread, as
+    X's or Google Cloud's does while it builds a view, and the wait asks again within its own time."""
     try:
         return await _count(page.locator(_MODALS).filter(visible=True)) == 0
-    except TimeoutError as error:
-        raise BrowserError("the page did not say in time what it shows", {"url": page.url}) from error
+    except TimeoutError:
+        return None
     except PlaywrightError as error:
         raise _failure("looking for a dialog failed", page, {}, error) from error
 
@@ -1577,7 +1579,8 @@ async def wait_for_text_or_dialog(
     of the page while none was open when the wait began (item 698; the text would not come until it is answered), or
     the time. A dialog that brings the text with it is the text. One wait in the page, for either, so nothing is left
     waiting behind it. ``watch_dialogs`` says whether no dialog was open when a wait made of several began (item 774);
-    ``None`` looks now."""
+    ``None`` looks now. A page that does not say within ``_COUNT_TIMEOUT_S`` which of them it shows ends this slice of
+    the wait as its time does (item 1134): the wait looks again within its own time."""
     wanted: Locator = page.get_by_text(text).filter(visible=True)
     dialogs: Locator = page.locator(_MODALS).filter(visible=True)
     try:
@@ -1587,10 +1590,8 @@ async def wait_for_text_or_dialog(
         await target.first.wait_for(state="visible", timeout=timeout_ms)
         if not watch_dialogs or await _count(wanted) > 0:
             return "text"
-    except PlaywrightTimeoutError:
+    except (PlaywrightTimeoutError, TimeoutError):
         return "timeout"
-    except TimeoutError as error:
-        raise BrowserError("the page did not say in time what it shows", {"text": text, "url": page.url}) from error
     except PlaywrightError as error:
         raise _failure("waiting for the text failed", page, {"text": text}, error) from error
     return "dialog"
