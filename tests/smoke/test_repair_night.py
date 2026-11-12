@@ -299,6 +299,19 @@ elif args[:2] == ["pr", "view"] and "mergeable" in args:
 elif args[:2] == ["pr", "edit"]:
     with (here / "edits").open("a") as edits:
         edits.write(" ".join(args[:3]) + "\\n")
+elif args[:2] == ["pr", "view"] and "author,headRefName" in args:
+    # A night that merges twice leaves the first repair branch in place. The one just pushed is the newest.
+    import subprocess
+    listed = subprocess.run(
+        ["git", "-C", str(here.parent / "origin.git"), "for-each-ref", "--sort=-committerdate",
+         "--format=%(refname:short)", "refs/heads/repair/"],
+        check=True, capture_output=True, text=True)
+    names = [line.strip() for line in listed.stdout.splitlines() if line.strip()]
+    if not names:
+        sys.exit(1)
+    print(json.dumps({"author": {"login": "dot"}, "headRefName": names[0]}))
+elif args[:2] == ["api", "user"]:
+    print("dot")
 elif args[:2] == ["pr", "view"] and "commits" in args:
     print("Item 1: fix")
 elif args[:1] == ["api"] and "/commits/" in args[1]:

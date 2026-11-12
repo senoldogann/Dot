@@ -906,7 +906,8 @@ class RunGate:
         """Refuse a step of a run that read outside content when its words would send a secret Dot holds, or text in
         the form of a key, out of the Mac (item 525): in every approval mode, yolo too, whatever the preset or the
         owner's rules say, but the owner's free mode, which refuses none (item 1097: the owner's choice of 2026-11-10,
-        of free alone over yolo and free). Its record and its error mask the secrets, as they hold the one refused."""
+        of free alone over yolo and free). A run that read nothing of the sort may still send a key to the host it was
+        told to use. Its record and its error mask the secrets, as they hold the one refused."""
         if not self.tainted:
             return
         # A refusal: the values filled into a page are not among the secrets it looks for (item 621); the record of it

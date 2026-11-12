@@ -160,9 +160,13 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   `main` (item 955).
 - **Merge.** With every check passed:
   - `merge = "on_pass"`: Dot merges the pull request into main, squashed (rebased for several items), only while its
-    head is still the commit whose files and checks it looked at (`--match-head-commit`). A merge that reports a
-    failure is read back from GitHub: merged is merged. Dot then deletes the branch on GitHub and, once the checkout is
-    gone, here. The night goes on to the next problem (item 1110: a merge ended the night before, one problem a night),
+    head is still the commit whose files and checks it looked at (`--match-head-commit`), and only a pull request the
+    night itself opened. The branch is `repair/…`. When GitHub names both the opener and the account `gh` is signed in
+    as, they are the same account; a stand-in of `gh` that names the branch and not the account does not stop the
+    night. A pull request anyone else opened, one that only changes docs among them, is left alone, and so is a branch
+    the night did not open. A merge that reports a failure is read back from GitHub: merged is merged. Dot then deletes the
+    branch on GitHub and, once the checkout is gone, here. The night goes on to the next problem (item 1110: a merge
+    ended the night before, one problem a night),
     each session on a checkout of its own of the new main. Once the night is over, if it merged anything and your
     checkout (`repo`) is on main, Dot pulls it fast-forward only and asks for its own restart once it is idle
     (`dotx service restart --when-idle`, run with `python -P`, item 943); a checkout off main or a pull that failed is
@@ -222,7 +226,8 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
     a file the session edited or wrote outside its checkout;
   - the session handed work to a helper agent (`Agent`, `Task`: their tools go to a transcript of their own, which is
     not read; a session is refused those tools besides);
-  - its checks do not all pass once its branch is brought up to `main`: the checks of the new head, read once GitHub
+  - its checks do not all pass once its branch is brought up to `main` (only when the night opened that pull request;
+    another actor's, or a branch that is not `repair/…`, is left as it is): the checks of the new head, read once GitHub
     has made it (two minutes at most), and held when the head moved while they were read;
   - a new Claude Code session that may only read (`Read`, `Grep`, `Glob`: no shell, no edit, no MCP server), in a
     checkout of its own of the pull request's head, does not end with `MERGE:`. It is given what moved, the change and

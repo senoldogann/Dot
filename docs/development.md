@@ -141,7 +141,42 @@ together, and the Linux jobs do not take one. The job `ci` always runs and passe
 skipped: that is the status check `main`'s protection should require (`ci`), in place of `gate`, `gate (part 2)`,
 `browser (pages)`, `browser (phone 1)` and `browser (phone 2)`. A skipped part reports no check of its own, and a
 required check that never arrives blocks the merge. The token this repository's workflows use could not read the
-protection (the rulesets list is empty; item 944 records those five names). Ripgrep and Playwright's browsers are
+protection (the rulesets list is empty; item 944 records those five names). The interface install on that runner is
+`npm ci --ignore-scripts` (`.github/actions/prepare/action.yml`): Biome and tsc need no package script, and a
+`postinstall` in a pull request's `package.json` must not run there. A ruleset that requires a pull request to land
+on `main` (no direct push, no force-push, no deleting `main`, no bypass actor, no signed commits, no required
+review) was not created from here: `POST /repos/senoldogann/Dot/rulesets` answered HTTP 403, `Resource not accessible
+by integration`. Creating it, from an account that administers the repository, and not deleting any branch protection
+already there:
+
+```bash
+gh api --method POST repos/senoldogann/Dot/rulesets --input - <<'EOF'
+{
+  "name": "main",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {"ref_name": {"include": ["refs/heads/main"], "exclude": []}},
+  "rules": [
+    {"type": "pull_request", "parameters": {
+      "required_approving_review_count": 0,
+      "dismiss_stale_reviews_on_push": false,
+      "require_code_owner_review": false,
+      "require_last_push_approval": false,
+      "required_review_thread_resolution": false,
+      "allowed_merge_methods": ["merge", "squash", "rebase"]
+    }},
+    {"type": "non_fast_forward"},
+    {"type": "deletion"}
+  ]
+}
+EOF
+```
+
+`bypass_actors` is empty, which is how this API withholds a bypass: it grants one only to an actor listed there, and
+there is no separate switch that forces administrators through. The ruleset does not require signed commits and does
+not require a review, so a pull request this automation opened can still merge once its checks pass. It does not
+replace a status check the repository already requires. Ripgrep and Playwright's browsers are
 cached, so a job does not download them when a previous run already did. The browser files are those whose names start
 `test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards and the face, in
 Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides nothing of the

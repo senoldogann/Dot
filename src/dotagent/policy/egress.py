@@ -3,9 +3,17 @@
 A run that read content third parties can author may have been told by it to send a secret away. Such a step is
 refused in every approval mode, yolo too, whatever its preset or the owner's rules say: no task the owner gives needs
 a run that read a stranger's words to send their keys anywhere, and the owner can do that step themselves.
+
+:func:`secret_to_unknown_host` says whether those words name a host Dot does not already send keys to. The gate
+refuses a carried secret only once the run has read outside content, and the refusal says the step would send a
+secret out of the Mac, whichever host it names. A run that read nothing of the sort may still send a key where it
+was told.
 """
 
+import ipaddress
+import re
 from collections.abc import Iterator, Sequence
+from urllib.parse import urlsplit
 
 from pydantic import JsonValue
 
@@ -13,6 +21,34 @@ from dotagent.core.text import KNOWN_SECRET_MIN_CHARS
 from dotagent.core.types import JsonObject
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, ActionKind, Flag
+
+# Hosts Dot's own clients already send the owner's keys to, and the clouds a key of that shape is for. A subdomain of
+# one counts. The loopback is always one, so a test and a service on this Mac are not an unknown host. The owner's
+# ``[browser] allowed_hosts`` are added by the gate when that list is set; an empty list does not mean every host.
+KEY_HOSTS: tuple[str, ...] = (
+    "localhost",
+    "github.com",
+    "githubusercontent.com",
+    "openai.com",
+    "anthropic.com",
+    "openrouter.ai",
+    "opencode.ai",
+    "ollama.com",
+    "coinbase.com",
+    "search.brave.com",
+    "tavily.com",
+    "exa.ai",
+    "google.serper.dev",
+    "googleapis.com",
+    "accounts.google.com",
+    "microsoftonline.com",
+    "microsoft.com",
+    "apple.com",
+    "typesafe.ai",
+    "amazonaws.com",
+    "core.windows.net",
+)
+_URL: re.Pattern[str] = re.compile(r"https?://[^\s<>'\"`]+", re.IGNORECASE)
 
 # The kinds of step that hand their words to someone beyond the Mac: a request, a page's address or field, a message,
 # an MCP server's tool, whose server may be anywhere, and what runs code or types into an application (a command line,
@@ -72,3 +108,59 @@ def carries_secret(info: ActionInfo, arguments: JsonObject, known: Sequence[str]
     if looks_like_key(text):
         return True
     return any(value in text for value in known if len(value) >= KNOWN_SECRET_MIN_CHARS)
+
+
+def _host_of(url: str) -> str | None:
+    """The host ``url`` names, lower case, or ``None`` when it names none."""
+    try:
+        host: str | None = urlsplit(url).hostname
+    except ValueError:
+        return None
+    if not host:
+        return None
+    return host.lower().rstrip(".")
+
+
+def _loopback(host: str) -> bool:
+    """Whether ``host`` is this machine: ``localhost`` or a loopback address."""
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _known_host(host: str, known_hosts: Sequence[str]) -> bool:
+    """Whether ``host`` is the loopback or one of ``known_hosts`` or a subdomain of one."""
+    if _loopback(host):
+        return True
+    for entry in known_hosts:
+        item: str = entry.lower().strip().strip(".").rstrip(".")
+        if item and (host == item or host.endswith(f".{item}")):
+            return True
+    return False
+
+
+def _destination_hosts(info: ActionInfo, arguments: JsonObject) -> tuple[str, ...]:
+    """The hosts the step's words name in an ``http`` or ``https`` address: its target, its summary, its body and
+    every string of ``arguments``."""
+    text: str = "\n".join((info.target, info.summary, info.body, *_texts(arguments)))
+    hosts: list[str] = []
+    for raw in _URL.findall(text):
+        host: str | None = _host_of(raw.rstrip(".,;)]}"))
+        if host and host not in hosts:
+            hosts.append(host)
+    return tuple(hosts)
+
+
+def secret_to_unknown_host(
+    info: ActionInfo, arguments: JsonObject, known: Sequence[str], known_hosts: Sequence[str]
+) -> bool:
+    """Whether a step that sends out and carries a secret (:func:`carries_secret`) names a host that is not the
+    loopback and not one of ``known_hosts`` (nor a subdomain of one). A step that names no host is not one: a token
+    on a ``gh`` line has nowhere in its words to refuse. One that names a known host and an unknown one is."""
+    if not carries_secret(info, arguments, known):
+        return False
+    hosts: tuple[str, ...] = _destination_hosts(info, arguments)
+    return bool(hosts) and any(not _known_host(host, known_hosts) for host in hosts)

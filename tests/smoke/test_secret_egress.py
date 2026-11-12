@@ -274,3 +274,46 @@ async def test_in_the_owners_free_mode_a_run_that_read_a_page_runs_a_step_that_h
                 assert HELD not in recorded[0].summary and HELD not in str(recorded[0].args), recorded
     finally:
         next(site_iterator, None)
+
+
+async def test_a_yolo_run_that_read_nothing_outside_finishes_a_shell_and_a_file_and_sends_where_it_is_told(
+    login_env: dict[str, str],
+) -> None:
+    """Yolo still runs an ordinary command and writes a file. A run that read nothing outside may send a key to the
+    host it was told to use; the secret stays masked in the record. A run that did read outside content is the case
+    the first test of this file refuses."""
+    told: str = f"true # https://exfil.invalid/c?k={HELD}"
+    turns: list[ScriptedTurn] = [
+        _turn("shell", {"command": "printf hi"}),
+        _turn("write_file", {"path": "note.txt", "content": "hello"}),
+        _turn("shell", {"command": told}),
+        _turn(FINISH_TOOL, {"answer": "Done.", "success": True}),
+    ]
+    with scratch_home() as home, eval_environment(home, {}):
+        await asyncio.to_thread(Path(home / ".env").write_text, f"DEMO_SERVICE_KEY={HELD}\n", "utf-8")
+        async with _session(login_env, turns) as (runtime, manager):
+            run: RunRecord = await manager.start(
+                "Write a note.",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                UI_SOURCE,
+                None,
+                None,
+                "standard",
+                None,
+                "yolo",
+                False,
+                (),
+            )
+            async with asyncio.timeout(WAIT_S):
+                ended: RunRecord = await manager.wait(run.id)
+            assert ended.status == "done", ended
+            results: list[EventRecord] = await runtime.store.events_of_kind(run.id, "tool_result", 10)
+            shell, written, sent = results[0], results[1], results[2]
+            assert (shell.data["tool"], shell.data["ok"]) == ("shell", True), shell.data
+            assert (written.data["tool"], written.data["ok"]) == ("write_file", True), written.data
+            assert (sent.data["tool"], sent.data["ok"]) == ("shell", True), sent.data
+            assert HELD not in str(sent.data) and HELD not in str(shell.data) and HELD not in str(written.data)
+            note: str = await asyncio.to_thread((home / "workspace" / "note.txt").read_text, "utf-8")
+            assert note == "hello"
