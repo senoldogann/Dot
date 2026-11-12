@@ -153,15 +153,17 @@ def meeting_address(url: str) -> str:
 
 
 def classify_page(text: str, headings: tuple[str, ...], has_leave: bool, has_join: bool) -> MeetState:
-    """The call's state from what the page shows: its text, its h1s, whether Leave call and a join button are there."""
+    """The call's state from what the page shows: its text, its h1s, whether Leave call and a join button are there.
+    While Leave call is there Dot is in the call, whatever the page's text says: the text holds the call's captions and
+    chat, where anyone can write "The call has ended" (the security review of item 1138)."""
+    if has_leave:
+        return "in_call"
     if any(phrase in text for phrase in _STATE_TEXT["ended"]):
         return "ended"
     if any(phrase in text for phrase in _STATE_TEXT["removed"]):
         return "removed"
     if any(phrase in text for phrase in _STATE_TEXT["refused"]):
         return "refused"
-    if has_leave:
-        return "in_call"
     if any("Sign in" in heading for heading in headings):
         return "sign_in"
     if any(phrase in text for phrase in _STATE_TEXT["waiting"]):

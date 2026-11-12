@@ -4376,6 +4376,7 @@ class Store:
         )
         return [_meeting(row) for row in rows]
 
+    @_writing
     async def set_meeting_status(self, meeting_id: str, status: MeetingStatus, note: str) -> MeetingRecord:
         """Move the meeting to ``status`` with ``note``; the first move into the call stamps when Dot was let in, and a
         move to ``ended`` or ``failed`` when it was over."""
@@ -4390,6 +4391,7 @@ class Store:
         await self._db.commit()
         return await self.get_meeting(meeting_id)
 
+    @_writing
     async def set_meeting_notes(self, meeting_id: str, notes: str) -> None:
         """Keep the notes the note maker wrote of the meeting's words (JSON of ``MeetingNotes``)."""
         await self._db.execute(
@@ -4397,6 +4399,7 @@ class Store:
         )
         await self._db.commit()
 
+    @_writing
     async def set_meeting_summary(self, meeting_id: str, summary: str) -> None:
         """Keep the line the meeting left in its chat when it ended."""
         await self._db.execute(
@@ -4404,6 +4407,7 @@ class Store:
         )
         await self._db.commit()
 
+    @_writing
     async def add_meeting_lines(self, meeting_id: str, lines: Sequence[tuple[MeetingLineKind, str, str, float]]) -> int:
         """Add ``lines`` (kind, speaker, text, when) to the meeting after those it has, in their order; returns how
         many lines it has then."""
@@ -4435,6 +4439,7 @@ class Store:
         )
         return [_meeting_line(row) for row in rows]
 
+    @_writing
     async def forget_meeting_lines(self, ended_before: float) -> int:
         """Delete the lines of the meetings that were over before ``ended_before`` (``[meetings] keep_days``), and their
         count: their summary and notes stay. Returns how many lines went."""
@@ -4451,6 +4456,7 @@ class Store:
         await self._db.commit()
         return gone
 
+    @_writing
     async def add_work_order(
         self,
         agent_id: str,

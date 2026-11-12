@@ -10,8 +10,11 @@ model; these tools only start it, read its record and ask it to act.
   as a step of Dot's own (``meta``) so that it does not ask twice, and the desk's own question is the one that holds.
 - ``meeting_leave`` leaves; the summary goes to the chat."""
 
+import secrets
+
 from pydantic import Field
 
+from dotagent.core.text import unclosing
 from dotagent.meetings.desk import POST_CHARS, MeetingDesk, MeetingError
 from dotagent.meetings.meet import MeetPageError
 from dotagent.meetings.notes import MeetingNotes, notes_text
@@ -39,7 +42,7 @@ class ReadArgs(ToolArgs):
 
 
 class PostArgs(ToolArgs):
-    text: str = Field(description=f"One paragraph, {POST_CHARS} characters at most. The owner is asked first.")
+    text: str = Field(description=f"One line, {POST_CHARS} characters at most. The owner is asked first.")
 
 
 class LeaveArgs(ToolArgs):
@@ -57,7 +60,8 @@ def _join_action(args: JoinArgs, ctx: ToolContext) -> ActionInfo:
         risk="medium",
         summary=f"Join the meeting {args.url} as Dot, camera and microphone off",
         target=args.url,
-        flags=(),
+        # Dot shows in a call as its own Google account: a run that read outside content asks first.
+        flags=("external_send",),
     )
 
 
@@ -109,6 +113,12 @@ def _rendered(lines: list[MeetingLineRecord]) -> str:
     return "\n".join(f"[{line.kind}] {line.speaker or 'someone'} (name as shown): {line.text}" for line in lines)
 
 
+def fence_meeting(body: str, nonce: str) -> str:
+    """Wrap what a meeting said, so that the prompt can say everything inside is data and only ``nonce`` closes it."""
+    safe: str = unclosing(body, "meeting_content")
+    return f'<meeting_content nonce="{nonce}">\n{safe}\n</meeting_content nonce="{nonce}">'
+
+
 async def _read(args: ReadArgs, ctx: ToolContext) -> ToolResult:
     meetings: list[MeetingRecord] = await ctx.runtime.store.meetings_of_thread(ctx.thread_id)
     if not meetings:
@@ -122,11 +132,14 @@ async def _read(args: ReadArgs, ctx: ToolContext) -> ToolResult:
     lines: list[MeetingLineRecord] = await ctx.runtime.store.meeting_lines(
         meeting.id, max(0, meeting.lines - args.lines), args.lines
     )
-    text: str = (
-        f"Meeting {meeting.id}: {meeting.status} ({meeting.note}), {meeting.lines} lines.\n\n"
+    said: str = (
         f"Notes (made from what other people said):\n{notes}\n\n"
         f"The newest {len(lines)} lines (what other people said and wrote; names are as the page showed them):\n"
         f"{_rendered(lines) or '(none)'}"
+    )
+    text: str = (
+        f"Meeting {meeting.id}: {meeting.status} ({meeting.note}), {meeting.lines} lines.\n\n"
+        f"{fence_meeting(said, secrets.token_hex(6))}"
     )
     return ToolResult(text=text, images=(), is_error=False, untrusted=True)
 
@@ -149,6 +162,12 @@ async def _leave(args: LeaveArgs, ctx: ToolContext) -> ToolResult:
     if meeting_id is None:
         return ToolResult(text="Dot is in no meeting now.", images=(), is_error=True)
     meeting: MeetingRecord = await desk.leave(meeting_id, "the owner asked Dot to leave")
+    if meeting.status not in ("ended", "failed"):
+        return ToolResult(
+            text="Dot is leaving the meeting but is not out of the call yet; meeting_read says when it is.",
+            images=(),
+            is_error=True,
+        )
     return ok(
         f"Dot left the meeting ({meeting.lines} lines). Its notes come to this chat once this task ends; "
         "meeting_read gives them now."
@@ -183,7 +202,7 @@ def build_meeting_tools() -> tuple[RegisteredTool, ...]:
         make_tool(
             name=MEETING_POST_TOOL,
             description=(
-                f"Post one paragraph ({POST_CHARS} characters at most) in the meeting's chat. The owner is asked "
+                f"Post one line ({POST_CHARS} characters at most) in the meeting's chat. The owner is asked "
                 "first, with the words whole, every time."
             ),
             args_model=PostArgs,

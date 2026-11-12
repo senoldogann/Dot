@@ -17,6 +17,8 @@ What holds, whatever a run or a meeting says:
 
 import asyncio
 import contextlib
+import re
+import sqlite3
 import time
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
@@ -45,7 +47,7 @@ MEETING_POST_TOOL: str = "meeting_post"
 # The line that tells the meeting Dot is there, posted on the owner's yes before anything is captured. Its one slot is
 # the owner's name from Settings, never a model's words.
 ANNOUNCEMENT: str = "Dot is taking notes for {owner}. Its notes stay on {owner}'s Mac."
-# The most of a post, in characters, and its one paragraph.
+# The most of a post, in characters, on its one line.
 POST_CHARS: int = 500
 # How often the page is read while Dot is in the call, and while it waits to be let in.
 _READ_EVERY_S: float = 2.0
@@ -152,16 +154,25 @@ async def launch_meeting_chrome(profile: Path, browser: BrowserConfig, config: M
     return MeetingChrome(context=context, page=page, close=close)
 
 
+# Characters that would make the owner's card show other words than the meeting gets: controls (but the line break)
+# and the marks that turn the direction of text.
+_HIDDEN: re.Pattern[str] = re.compile("[\u0000-\u0009\u000b-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+_LINE_BREAK: re.Pattern[str] = re.compile(r"[\r\n\u2028\u2029]")
+
+
 def post_refused(text: str) -> str | None:
-    """Why ``text`` is no post Dot types into a meeting, or ``None``: empty, longer than :data:`POST_CHARS`, or more
-    than one paragraph."""
+    """Why ``text`` is no post Dot types into a meeting, or ``None``: empty, longer than :data:`POST_CHARS`, more than
+    one line (Enter sends it in Meet's chat), or holding a control or a mark that turns the direction of text, which
+    would show the owner other words than the meeting gets."""
     words: str = text.strip()
     if words == "":
         return "a post needs words"
     if len(words) > POST_CHARS:
         return f"a post is {POST_CHARS} characters at most ({len(words)} given)"
-    if "\n\n" in words:
-        return "a post is one paragraph"
+    if _LINE_BREAK.search(words):
+        return "a post is one line"
+    if _HIDDEN.search(words):
+        return "a post holds no control characters or marks that turn the direction of text"
     return None
 
 
@@ -416,61 +427,88 @@ class MeetingDesk:
 
     async def _watch(self, live: _Live) -> None:
         """Read the page every :data:`_READ_EVERY_S` until the meeting is over for Dot: lines to the store, the notes
-        again every ``notes_minutes`` while lines come, and the summary at the end."""
+        again every ``notes_minutes`` while lines come, and the summary at the end. The notes are made beside the
+        reading, never in its way: a stop is seen within :data:`_READ_EVERY_S` while the note maker works, and cuts it.
+        Whatever ends the watch, Dot leaves the call and closes its browser."""
+        notes: MeetingNotes = NO_NOTES
+        making: asyncio.Task[tuple[MeetingNotes, str | None]] | None = None
+        end_note: str = "the meeting ended"
+        status: str = "ended"
+        try:
+            end_note, notes, making = await self._read_until_over(live)
+            if making is not None and making.done() and not making.cancelled():
+                notes = making.result()[0]
+        except DotError as error:
+            log.error("meeting_watch_failed", meeting_id=live.meeting_id, error=error.message, context=error.context)
+            status, end_note = "failed", error.message
+        except PlaywrightError as error:
+            status, end_note = "failed", f"Dot lost the meeting's page ({str(error)[:200]})"
+            log.error("meeting_watch_failed", meeting_id=live.meeting_id, error=end_note)
+        except sqlite3.Error as error:
+            status, end_note = "failed", f"Dot could not keep the meeting's lines ({error})"
+            log.error("meeting_watch_failed", meeting_id=live.meeting_id, error=end_note)
+        finally:
+            if making is not None and not making.done():
+                making.cancel()
+            if not live.left.is_set():
+                await self._close(live, status, end_note)
+        if status == "ended":
+            await self._sum_up(live, notes, end_note)
+        else:
+            await self._tell(live, "Dot left the meeting", f"Dot left the meeting: {end_note}")
+
+    async def _read_until_over(
+        self, live: _Live
+    ) -> tuple[str, MeetingNotes, asyncio.Task[tuple[MeetingNotes, str | None]] | None]:
+        """The reading of the call until it is over for Dot: why it ended, the notes as they stand, and the note maker
+        still at work, if it is."""
         book: CaptionBook = CaptionBook()
         seen_chat: frozenset[str] = frozenset()
         notes: MeetingNotes = NO_NOTES
+        making: asyncio.Task[tuple[MeetingNotes, str | None]] | None = None
         noted: int = 0
         next_notes: float = time.monotonic() + self._config.notes_minutes * 60.0
         ends: float = time.monotonic() + self._config.most_hours * 3600.0
         end_note: str = "the meeting ended"
         captions_off_since: float | None = None
-        try:
-            while not live.stop.is_set():
-                if time.monotonic() > ends:
-                    end_note = f"Dot left after {self._config.most_hours:g} hours, its most"
+        while not live.stop.is_set():
+            if time.monotonic() > ends:
+                end_note = f"Dot left after {self._config.most_hours:g} hours, its most"
+                break
+            state: MeetState = await live.page.state()
+            if state in ("ended", "removed"):
+                end_note = _STATE_WORDS[state]
+                break
+            if await live.page.captions_on():
+                captions_off_since = None
+            else:
+                captions_off_since = captions_off_since if captions_off_since is not None else time.monotonic()
+                if time.monotonic() - captions_off_since > _CAPTIONS_OFF_S:
+                    end_note = "the meeting's captions were turned off, and Dot takes no notes without them"
                     break
-                state: MeetState = await live.page.state()
-                if state in ("ended", "removed"):
-                    end_note = _STATE_WORDS[state]
-                    break
-                if await live.page.captions_on():
-                    captions_off_since = None
-                else:
-                    captions_off_since = captions_off_since if captions_off_since is not None else time.monotonic()
-                    if time.monotonic() - captions_off_since > _CAPTIONS_OFF_S:
-                        end_note = "the meeting's captions were turned off, and Dot takes no notes without them"
-                        break
-                batch: PageBatch = await live.page.drain()
-                if batch.dropped:
-                    log.warning("meeting_page_dropped", meeting_id=live.meeting_id, dropped=batch.dropped)
-                book, captions = fold_captions(book, batch.captions, time.time(), self._config.settle_s)
-                seen_chat, chat = new_chat(seen_chat, batch.chat)
-                # Dot's own posts come back in the chat: they are not the meeting's words.
-                theirs: tuple[MeetingLine, ...] = tuple(line for line in chat if line.text not in live.posted)
-                total: int = await self._keep(live, (*captions, *theirs))
-                if total > noted and time.monotonic() >= next_notes:
-                    notes, _ = await self._noted(live, notes)
-                    noted = total
-                    next_notes = time.monotonic() + self._config.notes_minutes * 60.0
-                with contextlib.suppress(TimeoutError):
-                    await asyncio.wait_for(live.stop.wait(), _READ_EVERY_S)
-            # What stood on the page last is a line too.
-            _, rest = fold_captions(book, (), time.time() + self._config.settle_s, self._config.settle_s)
-            await self._keep(live, rest)
-            if live.why:
-                end_note = live.why[-1]
-            await self._close(live, "ended", end_note)
-            await self._sum_up(live, notes, end_note)
-        except DotError as error:
-            log.error("meeting_watch_failed", meeting_id=live.meeting_id, error=error.message, context=error.context)
-            await self._close(live, "failed", error.message)
-            await self._tell(live, "Dot left the meeting", f"Dot left the meeting: {error.message}")
-        except PlaywrightError as error:
-            message: str = f"Dot lost the meeting's page ({str(error)[:200]})"
-            log.error("meeting_watch_failed", meeting_id=live.meeting_id, error=message)
-            await self._close(live, "failed", message)
-            await self._tell(live, "Dot left the meeting", f"Dot left the meeting: {message}")
+            batch: PageBatch = await live.page.drain()
+            if batch.dropped:
+                log.warning("meeting_page_dropped", meeting_id=live.meeting_id, dropped=batch.dropped)
+            book, captions = fold_captions(book, batch.captions, time.time(), self._config.settle_s)
+            seen_chat, chat = new_chat(seen_chat, batch.chat)
+            # Dot's own posts come back in the chat: they are not the meeting's words.
+            theirs: tuple[MeetingLine, ...] = tuple(line for line in chat if line.text not in live.posted)
+            total: int = await self._keep(live, (*captions, *theirs))
+            if making is not None and making.done():
+                notes = making.result()[0]
+                making = None
+            if making is None and total > noted and time.monotonic() >= next_notes:
+                making = asyncio.create_task(self._noted(live, notes), name=f"meeting-notes-{live.meeting_id}")
+                noted = total
+                next_notes = time.monotonic() + self._config.notes_minutes * 60.0
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(live.stop.wait(), _READ_EVERY_S)
+        # What stood on the page last is a line too.
+        _, rest = fold_captions(book, (), time.time() + self._config.settle_s, self._config.settle_s)
+        await self._keep(live, rest)
+        if live.why:
+            end_note = live.why[-1]
+        return end_note, notes, making
 
     async def _keep(self, live: _Live, lines: tuple[MeetingLine, ...]) -> int:
         return await self._store.add_meeting_lines(

@@ -33,7 +33,7 @@ Say "join my call https://meet.google.com/abc-defg-hij" in a chat. Then:
    reads them as it reads a web page.
 6. **Posting.** Ask "post in the call that we agree", and the run drafts the words. You are asked about each post with
    its words whole, in every mode, yolo and free mode too, and "don't ask again" does not apply: the question is the
-   meeting desk's own, not the gate's. A post is one paragraph of at most 500 characters. Your no, or no answer, posts
+   meeting desk's own, not the gate's. A post is one line of at most 500 characters. Your no, or no answer, posts
    nothing.
 7. **Leaving.** Dot leaves when the call ends, when it is removed, when you say "leave the call" (`meeting_leave`), at
    the emergency stop, when the daemon stops, and after `[meetings] most_hours` (3). The notes are made once more from
