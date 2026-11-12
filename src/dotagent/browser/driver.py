@@ -1368,11 +1368,16 @@ async def screenshot_jpeg(
 
 
 async def visible_text(page: Page, ref: str | None, timeout_ms: int) -> str:
-    """The rendered text of the whole page, or of the element ``ref``."""
+    """The rendered text of the whole page, or of the element ``ref``. The whole page is read again on the document
+    that replaced it while it was read (:func:`_again_after_navigation`, item 1135): a job ad or an application form
+    that sends itself on as it loads failed the read; an element's ref belongs to the document it was read on, and its
+    read is not repeated."""
+    if ref is None:
+        text: object = await _again_after_navigation(
+            page, "reading the page text failed", lambda: page.evaluate(_BODY_TEXT_SCRIPT)
+        )
+        return text if isinstance(text, str) else ""
     try:
-        if ref is None:
-            text: object = await page.evaluate(_BODY_TEXT_SCRIPT)
-            return text if isinstance(text, str) else ""
         locator: Locator = await live_locator(page, ref, "read")
         return await locator.inner_text(timeout=timeout_ms)
     except PlaywrightError as error:
