@@ -161,10 +161,6 @@ function optionChips(record, agent) {
   return [
     el("span", { class: "chip", title: "Mode" }, record.mode),
     agent === null ? null : el("span", { class: "chip", title: "Its tasks run as this agent, within its limits" }, `As ${agent.name}`),
-    // A paused agent's schedule fires nothing by itself until the agent is resumed (item 465).
-    agent === null || agent.paused_at === null
-      ? null
-      : el("span", { class: "badge b-warn", title: "It starts nothing by itself until you resume the agent" }, `${agent.name} is paused`),
     approvals === null
       ? null
       : el(
@@ -189,6 +185,14 @@ function optionChips(record, agent) {
       ? null
       : el("span", { class: "chip", title: "How the end of its tasks is told" }, `Notifications: ${notifyLabel(options.notify).toLowerCase()}`),
   ];
+}
+
+/** A paused agent's schedule fires nothing by itself until the agent is resumed (item 465): its row's line says so, in
+ * sight as a failed last run is (item 1136), or null. */
+function pausedBadge(agent) {
+  return agent === null || agent.paused_at === null
+    ? null
+    : el("span", { class: "badge b-warn", title: "It starts nothing by itself until you resume the agent" }, `${agent.name} is paused`);
 }
 
 /** What Run now says it starts: real work, as at the schedule's time, with the approvals its run takes. */
@@ -320,6 +324,7 @@ function scheduleRow(view, handlers) {
           last,
           lastStatusBadge(record.last_status),
           failedInRow(record),
+          pausedBadge(agent),
           view.zone === localZone()
             ? null
             : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),

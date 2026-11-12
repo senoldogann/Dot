@@ -123,7 +123,7 @@ as the page's heading, as the tab does ("Scout · Agents · Dot"), and holds one
 **Export**, **Pause** (or **Resume**) and **Delete**. Edit opens the editor at the top of the page, not
 where the greeting stood. **Pause** (item 465; `POST /api/agents/<id>/pause`, and `/resume`) keeps the
 agent's schedules from starting anything by themselves until **Resume**: the list and the page say "Paused", and its
-schedules' rows "<name> is paused" (see [Memory and schedules](memory-and-schedules.md)). What you send the agent, **Run
+schedules' rows "<name> is paused" on their one line (see [Memory and schedules](memory-and-schedules.md)). What you send the agent, **Run
 now** of one of its schedules and the messages of other agents still reach it, and runs already working go on, each with
 its Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
 

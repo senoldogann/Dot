@@ -214,7 +214,7 @@ async def _launch(runtime: Runtime) -> tuple[Any, Browser]:
     return playwright, await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
 
 
-async def test_your_teams_stand_above_your_agents_and_the_agents_are_a_grid_two_to_four_across_and_one_on_a_phone(
+async def test_your_teams_are_a_tab_beside_your_agents_and_the_agents_are_a_grid_two_to_four_across_and_one_on_a_phone(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
     agents: list[JsonObject] = [

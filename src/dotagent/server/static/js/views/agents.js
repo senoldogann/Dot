@@ -2,9 +2,10 @@
 // instructions that open the prompt of its runs, and bounds for them (a model, a reasoning level, approvals, tools).
 // The list (#/agents) is in parts, one shown at a time (item 1136): Dot and the agents as a grid of compact cards, each
 // with its newest chat, and under them the ready teams (item 504) and the templates (item 315) agents start from in one
-// click; the owner's teams (item 610), each a card with its agents' faces; the work orders; and the office; an agent's page (#/agents/<id>) greets with its face and role, takes a message
-// for it and lists its chats; the editor makes or changes an agent. An agent goes out as a file from its page and comes
-// back, in this home or another, from the list's Import. A team's own page is views/teams.js.
+// click; the owner's teams (item 610), each a card with its agents' faces; the work orders; and the office. An agent's
+// page (#/agents/<id>) greets with its face and role, takes a message for it and lists its chats; the editor makes or
+// changes an agent. An agent goes out as a file from its page and comes back, in this home or another, from Import an
+// agent under the list's "…". A team's own page is views/teams.js.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
 import { isTrader, TRADING_DESK } from "../agentpanel.js";

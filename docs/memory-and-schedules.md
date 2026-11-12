@@ -406,9 +406,10 @@ what moved; a schedule switched off is not started so, and the end of such a run
   draft and the schedule's switch-off; a schedule deleted while its run works tells that run's end at the level it had.
 - A schedule runs as Dot or as one of your agents (item 462): **Agent** in its form, Dot by default. Its runs carry the
   agent, as a chat with it does (see [Agents and campaigns](agents-and-campaigns.md)): its instructions, its tools only,
-  its face on the row with an "As <name>" chip. Its model, reasoning level and approvals are the schedule's own where it
+  its face on the row and an "As <name>" chip under its Details. Its model, reasoning level and approvals are the schedule's own where it
   chose them, else the agent's, else the configured ones: a yolo schedule of an agent that asks runs yolo, and one left
-  on Default takes the agent's mode, which the form's Default names ("Default (the agent's: …)") and the row shows. An
+  on Default takes the agent's mode, which the form's Default names ("Default (the agent's: …)") and the row's Details
+  show. An
   agent that does not exist is refused (404), and Dot is named by no agent (422). Deleting the agent switches its
   schedules off, as Dot's ("switched off: its agent was deleted"). While you have paused the agent (item 465), its
   schedules fire nothing by themselves: a repeating one is skipped to its next time ("skipped: <name> is paused") and a
