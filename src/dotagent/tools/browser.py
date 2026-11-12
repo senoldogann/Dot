@@ -1410,8 +1410,8 @@ async def _login_secret(ctx: ToolContext, login: LoginChoice, otp: bool) -> Logi
 
 # A new account's password (item 740): Dot makes it, so that no model chooses, sees or records one, and keeps it with
 # the account's username in the owner's vault. Its letters, from each of which one at least: the signs are those most
-# sites take.
-_NEW_PASSWORD_CHARS: int = 20
+# sites take. Sixteen of them (item 1139, the owner's word: twenty were too long), a little under 96 bits.
+_NEW_PASSWORD_CHARS: int = 16
 _PASSWORD_SETS: tuple[str, ...] = (
     "abcdefghijkmnopqrstuvwxyz",
     "ABCDEFGHJKLMNPQRSTUVWXYZ",

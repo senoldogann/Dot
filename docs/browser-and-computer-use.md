@@ -337,7 +337,7 @@ Both modes share what follows.
   show in no result of the chat's tools. The logins of Dot's own vault (Settings › Vault, item 621) are filled the same
   way (its cards are kept there and filled into no page). A new account's password is made by Dot (item 740):
   `browser_create_login`, given the refs of a sign-up form's password field, of the field that repeats it and of the
-  username's, and the account's username, makes a password of 20 characters (`secrets`, each of lower and upper case,
+  username's, and the account's username, makes a password of 16 characters (`secrets`, each of lower and upper case,
   digits and signs), keeps the login in Dot's vault first (its website the page's origin, a note of when it was made),
   then fills it as a vault login is filled, under the same rules (outside `yolo` you are asked first, as for a fill; in
   `yolo` it runs at once), and takes the login back out of the vault when the fill fails; the model never chooses, sees
