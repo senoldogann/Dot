@@ -358,9 +358,10 @@ def _links_tool() -> RegisteredTool:
     )
 
 
-# Steps a model writes into a batch that only look, which the result of the batch does already (item 755): they are left
-# out rather than failing the whole batch, as they did in the owner's runs.
-_LOOKING_STEPS: frozenset[str] = frozenset({"snapshot", "screenshot", "look"})
+# Steps a model writes into a batch that only look or wait, which the result of the batch does already, as it waits for
+# the page to settle (items 755 and 1133): they are left out rather than failing the whole batch, as they did in the
+# owner's runs.
+_LOOKING_STEPS: frozenset[str] = frozenset({"snapshot", "screenshot", "look", "wait"})
 
 
 class ActArgs(ToolArgs):

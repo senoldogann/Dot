@@ -37,6 +37,30 @@ def test_a_step_that_only_looks_is_left_out_of_the_batch() -> None:
         ActArgs.model_validate({"steps": [{"action": "snapshot"}]})
 
 
+def test_a_bare_wait_is_left_out_of_the_batch_as_a_look_is() -> None:
+    # The batch already waits for the page to settle after its steps (run_mvsnlh3f wrote one after a click).
+    args: ActArgs = ActArgs.model_validate({"steps": [{"action": "click", "ref": "f1e133"}, {"action": "wait"}]})
+    assert [step.action for step in args.steps] == ["click"]
+
+
+def test_text_with_no_field_says_where_the_ref_of_the_field_comes_from() -> None:
+    # Item 1133: runs clicked a field by its pixel and typed with no ref; the refusal named no way to the ref, and a
+    # run filled the form with a script instead, past the checks a step of a batch has at each field.
+    for action in ("type", "insert", "fill"):
+        with pytest.raises(ValidationError) as refused:
+            ActArgs.model_validate(
+                {"steps": [{"action": "click_at", "x": 643, "y": 402}, {"action": action, "text": "Ada"}]}
+            )
+        message: str = str(refused.value)
+        assert f"{action} needs a ref" in message
+        assert "browser_find" in message
+        assert "click_at" in message
+    # A step that writes no text is told only that it needs a ref.
+    with pytest.raises(ValidationError) as clicked:
+        ActArgs.model_validate({"steps": [{"action": "hover"}]})
+    assert "browser_find" not in str(clicked.value)
+
+
 def test_an_upload_step_names_the_tool_that_uploads() -> None:
     with pytest.raises(ValidationError, match="call browser_upload"):
         ActArgs.model_validate({"steps": [{"action": "upload", "ref": "e362", "paths": ["/tmp/cv.pdf"]}]})
