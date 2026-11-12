@@ -151,7 +151,12 @@ class ApprovalRejected(DotError):
 class ApprovalNoted(ApprovalRejected):
     """The owner said yes to a step with a note (item 1140): the step did not happen yet, so that the run reads the note
     first; its message is what the run is told, and the same step done again exactly so goes through once. Every
-    handler of a refusal handles it too, but the words the model reads ask for no "do not retry"."""
+    handler of a refusal handles it too, but the words the model reads ask for no "do not retry". ``note`` is what the
+    owner wrote."""
+
+    def __init__(self, message: str, context: Mapping[str, JsonValue], note: str) -> None:
+        super().__init__(message, context)
+        self.note: str = note
 
 
 class ApprovalParked(ApprovalRejected):

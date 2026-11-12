@@ -13,7 +13,6 @@ from dotagent.agent.declined import (
     OWNER_DECIDERS,
     Declined,
     declined_key,
-    noted_text,
     refusal_text,
     still_declined,
 )
@@ -44,6 +43,7 @@ from dotagent.core.errors import (
     RunConflict,
 )
 from dotagent.core.logs import get_logger
+from dotagent.core.noted import noted_text
 from dotagent.core.text import redact_known
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
@@ -1021,4 +1021,4 @@ class RunGate:
         self._noted_yes = self._noted_yes | {info.model_dump_json()}
         self.add_instruction(note)
         log.info("noted_yes_held", run_id=self._run_id, tool=info.tool)
-        raise ApprovalNoted(noted_text(note), {"action": _describe(shown), "note": note})
+        raise ApprovalNoted(noted_text(note), {"action": _describe(shown), "note": note}, note)

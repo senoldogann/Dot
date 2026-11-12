@@ -156,6 +156,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.images import jpeg_of_size
 from dotagent.core.logs import get_logger
+from dotagent.core.noted import noted_in_batch_text
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.desktop.types import AppInfo
@@ -3032,8 +3033,9 @@ class BrowserSession:
                 stopped = f"step {index} failed"
                 continue
             except ApprovalNoted as error:
-                # A yes with a note (item 1140): the step waits for the note to be read, and may be done again once.
-                noted: str = f"Not done yet: {error.message}."
+                # A yes with a note (item 1140): the step waits for the note to be read; the batch's result reads the
+                # page or the screen again, which lets the yes go, so doing it again asks the owner once more.
+                noted: str = f"Not done yet: {noted_in_batch_text(error.note)}."
                 reports.append(StepReport(index=index, description=description, outcome="failed", detail=noted))
                 stopped = "a step waits for the user's note to be read"
                 continue
