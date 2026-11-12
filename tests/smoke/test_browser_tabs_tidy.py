@@ -25,7 +25,9 @@ from dotagent.config import BrowserConfig, ServerConfig, load_config, load_defau
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 SERVER: ServerConfig = load_default_config().server
-_IDLE_S: float = 0.3
+# How long a background tab may stand unused. The other chat's background tab must stay under it while that chat opens a
+# second page and switches to it: at 0.3 s a slow CI runner took longer and closed it (main's run 43167805986).
+_IDLE_S: float = 3.0
 
 
 class _Handler(BaseHTTPRequestHandler):
