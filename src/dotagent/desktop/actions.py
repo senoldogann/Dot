@@ -777,8 +777,9 @@ def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
         return _effect(f"set the value of {inspection.target} ({len(wanted)} chars, not read back)", None, False, aim)
     _, actual, _ = ax.read_text(element, env.app.pid)
     if _normalised(actual) != _normalised(wanted):
+        # What it holds is told by its length: a step's report never carries the text of a field (item 1146).
         raise ValueNotKept(
-            f"a{number} did not keep the value: it now reads {_clip(actual, 80)!r}. "
+            f"a{number} did not keep the value: it holds {len(actual)} characters where {len(wanted)} were set. "
             "Click the field and use type or paste instead",
             {"ref": f"a{number}", "wanted_chars": len(wanted), "actual_chars": len(actual)},
         )
