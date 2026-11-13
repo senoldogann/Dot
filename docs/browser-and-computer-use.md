@@ -442,7 +442,9 @@ Both modes share what follows.
 - A conversation thread keeps at most `max_tabs` tabs open, and closes the tabs it is done with (item 696): a tab that
   is not its current one once unused for `background_tab_idle_s` (300 s; 0 keeps it), while its run works as well; when
   a run ends, the chat's background tabs, keeping the current one for a message that goes on from it until `tab_idle_s`;
-  and every tab of a helper's chat (a delegated run, an agent's) when it ends. `browser_close_tab` without an index
+  and every tab of a chat that no message goes on from when its run ends: a helper's (a delegated run, an agent's) and
+  that of a run nobody watches (a schedule's, a watcher's, Dot's own initiative, a reply; item 1168). `tab_idle_s` is
+  600 s by default (item 1168). `browser_close_tab` without an index
   closes every tab of the chat but the current one. Only the chat's own tabs are closed: those of a chat at work at the
   same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a link or a page that
   opens a new tab) is the chat's, also when you opened it that way (a middle click in a tab of Dot's in your Chrome).
@@ -467,7 +469,7 @@ Both modes share what follows.
   clicked in its place. When no chooser opens and the page has exactly one file field, that field takes them, since no
   other control can be the one meant. A field beside the element, on a page with several, is not taken, as it may be
   another control's.
-- With `idle_close_s` (seconds; 1800 by default since item 731, the time after which the chats' own tabs close; 0 keeps
+- With `idle_close_s` (seconds; 600 by default since item 1168, the time after which the chats' own tabs close; 0 keeps
   it open until the daemon stops; item 454), Dot's own Chrome (`own`) closes, the Playwright driver with it, once
   nothing used it for that long: no chat's step is under way in it, no run at work holds tabs in it, no page is being
   read in it for the web tools or watched under "Dot's computer", no task is being taught in it, and its window is not

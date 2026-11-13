@@ -360,6 +360,13 @@ def goes_on_from(run: RunRecord, earlier: RunRecord) -> bool:
     )
 
 
+def keeps_current_tab(run: RunRecord, nobody_watched: bool) -> bool:
+    """Whether the chat of ``run``, once it has ended, keeps its current tab for a message that goes on from it (item
+    696): not a helper's chat, which no message continues, nor that of a run nobody watched (a schedule's, a watcher's,
+    Dot's own initiative, a reply, or a helper of one; item 1168), whose tab would only hold Chrome open."""
+    return run.parent_run_id is None and not nobody_watched
+
+
 def stricter_approvals(first: ApprovalMode, second: ApprovalMode) -> ApprovalMode:
     """The stricter of two approval modes."""
     return min(first, second, key=_APPROVALS_STRICTEST_FIRST.index)
@@ -3574,9 +3581,12 @@ class RunManager:
         if recorded and not self._stopping and playbook_case(runtime.config, run, status) is not None:
             self._distilling[run.id] = asyncio.create_task(self._distil(run, status))
         if not self._stopping:
-            # The tabs the run left (item 696): a helper's chat closes them all, another keeps its current one for a
-            # message that goes on from it. Before the queue moves on, so that the chat's next run starts tidy.
-            await runtime.browsers.end_of_run(run.thread_id, helper=run.parent_run_id is not None)
+            # The tabs the run left (item 696): a chat no message goes on from closes them all (a helper's, and one
+            # whose run nobody watched, item 1168), another keeps its current one for a message that goes on from it.
+            # Before the queue moves on, so that the chat's next run starts tidy.
+            await runtime.browsers.end_of_run(
+                run.thread_id, keep_current=keeps_current_tab(run, runtime.browsers.is_unattended(run.thread_id))
+            )
             # And the front of the Mac goes back to the application the run took it from (item 702).
             await runtime.desktop.end_of_run(run.thread_id)
         runtime.browsers.unattended(run.thread_id, False)
