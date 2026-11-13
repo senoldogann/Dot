@@ -1053,6 +1053,9 @@ async def test_the_evening_check_in_tells_the_day_done_and_the_next_step_in_its_
     the morning, in a fence, before a goal of its own; it ends told in its own words, in a chat of its own."""
     for record in await runtime.store.list_schedules():
         await runtime.store.delete_schedule(record.id)
+    # The campaign the brief's test left active: a tick two hours on would plan and start its session too (item 1104).
+    for campaign in await runtime.store.list_campaigns():
+        await runtime.store.stop_active_campaign(campaign.id)
     # A run of the owner's day that ended done, whose goal the check-in names.
     WRITER.succeed = True
     WRITER.answer = "Fixed the invoice export."

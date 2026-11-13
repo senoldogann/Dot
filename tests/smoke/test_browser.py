@@ -207,6 +207,15 @@ setTimeout(tick, 1500)</script>""",
 <input type="file" style="position:absolute;inset:0;opacity:0"
   onchange="document.getElementById('cv').textContent = event.target.files[0].name"></div>
 <p>CV: <span id="cv">none</span></p>""",
+    # Item 1144: the same field over its dropzone, in a dialog's list below what shows: the point is read once it shows.
+    "/upload-overlay-below": """<!doctype html><title>Below</title><input type="file" hidden>
+<div style="position:fixed;inset:20px;overflow:auto" role="dialog" aria-label="Apply">
+<div style="height:3000px">Long form</div>
+<div style="position:relative;width:200px;height:40px">
+<span style="display:block;width:200px;height:40px">Drop or upload your CV</span>
+<input type="file" style="position:absolute;inset:0;opacity:0"
+  onchange="document.getElementById('cv').textContent = event.target.files[0].name"></div>
+<p>CV: <span id="cv">none</span></p></div>""",
     "/upload-shadow": """<!doctype html><title>Shadow</title><input type="file" hidden><cv-picker></cv-picker>
 <p>CV: <span id="cv">none</span></p>
 <script>customElements.define('cv-picker', class extends HTMLElement { connectedCallback() {
@@ -858,6 +867,12 @@ async def test_a_control_that_names_its_field_or_never_holds_still_or_opens_noth
         view = await browser.open_url("upload2", f"{site}{path}", True)
         await browser.upload("upload2", ref_of(view.body, f'button "{button}"'), [str(cv)], True)
         assert "CV: cv.pdf" in (await browser.read_text("upload2", None, 0, 2000)).text, path
+    await browser.open_url("upload2", f"{site}/upload-overlay-below", True)
+    found = await browser.find("upload2", "Drop or upload your CV", 5, True)
+    below: re.Match[str] | None = re.search(r"\[ref=([^\]]+)\]: Drop or upload your CV", found.hits[0])
+    assert below is not None, found.hits
+    await browser.upload("upload2", below.group(1), [str(cv)], True)
+    assert "CV: cv.pdf" in (await browser.read_text("upload2", None, 0, 2000)).text
     view = await browser.open_url("upload2", f"{site}/upload-covered", True)
     with pytest.raises(BrowserError, match="uploading the files failed"):
         await browser.upload("upload2", ref_of(view.body, 'button "Choose file"'), [str(cv)], True)

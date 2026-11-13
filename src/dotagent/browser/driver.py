@@ -1934,7 +1934,8 @@ async def text_shown(page: Page, text: str) -> bool | None:
 # element is in (its ``for``, or the field inside it) or the one an id in its ``aria-controls`` names.
 # Item 754: or the file field a click at the element's middle reaches, a field made see-through and laid over the button
 # it looks like (the one a person's click there opens); ids and points are looked up in the element's own root, a
-# shadow root's for a control of a web component.
+# shadow root's for a control of a web component. Item 1144: the element is scrolled into view first, as the click
+# would be, since no point outside what shows (below a long form, or in a dialog's list) reaches anything.
 _CONTROLLED_FIELD_SCRIPT: str = """(element) => {
   const field = (node) => (node instanceof HTMLInputElement && node.type === 'file' ? node : null);
   const root = element.getRootNode();
@@ -1945,6 +1946,7 @@ _CONTROLLED_FIELD_SCRIPT: str = """(element) => {
     const controlled = id && root.getElementById ? field(root.getElementById(id)) : null;
     if (controlled) return controlled;
   }
+  element.scrollIntoView({block: 'nearest', inline: 'nearest'});
   const box = element.getBoundingClientRect();
   if (box.width > 0 && box.height > 0 && root.elementFromPoint) {
     const over = field(root.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
