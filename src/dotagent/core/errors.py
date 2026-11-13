@@ -186,6 +186,11 @@ class BrowserError(DotError):
     """Browser automation failed."""
 
 
+class StepNotSent(BrowserError):
+    """A step of a browser batch was refused before anything went to the page (item 1145): a ref that is no longer
+    there, an option the dropdown does not have. Doing it again, corrected, repeats nothing."""
+
+
 class TabSilentError(BrowserError):
     """The page of a tab answered nothing at all within the navigation timeout (item 753): it is stuck, or Chrome is
     overloaded, so nothing can be read of it either; told apart from a page that answers and is still loading (item

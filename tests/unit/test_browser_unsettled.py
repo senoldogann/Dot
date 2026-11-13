@@ -42,7 +42,9 @@ async def test_a_forbidden_address_still_raises() -> None:
 
 def _reports(*outcomes: str) -> list[StepReport]:
     return [
-        StepReport(index=index, description=f"click e{index}", outcome=cast(Any, outcome), detail="")
+        StepReport(
+            index=index, description=f"click e{index}", outcome=cast(Any, outcome), detail="", dispatched="unknown"
+        )
         for index, outcome in enumerate(outcomes, start=1)
     ]
 
