@@ -571,7 +571,10 @@ harness count every model call of the run and of the runs it delegated to, side 
 attempt counted the run's own only before item 589), and the report holds the approvals the run asked, each declined;
 a report saved before model calls were timed counted the steps' tokens only and has
 no seconds, and one saved before acts and cached tokens were counted shows `-` for their shares. `dotx eval run` saves
-its report after every attempt, so an interrupted run keeps what it measured.
+its report after every attempt, so an interrupted run keeps what it measured. Each attempt keeps its trace too (item
+1159, `outcomes[].trace` of the report's JSON): its model calls with their seconds and tokens and its tool calls with
+their seconds, whether they went through and the first line of their result, in order, an act's with the actions of
+its steps and never what they typed, so that a change of the harness shows which steps it saved or added.
 
 **The state set** (item 1147, `src/dotagent/evals/state_tasks.py`) is two browser tasks whose site keeps every form it
 was sent, and which pass by that record: exactly one request with the right fields, whatever the answer says. One
