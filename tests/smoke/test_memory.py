@@ -590,3 +590,52 @@ async def test_a_note_that_holds_a_secret_is_refused_and_nothing_is_saved(
         assert await built.store.count_memories() == 0
     finally:
         await close_runtime(built)
+
+
+async def test_a_run_that_corrects_a_note_for_a_while_moves_its_time_and_keeps_a_lasting_one_lasting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1143: ``memory_update`` takes ``valid_days`` as ``memory_save`` does, so a corrected short-lived fact holds
+    from the correction rather than running out on the old clock. Without it a note keeps the time it had: a lasting
+    note stays lasting and a timed one keeps its day. A pinned note keeps its time, as when its words are saved
+    again."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    built: Runtime = await build_runtime(_without_embeddings(load_config(tmp_path / "config.toml")))
+    try:
+        day: float = 86400.0
+        old_clock: float = time.time() + day
+        trip: MemoryRecord = (
+            await save_memory(
+                built.memory, "The user is in Lisbon until Friday.", [], "memory-test", None, old_clock, False
+            )
+        ).record
+        lasting: MemoryRecord = (await save_memory(built.memory, DOG, [], "memory-test", None, None, False)).record
+        rule: MemoryRecord = (await save_memory(built.memory, LAPTOP, [], "memory-test", None, None, False)).record
+        await built.store.set_memory_pin(rule.id, time.time())
+
+        before: float = time.time()
+        moved, _ = await _call(
+            built,
+            "memory_update",
+            {"memory_id": trip.id, "content": "The user is in Lisbon until next Friday.", "tags": [], "valid_days": 9},
+        )
+        assert not moved.is_error, moved.text
+        record: MemoryRecord = await built.store.get_memory(trip.id)
+        assert record.expires_at is not None
+        assert before + 9 * day <= record.expires_at <= time.time() + 9 * day
+
+        kept, _ = await _call(
+            built, "memory_update", {"memory_id": trip.id, "content": "The user is in Lisbon, Alfama.", "tags": []}
+        )
+        assert not kept.is_error, kept.text
+        assert (await built.store.get_memory(trip.id)).expires_at == record.expires_at
+
+        await _call(
+            built, "memory_update", {"memory_id": lasting.id, "content": DOG.replace("golden", "red"), "tags": []}
+        )
+        assert (await built.store.get_memory(lasting.id)).expires_at is None
+
+        await _call(built, "memory_update", {"memory_id": rule.id, "content": LAPTOP, "tags": [], "valid_days": 2})
+        assert (await built.store.get_memory(rule.id)).expires_at is None
+    finally:
+        await close_runtime(built)

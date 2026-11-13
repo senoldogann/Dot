@@ -640,14 +640,23 @@ async def update_memory_note(index: MemoryIndex, memory_id: str, content: str, t
 
 
 async def rewrite_memory_note(
-    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], run_id: str, tainted: bool
+    index: MemoryIndex,
+    memory_id: str,
+    content: str,
+    tags: Sequence[str],
+    run_id: str,
+    tainted: bool,
+    new_expiry: float | None,
 ) -> MemoryRecord:
     """A run's rewrite of a note in place, as :func:`update_memory_note`, except that the run becomes its author: the
     text is the model's now, so a note the user wrote no longer reads as theirs (item 157). A run that had read content
-    third parties can author leaves the note tainted, and a clean one leaves the mark a note had."""
+    third parties can author leaves the note tainted, and a clean one leaves the mark a note had. ``new_expiry`` is
+    when the corrected fact stops holding, so that it does not run out on the old clock (item 1143); ``None`` keeps
+    the time the note had, a lasting note lasting. The owner's note or a pinned one keeps its time, as when a run saves
+    its words again (:func:`_saved_again`); the store judges that in the write itself."""
     await index.store.get_memory(memory_id)
     text, vector = await _embedded(index, content)
-    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, run_id, tainted)
+    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, run_id, tainted, new_expiry)
 
 
 async def _embedded(index: MemoryIndex, content: str) -> tuple[str, Vector | None]:

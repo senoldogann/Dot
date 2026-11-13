@@ -107,7 +107,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - A note can hold for a while (item 306): `memory_save` takes `valid_days` for a fact that is true only so long (a
   trip, a deadline, an offer). The model is told until when it holds ("holds until 2026-10-20"); once that day passes
   the note rests, whoever wrote it, and neither a run nor a search is handed it; the Memory page says "Holds until …",
-  then "Ran out …". Saving the same note again wakes it with the new time. Under each note the page says how the runs it was handed to
+  then "Ran out …". Saving the same note again wakes it with the new time. `memory_update` takes `valid_days` too, counted from the correction
+  (item 1143); without it a corrected note keeps the time it had, and your notes and pinned ones always keep theirs. Under each note the page says how the runs it was handed to
   ended ("Handed to 5 runs, 4 done"); every use is recorded with the run's end, which `dotx stats` reads.
 - What Dot knows about you opens the memory part of every prompt: a short section the nightly reflection keeps (your
   language, hours, the tools and sites you use by their names, the ways you ask, the limits you set), rewritten each

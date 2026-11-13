@@ -117,7 +117,7 @@ async def test_an_owner_correction_of_a_note_this_run_saved_is_handed_to_the_run
             CORRECTED,
         ]
 
-        await rewrite_memory_note(index, saved.id, REWRITTEN, [], RUN, False)
+        await rewrite_memory_note(index, saved.id, REWRITTEN, [], RUN, False, None)
         # The run's own rewrite replaces the correction and is not handed again.
         assert [note.id for note in await store.memories_changed_since(0.0, RUN)] == [theirs.id]
         # Another run is handed the rewrite: the author is now this run.

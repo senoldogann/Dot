@@ -271,6 +271,12 @@ class UpdateArgs(ToolArgs):
     tags: list[str] = Field(
         max_length=6, description="The note's tags after the change (pass its current tags to keep them)."
     )
+    valid_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=_MOST_VALID_DAYS,
+        description="Days it stays true from now; none keeps its time.",
+    )
 
 
 def _update_tool() -> RegisteredTool:
@@ -290,6 +296,7 @@ def _update_tool() -> RegisteredTool:
             _own_tags(args.tags, (await ctx.runtime.memory.store.get_memory(args.memory_id)).tags),
             ctx.run_id,
             ctx.ever_tainted(),
+            expiry_of(args.valid_days, time.time()),
         )
         return ok(f"Updated: {render_note(updated)}")
 
