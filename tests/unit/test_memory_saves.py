@@ -115,3 +115,45 @@ async def test_a_note_deleted_while_its_rewrite_waits_on_the_embedding_leaves_no
     finally:
         await store.close()
     assert (vectors, indexed) == ([], [])
+
+
+class _PinningEmbedder:
+    """An embedding service that, while it embeds, lets the owner pin the note being rewritten."""
+
+    def __init__(self, store: Store) -> None:
+        self.store: Store = store
+        self.memory_id: str = ""
+
+    @property
+    def model(self) -> str:
+        return "pinning"
+
+    async def embed(self, texts: Sequence[str]) -> list[Vector]:
+        if self.memory_id:
+            await self.store.set_memory_pin(self.memory_id, time.time())
+        return [(1.0, 0.0) for _ in texts]
+
+    async def aclose(self) -> None:
+        return None
+
+
+async def test_a_note_pinned_while_a_run_rewrites_it_for_a_while_keeps_its_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1143: a pinned note keeps its time when a run corrects it with a validity, even one pinned while the
+    rewrite waits on the embedding."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    config: AppConfig = load_config(tmp_path / "config.toml")
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    embedder: _PinningEmbedder = _PinningEmbedder(store)
+    index: MemoryIndex = MemoryIndex(store=store, embedder=embedder, config=config.memory)
+    try:
+        saved: SavedMemory = await save_memory(index, NOTE, [], "run_1", None, None, False)
+        embedder.memory_id = saved.record.id
+        rewritten: MemoryRecord = await rewrite_memory_note(
+            index, saved.record.id, OTHER, [], "run_1", False, time.time() + 86400.0
+        )
+    finally:
+        await store.close()
+    assert rewritten.pinned_at is not None
+    assert rewritten.expires_at is None

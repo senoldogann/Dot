@@ -653,10 +653,8 @@ async def rewrite_memory_note(
     third parties can author leaves the note tainted, and a clean one leaves the mark a note had. ``new_expiry`` is
     when the corrected fact stops holding, so that it does not run out on the old clock (item 1143); ``None`` keeps
     the time the note had, a lasting note lasting. The owner's note or a pinned one keeps its time, as when a run saves
-    its words again (:func:`_saved_again`)."""
-    existing: MemoryRecord = await index.store.get_memory(memory_id)
-    if existing.pinned_at is not None or existing.source_run is None:
-        new_expiry = None
+    its words again (:func:`_saved_again`); the store judges that in the write itself."""
+    await index.store.get_memory(memory_id)
     text, vector = await _embedded(index, content)
     return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, run_id, tainted, new_expiry)
 

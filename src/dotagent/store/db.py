@@ -5615,7 +5615,8 @@ class Store:
     ) -> MemoryRecord:
         """Rewrite a memory's text and tags, written now by ``source_run``. A tainted run's rewrite marks the note
         tainted; a clean one leaves the mark a note had. The owner's correction mark comes off: this text is the
-        run's. ``new_expiry`` is when the note now stops holding; ``None`` keeps the time it had."""
+        run's. ``new_expiry`` is when the note now stops holding; ``None`` keeps the time it had, as does the owner's
+        note or a pinned one, judged in the same statement so that a pin made while the rewrite waits holds."""
         return await self._rewrite_memory(
             memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted), None, new_expiry
         )
@@ -5648,11 +5649,13 @@ class Store:
     ) -> MemoryRecord:
         """The statements of a rewrite, committed together; ``mark`` is how the note's mark is set from ``tainted``,
         ``edited_by`` is who corrected it apart from the author (``None`` when the rewrite is a run's), and
-        ``new_expiry`` when it now stops holding (``None`` keeps the time it had, read in the same statement)."""
+        ``new_expiry`` when it now stops holding (``None`` keeps the time it had; the owner's note and a pinned one
+        keep theirs, read as they stand before this statement writes ``source_run``)."""
         tag_text: str = ",".join(tags)
         updated = await self._db.execute(
             f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark},"
-            " edited_by = ?, expires_at = COALESCE(?, expires_at) WHERE id = ?",
+            " edited_by = ?, expires_at = CASE WHEN pinned_at IS NOT NULL OR source_run IS NULL THEN expires_at"
+            " ELSE COALESCE(?, expires_at) END WHERE id = ?",
             (content, tag_text, time.time(), source_run, tainted, edited_by, new_expiry, memory_id),
         )
         if updated.rowcount == 0:
