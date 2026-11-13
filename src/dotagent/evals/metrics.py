@@ -7,7 +7,7 @@ from pydantic import JsonValue
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.plan import PLAN_EVENT, plan_from_event, unevidenced_done
 from dotagent.core.errors import EvalError
-from dotagent.evals.results import RunMetrics
+from dotagent.evals.results import RunMetrics, TraceStep
 from dotagent.evals.types import EasyWay
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.types import invalid_arguments_text
@@ -119,6 +119,68 @@ def _peak_input(events: Sequence[EventRecord]) -> int:
         ),
         default=0,
     )
+
+
+# How much of a tool result's first line a trace keeps, and the most moments it keeps of one attempt (a run cut at its
+# token budget takes a few hundred).
+_TRACE_NOTE_CHARS: int = 160
+_TRACE_MOST: int = 400
+
+
+def _int_of(value: JsonValue) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def _seconds_of(value: JsonValue) -> float:
+    return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else 0.0
+
+
+def _actions_of(args: JsonValue) -> str:
+    """The actions of an act call's steps ("fill,click"), from its arguments; none of what they typed or chose."""
+    steps: JsonValue = args.get("steps") if isinstance(args, dict) else None
+    if not isinstance(steps, list):
+        return ""
+    return ",".join(str(step.get("action", "?")) for step in steps if isinstance(step, dict))
+
+
+def run_trace(events: Sequence[EventRecord]) -> tuple[TraceStep, ...]:
+    """What a run did, in order (item 1159): each model call and each tool call, the act calls with the actions of
+    their steps. At most :data:`_TRACE_MOST` moments, the first ones."""
+    actions: dict[str, str] = {}
+    moments: list[TraceStep] = []
+    for event in events:
+        data = event.data
+        if event.kind == "tool_call" and data.get("tool") in ACT_TOOLS:
+            actions[str(data.get("call_id", ""))] = _actions_of(data.get("args"))
+        elif event.kind == CALL_EVENT:
+            moments.append(
+                TraceStep(
+                    kind="model",
+                    name=str(data.get("purpose", "")),
+                    seconds=_seconds_of(data.get("seconds")),
+                    ok=data.get("error") is None,
+                    input_tokens=_int_of(data.get("input_tokens")),
+                    output_tokens=_int_of(data.get("output_tokens")),
+                    note="",
+                )
+            )
+        elif event.kind == "tool_result":
+            first: str = str(data.get("text", "")).split("\n", 1)[0][:_TRACE_NOTE_CHARS]
+            did: str = actions.get(str(data.get("call_id", "")), "")
+            moments.append(
+                TraceStep(
+                    kind="tool",
+                    name=str(data.get("tool", "")),
+                    seconds=_seconds_of(data.get("seconds")),
+                    ok=data.get("ok") is not False,
+                    input_tokens=0,
+                    output_tokens=0,
+                    note=f"[{did}] {first}" if did else first,
+                )
+            )
+        if len(moments) >= _TRACE_MOST:
+            break
+    return tuple(moments)
 
 
 def run_metrics(

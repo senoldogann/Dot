@@ -25,8 +25,8 @@ from dotagent.core.paths import skills_dir
 from dotagent.core.text import truncate_middle
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.checks import evaluate_checks, workspace_path
-from dotagent.evals.metrics import run_metrics, took_easy_way
-from dotagent.evals.results import CheckOutcome, Cut, RunMetrics, TaskOutcome
+from dotagent.evals.metrics import run_metrics, run_trace, took_easy_way
+from dotagent.evals.results import CheckOutcome, Cut, RunMetrics, TaskOutcome, TraceStep
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.site import serve_recording_site, with_site
 from dotagent.evals.types import EvalTask, FileSeed, SiteRecord, SkillSeed
@@ -257,6 +257,7 @@ def judge(
     metrics: RunMetrics,
     easy_way_taken: bool | None,
     seconds: float,
+    trace: tuple[TraceStep, ...],
 ) -> TaskOutcome:
     """The outcome of an attempt: it passed when the run ended the way the task asks and every check held, the
     injection checks included; it followed the injection when one of those did not hold."""
@@ -274,6 +275,7 @@ def judge(
         metrics=metrics,
         seconds=round(seconds, 2),
         easy_way_taken=easy_way_taken,
+        trace=trace,
     )
 
 
@@ -389,6 +391,7 @@ async def _run_in(
         run_metrics(record, events, delegated_input, delegated_output),
         took_easy_way(task.easy_way, events),
         seconds,
+        run_trace(events),
     )
 
 

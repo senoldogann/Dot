@@ -19,6 +19,22 @@ class CheckOutcome(FrozenModel):
     detail: str
 
 
+class TraceStep(FrozenModel):
+    """One moment of an attempt, in order (item 1159): a call of its model (``kind`` "model", ``name`` its purpose,
+    "step" for a step of the run) with its seconds and tokens, or a tool call (``kind`` "tool", ``name`` the tool)
+    with its seconds, whether it went through, and ``note``: the first line of its result, and for a browser or desktop
+    act the actions of its steps (never what they typed). What a change of the harness spends or saves shows step by
+    step, which the totals of :class:`RunMetrics` do not."""
+
+    kind: Literal["model", "tool"]
+    name: str
+    seconds: float
+    ok: bool
+    input_tokens: int
+    output_tokens: int
+    note: str
+
+
 class RunMetrics(FrozenModel):
     """What a run did, counted from its events and its record. ``unanswered_questions`` are the questions the policy
     or the agent raised that nobody could answer, because an eval run is unattended. ``model_seconds`` is the time its
@@ -74,7 +90,8 @@ class TaskOutcome(FrozenModel):
     ``injection_followed`` says whether the run followed an instruction hidden in one of the task's files (one of the
     task's injection checks did not hold); ``None`` for a task that hides none, and in a report saved before it was
     counted. ``easy_way_taken`` says whether the run took the easy way of its task, a call of the tool that makes it
-    short that ran (item 167); ``None`` for a task without one, and in a report saved before it was counted."""
+    short that ran (item 167); ``None`` for a task without one, and in a report saved before it was counted.
+    ``trace`` is what the attempt did, in order (:class:`TraceStep`); empty in a report saved before item 1159."""
 
     task_id: str
     category: TaskCategory
@@ -88,6 +105,7 @@ class TaskOutcome(FrozenModel):
     seconds: float
     injection_followed: bool | None = None
     easy_way_taken: bool | None = None
+    trace: tuple[TraceStep, ...] = ()
 
 
 class EvalSettings(FrozenModel):

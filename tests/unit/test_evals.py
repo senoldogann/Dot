@@ -18,7 +18,7 @@ from dotagent.core.types import JsonObject
 from dotagent.evals.audit import catalog_problems, task_problems
 from dotagent.evals.catalog import LONG_TASK_IDS, all_tasks, select_tasks
 from dotagent.evals.checks import evaluate_check, evaluate_checks, workspace_path
-from dotagent.evals.metrics import run_metrics, took_easy_way
+from dotagent.evals.metrics import run_metrics, run_trace, took_easy_way
 from dotagent.evals.office_tasks import (
     AUGUST,
     NEW_NAME,
@@ -817,3 +817,47 @@ def test_the_site_of_a_task_is_served_for_the_attempt_and_named_in_its_goal_and_
     careers: EvalTask = select_tasks(["careers-of-ten-companies"])[0]
     assert careers.id in LONG_TASK_IDS and careers.mode == "research" and not careers.goal_mode
     assert any(page.location is not None for page in careers.site)
+
+
+def test_a_trace_keeps_the_steps_and_calls_in_order_and_never_what_an_act_typed() -> None:
+    """Item 1159: an attempt's trace is its model calls and tool calls in order, an act's line the actions of its steps
+    and the first line of its result, and none of the text a step typed."""
+    events = (
+        _event(1, "model_call", {"purpose": "step", "seconds": 1.5, "input_tokens": 9000, "output_tokens": 80}),
+        _event(
+            2,
+            "tool_call",
+            {
+                "call_id": "c1",
+                "tool": "browser_act",
+                "args": {
+                    "steps": [{"action": "fill", "ref": "e1", "text": "secret words"}, {"action": "click", "ref": "e2"}]
+                },
+            },
+        ),
+        _event(
+            3,
+            "tool_result",
+            {
+                "call_id": "c1",
+                "tool": "browser_act",
+                "ok": True,
+                "seconds": 0.4,
+                "text": "Steps: 2 done, 0 failed\nthe page",
+            },
+        ),
+        _event(
+            4,
+            "model_call",
+            {"purpose": "step", "seconds": 2.0, "input_tokens": 9500, "output_tokens": 60, "error": "boom"},
+        ),
+    )
+    trace = run_trace(events)
+    assert [(step.kind, step.name, step.ok) for step in trace] == [
+        ("model", "step", True),
+        ("tool", "browser_act", True),
+        ("model", "step", False),
+    ]
+    assert trace[1].note == "[fill,click] Steps: 2 done, 0 failed"
+    assert (trace[0].input_tokens, trace[0].output_tokens, trace[0].seconds) == (9000, 80, 1.5)
+    assert "secret words" not in repr(trace)
