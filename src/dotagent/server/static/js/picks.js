@@ -6,6 +6,7 @@
 // with the message that starts a run and are put away once it went (`sent()`); a steer leaves them for the next one.
 
 import { el, switchRow } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { markContent, wearsDot } from "./marks.js";
 import { onServerMarks, serverMark, signedAccount, wantServerMarks } from "./palette.js";
@@ -15,8 +16,8 @@ import { toast } from "./ui.js";
 const MAX_PLUGINS = 8;
 const MAX_SKILLS = 4;
 const MAX_ACCOUNTS = 4;
-const PLAN_FIRST = "Plan first";
-const PLAN_FIRST_HINT = "Dot writes its plan and asks you before it changes anything.";
+const PLAN_FIRST = t("options.planFirst");
+const PLAN_FIRST_HINT = t("options.planFirstHint");
 
 const KINDS = {
   plugin: { icon: "plug", noun: "connected app", many: "connected apps", most: MAX_PLUGINS },
@@ -110,7 +111,7 @@ function pickChip(kind, name, onRemove) {
     tint(chip, name);
   }
   if (onRemove !== null) {
-    chip.append(el("button", { class: "pick-remove", type: "button", title: `Remove ${name}`, "aria-label": `Remove ${name}`, onclick: onRemove }, icon("x")));
+    chip.append(el("button", { class: "pick-remove", type: "button", title: t("options.remove", { name }), "aria-label": t("options.remove", { name }), onclick: onRemove }, icon("x")));
   }
   if (kind === "account") {
     paintAccount(chip);
@@ -125,7 +126,7 @@ function pickChip(kind, name, onRemove) {
 export function sentPicks(data, inline = false) {
   return el(
     inline ? "span" : "div",
-    { class: inline ? "pick-list sent inline" : "pick-list sent", role: "list", "aria-label": "Picked for this message" },
+    { class: inline ? "pick-list sent inline" : "pick-list sent", role: "list", "aria-label": t("options.picked") },
     spaced(
       [
         data.plan_first ? pickChip("plan", PLAN_FIRST, null) : null,
@@ -171,7 +172,7 @@ export function createPicks({ onChange }) {
   const chosen = { plugin: [], account: [], skill: [] };
   let planFirst = false;
   let planAvailable = true;
-  const list = el("div", { class: "pick-list", role: "list", "aria-label": "Picked for this message", hidden: true });
+  const list = el("div", { class: "pick-list", role: "list", "aria-label": t("options.picked"), hidden: true });
   const planSwitch = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": PLAN_FIRST });
   const planRow = switchRow(
     el(
@@ -181,7 +182,7 @@ export function createPicks({ onChange }) {
         "span",
         { class: "composer-pick-content" },
         el("span", { class: "composer-pick-label" }, PLAN_FIRST),
-        el("span", { class: "composer-pick-hint" }, "Draft a plan and ask before taking action"),
+        el("span", { class: "composer-pick-hint" }, t("options.planFirstShort")),
       ),
       planSwitch,
     ),

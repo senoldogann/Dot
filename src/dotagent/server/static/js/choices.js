@@ -7,6 +7,7 @@
 import { api } from "./api.js";
 import { composerPill } from "./composer.js";
 import { el, modelName } from "./dom.js";
+import { t } from "./i18n.js";
 import { allModels, levelLabel, offersChoice, ONE_MESSAGE, oneMessageChoices, SPEED_HINTS } from "./efforts.js";
 import { icon } from "./icons.js";
 import { PHONE } from "./layout.js";
@@ -18,20 +19,20 @@ import { getSnapshot, loadModels, refresh } from "./state.js";
 import { attempt, toast, toastError } from "./ui.js";
 
 const MODES = [
-  { id: "task", label: "Task", hint: "Do the job from start to finish on this Mac", icon: "target" },
-  { id: "chat", label: "Chat", hint: "Talk it through; Dot still uses apps and files when that helps", icon: "message" },
-  { id: "research", label: "Research", hint: "Look things up and report back. Changes nothing", icon: "search" },
+  { id: "task", label: t("choices.task"), hint: t("choices.taskHint"), icon: "target" },
+  { id: "chat", label: t("choices.chat"), hint: t("choices.chatHint"), icon: "message" },
+  { id: "research", label: t("choices.research"), hint: t("choices.researchHint"), icon: "search" },
 ];
 // Auto (item 495), a message's mode on the home and in a chat: the message's own words settle it (the daemon's
 // agent/mode_words.py), so the box shows no mode pill until one is named with /task, /chat or /research.
-export const AUTO_MODE = { id: "auto", label: "Auto", hint: "Dot decides: it only looks when you ask it to look, and otherwise does the job", icon: "sparkles" };
+export const AUTO_MODE = { id: "auto", label: t("choices.auto"), hint: t("choices.autoHint"), icon: "sparkles" };
 // The modes a message may ask for: Auto first, then each mode by name.
 export const MESSAGE_MODES = [AUTO_MODE, ...MODES];
 // Never a real value of a status, so the first synchronisation always paints.
 const NOTHING_SHOWN = false;
 // What the pills add to their tooltips while a run works on a chat's page: a message waits in the queue and starts
 // with them once that run, which keeps its own, has ended (item 148).
-const WAITING_NOTE = "For your next message: the task under way keeps its own";
+const WAITING_NOTE = t("choices.waiting");
 
 /** Where `word` stands in `text` as a whole word of its own, any case, or -1. */
 function wordAt(text, word) {
@@ -111,7 +112,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
 
   // The approval mode stays in sight as the Options pill's value and icon, since it decides whether the run asks before
   // it acts.
-  const optionsPill = composerPill({ id: "options", caption: "Options", value: "", icon: null });
+  const optionsPill = composerPill({ id: "options", caption: t("choices.options"), value: "", icon: null });
   setTitle(optionsPill.element, optionsTitle);
   // The pill wears the mode's shorter name and its icon (item 398), its tooltip the whole name.
   const approvals = approvalsPicker((shown) => {
@@ -130,17 +131,17 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   }
   const executionGroup = el(
     "div",
-    { class: "pop-group pop-execution", role: "group", "aria-label": "How Dot works" },
+    { class: "pop-group pop-execution", role: "group", "aria-label": t("choices.howDotWorks") },
   );
   const optionsMenu = anchoredPopover({
     anchor: optionsPill.element,
     frame: frame.element,
-    label: "Options",
+    label: t("choices.options"),
     build: () => {
       const isChat = modeId === "chat";
       executionGroup.hidden = isChat;
       executionGroup.replaceChildren(
-        el("div", { class: "pop-heading" }, "How Dot works"),
+        el("div", { class: "pop-heading" }, t("choices.howDotWorks")),
         ...executionItems.flatMap((build) => build()),
         goalMode.element,
         frame.picks.planRow(),
@@ -156,7 +157,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   // The mode (item 108): a pill with the mode's icon, its menu the modes with what each does. A chat has no goal to
   // check, so the goal switch only belongs to the other kinds of run. On Auto (item 495) the pill is away: the box
   // shows a mode only once one is named, and its menu leads back to Auto.
-  const modePill = composerPill({ id: "mode", caption: "Mode", value: "", icon: null });
+  const modePill = composerPill({ id: "mode", caption: t("choices.mode"), value: "", icon: null });
   let modeId = kept.mode;
   function paintMode() {
     const option = modes.find((candidate) => candidate.id === modeId);
@@ -189,11 +190,11 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   const modeMenu = anchoredPopover({
     anchor: modePill.element,
     frame: frame.element,
-    label: "Mode",
+    label: t("choices.mode"),
     build: () => [
       el(
         "div",
-        { role: "listbox", "aria-label": "Mode" },
+        { role: "listbox", "aria-label": t("choices.mode") },
         ...modes.map((option) =>
           optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) }),
         ),
@@ -206,10 +207,10 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   executionGroup.hidden = modeId === "chat";
 
   // The model: the daemon's default until one is picked, worn with its provider's mark (item 108).
-  const modelPill = composerPill({ id: "model", caption: "Model", value: "", icon: null });
+  const modelPill = composerPill({ id: "model", caption: t("choices.model"), value: "", icon: null });
   // The reasoning level of a model that offers a choice, and its speed when it has fast mode; hidden for the others.
-  const reasoningPill = composerPill({ id: "reasoning", caption: "Reasoning", value: "", icon: icon("brain") });
-  setTitle(reasoningPill.element, "Reasoning level");
+  const reasoningPill = composerPill({ id: "reasoning", caption: t("choices.reasoning"), value: "", icon: icon("brain") });
+  setTitle(reasoningPill.element, t("choices.reasoningLevel"));
   reasoningPill.element.hidden = true;
   let chosenRef = kept.model;
   let providers = [];
@@ -258,7 +259,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   function paintModel() {
     const info = selectedInfo();
     const ref = chosenRef === "" ? defaultRefOf(getSnapshot()) : chosenRef;
-    modelPill.setValue(ref === null ? "Default" : modelName(ref), "");
+    modelPill.setValue(ref === null ? t("choices.default") : modelName(ref), "");
     modelPill.setIcon(providerMark(ref === null ? "" : providerOf(ref)));
     setTitle(modelPill.element, info === null ? "" : info.ref);
     const choice = info !== null && offersChoice(info);
@@ -275,12 +276,12 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     reasoningShort = "";
     if (shown) {
       const level = choice ? (kept.level.read(info) ?? info.default_effort) : null;
-      const words = boost !== null ? boost.label : choice ? (level === null ? "Default" : levelLabel(level)) : "";
-      reasoningShort = fastOn(info) ? (words === "" ? "Fast" : `${words} · Fast`) : words;
+      const words = boost !== null ? boost.label : choice ? (level === null ? t("choices.default") : levelLabel(level)) : "";
+      reasoningShort = fastOn(info) ? (words === "" ? t("choices.fast") : `${words} · ${t("choices.fast")}`) : words;
       reasoningPill.setValue(reasoningShort, "");
       reasoningPill.setIcon(icon(boost !== null ? boost.icon : fastOn(info) ? "bolt" : "brain"));
-      const typed = boost !== null && once === null ? " (the word in the box)" : "";
-      setTitle(reasoningPill.element, boost === null ? "Reasoning level" : `${boost.label}: ${boost.hint}${typed}`);
+      const typed = boost !== null && once === null ? ` ${t("choices.typed")}` : "";
+      setTitle(reasoningPill.element, boost === null ? t("choices.reasoningLevel") : `${boost.label}: ${boost.hint}${typed}`);
     } else {
       reasoningMenu.close();
     }
@@ -337,12 +338,12 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     const rows = [];
     if (offersChoice(info)) {
       const chosen = kept.level.read(info);
-      const fallback = info.default_effort === null ? "Default" : `Default (${levelLabel(info.default_effort)})`;
+      const fallback = info.default_effort === null ? t("choices.default") : t("choices.defaultOf", { level: levelLabel(info.default_effort) });
       rows.push(
         el(
           "div",
-          { role: "listbox", "aria-label": "Reasoning" },
-          optionRow({ lead: null, label: fallback, hint: "Dot's own choice", selected: chosen === null, onPick: () => pickLevel(info, null) }),
+          { role: "listbox", "aria-label": t("choices.reasoning") },
+          optionRow({ lead: null, label: fallback, hint: t("choices.ownChoice"), selected: chosen === null, onPick: () => pickLevel(info, null) }),
           ...info.efforts.map((level) => optionRow({ lead: null, label: levelLabel(level), hint: "", selected: chosen === level, onPick: () => pickLevel(info, level) })),
         ),
       );
@@ -352,11 +353,11 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
       rows.push(
         el(
           "div",
-          { class: "pop-group", role: "group", "aria-label": "This message only" },
-          el("div", { class: "pop-heading", "aria-hidden": "true" }, "This message only"),
+          { class: "pop-group", role: "group", "aria-label": t("choices.messageOnly") },
+          el("div", { class: "pop-heading", "aria-hidden": "true" }, t("choices.messageOnly")),
           el(
             "div",
-            { role: "listbox", "aria-label": "This message only" },
+            { role: "listbox", "aria-label": t("choices.messageOnly") },
             ...single.map((choice) =>
               optionRow({ lead: icon(choice.icon), label: choice.label, hint: choice.hint, selected: (once ?? typedChoice()) === choice.id, onPick: () => pickOnce(choice.id) }),
             ),
@@ -369,13 +370,13 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
       rows.push(
         el(
           "div",
-          { class: "pop-group", role: "group", "aria-label": "Speed" },
-          el("div", { class: "pop-heading", "aria-hidden": "true" }, "Speed"),
+          { class: "pop-group", role: "group", "aria-label": t("choices.speed") },
+          el("div", { class: "pop-heading", "aria-hidden": "true" }, t("choices.speed")),
           el(
             "div",
-            { role: "listbox", "aria-label": "Speed" },
-            optionRow({ lead: null, label: "Standard", hint: SPEED_HINTS.standard, selected: !fast, onPick: () => pickSpeed("standard") }),
-            optionRow({ lead: null, label: "Fast", hint: SPEED_HINTS.fast, selected: fast, onPick: () => pickSpeed("fast") }),
+            { role: "listbox", "aria-label": t("choices.speed") },
+            optionRow({ lead: null, label: t("choices.standard"), hint: SPEED_HINTS.standard, selected: !fast, onPick: () => pickSpeed("standard") }),
+            optionRow({ lead: null, label: t("choices.fast"), hint: SPEED_HINTS.fast, selected: fast, onPick: () => pickSpeed("fast") }),
           ),
         ),
       );
@@ -393,7 +394,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
       toastError(error);
       return false;
     }
-    toast("ok", `New chats start on ${modelName(ref)}.`);
+    toast("ok", t("choices.newDefault", { model: modelName(ref) }));
     await attempt(refresh);
     return true;
   }
@@ -403,7 +404,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   const modelMenu = anchoredPopover({
     anchor: modelPill.element,
     frame: frame.element,
-    label: "Model",
+    label: t("choices.model"),
     build: () => {
       const fallback = defaultRefOf(getSnapshot());
       const models = picker.build({ groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) });
@@ -425,19 +426,19 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   function phoneTabs() {
     const isChat = modeId === "chat";
     executionGroup.hidden = isChat;
-    executionGroup.replaceChildren(el("div", { class: "pop-heading" }, "How Dot works"), ...executionItems.flatMap((build) => build()), goalMode.element, frame.picks.planRow());
+    executionGroup.replaceChildren(el("div", { class: "pop-heading" }, t("choices.howDotWorks")), ...executionItems.flatMap((build) => build()), goalMode.element, frame.picks.planRow());
     const reasoning = reasoningRows();
     return [
-      { id: "model", label: "Model", build: (models) => models },
-      ...(reasoning.length === 0 ? [] : [{ id: "reasoning", label: "Reasoning", build: () => reasoning }]),
-      { id: "options", label: "Options", build: () => [approvals.element, ...(isChat ? [] : [executionGroup]), ...more()] },
+      { id: "model", label: t("choices.model"), build: (models) => models },
+      ...(reasoning.length === 0 ? [] : [{ id: "reasoning", label: t("choices.reasoning"), build: () => reasoning }]),
+      { id: "options", label: t("choices.options"), build: () => [approvals.element, ...(isChat ? [] : [executionGroup]), ...more()] },
       {
         id: "mode",
-        label: "Mode",
+        label: t("choices.mode"),
         build: () => [
           el(
             "div",
-            { role: "listbox", "aria-label": "Mode" },
+            { role: "listbox", "aria-label": t("choices.mode") },
             ...modes.map((option) => optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) })),
           ),
         ],
@@ -450,7 +451,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     const shown = tabs.find((tab) => tab.id === phoneTab) ?? tabs[0];
     const bar = el(
       "div",
-      { class: "pop-tabs", role: "tablist", "aria-label": "Choices" },
+      { class: "pop-tabs", role: "tablist", "aria-label": t("choices.choices") },
       ...tabs.map((tab) =>
         el(
           "button",
@@ -481,7 +482,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     modelPill.setValue(value, extra);
   };
   paintPhonePill();
-  const reasoningMenu = anchoredPopover({ anchor: reasoningPill.element, frame: frame.element, label: "Reasoning", build: reasoningRows });
+  const reasoningMenu = anchoredPopover({ anchor: reasoningPill.element, frame: frame.element, label: t("choices.reasoning"), build: reasoningRows });
 
   // Called on every status update; it only does work when the daemon's default model changed.
   function syncDefault() {
@@ -500,7 +501,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
 
   ready().catch((error) => {
     console.warn("the model list is unavailable", error);
-    setTitle(modelPill.element, `The model list could not be loaded: ${error.message}`);
+    setTitle(modelPill.element, t("choices.modelsFailed", { problem: error.message }));
   });
   syncDefault();
 

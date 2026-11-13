@@ -52,9 +52,9 @@ export const APPROVAL_OPTIONS = [
     icon: "lockOpen",
   },
 ];
-const GOAL_MODE_HINT = "Dot checks its answer against your goal and keeps working until the goal is really reached";
-const STANDING_HINT = "Keep going until done: Dot works on the goal in several sessions until a check confirms it is done, or you stop it";
-const STANDING_NOTE = "Keep going is on: Dot works on this goal in several sessions until a check confirms it is done. You can follow it under Campaigns.";
+const GOAL_MODE_HINT = t("options.goalModeHint");
+const STANDING_HINT = t("options.keepGoingHint");
+const STANDING_NOTE = t("options.keepGoingNote");
 
 /** The words for an approval mode, for chips and facts. */
 export function approvalLabel(id) {
@@ -120,7 +120,7 @@ function pick(caption, control, hint) {
 function approvalList(selected, onSelect) {
   let current = selected;
   const rows = new Map();
-  const element = el("div", { class: "approval-list", role: "listbox", "aria-label": "Approval mode" });
+  const element = el("div", { class: "approval-list", role: "listbox", "aria-label": t("options.approvalMode") });
 
   function paint() {
     for (const [id, row] of rows) {
@@ -185,7 +185,7 @@ export function approvalsPicker(onPaint, kept) {
 
   paint();
   return {
-    element: el("div", { class: "pop-group", role: "group", "aria-label": "Approvals" }, el("div", { class: "pop-heading", "aria-hidden": "true" }, "Approvals"), control.element),
+    element: el("div", { class: "pop-group", role: "group", "aria-label": t("options.approvals") }, el("div", { class: "pop-heading", "aria-hidden": "true" }, t("options.approvals")), control.element),
     value: kept.read,
     sync: () => {
       control.set(shown());
@@ -202,8 +202,8 @@ export function approvalsPicker(onPaint, kept) {
  */
 export function standingPicker(onToggle) {
   let on = false;
-  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Keep going until done" });
-  const element = switchRow(pick("Keep going", toggle, "Work in several sessions until the result is checked"), toggle);
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": t("options.keepGoingName") });
+  const element = switchRow(pick(t("options.keepGoing"), toggle, t("options.keepGoingShort")), toggle);
   element.title = STANDING_HINT;
   const note = el("div", { class: "composer-note", hidden: true }, icon("target"), el("span", null, STANDING_NOTE));
 
@@ -246,8 +246,8 @@ export function goalModePicker(kept) {
     }
     return status.goal_mode === true;
   }
-  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Goal mode" });
-  const element = switchRow(pick("Goal mode", toggle, "Keep working until the goal is reached"), toggle);
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": t("options.goalMode") });
+  const element = switchRow(pick(t("options.goalMode"), toggle, t("options.goalModeShort")), toggle);
   element.title = GOAL_MODE_HINT;
 
   function paint() {

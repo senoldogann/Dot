@@ -154,17 +154,17 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
       menu.append(el("div", { class: "slash-section", role: "group", "aria-label": section.title }, options));
     });
     if (problem !== null) {
-      menu.append(el("div", { class: "slash-note" }, `Skills and connected apps could not be loaded: ${problem}`));
+      menu.append(el("div", { class: "slash-note" }, t("composer.paletteFailed", { problem })));
     }
     if (shown.length === 0 && problem === null) {
       // The at menu holds nothing but what the palette lists: until it is read, it says so rather than that nothing
       // matches.
       const loading = palette === null && range.trigger === "@";
-      menu.append(el("div", { class: "slash-note" }, loading ? "Looking for your connected apps and plugins…" : `Nothing matches ${range.trigger}${range.word}.`));
+      menu.append(el("div", { class: "slash-note" }, loading ? t("composer.paletteLoading") : t("composer.nothingMatches", { typed: `${range.trigger}${range.word}` })));
     }
     if (shown.length > 0) {
       // What the keys do, under the list (a touch screen has none of them: the foot is left off it).
-      menu.append(el("div", { class: "slash-foot", "aria-hidden": "true" }, icon("arrowUpDown"), "Select · Enter/Tab to add · Esc to close"));
+      menu.append(el("div", { class: "slash-foot", "aria-hidden": "true" }, icon("arrowUpDown"), t("composer.menuKeys")));
     }
     menu.hidden = false;
     textarea.setAttribute("aria-expanded", "true");
@@ -313,7 +313,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
     rows: "1",
     placeholder,
     "aria-label": boxLabel,
-    title: "Type @ for apps, / for skills and commands",
+    title: t("composer.boxTitle"),
   });
   const element = el("section", { class: "card composer", "aria-label": label });
   // The box as one line until the owner asks for the run's choices (item 833): the "+" menu shows and hides them, and
