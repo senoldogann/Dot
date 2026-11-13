@@ -391,6 +391,34 @@ _INTERCEPTOR: re.Pattern[str] = re.compile(
     r"- (<[^\n]+?>)(?:…</[\w-]+>)?(?: from (<[^\n]+?>)(?:…</[\w-]+>)? subtree)? intercepts pointer events"
 )
 _COVERING_CHARS: int = 160
+# The steps that press an element with the pointer, which something in front of it can take, and those of them that
+# go through the element's own label when that is what lies in front (a double or right press on a label means
+# nothing a person would do).
+_PRESSES: frozenset[str] = frozenset({"click", "double_click", "right_click", "check", "uncheck"})
+_LABEL_PRESSES: frozenset[str] = frozenset({"click", "check", "uncheck"})
+# How long each of a press's two looks waits for its element to take it before the step itself waits its whole time
+# (``action_timeout_s``): the same thing still in front of it on both looks is said at once. On the owner's Dot, 24
+# presses of a week waited 8 s each to be told so (2026-11-13); a cover that goes or changes between the looks (an
+# animation, a toast, a loading mask, a cookie banner its decliner closes) leaves the press to wait as before.
+_COVER_LOOK_MS: int = 1500
+_COVER_LOOKS: int = 2
+# The least time a press keeps after its looks, so that one whose looks took its whole time still makes its own.
+_LEAST_PRESS_MS: int = 1000
+# Whether what lies in front of the middle of an element is its own label (``target`` the element): a styled checkbox or
+# radio, whose field hides under the label drawn over it. Only the label whose control the element is, and only where
+# no other control (a link of the label's text, a button) is the point's: a press there would go to that one. Looked up
+# in the element's own root, a shadow root's for a control of a web component; an element of no size has no middle.
+_OWN_LABEL_SCRIPT: str = """(target) => {
+  const box = target.getBoundingClientRect();
+  const root = target.getRootNode();
+  if (!root.elementFromPoint || box.width <= 0 || box.height <= 0) return false;
+  const hit = root.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+  if (!hit) return false;
+  const control = hit.closest('a, button, input, select, textarea, [role=button], [role=link]');
+  if (control !== null && control !== target) return false;
+  const label = hit.closest('label');
+  return label !== null && label.control === target;
+}"""
 _CONSENT_HANDLER_TIMES: int = 6
 _CONSENT_CLICK_TIMEOUT_MS: float = 2000.0
 
@@ -1477,6 +1505,66 @@ async def fill_login_field(
         await named.dispose()
 
 
+async def _trial(locator: Locator, action: str, timeout_ms: int) -> None:
+    """Playwright's own trial of the press ``action`` on ``locator``: every check the press makes before it sends
+    (it is in view, still, enabled, and takes the pointer where it would land; the cookie banner's decliner runs as for
+    the press), with nothing sent."""
+    match action:
+        case "click":
+            await locator.click(trial=True, timeout=timeout_ms)
+        case "double_click":
+            await locator.dblclick(trial=True, timeout=timeout_ms)
+        case "right_click":
+            await locator.click(button="right", trial=True, timeout=timeout_ms)
+        case "check":
+            await locator.check(trial=True, timeout=timeout_ms)
+        case "uncheck":
+            await locator.uncheck(trial=True, timeout=timeout_ms)
+
+
+def _cover_named(error: PlaywrightTimeoutError) -> str | None:
+    """What Playwright's log of a press that timed out says took the pointer (:data:`_INTERCEPTOR`), or None."""
+    found: re.Match[str] | None = _INTERCEPTOR.search(str(error))
+    return None if found is None else found.group(2) or found.group(1)
+
+
+async def _through_own_label(page: Page, locator: Locator, step: Step, ref: str, timeout_ms: int) -> bool:
+    """Whether the press of ``step`` goes to the label in front of its element (``force``). Its trial (:func:`_trial`)
+    looks :data:`_COVER_LOOKS` times for at most :data:`_COVER_LOOK_MS` each: the same thing in front of the element on
+    every look raises at once, naming it, as a press that waited its whole time did (nothing was sent), unless that is
+    the element's own label (:data:`_OWN_LABEL_SCRIPT`) and the press one a label takes (:data:`_LABEL_PRESSES`): a
+    person's press lands on it and presses its field, so the press goes there. Any other end of a look (the element
+    takes the press, or is not yet shown, or still moves, or the cover went or changed) leaves the press to wait its
+    own time, as before."""
+    if step.action not in _PRESSES:
+        return False
+    covers: list[str] = []
+    last: PlaywrightTimeoutError | None = None
+    try:
+        for _ in range(_COVER_LOOKS):
+            try:
+                await _trial(locator, step.action, min(_COVER_LOOK_MS, timeout_ms))
+                return False
+            except PlaywrightTimeoutError as error:
+                cover: str | None = _cover_named(error)
+                if cover is None or (covers and covers[-1] != cover):
+                    return False
+                covers.append(cover)
+                last = error
+        if last is None:
+            return False
+        own: object = step.action in _LABEL_PRESSES and await locator.evaluate(
+            _OWN_LABEL_SCRIPT, timeout=_FIELD_PROBE_TIMEOUT_MS
+        )
+    except PlaywrightError as error:
+        # The looks send nothing: what ended them (the page went on, the element left it) ended a press not sent.
+        failed: BrowserError = _failure(f"{step.action} failed", page, {"ref": ref}, error)
+        raise StepNotSent(failed.message, failed.context) from error
+    if own is True:
+        return True
+    raise _failure(f"{step.action} failed", page, {"ref": ref}, last) from last
+
+
 async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> StepResult:
     """Perform one step against the latest snapshot, and return what it checked of itself (item 1145): what the field
     a ``fill``, ``type`` or ``insert`` wrote into holds after it, the option a ``select`` left chosen, whether the box
@@ -1520,13 +1608,18 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
     ref: str = _ref_of(step)
     locator: Locator = await _step_locator(page, ref, step.action)
     try:
+        started: float = time.monotonic()
+        force: bool = await _through_own_label(page, locator, step, ref, timeout_ms)
+        if step.action in _PRESSES:
+            # A press keeps what is left of its time after its looks.
+            timeout_ms = max(timeout_ms - round((time.monotonic() - started) * 1000), _LEAST_PRESS_MS)
         match step.action:
             case "click":
-                await locator.click(timeout=timeout_ms)
+                await locator.click(timeout=timeout_ms, force=force)
             case "double_click":
-                await locator.dblclick(timeout=timeout_ms)
+                await locator.dblclick(timeout=timeout_ms, force=force)
             case "right_click":
-                await locator.click(button="right", timeout=timeout_ms)
+                await locator.click(button="right", timeout=timeout_ms, force=force)
             case "hover":
                 await locator.hover(timeout=timeout_ms)
             case "fill":
@@ -1615,10 +1708,10 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
                 await locator.press(_key_of(step), timeout=timeout_ms)
             case "check":
-                await locator.check(timeout=timeout_ms)
+                await locator.check(timeout=timeout_ms, force=force)
                 return await _ticked(locator, True, timeout_ms)
             case "uncheck":
-                await locator.uncheck(timeout=timeout_ms)
+                await locator.uncheck(timeout=timeout_ms, force=force)
                 return await _ticked(locator, False, timeout_ms)
             case "scroll_into_view":
                 await locator.scroll_into_view_if_needed(timeout=timeout_ms)

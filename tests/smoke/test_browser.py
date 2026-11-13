@@ -337,6 +337,22 @@ for (const list of document.querySelectorAll('ul')) {
 <div role="dialog" aria-label="Newsletter" style="position:fixed;inset:0;background:#fff;z-index:9999">
 <p>Get our weekly deals</p><input aria-label="Email"><button>Subscribe</button>
 <button onclick="this.parentElement.remove()">No thanks</button></div>""",
+    # A styled checkbox whose label is drawn over its field, as Shopify's and Okta's are; and a link inside another
+    # label, which a press must never be sent to in the field's place.
+    "/own-label": """<!doctype html><title>Own label</title>
+<style>.box{position:relative;display:inline-block;width:160px;height:24px}
+.box input{position:absolute;left:0;top:0;width:24px;height:24px;margin:0}
+.box label{position:absolute;inset:0;padding-left:28px;background:#eef}</style>
+<span class="box"><input type="checkbox" id="remember" onchange="document.getElementById('o').textContent =
+'remember ' + this.checked"><label for="remember">Remember this device</label></span>
+<span class="box"><input type="checkbox" id="terms" aria-label="Terms box"><label for="terms"><a href="#terms-text"
+style="position:absolute;inset:0">Terms</a></label></span>
+<span id="o"></span>""",
+    # A loading mask in front of a button that goes by itself after two seconds, as a single-page app's does.
+    "/mask": """<!doctype html><title>Mask</title>
+<button onclick="document.getElementById('k').textContent = 'saved'">Save</button><span id="k"></span>
+<div id="mask" style="position:fixed;inset:0;background:rgba(255,255,255,.6)">Loading…</div>
+<script>setTimeout(() => document.getElementById('mask').remove(), 2000);</script>""",
 }
 
 
@@ -1126,10 +1142,14 @@ async def test_a_dialog_in_front_of_the_page_is_shown_first_and_a_blocked_click_
     assert "a dialog is open in front of the page" in rendered.splitlines()[0]
     assert rendered.index("in front of the page:") < rendered.index("the page:")
 
+    # Told after two looks of 1.5 s, not after the press's whole time (8 s), and nothing was sent.
+    started: float = time.monotonic()
     blocked: ActOutcome = await act(
         browser, "modal", [Step(action="click", ref=ref_of(view.body, 'button "Buy now"'))], False
     )
+    assert time.monotonic() - started < 6.0, time.monotonic() - started
     assert blocked.steps[0].outcome == "failed", blocked
+    assert blocked.steps[0].dispatched == "not_sent", blocked
     assert "lies in front of the element" in blocked.steps[0].detail
     assert 'role="dialog"' in blocked.steps[0].detail
 
@@ -1345,3 +1365,32 @@ async def test_dots_own_chrome_closes_once_unused_and_starts_again_for_the_next_
         assert view.title == "Home"
     finally:
         await session.aclose()
+
+
+async def test_a_field_its_own_label_covers_is_pressed_through_the_label(browser: BrowserSession, site: str) -> None:
+    """A styled checkbox whose label is drawn over its field (Shopify's, Okta's "Remember this device") is pressed where
+    a person would, on its label, and its state is read back; a link inside another label is not pressed in the
+    field's place: that press is said to be covered."""
+    view: PageView = await browser.open_url("own-label", f"{site}/own-label", True)
+    checked: ActOutcome = await act(
+        browser, "own-label", [Step(action="check", ref=ref_of(view.body, 'checkbox "Remember this device"'))], False
+    )
+    assert [report.outcome for report in checked.steps] == ["done"], checked.steps
+    assert "remember true" in (await browser.read_text("own-label", None, 0, 1000)).text
+    linked: ActOutcome = await act(
+        browser, "own-label", [Step(action="click", ref=ref_of(view.body, 'checkbox "Terms box"'))], False
+    )
+    assert linked.steps[0].outcome == "failed", linked
+    assert "lies in front of the element" in linked.steps[0].detail
+    assert "#terms-text" not in (await browser.snapshot("own-label", True)).url
+
+
+async def test_a_press_waits_for_a_mask_that_goes_by_itself(browser: BrowserSession, site: str) -> None:
+    """A loading mask that goes after two seconds (between the press's two looks) leaves the press to go through, as a
+    person's would once it went: only a cover that stays is said at once."""
+    view: PageView = await browser.open_url("mask", f"{site}/mask", True)
+    saved: ActOutcome = await act(
+        browser, "mask", [Step(action="click", ref=ref_of(view.body, 'button "Save"'))], False
+    )
+    assert [report.outcome for report in saved.steps] == ["done"], saved.steps
+    assert "saved" in (await browser.read_text("mask", None, 0, 1000)).text
