@@ -71,6 +71,16 @@ def test_a_field_the_page_adds_to_holds_the_text_and_a_short_text_is_not_found_b
     assert judge_replaced("Ada Lovelace", "Ada Lovelace", "Grace Hopper").status == "contradicted"
 
 
+def test_a_page_that_puts_back_a_value_ending_in_the_text_is_taken_for_one_that_added_to_it() -> None:
+    """The price of item 1149, chosen and not overlooked. A page that answers ``Lovelace`` by showing ``Ada Lovelace``
+    again does what one that puts ``https://`` before an address does: it shows the text with more before it. The
+    two cannot be told apart by the field, so both are held, and the check says how many characters the field holds
+    against how many were written, which is what gives the first one away."""
+    put_back: OutcomeCheck = judge_replaced("Ada Lovelace", "Ada Lovelace", "Lovelace")
+    assert put_back.status == "verified"
+    assert put_back.evidence == "the page added to it: 12 characters where 8 were written"
+
+
 def test_a_field_that_is_as_it_was_contradicts_the_write_and_one_that_changed_otherwise_is_uncertain() -> None:
     kept: OutcomeCheck = judge_replaced("fixed", "fixed", "mine")
     assert kept.status == "contradicted" and "did not take the text" in kept.reason
