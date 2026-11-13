@@ -435,8 +435,8 @@ NEVER_PRESSED: str = "never_pressed"
 
 def never_pressed(log: str) -> bool:
     """Whether Playwright's ``log`` of a failed press says that it tried the press and never made it (the element
-    was not shown, enabled and still in time: hidden, a button that stayed disabled, one that kept moving): nothing
-    went to the page."""
+    was not shown and still in time, nor, for a click, enabled: hidden, a button that stayed disabled, one that kept
+    moving; a hover does not wait for its element to be enabled): nothing went to the page."""
     tried: re.Match[str] | None = _PRESS_TRIED.search(log)
     return tried is not None and _PRESS_MADE.format(tried.group(1)) not in log
 
@@ -1343,6 +1343,32 @@ async def _ticked(locator: Locator, asked: bool, timeout_ms: int) -> StepResult:
     return StepResult(checks=(judge_ticked(asked, now),), note="")
 
 
+# What Playwright says when the box is not as asked at its own reading, right after its click.
+_TICK_NOT_KEPT: str = "did not change its state"
+
+
+async def _tick(locator: Locator, asked: bool, timeout_ms: int, through_label: bool) -> StepResult:
+    """Tick or clear a box, and say what it holds once the page took a turn (:func:`_ticked`). ``through_label`` is
+    a press that goes to the box's own label in front of it (item 1153).
+
+    Playwright reads the box itself right after its click and raises when it is not as asked. That reading is not
+    the step's (item 1157): the click went out, and the page may put the box back before it (a timer of its own,
+    which came first on a slow machine, where the step then read "failed, may have been sent" with no check) or
+    set it only after it (a box a script draws). Either way the reading after the page's turn says which, as for a
+    box Playwright saw as asked. Any other failure of the click is the step's."""
+    try:
+        if asked:
+            await locator.check(timeout=timeout_ms, force=through_label)
+        else:
+            await locator.uncheck(timeout=timeout_ms, force=through_label)
+    except PlaywrightError as error:
+        if _TICK_NOT_KEPT not in str(error):
+            raise
+        # Kept in the log: where the step's own reading then finds the box as asked, Playwright had read too early.
+        _log.info("browser_box_read_early", url=truncate_middle(locator.page.url, _ERROR_CHARS), asked=asked)
+    return await _ticked(locator, asked, timeout_ms)
+
+
 async def _check_secret_field(
     page: Page, marking: object, ref: str | None, check: SecretFieldCheck, text: str | None = None
 ) -> None:
@@ -1760,11 +1786,9 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
                 await locator.press(_key_of(step), timeout=timeout_ms)
             case "check":
-                await locator.check(timeout=timeout_ms, force=force)
-                return await _ticked(locator, True, timeout_ms)
+                return await _tick(locator, True, timeout_ms, force)
             case "uncheck":
-                await locator.uncheck(timeout=timeout_ms, force=force)
-                return await _ticked(locator, False, timeout_ms)
+                return await _tick(locator, False, timeout_ms, force)
             case "scroll_into_view":
                 await locator.scroll_into_view_if_needed(timeout=timeout_ms)
             case "click_at":
