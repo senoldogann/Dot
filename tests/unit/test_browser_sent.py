@@ -2,7 +2,7 @@
 answer, and the one that has none yet."""
 
 from dotagent.browser.driver import NEVER_PRESSED, never_pressed
-from dotagent.browser.session import Sent, _dispatch_of, same_site, sent_words, unanswered
+from dotagent.browser.session import Sent, _dispatch_of, form_sent_nothing, same_site, sent_words, unanswered
 from dotagent.core.errors import BrowserError, StepNotSent
 
 
@@ -55,3 +55,14 @@ def test_a_press_playwright_tried_and_never_made_was_not_sent() -> None:
     assert _dispatch_of(BrowserError("click failed", {NEVER_PRESSED: "true"})) == "not_sent"
     assert _dispatch_of(BrowserError("click failed", {"error": made})) == "unknown"
     assert _dispatch_of(StepNotSent("the ref is gone", {})) == "not_sent"
+
+
+def test_a_form_is_said_to_have_sent_nothing_only_when_nothing_says_otherwise() -> None:
+    """Each fact that takes the line away, alone: the page asked for something, the form may have gone by a socket
+    or to a tab still on its way (the pre-push review of item 1158: no page of the smoke tests holds a new tab
+    back), the batch has other news of the press, or the step's line says already that nothing changed."""
+    assert form_sent_nothing(asked=False, elsewhere=False, moved_on=False, told=False)
+    assert not form_sent_nothing(asked=True, elsewhere=False, moved_on=False, told=False)
+    assert not form_sent_nothing(asked=False, elsewhere=True, moved_on=False, told=False)
+    assert not form_sent_nothing(asked=False, elsewhere=False, moved_on=True, told=False)
+    assert not form_sent_nothing(asked=False, elsewhere=False, moved_on=False, told=True)

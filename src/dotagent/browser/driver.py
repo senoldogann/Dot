@@ -435,7 +435,8 @@ NEVER_PRESSED: str = "never_pressed"
 
 def never_pressed(log: str) -> bool:
     """Whether Playwright's ``log`` of a failed press says that it tried the press and never made it (the element
-    was not shown in time, or kept moving): nothing went to the page."""
+    was not shown, enabled and still in time: hidden, a button that stayed disabled, one that kept moving): nothing
+    went to the page."""
     tried: re.Match[str] | None = _PRESS_TRIED.search(log)
     return tried is not None and _PRESS_MADE.format(tried.group(1)) not in log
 

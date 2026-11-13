@@ -688,6 +688,15 @@ def sent_words(sent: Sequence[Sent]) -> str:
     return "its page sent " + "; ".join(shown) + more
 
 
+def form_sent_nothing(*, asked: bool, elsewhere: bool, moved_on: bool, told: bool) -> bool:
+    """Whether a press on a form's own button is said to have sent nothing to the site (item 1158). Not when the
+    page asked its site or anyone for anything (``asked``); not when the form may have gone another way
+    (``elsewhere``: a socket the page holds open, or a tab the press opened that is still on its way, where a form
+    sent to a new tab goes out); not when the batch has other news of the press (``moved_on``: a new address, tab or
+    dialog); and not when the step's line says already that the page did not change (``told``), which says it."""
+    return not (asked or elsewhere or moved_on or told)
+
+
 def unanswered(sent: Sequence[Sent]) -> Sent | None:
     """The first request of a step that the server has not answered and that did not fail, if there is one."""
     return next((one for one in sent if one.status is None and not one.failed), None)
@@ -799,8 +808,8 @@ def effect_of_expected(effect: str, sights: Sequence[OutcomeCheck]) -> str:
 
 def _dispatch_of(error: BrowserError) -> Dispatch:
     """Whether a step that failed with ``error`` went out: one refused before anything was sent, whose click
-    something in front took, or whose press Playwright tried and never made (item 1158: its element was not shown
-    in time), did not; any other may have."""
+    something in front took, or whose press Playwright tried and never made (item 1158: its element was not shown,
+    enabled and still in time), did not; any other may have."""
     if isinstance(error, StepNotSent) or error.context.get("covered_by") or error.context.get(NEVER_PRESSED):
         return "not_sent"
     return "unknown"
@@ -3377,11 +3386,12 @@ class BrowserSession:
             # a page asks for by itself during the waits after it (a chat that polls) leaves the finding as it is.
             effect = ""
         said: list[str] = [effect or result.note, sent_words(sent)]
-        # A page that holds a socket open may have sent its form there, where no request shows.
-        # Nor is it said while a tab the press opened is on its way: a form sent to a new tab goes out there.
-        gone_elsewhere: bool = opening or tab.sockets > 0
-        silent: bool = not sent and tab.requests == requests and surprise is None and not gone_elsewhere
-        if result.submits and silent and not effect.startswith(PAGE_UNCHANGED):
+        if result.submits and form_sent_nothing(
+            asked=bool(sent) or tab.requests != requests,
+            elsewhere=opening or tab.sockets > 0,
+            moved_on=surprise is not None,
+            told=effect.startswith(PAGE_UNCHANGED),
+        ):
             said.append(_SENT_NOTHING)
         report: StepReport = StepReport(
             index=index,
