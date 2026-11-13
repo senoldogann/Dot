@@ -12,18 +12,21 @@ from dotagent.core.outcomes import (
     SightEnd,
     StepReport,
     echoes_written,
+    gate_lost,
     holds_back,
     judge_added,
     judge_chosen,
     judge_replaced,
     judge_sight,
     judge_ticked,
+    not_looked_for,
     render_outcomes,
     render_step,
     still_on_its_way,
     url_shows,
 )
 from dotagent.tools.browser import ActArgs as BrowserActArgs
+from dotagent.tools.browser import guesses_to_the_call
 
 _LOOK: str = "look again"
 _NOT_SEEN: tuple[SightEnd, ...] = ("timeout", "still", "dialog", "no_time")
@@ -142,15 +145,47 @@ def test_a_text_the_batch_writes_cannot_be_what_a_step_expects_to_see() -> None:
     assert echoes_written("ada lovelace", ["Ada  Lovelace"])
     assert echoes_written("Lovelace", ["Ada Lovelace"])
     assert not echoes_written("Welcome, Ada Lovelace", ["Ada Lovelace"])
-    with pytest.raises(ValidationError, match="within a text this batch writes"):
-        BrowserActArgs.model_validate(
-            {
-                "steps": [
-                    {"action": "fill", "ref": "e5", "text": "Ada Lovelace"},
-                    {"action": "click", "ref": "e9", "expect_text": "Lovelace"},
-                ]
-            }
-        )
+    # The call is taken all the same (item 1164): refused, it cost a round trip of the model, and came back with
+    # nothing to expect. The session sends the step and says that what it named was not looked for.
+    taken: BrowserActArgs = BrowserActArgs.model_validate(
+        {
+            "steps": [
+                {"action": "fill", "ref": "e5", "text": "Ada Lovelace"},
+                {"action": "click", "ref": "e9", "expect_text": "Lovelace"},
+            ]
+        }
+    )
+    assert taken.steps[1].expect_text == "Lovelace"
+    assert not_looked_for("") == ""
+    assert not_looked_for("the page showed those words already before the step") == (
+        "what it expected was not looked for (the page showed those words already before the step)"
+    )
+    assert gate_lost(2).startswith("what step 2 expected could not be looked for, so the steps after it were not run")
+
+
+def test_a_guess_a_step_carries_is_the_calls_and_none_is_dropped() -> None:
+    """Item 1164, from traced runs: a guess in the model's own words given to a step (``expect``) was refused whole,
+    a round trip of the model for a meaning that was plain. It is the call's, after the call's own."""
+    fill: dict[str, object] = {"action": "fill", "ref": "e5", "text": "lamp"}
+    click: dict[str, object] = {"action": "click", "ref": "e6"}
+    guessed: dict[str, object] = {**click, "expect": "the results list"}
+    given: dict[str, object] = {"steps": [fill, guessed], "retry": False}
+    assert guesses_to_the_call(given) == {"steps": [fill, click], "retry": False, "expect": "the results list"}
+    # The arguments given are left as they were, and a call with no such step is given back as it is.
+    assert given == {"steps": [fill, guessed], "retry": False} and guessed["expect"] == "the results list"
+    plain: dict[str, object] = {"steps": [fill, click]}
+    assert guesses_to_the_call(plain) is plain and guesses_to_the_call("nope") == "nope"
+    # After the call's own, each kept and none twice.
+    assert guesses_to_the_call({"expect": "a list", "steps": [guessed, {**fill, "expect": "a list"}]}) == {
+        "steps": [click, fill],
+        "expect": "a list; the results list",
+    }
+    # Through the tool's arguments, beside item 1161's reading of words written beside the steps: a step that only
+    # looks is left out first, the words are the last step's, and the guess is the call's.
+    args: BrowserActArgs = BrowserActArgs.model_validate(
+        {"steps": [fill, guessed, {"action": "snapshot"}], "expect_text": "Brass desk lamp"}
+    )
+    assert (len(args.steps), args.steps[1].expect_text, args.expect) == (2, "Brass desk lamp", "the results list")
 
 
 def test_a_step_takes_exact_words_to_expect_and_not_the_calls_free_guess() -> None:

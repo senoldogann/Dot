@@ -165,12 +165,17 @@ from dotagent.core.images import jpeg_of_size
 from dotagent.core.logs import get_logger
 from dotagent.core.noted import noted_in_batch_text
 from dotagent.core.outcomes import (
+    ADDRESS_SHOWN_BEFORE,
+    TEXT_SHOWN_BEFORE,
+    WRITTEN_BY_THE_BATCH,
     Dispatch,
     OutcomeCheck,
     SightEnd,
-    already_shown,
+    echoes_written,
+    gate_lost,
     holds_back,
     judge_sight,
+    not_looked_for,
     url_shows,
 )
 from dotagent.core.text import truncate_middle
@@ -758,14 +763,30 @@ class _Waits:
 
 
 @dataclass(frozen=True, slots=True)
+class _Sights:
+    """What a step named to expect, as it can be looked for after the step (item 1164): the words and the part of
+    the address that can tell what the step did (``None``: not named, or not able to), and why each one that cannot
+    is left out."""
+
+    text: str | None
+    url: str | None
+    left_out: tuple[str, ...]
+
+    def any(self) -> bool:
+        return self.text is not None or self.url is not None
+
+
+@dataclass(frozen=True, slots=True)
 class _StepMade:
     """What running one step of a batch came to: its report, why the batch stops after it (``None``: it goes on),
-    whether a check of its own is not verified, and the waits the batch has left."""
+    whether a check of its own is not verified, the waits the batch has left, and whether nothing of what the step
+    named to expect could be looked for (item 1164), which stops a batch that has steps after it."""
 
     report: StepReport
     stopped: str | None
     unverified: bool
     left: _Waits
+    unjudged: bool = False
 
 
 def _not_done(
@@ -3289,12 +3310,14 @@ class BrowserSession:
     ) -> tuple[list[StepReport], str | None]:
         """Run ``steps`` in order, each with whether it went out and what was checked of it (item 1145). The batch
         stops at the first failure or surprise, as before; at a step whose expected result was not seen; at one whose
-        page sent something the server has not answered (item 1158); and before a step that acts on what the steps
-        before it left when one of their own checks is not verified."""
+        page sent something the server has not answered (item 1158); after one whose expectation could not be
+        looked for when steps follow it (item 1164); and before a step that acts on what the steps before it left
+        when one of their own checks is not verified."""
         reports: list[StepReport] = []
         stopped: str | None = None
         unverified: int | None = None
         left: _Waits = _Waits(expected=_EXPECT_BATCH_S, sent=_SENT_BATCH_S)
+        written: tuple[str, ...] = tuple(step.text for step in steps if step.text is not None)
         for index, step in enumerate(steps, start=1):
             if stopped is None and unverified is not None and step.acts_on_what_was_left():
                 # What to do next is said whole (item 1149): a run of the owner's wrote the field again with other
@@ -3311,11 +3334,13 @@ class BrowserSession:
             sends: _Sends = _Sends(tab.page)
             sends.start()
             try:
-                made: _StepMade = await self._run_one(thread, tab, index, step, secret_field, sends, left)
+                made: _StepMade = await self._run_one(thread, tab, index, step, secret_field, sends, left, written)
             finally:
                 sends.stop()
             reports.append(made.report)
             stopped, left = made.stopped, made.left
+            if stopped is None and made.unjudged and index < len(steps):
+                stopped = gate_lost(index)
             if unverified is None and made.unverified:
                 unverified = index
         return reports, stopped
@@ -3329,14 +3354,15 @@ class BrowserSession:
         secret_field: SecretFieldCheck,
         sends: _Sends,
         left: _Waits,
+        written: Sequence[str],
     ) -> _StepMade:
         """Run one step of a batch: its report, why the batch stops after it, whether a check of its own is not
-        verified, and the waits the batch has left."""
+        verified, and the waits the batch has left. ``written`` is every text the batch writes."""
         before: _Watch = self._watch(thread, tab)
         pulse: Pulse | None = await page_pulse(tab.page) if _moves_the_page(step) else None
         requests: int = tab.requests
         try:
-            await self._refuse_shown_already(tab, step)
+            named: _Sights = await self._sights_of(tab, step, written)
             result: StepResult = await run_step(tab.page, step, _ms(self._config.action_timeout_s), secret_field)
             went_at: float = time.monotonic()
         except BrowserError as error:
@@ -3426,9 +3452,9 @@ class BrowserSession:
         sends.stop()
         looked: int = tab.requests
         sights: tuple[OutcomeCheck, ...] = ()
-        if step.expects() and not tab.page.is_closed():
+        if named.any() and not tab.page.is_closed():
             began: float = time.monotonic()
-            sights = await self._await_expected(tab, step, left.expected)
+            sights = await self._await_expected(tab, named, left.expected)
             left = replace(left, expected=max(0.0, left.expected - (time.monotonic() - began)))
             effect = effect_of_expected(effect, sights)
         # What the step's page sent is waited for, so that the steps after it do not run on a page whose server has
@@ -3448,6 +3474,7 @@ class BrowserSession:
             told=effect.startswith(PAGE_UNCHANGED),
         ):
             said.append(_SENT_NOTHING)
+        said.append(not_looked_for("; ".join(named.left_out)))
         report: StepReport = StepReport(
             index=index,
             description=describe_step(step),
@@ -3471,7 +3498,13 @@ class BrowserSession:
                 "do not send the step again; wait for the answer (browser_wait_text) or look again "
                 "(browser_snapshot)"
             )
-        return _StepMade(report=report, stopped=stopped, unverified=holds_back(result.checks), left=left)
+        return _StepMade(
+            report=report,
+            stopped=stopped,
+            unverified=holds_back(result.checks),
+            left=left,
+            unjudged=step.expects() and not named.any(),
+        )
 
     async def _let_failed_step_show(self, tab: Tab) -> None:
         """Let the page of a step that failed and may have gone out take a turn, :data:`_FAILED_TURN_S` at most, so
@@ -3520,41 +3553,55 @@ class BrowserSession:
         except TimeoutError:
             _log.info("browser_sent_answer_not_committed", url=truncate_middle(tab.page.url, 200), waited_s=timeout_s)
 
-    async def _refuse_shown_already(self, tab: Tab, step: Step) -> None:
-        """Refuse, before it goes, a step that expects to see what the page shows already (item 1145): seen after
-        the step, it could not tell what the step did. A page that does not say is refused too, for the same reason.
-        """
-        if step.expect_url is not None and url_shows(tab.page.url, step.expect_url):
-            raise StepNotSent(already_shown("the expected part of the address"), {"url": tab.page.url})
-        if step.expect_text is None:
-            return
-        try:
-            shown: bool | None = await text_shown(tab.page, step.expect_text)
-        except BrowserError as error:
-            # The look came before the step: whatever it failed on, nothing went to the page.
-            raise StepNotSent(error.message, error.context) from error
-        if shown is None:
-            raise StepNotSent(
-                "the page did not answer when Dot looked for the expected text before the step, so nothing was sent; "
-                "take a new snapshot and try again",
-                {"url": tab.page.url},
-            )
-        if shown:
-            raise StepNotSent(already_shown("the expected text"), {"url": tab.page.url})
+    async def _sights_of(self, tab: Tab, step: Step, written: Sequence[str]) -> _Sights:
+        """What ``step`` names to expect, as it can be looked for after the step, read before the step goes. Words
+        the batch itself writes, and words or an address the page shows already, would be seen after the step
+        whatever it did: each is left out with why, and what else the step named is still looked for (the pre-push
+        review of item 1164: one that could not tell took the other with it).
 
-    async def _await_expected(self, tab: Tab, step: Step, left_s: float) -> tuple[OutcomeCheck, ...]:
+        Such a step was refused before it went (item 1145), so that the expectation could be corrected at no cost.
+        Measured, the correction was a whole round trip of the model and always the same one, the step sent again
+        with nothing to expect (item 1164): the step now goes, is not checked by what could not tell, and says so.
+        A page that does not answer the look is still refused: that is the page's state, not the expectation's."""
+        left_out: list[str] = []
+        url: str | None = step.expect_url
+        if url is not None and url_shows(tab.page.url, url):
+            left_out.append(ADDRESS_SHOWN_BEFORE)
+            url = None
+        text: str | None = step.expect_text
+        if text is not None and echoes_written(text, written):
+            left_out.append(WRITTEN_BY_THE_BATCH)
+            text = None
+        if text is not None:
+            try:
+                shown: bool | None = await text_shown(tab.page, text)
+            except BrowserError as error:
+                # The look came before the step: whatever it failed on, nothing went to the page.
+                raise StepNotSent(error.message, error.context) from error
+            if shown is None:
+                raise StepNotSent(
+                    "the page did not answer when Dot looked for the expected text before the step, so nothing was "
+                    "sent; take a new snapshot and try again",
+                    {"url": tab.page.url},
+                )
+            if shown:
+                left_out.append(TEXT_SHOWN_BEFORE)
+                text = None
+        return _Sights(text=text, url=url, left_out=tuple(left_out))
+
+    async def _await_expected(self, tab: Tab, named: _Sights, left_s: float) -> tuple[OutcomeCheck, ...]:
         """What a step that went out was expected to show (item 1145), each waited for within what is left of
         :data:`_EXPECT_WAIT_S` and of the batch's ``left_s``: seen is verified, not seen uncertain. The address is
-        waited for only once the text was seen."""
+        waited for only once the text was seen. ``named`` holds what can tell what the step did."""
         began: float = time.monotonic()
         room: float = min(_EXPECT_WAIT_S, left_s)
         checks: list[OutcomeCheck] = []
-        if step.expect_text is not None:
-            end: SightEnd = await self._sight(tab, self._text_look(tab, step.expect_text), room)
+        if named.text is not None:
+            end: SightEnd = await self._sight(tab, self._text_look(tab, named.text), room)
             checks.append(judge_sight(_EXPECTED_TEXT, end, time.monotonic() - began, _LOOK_AGAIN))
-        if step.expect_url is not None and not holds_back(checks):
+        if named.url is not None and not holds_back(checks):
             left: float = max(0.0, room - (time.monotonic() - began))
-            end = await self._sight(tab, self._url_look(tab, step.expect_url), left)
+            end = await self._sight(tab, self._url_look(tab, named.url), left)
             checks.append(judge_sight(_EXPECTED_URL, end, time.monotonic() - began, _LOOK_AGAIN))
         return tuple(checks)
 

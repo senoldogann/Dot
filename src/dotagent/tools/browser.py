@@ -73,7 +73,7 @@ from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import DotError, ToolExecutionError, ToolInputError
 from dotagent.core.held import held_folder, open_regular
 from dotagent.core.logs import get_logger
-from dotagent.core.outcomes import BROWSER_EXPECTATIONS, echoes_written, expectation_on_last_step
+from dotagent.core.outcomes import BROWSER_EXPECTATIONS, expectation_on_last_step
 from dotagent.core.paths import uploads_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData
@@ -366,10 +366,40 @@ def _links_tool() -> RegisteredTool:
 _LOOKING_STEPS: frozenset[str] = frozenset({"snapshot", "screenshot", "look", "wait"})
 
 
+# The call's own guess of what its steps will show, in the model's words, by the name a step may not carry.
+_CALL_GUESS: str = "expect"
+
+
+def guesses_to_the_call(data: object) -> object:
+    """An act call (``data``, as the model wrote it) with a guess in the model's own words that a step carries
+    (``expect``) taken to the call, where it is read (item 1164): after the call's own, each one kept and none
+    twice. A step was refused for it before, which cost a round trip of the model for a meaning that was plain.
+    Words a step expects to see (``expect_text``) are another thing, and are placed by
+    :func:`dotagent.core.outcomes.expectation_on_last_step` (item 1161)."""
+    if not isinstance(data, dict) or not isinstance(data.get("steps"), list):
+        return data
+    steps: list[object] = data["steps"]
+    guesses: list[str] = [
+        step[_CALL_GUESS] for step in steps if isinstance(step, dict) and isinstance(step.get(_CALL_GUESS), str)
+    ]
+    if not guesses:
+        return data
+    placed: list[object] = [
+        {name: value for name, value in step.items() if name != _CALL_GUESS}
+        if isinstance(step, dict) and isinstance(step.get(_CALL_GUESS), str)
+        else step
+        for step in steps
+    ]
+    own: object = data.get(_CALL_GUESS)
+    every: list[str] = [own, *guesses] if isinstance(own, str) else guesses
+    return {**data, "steps": placed, _CALL_GUESS: "; ".join(dict.fromkeys(every))}
+
+
 class ActArgs(ToolArgs):
     @model_validator(mode="before")
     @classmethod
-    def _without_looks(cls, data: object) -> object:
+    def _as_meant(cls, data: object) -> object:
+        """Without the steps that only look, and with what the call expects where it is read."""
         if not isinstance(data, dict) or not isinstance(data.get("steps"), list):
             return data
         steps: list[object] = [
@@ -378,20 +408,9 @@ class ActArgs(ToolArgs):
             if not (isinstance(step, dict) and step.get("action") in _LOOKING_STEPS and len(step) == 1)
         ]
         # The looks go first, so that an expectation beside the steps lands on the last step that acts (item 1161).
-        return expectation_on_last_step({**data, "steps": steps or data["steps"]}, BROWSER_EXPECTATIONS)
-
-    @model_validator(mode="after")
-    def _expects_what_only_the_result_shows(self) -> Self:
-        """A step may not expect to see words the batch itself writes (item 1145): a page that repeats what was typed
-        would show them whatever the step did."""
-        written: list[str] = [step.text for step in self.steps if step.text is not None]
-        for step in self.steps:
-            if step.expect_text is not None and echoes_written(step.expect_text, written):
-                raise ValueError(
-                    "expect_text is within a text this batch writes, which a page can repeat whatever the step did: "
-                    "expect words only the result shows (the line a sent form answers with), or leave it out"
-                )
-        return self
+        return guesses_to_the_call(
+            expectation_on_last_step({**data, "steps": steps or data["steps"]}, BROWSER_EXPECTATIONS)
+        )
 
     steps: list[Step] = Field(
         min_length=1,

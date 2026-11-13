@@ -264,9 +264,14 @@ Both modes share what follows.
     line break is not read back, as the break may have sent the form.
   - `expect_text` and `expect_url` on a step name what the page must show once the step is done: exact words (4 to 200
     characters) that become visible, or a part of the address the tab comes to (looked for in its host and path, and
-    anywhere when the part itself names a `?` or a `#`). Dot looks before the step goes: when the page shows it
-    already the step is not sent, since seeing it afterwards could not tell what the step did; and words the same batch
-    writes are refused, as a page that repeats them shows them whatever happened. After the step Dot waits for it, 10 s
+    anywhere when the part itself names a `?` or a `#`). Dot looks before the step goes: words or an address the page
+    shows already, and words the same batch writes, would be seen afterwards whatever the step did, so they are not
+    looked for. The step goes all the same, its line says so (`what it expected was not looked for`), and what else
+    it named that can tell is still looked for. When nothing it named could be looked for, the steps after it in the
+    batch are not run, since they were to wait for that sight (item 1164; such a step was refused before, which cost
+    a round trip of the model and brought the same step back with nothing to expect). A guess in the model's own
+    words given to a step (`expect`) is the call's, after the call's own (item 1164); words written beside the steps
+    are the last step's (item 1161, above). After the step Dot waits for what it named, 10 s
     at most and 20 s over the steps of one batch, and less once the page has stood still for 3 s or a dialog opened.
     Seen is verified. Not seen is uncertain and never contradicted: what was sent may still land. The batch stops
     there, and the click is not tried again with a script: a second click of a form that answers slowly would send it
