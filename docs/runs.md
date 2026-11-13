@@ -37,11 +37,15 @@ said nothing new). States of their own are said too, each from its event: "Waiti
 state once, through a status region, never each call nor the seconds of the bar over the box. What the run says on the way to its calls ("Checking the domain now")
 is its work told, not a message (item 1131): it folds with the steps, and the line says the newest of it while the step's
 calls run ("Checking the domain now…"); shown with the steps, it reads as a quiet note among them, with a rule at its
-left and named a progress update to a screen reader, where the answer is named Answer. A run outside a chat streams
-its words as such an update from the first word, as nearly all of them are (item 1162; 443 of 498 steps with words in
-the owner's week), and they become a message only when the step ends with no call but finish: before, they streamed as
-a message and folded into the steps once the step ended. An answer written as a reply (OpenCode's last, or a
-first step's) is so seen whole when its step ends, not word by word. Nothing is said that the run is not doing: while it writes a
+left and named a progress update to a screen reader, where the answer is named Answer. No model says before its
+words whether calls follow them, so what they are is known while they stream only where the run's own rules say a
+reply with no call is not the answer. In Dot's own loop, once a task or research run used a tool, short of its
+limit and of the last time it is told to finish, they are an update from the first word and stream folded with the steps (item 1162; 443 of 498 steps with words
+in the owner's week went on to calls). Elsewhere they may still be the answer: every step of a task on Claude Code or
+OpenCode, whose last reply is the answer when it calls no finish (45 of 68 of the owner's Claude Code tasks in a week),
+and a first step. Those stream in sight as a quiet note (item 1166), and their step's end makes them the message when
+it calls nothing, or nothing but finish, or folds them with the steps; before item 1162 they streamed as a message and
+folded once the step ended. Nothing is said that the run is not doing: while it writes a
 message the line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
 over and has its answer, the line goes and **Show the steps** stands in the answer's foot, beside the copy, the speaker
 and the time, where the pointer rests (item 842; on a touch screen it is a row of the sheet a hold of the answer opens, item 1064),

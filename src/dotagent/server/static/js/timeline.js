@@ -140,6 +140,11 @@ function newBubble(scope, step, live) {
  */
 function sayKind(node, progress, live) {
   node.className = ["bubble", live ? "live" : "", "say", progress ? "say-progress" : ""].filter((name) => name !== "").join(" ");
+  // Words that may be the answer stream in sight (item 1166) only while they stream: their step's end says what
+  // they are.
+  if (!live) {
+    node.removeAttribute("data-either");
+  }
   const speaker = node.dataset.speaker ?? node.getAttribute("aria-label") ?? "";
   node.dataset.speaker = speaker;
   node.setAttribute("aria-label", progress ? t("outcome.updateOf", { speaker }) : speaker);
@@ -529,8 +534,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       live.node.remove();
       return;
     }
-    // An update stays one (sayKind): only its step's end says it was the message.
+    // An update stays one (sayKind): only its step's end says it was the message, and words that may have been it
+    // fold with the steps until then.
     live.node.classList.remove("live");
+    live.node.removeAttribute("data-either");
     const body = prose(live.text);
     live.body.replaceWith(body);
     // Its step's end may still come for it: it is drawn there again (the assistant handler), not in a second message.
@@ -1174,9 +1181,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         // The step writes: its thought comes out of the group before its message, as on a page loaded later.
         liftThought(scope);
         scope.live = newBubble(scope, data.step, true);
-        // Words a run outside a chat writes are an update until its step ends with no call (the daemon's "update"):
-        // they stream where they will stay, not as a message that folds into the steps at the step's end.
-        sayKind(scope.live.node, data.update === true, true);
+        // Words a run outside a chat writes are an update until their step ends with no call (the daemon's `says`):
+        // they stream where they will stay, not as a message that folds into the steps at the step's end. Those that
+        // may be the answer ("either", item 1166) stream in sight, so an answer is read as it is written.
+        sayKind(scope.live.node, data.says === "update" || data.says === "either", true);
+        scope.live.node.toggleAttribute("data-either", data.says === "either");
       }
       const live = scope.live;
       live.text += data.text;

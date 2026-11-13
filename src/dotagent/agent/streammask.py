@@ -26,13 +26,36 @@ _BLOCK_START: str = "-----BEGIN"
 _BLOCK_EDGE: str = "-----"
 
 
-def delta_event(delta: StreamDelta, step: int, mode: RunMode) -> JsonObject:
+# What a step's words are, as far as the run knows while they stream (item 1166): "update", told on the way to the
+# step's calls, which cannot be the run's answer; "message", the answer of a chat; "either", words that may be either
+# until the step ends, with calls or without. No model says which before its words are written: its calls come after
+# them.
+Said = Literal["update", "either", "message"]
+
+
+def said_in_loop(mode: RunMode, used_tools: bool, at_limit: bool, nudges_left: bool) -> Said:
+    """What a step's words are in Dot's own loop (agent/loop.py), whose rules say when a reply with no call is the
+    answer: in a chat always; in a task or research run only before the run used a tool, at its limit, or once the run
+    was told to finish as often as it is told (``nudges_left`` false). Else words with no call after them are sent
+    back to finish, which brings the answer, so the words are an update whatever comes after them."""
+    if mode == "chat":
+        return "message"
+    return "update" if used_tools and not at_limit and nudges_left else "either"
+
+
+def said_in_harness(mode: RunMode) -> Said:
+    """What a step's words are in Claude Code's and OpenCode's runs: a chat's are its message; a task's may be its
+    answer whenever the step ends with no call (45 of 68 of the owner's Claude Code tasks in the week to 2026-11-13
+    ended with a reply that called nothing, never having called finish), so they are either."""
+    return "message" if mode == "chat" else "either"
+
+
+def delta_event(delta: StreamDelta, step: int, said: Said) -> JsonObject:
     """The ``delta`` event of a step's stream, as every harness sends it (Dot's own loop, Claude Code's and OpenCode's):
-    ``update`` says that words of a run in ``mode`` are told on the way to the step's calls unless the step ends with
-    none (item 1162). Outside a chat nearly all are (443 of 498 steps with words in the owner's week to 2026-11-13; the
-    answer comes with finish, or with OpenCode's last reply), so the conversation shows them as an update from the first
-    word rather than as a message that folds into the steps once the step ends."""
-    return {"kind": delta.kind, "text": delta.text, "step": step, "update": mode != "chat"}
+    ``says`` is what its words are as far as the run knows (:data:`Said`). An update streams folded with the steps from
+    its first word (item 1162); words that may be the answer stream in sight, as an update until their step ends with
+    no call, so an answer streams as it is written and an update never looks like a message (item 1166)."""
+    return {"kind": delta.kind, "text": delta.text, "step": step, "says": said}
 
 
 def _in_word(char: str) -> bool:
