@@ -7619,6 +7619,18 @@ dialog.message-sheet::backdrop {
   gap: var(--space-1);
 }
 
+/* An earlier turn far from what is seen is not laid out again (item 1165): every change of the page (an event of a
+   live run, its scroll to the foot) laid out all the turns, 15 to 40 ms each time on a phone for a chat of 40. Each
+   turn keeps the size it was last laid out at (`auto`), and history.js sets `data-sized` only once all of them were laid
+   out once, so the conversation is as tall, and each message where, as when every turn is laid out. */
+.history > .turn {
+  contain-intrinsic-size: auto 600px;
+}
+
+.history[data-sized] > .turn {
+  content-visibility: auto;
+}
+
 /* What an earlier turn did (item 374): its tool calls, open under its message as the run's own page shows them. */
 .turn-ops {
   display: flex;

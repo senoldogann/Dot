@@ -466,11 +466,46 @@ export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal, rea
           el("span", null, `${plural(left, "earlier task is", "earlier tasks are")} not shown.`),
           el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first task"),
         );
-  return el(
+  const history = el(
     "div",
     { class: "history", role: "region", "aria-label": "Earlier in this conversation" },
     note,
     shown.map((past) => turn(past, editFromHereOf, read.get(past.id), signal, reactions)),
   );
+  skipWhenSized(history, signal);
+  return history;
+}
+
+/** Lets the browser skip laying out the turns of `history` that are far from what is seen (item 1165, app.css), once
+ * every one of them was laid out in the page: its first size is seen, and a frame later, when each turn's size is kept
+ * for it, `data-sized` goes on. Nothing is set once `signal` aborted (the page went). */
+function skipWhenSized(history, signal) {
+  const watch = new ResizeObserver(() => {
+    watch.disconnect();
+    requestAnimationFrame(() => {
+      if (!signal.aborted) {
+        history.dataset.sized = "";
+      }
+    });
+  });
+  watch.observe(history);
+  signal.addEventListener("abort", () => watch.disconnect(), { once: true });
+}
+
+/** `act(node)` with the earlier turn `node` stands in laid out (item 1165): a turn far from what is seen is not, and
+ * then Chromium gives no words of it (`innerText`) and WebKit does not scroll to it (`scrollIntoView`); the focus goes
+ * to it in both. Only that turn is laid out, while `act` runs; one scrolled into sight stays laid out, as every turn in
+ * sight is. Returns what `act` returns. */
+export function laidOut(node, act) {
+  const turn = node.closest(".history > .turn");
+  if (turn === null) {
+    return act(node);
+  }
+  turn.style.contentVisibility = "visible";
+  try {
+    return act(node);
+  } finally {
+    turn.style.removeProperty("content-visibility");
+  }
 }
 
