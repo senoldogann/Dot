@@ -8,6 +8,7 @@ import { api } from "./api.js";
 import { el, hourMinute, modelName } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
+import { t } from "./i18n.js";
 
 // The least time between two looks at whether a recap is due while the run takes steps.
 const LOOK_EVERY_MS = 20_000;
@@ -29,7 +30,7 @@ export function recapSection({ runId, earlierRunId = null, signal }) {
     icon("refresh"),
   );
   const body = el("div", { class: "recap", "aria-live": "polite" }, text, meta);
-  const section = panelSection({ id: "run-recap", title: "Recap", actions: again, body });
+  const section = panelSection({ id: "run-recap", title: t("panel.recap"), actions: again, body });
   let inSight = false;
   // Whether this run's own recap is painted: the turn before's stands in only until then.
   let shown = false;

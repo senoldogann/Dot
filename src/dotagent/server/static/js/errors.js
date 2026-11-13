@@ -3,14 +3,16 @@
 // no answer, a refusal of the daemon's and a fault of the page each read in words of their own; the code (`500`) and the
 // raw message never stand alone.
 
+import { t } from "./i18n.js";
+
 // What a request says when no answer came at all: Dot is not running, or the network is not there yet.
-export const UNREACHABLE = "Could not reach Dot. Is it running? Open Dot again, or restart your Mac.";
-const NOT_RECOGNISED = "Dot does not recognise this browser. Sign in again.";
-const DOT_FAILED = "Dot ran into a problem and could not finish. Try again in a moment.";
+export const UNREACHABLE = t("errors.unreachable");
+const NOT_RECOGNISED = t("errors.notRecognised");
+const DOT_FAILED = t("errors.dotFailed");
 // A model service that failed or refused (the daemon answers 502 for it): its own words go under Details.
-const SERVICE_FAILED = "The AI service did not answer as Dot expected. Check its key in Settings › AI services, or try again in a moment.";
-const NOT_UNDERSTOOD = "Dot's answer was not what this page expected. Try again in a moment.";
-const PAGE_FAILED = "Something went wrong on this page. Reload the page and try again.";
+const SERVICE_FAILED = t("errors.serviceFailed");
+const NOT_UNDERSTOOD = t("errors.notUnderstood");
+const PAGE_FAILED = t("errors.pageFailed");
 
 /** Whether `error` is one the browser raises for a fault of the page itself, not a message written for the person. */
 function isFault(error) {
@@ -71,7 +73,7 @@ export function explain(error) {
       return { text: NOT_UNDERSTOOD, details: message };
     }
     // The key of a setting the daemon names for whoever edits the settings file stands under Details (item 625).
-    const setting = typeof known.context?.setting === "string" ? `In the settings file: ${known.context.setting}` : "";
+    const setting = typeof known.context?.setting === "string" ? t("errors.settingsFile", { setting: known.context.setting }) : "";
     return { text: sentence(message), details: setting };
   }
   if (isFault(error)) {
@@ -98,5 +100,45 @@ export function serviceWords(line) {
     return { text: line, details: "" };
   }
   const words = (found[2] ?? "").replace(SERVICE_REF, "").trim();
-  return { text: words === "" ? `The AI service answered with an error (HTTP ${found[1]}).` : sentence(words), details: line.trim() };
+  return { text: words === "" ? t("errors.serviceCode", { code: found[1] }) : sentence(words), details: line.trim() };
+}
+
+/**
+ * What the owner can do about a model service's answer of HTTP `status`, by what the code means: a key it refused, a
+ * balance or a plan that does not pay, a limit reached, a fault of the service's own, anything else.
+ * @param {number} status
+ * @returns {{ short: import("./i18n.js").WordKey, next: import("./i18n.js").WordKey }}
+ */
+function serviceCause(status) {
+  if (status === 401 || status === 403) {
+    return { short: "errors.serviceKeyShort", next: "errors.serviceKeyNext" };
+  }
+  if (status === 402) {
+    return { short: "errors.serviceBalanceShort", next: "errors.serviceBalanceNext" };
+  }
+  if (status === 429) {
+    return { short: "errors.serviceLimitShort", next: "errors.serviceLimitNext" };
+  }
+  if (status >= 500) {
+    return { short: "errors.serviceDownShort", next: "errors.serviceDownNext" };
+  }
+  return { short: "errors.serviceRefusedShort", next: "errors.serviceRefusedNext" };
+}
+
+/**
+ * A run's last words read as a model service's failure, as the run records it ("provider answered HTTP 402: …",
+ * `llm/provider_errors.py`), or null for any other words. `short` says what stopped the task in a few words (a chat's
+ * line in the sidebar), `next` what the owner can do, and `details` the line as it was recorded, whose service's
+ * words, a link of theirs among them, stand under Details.
+ * @param {string} line
+ * @returns {{ status: number, short: string, next: string, details: string } | null}
+ */
+export function serviceFailure(line) {
+  const found = SERVICE_ANSWER.exec(line.trim());
+  if (found === null) {
+    return null;
+  }
+  const status = Number(found[1]);
+  const cause = serviceCause(status);
+  return { status, short: t(cause.short), next: t(cause.next), details: line.trim() };
 }

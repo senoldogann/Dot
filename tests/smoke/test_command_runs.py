@@ -476,7 +476,7 @@ async def test_the_page_of_a_command_run_shows_it_at_work_queues_a_message_and_s
                         send: Locator = page.locator(".dock .btn.send")
                         await expect(send).to_have_attribute("aria-label", "Stop")
                         await box.fill(SUMMARY)
-                        await expect(send).to_have_attribute("aria-label", "Queue")
+                        await expect(send).to_have_attribute("aria-label", "After this task")
                         await box.press("Enter")
                         await expect(box).to_have_value("")
                         await expect(page.locator(".dock .queue .queue-text")).to_have_text([SUMMARY])

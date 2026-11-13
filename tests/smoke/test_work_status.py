@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 import pytest
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
@@ -152,16 +153,16 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 face = await line.locator(".turn-face").bounding_box()
                 assert face is not None
                 await page.mouse.click(face["x"] + face["width"] / 2, face["y"] + face["height"] / 2)
-                await expect(line).to_have_attribute("aria-pressed", "true")
+                await expect(line).to_have_attribute("aria-expanded", "true")
                 await line.click()
-                await expect(line).to_have_attribute("aria-pressed", "false")
+                await expect(line).to_have_attribute("aria-expanded", "false")
                 await expect(page.locator("details.steps")).to_be_hidden()
                 await page.screenshot(path=str(tmp_path / "working.png"))
                 # Pressed while the run works, the line shows the steps; pressed again, it folds them back; pressed a
                 # third time, the steps stay shown when the answer comes.
                 await line.click()
                 await expect(page.locator("details.steps").first).to_be_visible()
-                await expect(line).to_have_attribute("aria-pressed", "true")
+                await expect(line).to_have_attribute("aria-expanded", "true")
                 await line.click()
                 await expect(page.locator("details.steps")).to_be_hidden()
                 await line.click()
@@ -229,5 +230,49 @@ async def test_by_default_the_steps_fold_away_and_the_line_offers_them(own_home:
                 await expect(page.locator(".answer-steps")).to_have_count(1)
                 await expect(page.locator(".work-status")).to_be_hidden()
                 await page.close()
+            finally:
+                await browser.close()
+
+
+async def test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answered(own_home: Path) -> None:
+    """Item 1148: while a step waits for the owner's yes the line says so; once it is answered the line says the work
+    it was at again, while its command still runs (the pre-push review: it kept "Waiting for you" until the command
+    ended)."""
+    async with _served(own_home) as (manager, address, port):
+        # A rule has the command ask, as a rule of the owner's would.
+        async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as api:
+            asked = await api.post(
+                "/api/rules",
+                json={"behavior": "ask", "tool_glob": "shell", "match_regex": "sleep", "description": "Ask"},
+            )
+            assert asked.status_code == 201, asked.text
+        run: RunRecord = await manager.start(
+            "List the folder slowly",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            None,
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            (),
+        )
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+            try:
+                page: Page = await _open(browser, port, address, run.id, "status", 1280)
+                words: Locator = page.locator(".work-status .work-status-words")
+                await expect(words).to_have_text("Waiting for you…", timeout=15_000)
+                # Said once to a screen reader, as a change of state.
+                await expect(
+                    page.locator(".run-thread [role='status']").filter(has_text="Waiting for you")
+                ).to_have_count(1)
+                await page.get_by_label("Dot asked you").get_by_role("button", name="Approve").first.click()
+                await expect(words).to_have_text(re.compile(_TOLD_WORDS))
+                async with asyncio.timeout(30):
+                    assert (await manager.wait(run.id)).status == "done"
             finally:
                 await browser.close()

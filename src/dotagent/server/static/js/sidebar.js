@@ -14,7 +14,8 @@
 
 import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
-import { serviceWords } from "./errors.js";
+import { serviceFailure, serviceWords } from "./errors.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { actorFace, DOT_ID, lookOf, teamDuo } from "./actors.js";
 import { onAssistant } from "./assistant.js";
@@ -49,12 +50,12 @@ const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "appr
 // are rows as a messaging app's (item 836), with no heading: a row says that it waits or works itself, and its group's
 // name is for a screen reader.
 const ACTIVITY_SECTIONS = [
-  { key: "waiting", label: "Waiting for you" },
-  { key: "working", label: "Working" },
+  { key: "waiting", label: t("side.waiting") },
+  { key: "working", label: t("side.working") },
 ];
 // What a chat's row says while something of it waits for the owner, ahead of what waits (item 836).
-const WAITS_WORDS = "Waiting for you";
-const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
+const WAITS_WORDS = t("side.waiting");
+const DAY_LABELS = [t("side.today"), t("side.yesterday"), t("side.week"), t("side.older")];
 // Connect apps at the foot shows the logos of this many services (item 492; four since item 959, the owner's ask): the
 // ones it is connected to, the same ones while they stay connected (item 853), and while fewer are, the logos of the
 // services most connect first, in this order, as what it leads to.
@@ -73,22 +74,22 @@ const FOLDS_KEY = "dot.sideFolds";
 // the owner found the list full of them); iMessage's another. A thread of any other source is a chat among the days.
 // No label has a mark, so that it stands where the days' labels do (items 827, 828 and 855).
 const CHANNEL_SECTIONS = {
-  work: { label: "Dot's work", folded: true, sources: ["initiative", "schedule"] },
-  agents: { label: "Agents' work", folded: true, sources: ["team"] },
+  work: { label: t("side.dotsWork"), folded: true, sources: ["initiative", "schedule"] },
+  agents: { label: t("side.agentsWork"), folded: true, sources: ["team"] },
   imessage: { label: "iMessage", folded: false, sources: ["imessage"] },
 };
 const SECTION_OF_SOURCE = new Map(Object.entries(CHANNEL_SECTIONS).flatMap(([id, section]) => section.sources.map((source) => [source, id])));
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = {
-  queued: "queued",
-  running: "running",
-  blocked: "waiting for you",
-  failed: "failed",
-  ending: "saving the end",
+  queued: t("side.statusQueued"),
+  running: t("side.statusRunning"),
+  blocked: t("side.statusBlocked"),
+  failed: t("side.statusFailed"),
+  ending: t("side.statusEnding"),
 };
 // The states of a run that is over: only such a chat can be marked unread (item 131).
 const ENDED = new Set(["done", "failed", "cancelled"]);
-const BUSY_MESSAGE = "A chat with a task under way cannot be deleted. Wait for the task to end, or stop it, and try again.";
+const BUSY_MESSAGE = t("side.busy");
 // How often the ages at the right of the chats are read again, so a "5m" does not stay while the page rests.
 const AGE_REFRESH_MS = 60_000;
 // The states of a run that works; one that waits for you is "blocked" and keeps its dot and its age.
@@ -125,7 +126,7 @@ function groupChats(chats, now) {
     chats.filter((chat) => chat.pinned_at === null),
     now,
   );
-  return pinned.length === 0 ? days : [{ label: "Pinned", chats: pinned }, ...days];
+  return pinned.length === 0 ? days : [{ label: t("side.pinned"), chats: pinned }, ...days];
 }
 
 /** The channel whose messages made `chat` (item 619), or null: a thread whose source is a channel's id. A chat the
@@ -160,9 +161,9 @@ function mark(node, current) {
 function workingSlot(since) {
   return el(
     "span",
-    { class: "side-working", title: `Working since ${dateTime(since)}` },
+    { class: "side-working", title: t("side.workingSince", { when: dateTime(since) }) },
     icon("circleDashed"),
-    el("span", null, "Working"),
+    el("span", null, t("side.working")),
     el("span", { class: "side-working-time", "data-since": String(since) }, workingFor(since)),
   );
 }
@@ -199,7 +200,7 @@ const SIDE_FACES = 3;
 
 /** What a row delegated, in words: "1 helper", "4 helpers", nothing for a row that delegated none (item 507). */
 function helperWords(children) {
-  return children.length === 1 ? "1 helper" : children.length > 1 ? `${children.length} helpers` : "";
+  return children.length === 1 ? t("side.helper") : children.length > 1 ? t("side.helpers", { count: children.length }) : "";
 }
 
 /** The runs a row delegated, as small faces laid over one another (item 507): three at most, the rest counted, a run
@@ -240,9 +241,11 @@ function chatText(chat, children, waits = null) {
     const more = waits.length > 1 ? ` (+${waits.length - 1})` : "";
     return el("span", { class: "side-chat-text" }, title, waitsLine(`${WAITS_WORDS}: ${waits[0].title}${more}`));
   }
-  // A chat whose run failed at its model service ends on the service's sentence, not on its code (item 1136).
-  const words = serviceWords(chat.last_message ?? "").text;
-  const last = words === "" || chat.last_role !== "user" ? words : `You: ${words}`;
+  // A chat its model service stopped says so in a few words of what stopped it (the service's sentence, a billing link
+  // and all, stood here after item 1136); its own line stands in the chat. Any other chat ends on its last words.
+  const stopped = chat.latest_status === "failed" ? serviceFailure(chat.last_message ?? "") : null;
+  const words = stopped === null ? serviceWords(chat.last_message ?? "").text : stopped.short;
+  const last = words === "" || chat.last_role !== "user" || stopped !== null ? words : t("side.you", { words });
   const faces = helperFaces(children);
   // A chat with a team (item 610) says which, ahead of its last words.
   const team = chat.team === null || chat.team === undefined ? null : el("span", { class: "side-chat-team", title: chat.team.name }, chat.team.name);
@@ -250,7 +253,12 @@ function chatText(chat, children, waits = null) {
     faces === null
       ? last === "" && team === null
         ? null
-        : el("span", { class: "side-chat-last" }, team, last === "" ? null : el("span", { class: "side-chat-words" }, last))
+        : el(
+          "span",
+          { class: "side-chat-last" },
+          team,
+          last === "" ? null : el("span", { class: "side-chat-words", dataset: stopped === null ? {} : { stopped: "" } }, last),
+        )
       : el("span", { class: "side-chat-last side-chat-helpers" }, team, faces);
   return el("span", { class: "side-chat-text" }, title, under);
 }
@@ -274,14 +282,14 @@ function loopWords(chat) {
     return null;
   }
   const next = chat.loop_next_at ?? null;
-  const rhythm = `Loops ${loopRhythm(cron) ?? "on its schedule"}`;
-  return next === null ? rhythm : `${rhythm}, next ${nextFiring(next, Date.now() / 1000)}`;
+  const rhythm = t("side.loops", { rhythm: loopRhythm(cron) ?? t("side.onSchedule") });
+  return next === null ? rhythm : t("side.loopsNext", { rhythm, when: nextFiring(next, Date.now() / 1000) });
 }
 
 /** What a chat or a row at work says of its campaign (item 705), or null: the conversation of a campaign, or one of its
  * sessions, which the Campaigns page lists. */
-const CAMPAIGN_CHAT = "A campaign's conversation";
-const CAMPAIGN_SESSION = "A session of a campaign";
+const CAMPAIGN_CHAT = t("side.campaignChat");
+const CAMPAIGN_SESSION = t("side.campaignSession");
 
 /** A chat's creature, with the mark of its loop at its foot (item 580): arrows that turn slowly in a glow, so that a
  * chat that asks again by itself stands out in the list; and the mark of its campaign at its other foot (item 705), a
@@ -312,11 +320,11 @@ function campaignWords(chat) {
 function chatLink(chat, onNavigate, face, children, waits = null) {
   const loop = loopWords(chat);
   const word = [
-    chat.team === null || chat.team === undefined ? undefined : `with ${chat.team.name}`,
+    chat.team === null || chat.team === undefined ? undefined : t("side.withTeam", { name: chat.team.name }),
     waits === null ? STATUS_WORD[chat.latest_status] : `${WAITS_WORDS.toLowerCase()}: ${waits.map((row) => `${row.title}, ${row.detail}`).join("; ")}`,
     helperWords(children),
     // While it waits its row shows no dot of an unread chat, so its name says none either (the pre-push review).
-    chat.unread === true && waits === null ? "unread" : undefined,
+    chat.unread === true && waits === null ? t("side.unread") : undefined,
     loop === null ? undefined : loop.toLowerCase(),
     campaignWords(chat)?.toLowerCase(),
   ]
@@ -545,15 +553,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const search = el("input", {
     class: "side-search-input",
     type: "search",
-    placeholder: "Search chats",
-    "aria-label": "Search chats",
+    placeholder: t("side.search"),
+    "aria-label": t("side.search"),
     autocomplete: "off",
     spellcheck: "false",
   });
   // On a touch screen the drawer has no X (item 888, the owner's ask): a chat chosen closes it, and so does a swipe to
   // the left; a narrow window of the Mac, with no touch, keeps the button.
   const close = el("button", { class: "icon-btn side-close", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse });
-  const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, "Select");
+  const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, t("side.select"));
   let folds = readFolds(FOLDS_KEY);
   // Whether a section is folded: as the owner left it, else as it starts (item 822: Dot's own work starts folded).
   function isFolded(key) {
@@ -597,7 +605,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // missing a group).
   let above = new Set();
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
-  const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
+  const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, t("side.agents")));
   // Campaigns and Schedules are icons in the head, beside the "+" (item 855, the owner's ask: two rows of their own
   // before the chats).
   const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: "Campaigns", "aria-label": "Campaigns", onclick: onNavigate }, icon("target"));
@@ -791,7 +799,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
               load();
             },
           },
-          "Show older chats",
+          t("side.showOlder"),
         ),
       ),
     ];

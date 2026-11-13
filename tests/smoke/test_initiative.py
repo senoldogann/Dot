@@ -368,7 +368,7 @@ async def test_the_card_on_schedules_switches_it_and_keeps_the_list(login_env: d
                     if await switch.get_attribute("aria-checked") == "false":
                         await expect(card.locator(".panel-head .hint")).to_have_text("Off")
                         # It says the mode its runs start in (item 756).
-                        await expect(card.locator(".watcher-lead")).to_contain_text("asking nothing (YOLO)")
+                        await expect(card.locator(".watcher-lead")).to_contain_text("asking only before a message, a post or a release")
                         # The model that decides and what a costly try comes to (item 916), the model a link to its
                         # choice in Settings › Models.
                         judge: Locator = card.locator(".initiative-judge")

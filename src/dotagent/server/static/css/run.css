@@ -157,6 +157,14 @@
   font-size: var(--text-sm);
 }
 
+/* An update on the way reads as one by its shape too, not by its ink alone: a rule at its left, as a note in a log has,
+   where the answer stands with its face and its foot. */
+.run-thread :is(.bubble.say, .turn-say).say-progress {
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0;
+  padding-left: var(--space-2);
+}
+
 /* No bubble on a phone (run.css gives its words one): the words start on the conversation's lane, as the answer's. */
 .run-thread :is(.bubble.say, .turn-say).say-progress > .prose {
   padding-inline: 0;
@@ -1808,6 +1816,70 @@ button.context-row {
   overflow: hidden;
   text-align: start;
   text-overflow: ellipsis;
+}
+
+/* A result file of the task (its answer names it): its name over its folder, both cut at their ends; the whole path is
+   the row's tooltip and its name for a screen reader. Its kind stands at the right. */
+.context-result .context-name {
+  display: flex;
+  flex-direction: column;
+  white-space: normal;
+}
+
+.context-file,
+.context-folder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-file {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.context-folder {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+/* How the task ended, from its end: a line with its mark, and what it needs from the owner under it. */
+.context-outcome {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0 var(--space-half);
+  font-size: var(--text-sm);
+}
+
+.context-outcome-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.context-outcome-line .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: var(--space-half);
+}
+
+.context-outcome-line[data-outcome="done"] .icon {
+  color: var(--ok);
+}
+
+.context-outcome-line[data-outcome="failed"] .icon {
+  color: var(--bad);
+}
+
+.context-outcome-line[data-outcome="waiting"] .icon {
+  color: var(--warn);
+}
+
+.context-needs p {
+  margin: var(--space-1) 0 0;
+  white-space: pre-wrap;
 }
 
 .context-more {

@@ -329,7 +329,7 @@ no run is at work is refused, and new work for an agent goes with `message_agent
 sends at most six, so two runs that answer each other's notes stop; a run that may only read (research) sends none, nor
 does a helper, whose run tells it. A note always marks the run that reads it as outside content does, so that what it
 does after is judged as after a page until you write in its chat; none goes to a run whose approval mode asks you less
-than its sender's (a run in Ask mode sends none to one in YOLO), and a run of Dot's own initiative sends none to a run
+than its sender's (a run in Ask mode sends none to one in `yolo`), and a run of Dot's own initiative sends none to a run
 that does not ask before a message, a post or a release as it does, but for one of a chat of yours (item 963), and a
 run a note or a page marked untrusted sends none on, so that a note is never passed along ([Safety](safety.md)). The secrets Dot holds are
 masked in it.
@@ -370,7 +370,7 @@ lists the team by name and role under "Team" whenever there is another agent to 
 itself, and an answering run messages no one further. The sender's chat shows the exchange as a delegated row wearing
 the agent's face: a line of the conversation, no card, its face in the column of the faces and its words where theirs
 start (item 884). While the message is on its way, the conversation shows nothing of it: only the main agent's work is
-told there, in the line of what it is doing ("Asking Scout…"), and the agent's row stands for the part once its run
+told there, in the line of what it is doing ("Waiting for Scout…"), and the agent's row stands for the part once its run
 starts (item 892, the owner's word; items 668 and 884 had a "Sending to Scout…" line, which stayed in the chat when the
 row's name was not the one the message used). The agent's answer then stands in the conversation as its message, with **Every step**
 folded under one line (item 733): "Message

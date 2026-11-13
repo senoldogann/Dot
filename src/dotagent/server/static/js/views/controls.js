@@ -140,7 +140,7 @@ export function mount(root, _ctx) {
     el("span", { class: "live-dot live" }),
     el("span", { class: "spinner" }),
   );
-  const yolo = segmented([{ id: "ask", label: "Ask", hint: "" }, { id: "auto", label: "Auto", hint: "" }, { id: "yolo", label: "YOLO", hint: "" }], "yolo", () => {});
+  const yolo = segmented([{ id: "ask", label: "Ask", hint: "" }, { id: "auto", label: "Auto", hint: "" }, { id: "yolo", label: "Pay or send", hint: "" }], "yolo", () => {});
   yolo.element.dataset.mode = "yolo";
   // The range (item 127), as Settings › Appearance draws its contrast, its slide and its sizes.
   let ranged = 40;

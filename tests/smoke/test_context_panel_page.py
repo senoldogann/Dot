@@ -1,5 +1,5 @@
 """The context under the recap of a run's Run tab (item 539), in a real browser: an ended run shows the files its chat
-wrote under Artifacts, the page it fetched under Web reading (and not the one it did not get) and the note it saved
+wrote under Changed files, the page it fetched under Sources (and not the one it did not get) and the note it saved
 under Memory updated, with the recap first and the time it was written; a row of Artifacts opens the Changes tab where
 the diff is. Each row wears its mark on a tile, and a file its language's own logo (item 547). A run that used no skill
 and no MCP server shows no Skills & MCP section (item 546). At 1280 beside the conversation and at 390 in the phone's
@@ -250,10 +250,14 @@ async def _one_size(
         await expect(
             details.locator(".panel-section", has=page.locator("#panel-run-memory")).locator(".panel-summary")
         ).to_have_text("1 note")
-        # The recap is first; Artifacts, Web reading and Memory updated come after it.
+        # What came of the task comes first (its answer's files, how it ended), then the recap and the sources; the
+        # technical sections (Changed files, Memory updated) after them.
         titles: list[str] = await details.locator(".panel-section-title").all_inner_texts()
-        assert titles[0] == "Recap", titles
-        assert titles.index("Files made") < titles.index("Web reading") < titles.index("Memory updated"), titles
+        assert titles[:3] == ["Results", "Outcome", "Recap"], titles
+        assert titles.index("Sources") < titles.index("Changed files") < titles.index("Memory updated"), titles
+        outcome: Locator = details.locator("#panel-run-outcome")
+        await expect(outcome).to_be_visible()
+        await expect(outcome.locator(".context-outcome-line")).to_have_attribute("data-outcome", "done")
         await page.screenshot(path=str(shots / f"context-{width}-{scheme}.png"))
         # A row of Artifacts opens the Changes tab, where the diff is.
         await artifacts.locator(".context-row").first.click()
@@ -320,7 +324,7 @@ async def test_a_new_message_keeps_the_chats_context_and_web_reading_scrolls_pas
     login_env: dict[str, str], site: str, tmp_path: Path
 ) -> None:
     """Item 650: the panel of a chat's second turn shows what its first read and saved, under this turn's own, and
-    the first turn's recap until this one has its own; ten pages read scroll inside Web reading."""
+    the first turn's recap until this one has its own; ten pages read scroll inside Sources."""
     async with _daemon(login_env, site, _two_turns(site)) as (manager, address), async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(
             channel=load_default_config().browser.channel, headless=True

@@ -179,7 +179,7 @@ async def test_each_rule_row_says_how_it_was_used(
                 await expect(lines).to_have_count(3)
                 await expect(lines.nth(0)).to_have_text("Fits 1 step of the last 30 days: decides 1.")
                 await expect(lines.nth(1)).to_have_text(
-                    "Fits 3 steps of the last 30 days: decides 1; 1 was in YOLO runs, which ask nothing; rule #1"
+                    "Fits 3 steps of the last 30 days: decides 1; 1 was in tasks that ask only to pay or send; rule #1"
                     " decides 1 first."
                 )
                 # The rule switched off decides nothing, and says so, where a rule on has its line.

@@ -830,13 +830,19 @@
   background: var(--surface-2);
 }
 
+/* A name takes two lines before it gives way (a name of two words cut to "Rekla…" on one line was not told from the
+   next); the whole name is the tile's tooltip and its name for a screen reader. */
 .side-agent-name {
+  display: -webkit-box;
   max-width: 100%;
   padding: 0 var(--space-half);
   overflow: hidden;
+  line-height: var(--leading-sm);
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 /* What waits for you and what works stand above the chats as their rows (item 836), with no heading: a row says what

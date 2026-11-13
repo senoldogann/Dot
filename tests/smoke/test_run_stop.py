@@ -139,8 +139,22 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                 await page.wait_for_timeout(_SETTLE_MS)
                 await page.screenshot(path=str(tmp_path / f"stop-{width}-{scheme}.png"))
                 await box.fill("Look at the other file too")
-                await expect(send).to_have_attribute("aria-label", "Queue")
+                await expect(send).to_have_attribute("aria-label", "After this task")
                 await expect(page.locator(".dock .composer[data-stop]")).to_have_count(0)
+                # What the send does is said before it is pressed, by the choice over the box, which starts from
+                # Settings › General's; the task's Stop stays in the bar over the composer while the box holds words.
+                intent: Locator = page.get_by_role("radiogroup", name="What your message does")
+                await expect(intent.get_by_role("radio", name="After this task")).to_have_attribute(
+                    "aria-checked", "true"
+                )
+                await expect(intent.get_by_role("radio", name="Add to task")).to_have_attribute("aria-checked", "false")
+                await expect(page.locator(".capsule").get_by_role("button", name="Stop task")).to_be_visible()
+                await intent.get_by_role("radio", name="After this task").focus()
+                await page.keyboard.press("ArrowLeft")
+                await expect(intent.get_by_role("radio", name="Add to task")).to_be_focused()
+                await expect(send).to_have_attribute("aria-label", "Add to task")
+                await page.keyboard.press("ArrowRight")
+                await expect(send).to_have_attribute("aria-label", "After this task")
                 await page.wait_for_timeout(_SETTLE_MS)
                 await page.screenshot(path=str(tmp_path / f"queue-{width}-{scheme}.png"))
                 await box.fill("")

@@ -154,7 +154,7 @@ function foot(count, onSeeAll) {
     el(
       "p",
       null,
-      "Dot's built-in safety checks come first, and your rules cannot switch them off: spending money, passwords, posts and messages in your name, and changes to Dot's own files. YOLO mode is the one exception: there Dot asks only before a payment, a message or mail sent for you or a public post, in a chat you opened.",
+      "Dot's built-in safety checks come first, and your rules cannot switch them off: spending money, passwords, posts and messages in your name, and changes to Dot's own files. The mode “Ask only to pay or send” is the one exception: there Dot asks only before a payment, a message or mail sent for you or a public post, in a chat you opened.",
     ),
     el("button", { class: "set-link rule-see-all", type: "button", onclick: onSeeAll }, "See them all"),
   );
@@ -175,14 +175,14 @@ function emptyState(onPick) {
   );
 }
 
-/** What no rule lifts, in words: five checked lines and what a YOLO run does, one row of the Advanced card. */
+/** What no rule lifts, in words: five checked lines and what a run in the least-asking mode does, one row of the Advanced card. */
 function protections() {
   const lines = [
     "Reading your secrets and sending them out is refused.",
     "Money and passwords are handed to you: Dot stops and asks you to do that step yourself.",
     "A message or a post in your name waits for your yes.",
     "A change to Dot's own files (its code, skills and emergency stop) is asked of you.",
-    ["A research run only reads. ", el("span", { class: "muted" }, "YOLO keeps this one too.")],
+    ["A research run only reads. ", el("span", { class: "muted" }, "“Ask only to pay or send” keeps this one too.")],
   ];
   return el(
     "div",
@@ -202,7 +202,7 @@ function protections() {
       "p",
       { class: "rule-always-note" },
       // What a yolo run keeps besides (item 559): what an untrusted read leaves it is said, not only what it waives.
-      "YOLO mode asks about none of the others: Dot does the step and records why it would have asked. Even then, once a run has read something from outside (a web page, a mail), a secret is still refused on its way out, and the review model checks any step that page may be after.",
+      "“Ask only to pay or send” asks about none of the others: Dot does the step and records why it would have asked. Even then, once a run has read something from outside (a web page, a mail), a secret is still refused on its way out, and the review model checks any step that page may be after.",
     ),
   );
 }
@@ -216,7 +216,7 @@ function buildFreeMode(isDisposed) {
   const setting = switchRowSetting({
     label: "Free mode: Dot asks you nothing",
     hint: [
-      "On, no task asks you anything, in any chat and any mode: Dot pays, sends mail and messages for you, posts and puts projects live by itself, and records why it would have asked. Off, each chat asks as its mode says: YOLO only before a payment, a message or mail and a post, and Dot's own work keeps its mails and posts as drafts until you say yes.",
+      "On, no task asks you anything, in any chat and any mode: Dot pays, sends mail and messages for you, posts and puts projects live by itself, and records why it would have asked. Off, each chat asks as its mode says: “Ask only to pay or send” only before a payment, a message or mail and a post, and Dot's own work keeps its mails and posts as drafts until you say yes.",
       el(
         "span",
         { class: "rule-fine" },
@@ -263,7 +263,7 @@ function buildSandbox(isDisposed) {
   const setting = switchRowSetting({
     label: "Keep Dot's commands in a safe box",
     hint: [
-      "Commands, terminals, scripts and searches that a run starts can't read or change Dot's own files (its keys, settings, memory and browser profiles), and can't run as an administrator. A YOLO run is never put in the box.",
+      "Commands, terminals, scripts and searches that a run starts can't read or change Dot's own files (its keys, settings, memory and browser profiles), and can't run as an administrator. A run in “Ask only to pay or send” is never put in the box.",
       el(
         "span",
         { class: "rule-fine" },
@@ -275,7 +275,7 @@ function buildSandbox(isDisposed) {
     read: () => view?.sandbox === true,
     write: async (on) => {
       view = await api.put("/shell/sandbox", { sandbox: on });
-      toast("ok", on ? "From the next command on, Dot's commands run in the safe box (a YOLO run never does)." : "From the next command on, Dot's commands run without the safe box.");
+      toast("ok", on ? "From the next command on, Dot's commands run in the safe box (a run in “Ask only to pay or send” never does)." : "From the next command on, Dot's commands run without the safe box.");
     },
     onToggled: () => {
       if (!isDisposed()) {

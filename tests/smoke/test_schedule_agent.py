@@ -357,7 +357,7 @@ async def test_the_form_offers_the_agents_and_the_row_names_its_agent(
                 await expect(approvals.locator("option").first).to_have_text("Default (the agent's: Auto-accept edits)")
                 # Dot's runs take the configured approvals, which the Default then names.
                 await agent.select_option("")
-                await expect(approvals.locator("option").first).to_have_text("Default (YOLO)")
+                await expect(approvals.locator("option").first).to_have_text("Default (Ask only to pay or send)")
                 await page.close()
         finally:
             await browser.close()

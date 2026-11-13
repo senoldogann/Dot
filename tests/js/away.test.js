@@ -35,15 +35,15 @@ test("campaign sessions, decisions made for the owner and drafts join the line",
   };
   assert.equal(
     awayLine(view),
-    "2 scheduled tasks: 2 done · 1 campaign session · 14 decisions made for you (9 by YOLO, 5 by the reviewer; 1 denied) · 2 drafts wait for you",
+    "2 scheduled tasks: 2 done · 1 campaign session · 14 decisions made for you (9 without asking, 5 by the reviewer; 1 denied) · 2 drafts wait for you",
   );
   assert.equal(
     awayLine({ ...NOTHING, decisions: { ...NOTHING.decisions, yolo_approved: 1 }, drafts: 1 }),
-    "1 decision made for you (1 by YOLO) · 1 draft waits for you",
+    "1 decision made for you (1 without asking) · 1 draft waits for you",
   );
 });
 
 test("who decided says only who did", () => {
   assert.equal(decidedBy(0, 3, 0), "3 by the reviewer");
-  assert.equal(decidedBy(2, 0, 2), "2 by YOLO; 2 denied");
+  assert.equal(decidedBy(2, 0, 2), "2 without asking; 2 denied");
 });

@@ -118,7 +118,8 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     const badge = shown === null ? null : approvalBadge(shown);
     optionsPill.setValue(badge === null ? "" : badge.short, "");
     optionsPill.setIcon(icon(badge === null ? "lock" : badge.icon));
-    // In YOLO the run asks nothing: the box says so even while its choices are away (item 833).
+    // In the least-asking mode the run asks only to pay or send: the box says so even while its choices are away (item
+    // 833).
     optionsPill.element.toggleAttribute("data-yolo", shown === "yolo");
     setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);
     approvalsShort = badge === null ? "" : badge.short;
@@ -477,7 +478,8 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   paintPhonePill = () => {
     const option = modes.find((candidate) => candidate.id === modeId);
     const named = option === undefined || option.id === AUTO_MODE.id ? "" : option.label;
-    // The approvals first: what is cut on a narrow line is the end, and YOLO must stay in sight (items 833 and 860).
+    // The approvals first: what is cut on a narrow line is the end, and the least-asking mode must stay in sight (items
+    // 833 and 860).
     const extra = [approvalsShort, named, reasoningShort].filter((word) => word !== "").join(" · ");
     const value = modelPill.element.querySelector(".composer-pill-value")?.textContent ?? "";
     modelPill.setValue(value, extra);

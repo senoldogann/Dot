@@ -1,15 +1,19 @@
 // How often a schedule of a chat asks again, in words (items 281, 580, 590 and 592): the rhythms "/loop" makes (every
 // 30 minutes, every 2 hours) and the days and times a schedule a run made keeps (every day at 10:00, on Mon, Wed and
-// Fri at 18:30), as the loop line over the composer and the mark of a chat in the sidebar say them. Pure, so that it
-// runs under Node without a page.
+// Fri at 18:30), as the loop line over the composer and the mark of a chat in the sidebar say them, in the interface's
+// language (i18n.js). Pure, so that it runs under Node without a page.
+
+import { t, uiLocale } from "./i18n.js";
 
 // A day alone by its name ("on Mondays at 09:00"), days together by their short names, so that the time after them
 // stays in sight on a phone's line (item 592: "on Mondays, Wednesdays and Frid…" lost it).
-const DAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
-const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const HOUR_MINUTE = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-const WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "short" });
-const DAY_MONTH = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+/** @type {import("./i18n.js").WordKey[]} */
+const DAYS = ["rhythm.sundays", "rhythm.mondays", "rhythm.tuesdays", "rhythm.wednesdays", "rhythm.thursdays", "rhythm.fridays", "rhythm.saturdays"];
+/** @type {import("./i18n.js").WordKey[]} */
+const SHORT_DAYS = ["rhythm.sun", "rhythm.mon", "rhythm.tue", "rhythm.wed", "rhythm.thu", "rhythm.fri", "rhythm.sat"];
+const HOUR_MINUTE = new Intl.DateTimeFormat(uiLocale(), { hour: "2-digit", minute: "2-digit", hour12: false });
+const WEEKDAY = new Intl.DateTimeFormat(uiLocale(), { weekday: "short" });
+const DAY_MONTH = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "short" });
 const DAY_KEY = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
 // A next firing this far away or more is named by its date: a day's name alone would read as the coming one.
 const WEEK_S = 6 * 24 * 3600;
@@ -19,7 +23,7 @@ const DUE_GRACE_S = 5 * 60;
 
 /** "a", "a and b", "a, b and c". */
 function listed(words) {
-  return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+  return words.length < 2 ? words.join("") : t("rhythm.listed", { first: words.slice(0, -1).join(", "), last: words.at(-1) });
 }
 
 /** The times of a cron's minute and hour fields ("09:00 and 19:00"), or null for a form that names no plain times. */
@@ -34,18 +38,18 @@ function cronTimes(minute, hour) {
 /** The days of a cron's day-of-week field ("every day", "on weekdays", "on Mondays", "on Mon and Fri"), or null. */
 function cronDays(day) {
   if (day === "*") {
-    return "every day";
+    return t("rhythm.everyDay");
   }
   if (day === "1-5") {
-    return "on weekdays";
+    return t("rhythm.weekdays");
   }
   if (/^[0-7](,[0-7])*$/.test(day)) {
     // In the order of a week that starts on Monday, as en-GB's does; 0 and 7 are both Sunday.
     const numbers = [...new Set(day.split(",").map((each) => Number(each) % 7))].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
     if (numbers.length === 2 && numbers.includes(0) && numbers.includes(6)) {
-      return "at weekends";
+      return t("rhythm.weekends");
     }
-    return numbers.length === 1 ? `on ${DAYS[numbers[0]]}` : `on ${listed(numbers.map((each) => SHORT_DAYS[each]))}`;
+    return numbers.length === 1 ? t("rhythm.onDay", { day: t(DAYS[numbers[0]]) }) : t("rhythm.onDay", { day: listed(numbers.map((each) => t(SHORT_DAYS[each]))) });
   }
   return null;
 }
@@ -56,14 +60,14 @@ function cronDays(day) {
 export function loopRhythm(cron) {
   const minutes = /^\*\/(\d+) \* \* \* \*$/.exec(cron);
   if (minutes !== null) {
-    return `every ${minutes[1]} minutes`;
+    return t("rhythm.minutes", { count: minutes[1] });
   }
   if (cron === "0 * * * *") {
-    return "every hour";
+    return t("rhythm.hour");
   }
   const hours = /^0 \*\/(\d+) \* \* \*$/.exec(cron);
   if (hours !== null) {
-    return `every ${hours[1]} hours`;
+    return t("rhythm.hours", { count: hours[1] });
   }
   const fields = cron.trim().split(/\s+/);
   if (fields.length !== 5 || fields[2] !== "*" || fields[3] !== "*") {
@@ -71,7 +75,7 @@ export function loopRhythm(cron) {
   }
   const times = cronTimes(fields[0], fields[1]);
   const days = cronDays(fields[4]);
-  return times === null || days === null ? null : `${days} at ${times}`;
+  return times === null || days === null ? null : t("rhythm.daysAt", { days, times });
 }
 
 /** When a schedule fires next (`at`, seconds), as the sidebar says it: the time alone later today ("15:30"), the day's

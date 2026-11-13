@@ -84,14 +84,14 @@ export function mountInitiative() {
 
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Work on its own while the Mac is idle", disabled: true });
   const count = el("span", { class: "hint" });
-  // The mode its runs start in, as the daemon says it (item 756): in YOLO they ask nothing.
-  const mode = el("span", null, "asking nothing (YOLO)");
+  // The mode its runs start in, as the daemon says it (item 756).
+  const mode = el("span", null, "asking only before a message, a post or a release");
   const lead = el(
     "p",
     { class: "hint watcher-lead" },
     "While the Mac is idle, Dot does on its own what is on this list, each in a chat of its own, ",
     mode,
-    "; with nothing on it, it looks for work that helps you now and then. What Dot found in a mail or a page while at it is handled as untrusted: what would reach others asks you first, or in YOLO is refused unless your words call for it.",
+    "; with nothing on it, it looks for work that helps you now and then. What Dot found in a mail or a page while at it is handled as untrusted: what would reach others asks you first, or, in the mode that asks only to pay or send, is refused unless your words call for it.",
   );
   // The weekday hours its runs wait in (item 826), told in the Mac's own time.
   const peak = el("p", { class: "hint initiative-peak", hidden: true });
@@ -138,7 +138,7 @@ export function mountInitiative() {
     view = fresh;
     toggle.setAttribute("aria-checked", String(view.enabled));
     idleNote.hidden = !view.enabled || view.idle_readable !== false;
-    mode.textContent = view.approvals === "yolo" ? "asking nothing (YOLO)" : `in the ${view.approvals} approval mode`;
+    mode.textContent = view.approvals === "yolo" ? "asking only before a message, a post or a release" : `in the ${view.approvals} approval mode`;
     const hours = view.peak_hours_utc ?? [];
     peak.hidden = hours.length !== 2;
     if (hours.length === 2) {
