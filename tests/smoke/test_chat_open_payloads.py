@@ -241,3 +241,22 @@ async def test_a_chat_reads_its_run_once(chat: tuple[str, list[RunRecord]]) -> N
                 await page.context.close()
             finally:
                 await browser.close()
+
+
+async def test_a_chat_reads_no_loop_snapshot_and_draws_each_turns_work(chat: tuple[str, list[RunRecord]]) -> None:
+    address, runs = chat
+    async with async_playwright() as playwright:
+        for engine in (playwright.chromium, playwright.webkit):
+            browser: Browser = await engine.launch()
+            try:
+                read: _Read = {"paths": [], "kinds": []}
+                page: Page = await _opened(browser, address, runs[-2].id, read)
+                # Each earlier turn read before the page was drawn shows its work, and none says it could not.
+                newest = page.locator(".history > .turn").last
+                await expect(newest.locator(".turn-say")).to_contain_text("Paragraph 0 of what the run said")
+                await expect(page.locator(".history", has_text=_NOT_SHOWN)).to_have_count(0)
+                assert "tool_result" in read["kinds"], engine.name
+                assert "loop_state" not in read["kinds"], engine.name
+                await page.context.close()
+            finally:
+                await browser.close()

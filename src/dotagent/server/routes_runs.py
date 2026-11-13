@@ -50,6 +50,7 @@ from dotagent.server.guard import local_hosts
 from dotagent.server.sending import send_once
 from dotagent.server.stream import (
     MOST_FOLLOWED_RUNS,
+    UNREAD_BY_PAGES,
     event_stream,
     follow_lifecycle,
     follow_run,
@@ -380,7 +381,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     @router.get("/runs/{run_id}/events")
     async def run_events(run_id: str, query: Annotated[EventsQuery, Query()]) -> list[EventRecord]:
         await store.get_run(run_id)
-        return await store.list_events(run_id, query.after, query.limit)
+        return await store.list_events_without(run_id, query.after, query.limit, UNREAD_BY_PAGES)
 
     @router.get("/runs/{run_id}/stream")
     async def run_stream(run_id: str, query: Annotated[StreamQuery, Query()]) -> StreamingResponse:
