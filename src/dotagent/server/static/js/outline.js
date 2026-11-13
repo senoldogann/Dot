@@ -50,6 +50,10 @@ function words(node) {
   return laidOut(node, wordsAsRead);
 }
 
+function goTo(node) {
+  node.scrollIntoView({ block: "start", behavior: REDUCED_MOTION.matches ? "auto" : "smooth" });
+}
+
 function wordsAsRead(node) {
   const all = folded(node.innerText);
   const picks = node.querySelector(".pick-list.inline");
@@ -189,7 +193,7 @@ export function messageOutline({ layout, main, thread, dock }) {
 
   function jump() {
     if (active !== null) {
-      laidOut(messages[active].node, (node) => node.scrollIntoView({ block: "start", behavior: REDUCED_MOTION.matches ? "auto" : "smooth" }));
+      laidOut(messages[active].node, goTo);
     }
   }
 

@@ -242,3 +242,113 @@ async def test_the_marks_go_to_a_message_of_a_far_turn(chat: tuple[str, list[Run
                 await page.context.close()
             finally:
                 await browser.close()
+
+
+# A chat whose earlier turns each said something long on the way and ran a command: their work, read only as each comes
+# near what is seen (history.js, item 708), makes them grow while the reader scrolls up.
+_FILLING_TURNS: int = 24
+_SAID: str = "\n\n".join(f"Paragraph {line} of what the run said on its way to the tides." for line in range(8))
+_SCROLL_STEP: int = 500
+_FILL_WAIT_MS: int = 900
+# What the page reads before it is drawn (history.js READ_FIRST); a turn above them reads its work as it comes near.
+_READ_FIRST: int = 6
+# The message read: the one whose top is nearest the middle of what is seen, in the box the conversation scrolls in.
+_READ_MESSAGE: str = """() => {
+  const phone = getComputedStyle(document.querySelector('.run-thread')).overflowY !== 'visible';
+  const box = phone ? document.querySelector('.run-thread') : document.scrollingElement;
+  const middle = innerHeight / 2;
+  const messages = [...document.querySelectorAll('.run-thread .bubble.user')];
+  let best = -1;
+  messages.forEach((node, index) => { const top = node.getBoundingClientRect().top;
+    const off = (at) => Math.abs(at - middle);
+    const nearer = best === -1 || off(top) < off(messages[best].getBoundingClientRect().top);
+    if (top > 0 && top < innerHeight && nearer) best = index; });
+  return { index: best, top: best === -1 ? null : messages[best].getBoundingClientRect().top, at: box.scrollTop };
+}"""
+_SCROLL_UP: str = """(step) => {
+  const phone = getComputedStyle(document.querySelector('.run-thread')).overflowY !== 'visible';
+  const box = phone ? document.querySelector('.run-thread') : document.scrollingElement;
+  box.scrollTop = box.scrollTop - step;
+}"""
+_TOP_OF: str = "(index) => document.querySelectorAll('.run-thread .bubble.user')[index].getBoundingClientRect().top"
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def filling(runtime: Runtime, chat: tuple[str, list[RunRecord]]) -> tuple[str, list[RunRecord]]:
+    address, _ = chat
+    thread: ThreadRecord = await runtime.store.create_thread("A chat that fills in", "test")
+    runs: list[RunRecord] = []
+    for index in range(_FILLING_TURNS):
+        made: RunRecord = await runtime.store.create_run(
+            thread.id,
+            f"Filling question {index}",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            "high",
+            "standard",
+            None,
+            "yolo",
+            False,
+            None,
+            None,
+            None,
+        )
+        await runtime.store.add_event(made.id, "assistant", {"text": _SAID, "step": 1, "tool_calls": []})
+        await runtime.store.add_event(
+            made.id, "tool_call", {"call_id": "call_1", "tool": "shell", "args": {"command": f"echo tide {index}"}}
+        )
+        await runtime.store.add_event(
+            made.id, "tool_result", {"call_id": "call_1", "tool": "shell", "ok": True, "seconds": 0.1}
+        )
+        await runtime.store.finish_run(made.id, "done", f"Filling answer {index}.")
+        runs.append(made)
+    return address, runs
+
+
+@pytest.mark.parametrize("phone", [True, False], ids=["phone", "wide"])
+async def test_scrolling_up_a_chat_whose_turns_fill_in_keeps_the_message_read_where_it_is(
+    filling: tuple[str, list[RunRecord]], phone: bool
+) -> None:
+    """In Chromium. WebKit moves the message read by 24 to 284 px as the turns above it fill in, on `main` as with this
+    item, measured alike: it says it anchors scrolling (`overflow-anchor`) and does not here, so `keepPlace` (item 708)
+    leaves it to it. That is the next item's."""
+    address, runs = filling
+    read: list[str] = []
+    async with async_playwright() as playwright:
+        for engine in (playwright.chromium,):
+            browser: Browser = await engine.launch()
+            try:
+                page: Page = await browser.new_page(
+                    viewport=_PHONE if phone else _WIDE, is_mobile=phone, has_touch=phone, reduced_motion="reduce"
+                )
+                read.clear()
+                page.on("request", lambda request: read.append(request.url) if "/events" in request.url else None)
+                host, port = "127.0.0.1", int(address.rpartition(":")[2])
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"{address}/#/runs/{runs[-1].id}")
+                await expect(page.locator(".history > .turn")).to_have_count(_FILLING_TURNS - 1, timeout=15000)
+                await expect(page.locator(".history")).to_have_attribute("data-sized", "", timeout=5000)
+                await page.wait_for_timeout(_SETTLE_MS)
+                opened: int = len(read)
+                moves: list[tuple[int, float, float]] = []
+                for _ in range(40):
+                    seen: dict[str, float] = await page.evaluate(_READ_MESSAGE)
+                    if seen["at"] < _SCROLL_STEP:
+                        break
+                    await page.evaluate(_SCROLL_UP, _SCROLL_STEP)
+                    await page.wait_for_timeout(_FILL_WAIT_MS)
+                    if seen["index"] == -1:
+                        continue
+                    now: float = await page.evaluate(_TOP_OF, seen["index"])
+                    moves.append((int(seen["index"]), seen["top"] + _SCROLL_STEP, now))
+                # The turns above those read first filled in as the reader came up to them.
+                assert len(read) > opened, (engine.name, opened, len(read))
+                assert moves != [], engine.name
+                jumped = [move for move in moves if abs(move[2] - move[1]) > 2]
+                assert jumped == [], (engine.name, jumped)
+                await page.context.close()
+            finally:
+                await browser.close()

@@ -478,8 +478,13 @@ export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal, rea
 
 /** Lets the browser skip laying out the turns of `history` that are far from what is seen (item 1165, app.css), once
  * every one of them was laid out in the page: its first size is seen, and a frame later, when each turn's size is kept
- * for it, `data-sized` goes on. Nothing is set once `signal` aborted (the page went). */
+ * for it, `data-sized` goes on. Nothing is set once `signal` aborted (the page went). A browser without scroll anchoring
+ * skips none: a turn is filled 800 px before it is seen (`whenNear`) and laid out nearer, so it grows above the reader
+ * with nothing to keep their place, where `keepPlace` measured it growing while it was laid out. */
 function skipWhenSized(history, signal) {
+  if (!ANCHORS) {
+    return;
+  }
   const watch = new ResizeObserver(() => {
     watch.disconnect();
     requestAnimationFrame(() => {
