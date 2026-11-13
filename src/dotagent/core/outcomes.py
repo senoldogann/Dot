@@ -87,24 +87,25 @@ def _added_to(core: str, held: str) -> bool:
 def judge_replaced(before: str, after: str, written: str) -> OutcomeCheck:
     """What a field holds once a step replaced its value with ``written`` (a fill): verified when it holds the text,
     as written, as a page formats it, or with what a page adds before or after it (item 1149: an address field that
-    puts ``https://`` first was taken for one that changed the text, in the owner's run); contradicted when it still
-    holds what it held, which is not the text; uncertain when it holds something else (cut short, replaced), told by
-    its length alone."""
+    puts ``https://`` first was taken for one that changed the text, in the owner's run), whether or not it held
+    that before the step, since a field filled again with the text it holds is as it was; contradicted when it is as
+    it was and that is not the text; uncertain when it holds something else (cut short, replaced), told by its length
+    alone."""
     if _plain(after) == _plain(written):
         return _verified(_HOLDS_TEXT, _AS_WRITTEN)
     core: str = written_core(written)
     if core and written_core(after) == core:
         return _verified(_HOLDS_TEXT, _FORMATTED)
+    if _added_to(core, written_core(after)):
+        return _verified(
+            _HOLDS_TEXT, f"the page added to it: {len(after)} characters where {len(written)} were written"
+        )
     if after == before:
         return OutcomeCheck(
             condition=_HOLDS_TEXT,
             status="contradicted",
             evidence=_UNCHANGED,
             reason="the field did not take the text: it may be read-only or the page put its value back; look at it",
-        )
-    if _added_to(core, written_core(after)):
-        return _verified(
-            _HOLDS_TEXT, f"the page added to it: {len(after)} characters where {len(written)} were written"
         )
     return OutcomeCheck(
         condition=_HOLDS_TEXT,

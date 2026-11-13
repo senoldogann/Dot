@@ -286,6 +286,15 @@ async def test_an_address_the_page_puts_its_scheme_before_is_held_and_the_click_
     assert (click.outcome, _statuses(click)) == ("done", ["verified"])
     assert outcome.stopped is None
     assert [order["site"] for order in site.orders] == ["https://gistsmith.example"]
+    # Written again, the same text leaves the field as it was, and the field holds it: the step does not fail.
+    again: ActOutcome = await browser.act(
+        "scheme",
+        [Step(action="fill", ref=_ref(view, "Site", "textbox"), text="gistsmith.example")],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    assert (again.steps[0].outcome, _statuses(again.steps[0])) == ("done", ["verified"]), again
 
 
 async def test_a_field_that_takes_a_secret_is_never_read_back(browser: BrowserSession, site: _Site) -> None:

@@ -63,8 +63,12 @@ def test_a_field_the_page_adds_to_holds_the_text_and_a_short_text_is_not_found_b
     assert judge_replaced("", "banana", "a").status == "uncertain"
     # In the middle of other text, it is not what was written with more around it.
     assert judge_replaced("", "see gistsmith.example now", "gistsmith.example").status == "uncertain"
-    # A field that is as it was did not take the text, though the text it held ends with it.
-    assert judge_replaced("Ada Lovelace", "Ada Lovelace", "Lovelace").status == "contradicted"
+    # Written again into the field that holds it with its scheme, the text is held: the field is as it was, as one
+    # filled again with the very text it holds is (the review of this item: the retry the owner's run made).
+    again: OutcomeCheck = judge_replaced("https://gistsmith.example", "https://gistsmith.example", "gistsmith.example")
+    assert again.status == "verified"
+    # A field that is as it was and holds other text did not take what was written.
+    assert judge_replaced("Ada Lovelace", "Ada Lovelace", "Grace Hopper").status == "contradicted"
 
 
 def test_a_field_that_is_as_it_was_contradicts_the_write_and_one_that_changed_otherwise_is_uncertain() -> None:
