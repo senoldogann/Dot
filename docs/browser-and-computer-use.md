@@ -602,6 +602,22 @@ every mode but `yolo` (item 433).
   changed something, the window is read once the application has
   announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
   without announcing anything in between shows in the next view.
+- A step's line says whether it was sent and what Dot checked of it, as a browser step's does (item 1146): done says
+  that it was sent, and verified, uncertain or not checked stands beside it. What `set_value` set is read back as
+  before, and now says so: verified, or the step fails as sent and not kept. What `type` and `paste` put in is read
+  back from the field the step names, or from the one that has the keyboard, for up to a second, since keys reach an
+  application after the step returns: verified once the text is in the field one more time than before (as typed, or
+  with the same letters and digits), otherwise uncertain and never contradicted. A secure field is never read; a field
+  whose value is no text, a text area of more than 4,000 characters (a terminal, a document) and a text that presses
+  Return or Tab are not checked. `expect_text` on a step names exact words (4 to 80 characters) that an element of the
+  front window must show in its name or its value once the step is done: the window is read before the step (words it
+  shows already, or that the batch writes, are refused and nothing is sent) and then every quarter second, 5 s at most
+  and 10 s over one batch. Seen is verified; not seen is uncertain, the batch stops there and the step is not to be
+  sent again unseen. A batch stops before a step that acts on what the steps before it left (a click, a press, a key,
+  a menu item, a drag, a text with Return or Tab) when one of their own checks is not verified. A failed step says
+  whether it went out: one refused before any input was sent (its target changed since the review, the pointer was
+  moved, an accessibility call that says nothing was done) did not. Another window of the same application taking the
+  keyboard does not stop a batch; another application coming forward does (item 749).
 - In a terminal application (Terminal, iTerm2, Ghostty and the like) text and keys are shell input. Dot keeps the
   command line it typed there since the line was last empty and judges it whole, as a `shell` command, when Return or
   a Ctrl- key that may run it goes in, so a command typed in parts is judged as one, from the home folder. After a

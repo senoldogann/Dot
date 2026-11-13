@@ -2,7 +2,9 @@
 
 It opens one window with a button, a checkbox, a text field, a secure field, a scroll view and a pad that reacts to the
 mouse. Every event it receives is appended to a JSON-lines log, so a test can compare what a tool did with what the
-application actually saw. Usage: ``python dot_fixture_app.py <log path>``.
+application actually saw. Four controls are there for what a step's outcome is checked against: a field that takes
+digits alone and puts anything else back, a button that does nothing, a button whose result shows a moment later, and a
+button that brings Finder to the front. Usage: ``python dot_fixture_app.py <log path>``.
 """
 
 import json
@@ -25,6 +27,7 @@ from AppKit import (
     NSMenu,
     NSMenuItem,
     NSRectFill,
+    NSRunningApplication,
     NSScrollView,
     NSSecureTextField,
     NSString,
@@ -41,14 +44,19 @@ from AppKit import (
     NSWindowStyleMaskMiniaturizable,
     NSWindowStyleMaskResizable,
     NSWindowStyleMaskTitled,
+    NSWorkspace,
 )
-from Foundation import NSMakePoint, NSMakeRect, NSNotificationCenter, NSObject, NSProcessInfo
+from Foundation import NSDate, NSMakePoint, NSMakeRect, NSNotificationCenter, NSObject, NSProcessInfo, NSRunLoop
 
 _LOG_PATH: Path = Path(sys.argv[1])
 _GRID_STEP: float = 100.0
 _GRID_WIDTH: float = 1600.0
 _GRID_HEIGHT: float = 2400.0
 _MOVE_LOG_GAP_S: float = 0.05
+# How long the slow button takes to show its result, and how long the fixture waits for Finder to be in front.
+_SLOW_S: float = 1.2
+_FRONT_WAIT_S: float = 3.0
+_FINDER: str = "com.apple.finder"
 _state: dict[str, float] = {"last_move": 0.0}
 
 
@@ -175,6 +183,9 @@ class FixtureDelegate(NSObject):
         ready: FixtureDelegate = objc.super(FixtureDelegate, self).init()
         ready.count = 0
         ready.counter_label = None
+        ready.digits_field = None
+        ready.saved = 0
+        ready.saved_label = None
         return ready
 
     def incrementPressed_(self, sender: object) -> None:
@@ -196,8 +207,40 @@ class FixtureDelegate(NSObject):
         secure: bool = bool(field.isKindOfClass_(NSSecureTextField))
         if secure:
             log_event("text", field="secret", length=len(str(field.stringValue())))
+        elif field == self.digits_field:
+            # The field takes digits alone: anything else typed into it is taken out again at once.
+            kept: str = "".join(char for char in str(field.stringValue()) if char.isdigit())
+            field.setStringValue_(kept)
+            log_event("text", field="digits", value=kept)
         else:
             log_event("text", field="name", value=str(field.stringValue()))
+
+    def slowPressed_(self, sender: object) -> None:
+        log_event("slow_press")
+        self.performSelector_withObject_afterDelay_("slowDone:", None, _SLOW_S)
+
+    def slowDone_(self, sender: object) -> None:
+        self.saved += 1
+        self.saved_label.setStringValue_(f"Saved {self.saved}")
+        log_event("slow_done", count=self.saved)
+
+    def finderPressed_(self, sender: object) -> None:
+        """Bring Finder to the front and return once it is there, so that whoever pressed finds it in front."""
+        finders = NSRunningApplication.runningApplicationsWithBundleIdentifier_(_FINDER)
+        if not finders:
+            log_event("front_other", front=False)
+            return
+        application = NSApplication.sharedApplication()
+        if application.respondsToSelector_("yieldActivationToApplication:"):
+            application.yieldActivationToApplication_(finders[0])
+        finders[0].activateWithOptions_(0)
+        deadline: float = time.monotonic() + _FRONT_WAIT_S
+        front: bool = False
+        while not front and time.monotonic() < deadline:
+            NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(0.05))
+            active = NSWorkspace.sharedWorkspace().frontmostApplication()
+            front = active is not None and str(active.bundleIdentifier()) == _FINDER
+        log_event("front_other", front=front)
 
     def scrolled_(self, notification: object) -> None:
         origin = notification.object().bounds().origin
@@ -274,6 +317,35 @@ def build_window(delegate: FixtureDelegate) -> NSWindow:
     secret_field.setPlaceholderString_("Password")
     secret_field.setDelegate_(delegate)
     content.addSubview_(secret_field)
+
+    digits_field = NSTextField.alloc().initWithFrame_(NSMakeRect(340, 356, 130, 24))
+    digits_field.setPlaceholderString_("Digits")
+    digits_field.setDelegate_(delegate)
+    digits_field.setAccessibilityLabel_("Digits")
+    delegate.digits_field = digits_field
+    content.addSubview_(digits_field)
+
+    idle = NSButton.alloc().initWithFrame_(NSMakeRect(480, 352, 140, 30))
+    idle.setTitle_("Idle")
+    idle.setBezelStyle_(NSBezelStyleRounded)
+    content.addSubview_(idle)
+
+    slow = NSButton.alloc().initWithFrame_(NSMakeRect(340, 316, 130, 30))
+    slow.setTitle_("Slow save")
+    slow.setBezelStyle_(NSBezelStyleRounded)
+    slow.setTarget_(delegate)
+    slow.setAction_("slowPressed:")
+    content.addSubview_(slow)
+
+    delegate.saved_label = label("Saved 0", (480, 320, 140, 22))
+    content.addSubview_(delegate.saved_label)
+
+    finder = NSButton.alloc().initWithFrame_(NSMakeRect(340, 282, 160, 30))
+    finder.setTitle_("Bring Finder")
+    finder.setBezelStyle_(NSBezelStyleRounded)
+    finder.setTarget_(delegate)
+    finder.setAction_("finderPressed:")
+    content.addSubview_(finder)
 
     pad = PadView.alloc().initWithFrame_(NSMakeRect(20, 280, 300, 100))
     pad.setAccessibilityElement_(True)

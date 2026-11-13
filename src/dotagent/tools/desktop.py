@@ -11,12 +11,13 @@ import os
 import secrets
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from dotagent.config import AppConfig
 from dotagent.core.errors import DesktopError, NotFoundError, ToolInputError
+from dotagent.core.outcomes import echoes_written
 from dotagent.core.text import truncate_tail
 from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
 from dotagent.desktop.apps import bundle_path
@@ -357,13 +358,31 @@ class ActArgs(ToolArgs):
             "Steps run in order: every step you can predict without a new look at the window (a call with one step "
             "costs a model round trip for one click). The batch stops at the first failure or when the screen "
             "surprises you (a dialog, a different application); the remaining steps are then skipped. A batch holds "
-            "a few dozen steps (25 by default); more are cut to the first ones, and the result says so. Example: "
-            '[{"action": "set_value", "ref": "a3", "text": "notes.md"}, {"action": "press", "ref": "a7"}].'
+            "a few dozen steps (25 by default); more are cut to the first ones, and the result says so. Put "
+            "expect_text on the step whose result matters (the press that saves): Dot then looks for those words and "
+            "reports verified or uncertain, where done alone says only that the step was sent. Example: "
+            '[{"action": "set_value", "ref": "a3", "text": "notes.md"}, '
+            '{"action": "press", "ref": "a7", "expect_text": "Saved to notes.md"}].'
         ),
     )
     app: str | None = Field(
         default=None, description="Application name, bundle id or pid. Default: the application you are working in."
     )
+
+    @model_validator(mode="after")
+    def _expects_what_only_the_result_shows(self) -> Self:
+        """A step may not expect to see words the batch itself writes (item 1146): the field they went into shows
+        them whatever the step did."""
+        written: list[str] = [
+            step.text for step in self.steps if step.text is not None and step.action in ("set_value", "type", "paste")
+        ]
+        for step in self.steps:
+            if step.expect_text is not None and echoes_written(step.expect_text, written):
+                raise ValueError(
+                    "expect_text is within a text this batch writes, which its field shows whatever the step did: "
+                    "expect words only the result shows (the label that says Saved), or leave it out"
+                )
+        return self
 
 
 def _step_label(step: Step, context: StepContext) -> str:
@@ -483,7 +502,10 @@ def _act_tool() -> RegisteredTool:
             "chooses a menu bar item by its path; scroll moves an area (give it a ref); drag, double_click, "
             "right_click (its menu then appears in the snapshot), hover, wait, and activate (switch to another "
             "application). Batch the steps you can predict, such as filling a form and pressing its button. The "
-            "result shows what each step did and how the window changed. Passwords, codes and card numbers go into "
+            "result shows what each step did and how the window changed, and what Dot checked of it: the field read "
+            "back after set_value, type and paste, and expect_text where you gave one. Done means the step was sent; "
+            "verified means Dot saw its result; not checked means only that it was sent; uncertain means it was sent "
+            "and its result was not seen, so look before sending it again. Passwords, codes and card numbers go into "
             "secure fields only as your instructions on secrets say: otherwise Dot refuses the step. " + _REF_HELP
         ),
         args_model=ActArgs,

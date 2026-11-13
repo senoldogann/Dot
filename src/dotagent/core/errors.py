@@ -214,6 +214,16 @@ class DesktopError(DotError):
     """Desktop (computer use) automation failed."""
 
 
+class DesktopStepNotSent(DesktopError):
+    """A step of a desktop batch was refused before any input went to an application (item 1146): its target was no
+    longer what was reviewed, the pointer was not where the step before left it."""
+
+
+class ValueNotKept(DesktopError):
+    """A field whose value a step set reads back as something else (item 1146): the step went out, and what it asked
+    for is not so."""
+
+
 class DesktopPermissionError(DesktopError):
     """A macOS privacy permission (Screen Recording, Accessibility, Automation) is missing."""
 

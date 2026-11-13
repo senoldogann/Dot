@@ -583,6 +583,20 @@ def read_text(element: AXElement, pid: int) -> tuple[str, str, int]:
     return state.label, text, len(text)
 
 
+def read_value(element: AXElement, pid: int) -> str | None:
+    """The text a field holds, for the check of a step that wrote into it (item 1146): its ``AXValue`` when that is a
+    string. ``None`` for a secure field, whose content is never read; for an element whose value is no string (its
+    label is not what it holds); and for a text too long to read after every step, a terminal's scrollback or a
+    document (more than ``_LARGE_TEXT_CHARS``)."""
+    if read_state(element, pid).secure():
+        return None
+    size: float | None = _number(read_optional(element, "AXNumberOfCharacters", pid))
+    if size is not None and size > _LARGE_TEXT_CHARS:
+        return None
+    raw: object | None = read_optional(element, "AXValue", pid)
+    return raw if isinstance(raw, str) and len(raw) <= _LARGE_TEXT_CHARS else None
+
+
 def perform(element: AXElement, action: str, pid: int) -> None:
     code: int = int(AS.AXUIElementPerformAction(element, action))
     if code != 0:
