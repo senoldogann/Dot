@@ -10,8 +10,8 @@ import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { memoryChange } from "./contextpanel.js";
 import { stillAsks } from "./openasks.js";
-import { clip, clock, compact, dateTime, duration, el, plural, repeatsAnswer, setText } from "./dom.js";
-import { t } from "./i18n.js";
+import { clip, clock, compact, dateTime, duration, el, repeatsAnswer, setText } from "./dom.js";
+import { t, tCount, uiLocale } from "./i18n.js";
 import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
@@ -34,14 +34,27 @@ const FINISH_TOOL = "finish";
 // The calls whose row shows only once they are refused: the answer stands for a finish, and the badge on your message
 // for a reaction of Dot's (item 664).
 const QUIET_TOOLS = new Set([FINISH_TOOL, "react"]);
-const VERDICT_TEXT = { ask: "Needs approval", handoff: "Handed to you", deny: "Blocked by Dot's safety rules" };
+const VERDICT_TEXT = { ask: t("timeline.verdictAsk"), handoff: t("timeline.verdictHandoff"), deny: t("timeline.verdictDeny") };
 // The ways a model turn ends that need no word of their own.
 const ORDINARY_ENDS = new Set(["stop", "tool_calls", ""]);
 // The open state of each group of steps the reader chose on this page, by the group's element (see buildGroup): a later
 // event that repaints the head leaves the group as they left it, and so does the end of the run.
 const READER_OPEN = new WeakMap();
+// The words of a delegated run's status, as its row says how it ended; any other status reads as its own name.
+const STATUS_WORDS = {
+  queued: t("timeline.statusQueued"),
+  running: t("timeline.statusRunning"),
+  ending: t("timeline.statusEnding"),
+  done: t("timeline.statusDone"),
+  failed: t("timeline.statusFailed"),
+  cancelled: t("timeline.statusCancelled"),
+};
 // The words of a delegated run's status ring, for its tooltip and for a screen reader.
-const RING_LABELS = { blocked: "waiting" };
+const RING_LABELS = { ...STATUS_WORDS, blocked: t("timeline.statusWaiting") };
+// What the page says while the model thinks (item 246), in the thought's block and on the line of its group.
+const THINKING = t("timeline.thinking");
+// The last line of a delegated run's row before its first step.
+const STARTING = t("timeline.starting");
 // The faces the head of a group of helpers shows, the rest counted (item 245), and how much of a helper's answer its row
 // keeps for its last line.
 const FLOCK_FACES = 3;
@@ -78,16 +91,17 @@ function keepSaidOpen(key, open) {
 // How much of an agent's reply its message in the conversation shows; the rest is on its run's page.
 const AGENT_SAID_CHARS = 1200;
 // What a line of the conversation says of a change of the memory (item 313); it shows this much of the note.
-const MEMORY_CHANGES = { Saved: "Saved to memory", Updated: "Updated memory", Forgot: "Removed from memory" };
+const MEMORY_CHANGES = { Saved: t("timeline.memorySaved"), Updated: t("timeline.memoryUpdated"), Forgot: t("timeline.memoryForgot") };
 const MEMORY_WORDS_CHARS = 120;
 // How the helpers of a group stand, in the order a reader scans them: those under way first, then how
 // the others ended.
+/** @type {Array<[import("./i18n.js").WordKey, string[]]>} */
 const FLOCK_WORDS = [
-  ["working", ["queued", "running", "ending"]],
-  ["waiting for you", ["blocked"]],
-  ["done", ["done"]],
-  ["failed", ["failed"]],
-  ["stopped", ["cancelled"]],
+  ["timeline.flockWorking", ["queued", "running", "ending"]],
+  ["timeline.flockWaiting", ["blocked"]],
+  ["timeline.flockDone", ["done"]],
+  ["timeline.flockFailed", ["failed"]],
+  ["timeline.flockStopped", ["cancelled"]],
 ];
 
 /** Show the status of a delegated run on the ring of its chip. */
@@ -114,7 +128,7 @@ function plainLine(text) {
 export function flockState(statuses) {
   return FLOCK_WORDS.map(([word, kinds]) => ({ word, count: statuses.filter((status) => kinds.includes(status)).length }))
     .filter(({ count }) => count > 0)
-    .map(({ word, count }) => `${count} ${word}`)
+    .map(({ word, count }) => t(word, { count }))
     .join(" · ");
 }
 
@@ -228,35 +242,35 @@ function drawStreaming(live) {
 }
 
 // How a call of the step a resumed run was in ended (agent/resume.py).
-const CALL_ENDS = { succeeded: "finished", failed: "failed", cut_off: "cut off", not_started: "not started" };
-// What cut off the run that a resumed run goes on from (agent/resume.py `CutOff`): as the resumed run's line says it
-// after "Resumed this turn after", and in full.
+const CALL_ENDS = {
+  succeeded: t("timeline.callFinished"),
+  failed: t("timeline.callFailed"),
+  cut_off: t("timeline.callCutOff"),
+  not_started: t("timeline.callNotStarted"),
+};
+// What cut off the run that a resumed run goes on from (agent/resume.py `CutOff`): the resumed run's line, each a
+// whole sentence ("Resumed this turn after Dot restarted"), and in full.
 const CUT_OFFS = {
-  daemon_restarted: { after: "Dot restarted", how: "Dot stopped while the task before this one worked: a crash, or a restart that did not wait for it." },
-  daemon_shutdown: { after: "Dot was shut down", how: "Dot was shut down while the task before this one worked." },
-  process_ended: { after: "its Terminal command was told to end", how: "The Terminal command that drove the task before this one was told to end while it worked." },
-  process_died: { after: "its Terminal command stopped suddenly", how: "The Terminal command that drove the task before this one stopped suddenly while it worked." },
-  blocked: { after: "it was blocked", how: "The task before this one was blocked." },
-  failed: { after: "it failed", how: "The task before this one failed." },
-  continued: { after: "you said to continue", how: "You said to continue the task before this one." },
+  daemon_restarted: { after: t("timeline.resumedAfterRestart"), how: t("timeline.cutRestartHow") },
+  daemon_shutdown: { after: t("timeline.resumedAfterShutdown"), how: t("timeline.cutShutdownHow") },
+  process_ended: { after: t("timeline.resumedAfterProcessEnded"), how: t("timeline.cutProcessEndedHow") },
+  process_died: { after: t("timeline.resumedAfterProcessDied"), how: t("timeline.cutProcessDiedHow") },
+  blocked: { after: t("timeline.resumedAfterBlocked"), how: t("timeline.cutBlockedHow") },
+  failed: { after: t("timeline.resumedAfterFailed"), how: t("timeline.cutFailedHow") },
+  continued: { after: t("timeline.resumedAfterContinued"), how: t("timeline.cutContinuedHow") },
 };
 
 /** One call of the step a resumed run was in, as "what it did: how it ended". */
 function callEnd(call) {
   const end = `${toolWords(call.tool)}: ${CALL_ENDS[call.end] ?? call.end}`;
-  return call.end === "cut_off" && !call.repeatable ? `${end} (it may have changed something)` : end;
+  return call.end === "cut_off" && !call.repeatable ? t("timeline.callMayHaveChanged", { end }) : end;
 }
 
 /** What a run spent of each of its limits that is set (agent/limits.py), e.g. "61.2 of 60 minutes and 512k of 500k tokens". */
 function limitSpent(data) {
-  const parts = [];
-  if (data.max_minutes > 0) {
-    parts.push(`${(data.seconds / 60).toFixed(1)} of ${data.max_minutes} minutes`);
-  }
-  if (data.max_tokens > 0) {
-    parts.push(`${compact(data.tokens)} of ${compact(data.max_tokens)} usage`);
-  }
-  return parts.join(" and ");
+  const minutes = data.max_minutes > 0 ? t("timeline.limitMinutes", { spent: (data.seconds / 60).toFixed(1), max: data.max_minutes }) : "";
+  const usage = data.max_tokens > 0 ? t("timeline.limitUsage", { spent: compact(data.tokens), max: compact(data.max_tokens) }) : "";
+  return minutes !== "" && usage !== "" ? t("timeline.limitBoth", { minutes, usage }) : `${minutes}${usage}`;
 }
 
 /** The one line a live group shows for the call that ran last, in its row's words (item 402): the tool's name goes
@@ -273,7 +287,7 @@ function describeCall(tool, args) {
  * before and after it where the event says them (an event of before item 312 does not). */
 function compactionLine(data) {
   const sized = typeof data.tokens_before === "number" && typeof data.tokens_after === "number";
-  const text = sized ? `Older part of the chat summed up: ${compact(data.tokens_before)} → ${compact(data.tokens_after)}` : "Older part of the chat summed up";
+  const text = sized ? t("timeline.compactedSized", { before: compact(data.tokens_before), after: compact(data.tokens_after) }) : t("timeline.compacted");
   return el("div", { class: "compaction-line" }, icon("minimize"), el("span", null, text));
 }
 
@@ -330,9 +344,12 @@ function paintGroup(group) {
   // it, and while it runs, how much of it is behind it.
   const took = duration(Math.max(group.end - group.start, group.longest));
   const words = flowWords(group.kinds);
-  setText(group.title, live ? "Working…" : words === "" ? `Worked for ${took}` : words);
-  setText(group.count, live ? (words === "" ? "" : `${words[0].toLowerCase()}${words.slice(1)} so far`) : words === "" ? "" : took);
-  const troubles = [group.failedCalls > 0 ? `${group.failedCalls} failed` : "", group.cutCalls > 0 ? `${group.cutCalls} cut off` : ""];
+  setText(group.title, live ? t("timeline.working") : words === "" ? t("timeline.workedFor", { took }) : words);
+  setText(group.count, live ? (words === "" ? "" : t("timeline.soFar", { words: `${words[0].toLocaleLowerCase(uiLocale())}${words.slice(1)}` })) : words === "" ? "" : took);
+  const troubles = [
+    group.failedCalls > 0 ? t("timeline.callsFailed", { count: group.failedCalls }) : "",
+    group.cutCalls > 0 ? t("timeline.callsCutOff", { count: group.cutCalls }) : "",
+  ];
   group.failed.hidden = group.failedCalls === 0 && group.cutCalls === 0;
   setText(group.failed, troubles.filter((text) => text !== "").join(" · "));
   group.latest.hidden = !live;
@@ -515,7 +532,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     const live = helpers.some((helper) => helper.ended === null);
     const began = Math.min(...helpers.map((helper) => helper.began));
     const ended = live ? now : Math.max(...helpers.map((helper) => helper.ended));
-    setText(flock.group.title, plural(helpers.length, "helper", "helpers"));
+    setText(flock.group.title, tCount(helpers.length, "timeline.helperOne", "timeline.helperMany"));
     setText(flock.group.state, flockState(helpers.map((helper) => helper.status)));
     flock.group.state.classList.toggle("bad", !live && helpers.some((helper) => helper.status === "failed"));
     setText(flock.group.time, duration(Math.max(ended - began, 0)));
@@ -673,7 +690,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     if (agentName === null) {
       parent.helpers += 1;
     }
-    const name = agentName ?? `Helper ${parent.helpers}`;
+    const name = agentName ?? t("timeline.helperNamed", { number: parent.helpers });
     // A run of an agent (item 87, a message to it) wears the agent's face; any other delegated run its own.
     const face = actorFace(data.agent_id ?? runId, "working", null);
     const status = el("span", { role: "img" });
@@ -681,11 +698,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // The mode and, once it starts, the model of the delegated run: for a screen reader; the row shows none of it.
     const meta = el("span", { class: "visually-hidden" }, data.mode ?? "task");
     // The last line of the delegated run: its step and tool, then how it ended and how many steps it took.
-    const progress = el("span", { class: "child-last small muted meta-facts child-progress" }, el("span", null, "starting"));
+    const progress = el("span", { class: "child-last small muted meta-facts child-progress" }, el("span", null, STARTING));
     const time = el("span", { class: "child-time" });
     const open = el(
       "a",
-      { class: "child-open", href: `#/runs/${runId}`, title: "Open the helper's own page", "aria-label": "Open the helper's task" },
+      { class: "child-open", href: `#/runs/${runId}`, title: t("timeline.helperPage"), "aria-label": t("timeline.helperTask") },
       icon("external"),
     );
     open.addEventListener("click", (event) => event.stopPropagation());
@@ -696,7 +713,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       "summary",
       { class: "child-row" },
       el("span", { class: "child-face" }, face, status),
-      el("span", { class: "visually-hidden" }, "Helper:"),
+      el("span", { class: "visually-hidden" }, t("timeline.helperLabel")),
       el(
         "span",
         { class: "child-main" },
@@ -742,7 +759,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     };
     card.attach(summary, helper, () => actorFace(data.agent_id ?? runId, faceState(helper.status), null));
     // `line`: the facts its last line shows (see paintChild); `showSteps()` puts the run's steps in the row.
-    const panel = { node, face, status, meta, progress, line: "starting", time, steps: 0, helper, flock: null, showSteps };
+    const panel = { node, face, status, meta, progress, line: STARTING, time, steps: 0, helper, flock: null, showSteps };
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
     // The agent the run is of, by its name (item 668): its answer stands in the parent's conversation as its message.
     scope.agentName = agentName;
@@ -777,12 +794,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       names.push({ name: child.agentName, id: child.actorId });
     }
     const said = names.flatMap((each, index) => [
-      index === 0 ? null : index === names.length - 1 ? " and " : ", ",
+      index === 0 ? null : index === names.length - 1 ? t("timeline.namesAnd") : ", ",
       el("span", { class: "agent-said-who" }, actorFace(each.id, "idle", null), each.name),
     ]);
     const body = block.querySelector(".agent-said-body");
     const count = body.childElementCount + 1;
-    block.querySelector(".agent-said-names").replaceChildren(el("span", null, count === 1 ? "Message from" : "Messages from"), " ", ...said.filter((part) => part !== null));
+    block.querySelector(".agent-said-names").replaceChildren(el("span", null, count === 1 ? t("timeline.messageFrom") : t("timeline.messagesFrom")), " ", ...said.filter((part) => part !== null));
     setText(block.querySelector(".agent-said-count"), count === 1 ? "" : String(count));
     const text = result.trim();
     const cut = text.length > AGENT_SAID_CHARS;
@@ -792,7 +809,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         { class: "agent-message" },
         el("div", { class: "agent-message-name" }, actorFace(child.actorId, "idle", null), child.agentName),
         prose(cut ? `${text.slice(0, AGENT_SAID_CHARS).trimEnd()}…` : text),
-        cut ? el("a", { class: "agent-message-more", href: `#/runs/${child.runId}` }, "Read it all") : null,
+        cut ? el("a", { class: "agent-message-more", href: `#/runs/${child.runId}` }, t("timeline.readItAll")) : null,
       ),
     );
   }
@@ -824,7 +841,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // Its last line is the start of its answer (item 245), after how it ended unless it is done;
     // a run with no answer says how it ended and in how many steps.
     const answer = clip(plainLine(result), PREVIEW_CHARS);
-    const facts = answer === "" ? [status, plural(steps, "step", "steps")] : status === "done" ? [answer] : [status, answer];
+    const said = STATUS_WORDS[status] ?? status;
+    const facts = answer === "" ? [said, tCount(steps, "timeline.stepOne", "timeline.stepMany")] : status === "done" ? [answer] : [said, answer];
     paintChild(scope, ts, facts);
     liveChildren.delete(scope);
     paintFlock(scope.panel.flock, ts);
@@ -859,7 +877,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         endChild(scope, run.status, run.steps, run.finished_at, run.result);
       } else if (run.steps > scope.panel.steps) {
         scope.panel.steps = run.steps;
-        paintChild(scope, now, [`step ${run.steps}`]);
+        paintChild(scope, now, [t("timeline.stepAt", { step: run.steps })]);
       }
     }
   }
@@ -888,7 +906,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
    * takes it in (`groupFor`); a group that ends before a call of the step comes leaves it out (`liftThought`).
    */
   function startThought(scope, step) {
-    const label = el("span", { class: "thought-label" }, "Thinking…");
+    const label = el("span", { class: "thought-label" }, THINKING);
     const preview = el("span", { class: "tool-sum thought-preview" });
     const text = el("div", { class: "thought-text" });
     const head = el(
@@ -905,7 +923,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // `line` is what the group said of its last call before: a folded group says that the model thinks until it is done.
     scope.thought = { node, label, preview, text, step, start: "", live: true, settled: false, group, line: group === null ? "" : group.last };
     if (group !== null) {
-      group.last = "Thinking…";
+      group.last = THINKING;
       paintGroup(group);
     }
     return scope.thought;
@@ -913,7 +931,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
   /** The group the thought sits in says what it said of its last call again, not that the model thinks. */
   function restoreLine(thought) {
-    if (thought.group !== null && thought.group.last === "Thinking…") {
+    if (thought.group !== null && thought.group.last === THINKING) {
       thought.group.last = thought.line;
       paintGroup(thought.group);
     }
@@ -941,7 +959,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     } else if (!thought.live) {
       thought.live = true;
       thought.node.dataset.live = "true";
-      thought.label.textContent = "Thinking…";
+      thought.label.textContent = THINKING;
     }
     thought.text.append(piece);
     if (thought.start.length < PREVIEW_CHARS) {
@@ -956,7 +974,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     if (thought?.live) {
       thought.live = false;
       thought.node.dataset.live = "false";
-      thought.label.textContent = "Thought";
+      thought.label.textContent = t("timeline.thought");
       restoreLine(thought);
     }
   }
@@ -1084,7 +1102,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         // A turn that calls a tool has its line painted by its first call, so the tool's name does not go and come back
         // at every step (item 310). The row of a run that ended keeps how it ended (item 734).
         if (atWork(scope) && !data.tool_calls.some((name) => !QUIET_TOOLS.has(name))) {
-          paintChild(scope, record.ts, [`step ${scope.panel.steps}`]);
+          paintChild(scope, record.ts, [t("timeline.stepAt", { step: scope.panel.steps })]);
         }
       }
       const bubble = scope.live !== null && scope.live.step === data.step ? scope.live : null;
@@ -1137,7 +1155,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       target.body.replaceWith(prose(data.text));
       scope.replies.push({ node: target.node, text: data.text, step: data.step });
       if (!ORDINARY_ENDS.has(data.finish)) {
-        target.node.append(el("div", { class: "small muted" }, `This message ended early: ${data.finish}`));
+        target.node.append(el("div", { class: "small muted" }, t("timeline.endedEarly", { finish: data.finish })));
       }
       // The reactions on what the page's own run said in a step (item 586): the words are in the thread, the key is the step.
       if (reactions !== null && scope.runId === rootRunId) {
@@ -1207,7 +1225,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       }
       if (atWork(scope)) {
         // The tool in the words the steps use ("Write file", "Web Research · Web scrape").
-        paintChild(scope, record.ts, [`step ${scope.panel.steps}`, toolWords(data.tool)]);
+        paintChild(scope, record.ts, [t("timeline.stepAt", { step: scope.panel.steps }), toolWords(data.tool)]);
         scope.panel.helper.action = describeCall(data.tool, data.args);
         scope.panel.helper.calls += 1;
       }
@@ -1299,11 +1317,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     question_left(scope, record) {
       const data = record.data;
       if (typeof data.kept_until === "number") {
-        const kept = data.severity === "handoff" ? "Kept for you" : "Kept for you to allow";
-        note(scope, record.ts, "hand", `${kept}: ${clip(data.summary, 300)}. Nobody answered in time, so Dot went on without it`, "warn");
+        const summary = clip(data.summary, 300);
+        note(scope, record.ts, "hand", data.severity === "handoff" ? t("timeline.keptHandoff", { summary }) : t("timeline.keptAllow", { summary }), "warn");
       } else {
         const question = typeof data.args.question === "string" ? data.args.question : data.summary;
-        note(scope, record.ts, "help", `Dot asked you “${clip(question, 300)}” and went on without the answer`, "warn");
+        note(scope, record.ts, "help", t("timeline.askedWentOn", { question: clip(question, 300) }), "warn");
       }
       if (scope.runId === rootRunId) {
         onQuestionLeft();
@@ -1353,7 +1371,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       if (!denied && settingValue(AUTO_LINES) === "hidden") {
         return;
       }
-      const verdict = permit ? "You allowed it earlier" : chatPermit ? "You allowed this kind in this chat" : denied ? "The reviewer said no" : "The reviewer approved";
+      const verdict = permit
+        ? t("timeline.autoPermit")
+        : chatPermit
+          ? t("timeline.autoChatPermit")
+          : denied
+            ? t("timeline.autoDenied")
+            : t("timeline.autoApproved");
       const said = data.note === "" || data.summary.endsWith(data.note);
       const reason = said ? "" : ` — ${clip(data.note, 240)}`;
       const text = `${verdict}: ${clip(data.summary, 200)}${reason}`;
@@ -1446,8 +1470,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       }
       const done = steps.filter((step) => step.status === "done").length;
       const failed = steps.filter((step) => step.status === "failed").length;
-      const failedText = failed > 0 ? `, ${failed} failed` : "";
-      note(scope, record.ts, "list", `Plan: ${done} of ${steps.length} steps done${failedText}`, "");
+      const counts = { done, total: steps.length, failed };
+      note(scope, record.ts, "list", failed > 0 ? t("timeline.planFailed", counts) : t("timeline.plan", counts), "");
     },
 
     // Dot was asked to close its plan's open steps before it finished: a note of the machinery, which the plan's own
@@ -1459,26 +1483,25 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // to the side panel, not the conversation (item 1117, as 852).
     finish_after_failure(scope, record) {
       const calls = record.data.calls.map(toolWords).join(", ");
-      setupLine(scope, "correction", "a correction", "list", `Dot wanted to finish in the same reply as a step that did not work (${calls}) and was asked to read its result first`, "warn");
+      setupLine(scope, "correction", t("timeline.correction"), "list", t("timeline.finishAfterFailure", { calls }), "warn");
     },
 
     // A session of a campaign wanted to end while the campaign had no targets: it was sent back once to record them.
     campaign_targets_reminder(scope, _record) {
-      setupLine(scope, "correction", "a correction", "target", "Dot wanted to end the session before the campaign had targets and was asked to record them first", "warn");
+      setupLine(scope, "correction", t("timeline.correction"), "target", t("timeline.campaignTargets"), "warn");
     },
 
     // The run reached a limit of [agent] run_max_minutes or run_max_tokens: it was told to finish, and its next reply ends it.
     limit_reached(scope, record) {
-      note(scope, record.ts, "clock", `The task reached its limit (${limitSpent(record.data)}) and was told to finish now`, "warn");
+      note(scope, record.ts, "clock", t("timeline.limitReached", { spent: limitSpent(record.data) }), "warn");
     },
 
     // The final answer named paths that do not exist and that the run never touched ([agent] verify_answer_paths): the
     // run was sent back once to create them or to correct the answer.
     answer_paths(scope, record) {
       const missing = record.data.missing;
-      const noun = missing.length === 1 ? "a file or folder" : `${missing.length} files or folders`;
       const listed = clip(missing.join(", "), 300);
-      setupLine(scope, "correction", "a correction", "file", `Dot's answer named ${noun} that do not exist (${listed}) and was asked to correct it`, "warn");
+      setupLine(scope, "correction", t("timeline.correction"), "file", tCount(missing.length, "timeline.answerPathsOne", "timeline.answerPathsMany", { listed }), "warn");
     },
 
     // The run goes on from where the run before it was cut off ([agent] resume, Continue or dotx resume): a line with a
@@ -1486,25 +1509,25 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // the step it was in ended, and the way to that run.
     resumed(scope, record) {
       const data = record.data;
-      const cutOff = CUT_OFFS[data.cut_off] ?? { after: data.cut_off, how: String(data.cut_off) };
+      const cutOff = CUT_OFFS[data.cut_off] ?? { after: t("timeline.resumedAfter", { after: data.cut_off }), how: String(data.cut_off) };
       const restarted = data.automatic && (data.cut_off === "daemon_restarted" || data.cut_off === "daemon_shutdown");
       const head = el(
         "summary",
         { class: "tool-head" },
         el("span", { class: "tool-state restart-mark" }, icon("bolt")),
-        el("span", { class: "restart-label" }, restarted ? "Dot restarted and resumed this turn" : `Resumed this turn after ${cutOff.after}`),
+        el("span", { class: "restart-label" }, restarted ? t("timeline.restartedResumed") : cutOff.after),
         el("span", { class: "chev" }, icon("chevron")),
       );
       const calls =
         data.calls.length === 0
           ? null
-          : el("div", null, el("h4", null, "Its last step"), el("ul", { class: "restart-calls" }, ...data.calls.map((call) => el("li", null, callEnd(call)))));
+          : el("div", null, el("h4", null, t("timeline.lastStep")), el("ul", { class: "restart-calls" }, ...data.calls.map((call) => el("li", null, callEnd(call)))));
       const body = el(
         "div",
         { class: "tool-body restart-body" },
-        el("p", null, `${cutOff.how} ${data.automatic ? "Dot went on with it on its own when it started again." : "It was resumed by hand."}`),
+        el("p", null, `${cutOff.how} ${data.automatic ? t("timeline.resumedOnItsOwn") : t("timeline.resumedByHand")}`),
         calls,
-        el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, "Open the task it continues"),
+        el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, t("timeline.openContinued")),
       );
       place(scope, el("details", { class: "restart" }, head, body), record.ts);
     },
@@ -1525,22 +1548,25 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
           summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null,
         });
       }
-      const output = `step results up to ${compact(data.tool_output_chars)} characters`;
-      const budget = `limit ${compact(data.context_tokens)}`;
+      const output = t("timeline.stepOutput", { chars: compact(data.tool_output_chars) });
+      const limit = compact(data.context_tokens);
+      const budget = t("timeline.budgetShort", { limit });
       if (data.cut_to_window && chosen !== null) {
-        setupLine(scope, "budget", budget, "sliders", `Chat size limit ${compact(data.context_tokens)}: the ${compact(chosen)} chosen for the model in Settings, cut to fit the ${compact(data.window)} the model can take in; ${output}`, "");
+        setupLine(scope, "budget", budget, "sliders", t("timeline.budgetChosenCut", { limit, chosen: compact(chosen), window: compact(data.window), output }), "");
       } else if (data.cut_to_window) {
-        setupLine(scope, "budget", budget, "sliders", `Chat size limit ${compact(data.context_tokens)}, to fit the ${compact(data.window)} the model can take in; ${output}`, "");
+        setupLine(scope, "budget", budget, "sliders", t("timeline.budgetCut", { limit, window: compact(data.window), output }), "");
       } else if (chosen !== null) {
-        setupLine(scope, "budget", budget, "sliders", `Chat size limit ${compact(data.context_tokens)}, the size chosen for the model in Settings; ${output}`, "");
+        setupLine(scope, "budget", budget, "sliders", t("timeline.budgetChosen", { limit, output }), "");
       }
       if (data.reminder_every !== null) {
-        setupLine(scope, "cadence", `goal every ${data.reminder_every} steps`, "target", `The goal is repeated every ${data.reminder_every} steps: ${data.reason}`, "");
+        const every = { count: data.reminder_every };
+        setupLine(scope, "cadence", t("timeline.cadenceShort", every), "target", t("timeline.cadence", { ...every, reason: data.reason }), "");
       }
     },
 
     reminder(scope, record) {
-      setupLine(scope, "reminder", `goal at step ${record.data.step}`, "target", `Reminded of the goal at step ${record.data.step}`, "");
+      const at = { step: record.data.step };
+      setupLine(scope, "reminder", t("timeline.reminderShort", at), "target", t("timeline.reminder", at), "");
     },
 
     // The tool groups of a run whose tools come in groups ([agent] tool_surface): the ones it starts with, then each
@@ -1548,11 +1574,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     tool_groups(scope, record) {
       const data = record.data;
       if (data.step === 0) {
-        const off = data.off.length === 0 ? "" : `; ${data.off.join(", ")} off until the task needs them`;
-        setupLine(scope, "tools", "actions by group", "layers", `Actions offered in groups: ${data.on.join(", ")} on${off} (${data.reason})`, "");
+        const groups = { on: data.on.join(", "), off: data.off.join(", "), reason: data.reason };
+        const text = data.off.length === 0 ? t("timeline.groupsOn", groups) : t("timeline.groupsOnOff", groups);
+        setupLine(scope, "tools", t("timeline.groupsShort"), "layers", text, "");
       } else {
-        const noun = data.turned_on.length === 1 ? "group" : "groups";
-        setupLine(scope, "tools", `${data.turned_on.join(", ")} on`, "layers", `Turned on the action ${noun} ${data.turned_on.join(", ")} at step ${data.step}`, "");
+        const names = data.turned_on.join(", ");
+        const text = tCount(data.turned_on.length, "timeline.turnedOnOne", "timeline.turnedOnMany", { names, step: data.step });
+        setupLine(scope, "tools", t("timeline.turnedOnShort", { names }), "layers", text, "");
       }
     },
 
@@ -1564,26 +1592,27 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       if (data.live !== true && typeof data.site !== "string" && typeof data.tool !== "string" && fresh === 0) {
         return;
       }
-      const count = plural(data.ids.length, "memory", "memories");
-      const tokens = typeof data.tokens === "number" ? `, about ${plural(Math.round(data.tokens * 0.75), "word", "words")}` : "";
-      const newer = fresh < data.ids.length ? ` (${fresh} new)` : "";
+      const count = tCount(data.ids.length, "timeline.memoryOne", "timeline.memoryMany");
+      const words = typeof data.tokens === "number" ? tCount(Math.round(data.tokens * 0.75), "timeline.wordOne", "timeline.wordMany") : "";
+      const tokens = words === "" ? "" : `, ${t("timeline.memoriesAbout", { words })}`;
+      const newer = fresh < data.ids.length ? ` ${t("timeline.memoriesNew", { count: fresh })}` : "";
       // Item 308: the lessons of a site the run just reached say where they were learned; item 1111: those of a tool
       // that failed, which tool.
       const text =
         data.live === true
-          ? `Picked up ${count} saved while the task worked`
+          ? t("timeline.memoriesLive", { memories: count })
           : typeof data.site === "string"
-            ? `Recalled ${count} learned on ${data.site}`
+            ? t("timeline.memoriesSite", { memories: count, site: data.site })
             : typeof data.tool === "string"
-              ? `Recalled ${count} learned about ${data.tool} as it failed`
-              : `Recalled ${count}${newer}${tokens}`;
+              ? t("timeline.memoriesTool", { memories: count, tool: data.tool })
+              : t("timeline.memoriesRecalled", { memories: `${count}${newer}${tokens}` });
       const short =
         data.live === true
-          ? `${count} picked up`
+          ? t("timeline.memoriesLiveShort", { memories: count })
           : typeof data.site === "string"
-            ? `${count} of ${data.site}`
+            ? t("timeline.memoriesSiteShort", { memories: count, site: data.site })
             : typeof data.tool === "string"
-              ? `${count} about ${data.tool}`
+              ? t("timeline.memoriesToolShort", { memories: count, tool: data.tool })
               : `${count}${newer}`;
       setupLine(scope, "memories", short, "database", text, "");
     },
@@ -1591,8 +1620,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // The run's start found its notes or its skills by their words alone: the embedding service failed (item 256).
     embedding_failed(scope, record) {
       const skills = record.data.purpose === "skills";
-      const what = skills ? "Skills were listed" : "Notes were recalled";
-      setupLine(scope, "words", skills ? "skills" : "notes", "database", `${what} by their words alone: the search by meaning did not work.`, "warn", clip(record.data.error, 240));
+      // The short words stay as they are: setup.js says them in an English sentence of its own ("notes and skills found
+      // by their words alone").
+      const text = skills ? t("timeline.skillsByWords") : t("timeline.notesByWords");
+      setupLine(scope, "words", skills ? "skills" : "notes", "database", text, "warn", clip(record.data.error, 240));
     },
 
     // A compaction is a quiet line across the conversation where it happened, with the size of the context before and
@@ -1633,12 +1664,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     },
 
     aside_answer(scope, record) {
-      const head = el("div", { class: "aside-head" }, icon("help"), el("span", null, `Side answer by ${record.data.model}. The task did not see it`));
+      const head = el("div", { class: "aside-head" }, icon("help"), el("span", null, t("timeline.sideAnswer", { model: record.data.model })));
       place(scope, el("div", { class: "aside-answer" }, head, prose(record.data.text)), record.ts);
     },
 
     aside_failed(scope, record) {
-      note(scope, record.ts, "alert", `The side question got no answer from ${record.data.model}.`, "bad", String(record.data.error));
+      note(scope, record.ts, "alert", t("timeline.sideFailed", { model: record.data.model }), "bad", String(record.data.error));
     },
 
     // The run's model could not answer (`reason`: a spent quota or rate, a refused or missing key, a refused access),
@@ -1646,7 +1677,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // of a delegated run, names the new model.
     model_switched(scope, record) {
       const data = record.data;
-      note(scope, record.ts, "refresh", `${data.from} cannot answer (${data.reason}); Dot goes on with ${data.to}`, "warn");
+      note(scope, record.ts, "refresh", t("timeline.modelSwitched", { from: data.from, reason: data.reason, to: data.to }), "warn");
       if (scope.runId === rootRunId) {
         onRunStatus({ status: "running", model: data.to, endedAt: null });
         return;
@@ -1667,78 +1698,80 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const data = record.data;
       const wait = waitNote(scope, record.ts);
       wait.tries += 1;
-      const tried = wait.tries === 1 ? "" : `tried ${wait.tries} times; `;
-      const until = `until ${clock(data.until)}`;
+      const until = clock(data.until);
       let words;
       if (typeof data.offline === "string") {
-        words = `No connection to ${data.offline}; Dot asks ${data.model} again as soon as it connects, ${until}.`;
+        words = t("timeline.waitOffline", { host: data.offline, model: data.model, until });
       } else {
-        const why = data.spent === undefined || data.spent === null ? "cannot be reached" : `cannot answer (${data.spent})`;
-        words = `${data.model} ${why}; ${tried}Dot asks again at ${clock(record.ts + data.retry_in_s)} and keeps asking ${until}.`;
+        const why =
+          data.spent === undefined || data.spent === null ? t("timeline.waitUnreachable", { model: data.model }) : t("timeline.waitSpent", { model: data.model, spent: data.spent });
+        const times = { why, at: clock(record.ts + data.retry_in_s), until, count: wait.tries };
+        words = wait.tries === 1 ? t("timeline.waitFirst", times) : t("timeline.waitAgain", times);
       }
       wait.text.replaceChildren(...[words, detailsFold(String(data.error))].filter((part) => part !== null));
     },
     model_reconnected(scope, record) {
       const data = record.data;
       waitNote(scope, record.ts).text.replaceChildren(
-        `The connection to ${data.host} is back after ${duration(data.offline_s)}; Dot asks ${data.model} again.`,
+        t("timeline.reconnected", { host: data.host, took: duration(data.offline_s), model: data.model }),
       );
     },
     model_back(scope, record) {
       const data = record.data;
       scope.unreachable = null;
-      note(scope, record.ts, "refresh", `${data.model} answered again after ${duration(data.waited_s)}; Dot goes on`, "");
+      note(scope, record.ts, "refresh", t("timeline.modelBack", { model: data.model, took: duration(data.waited_s) }), "");
     },
 
     // A helper model ([models] helpers) could not answer a question of the run; `until` (seconds) is when it may be
     // asked again, null for a missing key.
     helper_unavailable(scope, record) {
       const data = record.data;
-      const until = data.until === null ? "" : ` until ${dateTime(data.until)}`;
-      note(scope, record.ts, "key", `The helper ${data.model} cannot answer (${data.reason}${until})`, "warn");
+      const facts = { model: data.model, reason: data.reason };
+      const text = data.until === null ? t("timeline.helperDown", facts) : t("timeline.helperDownUntil", { ...facts, until: dateTime(data.until) });
+      note(scope, record.ts, "key", text, "warn");
     },
 
     // The typed judge ([judge]) could not answer (`reason`, `error`); until `until` (seconds) nothing is asked of it and
     // the policy's patterns and the goal checker decide alone.
     judge_unavailable(scope, record) {
       const data = record.data;
-      const text = `The extra checker (TypeSafe) cannot answer (${data.reason}) until ${dateTime(data.until)}. Until then Dot's safety rules and the goal check decide alone.`;
+      const text = t("timeline.judgeDown", { reason: data.reason, until: dateTime(data.until) });
       note(scope, record.ts, "key", text, "warn", String(data.error));
     },
 
     // TypeSafe rejected a request of the typed judge or of judge_items, or answered outside its reference (`error`): an
     // error of the code or the model, logged with the request; nothing is paused.
     judge_error(scope, record) {
-      note(scope, record.ts, "key", "The extra checker (TypeSafe) rejected a request. Dot's log has it.", "warn", String(record.data.error));
+      note(scope, record.ts, "key", t("timeline.judgeError"), "warn", String(record.data.error));
     },
 
     // The user took the browser over (`url`: the tab they got) and the run waits at its next tool call; and gave it
     // back after `held_s` seconds, with a note to the model that the page may have changed.
     takeover(scope, record) {
-      const where = record.data.url ? ` at ${record.data.url}` : "";
-      note(scope, record.ts, "hand", `You took the browser over${where}; Dot waits until you return control.`, "");
+      const text = record.data.url ? t("timeline.takeoverAt", { url: record.data.url }) : t("timeline.takeover");
+      note(scope, record.ts, "hand", text, "");
       onHeld(true);
     },
     handback(scope, record) {
-      note(scope, record.ts, "hand", `You returned control after ${Math.round(record.data.held_s)} s; Dot goes on.`, "");
+      note(scope, record.ts, "hand", t("timeline.handback", { seconds: Math.round(record.data.held_s) }), "");
       onHeld(false);
     },
 
     // The owner held the run with a ✋ (item 586): it waits at its next step for what they write next, or for the ✋ to be
     // taken back, and stops when nobody writes for as long as a hold may last (`[reactions] hold_minutes`).
     reaction_hold(scope, record) {
-      note(scope, record.ts, "hand", "You held the task (✋): it waits for your next message.", "");
+      note(scope, record.ts, "hand", t("timeline.held"), "");
       if (scope.runId === rootRunId) {
         onReactionHold(true);
       }
     },
     reaction_hold_ended(scope, record) {
       const words = {
-        message: "You wrote to the task, and it goes on.",
-        released: "You took the ✋ back, and the task goes on.",
-        lapsed: `Nobody wrote for ${duration(record.data.held_s)}, so the task stopped.`,
+        message: t("timeline.holdMessage"),
+        released: t("timeline.holdReleased"),
+        lapsed: t("timeline.holdLapsed", { took: duration(record.data.held_s) }),
       };
-      note(scope, record.ts, "hand", words[record.data.reason] ?? "The hold is over.", "");
+      note(scope, record.ts, "hand", words[record.data.reason] ?? t("timeline.holdOver"), "");
       if (scope.runId === rootRunId) {
         onReactionHold(false);
       }
@@ -1749,11 +1782,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     step_routed(scope, record) {
       const data = record.data;
       const odds = Object.entries(data.probabilities).map(([option, p]) => `${option} ${p.toFixed(2)}`).join(", ");
-      setupLine(scope, "route", `step ${data.step} on ${data.model}`, "refresh", `Step ${data.step} goes to ${data.model} (${odds})`, "");
+      const routed = { step: data.step, model: data.model };
+      setupLine(scope, "route", t("timeline.routedShort", routed), "refresh", t("timeline.routed", { ...routed, odds }), "");
     },
     step_route_failed(scope, record) {
       const data = record.data;
-      setupLine(scope, "route-back", `step ${data.step} back on the task's own model`, "refresh", `${data.model} could not answer step ${data.step}; asked again on the task's own model.`, "warn", String(data.error));
+      const back = { step: data.step, model: data.model };
+      setupLine(scope, "route-back", t("timeline.routeBackShort", back), "refresh", t("timeline.routeBack", back), "warn", String(data.error));
     },
 
     // A session of a campaign ranked the posts it could answer (`topic`, `weights`, `posts` with their scores, the
@@ -1761,7 +1796,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     posts_ranked(scope, record) {
       const data = record.data;
       const top = data.posts.slice(0, 3).map((post) => `${post.id} ${post.score.toFixed(2)}`).join(", ");
-      note(scope, record.ts, "key", `Ranked ${data.posts.length} posts on “${data.topic}”; the top: ${top}`, "");
+      note(scope, record.ts, "key", t("timeline.postsRanked", { count: data.posts.length, topic: data.topic, top }), "");
     },
 
     // The progress watchdog saw that the run is not getting anywhere (`detail`) and answered with a rung of its ladder
@@ -1772,26 +1807,26 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     stall(scope, record) {
       const data = record.data;
       if (data.action === undefined) {
-        setupLine(scope, "correction", "a correction", "alert", `Dot repeated the same step and was told to change its approach (warning ${data.warnings})`, "warn");
+        setupLine(scope, "correction", t("timeline.correction"), "alert", t("timeline.repeated", { warning: data.warnings }), "warn");
         return;
       }
       const answers = {
-        nudge: "Dot was told to change its approach.",
-        replan: "Its next step may only plan again or finish.",
-        consult: "The reviewer was asked for a second opinion.",
-        ask: "Its next step may only ask you a question or finish.",
-        stop: "The task stops; its result says what it tried.",
+        nudge: t("timeline.stallNudge"),
+        replan: t("timeline.stallReplan"),
+        consult: t("timeline.stallConsult"),
+        ask: t("timeline.stallAsk"),
+        stop: t("timeline.stallStop"),
       };
-      const parts = [`Not getting anywhere: ${clip(data.detail, 300)}`, answers[data.action]];
+      const parts = [t("timeline.stalled", { detail: clip(data.detail, 300) }), answers[data.action]];
       if (data.error !== undefined) {
-        parts.push(`It could not answer (${clip(data.error, 300)}), so the task stops.`);
+        parts.push(t("timeline.stallNoAnswer", { error: clip(data.error, 300) }));
       }
       if (data.diagnosis !== undefined) {
         parts.push(clip(data.diagnosis, 400));
       }
       const steps = data.next_steps ?? [];
       if (steps.length > 0) {
-        parts.push(`Next: ${steps.map((step, index) => `${index + 1}. ${clip(step, 300)}`).join(" ")}`);
+        parts.push(t("timeline.stallNext", { steps: steps.map((step, index) => `${index + 1}. ${clip(step, 300)}`).join(" ") }));
       }
       const ends = data.action === "stop" || data.error !== undefined;
       if (ends) {
@@ -1799,7 +1834,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       } else if (data.action === "ask") {
         note(scope, record.ts, "alert", parts.join(" "), "warn");
       } else {
-        setupLine(scope, "correction", "a correction", "alert", parts.join(" "), "warn");
+        setupLine(scope, "correction", t("timeline.correction"), "alert", parts.join(" "), "warn");
       }
     },
   };

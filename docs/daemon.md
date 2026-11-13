@@ -257,7 +257,9 @@ General › Messages › **Language** chooses the language of Dot's own words in
 screen (English or Türkçe, kept in this browser, English until chosen; it never follows the browser, the model or a
 chat's words, and what you and Dot write stays as it was written; a change draws the page again): the words are in
 `js/lang/en.js` and `js/lang/tr.js`, whose keys `tsc` and `tests/js/i18n.test.js` hold together, and the dates follow
-the language too. The other settings pages are in English yet. The markdown
+the language too. Item 1172 brought the rest of a chat's flow into it: the steps and their group titles, the
+thoughts, the notes and resume lines between them, the tool words of a step's row and the model, mode and Options
+menus. The other settings pages, the run page's own panels and the sidebar's Connect apps are in English yet. The markdown
 in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
