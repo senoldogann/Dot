@@ -218,6 +218,28 @@ def already_shown(what: str) -> str:
     )
 
 
+# Why what a step named to expect could not tell what the step did (item 1164): it showed before the step went, or
+# the batch writes it itself. The step goes all the same, and its line says that its expectation was not looked for.
+TEXT_SHOWN_BEFORE: str = "the page showed those words already before the step"
+ADDRESS_SHOWN_BEFORE: str = "the address held that part already before the step"
+WRITTEN_BY_THE_BATCH: str = "those words are within a text this batch writes, which a page repeats whatever happened"
+
+
+def not_looked_for(why: str) -> str:
+    """What the line of a step says whose expectation could not tell what the step did: it was sent, and what it
+    named was not looked for, so the step is not checked by it. Empty when there is no such reason."""
+    return f"what it expected was not looked for ({why})" if why else ""
+
+
+def gate_lost(index: int) -> str:
+    """Why a batch stops after step ``index`` when what it named to expect could not be looked for and steps follow
+    it: they were to run once that had shown."""
+    return (
+        f"what step {index} expected could not be looked for, so the steps after it were not run: look at the page "
+        "below, then send them"
+    )
+
+
 def url_shows(url: str, part: str) -> bool:
     """Whether the address ``url`` holds ``part`` in its host and path, or anywhere when ``part`` itself names a query
     or a fragment: ``/checkout`` is not shown by ``/login?next=/checkout``."""
