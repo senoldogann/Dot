@@ -272,6 +272,24 @@ Both modes share what follows.
   on: the fields of one form do not wait for each other, and its button waits for a look. Verified says that the page
   showed it, not that a server took it, and a change the page makes later than its turn shows in the next look. The
   call's own `expect` stays what it was, the typed judge's estimate of words the model chose, and is no check.
+
+  A step's line also says what its page sent to its own site while the step ran, and what the server answered (item
+  1158): `its page sent POST https://shop.example/order → 200`. It names the requests that are not reads (a `POST`,
+  `PUT`, `PATCH` or `DELETE` that a form or a script of the page sent; a beacon, whose answer the page never reads, is
+  not one), the first three, each without its query, and only those to the page's own site: the same host, or a name
+  that ends in the same two labels (no list of public suffixes is read, so two names under `co.uk` count as one
+  site). The page is heard from before the step until Dot's own look at what the step did is over, so a request the
+  page makes by itself later, while the step waits for an answer or a sight, is not told as the step's. Dot waits for
+  the answer, 5 s at most for a step and 10 s over the steps of one batch. An answer that has not come is said (`no
+  answer yet`) and the batch stops there: the steps after it would run on a page whose server has not answered, and
+  sending the step again would send it twice. A step that went out and then failed says what its page sent
+  meanwhile, for the same reason. A press on a form's own button after which nothing left the page within half a
+  second says that too (`its form sent nothing to the site within 0.5 s`), which is what was seen and not a failure:
+  a page that keeps its work in itself sends nothing either, and the page below shows which it is. It is not said of
+  a page that holds a socket open, which may have sent its form there, nor of a dialog's form. None of this is a
+  check: an answer of 200 says that the server took a request, not that what the step was for happened, so such a
+  step stays not checked unless something of it was read back or awaited. It needs no word from the model: a click
+  that names nothing it expects is still told by what it sent.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a

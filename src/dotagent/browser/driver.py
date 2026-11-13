@@ -1227,10 +1227,11 @@ async def _read_after(
 @dataclass(frozen=True, slots=True)
 class StepResult:
     """What a step that went through checked of itself (item 1145): ``checks``, and ``note`` for the step's line when a
-    value is never read back."""
+    value is never read back. ``submits`` says that the step clicked the button that sends its form (item 1158)."""
 
     checks: tuple[OutcomeCheck, ...]
     note: str
+    submits: bool = False
 
 
 _NO_CHECK: StepResult = StepResult(checks=(), note="")
@@ -1245,6 +1246,30 @@ _EDITOR_DROPPED: OutcomeCheck = OutcomeCheck(
     evidence="its text did not change",
     reason="the editor did not take the text: its text did not change. Look at the page, then try the step again",
 )
+
+
+# Whether the element a click names is the button that sends its form (item 1158): a button or an input of a form
+# whose type is submit (a button's when it names none) or image. The button of a dialog's form closes the dialog and
+# sends nothing by design, so it is none.
+_SUBMITS_SCRIPT: str = """(element) => {
+  const control = element.closest('button, input');
+  if (!control || !control.form || (control.type !== 'submit' && control.type !== 'image')) return false;
+  const method = control.getAttribute('formmethod') || control.form.getAttribute('method') || '';
+  return method.toLowerCase() !== 'dialog';
+}"""
+
+
+async def _submits_form(locator: Locator) -> bool:
+    """Whether a click on ``locator`` presses the button that sends its form (:data:`_SUBMITS_SCRIPT`), asked before
+    the click. A page that does not say is taken for one whose click sends none: nothing is then said of the form."""
+    try:
+        return (
+            await _asked(locator.evaluate(_SUBMITS_SCRIPT, timeout=_FIELD_PROBE_TIMEOUT_MS), _FIELD_PROBE_TIMEOUT_MS)
+            is True
+        )
+    except (PlaywrightError, TimeoutError) as error:
+        _log_unread(locator, error)
+        return False
 
 
 def _unreadable(condition: str) -> StepResult:
@@ -1615,7 +1640,9 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             timeout_ms = max(timeout_ms - round((time.monotonic() - started) * 1000), _LEAST_PRESS_MS)
         match step.action:
             case "click":
+                submits: bool = await _submits_form(locator)
                 await locator.click(timeout=timeout_ms, force=force)
+                return StepResult(checks=(), note="", submits=submits)
             case "double_click":
                 await locator.dblclick(timeout=timeout_ms, force=force)
             case "right_click":
