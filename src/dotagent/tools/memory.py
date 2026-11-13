@@ -275,10 +275,7 @@ class UpdateArgs(ToolArgs):
         default=None,
         ge=1,
         le=_MOST_VALID_DAYS,
-        description=(
-            "Days the corrected fact stays true, counted from now, for a short-lived one; none keeps the time the note "
-            "had."
-        ),
+        description="Days it stays true from now; none keeps its time.",
     )
 
 
