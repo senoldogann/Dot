@@ -442,8 +442,10 @@ Both modes share what follows.
 - A conversation thread keeps at most `max_tabs` tabs open, and closes the tabs it is done with (item 696): a tab that
   is not its current one once unused for `background_tab_idle_s` (300 s; 0 keeps it), while its run works as well; when
   a run ends, the chat's background tabs, keeping the current one for a message that goes on from it until `tab_idle_s`;
-  and every tab of a chat that no message goes on from when its run ends: a helper's (a delegated run, an agent's) and
-  that of a run nobody watches (a schedule's, a watcher's, Dot's own initiative, a reply; item 1168). `tab_idle_s` is
+  and every tab of a chat that no message goes on from when its run ends: a helper's (a delegated run, an agent's), and
+  one a run nobody watches opened (a schedule's, a watcher's, Dot's own initiative, a reply) once such a run in it ends
+  with no question left (item 1168). Your own chat keeps its current tab whoever ran in it last (a loop of the chat, a
+  reply in it). `tab_idle_s` is
   600 s by default (item 1168). `browser_close_tab` without an index
   closes every tab of the chat but the current one. Only the chat's own tabs are closed: those of a chat at work at the
   same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a link or a page that

@@ -744,7 +744,8 @@ max_tabs = 4
 # not the chat's current one closes once unused for background_tab_idle_s, while its run works as well (item 696; 0
 # keeps it). When a run ends, its chat's background tabs close at once and the current one stays for a message that goes
 # on from it; a chat that no message goes on from closes all of its tabs: a helper's (a delegated run, an agent's) and
-# that of a run nobody watches (a schedule's, a watcher's, Dot's own initiative, a reply; item 1168). Only the chat's
+# one a run nobody watches opened (a schedule's, a watcher's, Dot's own initiative, a reply), once such a run in it ends
+# with no question left (item 1168); your own chat keeps its current tab whoever ran in it last. Only the chat's
 # own tabs are closed, never those of another chat at work at the same time, nor a tab you opened yourself. A tab opened
 # from one of the chat's tabs (a link or a page that opens a new tab) is the chat's, also when you opened it that way.
 tab_idle_s = 600.0

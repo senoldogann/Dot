@@ -360,11 +360,15 @@ def goes_on_from(run: RunRecord, earlier: RunRecord) -> bool:
     )
 
 
-def keeps_current_tab(run: RunRecord, nobody_watched: bool) -> bool:
-    """Whether the chat of ``run``, once it has ended, keeps its current tab for a message that goes on from it (item
-    696): not a helper's chat, which no message continues, nor that of a run nobody watched (a schedule's, a watcher's,
-    Dot's own initiative, a reply, or a helper of one; item 1168), whose tab would only hold Chrome open."""
-    return run.parent_run_id is None and not nobody_watched
+def keeps_current_tab(run: RunRecord, nobody_watched: bool, chat_source: str, status: RunStatus) -> bool:
+    """Whether the chat of ``run``, once it has ended with ``status``, keeps its current tab for a message that goes on
+    from it (item 696). A helper's chat does not: no message continues it. Nor does a chat that a run nobody watches
+    opened (``chat_source``: a schedule's, a watcher's, Dot's own initiative, a reply; item 1168) once such a run in it
+    ends with no question left: its tab would only hold Chrome open. The owner's chat keeps it whoever ran in it last (a
+    loop of the chat, a reply in it), and so does a run that asks, which the answer goes on from."""
+    if run.parent_run_id is not None:
+        return False
+    return not (nobody_watched and chat_source in UNWATCHED_SOURCES and status != "blocked")
 
 
 def stricter_approvals(first: ApprovalMode, second: ApprovalMode) -> ApprovalMode:
@@ -3581,12 +3585,17 @@ class RunManager:
         if recorded and not self._stopping and playbook_case(runtime.config, run, status) is not None:
             self._distilling[run.id] = asyncio.create_task(self._distil(run, status))
         if not self._stopping:
-            # The tabs the run left (item 696): a chat no message goes on from closes them all (a helper's, and one
-            # whose run nobody watched, item 1168), another keeps its current one for a message that goes on from it.
+            # The tabs the run left (item 696): a chat no message goes on from closes them all (a helper's, and one an
+            # unwatched run opened, item 1168), another keeps its current one for a message that goes on from it.
             # Before the queue moves on, so that the chat's next run starts tidy.
-            await runtime.browsers.end_of_run(
-                run.thread_id, keep_current=keeps_current_tab(run, runtime.browsers.is_unattended(run.thread_id))
-            )
+            # A chat deleted once the run's end was stored has no message to go on from: all its tabs close.
+            keep_current: bool = False
+            with contextlib.suppress(NotFoundError):
+                chat: ThreadRecord = await runtime.store.get_thread(run.thread_id)
+                keep_current = keeps_current_tab(
+                    run, runtime.browsers.is_unattended(run.thread_id), chat.source, status
+                )
+            await runtime.browsers.end_of_run(run.thread_id, keep_current=keep_current)
             # And the front of the Mac goes back to the application the run took it from (item 702).
             await runtime.desktop.end_of_run(run.thread_id)
         runtime.browsers.unattended(run.thread_id, False)
