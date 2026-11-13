@@ -7,6 +7,7 @@ import asyncio
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import TypedDict
 
 import pytest
 import pytest_asyncio
@@ -120,12 +121,16 @@ async def chat(runtime: Runtime) -> AsyncIterator[tuple[str, list[RunRecord]]]:
         await manager.shutdown()
 
 
-async def _opened(browser: Browser, address: str, run_id: str, viewport: dict[str, int], phone: bool) -> Page:
-    """The page of the run ``run_id``, signed in, once its earlier turns are drawn and have settled."""
+async def _opened(
+    browser: Browser, address: str, run_id: str, viewport: dict[str, int], phone: bool, errors: list[str]
+) -> Page:
+    """The page of the run ``run_id``, signed in, once its earlier turns are drawn and have settled; what it throws
+    from the start goes into ``errors``."""
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     page: Page = await browser.new_page(
         viewport=viewport, is_mobile=phone, has_touch=phone, color_scheme="light", reduced_motion="reduce"
     )
+    page.on("pageerror", lambda error: errors.append(str(error)))
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
     await page.goto(ui_url(host, port, TOKEN))
     await page.goto(f"{address}/#/runs/{run_id}")
@@ -200,8 +205,7 @@ async def test_far_turns_are_skipped_and_the_chat_keeps_its_height_its_places_it
         for engine in _engines(playwright):
             browser: Browser = await engine.launch()
             try:
-                page: Page = await _opened(browser, address, runs[-1].id, _PHONE if phone else _WIDE, phone)
-                page.on("pageerror", lambda error: errors.append(str(error)))
+                page: Page = await _opened(browser, address, runs[-1].id, _PHONE if phone else _WIDE, phone, errors)
                 history = page.locator(".history")
                 await expect(history).to_have_attribute("data-sized", "", timeout=5000)
                 first = page.locator(".history > .turn").first
@@ -227,11 +231,12 @@ async def test_far_turns_are_skipped_and_the_chat_keeps_its_height_its_places_it
 
 async def test_the_marks_go_to_a_message_of_a_far_turn(chat: tuple[str, list[RunRecord]]) -> None:
     address, runs = chat
+    errors: list[str] = []
     async with async_playwright() as playwright:
         for engine in _engines(playwright):
             browser: Browser = await engine.launch()
             try:
-                page: Page = await _opened(browser, address, runs[-1].id, _WIDE, False)
+                page: Page = await _opened(browser, address, runs[-1].id, _WIDE, False, errors)
                 await expect(page.locator(".history")).to_have_attribute("data-sized", "", timeout=5000)
                 # The mark of the oldest message shows its words and goes to it as when every turn is laid out.
                 await _whole(page)
@@ -242,6 +247,7 @@ async def test_the_marks_go_to_a_message_of_a_far_turn(chat: tuple[str, list[Run
                 await page.context.close()
             finally:
                 await browser.close()
+    assert errors == []
 
 
 # A chat whose earlier turns each said something long on the way and ran a command: their work, read only as each comes
@@ -270,6 +276,16 @@ _SCROLL_UP: str = """(step) => {
   const box = phone ? document.querySelector('.run-thread') : document.scrollingElement;
   box.scrollTop = box.scrollTop - step;
 }"""
+
+
+class _Seen(TypedDict):
+    """The message read (its index among the conversation's, -1 for none in sight), its top, and the box's scroll."""
+
+    index: int
+    top: float | None
+    at: float
+
+
 _TOP_OF: str = "(index) => document.querySelectorAll('.run-thread .bubble.user')[index].getBoundingClientRect().top"
 
 
@@ -335,15 +351,15 @@ async def test_scrolling_up_a_chat_whose_turns_fill_in_keeps_the_message_read_wh
                 opened: int = len(read)
                 moves: list[tuple[int, float, float]] = []
                 for _ in range(40):
-                    seen: dict[str, float] = await page.evaluate(_READ_MESSAGE)
+                    seen: _Seen = await page.evaluate(_READ_MESSAGE)
                     if seen["at"] < _SCROLL_STEP:
                         break
                     await page.evaluate(_SCROLL_UP, _SCROLL_STEP)
                     await page.wait_for_timeout(_FILL_WAIT_MS)
-                    if seen["index"] == -1:
+                    if seen["top"] is None:
                         continue
                     now: float = await page.evaluate(_TOP_OF, seen["index"])
-                    moves.append((int(seen["index"]), seen["top"] + _SCROLL_STEP, now))
+                    moves.append((seen["index"], seen["top"] + _SCROLL_STEP, now))
                 # The turns above those read first filled in as the reader came up to them.
                 assert len(read) > opened, (engine.name, opened, len(read))
                 assert moves != [], engine.name
