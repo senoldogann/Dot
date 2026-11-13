@@ -14,7 +14,7 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Locator, Page
 
 from dotagent.core.errors import DotError
-from dotagent.meetings.types import CaptionSeen, ChatSeen, MeetState, PageBatch
+from dotagent.meetings.types import CaptionSeen, ChatSeen, MeetState, PageBatch, PageTick
 
 MEET_HOST: Final[str] = "meet.google.com"
 _CODE: Final[re.Pattern[str]] = re.compile(r"[a-z]{3}-[a-z]{4}-[a-z]{3}")
@@ -133,6 +133,31 @@ _DRAIN_SCRIPT: Final[str] = """
 }
 """
 
+# One read of the call in one call into the page, as often as Dot reads it (item 1150): whether Leave call, the
+# captions' Turn off toggle and the chat (its message box, or its messages when the host turned writing off) show, and
+# the drain while Dot is in the call. The whole page's text, and the role query of a join button that ``state`` makes,
+# are left for when Leave call is gone.
+_TICK_SCRIPT: Final[str] = (
+    """
+(spec) => {
+  const shown = (sel) => {
+    const el = document.querySelector(sel);
+    return el !== null && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  };
+  const leave = document.querySelector(spec.leave) !== null;
+  return {
+    leave,
+    captions: shown(spec.captions_off),
+    chat: shown(spec.chat_input) || shown(spec.chat_region),
+    // Drained only while Dot is in the call: a page Meet drew anew for its end has no watcher, and is no failure.
+    batch: !leave ? null : ("""
+    + _DRAIN_SCRIPT.strip()
+    + """)(),
+  };
+}
+"""
+)
+
 _READ_SCRIPT: Final[str] = """
 (spec) => ({
   text: document.body ? document.body.innerText : '',
@@ -142,6 +167,8 @@ _READ_SCRIPT: Final[str] = """
 """
 
 _BUFFER_CAP: Final[int] = 500
+# What a read of a page Dot is not in the call on gives: nothing new.
+_NOTHING: Final[PageBatch] = PageBatch(captions=(), vanished=(), chat=(), dropped=0)
 
 
 class MeetPageError(DotError):
@@ -282,9 +309,43 @@ class MeetPage:
             {"captions": SELECTORS["captions_region"], "chat": SELECTORS["chat_region"], "cap": _BUFFER_CAP},
         )
 
+    async def tick(self) -> PageTick:
+        """One quick read of the call: whether Dot is in it, whether the captions and the chat show, and what the page
+        buffered since the last read, emptied (:meth:`drain`)."""
+        raw: object = await self._page.evaluate(
+            _TICK_SCRIPT,
+            {
+                "leave": SELECTORS["leave"],
+                "captions_off": SELECTORS["captions_turn_off"],
+                "chat_input": SELECTORS["chat_input"],
+                "chat_region": SELECTORS["chat_region"],
+            },
+        )
+        if not isinstance(raw, dict):
+            raise MeetPageError("The page gave no reading of the call.", {"url": self._page.url})
+        return PageTick(
+            in_call=raw.get("leave") is True,
+            captions_on=raw.get("captions") is True,
+            chat_open=raw.get("chat") is True,
+            batch=_NOTHING if raw.get("leave") is not True else self._batch(raw.get("batch")),
+        )
+
+    async def open_chat(self) -> None:
+        """Open the call's chat, whose messages are on the page only while it is open."""
+        try:
+            await self._page.locator(SELECTORS["chat_open"]).first.click(timeout=_STEP_MS)
+        except PlaywrightError as error:
+            raise MeetPageError(
+                "Dot could not open the meeting's chat.",
+                {"url": self._page.url, "looked_for": [SELECTORS["chat_open"]], "error": str(error)},
+            ) from error
+
     async def drain(self) -> PageBatch:
         """Return what the page buffered since the last drain, and empty the buffer."""
-        raw: object = await self._page.evaluate(_DRAIN_SCRIPT)
+        return self._batch(await self._page.evaluate(_DRAIN_SCRIPT))
+
+    def _batch(self, raw: object) -> PageBatch:
+        """What a drain returned, read; none is a page whose watcher is gone."""
         if not isinstance(raw, dict):
             raise MeetPageError(
                 "The page has no watcher: watch() was not called, or the page was reloaded.",

@@ -63,7 +63,8 @@ _SYSTEM: str = (
     "they say. Write with the tool {tool}: decisions made, actions someone took on (who, what, by when if said), "
     "questions left open, and each moment {owner} was named or asked something. Use the call's own words, short, in "
     "the language they were said in. Leave a list empty when the call holds nothing for it. Names are as the call "
-    "showed them and may be wrong; never say that {owner} said something unless the line is named {owner}."
+    "showed them and may be wrong; never say that {owner} said something unless the line is named {owner}. Lines "
+    "marked [dot] are Dot's own answers in the call: never a decision or anyone's action."
 )
 
 
