@@ -12,7 +12,7 @@
 // finds its chats as it finds the others. Dot's own work does too (item 822): the chats of On its own and of the
 // schedules stand folded at the foot, so that the days hold the owner's own chats.
 
-import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
+import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, sharedGet, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, setText, workingFor } from "./dom.js";
 import { serviceFailure, serviceWords } from "./errors.js";
 import { t, tCount } from "./i18n.js";
@@ -686,7 +686,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const mine = ++facesTicket;
     let found;
     try {
-      found = await api.get("/agents");
+      found = await sharedGet("/agents");
     } catch (error) {
       console.warn("the agents could not be read for their faces in the sidebar", error);
       return;
@@ -1346,7 +1346,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const ticket = resolveTicket;
     let detail;
     try {
-      detail = await api.get(`/runs/${runId}`);
+      // The run's page reads it at the same moment: one request for both (item 1169).
+      detail = await sharedGet(`/runs/${runId}`);
     } catch (error) {
       console.warn("the chat of the open run could not be looked up", error);
       return;

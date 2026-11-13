@@ -40,7 +40,7 @@ class LoopState(FrozenModel):
 async def remember_loop_state(bus: EventBus, run_id: str, state: LoopState) -> None:
     """Store ``state`` for ``run_id``. A store that refuses is logged: the step goes on, and the next one tries."""
     # The ledger keeps each call's arguments as the model sent them: masked as a call's own event masks them (item 551),
-    # since the snapshot is an event the store, the API and the page read.
+    # since the snapshot is an event of the store (the pages' reads leave it out, item 1170).
     known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     masked: JsonValue = redact_json(state.model_dump(mode="json"), known)
     data: JsonObject = masked if isinstance(masked, dict) else {}

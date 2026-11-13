@@ -254,6 +254,46 @@ async def test_the_marks_go_to_a_message_of_a_far_turn(chat: tuple[str, list[Run
     assert errors == []
 
 
+# The window a page is turned to (a phone upright to on its side) or narrowed to, from the size it opened at.
+_TURNED: dict[str, int] = {"width": 844, "height": 390}
+_NARROWED: dict[str, int] = {"width": 800, "height": 900}
+
+
+@pytest.mark.parametrize("phone", [True, False], ids=["phone-turned", "wide-narrowed"])
+async def test_a_window_turned_or_narrowed_keeps_the_far_turns_as_tall_as_they_are_laid_out(
+    chat: tuple[str, list[RunRecord]], phone: bool
+) -> None:
+    """Item 1171: a skipped turn keeps the height it was last laid out at, which is of the width it had. A window turned
+    or narrowed made the far turns as tall as at the old width until each was seen: the conversation's height and each
+    message's place were off, and a mark went where the message no longer was."""
+    address, runs = chat
+    errors: list[str] = []
+    async with async_playwright() as playwright:
+        for engine in _engines(playwright):
+            browser: Browser = await engine.launch()
+            try:
+                page: Page = await _opened(browser, address, runs[-1].id, _PHONE if phone else _WIDE, phone, errors)
+                await expect(page.locator(".history")).to_have_attribute("data-sized", "", timeout=5000)
+                await page.set_viewport_size(_TURNED if phone else _NARROWED)
+                await page.wait_for_timeout(_SETTLE_MS)
+                await _at_foot(page)
+                await expect(page.locator(".history")).to_have_attribute("data-sized", "", timeout=5000)
+                skipped: dict[str, object] = await page.evaluate(_PLACES)
+                await _whole(page)
+                whole: dict[str, object] = await page.evaluate(_PLACES)
+                assert whole["height"] == skipped["height"], (engine.name, whole["height"], skipped["height"])
+                assert whole["tops"] == skipped["tops"], engine.name
+                if not phone:
+                    whole_top: float = await _jumped_at(page)
+                    await _skipping(page)
+                    skipped_top: float = await _jumped_at(page)
+                    assert abs(skipped_top - whole_top) <= 2, (engine.name, skipped_top, whole_top)
+                await page.context.close()
+            finally:
+                await browser.close()
+    assert errors == []
+
+
 # A chat whose earlier turns each said something long on the way and ran a command: their work, read only as each comes
 # near what is seen (history.js, item 708), makes them grow while the reader scrolls up.
 _FILLING_TURNS: int = 24

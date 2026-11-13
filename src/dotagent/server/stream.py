@@ -18,6 +18,7 @@ from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.learning_health import LEARNING_STALLED_EVENT
 from dotagent.agent.lessons import LESSON_EVENTS
 from dotagent.agent.loop import browser_of
+from dotagent.agent.loop_state import LOOP_STATE_EVENT
 from dotagent.agent.manager import QUEUE_CHANGED_EVENT, TERMINALS_CHANGED_EVENT
 from dotagent.agent.reaction_words import REACTION_ADDED_EVENT, REACTION_REMOVED_EVENT
 from dotagent.agent.rewind import CHAT_REWOUND_EVENT
@@ -126,13 +127,19 @@ def joins_family(family: set[str], event: EventRecord) -> bool:
     return event.kind == _QUEUED and isinstance(parent, str) and parent in family
 
 
+# The events no page draws, kept out of what a page reads of a run (item 1170): the loop's snapshot, the whole context
+# of a step (100 to 330 KB a run on the owner's Dot), which only the loop reads back, from the store.
+UNREAD_BY_PAGES: tuple[str, ...] = (LOOP_STATE_EVENT,)
+
+
 async def _stored_events(store: Store, run_ids: Iterable[str], after: int) -> list[EventRecord]:
-    """The stored events of the runs after id ``after``, in the order they happened."""
+    """The stored events of the runs after id ``after`` a page reads (not :data:`UNREAD_BY_PAGES`), in the order they
+    happened."""
     found: list[EventRecord] = []
     for run_id in sorted(run_ids):
         cursor: int = after
         while True:
-            page: list[EventRecord] = await store.list_events(run_id, cursor, _PAGE)
+            page: list[EventRecord] = await store.list_events_without(run_id, cursor, _PAGE, UNREAD_BY_PAGES)
             found.extend(page)
             if len(page) < _PAGE:
                 break
@@ -208,6 +215,8 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
 
         def live(event: EventRecord) -> bytes | None:
             """The frame of an event from the subscription, or ``None`` for one that is not for this client."""
+            if event.kind in UNREAD_BY_PAGES:
+                return None
             if event.run_id not in family:
                 if not joins_family(family, event):
                     return None
@@ -306,7 +315,11 @@ async def follow_runs(ctx: ServerContext, run_ids: frozenset[str], after: int) -
                 if frames:
                     owed, written = True, time.monotonic()
                     yield frames
-            if incoming.run_id not in run_ids or (incoming.id > 0 and incoming.id in sent):
+            if (
+                incoming.run_id not in run_ids
+                or incoming.kind in UNREAD_BY_PAGES
+                or (incoming.id > 0 and incoming.id in sent)
+            ):
                 continue
             if incoming.id > 0:
                 sent.add(incoming.id)
