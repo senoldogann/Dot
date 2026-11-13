@@ -54,6 +54,7 @@ from dotagent.browser.driver import (
     cookie_secrets,
     document_of,
     fill_login_field,
+    focus_landed,
     go_back,
     holds_field_focus,
     holds_secret_field,
@@ -3061,8 +3062,12 @@ class BrowserSession:
             effect: str = ""
             if pulse is not None and not tab.page.is_closed():
                 # Only a click is meant to focus a field; Enter pressed in one leaves it there whatever it did.
+                # A click at a point names no ref, so the field it focuses is read from the page (item 1142). A click
+                # on a ref, and Enter, are not: a Send that the browser answers by focusing an empty required field,
+                # and Enter in one, still did nothing.
                 clicked: str | None = step.ref if step.action in _MOVING_ACTIONS else None
-                effect = await self._effect(thread, tab, before, pulse, requests, clicked)
+                at_point: bool = step.action in _MOVING_ACTIONS and step.ref is None
+                effect = await self._effect(thread, tab, before, pulse, requests, clicked, at_point)
             reports.append(StepReport(index=index, description=description, outcome="done", detail=effect))
             stopped = describe_surprise(before, self._watch(thread, tab))
             if stopped is None and opening:
@@ -3070,14 +3075,23 @@ class BrowserSession:
         return reports, stopped
 
     async def _effect(
-        self, thread: ThreadTabs, tab: Tab, before: _Watch, pulse: Pulse, requests: int, ref: str | None
+        self,
+        thread: ThreadTabs,
+        tab: Tab,
+        before: _Watch,
+        pulse: Pulse,
+        requests: int,
+        ref: str | None,
+        at_point: bool = False,
     ) -> str:
         """What a step that should change the page did (item 739), as its report says it: nothing when the page
         changed and shows nothing new to read; what it shows new (an alert, a field it marks invalid) when it did; and,
         when nothing changed within :data:`_EFFECT_WAIT_S` (no change to its documents, no box ticked or field typed
-        in, no request, no new address, tab or dialog, and the element clicked took no focus as a field), that it did
-        not, with what the page marks invalid, so that the run does not take a click that
-        did nothing for one that worked. A page that could not be read counts as changed."""
+        in, no request, no new address, tab or dialog, and, for a click at a point, the keyboard did not land in a
+        field), that it did not, with what the page marks invalid, so that the run does not take a click that
+        did nothing for one that worked. ``at_point`` is a click or a drag that names no ref (item 1142): the field
+        it focuses is read from the page. A click on a ref uses :func:`holds_field_focus` instead, and Enter is
+        neither. A page that could not be read counts as changed."""
         after: Pulse = pulse
         moved: bool = False
         waited: float = 0.0
@@ -3087,6 +3101,7 @@ class BrowserSession:
                 after.changes is None
                 or pulse.changes is None
                 or after.changes != pulse.changes
+                or (at_point and focus_landed(pulse.focus, after.focus))
                 or tab.requests != requests
                 or describe_surprise(before, self._watch(thread, tab)) is not None
             )
@@ -3099,7 +3114,7 @@ class BrowserSession:
         if not moved:
             invalid: str = f"; fields it marks invalid: {'; '.join(after.invalid)}" if after.invalid else ""
             return (
-                "but the page did not change (no new content, request or address)"
+                "but the page did not change (no new content, request, address or keyboard focus)"
                 f"{invalid}. Something in front may have taken the click, or the control may wait for another event: "
                 "look at the page, close what is in front, or reach the element with browser_eval and its ref"
             )

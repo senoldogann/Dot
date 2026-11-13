@@ -38,12 +38,24 @@ _PAGE: str = """<!doctype html><title>Effect page</title>
 <label><input type="checkbox" aria-label="Terms"> Terms</label>
 <label>Note <textarea aria-label="Note"></textarea></label>
 <label>Size <select aria-label="Size"><option>S</option><option>M</option></select></label>"""
+# A page whose controls sit at known pixels, so a click_at can be aimed without a ref (item 1142).
+_PIXEL: str = """<!doctype html><title>Pixels</title>
+<style>
+  html, body { margin: 0; }
+  button { position: absolute; left: 0; top: 0; width: 40px; height: 40px; }
+  textarea { position: absolute; left: 80px; top: 60px; width: 160px; height: 40px; }
+  select { position: absolute; left: 80px; top: 140px; width: 160px; height: 32px; }
+</style>
+<button type="button" aria-label="Nothing">Nothing</button>
+<textarea aria-label="Note"></textarea>
+<select aria-label="Size"><option>S</option><option>M</option></select>"""
 
 
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = urlsplit(self.path).path
-        body: bytes = (_PAGE if path == "/" else "<!doctype html><title>Other</title><p>ok</p>").encode()
+        page: str = {"/": _PAGE, "/pixel": _PIXEL}.get(path, "<!doctype html><title>Other</title><p>ok</p>")
+        body: bytes = page.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -152,3 +164,27 @@ async def test_enter_in_a_field_that_sends_nothing_is_told_though_the_field_keep
     )
     (report,) = outcome.steps
     assert report.detail.startswith("but the page did not change") and "Email" in report.detail, report
+
+
+async def _click_at(browser: BrowserSession, thread: str, x: float, y: float) -> str:
+    outcome: ActOutcome = await browser.act(
+        thread, [Step(action="click_at", x=x, y=y)], False, refuse_secret_field, True
+    )
+    (report,) = outcome.steps
+    assert report.outcome == "done", report
+    return report.detail
+
+
+async def test_a_click_at_a_point_that_focuses_a_field_changed_the_page(browser: BrowserSession, site: str) -> None:
+    """A click at a pixel names no ref, so the focus check of a ref click does not see it (item 1142). A run told the
+    page did not change clicks the field again. A click that only takes the keyboard off a field still did nothing."""
+    await browser.open_url("pixel", f"{site}/pixel", True)
+    missed: str = await _click_at(browser, "pixel", 8, 8)
+    assert missed.startswith("but the page did not change"), missed
+    focused: str = await _click_at(browser, "pixel", 120, 75)
+    assert focused == "", focused
+    # The field has the keyboard. A control that does nothing only takes it away, which is not the control acting.
+    blurred: str = await _click_at(browser, "pixel", 8, 8)
+    assert blurred.startswith("but the page did not change"), blurred
+    opened: str = await _click_at(browser, "pixel", 120, 155)
+    assert opened == "", opened

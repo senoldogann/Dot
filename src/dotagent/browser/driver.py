@@ -745,7 +745,37 @@ _PULSE_SCRIPT: str = """() => {
       || el.getAttribute("name") || el.getAttribute("placeholder") || el.tagName.toLowerCase();
     return `${label.slice(0, 60)}: ${(el.validationMessage || "invalid").slice(0, 120)}`;
   });
-  return { changes: w.__dotPulse.changes, alerts, invalid };
+  // Where the keyboard is, when that is a field (item 1142): a click at a pixel has no ref, so the focus check of a
+  // ref click cannot see it. The path tells fields apart; the caret tells two clicks in one field apart. A button,
+  // and the page itself, are not a field.
+  const focusOf = () => {
+    let field = document.activeElement;
+    if (field && field.shadowRoot && field.shadowRoot.activeElement) field = field.shadowRoot.activeElement;
+    if (!field || field === document.body || field === document.documentElement) return "";
+    const takes = field.isContentEditable || (typeof field.matches === "function" && field.matches(
+      "input:not([type=button]):not([type=submit]):not([type=reset]):not([type=image]), textarea, select"
+    ));
+    if (!takes) return "";
+    const path = [];
+    let node = field;
+    while (node && node.parentElement) {
+      path.push(Array.prototype.indexOf.call(node.parentElement.children, node));
+      node = node.parentElement;
+    }
+    let caret = "";
+    try {
+      if (typeof field.selectionStart === "number") caret = `${field.selectionStart}:${field.selectionEnd}`;
+      else if (field.tagName === "SELECT") caret = String(field.selectedIndex);
+    } catch (error) { caret = ""; }
+    if (!caret && field.isContentEditable) {
+      const sel = field.ownerDocument.getSelection();
+      if (sel && sel.rangeCount && field.contains(sel.anchorNode)) {
+        caret = `${sel.anchorOffset}:${sel.focusOffset}`;
+      }
+    }
+    return `${path.join(".")}:${caret}`;
+  };
+  return { changes: w.__dotPulse.changes, alerts, invalid, focus: focusOf() };
 }"""
 _PULSE_FRAMES: int = 10
 _PULSE_TIMEOUT_S: float = 1.0
@@ -754,11 +784,27 @@ _PULSE_TIMEOUT_S: float = 1.0
 @dataclass(frozen=True, slots=True)
 class Pulse:
     """The page as :data:`_PULSE_SCRIPT` reads it: the changes its documents had (``None`` when one could not be
-    read, which then counts as a change), and what it shows of alerts and invalid fields."""
+    read, which then counts as a change), what it shows of alerts and invalid fields, and where the keyboard is in
+    each frame when that is a field (``focus``, empty for a frame whose keyboard is not in one; item 1142)."""
 
     changes: int | None
     alerts: tuple[str, ...]
     invalid: tuple[str, ...]
+    focus: tuple[str, ...] = ()
+
+
+def focus_landed(before: tuple[str, ...], after: tuple[str, ...]) -> bool:
+    """Whether the keyboard is in a field it was not in, caret included (item 1142).
+
+    An empty slot is not a field: the page itself, or a button. A field that stays put, caret included, is not a
+    landing, and neither is the keyboard leaving a field. Frames line up in the order they were read; a field that
+    shows up in one that had none is a landing."""
+    for index in range(max(len(before), len(after))):
+        was: str = before[index] if index < len(before) else ""
+        now: str = after[index] if index < len(after) else ""
+        if now and now != was:
+            return True
+    return False
 
 
 async def page_pulse(page: Page) -> Pulse:
@@ -776,15 +822,25 @@ async def page_pulse(page: Page) -> Pulse:
     changes: int | None = 0
     alerts: list[str] = []
     invalid: list[str] = []
+    focus: list[str] = []
     for answer in answers:
+        # One slot per frame, in order, so a frame that cannot be read does not shift the field of the next.
         if not isinstance(answer, dict) or not isinstance(answer.get("changes"), int) or answer["changes"] < 0:
             changes = None
+            focus.append("")
             continue
         if changes is not None:
             changes += answer["changes"]
         alerts.extend(str(one) for one in answer.get("alerts") or [] if isinstance(one, str))
         invalid.extend(str(one) for one in answer.get("invalid") or [] if isinstance(one, str))
-    return Pulse(changes=changes, alerts=tuple(dict.fromkeys(alerts)), invalid=tuple(dict.fromkeys(invalid)))
+        where: object = answer.get("focus")
+        focus.append(where if isinstance(where, str) else "")
+    return Pulse(
+        changes=changes,
+        alerts=tuple(dict.fromkeys(alerts)),
+        invalid=tuple(dict.fromkeys(invalid)),
+        focus=tuple(focus),
+    )
 
 
 # Whether the element a click named now has the focus as a field that takes input (a text field, a box, a dropdown,
