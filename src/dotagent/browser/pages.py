@@ -256,6 +256,16 @@ def target_id_of(answer: object) -> str | None:
     return _text(answer, "targetId")
 
 
+def chrome_lists(made: str, answer: object) -> bool:
+    """Whether Chrome's answer to ``Target.getTargets`` lists the tab ``made``: one it does not list has no window
+    to ask for."""
+    infos: object = answer.get("targetInfos") if isinstance(answer, Mapping) else None
+    return any(
+        isinstance(info, Mapping) and info.get("type") == "page" and _text(info, "targetId") == made
+        for info in (infos if isinstance(infos, list) else [])
+    )
+
+
 def unhanded_tab(made: str, answer: object) -> str:
     """What Chrome's answer to ``Target.getTargets`` says of the tab ``made`` that Playwright never reported (item
     1002): gone, or its address (still ``about:blank`` without the mark: its first page never committed), whether a

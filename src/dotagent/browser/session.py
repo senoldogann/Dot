@@ -87,6 +87,7 @@ from dotagent.browser.pages import (
     ThreadTabs,
     add_note,
     attach_handlers,
+    chrome_lists,
     page_target_id,
     taken_in,
     target_id_of,
@@ -242,6 +243,9 @@ _TEACH_START_PAGE: str = "https://www.google.com/"
 _TAB_MARK_BYTES: int = 6
 # How long Chrome is given to list its tabs for the error of a new tab it did not hand over (item 1002).
 _ASK_TABS_S: float = 2.0
+# How many pages reported meanwhile the error of a tab not handed over names, and how much of each address.
+_TABS_NAMED: int = 4
+_TAB_URL_CHARS: int = 120
 # Dot's own Chrome at this zoom draws a page at the size it was given, which the page need not be asked for (item 358).
 _UNZOOMED: int = 100
 # The height of a tab given a width alone (``browser_viewport``, item 746): a phone's, 390 by 844 being an iPhone's.
@@ -519,6 +523,16 @@ def idle_background_tabs(thread: ThreadTabs, cutoff: float) -> list[Tab]:
     return [tab for index, tab in enumerate(thread.tabs) if index != thread.active and tab.last_used < cutoff]
 
 
+def reported_meanwhile(urls: Sequence[str]) -> str:
+    """What Playwright reported while a tab that was not handed over was waited for: no page at all, or the pages
+    of others, the first :data:`_TABS_NAMED` by their addresses."""
+    if not urls:
+        return "Playwright reported no page meanwhile"
+    named: str = ", ".join(repr(url) for url in urls[:_TABS_NAMED])
+    more: str = f" and {len(urls) - _TABS_NAMED} more" if len(urls) > _TABS_NAMED else ""
+    return f"Playwright reported {len(urls)} other page{'s' if len(urls) != 1 else ''} meanwhile: {named}{more}"
+
+
 async def _what_chrome_made(cdp: CDPSession, made: str | None) -> str:
     """What Chrome says of the tab ``made`` that it did not hand over (:func:`unhanded_tab`), for the error of the step.
     Chrome is given :data:`_ASK_TABS_S` to answer: a Chrome that cannot list its tabs either says why it made none."""
@@ -531,7 +545,25 @@ async def _what_chrome_made(cdp: CDPSession, made: str | None) -> str:
         return f"Chrome did not list its tabs within {_ASK_TABS_S:g} s either"
     except PlaywrightError as error:
         return f"Chrome could not list its tabs: {truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}"
-    return unhanded_tab(made, answer)
+    if not chrome_lists(made, answer):
+        return unhanded_tab(made, answer)
+    return f"{unhanded_tab(made, answer)}; {await _window_of(cdp, made)}"
+
+
+async def _window_of(cdp: CDPSession, made: str) -> str:
+    """Whether Chrome names the window of the tab ``made`` within :data:`_ASK_TABS_S` (item 1160). It is the first
+    thing Playwright asks of a new tab, and it reports no tab before every such question is answered: the record of
+    2026-11-13 showed a tab Chrome had made, at its address and with Playwright attached, that was never reported,
+    so what is left to learn is which of Playwright's questions Chrome did not answer. This one is the browser's
+    own; the others are the page's."""
+    try:
+        async with asyncio.timeout(_ASK_TABS_S):
+            answer: dict[str, object] = await cdp.send("Browser.getWindowForTarget", {"targetId": made})
+    except TimeoutError:
+        return f"Chrome did not name the tab's window within {_ASK_TABS_S:g} s"
+    except PlaywrightError as error:
+        return f"Chrome could not name the tab's window: {truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}"
+    return "Chrome names the tab's window" if "windowId" in answer else "Chrome's answer names no window for the tab"
 
 
 def _none_unattended(thread_id: str) -> bool:
@@ -2615,7 +2647,14 @@ class BrowserSession:
             target["newWindow"] = True
         cdp: CDPSession = await browser.new_browser_cdp_session()
         arrived: asyncio.Queue[Page] = asyncio.Queue()
-        heard: Callable[[Page], None] = arrived.put_nowait
+        # The addresses of the pages Playwright reported while this tab was waited for, for the error of a tab that
+        # was not among them (item 1160): none says that Playwright reported nothing, some that it reported others.
+        reported: list[str] = []
+
+        def heard(page: Page) -> None:
+            reported.append(truncate_middle(page.url, _TAB_URL_CHARS))
+            arrived.put_nowait(page)
+
         context.on("page", heard)
         made: str | None = None
         try:
@@ -2630,6 +2669,7 @@ class BrowserSession:
                     {
                         "error": f"Chrome did not hand over the new tab within {self._config.action_timeout_s:g} s",
                         "chrome": await _what_chrome_made(cdp, made),
+                        "reported": reported_meanwhile(reported),
                     },
                 ) from error
             await page.goto("about:blank", wait_until="commit")

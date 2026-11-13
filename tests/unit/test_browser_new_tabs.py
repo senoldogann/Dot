@@ -90,6 +90,8 @@ class _Cdp:
             return {
                 "targetInfos": [_info("T-ours", "about:blank", False, "C-other"), _info("T-1", "https://a", True, "C")]
             }
+        if method == "Browser.getWindowForTarget":
+            return {"windowId": 7, "bounds": {}}
         return {"targetId": "T-ours"} if method == "Target.createTarget" else {}
 
     async def detach(self) -> None:
@@ -163,7 +165,41 @@ async def test_a_new_tab_chrome_does_not_hand_over_is_closed_and_what_chrome_mad
         await _tab_session()._background_tab(cast(Any, context))
     assert _closed(context) and context.listeners == []
     assert failed.value.context["chrome"] == (
-        "Chrome lists the tab at 'about:blank', not attached, in a browser context no other tab is in"
+        "Chrome lists the tab at 'about:blank', not attached, in a browser context no other tab is in; Chrome names "
+        "the tab's window"
+    )
+    assert failed.value.context["reported"] == "Playwright reported no page meanwhile"
+
+
+class _SilentWindow(_Cdp):
+    """A Chrome that makes and lists the tab, and never says which window it is in."""
+
+    async def send(self, method: str, params: object = None) -> dict[str, object]:
+        if method == "Browser.getWindowForTarget":
+            await asyncio.Event().wait()
+        return await super().send(method, params)
+
+
+async def test_a_tab_not_handed_over_says_whether_chrome_names_its_window_and_what_else_was_reported(
+    ids: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1160: the gate's record of 2026-11-13 showed a tab at its address with Playwright attached that was never
+    reported. The error now also says whether Chrome answers the first thing Playwright asks of a new tab, and
+    which pages Playwright did report meanwhile, so that the next record tells the browser's side from the page's."""
+    monkeypatch.setattr(session, "_ASK_TABS_S", 0.05)
+    # Another call's tab is reported, ours never: its address stands in the error.
+    context: _Context = _Context(_page("https://shop.example/basket", "T-other"))
+    context.cdp = _SilentWindow()
+    with pytest.raises(BrowserError, match="opening a tab failed") as failed:
+        await _tab_session()._background_tab(cast(Any, context))
+    assert failed.value.context["chrome"].endswith("; Chrome did not name the tab's window within 0.05 s")
+    assert failed.value.context["reported"] == (
+        "Playwright reported 1 other page meanwhile: 'https://shop.example/basket'"
+    )
+    assert _closed(context)
+    assert session.reported_meanwhile([f"https://a/{n}" for n in range(6)]) == (
+        "Playwright reported 6 other pages meanwhile: 'https://a/0', 'https://a/1', 'https://a/2', 'https://a/3' "
+        "and 2 more"
     )
 
 
@@ -181,6 +217,9 @@ def test_what_chrome_lists_of_a_tab_it_did_not_hand_over() -> None:
         "Chrome lists no such tab any more; it lists 1 other tabs"
     )
     assert pages.unhanded_tab("T-ours", "nope") == "Chrome lists no such tab any more; it lists 0 other tabs"
+    # A tab Chrome lists has a window to ask for; one it does not list has none.
+    assert pages.chrome_lists("T-ours", {"targetInfos": [mark, *others]})
+    assert not pages.chrome_lists("T-ours", {"targetInfos": others}) and not pages.chrome_lists("T-ours", "nope")
 
 
 async def test_a_run_stopped_while_its_new_tab_comes_closes_the_tab(ids: None) -> None:
