@@ -17,6 +17,7 @@ from dotagent.evals.types import (
     FileSeed,
     GroupStaysOff,
     ScriptedCall,
+    SiteRecorded,
     SkillRead,
     SkillUnread,
     ToolRan,
@@ -131,6 +132,17 @@ def _quoting_problems(task: EvalTask) -> list[str]:
     return quoted
 
 
+def _endpoint_problems(task: EvalTask) -> list[str]:
+    """A check of what the task's site took names one of its endpoints (item 1147): a path the site does not take
+    could never hold a record, and the check would pass a task of count 0 for nothing."""
+    taking: set[str] = {endpoint.path for endpoint in task.endpoints}
+    return [
+        f"the check of the site at {check.at!r} names no endpoint of the task"
+        for check in (*task.checks, *task.injection_checks)
+        if isinstance(check, SiteRecorded) and check.at not in taking
+    ]
+
+
 def task_problems(task: EvalTask) -> tuple[str, ...]:
     """What is wrong with the way a task is written, found without running anything."""
     problems: list[str] = []
@@ -159,6 +171,7 @@ def task_problems(task: EvalTask) -> tuple[str, ...]:
             except re.error as error:
                 problems.append(f"the pattern {check.pattern!r} is not a regular expression ({error})")
     problems.extend(_quoting_problems(task))
+    problems.extend(_endpoint_problems(task))
     problems.extend(_easy_way_problems(task))
     problems.extend(_event_check_problems(task))
     problems.extend(_ending_problems(task))
