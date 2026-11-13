@@ -3474,7 +3474,8 @@ class BrowserSession:
             told=effect.startswith(PAGE_UNCHANGED),
         ):
             said.append(_SENT_NOTHING)
-        said.append(not_looked_for("; ".join(named.left_out)))
+        # Two reasons are one part of the line, whose parts a semicolon divides.
+        said.append(not_looked_for(" and ".join(named.left_out)))
         report: StepReport = StepReport(
             index=index,
             description=describe_step(step),

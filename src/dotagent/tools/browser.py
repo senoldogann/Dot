@@ -372,8 +372,10 @@ _CALL_GUESS: str = "expect"
 
 def guesses_to_the_call(data: object) -> object:
     """An act call (``data``, as the model wrote it) with a guess in the model's own words that a step carries
-    (``expect``) taken to the call, where it is read (item 1164): after the call's own, each one kept and none
-    twice. A step was refused for it before, which cost a round trip of the model for a meaning that was plain.
+    (``expect``) taken to the call, where it is read (item 1164): after the call's own, none twice, and as many as
+    the call's guess has room for (:data:`_EXPECT_CHARS`), so that the call is never refused for the length of a
+    text the model did not write as one. A step was refused for it before, which cost a round trip of the model for
+    a meaning that was plain.
     Words a step expects to see (``expect_text``) are another thing, and are placed by
     :func:`dotagent.core.outcomes.expectation_on_last_step` (item 1161)."""
     if not isinstance(data, dict) or not isinstance(data.get("steps"), list):
@@ -391,8 +393,13 @@ def guesses_to_the_call(data: object) -> object:
         for step in steps
     ]
     own: object = data.get(_CALL_GUESS)
-    every: list[str] = [own, *guesses] if isinstance(own, str) else guesses
-    return {**data, "steps": placed, _CALL_GUESS: "; ".join(dict.fromkeys(every))}
+    every: list[str] = list(dict.fromkeys([own, *guesses] if isinstance(own, str) else guesses))
+    # The first stands as it was written, whatever its length; each further one only while the whole still fits.
+    kept: list[str] = every[:1]
+    for guess in every[1:]:
+        if len("; ".join([*kept, guess])) <= _EXPECT_CHARS:
+            kept = [*kept, guess]
+    return {**data, "steps": placed, _CALL_GUESS: "; ".join(kept)}
 
 
 class ActArgs(ToolArgs):

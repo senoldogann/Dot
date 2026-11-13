@@ -180,6 +180,12 @@ def test_a_guess_a_step_carries_is_the_calls_and_none_is_dropped() -> None:
         "steps": [click, fill],
         "expect": "a list; the results list",
     }
+    # A guess that would take the call's own past its length is left out: the call is not refused for a text the
+    # model did not write as one (the pre-push review).
+    long: str = ("the order confirmation with its number " * 8)[:290].strip()
+    assert len(long) < 300 < len(f"{long}; the results list")
+    assert guesses_to_the_call({"expect": long, "steps": [guessed]}) == {"steps": [click], "expect": long}
+    assert BrowserActArgs.model_validate({"expect": long, "steps": [guessed]}).expect == long
     # Through the tool's arguments, beside item 1161's reading of words written beside the steps: a step that only
     # looks is left out first, the words are the last step's, and the guess is the call's.
     args: BrowserActArgs = BrowserActArgs.model_validate(
