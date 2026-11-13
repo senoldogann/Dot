@@ -854,8 +854,8 @@ def effect_of_expected(effect: str, sights: Sequence[OutcomeCheck]) -> str:
 
 def _dispatch_of(error: BrowserError) -> Dispatch:
     """Whether a step that failed with ``error`` went out: one refused before anything was sent, whose click
-    something in front took, or whose press Playwright tried and never made (item 1158: its element was not shown,
-    enabled and still in time), did not; any other may have."""
+    something in front took, or whose press Playwright tried and never made (item 1158: its element was not shown
+    and still in time, nor, for a click, enabled), did not; any other may have."""
     if isinstance(error, StepNotSent) or error.context.get("covered_by") or error.context.get(NEVER_PRESSED):
         return "not_sent"
     return "unknown"
