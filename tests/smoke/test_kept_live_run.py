@@ -170,7 +170,9 @@ async def test_a_run_at_work_that_is_opened_again_goes_on_from_its_newest_stored
             model.write.set()
             # The word being written (``noon.``) waits for what follows it, in case it is the start of a key (item
             # 551): the words before it are on the page.
-            await expect(page.locator(".bubble.live")).to_contain_text("came in at")
+            # A task run's words stream as an update from the first word, where they stay if the step goes on to
+            # its calls, rather than as a message that folds into the steps at the step's end.
+            await expect(page.locator(".bubble.live.say-progress")).to_contain_text("came in at")
             await page.goto(f"{address}/#/agents")
             await expect(page.locator(".agent-card").first).to_be_visible()
             # Back on the run, the page follows its stream again: waited for, as the view it kept shows the call
@@ -195,6 +197,10 @@ async def test_a_run_at_work_that_is_opened_again_goes_on_from_its_newest_stored
                 assert (await manager.wait(run.id)).status == "done"
             # In the conversation: the sidebar's row of the chat says its last words too, the answer once it is in.
             await expect(page.locator(".timeline").get_by_text(ANSWER)).to_have_count(1)
+            # The step ended with finish alone: its words were its message, not an update on the way.
+            await expect(
+                page.locator(".bubble.say:not(.say-progress):not(.live)", has_text="came in at noon")
+            ).to_have_count(1)
             # Each thing the run did is drawn once: the message sent, and the call.
             await expect(page.locator(".user-message")).to_have_count(1)
             await expect(page.locator(".tool-name")).to_have_count(1)

@@ -245,7 +245,9 @@ export function createWorkStatus({ rootRunId, active, queued, onToggle, face }) 
       become("typing", "", "");
     } else if (record.kind === "delta" && data.kind === "thinking") {
       become("thinking", "", "");
-    } else if (record.kind === "delta" && data.kind !== "reset" && String(data.text ?? "").trim() !== "") {
+    } else if (record.kind === "delta" && data.kind !== "reset" && data.update !== true && String(data.text ?? "").trim() !== "") {
+      // Only a message's words step the line aside: an update streams folded with the steps, and the line says the
+      // work while it does.
       writing = true;
       paint();
     } else if (record.kind === "tool_call" && typeof data.tool === "string" && !UNSAID_TOOLS.has(data.tool)) {

@@ -7,7 +7,9 @@ from collections.abc import Sequence
 from typing import Literal
 
 from dotagent.core.text import KNOWN_SECRET_MIN_CHARS, redact_known
+from dotagent.core.types import JsonObject
 from dotagent.llm.types import DeltaSink, StreamDelta
+from dotagent.store.models import RunMode
 
 # Put after the text that waits: a mask that takes it in, with the secret before it, says the text ends inside a secret
 # that the next characters would lengthen.
@@ -22,6 +24,15 @@ _INTRODUCTION_WORDS: int = 4
 # The header of a PEM block: from it to its end the block is a private key's, which the mask takes whole.
 _BLOCK_START: str = "-----BEGIN"
 _BLOCK_EDGE: str = "-----"
+
+
+def delta_event(delta: StreamDelta, step: int, mode: RunMode) -> JsonObject:
+    """The ``delta`` event of a step's stream, as every harness sends it (Dot's own loop, Claude Code's and OpenCode's):
+    ``update`` says that words of a run in ``mode`` are told on the way to the step's calls unless the step ends with
+    none (item 1162). Outside a chat nearly all are (443 of 498 steps with words in the owner's week to 2026-11-13; the
+    answer comes with finish, or with OpenCode's last reply), so the conversation shows them as an update from the first
+    word rather than as a message that folds into the steps once the step ends."""
+    return {"kind": delta.kind, "text": delta.text, "step": step, "update": mode != "chat"}
 
 
 def _in_word(char: str) -> bool:

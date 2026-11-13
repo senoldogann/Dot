@@ -59,7 +59,7 @@ from dotagent.agent.limits import (
     limits_of,
 )
 from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome
-from dotagent.agent.streammask import StreamMask
+from dotagent.agent.streammask import StreamMask, delta_event
 from dotagent.browser.safety import UrlVerdict, browser_host, check_url, host_matches, url_flags
 from dotagent.core.errors import (
     ApprovalRejected,
@@ -477,7 +477,7 @@ class _Follow:
         return self.agent.runtime
 
     async def show(self, delta: StreamDelta) -> None:
-        await self.emit("delta", {"kind": delta.kind, "text": delta.text, "step": self.steps + 1}, False)
+        await self.emit("delta", delta_event(delta, self.steps + 1, self.agent.run.mode), False)
 
     async def prompt(self, text: str, files: tuple[PromptFile, ...]) -> None:
         self.prompts += 1

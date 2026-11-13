@@ -179,7 +179,7 @@ from dotagent.agent.stepmodel import (
     routed_event,
     step_state,
 )
-from dotagent.agent.streammask import StreamMask
+from dotagent.agent.streammask import StreamMask, delta_event
 from dotagent.agent.templates import AgentTeam, team_of
 from dotagent.agent.verify import (
     RunFacts,
@@ -2682,7 +2682,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     asked_again: int = 0
 
     async def show(delta: StreamDelta) -> None:
-        await runtime.bus.emit(run.id, "delta", {"kind": delta.kind, "text": delta.text, "step": steps}, False)
+        await runtime.bus.emit(run.id, "delta", delta_event(delta, steps, run.mode), False)
 
     # A step's stream is masked as its stored message is: a secret split between two deltas is not shown (item 551).
     sink: StreamMask = StreamMask(show)
