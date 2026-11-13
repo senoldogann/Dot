@@ -396,7 +396,10 @@ def guesses_to_the_call(data: object) -> object:
         for step in steps
     ]
     own: object = data.get(_CALL_GUESS)
-    every: list[str] = list(dict.fromkeys([own, *guesses] if isinstance(own, str) else guesses))
+    if own is not None and not isinstance(own, str):
+        # A guess of the call's that is no text is the call's to be refused for, as written: nothing replaces it.
+        return data
+    every: list[str] = list(dict.fromkeys([own, *guesses] if own else guesses))
     # The first stands (the call's own as the model wrote it there); each further one only while the whole fits.
     kept: list[str] = every[:1]
     for guess in every[1:]:

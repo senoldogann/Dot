@@ -163,7 +163,7 @@ def test_a_text_the_batch_writes_cannot_be_what_a_step_expects_to_see() -> None:
     assert gate_lost(2).startswith("what step 2 expected could not be looked for, so the steps after it were not run")
 
 
-def test_a_guess_a_step_carries_is_the_calls_and_none_is_dropped() -> None:
+def test_a_guess_a_step_carries_is_the_calls_as_far_as_it_has_room() -> None:
     """Item 1164, from traced runs: a guess in the model's own words given to a step (``expect``) was refused whole,
     a round trip of the model for a meaning that was plain. It is the call's, after the call's own."""
     fill: dict[str, object] = {"action": "fill", "ref": "e5", "text": "lamp"}
@@ -186,6 +186,10 @@ def test_a_guess_a_step_carries_is_the_calls_and_none_is_dropped() -> None:
     assert len(long) < 300 < len(f"{long}; the results list")
     assert guesses_to_the_call({"expect": long, "steps": [guessed]}) == {"steps": [click], "expect": long}
     assert BrowserActArgs.model_validate({"expect": long, "steps": [guessed]}).expect == long
+    # An empty guess of the call's is no guess, and one that is no text is left for the call to be refused for.
+    assert guesses_to_the_call({"expect": "", "steps": [guessed]}) == {"steps": [click], "expect": "the results list"}
+    odd: dict[str, object] = {"expect": 7, "steps": [guessed]}
+    assert guesses_to_the_call(odd) is odd
     # A step's guess longer than the call's may be is cut to that length, not refused under the call's name.
     wordy: dict[str, object] = {**click, "expect": "the confirmation " * 30}
     assert len(BrowserActArgs.model_validate({"steps": [wordy]}).expect or "") == 300
