@@ -580,7 +580,9 @@ a read of the page or the window (`browser_snapshot`, `desktop_snapshot` of the 
 the gate and waiting while you hold the run (item 809).
 `edit_file` changes the text it is given and nothing else: a file that breaks its
 lines with CRLF keeps them, in the new text too, a file that is not UTF-8 text is refused, saying so, for the shell
-to change, and an empty text to replace is refused (item 556). A file the file tools make gets the permission bits
+to change, and an empty text to replace is refused (item 556). A text found more than once is refused
+unless `replace_all` is set, and the error names the line where each one starts (item 1145), so the run widens
+the text from what it read rather than reading the file again. A file the file tools make gets the permission bits
 any program's new file gets (`0666` less your umask), and a file that was there keeps its own. `read_file` reads a
 long file in pages of lines, the text of a PDF too, each page ending with the line to go on from, so no part of it is
 out of reach; an image goes to the model as an image, an iPhone's HEIC photo too, which macOS draws first (item
