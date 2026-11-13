@@ -144,8 +144,11 @@
 
 /* What the run says on the way to its calls ("Checking the domain now") is its work told, not a message (item 1131, the
    owner's ask after a screenshot of ten such lines one under another): it folds with the steps, and the line under the
-   conversation says the newest of it while the run works. Shown with the steps, it reads as a quiet note among them. */
-:root[data-work="status"] .run-thread:not(.steps-shown) .say-progress {
+   conversation says the newest of it while the run works. Shown with the steps, it reads as a quiet note among them.
+   Words that may be the answer (`data-either`, item 1166: a task's step on Claude Code or OpenCode, a first step
+   of Dot's own loop, or one at its limit) stay in sight while
+   they stream, as a quiet note: their step's end makes them the answer or folds them with the steps. */
+:root[data-work="status"] .run-thread:not(.steps-shown) .say-progress:not([data-either]) {
   display: none;
 }
 

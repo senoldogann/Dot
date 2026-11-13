@@ -279,9 +279,10 @@ async def test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answer
 
 
 async def test_an_update_streams_under_the_line_and_a_message_steps_it_aside(own_home: Path) -> None:
-    """Item 1162: the words of a task's step stream as an update (their delta says ``update``), folded with the steps,
-    and the line keeps saying the work while they come; a message's words (a chat's) step the line aside, as the
-    message itself then says what goes on (the pre-push review asked for this lock)."""
+    """Items 1162 and 1166: words that are an update (their delta says ``says`` "update") stream folded with the
+    steps, and the line keeps saying the work while they come; words that may be the answer ("either") and a chat's
+    message stream in sight and step the line aside, as they then say what goes on; a live "either" note stays in
+    sight under "What it is doing" until its step ends (run.css)."""
     async with _served(own_home) as (_manager, _address, port), async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
@@ -293,16 +294,42 @@ async def test_an_update_streams_under_the_line_and_a_message_steps_it_aside(own
                   const line = createWorkStatus({
                     rootRunId: "r1", active: true, queued: false, onToggle: () => undefined, face: null,
                   });
-                  const words = (update) => ({
-                    run_id: "r1", kind: "delta", data: { kind: "text", text: "Checking it", step: 1, update },
+                  const words = (says) => ({
+                    run_id: "r1", kind: "delta", data: { kind: "text", text: "Checking it", step: 1, says },
                   });
-                  line.push({ run_id: "r1", kind: "model_call", data: {} });
-                  line.push(words(true));
-                  const update = line.element.dataset.state;
-                  line.push(words(false));
-                  return [update, line.element.dataset.state];
+                  const states = [];
+                  for (const says of ["update", "either", "message"]) {
+                    line.push({ run_id: "r1", kind: "model_call", data: {} });
+                    line.push(words(says));
+                    states.push(line.element.dataset.state);
+                  }
+                  return states;
                 }"""
             )
-            assert states == ["working", "quiet"], states
+            # Words that may be the answer stream in sight (item 1166), and step the line aside as a message's do.
+            assert states == ["working", "quiet", "quiet"], states
+            # In sight while they stream: a live update that may be the answer shows under "What it is doing", one
+            # that cannot does not, and neither once its step has ended (run.css).
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            shown: list[str] = await page.evaluate(
+                """() => {
+                  document.documentElement.dataset.work = "status";
+                  const thread = Object.assign(document.createElement("div"), { className: "run-thread" });
+                  document.body.append(thread);
+                  const line = (classes, either) => {
+                    const node = Object.assign(document.createElement("div"), { className: classes });
+                    node.toggleAttribute("data-either", either);
+                    node.append(Object.assign(document.createElement("div"), { textContent: "Hi" }));
+                    thread.append(node);
+                    return getComputedStyle(node).display;
+                  };
+                  return [
+                    line("bubble live say say-progress", true),
+                    line("bubble live say say-progress", false),
+                    line("bubble say say-progress", false),
+                  ];
+                }"""
+            )
+            assert shown[0] != "none" and shown[1:] == ["none", "none"], shown
         finally:
             await browser.close()
