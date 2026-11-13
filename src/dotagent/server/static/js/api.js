@@ -291,7 +291,7 @@ export async function request(method, path, body) {
     throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
   }
   if (method !== "GET") {
-    // What a read on its way returns may be from before this change.
+    // A read on its way may return what was there before this change: the next one goes to the daemon (item 1169).
     sharedReads.clear();
   }
   if (!response.ok) {
@@ -383,7 +383,9 @@ export const api = {
 const sharedReads = new Map();
 
 /** `GET path`, shared with the same read already on its way; each caller gets a copy of its own, so that none sees
- * what another changes in it. A change sent meanwhile (`request`) lets the next read go to the daemon again. */
+ * what another changes in it. Once a change (`request`) is answered, the next read goes to the daemon again; a read
+ * asked while a change is on its way may share one from before it, and the page reads again on the change's own event
+ * (`AGENTS_CHANGED_EVENT` and the others). */
 export function sharedGet(path) {
   let pending = sharedReads.get(path);
   if (pending === undefined) {
