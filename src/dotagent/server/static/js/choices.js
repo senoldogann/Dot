@@ -86,9 +86,9 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  */
 export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onChange }) {
   let waiting = false;
-  // What the model's pill adds after the name on a phone (item 1121), where it alone stands for the choices: the
-  // approvals, the mode when one is named and the reasoning level. Painted once the pills exist.
-  let approvalsShort = "";
+  // What the model's pill adds after the name on a phone (item 1121), where it alone stands for the choices: the mode
+  // when one is named and the reasoning level. The approval mode is not among them: the owner read "Pay or send" as a
+  // part of the model's name. Painted once the pills exist.
   let reasoningShort = "";
   let paintPhonePill = () => undefined;
 
@@ -122,8 +122,6 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     // 833).
     optionsPill.element.toggleAttribute("data-yolo", shown === "yolo");
     setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);
-    approvalsShort = badge === null ? "" : badge.short;
-    paintPhonePill();
   }, told(kept.approvals));
   const goalMode = goalModePicker(told(kept.goalMode));
   const executionItems = [];
@@ -478,9 +476,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   paintPhonePill = () => {
     const option = modes.find((candidate) => candidate.id === modeId);
     const named = option === undefined || option.id === AUTO_MODE.id ? "" : option.label;
-    // The approvals first: what is cut on a narrow line is the end, and the least-asking mode must stay in sight (items
-    // 833 and 860).
-    const extra = [approvalsShort, named, reasoningShort].filter((word) => word !== "").join(" · ");
+    const extra = [named, reasoningShort].filter((word) => word !== "").join(" · ");
     const value = modelPill.element.querySelector(".composer-pill-value")?.textContent ?? "";
     modelPill.setValue(value, extra);
   };

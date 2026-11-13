@@ -190,3 +190,5 @@ async def test_a_step_s_streamed_words_and_their_held_tail_come_under_the_step_t
     (said,) = [data for kind, data in shown if kind == "assistant"]
     assert deltas and {data["step"] for data in deltas} == {said["step"]} == {1}, shown
     assert "".join(str(data["text"]) for data in deltas) == words == said["text"], shown
+    # A task's words stream as an update until the step ends with no call (item 1162), on OpenCode as on Dot's loop.
+    assert all(data["update"] is True for data in deltas), shown

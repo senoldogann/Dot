@@ -579,7 +579,9 @@ its steps and never what they typed, so that a change of the harness shows which
 **The state set** (item 1147, `src/dotagent/evals/state_tasks.py`) is two browser tasks whose site keeps every form it
 was sent, and which pass by that record: exactly one request with the right fields, whatever the answer says. One
 answers a sent application a moment late, where pressing again would send it twice; the other has a button that takes
-its first press and does nothing, where reporting done would leave the form unsent. `dotx eval check` plays their
+its first press and does nothing, where reporting done would leave the form unsent. A page of such a site shows
+what the site holds (`{last_<field>}`: what the newest request sent, and `SiteEndpoint.holds` until one came, item
+1156), so that the settings page shows the saved name once it was saved. `dotx eval check` plays their
 references and `tests/smoke/test_browser_state_tasks.py` the ways of seeming done that must fail: saying so, opening a page
 that looks like the answer, pressing once, sending twice. `dotx eval run --task state-apply-once --task
 state-save-second-press` plays them with a model; they are not in the catalog's own list, so the weekly score stays

@@ -276,3 +276,33 @@ async def test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answer
                     assert (await manager.wait(run.id)).status == "done"
             finally:
                 await browser.close()
+
+
+async def test_an_update_streams_under_the_line_and_a_message_steps_it_aside(own_home: Path) -> None:
+    """Item 1162: the words of a task's step stream as an update (their delta says ``update``), folded with the steps,
+    and the line keeps saying the work while they come; a message's words (a chat's) step the line aside, as the
+    message itself then says what goes on (the pre-push review asked for this lock)."""
+    async with _served(own_home) as (_manager, _address, port), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await browser.new_page()
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            states: list[str] = await page.evaluate(
+                """async () => {
+                  const { createWorkStatus } = await import("/js/workstatus.js");
+                  const line = createWorkStatus({
+                    rootRunId: "r1", active: true, queued: false, onToggle: () => undefined, face: null,
+                  });
+                  const words = (update) => ({
+                    run_id: "r1", kind: "delta", data: { kind: "text", text: "Checking it", step: 1, update },
+                  });
+                  line.push({ run_id: "r1", kind: "model_call", data: {} });
+                  line.push(words(true));
+                  const update = line.element.dataset.state;
+                  line.push(words(false));
+                  return [update, line.element.dataset.state];
+                }"""
+            )
+            assert states == ["working", "quiet"], states
+        finally:
+            await browser.close()

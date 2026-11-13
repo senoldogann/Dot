@@ -8,6 +8,7 @@ verified when that shows and uncertain when it does not, and is never sent twice
 shows already is not sent at all.
 """
 
+import asyncio
 import re
 import threading
 import time
@@ -18,11 +19,15 @@ from urllib.parse import parse_qsl, urlsplit
 
 import pytest
 import pytest_asyncio
+from playwright.async_api import Page
 
+from dotagent.browser import session as browser_session
+from dotagent.browser.driver import StepResult
 from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession, no_runs_at_work
-from dotagent.browser.types import ActOutcome, PageView, SecretField, Step, StepReport
+from dotagent.browser.types import ActOutcome, PageView, SecretField, SecretFieldCheck, Step, StepReport
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
+from dotagent.core.errors import BrowserError
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -51,7 +56,18 @@ Bounce</label>
 <button type="button" aria-label="Send" onclick="send('/submit')">Send</button>
 <button type="button" aria-label="Slow" onclick="send('/slow')">Slow</button>
 <button type="button" aria-label="Later" onclick="later()">Later</button>
+<button type="button" aria-label="Count"
+  onclick="navigator.sendBeacon('/count', 'pressed'); out.textContent = 'Counted'">Count</button>
 <a href="/done">Finished orders</a>
+<form action="/submit" method="post"><input type="hidden" name="name" value="Grace">
+<button aria-label="Post">Post</button>
+<button aria-label="Quiet" onclick="this.dataset.pressed = 1; return false">Quiet</button>
+<button aria-label="Checked"
+  onclick="this.dataset.pressed = 1; setTimeout(() => send('/submit'), 200); return false">Checked</button></form>
+<button type="button" aria-label="Pulse" onclick="later(); setTimeout(() => send('/submit'), 700)">Pulse</button>
+<button type="button" aria-label="Poll" onclick="setTimeout(() => fetch('/done'), 1200)">Poll</button>
+<form action="/slow" method="post" target="_blank"><input type="hidden" name="name" value="Elsa">
+<button aria-label="Elsewhere">Elsewhere</button></form>
 <p id="out"></p>
 <script>
 const out = document.getElementById('out');
@@ -87,6 +103,10 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         sent: bytes = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        if urlsplit(self.path).path == "/count":
+            # A beacon: the page never reads its answer, and it is no order.
+            self._send("")
+            return
         if urlsplit(self.path).path == "/slow":
             time.sleep(_SLOW_S)
         order: dict[str, str] = dict(parse_qsl(sent.decode("utf-8"), keep_blank_values=True))
@@ -403,3 +423,173 @@ async def test_an_address_is_waited_for_and_a_page_that_only_looks_like_an_answe
     assert "Order 1 received for Ada" in outcome.view.body
     # The page says an order was received, and the site took none: only its record says what was done.
     assert site.orders == []
+
+
+async def test_a_step_says_what_its_page_sent_and_what_the_server_answered(
+    browser: BrowserSession, site: _Site
+) -> None:
+    """Item 1158: a run whose click sent a form read the page, its requests and its scripts to learn whether anything
+    went out. The step says it: what the page sent to its own site, and the server's answer."""
+    view: PageView = await browser.open_url("sent", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "sent", [Step(action="click", ref=_ref(view, "Send", "button"))], False, refuse_secret_field, True
+    )
+    (click,) = outcome.steps
+    assert (click.outcome, click.checks) == ("done", ())
+    assert click.detail == f"its page sent POST {_address(site)}/submit → 200"
+    assert outcome.stopped is None and len(site.orders) == 1
+    # A beacon is not what a step was for: the page never reads its answer, so the step neither names nor awaits it.
+    counted: ActOutcome = await browser.act(
+        "sent", [Step(action="click", ref=_ref(view, "Count", "button"))], False, refuse_secret_field, True
+    )
+    assert counted.steps[0].detail == "" and "Counted" in counted.view.body
+
+
+async def test_a_forms_button_that_sends_nothing_says_so_and_one_that_sends_its_form_says_where(
+    browser: BrowserSession, site: _Site
+) -> None:
+    view: PageView = await browser.open_url("form", f"{_address(site)}/", True)
+    quiet: ActOutcome = await browser.act(
+        "form", [Step(action="click", ref=_ref(view, "Quiet", "button"))], False, refuse_secret_field, True
+    )
+    # The page changed (the button marked itself pressed), and nothing went out: the form was not sent.
+    assert quiet.steps[0].detail == (
+        "its form sent nothing to the site within 0.5 s (no request, the same address): the page below shows whether "
+        "it took the press"
+    )
+    assert site.orders == []
+    posted: ActOutcome = await browser.act(
+        "form", [Step(action="click", ref=_ref(view, "Post", "button"))], False, refuse_secret_field, True
+    )
+    assert posted.steps[0].detail == f"its page sent POST {_address(site)}/submit → 200"
+    assert posted.stopped == f"the page navigated to {_address(site)}/submit"
+    assert site.orders == [{"name": "Grace"}]
+    # A button that is no form's says nothing of a form.
+    again: PageView = await browser.open_url("form", f"{_address(site)}/", True)
+    later: ActOutcome = await browser.act(
+        "form", [Step(action="click", ref=_ref(again, "Later", "button"))], False, refuse_secret_field, True
+    )
+    assert "form" not in later.steps[0].detail
+
+
+async def test_what_was_sent_and_is_not_answered_stops_the_batch_and_is_not_sent_again(
+    browser: BrowserSession, site: _Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The server takes longer than a step waits: the step says that no answer has come, the steps after it are not
+    run, and the order arrives once."""
+    monkeypatch.setattr(browser_session, "_SENT_WAIT_S", 0.3)
+    view: PageView = await browser.open_url("unanswered", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "unanswered",
+        [
+            Step(action="click", ref=_ref(view, "Slow", "button")),
+            Step(action="click", ref=_ref(view, "Send", "button")),
+        ],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    slow, after = outcome.steps
+    assert slow.detail == f"its page sent POST {_address(site)}/slow → no answer yet"
+    assert (after.outcome, after.dispatched) == ("skipped", "not_sent")
+    assert outcome.stopped is not None and "has not answered yet: do not send the step again" in outcome.stopped
+    for _ in range(50):
+        if site.orders:
+            break
+        await asyncio.sleep(0.1)
+    assert len(site.orders) == 1
+
+
+async def test_a_form_its_script_sends_a_moment_later_is_not_said_to_have_sent_nothing(
+    browser: BrowserSession, site: _Site
+) -> None:
+    """The independent reader of item 1158: a form whose script checks it first changes the page at once and sends
+    later, and a line that said it sent nothing would have been read as a press to make again. The step waits as
+    long as a page that did not change is watched, and names what went out."""
+    view: PageView = await browser.open_url("checked", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "checked", [Step(action="click", ref=_ref(view, "Checked", "button"))], False, refuse_secret_field, True
+    )
+    assert outcome.steps[0].detail == f"its page sent POST {_address(site)}/submit → 200"
+    assert len(site.orders) == 1
+
+
+async def test_what_a_page_sends_by_itself_after_the_steps_look_is_not_the_steps(
+    browser: BrowserSession, site: _Site
+) -> None:
+    """A page that sends something of its own while a step waits for what it expects (a connection it keeps open
+    with POSTs): the request is not told as the step's, and the batch does not stop for it."""
+    view: PageView = await browser.open_url("pulse", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "pulse",
+        [Step(action="click", ref=_ref(view, "Pulse", "button"), expect_text="Arrived by itself")],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    (click,) = outcome.steps
+    assert (_statuses(click), click.detail, outcome.stopped) == (["verified"], "", None)
+    assert len(site.orders) == 1
+
+
+async def test_what_a_page_reads_by_itself_during_a_steps_wait_leaves_its_unchanged_finding(
+    browser: BrowserSession, site: _Site
+) -> None:
+    """The pre-push review of item 1158: a page that asks for something by itself while a step waits for its sight
+    (a chat that polls) had the step's "did not change" taken off its line, since any request counted. Only what
+    left by the end of the step's own look does."""
+    view: PageView = await browser.open_url("poll", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "poll",
+        [Step(action="click", ref=_ref(view, "Poll", "button"), expect_text="Never shown on this page")],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    (click,) = outcome.steps
+    assert _statuses(click) == ["uncertain"]
+    assert click.detail.startswith("but the page did not change"), click.detail
+
+
+async def test_a_form_sent_to_a_new_tab_is_not_said_to_have_sent_nothing(browser: BrowserSession, site: _Site) -> None:
+    """A form whose answer opens in a new tab goes out from that tab, so this one sends nothing: the batch stops for
+    the new tab and the line does not say that the form sent nothing, however late the server answers. (The pre-push
+    review of item 1158 named the case of a tab still on its way, which `_run_one` now excludes by itself; here
+    Chrome reports the tab at once, so this test holds the behaviour and not that one branch.)"""
+    view: PageView = await browser.open_url("elsewhere", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "elsewhere", [Step(action="click", ref=_ref(view, "Elsewhere", "button"))], False, refuse_secret_field, True
+    )
+    assert "sent nothing" not in outcome.steps[0].detail, outcome.steps[0].detail
+    assert outcome.stopped is not None and "tab" in outcome.stopped
+    for _ in range(50):
+        if site.orders:
+            break
+        await asyncio.sleep(0.1)
+    assert site.orders == [{"name": "Elsa"}]
+
+
+async def test_a_step_that_failed_after_its_page_sent_something_says_what_was_sent(
+    browser: BrowserSession, site: _Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A click that went out and then failed (the page left under it): a run told only that the step failed pressed
+    again, which is an order sent twice. The line names what the page sent, and the batch's stop says to look."""
+    stepped = browser_session.run_step
+
+    async def lost_after(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> StepResult:
+        await stepped(page, step, timeout_ms, secret_field)
+        raise BrowserError("the page went away under the click", {})
+
+    monkeypatch.setattr(browser_session, "run_step", lost_after)
+    view: PageView = await browser.open_url("lost", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "lost", [Step(action="click", ref=_ref(view, "Send", "button"))], False, refuse_secret_field, True
+    )
+    (click,) = outcome.steps
+    assert (click.outcome, click.dispatched) == ("failed", "unknown")
+    assert click.detail == f"the page went away under the click; its page sent POST {_address(site)}/submit → 200"
+    assert outcome.stopped == (
+        f"step 1 failed, and its page sent POST {_address(site)}/submit while it ran: look at the page before "
+        "sending the step again"
+    )
+    assert len(site.orders) == 1

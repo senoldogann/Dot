@@ -18,11 +18,11 @@ import time
 from collections import Counter
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urldefrag, urlsplit
+from urllib.parse import urldefrag, urlsplit, urlunsplit
 
 from playwright.async_api import (
     Browser,
@@ -46,6 +46,7 @@ from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, r
 from dotagent.browser.console import console_lines
 from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
+    NEVER_PRESSED,
     PageLines,
     Pulse,
     StepResult,
@@ -87,6 +88,7 @@ from dotagent.browser.pages import (
     ThreadTabs,
     add_note,
     attach_handlers,
+    chrome_lists,
     page_target_id,
     taken_in,
     target_id_of,
@@ -242,6 +244,10 @@ _TEACH_START_PAGE: str = "https://www.google.com/"
 _TAB_MARK_BYTES: int = 6
 # How long Chrome is given to list its tabs for the error of a new tab it did not hand over (item 1002).
 _ASK_TABS_S: float = 2.0
+# What the address of a new tab of Dot's begins with (its mark follows), and what a page that has no address yet
+# is reported with.
+_TAB_MARK: str = "about:blank#dot-"
+_NO_ADDRESS_YET: frozenset[str] = frozenset({"", ":", "about:blank"})
 # Dot's own Chrome at this zoom draws a page at the size it was given, which the page need not be asked for (item 358).
 _UNZOOMED: int = 100
 # The height of a tab given a width alone (``browser_viewport``, item 746): a phone's, 390 by 844 being an iPhone's.
@@ -519,6 +525,29 @@ def idle_background_tabs(thread: ThreadTabs, cutoff: float) -> list[Tab]:
     return [tab for index, tab in enumerate(thread.tabs) if index != thread.active and tab.last_used < cutoff]
 
 
+type ReportedPage = Literal["blank", "new tab of Dot's", "at an address"]
+
+
+def reported_kind(url: str) -> ReportedPage:
+    """What kind of page Playwright reported, by its address when it was reported: blank (which the tab waited for
+    is too, until its address commits), one of the new tabs Dot marks, or a page at an address. The address itself
+    is not kept: in the owner's Chrome it may be of a tab the owner opened, with whatever its query carries."""
+    if url.startswith(_TAB_MARK):
+        return "new tab of Dot's"
+    return "blank" if url in _NO_ADDRESS_YET else "at an address"
+
+
+def reported_meanwhile(kinds: Sequence[ReportedPage]) -> str:
+    """What Playwright reported while a tab that was not handed over was waited for: no page at all, or how many of
+    which kind (:func:`reported_kind`). The tab itself may be among them: one reported and not matched in time (its
+    id not told) shows here, where one never reported does not."""
+    if not kinds:
+        return "Playwright reported no page meanwhile"
+    counted: Counter[ReportedPage] = Counter(kinds)
+    parts: str = ", ".join(f"{count} {kind}" for kind, count in sorted(counted.items()))
+    return f"Playwright reported {len(kinds)} page{'s' if len(kinds) != 1 else ''} meanwhile: {parts}"
+
+
 async def _what_chrome_made(cdp: CDPSession, made: str | None) -> str:
     """What Chrome says of the tab ``made`` that it did not hand over (:func:`unhanded_tab`), for the error of the step.
     Chrome is given :data:`_ASK_TABS_S` to answer: a Chrome that cannot list its tabs either says why it made none."""
@@ -531,7 +560,25 @@ async def _what_chrome_made(cdp: CDPSession, made: str | None) -> str:
         return f"Chrome did not list its tabs within {_ASK_TABS_S:g} s either"
     except PlaywrightError as error:
         return f"Chrome could not list its tabs: {truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}"
-    return unhanded_tab(made, answer)
+    if not chrome_lists(made, answer):
+        return unhanded_tab(made, answer)
+    return f"{unhanded_tab(made, answer)}; {await _window_of(cdp, made)}"
+
+
+async def _window_of(cdp: CDPSession, made: str) -> str:
+    """Whether Chrome names the window of the tab ``made`` within :data:`_ASK_TABS_S` (item 1160). It is the first
+    thing Playwright asks of a new tab, and it reports no tab before every such question is answered: the record of
+    2026-11-13 showed a tab Chrome had made, at its address and with Playwright attached, that was never reported,
+    so what is left to learn is which of Playwright's questions Chrome did not answer. This one is the browser's
+    own; the others are the page's."""
+    try:
+        async with asyncio.timeout(_ASK_TABS_S):
+            answer: dict[str, object] = await cdp.send("Browser.getWindowForTarget", {"targetId": made})
+    except TimeoutError:
+        return f"Chrome did not name the tab's window within {_ASK_TABS_S:g} s"
+    except PlaywrightError as error:
+        return f"Chrome could not name the tab's window: {truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}"
+    return "Chrome names the tab's window" if "windowId" in answer else "Chrome's answer names no window for the tab"
 
 
 def _none_unattended(thread_id: str) -> bool:
@@ -620,6 +667,181 @@ _LOOK_AGAIN: str = "look again with browser_wait_text or browser_snapshot"
 type _Look = Callable[[int, bool], Awaitable[TextWaitEnd]]
 
 
+# What a step's page sent to its own site besides reads (item 1158). A step waits this long for the server's answer
+# before it says that none has come, and the steps of one batch this long together; its line names this many.
+_SENT_WAIT_S: float = 5.0
+_SENT_BATCH_S: float = 10.0
+# What a step waits at least, whatever its batch has left: an answer that is there already takes a round trip to
+# read, and a wait of nothing called it not answered.
+_SENT_FLOOR_S: float = 0.25
+# How long the page of a step that failed is given to take a turn before what it sent is read: a page that left or
+# froze under the step, which is why it failed, is not waited for as long as a step is.
+_FAILED_TURN_S: float = 1.5
+_SENT_SHOWN: int = 3
+_SENT_KEPT: int = 20
+# What a form or a script of the page sends and reads the answer of. A beacon (``ping``) is none: the page never
+# reads its answer, so no step was for it.
+_SENT_KINDS: frozenset[str] = frozenset({"document", "fetch", "xhr"})
+# The line of a press on a form's own button after which nothing left the page. It says what was seen and for how
+# long Dot looked, not that the press failed: a page that keeps its work in itself sends nothing either, and shows
+# what it took.
+_SENT_NOTHING: str = (
+    f"its form sent nothing to the site within {_EFFECT_WAIT_S:g} s (no request, the same address): the page below "
+    "shows whether it took the press"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class Sent:
+    """One request other than a read that a step's page sent to its own site: its method, where it went (no query),
+    and what the server answered: a status, ``None`` while none has come, or why the request failed."""
+
+    method: str
+    where: str
+    status: int | None
+    failed: str
+
+
+def same_site(first: str, second: str) -> bool:
+    """Whether two addresses are of one site: the same host, or names that end in the same two labels
+    (``api.shop.example`` and ``www.shop.example``); a host written as numbers is itself alone. What a page sends
+    to another site (a counter, an advertiser) is not what its step was for. No list of the suffixes names are sold
+    under is read, so two names under ``co.uk`` count as one site: what such a page sends there is named in the
+    step's line and waited for like its own, and nothing else is done with it."""
+    one: str = (urlsplit(first).hostname or "").lower()
+    other: str = (urlsplit(second).hostname or "").lower()
+    if not one or not other:
+        return False
+    if one == other:
+        return True
+    numbers: bool = any(host.replace(".", "").isdigit() or ":" in host for host in (one, other))
+    return not numbers and "." in one and one.split(".")[-2:] == other.split(".")[-2:]
+
+
+def sent_words(sent: Sequence[Sent]) -> str:
+    """What a step's line says its page sent (item 1158): each request with the server's answer, the first
+    :data:`_SENT_SHOWN` of them; empty when it sent none."""
+    if not sent:
+        return ""
+
+    def answer(one: Sent) -> str:
+        if one.failed:
+            return f"failed ({one.failed})"
+        return "no answer yet" if one.status is None else str(one.status)
+
+    shown: list[str] = [f"{one.method} {one.where} → {answer(one)}" for one in sent[:_SENT_SHOWN]]
+    more: str = f" and {len(sent) - _SENT_SHOWN} more" if len(sent) > _SENT_SHOWN else ""
+    return "its page sent " + "; ".join(shown) + more
+
+
+def form_sent_nothing(*, asked: bool, elsewhere: bool, moved_on: bool, told: bool) -> bool:
+    """Whether a press on a form's own button is said to have sent nothing to the site (item 1158). Not when the
+    page asked its site or anyone for anything (``asked``); not when the form may have gone another way
+    (``elsewhere``: a socket the page holds open, or a tab the press opened that is still on its way, where a form
+    sent to a new tab goes out); not when the batch has other news of the press (``moved_on``: a new address, tab or
+    dialog); and not when the step's line says already that the page did not change (``told``), which says it."""
+    return not (asked or elsewhere or moved_on or told)
+
+
+def unanswered(sent: Sequence[Sent]) -> Sent | None:
+    """The first request of a step that the server has not answered and that did not fail, if there is one."""
+    return next((one for one in sent if one.status is None and not one.failed), None)
+
+
+@dataclass(frozen=True, slots=True)
+class _Waits:
+    """How long the steps of one batch may still wait together: for what they were expected to show, and for the
+    answers to what they sent."""
+
+    expected: float
+    sent: float
+
+
+@dataclass(frozen=True, slots=True)
+class _StepMade:
+    """What running one step of a batch came to: its report, why the batch stops after it (``None``: it goes on),
+    whether a check of its own is not verified, and the waits the batch has left."""
+
+    report: StepReport
+    stopped: str | None
+    unverified: bool
+    left: _Waits
+
+
+def _not_done(
+    index: int, step: Step, outcome: Literal["failed", "skipped"], detail: str, dispatched: Dispatch
+) -> StepReport:
+    """The report of a step that failed or was skipped."""
+    return StepReport(
+        index=index, description=describe_step(step), outcome=outcome, detail=detail, dispatched=dispatched
+    )
+
+
+class _Sends:
+    """Hears, while a step runs, the requests other than reads that its page sends to its own site (item 1158)."""
+
+    def __init__(self, page: Page) -> None:
+        self._page: Page = page
+        self._site: str = page.url
+        self._requests: list[Request] = []
+        self._hearing: bool = False
+
+    def start(self) -> None:
+        self._page.on("request", self._heard)
+        self._hearing = True
+
+    def stop(self) -> None:
+        """Hear no more; what was heard is kept. Stopping twice is stopping once."""
+        if self._hearing:
+            self._hearing = False
+            self._page.remove_listener("request", self._heard)
+
+    def _heard(self, request: Request) -> None:
+        if (
+            len(self._requests) < _SENT_KEPT
+            and request.method.upper() not in _READ_METHODS
+            and request.resource_type in _SENT_KINDS
+            and same_site(self._site, request.url)
+        ):
+            self._requests.append(request)
+
+    def heard(self) -> bool:
+        return bool(self._requests)
+
+    async def answers(self, timeout_s: float, named: Callable[[str], str]) -> tuple[Sent, ...]:
+        """Each request heard so far with the server's answer, waited for ``timeout_s`` at most together; ``named``
+        writes an address as the chat may read it."""
+        asking: list[asyncio.Task[Response | None]] = [
+            asyncio.ensure_future(request.response()) for request in self._requests
+        ]
+        try:
+            if asking:
+                await asyncio.wait(asking, timeout=max(0.0, timeout_s))
+        finally:
+            # An answer still waited for is given up, also when the run is stopped during the wait.
+            for pending in asking:
+                if not pending.done():
+                    pending.cancel()
+        sent: list[Sent] = []
+        for request, answer in zip(self._requests, asking, strict=True):
+            parts = urlsplit(request.url)
+            where: str = named(urlunsplit((parts.scheme, parts.netloc, parts.path, "", "")))[:_SENT_CHARS]
+            status: int | None = None
+            failed: str = ""
+            if not answer.done():
+                pass
+            elif answer.cancelled() or answer.exception() is not None:
+                failed = "the page went away"
+            else:
+                response: Response | None = answer.result()
+                if response is None:
+                    failed = truncate_middle(request.failure or "the request failed", _SENT_CHARS)
+                else:
+                    status = response.status
+            sent.append(Sent(method=request.method.upper(), where=where, status=status, failed=failed))
+        return tuple(sent)
+
+
 def effect_of_expected(effect: str, sights: Sequence[OutcomeCheck]) -> str:
     """What :meth:`BrowserSession._effect` found, as the report of a step that named what it expects says it (item
     1145). That the page stayed as it was for half a second is not said once what the step expected was seen: it came
@@ -631,9 +853,10 @@ def effect_of_expected(effect: str, sights: Sequence[OutcomeCheck]) -> str:
 
 
 def _dispatch_of(error: BrowserError) -> Dispatch:
-    """Whether a step that failed with ``error`` went out: one refused before anything was sent, or whose click
-    something in front took, did not; any other may have."""
-    if isinstance(error, StepNotSent) or error.context.get("covered_by"):
+    """Whether a step that failed with ``error`` went out: one refused before anything was sent, whose click
+    something in front took, or whose press Playwright tried and never made (item 1158: its element was not shown,
+    enabled and still in time), did not; any other may have."""
+    if isinstance(error, StepNotSent) or error.context.get("covered_by") or error.context.get(NEVER_PRESSED):
         return "not_sent"
     return "unknown"
 
@@ -2609,13 +2832,21 @@ class BrowserSession:
         # a plain blank page at once, the address the URL rules and the tab views know.
         # A page Playwright reports before its address committed is told by the id Chrome gave the tab (the review of
         # every module): matched by its address once, it was let pass and the call waited out its time.
-        mark: str = f"about:blank#dot-{secrets.token_hex(_TAB_MARK_BYTES)}"
+        mark: str = f"{_TAB_MARK}{secrets.token_hex(_TAB_MARK_BYTES)}"
         target: dict[str, object] = {"url": mark, "background": True}
         if self._config.mode == "attach":
             target["newWindow"] = True
         cdp: CDPSession = await browser.new_browser_cdp_session()
         arrived: asyncio.Queue[Page] = asyncio.Queue()
-        heard: Callable[[Page], None] = arrived.put_nowait
+        # What kind of pages Playwright reported while this tab was waited for, for the error of a tab not handed
+        # over (item 1160): none says that Playwright reported nothing, some that it reported pages and none was
+        # matched. Never their addresses.
+        reported: list[ReportedPage] = []
+
+        def heard(page: Page) -> None:
+            reported.append(reported_kind(page.url))
+            arrived.put_nowait(page)
+
         context.on("page", heard)
         made: str | None = None
         try:
@@ -2630,6 +2861,7 @@ class BrowserSession:
                     {
                         "error": f"Chrome did not hand over the new tab within {self._config.action_timeout_s:g} s",
                         "chrome": await _what_chrome_made(cdp, made),
+                        "reported": reported_meanwhile(reported),
                     },
                 ) from error
             await page.goto("about:blank", wait_until="commit")
@@ -3056,21 +3288,13 @@ class BrowserSession:
         self, thread: ThreadTabs, tab: Tab, steps: Sequence[Step], secret_field: SecretFieldCheck
     ) -> tuple[list[StepReport], str | None]:
         """Run ``steps`` in order, each with whether it went out and what was checked of it (item 1145). The batch
-        stops at the first failure or surprise, as before; at a step whose expected result was not seen; and before a
-        step that acts on what the steps before it left when one of their own checks is not verified."""
-        config: BrowserConfig = self._config
+        stops at the first failure or surprise, as before; at a step whose expected result was not seen; at one whose
+        page sent something the server has not answered (item 1158); and before a step that acts on what the steps
+        before it left when one of their own checks is not verified."""
         reports: list[StepReport] = []
         stopped: str | None = None
         unverified: int | None = None
-        expect_left: float = _EXPECT_BATCH_S
-
-        def report(index: int, step: Step, outcome: Literal["failed", "skipped"], detail: str, sent: Dispatch) -> None:
-            reports.append(
-                StepReport(
-                    index=index, description=describe_step(step), outcome=outcome, detail=detail, dispatched=sent
-                )
-            )
-
+        left: _Waits = _Waits(expected=_EXPECT_BATCH_S, sent=_SENT_BATCH_S)
         for index, step in enumerate(steps, start=1):
             if stopped is None and unverified is not None and step.acts_on_what_was_left():
                 # What to do next is said whole (item 1149): a run of the owner's wrote the field again with other
@@ -3081,110 +3305,220 @@ class BrowserSession:
                     f"you meant, send the steps from {index} on again without writing it again"
                 )
             if stopped is not None:
-                report(index, step, "skipped", "", "not_sent")
+                reports.append(_not_done(index, step, "skipped", "", "not_sent"))
                 continue
-            before: _Watch = self._watch(thread, tab)
-            pulse: Pulse | None = await page_pulse(tab.page) if _moves_the_page(step) else None
-            requests: int = tab.requests
+            # The page is heard from before the step until the step's own look at it is over (:meth:`_run_one`).
+            sends: _Sends = _Sends(tab.page)
+            sends.start()
             try:
-                await self._refuse_shown_already(tab, step)
-                result: StepResult = await run_step(tab.page, step, _ms(config.action_timeout_s), secret_field)
-            except BrowserError as error:
-                if tab.page.is_closed():
-                    # The page closed under the step (a callback that did its job, a tab the user closed): not a
-                    # failure.
-                    report(index, step, "skipped", _CLOSED_STEP_DETAIL, "unknown")
-                    stopped = closed_tab_stop(tab.page.url)
-                    continue
-                report(index, step, "failed", _error_detail(error), _dispatch_of(error))
-                stopped = f"step {index} failed"
-                continue
-            except ApprovalNoted as error:
-                # A yes with a note (item 1140): the step waits for the note to be read; the batch's result reads the
-                # page or the screen again, which lets the yes go, so doing it again asks the owner once more.
-                report(index, step, "failed", f"Not done yet: {noted_in_batch_text(error.note)}.", "not_sent")
-                stopped = "a step waits for the user's note to be read"
-                continue
-            except ApprovalParked as error:
-                # Kept for the owner (item 482): its words say that it did not happen and waits for them.
-                report(index, step, "failed", error.message, "not_sent")
-                stopped = "a step waits for the user"
-                continue
-            except (PolicyDenied, ApprovalRejected) as error:
-                # The gate refused the step at a field that takes a secret.
-                detail: str = f"Not allowed: {error.message}. Do not retry this step or look for a way around it."
-                report(index, step, "failed", detail, "not_sent")
-                stopped = "a step was not allowed"
-                continue
-            except HandedOff as error:
-                detail = f"the user handled this step themselves ({error.message})"
-                reports.append(
-                    StepReport(
-                        index=index,
-                        description=describe_step(step),
-                        outcome="done",
-                        detail=detail,
-                        dispatched="not_sent",
-                    )
-                )
-                stopped = "the user took over this step; look at the page before going on"
-                continue
-            refuted: OutcomeCheck | None = next(
-                (check for check in result.checks if check.status == "contradicted"), None
-            )
-            if refuted is not None:
-                # The step went out and what it wrote did not take: it failed, as a write an editor dropped does.
-                reports.append(
-                    StepReport(
-                        index=index,
-                        description=describe_step(step),
-                        outcome="failed",
-                        detail=refuted.reason,
-                        dispatched="sent",
-                        checks=result.checks,
-                    )
-                )
-                stopped = f"step {index} failed"
-                continue
-            opening: bool = False
-            if step.has_side_effects():
-                opening = await self._let_events_land(tab)
-            effect: str = ""
-            if pulse is not None and not tab.page.is_closed():
-                # Only a click is meant to focus a field; Enter pressed in one leaves it there whatever it did.
-                # A click at a point names no ref, so the field it focuses is read from the page (item 1142). A click
-                # on a ref, and Enter, are not: a Send that the browser answers by focusing an empty required field,
-                # and Enter in one, still did nothing.
-                clicked: str | None = step.ref if step.action in _MOVING_ACTIONS else None
-                at_point: bool = step.action in _MOVING_ACTIONS and step.ref is None
-                effect = await self._effect(thread, tab, before, pulse, requests, clicked, at_point)
-            sights: tuple[OutcomeCheck, ...] = ()
-            if step.expects() and not tab.page.is_closed():
-                began: float = time.monotonic()
-                sights = await self._await_expected(tab, step, expect_left)
-                expect_left = max(0.0, expect_left - (time.monotonic() - began))
-                effect = effect_of_expected(effect, sights)
-            reports.append(
-                StepReport(
-                    index=index,
-                    description=describe_step(step),
-                    outcome="done",
-                    detail=effect or result.note,
-                    dispatched="sent",
-                    checks=(*result.checks, *sights),
-                )
-            )
-            stopped = describe_surprise(before, self._watch(thread, tab))
-            if stopped is None and opening:
-                stopped = _TAB_OPENING
-            if stopped is None and holds_back(sights):
-                stopped = (
-                    f"step {index} was sent, and what it was expected to show was not seen: look at the page before "
-                    "going on, and do not send the step again unseen"
-                )
-            if unverified is None and holds_back(result.checks):
+                made: _StepMade = await self._run_one(thread, tab, index, step, secret_field, sends, left)
+            finally:
+                sends.stop()
+            reports.append(made.report)
+            stopped, left = made.stopped, made.left
+            if unverified is None and made.unverified:
                 unverified = index
         return reports, stopped
+
+    async def _run_one(
+        self,
+        thread: ThreadTabs,
+        tab: Tab,
+        index: int,
+        step: Step,
+        secret_field: SecretFieldCheck,
+        sends: _Sends,
+        left: _Waits,
+    ) -> _StepMade:
+        """Run one step of a batch: its report, why the batch stops after it, whether a check of its own is not
+        verified, and the waits the batch has left."""
+        before: _Watch = self._watch(thread, tab)
+        pulse: Pulse | None = await page_pulse(tab.page) if _moves_the_page(step) else None
+        requests: int = tab.requests
+        try:
+            await self._refuse_shown_already(tab, step)
+            result: StepResult = await run_step(tab.page, step, _ms(self._config.action_timeout_s), secret_field)
+            went_at: float = time.monotonic()
+        except BrowserError as error:
+            if tab.page.is_closed():
+                # The page closed under the step (a callback that did its job, a tab the user closed): not a failure.
+                closed: StepReport = _not_done(index, step, "skipped", _CLOSED_STEP_DETAIL, "unknown")
+                return _StepMade(report=closed, stopped=closed_tab_stop(tab.page.url), unverified=False, left=left)
+            went: Dispatch = _dispatch_of(error)
+            lost: tuple[Sent, ...] = ()
+            if went != "not_sent":
+                # A step that may have gone out and failed (a page that left under the click): what its page sent
+                # meanwhile is said, since a run told only that the step failed sends it again.
+                await self._let_failed_step_show(tab)
+                sends.stop()
+                lost, left = await self._answers(tab, sends, left)
+            detail: str = "; ".join(part for part in (_error_detail(error), sent_words(lost)) if part)
+            failed: StepReport = _not_done(index, step, "failed", detail, went)
+            why: str = f"step {index} failed"
+            if lost:
+                why += (
+                    f", and its page sent {lost[0].method} {lost[0].where} while it ran: look at the page before "
+                    "sending the step again"
+                )
+            return _StepMade(report=failed, stopped=why, unverified=False, left=left)
+        except ApprovalNoted as error:
+            # A yes with a note (item 1140): the step waits for the note to be read; the batch's result reads the
+            # page or the screen again, which lets the yes go, so doing it again asks the owner once more.
+            noted: StepReport = _not_done(
+                index, step, "failed", f"Not done yet: {noted_in_batch_text(error.note)}.", "not_sent"
+            )
+            return _StepMade(
+                report=noted, stopped="a step waits for the user's note to be read", unverified=False, left=left
+            )
+        except ApprovalParked as error:
+            # Kept for the owner (item 482): its words say that it did not happen and waits for them.
+            parked: StepReport = _not_done(index, step, "failed", error.message, "not_sent")
+            return _StepMade(report=parked, stopped="a step waits for the user", unverified=False, left=left)
+        except (PolicyDenied, ApprovalRejected) as error:
+            # The gate refused the step at a field that takes a secret.
+            refusal: str = f"Not allowed: {error.message}. Do not retry this step or look for a way around it."
+            refused: StepReport = _not_done(index, step, "failed", refusal, "not_sent")
+            return _StepMade(report=refused, stopped="a step was not allowed", unverified=False, left=left)
+        except HandedOff as error:
+            handed: StepReport = StepReport(
+                index=index,
+                description=describe_step(step),
+                outcome="done",
+                detail=f"the user handled this step themselves ({error.message})",
+                dispatched="not_sent",
+            )
+            return _StepMade(
+                report=handed,
+                stopped="the user took over this step; look at the page before going on",
+                unverified=False,
+                left=left,
+            )
+        refuted: OutcomeCheck | None = next((check for check in result.checks if check.status == "contradicted"), None)
+        if refuted is not None:
+            # The step went out and what it wrote did not take: it failed, as a write an editor dropped does.
+            dropped: StepReport = StepReport(
+                index=index,
+                description=describe_step(step),
+                outcome="failed",
+                detail=refuted.reason,
+                dispatched="sent",
+                checks=result.checks,
+            )
+            return _StepMade(report=dropped, stopped=f"step {index} failed", unverified=False, left=left)
+        opening: bool = False
+        if step.has_side_effects():
+            opening = await self._let_events_land(tab)
+        effect: str = ""
+        if pulse is not None and not tab.page.is_closed():
+            # Only a click is meant to focus a field; Enter pressed in one leaves it there whatever it did.
+            # A click at a point names no ref, so the field it focuses is read from the page (item 1142). A click
+            # on a ref, and Enter, are not: a Send that the browser answers by focusing an empty required field,
+            # and Enter in one, still did nothing.
+            clicked: str | None = step.ref if step.action in _MOVING_ACTIONS else None
+            at_point: bool = step.action in _MOVING_ACTIONS and step.ref is None
+            effect = await self._effect(thread, tab, before, pulse, requests, clicked, at_point)
+        if result.submits and not effect.startswith(PAGE_UNCHANGED):
+            # The page changed at once, and a form whose script sends it after a check of its own has sent
+            # nothing yet: it is given the time a page that did not change was watched for.
+            await self._let_form_send(thread, tab, before, requests, went_at)
+        # What the page sends from here on is not this step's: a request it makes by itself while the step waits
+        # for an answer or a sight (a connection it keeps open with POSTs) would be told as the step's.
+        sends.stop()
+        looked: int = tab.requests
+        sights: tuple[OutcomeCheck, ...] = ()
+        if step.expects() and not tab.page.is_closed():
+            began: float = time.monotonic()
+            sights = await self._await_expected(tab, step, left.expected)
+            left = replace(left, expected=max(0.0, left.expected - (time.monotonic() - began)))
+            effect = effect_of_expected(effect, sights)
+        # What the step's page sent is waited for, so that the steps after it do not run on a page whose server has
+        # not answered, and its answer stands in the step's line (item 1158).
+        sent, left = await self._answers(tab, sends, left)
+        surprise: str | None = describe_surprise(before, self._watch(thread, tab))
+        if effect.startswith(PAGE_UNCHANGED) and (sent or looked != requests):
+            # A request left just after the page had been watched: it did change, and a click that sent something
+            # is not one to try again with a script (item 781). Counted up to the end of the step's own look: what
+            # a page asks for by itself during the waits after it (a chat that polls) leaves the finding as it is.
+            effect = ""
+        said: list[str] = [effect or result.note, sent_words(sent)]
+        if result.submits and form_sent_nothing(
+            asked=bool(sent) or tab.requests != requests,
+            elsewhere=opening or tab.sockets > 0,
+            moved_on=surprise is not None,
+            told=effect.startswith(PAGE_UNCHANGED),
+        ):
+            said.append(_SENT_NOTHING)
+        report: StepReport = StepReport(
+            index=index,
+            description=describe_step(step),
+            outcome="done",
+            detail="; ".join(part for part in said if part),
+            dispatched="sent",
+            checks=(*result.checks, *sights),
+        )
+        stopped: str | None = surprise
+        if stopped is None and opening:
+            stopped = _TAB_OPENING
+        if stopped is None and holds_back(sights):
+            stopped = (
+                f"step {index} was sent, and what it was expected to show was not seen: look at the page before "
+                "going on, and do not send the step again unseen"
+            )
+        waiting: Sent | None = unanswered(sent)
+        if stopped is None and waiting is not None:
+            stopped = (
+                f"step {index}'s page sent {waiting.method} {waiting.where} and the server has not answered yet: "
+                "do not send the step again; wait for the answer (browser_wait_text) or look again "
+                "(browser_snapshot)"
+            )
+        return _StepMade(report=report, stopped=stopped, unverified=holds_back(result.checks), left=left)
+
+    async def _let_failed_step_show(self, tab: Tab) -> None:
+        """Let the page of a step that failed and may have gone out take a turn, :data:`_FAILED_TURN_S` at most, so
+        that Chrome has told of a request the step set off before what was sent is read. A page that cannot take
+        one is left as it is: the step's own failure is what its report says."""
+        try:
+            await let_page_turn(tab.page, _ms(_FAILED_TURN_S))
+        except BrowserError as error:
+            _log.info("browser_failed_step_turn", error=error.message, url=truncate_middle(tab.page.url, 200))
+
+    async def _answers(self, tab: Tab, sends: _Sends, left: _Waits) -> tuple[tuple[Sent, ...], _Waits]:
+        """What ``sends`` heard with the server's answers, and the waits the batch has left after waiting for them:
+        :data:`_SENT_WAIT_S` at most, less when the batch has less left, never under :data:`_SENT_FLOOR_S`. An
+        answer that is a new page is waited for until the page is there, within the same wait."""
+        if not sends.heard() or tab.page.is_closed():
+            return (), left
+        asked: float = time.monotonic()
+        wait: float = max(_SENT_FLOOR_S, min(_SENT_WAIT_S, left.sent))
+        sent: tuple[Sent, ...] = await sends.answers(wait, partial(self._shown_to, tab.page))
+        await self._let_answer_commit(tab, wait - (time.monotonic() - asked))
+        return sent, replace(left, sent=max(0.0, left.sent - (time.monotonic() - asked)))
+
+    async def _let_form_send(self, thread: ThreadTabs, tab: Tab, before: _Watch, requests: int, went_at: float) -> None:
+        """Wait until the page of a form whose button was pressed at ``went_at`` sends something or moves on,
+        :data:`_EFFECT_WAIT_S` after the press at most (item 1158): a form whose script checks it first (a token it
+        asks for, a field it validates) sends later than the page's first change, and a line that said it sent
+        nothing would have been read as a press to make again."""
+        while True:
+            moved: bool = (
+                tab.page.is_closed()
+                or tab.requests != requests
+                or describe_surprise(before, self._watch(thread, tab)) is not None
+            )
+            if moved or time.monotonic() - went_at >= _EFFECT_WAIT_S:
+                break
+            await asyncio.sleep(_EFFECT_POLL_S)
+
+    async def _let_answer_commit(self, tab: Tab, timeout_s: float) -> None:
+        """Let a navigation that a step's request began commit, ``timeout_s`` at most (item 1158): the server's answer
+        comes before the page is on its new address, and a batch that read the address in between went on with its
+        next step on a page that was leaving. One that takes longer is left to the settling after the batch."""
+        if tab.nav_idle.is_set() or tab.page.is_closed():
+            return
+        try:
+            await asyncio.wait_for(tab.nav_idle.wait(), timeout=max(0.0, timeout_s))
+        except TimeoutError:
+            _log.info("browser_sent_answer_not_committed", url=truncate_middle(tab.page.url, 200), waited_s=timeout_s)
 
     async def _refuse_shown_already(self, tab: Tab, step: Step) -> None:
         """Refuse, before it goes, a step that expects to see what the page shows already (item 1145): seen after

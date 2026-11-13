@@ -133,6 +133,18 @@ function newBubble(scope, step, live) {
   return { node, body, step, text: "", drawn: [], caret, queued: false, ended: false };
 }
 
+/**
+ * Whether the agent's line `node` is an update on the way to its calls or its message (item 1131), `live` while its
+ * words still stream. A screen reader hears an update apart from the answer (whose article is named Answer): the kind
+ * comes from the events, never from the words. The article keeps its speaker's name first.
+ */
+function sayKind(node, progress, live) {
+  node.className = ["bubble", live ? "live" : "", "say", progress ? "say-progress" : ""].filter((name) => name !== "").join(" ");
+  const speaker = node.dataset.speaker ?? node.getAttribute("aria-label") ?? "";
+  node.dataset.speaker = speaker;
+  node.setAttribute("aria-label", progress ? t("outcome.updateOf", { speaker }) : speaker);
+}
+
 // What stands between two of the agent's lines without anyone else speaking: its steps, thoughts and notes, and what
 // it asks or shows on the way (a card, a hand-off to an agent, a page, a restart).
 const NOT_SPEAKING = "details.steps, details.thought, .note, .approval, .agent-handoff, .shown-page, details.restart";
@@ -517,7 +529,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       live.node.remove();
       return;
     }
-    live.node.className = "bubble say";
+    // An update stays one (sayKind): only its step's end says it was the message.
+    live.node.classList.remove("live");
     const body = prose(live.text);
     live.body.replaceWith(body);
     // Its step's end may still come for it: it is drawn there again (the assistant handler), not in a second message.
@@ -1113,14 +1126,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const target = bubble ?? (settled !== undefined ? { node: settled.node, body: settled.body } : newBubble(scope, data.step, false));
       // A message said on the way to a step's calls is the run telling what it does next (item 1131): it folds with the
       // steps, and the line of the work says it while the run is at it. A message with no call after it stays one.
-      const progress = narrates(data.tool_calls);
-      target.node.className = progress ? "bubble say say-progress" : "bubble say";
-      // A screen reader hears it as an update on the way, apart from the answer (whose article is named Answer): the
-      // kind comes from the event (a message with calls after it), never from its words. The article keeps its
-      // speaker's name first.
-      const speaker = target.node.dataset.speaker ?? target.node.getAttribute("aria-label") ?? "";
-      target.node.dataset.speaker = speaker;
-      target.node.setAttribute("aria-label", progress ? t("outcome.updateOf", { speaker }) : speaker);
+      sayKind(target.node, narrates(data.tool_calls), false);
       target.body.replaceWith(prose(data.text));
       scope.replies.push({ node: target.node, text: data.text, step: data.step });
       if (!ORDINARY_ENDS.has(data.finish)) {
@@ -1168,6 +1174,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         // The step writes: its thought comes out of the group before its message, as on a page loaded later.
         liftThought(scope);
         scope.live = newBubble(scope, data.step, true);
+        // Words a run outside a chat writes are an update until its step ends with no call (the daemon's "update"):
+        // they stream where they will stay, not as a message that folds into the steps at the step's end.
+        sayKind(scope.live.node, data.update === true, true);
       }
       const live = scope.live;
       live.text += data.text;

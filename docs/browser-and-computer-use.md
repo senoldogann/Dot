@@ -237,7 +237,10 @@ Both modes share what follows.
   through; it does not say that what the step was for happened. Beside it stands each check: **verified** (Dot saw it),
   **contradicted** (Dot read the opposite), **uncertain** (sent, and its result was not seen), or **not checked**
   (nothing was looked at). A failed step says whether it went out: not sent (a ref that is gone, an option the dropdown
-  does not have, a click something in front took), sent, or may have been sent. The line above the result counts them.
+  does not have, a click something in front took, a click whose element was not shown, enabled and still in time (a
+  button that stayed disabled too) or a hover whose element was not shown and still, which Playwright's own log
+  tells as tried and never made, item 1158), sent, or may have been sent.
+  The line above the result counts them.
 - A press (a click, a double or right click, a check or uncheck) first looks whether its element takes the pointer
   (item 1153): Playwright's own trial of it, which sends nothing and lets the cookie banner's decliner run, twice for at
   most 1.5 s. The same thing still in front of the element on both looks is said at once, named, with how to close it
@@ -274,6 +277,26 @@ Both modes share what follows.
   on: the fields of one form do not wait for each other, and its button waits for a look. Verified says that the page
   showed it, not that a server took it, and a change the page makes later than its turn shows in the next look. The
   call's own `expect` stays what it was, the typed judge's estimate of words the model chose, and is no check.
+
+  A step's line also says what its page sent to its own site while the step ran, and what the server answered (item
+  1158): `its page sent POST https://shop.example/order → 200`. It names the requests that are not reads (a `POST`,
+  `PUT`, `PATCH` or `DELETE` that a form or a script of the page sent; a beacon, whose answer the page never reads, is
+  not one), the first three, each without its query, and only those to the page's own site: the same host, or a name
+  that ends in the same two labels (no list of public suffixes is read, so two names under `co.uk` count as one
+  site). The page is heard from before the step until Dot's own look at what the step did is over, so a request the
+  page makes by itself later, while the step waits for an answer or a sight, is not told as the step's. Dot waits for
+  the answer, 5 s at most for a step and 10 s over the steps of one batch. An answer that has not come is said (`no
+  answer yet`) and the batch stops there: the steps after it would run on a page whose server has not answered, and
+  sending the step again would send it twice. A step that went out and then failed says what its page sent
+  meanwhile, for the same reason. A press on a form's own button after which nothing left the page within half a
+  second says that too (`its form sent nothing to the site within 0.5 s`), which is what was seen and not a failure:
+  a page that keeps its work in itself sends nothing either, and the page below shows which it is. It is not said of
+  a page that holds a socket open, which may have sent its form there, of a press that opened a tab still on its way
+  (a form sent to a new tab goes out from that tab), nor of a dialog's form. A step that was not sent says nothing of
+  what its page sent meanwhile: that was the page's own. None of this is a
+  check: an answer of 200 says that the server took a request, not that what the step was for happened, so such a
+  step stays not checked unless something of it was read back or awaited. It needs no word from the model: a click
+  that names nothing it expects is still told by what it sent.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a
@@ -494,7 +517,11 @@ Both modes share what follows.
   Chrome reports it before its address commits. A new tab that Chrome does not hand over within `action_timeout_s`,
   that cannot be set up or whose run stops meanwhile is closed, not left open with no chat to close it (item 800). The
   error of one not handed over says what Chrome lists of it (item 1002): gone, or its address, whether Playwright
-  attached to it and whether it is in the browser context of the other tabs. A
+  attached to it and whether it is in the browser context of the other tabs. For a tab Chrome still lists it also
+  says whether Chrome names the tab's window, which is the first thing Playwright asks of a new tab before it reports
+  it, and how many pages Playwright did report meanwhile and of what kind (blank, a new tab of Dot's, or at an
+  address, which is never named: in the owner's Chrome it may be a tab of the owner's; item 1160). The cause of such
+  a tab is not known yet, and these tell the browser's side of the handover from the page's the next time. A
   quiet read's tab is closed the way it was made, through Chrome's own `Target.closeTarget`: Playwright's close never
   came back for a tab whose failed navigation Chrome was still committing its error page in (item 960).
   macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own

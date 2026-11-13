@@ -37,7 +37,12 @@ said nothing new). States of their own are said too, each from its event: "Waiti
 state once, through a status region, never each call nor the seconds of the bar over the box. What the run says on the way to its calls ("Checking the domain now")
 is its work told, not a message (item 1131): it folds with the steps, and the line says the newest of it while the step's
 calls run ("Checking the domain now…"); shown with the steps, it reads as a quiet note among them, with a rule at its
-left and named a progress update to a screen reader, where the answer is named Answer. Nothing is said that the run is not doing: while it writes a message the line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
+left and named a progress update to a screen reader, where the answer is named Answer. A run outside a chat streams
+its words as such an update from the first word, as nearly all of them are (item 1162; 443 of 498 steps with words in
+the owner's week), and they become a message only when the step ends with no call but finish: before, they streamed as
+a message and folded into the steps once the step ended. An answer written as a reply (OpenCode's last, or a
+first step's) is so seen whole when its step ends, not word by word. Nothing is said that the run is not doing: while it writes a
+message the line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
 over and has its answer, the line goes and **Show the steps** stands in the answer's foot, beside the copy, the speaker
 and the time, where the pointer rests (item 842; on a touch screen it is a row of the sheet a hold of the answer opens, item 1064),
 and turns to *Hide the steps* once

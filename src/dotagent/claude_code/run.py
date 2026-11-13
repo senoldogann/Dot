@@ -95,7 +95,7 @@ from dotagent.agent.prompt import THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
-from dotagent.agent.streammask import StreamMask
+from dotagent.agent.streammask import StreamMask, delta_event
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
 from dotagent.claude_code.env import claude_env
 from dotagent.claude_code.stream import (
@@ -499,7 +499,7 @@ class _Follow:
         return self.agent.runtime
 
     async def show(self, delta: StreamDelta) -> None:
-        await self.emit("delta", {"kind": delta.kind, "text": delta.text, "step": self.steps + 1}, False)
+        await self.emit("delta", delta_event(delta, self.steps + 1, self.agent.run.mode), False)
 
     async def emit(self, kind: str, data: JsonObject, persisted: bool) -> None:
         await self.runtime.bus.emit(self.agent.run.id, kind, data, persisted)
