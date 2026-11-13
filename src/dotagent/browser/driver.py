@@ -1087,17 +1087,35 @@ async def _read_field(locator: Locator) -> FieldReading:
     )
 
 
-async def _read_after(page: Page, locator: Locator, before: FieldReading, timeout_ms: int) -> FieldReading:
+def _shows_option(reading: FieldReading, wanted: str) -> bool:
+    """Whether the option a dropdown shows chosen is ``wanted``, by its value or its label as a choice finds it."""
+    shown: Dropdown = Dropdown(
+        options=(DropdownOption(label=reading.label, value=reading.value, selected=True, disabled=False),)
+    )
+    return has_option(shown, wanted)
+
+
+def _never(reading: FieldReading) -> bool:
+    """What a field that is as it was shows of a text put in at its caret: nothing, as the text is there no more
+    often than before."""
+    del reading
+    return False
+
+
+async def _read_after(
+    page: Page, locator: Locator, before: FieldReading, timeout_ms: int, holds: Callable[[FieldReading], bool]
+) -> FieldReading:
     """The field once the page took a turn after a step wrote into it, so that a page that puts its own value back
-    has done so. A field that is as it was is read again for :data:`_READ_BACK_WAIT_S`: only then did it not take
-    what was written."""
+    has done so. A field that is as it was is read again for :data:`_READ_BACK_WAIT_S`, since only then did it not
+    take what was written; unless it holds what was asked already (``holds``), which leaves nothing to wait for."""
     try:
         await let_page_turn(page, timeout_ms)
-    except BrowserError:
+    except BrowserError as error:
+        _log.warning("browser_field_unread", url=truncate_middle(page.url, _ERROR_CHARS), error=error.message)
         return FieldReading(kind="unreadable", value="", label="")
     after: FieldReading = await _read_field(locator)
     waited: float = 0.0
-    while after == before and after.kind == "value" and waited < _READ_BACK_WAIT_S:
+    while after == before and after.kind == "value" and not holds(after) and waited < _READ_BACK_WAIT_S:
         await asyncio.sleep(_READ_BACK_POLL_S)
         waited += _READ_BACK_POLL_S
         after = await _read_field(locator)
@@ -1160,10 +1178,7 @@ def _chosen(before: FieldReading, after: FieldReading, wanted: str) -> StepResul
         return _NO_CHECK
     if before.kind == "unreadable" or after.kind != "value":
         return _unreadable("the dropdown shows the option chosen")
-    shown: Dropdown = Dropdown(
-        options=(DropdownOption(label=after.label, value=after.value, selected=True, disabled=False),)
-    )
-    return StepResult(checks=(judge_chosen(has_option(shown, wanted), after == before),), note="")
+    return StepResult(checks=(judge_chosen(_shows_option(after, wanted), after == before),), note="")
 
 
 async def _ticked(page: Page, locator: Locator, asked: bool, timeout_ms: int) -> StepResult:
@@ -1172,7 +1187,12 @@ async def _ticked(page: Page, locator: Locator, asked: bool, timeout_ms: int) ->
     try:
         await let_page_turn(page, timeout_ms)
         now: bool = await locator.is_checked(timeout=_FIELD_PROBE_TIMEOUT_MS)
-    except (PlaywrightError, BrowserError):
+    except (PlaywrightError, BrowserError) as error:
+        _log.warning(
+            "browser_field_unread",
+            url=truncate_middle(page.url, _ERROR_CHARS),
+            error=truncate_middle(str(error), _ERROR_CHARS),
+        )
         return _unreadable(f"the box is {'ticked' if asked else 'clear'}")
     return StepResult(checks=(judge_ticked(asked, now),), note="")
 
@@ -1455,9 +1475,15 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     return edited
                 held: FieldReading = await _read_field(locator)
                 await locator.fill(_text_of(step), timeout=timeout_ms)
-                return _written(
-                    held, await _read_after(page, locator, held, timeout_ms), _text_of(step), judge_replaced
+                filled: FieldReading = await _read_after(
+                    page,
+                    locator,
+                    held,
+                    timeout_ms,
+                    # A field that held the text already is as it was, and holds it.
+                    lambda reading: judge_replaced(reading.value, reading.value, _text_of(step)).status == "verified",
                 )
+                return _written(held, filled, _text_of(step), judge_replaced)
             case "type":
                 edited = await _into_editor(
                     page,
@@ -1513,7 +1539,10 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                 )
                 held = await _read_field(locator)
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
-                return _chosen(held, await _read_after(page, locator, held, timeout_ms), _text_of(step))
+                chosen: FieldReading = await _read_after(
+                    page, locator, held, timeout_ms, lambda reading: _shows_option(reading, _text_of(step))
+                )
+                return _chosen(held, chosen, _text_of(step))
             case "press":
                 if key_enters_text(_key_of(step)):
                     await locator.focus(timeout=timeout_ms)
@@ -1539,7 +1568,7 @@ async def _keyed(page: Page, locator: Locator, before: FieldReading, text: str, 
     checked: the break may have sent the form and emptied the field, which is no refusal of the text."""
     if "\n" in text or "\r" in text:
         return _NO_CHECK
-    return _written(before, await _read_after(page, locator, before, timeout_ms), text, judge_added)
+    return _written(before, await _read_after(page, locator, before, timeout_ms, _never), text, judge_added)
 
 
 async def _scroll_state(page: Page, locator: Locator | None, centre: list[float], timeout_s: float) -> str | None:
