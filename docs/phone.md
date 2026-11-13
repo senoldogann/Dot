@@ -221,8 +221,8 @@ page's colour behind it, and the conversation scrolls under it, its last line ke
 composer grows (items 374 and 401). At rest the composer is the "+", the words and the send (item 1120); once its
 words are touched or typed in, the words take their whole line and the line under them holds the "+", the model, the
 context meter, the microphone and the send, each 36 px, and a touch elsewhere puts that line away again. The model's
-pill stands for every choice of the run (item 1121): after the name it says the approvals (first, so that the
-least-asking mode's "Pay or send" is never the word cut), the mode when one is named and the reasoning level in small words, and its menu holds them in
+pill stands for every choice of the run (item 1121): after the name it says the mode when one is named and the
+reasoning level in small words, not the approvals, which the owner read as a part of the model's name (item 1163), and its menu holds them in
 tabs under a bar at its top (item 1122): Model, Reasoning when the model offers a choice, Options (the approvals and
 How Dot works) and Mode, the menu keeping one height as the tabs change and opening on Model. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or

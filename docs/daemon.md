@@ -207,8 +207,8 @@ which brings them on a bar of their own under the words, with the send, and puts
 While they are away, the least-asking approval mode still shows as its pill ("Pay or send"), since the run then asks
 next to nothing (item 860: a payment, a message or a post), and so does the size of the chat once it is near full. A
 phone's box rests quieter, at the owner's ask (item 1120): the "+", the words and the send alone, the approvals' pill
-too out of sight until the words are touched; then the model's pill says the approvals first before the mode and the
-reasoning ([Phone](phone.md)), and a phone has no Model and options button. The bar of the choices never wraps: the **+** and the mode at
+too out of sight until the words are touched; then the model's pill says the mode and the reasoning, not the
+approvals (item 1163; [Phone](phone.md)), and a phone has no Model and options button. The bar of the choices never wraps: the **+** and the mode at
 the left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
 reads, when they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir
 şeyi değiştirme", "sadece araştır"; "read-only" or "salt okunur" opening a sentence counts, "stay", "remain", "work", "operate",
