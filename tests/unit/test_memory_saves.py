@@ -102,7 +102,7 @@ async def test_a_note_deleted_while_its_rewrite_waits_on_the_embedding_leaves_no
     try:
         saved: SavedMemory = await save_memory(index, NOTE, ["finance"], None, None, None, False)
         rewriting: asyncio.Task[MemoryRecord] = asyncio.create_task(
-            rewrite_memory_note(index, saved.record.id, OTHER, ["receipts"], "run_1", False)
+            rewrite_memory_note(index, saved.record.id, OTHER, ["receipts"], "run_1", False, None)
         )
         # The rewrite found the note, and waits on the embedder; the owner deletes the note meanwhile.
         await asyncio.sleep(_EMBED_S / 2)

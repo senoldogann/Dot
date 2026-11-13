@@ -5611,12 +5611,13 @@ class Store:
         vector: Sequence[float] | None,
         source_run: str | None,
         tainted: bool,
+        new_expiry: float | None,
     ) -> MemoryRecord:
         """Rewrite a memory's text and tags, written now by ``source_run``. A tainted run's rewrite marks the note
         tainted; a clean one leaves the mark a note had. The owner's correction mark comes off: this text is the
-        run's."""
+        run's. ``new_expiry`` is when the note now stops holding; ``None`` keeps the time it had."""
         return await self._rewrite_memory(
-            memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted), None
+            memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted), None, new_expiry
         )
 
     @_writing
@@ -5631,7 +5632,7 @@ class Store:
         """The user's rewrite of a memory's text and tags, as :meth:`update_memory`; in the same write the mark of
         having been saved while reading outside content comes off, as the user vouches for the text they save (item
         384), and the note is marked as the owner's correction so a run that wrote it is handed the new text."""
-        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "?", 0, OWNER_EDIT)
+        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "?", 0, OWNER_EDIT, None)
 
     async def _rewrite_memory(
         self,
@@ -5643,14 +5644,16 @@ class Store:
         mark: Literal["MAX(tainted, ?)", "?"],
         tainted: int,
         edited_by: str | None,
+        new_expiry: float | None,
     ) -> MemoryRecord:
         """The statements of a rewrite, committed together; ``mark`` is how the note's mark is set from ``tainted``,
-        and ``edited_by`` is who corrected it apart from the author (``None`` when the rewrite is a run's)."""
+        ``edited_by`` is who corrected it apart from the author (``None`` when the rewrite is a run's), and
+        ``new_expiry`` when it now stops holding (``None`` keeps the time it had, read in the same statement)."""
         tag_text: str = ",".join(tags)
         updated = await self._db.execute(
             f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark},"
-            " edited_by = ? WHERE id = ?",
-            (content, tag_text, time.time(), source_run, tainted, edited_by, memory_id),
+            " edited_by = ?, expires_at = COALESCE(?, expires_at) WHERE id = ?",
+            (content, tag_text, time.time(), source_run, tainted, edited_by, new_expiry, memory_id),
         )
         if updated.rowcount == 0:
             # The note was deleted while its rewrite waited on the embedding (item 556): nothing of it is written, as
