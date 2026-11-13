@@ -574,7 +574,9 @@ no seconds, and one saved before acts and cached tokens were counted shows `-` f
 its report after every attempt, so an interrupted run keeps what it measured. Each attempt keeps its trace too (item
 1159, `outcomes[].trace` of the report's JSON): its model calls with their seconds and tokens and its tool calls with
 their seconds, whether they went through and the first line of their result, in order, an act's with the actions of
-its steps and never what they typed, so that a change of the harness shows which steps it saved or added.
+its steps and never what they typed, so that a change of the harness shows which steps it saved or added. A call whose
+event says nothing of how it went (a result without `ok`, a model call without `error`) has `ok` null, not true (item
+1167).
 
 **The state set** (item 1147, `src/dotagent/evals/state_tasks.py`) is two browser tasks whose site keeps every form it
 was sent, and which pass by that record: exactly one request with the right fields, whatever the answer says. One

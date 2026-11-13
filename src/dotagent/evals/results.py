@@ -29,7 +29,9 @@ class TraceStep(FrozenModel):
     kind: Literal["model", "tool"]
     name: str
     seconds: float
-    ok: bool
+    # Whether the call went through as its event says it (item 1167): None when the event says nothing of it, which is
+    # not counted as gone through (a tool result without ``ok``, a model call without ``error``).
+    ok: bool | None
     input_tokens: int
     output_tokens: int
     note: str

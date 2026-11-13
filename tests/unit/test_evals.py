@@ -823,7 +823,11 @@ def test_a_trace_keeps_the_steps_and_calls_in_order_and_never_what_an_act_typed(
     """Item 1159: an attempt's trace is its model calls and tool calls in order, an act's line the actions of its steps
     and the first line of its result, and none of the text a step typed."""
     events = (
-        _event(1, "model_call", {"purpose": "step", "seconds": 1.5, "input_tokens": 9000, "output_tokens": 80}),
+        _event(
+            1,
+            "model_call",
+            {"purpose": "step", "seconds": 1.5, "input_tokens": 9000, "output_tokens": 80, "error": None},
+        ),
         _event(
             2,
             "tool_call",
@@ -859,5 +863,13 @@ def test_a_trace_keeps_the_steps_and_calls_in_order_and_never_what_an_act_typed(
         ("model", "step", False),
     ]
     assert trace[1].note == "[fill,click] Steps: 2 done, 0 failed"
+    # An event that says nothing of how its call went is not counted as gone through (item 1167).
+    unsaid = run_trace(
+        (
+            _event(5, "tool_result", {"call_id": "c2", "tool": "browser_open", "seconds": 0.1, "text": "Tab 1"}),
+            _event(6, "model_call", {"purpose": "step", "seconds": 1.0, "input_tokens": 1, "output_tokens": 1}),
+        )
+    )
+    assert [step.ok for step in unsaid] == [None, None]
     assert (trace[0].input_tokens, trace[0].output_tokens, trace[0].seconds) == (9000, 80, 1.5)
     assert "secret words" not in repr(trace)

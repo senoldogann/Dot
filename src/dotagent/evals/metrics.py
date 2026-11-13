@@ -7,6 +7,7 @@ from pydantic import JsonValue
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.plan import PLAN_EVENT, plan_from_event, unevidenced_done
 from dotagent.core.errors import EvalError
+from dotagent.core.types import JsonObject
 from dotagent.evals.results import RunMetrics, TraceStep
 from dotagent.evals.types import EasyWay
 from dotagent.llm.calls import CALL_EVENT
@@ -143,6 +144,21 @@ def _actions_of(args: JsonValue) -> str:
     return ",".join(str(step.get("action", "?")) for step in steps if isinstance(step, dict))
 
 
+def _went_through(data: JsonObject) -> bool | None:
+    """Whether a tool call went through, as its result's ``ok`` says; None when the result says nothing of it (item
+    1167): an absent field is no success."""
+    ok: JsonValue = data.get("ok")
+    return ok if isinstance(ok, bool) else None
+
+
+def _answered(data: JsonObject) -> bool | None:
+    """Whether a model call answered, as its event's ``error`` says (null when it did; the event's writer,
+    :func:`dotagent.llm.calls.call_event_data`, writes it always); None when the event has none (item 1167)."""
+    if "error" not in data:
+        return None
+    return data["error"] is None
+
+
 def run_trace(events: Sequence[EventRecord]) -> tuple[TraceStep, ...]:
     """What a run did, in order (item 1159): each model call and each tool call, the act calls with the actions of
     their steps. At most :data:`_TRACE_MOST` moments, the first ones."""
@@ -158,7 +174,7 @@ def run_trace(events: Sequence[EventRecord]) -> tuple[TraceStep, ...]:
                     kind="model",
                     name=str(data.get("purpose", "")),
                     seconds=_seconds_of(data.get("seconds")),
-                    ok=data.get("error") is None,
+                    ok=_answered(data),
                     input_tokens=_int_of(data.get("input_tokens")),
                     output_tokens=_int_of(data.get("output_tokens")),
                     note="",
@@ -172,7 +188,7 @@ def run_trace(events: Sequence[EventRecord]) -> tuple[TraceStep, ...]:
                     kind="tool",
                     name=str(data.get("tool", "")),
                     seconds=_seconds_of(data.get("seconds")),
-                    ok=data.get("ok") is not False,
+                    ok=_went_through(data),
                     input_tokens=0,
                     output_tokens=0,
                     note=f"[{did}] {first}" if did else first,
