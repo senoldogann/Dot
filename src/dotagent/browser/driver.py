@@ -2083,6 +2083,21 @@ async def no_dialog_open(page: Page) -> bool | None:
         raise _failure("looking for a dialog failed", page, {}, error) from error
 
 
+def _shown(scope: Page | Frame, text: str) -> Locator:
+    """Where ``text`` shows in ``scope``, as the page view a run reads names it (item 1154): its visible words, or the
+    name of a visible element the view gives by it, a field's placeholder (`textbox "Subject"`), an ``aria-label`` or a
+    label's words (a button drawn as an icon, `button "Select image 6"`), an image's alt text (`img "Gallery image"`).
+    A wait for a word the view showed only so waited out its whole time: 17 of 69 failed waits of two weeks on the
+    owner's Dot, 415 s, had their words in the very view they returned."""
+    return (
+        scope.get_by_text(text)
+        .or_(scope.get_by_label(text))
+        .or_(scope.get_by_placeholder(text))
+        .or_(scope.get_by_alt_text(text))
+        .filter(visible=True)
+    )
+
+
 async def wait_for_text_or_dialog(
     page: Page, text: str, timeout_ms: int, watch_dialogs: bool | None = None
 ) -> TextWaitEnd:
@@ -2093,7 +2108,7 @@ async def wait_for_text_or_dialog(
     waiting behind it. ``watch_dialogs`` says whether no dialog was open when a wait made of several began (item 774);
     ``None`` looks now. A page that does not say within ``_COUNT_TIMEOUT_S`` which of them it shows ends this slice of
     the wait as its time does (item 1134): the wait looks again within its own time."""
-    wanted: Locator = page.get_by_text(text).filter(visible=True)
+    wanted: Locator = _shown(page, text)
     dialogs: Locator = page.locator(_MODALS).filter(visible=True)
     try:
         if watch_dialogs is None:
@@ -2120,7 +2135,7 @@ async def text_in_frames(page: Page, text: str) -> bool:
     async def shows(frame: Frame) -> bool:
         try:
             async with asyncio.timeout(_PULSE_TIMEOUT_S):
-                return await frame.get_by_text(text).filter(visible=True).count() > 0
+                return await _shown(frame, text).count() > 0
         except (TimeoutError, PlaywrightError):
             return False
 
@@ -2131,7 +2146,7 @@ async def text_shown(page: Page, text: str) -> bool | None:
     """Whether ``text`` is visible on ``page`` now, in its main document or a frame below it (item 1145): what a step
     that expects to see it is asked before it goes. ``None`` when the page did not say within ``_COUNT_TIMEOUT_S``."""
     try:
-        if await _count(page.get_by_text(text).filter(visible=True)) > 0:
+        if await _count(_shown(page, text)) > 0:
             return True
     except TimeoutError:
         return None
