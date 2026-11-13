@@ -235,7 +235,9 @@ Both modes share what follows.
   through; it does not say that what the step was for happened. Beside it stands each check: **verified** (Dot saw it),
   **contradicted** (Dot read the opposite), **uncertain** (sent, and its result was not seen), or **not checked**
   (nothing was looked at). A failed step says whether it went out: not sent (a ref that is gone, an option the dropdown
-  does not have, a click something in front took), sent, or may have been sent. The line above the result counts them.
+  does not have, a click something in front took, a click or a hover whose element was not shown or did not stand
+  still in time, which Playwright's own log tells as tried and never made, item 1158), sent, or may have been sent.
+  The line above the result counts them.
 - A press (a click, a double or right click, a check or uncheck) first looks whether its element takes the pointer
   (item 1153): Playwright's own trial of it, which sends nothing and lets the cookie banner's decliner run, twice for at
   most 1.5 s. The same thing still in front of the element on both looks is said at once, named, with how to close it
@@ -286,7 +288,9 @@ Both modes share what follows.
   meanwhile, for the same reason. A press on a form's own button after which nothing left the page within half a
   second says that too (`its form sent nothing to the site within 0.5 s`), which is what was seen and not a failure:
   a page that keeps its work in itself sends nothing either, and the page below shows which it is. It is not said of
-  a page that holds a socket open, which may have sent its form there, nor of a dialog's form. None of this is a
+  a page that holds a socket open, which may have sent its form there, of a press that opened a tab still on its way
+  (a form sent to a new tab goes out from that tab), nor of a dialog's form. A step that was not sent says nothing of
+  what its page sent meanwhile: that was the page's own. None of this is a
   check: an answer of 200 says that the server took a request, not that what the step was for happened, so such a
   step stays not checked unless something of it was read back or awaited. It needs no word from the model: a click
   that names nothing it expects is still told by what it sent.

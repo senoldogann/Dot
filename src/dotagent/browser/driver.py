@@ -423,15 +423,35 @@ _CONSENT_HANDLER_TIMES: int = 6
 _CONSENT_CLICK_TIMEOUT_MS: float = 2000.0
 
 
+# Playwright's log of a press: it says that it tries the press, and, once the element is shown, still and takes the
+# pointer, that it makes it. A log with the first and without the second is of a press that never reached the page.
+# Only the actions whose making Playwright logs are read so (a click, which a check and an uncheck are too, a double
+# click, a hover, a tap): it never says that it makes a fill, so a fill that failed stays one that may have gone out.
+_PRESS_TRIED: re.Pattern[str] = re.compile(r"attempting (click|dblclick|hover|tap) action")
+_PRESS_MADE: str = "performing {} action"
+# The key of a failed call's context that says so (item 1158): such a step was not sent.
+NEVER_PRESSED: str = "never_pressed"
+
+
+def never_pressed(log: str) -> bool:
+    """Whether Playwright's ``log`` of a failed press says that it tried the press and never made it (the element
+    was not shown in time, or kept moving): nothing went to the page."""
+    tried: re.Match[str] | None = _PRESS_TRIED.search(log)
+    return tried is not None and _PRESS_MADE.format(tried.group(1)) not in log
+
+
 def _failure(message: str, page: Page, fields: dict[str, str | None], error: PlaywrightError) -> BrowserError:
-    """The error for a failed call; when another element took the click, ``covered_by`` names it (read from the whole
-    Playwright log, before the log is shortened)."""
+    """The error for a failed call; when another element took the click, ``covered_by`` names it, and a press that
+    never reached the page is marked (:data:`NEVER_PRESSED`); both are read from the whole Playwright log, before
+    the log is shortened."""
     raw: str = str(error)
     covering: re.Match[str] | None = _INTERCEPTOR.search(raw)
     context: dict[str, str | None] = {**fields, "url": page.url, "error": truncate_middle(raw, _ERROR_CHARS)}
     if covering is not None:
         # A covering text names the element whose subtree it belongs to, which is the one to close.
         context["covered_by"] = truncate_middle(covering.group(2) or covering.group(1), _COVERING_CHARS)
+    if never_pressed(raw):
+        context[NEVER_PRESSED] = "true"
     return BrowserError(message, context)
 
 
@@ -1268,7 +1288,8 @@ async def _submits_form(locator: Locator) -> bool:
             is True
         )
     except (PlaywrightError, TimeoutError) as error:
-        _log_unread(locator, error)
+        why: str = truncate_middle(str(error), _ERROR_CHARS) or type(error).__name__
+        _log.warning("browser_press_unasked", url=truncate_middle(locator.page.url, _ERROR_CHARS), error=why)
         return False
 
 
@@ -1640,8 +1661,11 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             timeout_ms = max(timeout_ms - round((time.monotonic() - started) * 1000), _LEAST_PRESS_MS)
         match step.action:
             case "click":
+                asked: float = time.monotonic()
                 submits: bool = await _submits_form(locator)
-                await locator.click(timeout=timeout_ms, force=force)
+                # The press keeps what is left of its time after that question too.
+                left_ms: int = max(timeout_ms - round((time.monotonic() - asked) * 1000), _LEAST_PRESS_MS)
+                await locator.click(timeout=left_ms, force=force)
                 return StepResult(checks=(), note="", submits=submits)
             case "double_click":
                 await locator.dblclick(timeout=timeout_ms, force=force)

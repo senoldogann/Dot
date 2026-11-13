@@ -46,6 +46,7 @@ from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, r
 from dotagent.browser.console import console_lines
 from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
+    NEVER_PRESSED,
     PageLines,
     Pulse,
     StepResult,
@@ -797,9 +798,10 @@ def effect_of_expected(effect: str, sights: Sequence[OutcomeCheck]) -> str:
 
 
 def _dispatch_of(error: BrowserError) -> Dispatch:
-    """Whether a step that failed with ``error`` went out: one refused before anything was sent, or whose click
-    something in front took, did not; any other may have."""
-    if isinstance(error, StepNotSent) or error.context.get("covered_by"):
+    """Whether a step that failed with ``error`` went out: one refused before anything was sent, whose click
+    something in front took, or whose press Playwright tried and never made (item 1158: its element was not shown
+    in time), did not; any other may have."""
+    if isinstance(error, StepNotSent) or error.context.get("covered_by") or error.context.get(NEVER_PRESSED):
         return "not_sent"
     return "unknown"
 
@@ -3376,7 +3378,9 @@ class BrowserSession:
             effect = ""
         said: list[str] = [effect or result.note, sent_words(sent)]
         # A page that holds a socket open may have sent its form there, where no request shows.
-        silent: bool = not sent and tab.requests == requests and tab.sockets == 0 and surprise is None
+        # Nor is it said while a tab the press opened is on its way: a form sent to a new tab goes out there.
+        gone_elsewhere: bool = opening or tab.sockets > 0
+        silent: bool = not sent and tab.requests == requests and surprise is None and not gone_elsewhere
         if result.submits and silent and not effect.startswith(PAGE_UNCHANGED):
             said.append(_SENT_NOTHING)
         report: StepReport = StepReport(
