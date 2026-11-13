@@ -2187,7 +2187,8 @@ export function mount(root, ctx) {
    * as it stands instead of filling in as its stream is read (the stream ends after them, item 734). */
   async function storedMessages() {
     const read = [];
-    for await (const message of sse(`/runs/${runId}/stream${query({ after: 0, stored: true })}`, controller.signal, () => undefined)) {
+    // Read once, with no retry: a short trip away does not cut it (item 1152), only a silence does.
+    for await (const message of sse(`/runs/${runId}/stream${query({ after: 0, stored: true })}`, controller.signal, () => undefined, Infinity)) {
       read.push(message);
     }
     return read;
