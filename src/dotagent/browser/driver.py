@@ -1101,16 +1101,25 @@ def _read_args() -> list[str | int]:
     return [f"{secret_selector()}, {_FILLED_SELECTOR}", _READ_BACK_CHARS]
 
 
-def _unread(locator: Locator, why: str) -> FieldReading:
-    """A field that could not be read: the step's check says so, and why is kept in the log."""
+def _log_unread(locator: Locator, error: BaseException) -> None:
+    """Keep why a field could not be read; the step's check says that it could not."""
+    why: str = truncate_middle(str(error), _ERROR_CHARS) or type(error).__name__
     _log.warning("browser_field_unread", url=truncate_middle(locator.page.url, _ERROR_CHARS), error=why)
-    return _UNREAD
+
+
+async def _asked[T](asking: Awaitable[T], timeout_ms: float) -> T:
+    """What the page answers to ``asking`` within ``timeout_ms``. Playwright's own time on an ``evaluate`` is for
+    finding the element only: a script that waits for a turn the page never takes (a frame that is frozen, or held by
+    work of its own) would wait without end (item 1151's review). ``TimeoutError`` past that time."""
+    async with asyncio.timeout(timeout_ms / 1000):
+        return await asking
 
 
 def _reading_of(raw: object, locator: Locator) -> FieldReading:
     """What :data:`_FIELD_READ_SCRIPT` answered, as a reading; anything else is ``unreadable``."""
     if not isinstance(raw, dict) or raw.get("kind") not in ("value", "secret", "none"):
-        return _unread(locator, "no answer")
+        _log.warning("browser_field_unread", url=truncate_middle(locator.page.url, _ERROR_CHARS), error="no answer")
+        return _UNREAD
     value: object = raw.get("value")
     label: object = raw.get("label")
     return FieldReading(
@@ -1122,21 +1131,31 @@ async def _read_field(locator: Locator) -> FieldReading:
     """What the field ``locator`` names holds (:class:`FieldReading`); a page that does not answer, or an element that
     is gone, is ``unreadable``."""
     try:
-        raw: object = await locator.evaluate(_FIELD_READ_SCRIPT, _read_args(), timeout=_FIELD_PROBE_TIMEOUT_MS)
+        raw: object = await _asked(
+            locator.evaluate(_FIELD_READ_SCRIPT, _read_args(), timeout=_FIELD_PROBE_TIMEOUT_MS),
+            _FIELD_PROBE_TIMEOUT_MS,
+        )
     except (PlaywrightError, TimeoutError) as error:
-        return _unread(locator, truncate_middle(str(error), _ERROR_CHARS))
+        _log_unread(locator, error)
+        return _UNREAD
     return _reading_of(raw, locator)
 
 
-async def _marked_reading(locator: Locator) -> tuple[object, FieldReading]:
+async def _marked_reading(locator: Locator, timeout_ms: int) -> tuple[object, FieldReading]:
     """The marking of the field ``locator`` names, which the step's secret check reads, and what the field holds
-    before the step, in one answer of the page (:data:`_MARKED_READ_SCRIPT`, item 1151). A page that does not answer
-    fails the step, as asking for the marking alone did; an answer that is not the script's is no marking to go by."""
-    raw: object = await locator.evaluate(_MARKED_READ_SCRIPT, _read_args())
+    before the step, in one answer of the page (:data:`_MARKED_READ_SCRIPT`, item 1151), within the time a step is
+    given. A page that does not answer fails the step before anything went to it, as does an answer that is not the
+    script's: neither is a marking to go by."""
+    try:
+        raw: object = await _asked(locator.evaluate(_MARKED_READ_SCRIPT, _read_args(), timeout=timeout_ms), timeout_ms)
+    except TimeoutError as error:
+        raise StepNotSent(
+            "the page did not answer in time when the field was read before the step (a script may be holding it); "
+            "wait, then take a new snapshot",
+            {"url": locator.page.url, "waited_ms": timeout_ms},
+        ) from error
     if not isinstance(raw, dict) or "marking" not in raw:
-        raise BrowserError(
-            "the field could not be read before the step; take a new snapshot", {"url": locator.page.url}
-        )
+        raise StepNotSent("the field could not be read before the step; take a new snapshot", {"url": locator.page.url})
     return raw["marking"], _reading_of(raw.get("reading"), locator)
 
 
@@ -1164,9 +1183,10 @@ async def _read_after(
     :data:`_READ_BACK_WAIT_S`, since only then did it not take what was written; unless it holds what was asked
     already (``holds``), which leaves nothing to wait for."""
     try:
-        raw: object = await locator.evaluate(_TURN_READ_SCRIPT, _read_args(), timeout=timeout_ms)
+        raw: object = await _asked(locator.evaluate(_TURN_READ_SCRIPT, _read_args(), timeout=timeout_ms), timeout_ms)
     except (PlaywrightError, TimeoutError) as error:
-        return _unread(locator, truncate_middle(str(error), _ERROR_CHARS))
+        _log_unread(locator, error)
+        return _UNREAD
     after: FieldReading = _reading_of(raw, locator)
     waited: float = 0.0
     while after == before and after.kind == "value" and not holds(after) and waited < _READ_BACK_WAIT_S:
@@ -1240,10 +1260,10 @@ async def _ticked(locator: Locator, asked: bool, timeout_ms: int) -> StepResult:
     (:data:`_TURN_TICKED_SCRIPT`): a page that puts the box back has done so by then. A box whose state the script
     does not know is asked of Playwright."""
     try:
-        raw: object = await locator.evaluate(_TURN_TICKED_SCRIPT, timeout=timeout_ms)
+        raw: object = await _asked(locator.evaluate(_TURN_TICKED_SCRIPT, timeout=timeout_ms), timeout_ms)
         now: bool = raw if isinstance(raw, bool) else await locator.is_checked(timeout=_FIELD_PROBE_TIMEOUT_MS)
     except (PlaywrightError, TimeoutError) as error:
-        _unread(locator, truncate_middle(str(error), _ERROR_CHARS))
+        _log_unread(locator, error)
         return _unreadable(f"the box is {'ticked' if asked else 'clear'}")
     return StepResult(checks=(judge_ticked(asked, now),), note="")
 
@@ -1510,7 +1530,7 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             case "hover":
                 await locator.hover(timeout=timeout_ms)
             case "fill":
-                marking, held = await _marked_reading(locator)
+                marking, held = await _marked_reading(locator, timeout_ms)
                 await _check_secret_field(page, marking, ref, secret_field, _text_of(step))
                 edited: StepResult | None = await _into_editor(
                     page,
@@ -1582,7 +1602,7 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     await page.mouse.up()  # a drag that fails or is cancelled after the press leaves the button down
                     raise
             case "select":
-                marking, held = await _marked_reading(locator)
+                marking, held = await _marked_reading(locator, timeout_ms)
                 await _check_secret_field(page, marking, ref, secret_field, _text_of(step))
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
                 chosen: FieldReading = await _read_after(

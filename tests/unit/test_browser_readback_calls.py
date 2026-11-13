@@ -1,6 +1,8 @@
 """How many times a step that wrote into a field asks its page (item 1151): once before it and once after it, where
 each used to be two or three. A stand-in plays the element, so each call is counted and no browser runs."""
 
+import asyncio
+import time
 from typing import cast
 
 import pytest
@@ -8,7 +10,7 @@ from playwright.async_api import Locator
 
 from dotagent.browser import driver
 from dotagent.browser.driver import FieldReading
-from dotagent.core.errors import BrowserError
+from dotagent.core.errors import StepNotSent
 
 _HELD: dict[str, str] = {"kind": "value", "value": "Ada", "label": ""}
 
@@ -37,13 +39,26 @@ class _Element:
         return True
 
 
+class _Frozen(_Element):
+    """An element of a page that never answers: its frame is frozen, or held by work of its own."""
+
+    def __init__(self) -> None:
+        super().__init__([])
+
+    async def evaluate(self, script: str, *given: object, **options: object) -> object:
+        del given, options
+        self.asked.append(script)
+        await asyncio.Event().wait()
+        return None
+
+
 def _locator(element: _Element) -> Locator:
     return cast(Locator, element)
 
 
 async def test_the_marking_and_what_the_field_holds_come_in_one_answer() -> None:
     element: _Element = _Element([{"marking": "email", "reading": _HELD}])
-    marking, held = await driver._marked_reading(_locator(element))
+    marking, held = await driver._marked_reading(_locator(element), 8000)
     assert (marking, held) == ("email", FieldReading(kind="value", value="Ada", label=""))
     assert element.asked == [driver._MARKED_READ_SCRIPT]
 
@@ -51,13 +66,28 @@ async def test_the_marking_and_what_the_field_holds_come_in_one_answer() -> None
 async def test_a_reading_that_failed_leaves_the_marking_the_secret_check_reads() -> None:
     # The script answers null for a reading that threw: the field's marking is still what the page said of it.
     element: _Element = _Element([{"marking": "password current-password", "reading": None}])
-    marking, held = await driver._marked_reading(_locator(element))
+    marking, held = await driver._marked_reading(_locator(element), 8000)
     assert marking == "password current-password" and held.kind == "unreadable"
     # A field that is no form field has no marking, which is an answer; an answer without one is none to go by.
     plain: _Element = _Element([{"marking": None, "reading": {"kind": "none"}}])
-    assert await driver._marked_reading(_locator(plain)) == (None, FieldReading(kind="none", value="", label=""))
-    with pytest.raises(BrowserError, match="could not be read before the step"):
-        await driver._marked_reading(_locator(_Element([None])))
+    assert await driver._marked_reading(_locator(plain), 8000) == (None, FieldReading(kind="none", value="", label=""))
+    with pytest.raises(StepNotSent, match="could not be read before the step"):
+        await driver._marked_reading(_locator(_Element([None])), 8000)
+
+
+async def test_a_page_that_never_answers_ends_the_readback_at_the_steps_time() -> None:
+    """The review of item 1151: Playwright's own time on an ``evaluate`` is for finding the element, so a script that
+    waits for a turn the page never takes waited without end. Each question has the step's time and no more."""
+    started: float = time.monotonic()
+    before: FieldReading = FieldReading(kind="value", value="Ada", label="")
+    assert (await driver._read_after(_locator(_Frozen()), before, 50, driver._never)).kind == "unreadable"
+    box = await driver._ticked(_locator(_Frozen()), True, 50)
+    assert [check.status for check in box.checks] == ["uncertain"]
+    assert (await driver._read_field(_locator(_Frozen()))).kind == "unreadable"
+    # Before the step nothing went to the page: the step is refused, not left waiting.
+    with pytest.raises(StepNotSent, match="did not answer in time"):
+        await driver._marked_reading(_locator(_Frozen()), 50)
+    assert time.monotonic() - started < 5.0
 
 
 async def test_the_turn_and_the_reading_after_a_step_are_one_question_when_the_field_changed() -> None:
