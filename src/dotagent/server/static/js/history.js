@@ -328,6 +328,12 @@ function scrollBox(node) {
   return PHONE.matches && document.documentElement.classList.contains("chat-shell") ? node.closest(".run-thread") : null;
 }
 
+/** Lets `turn`, laid out while its work filled in, be skipped again (item 1165), two frames on: the first lays it
+ * out with its work and keeps its height, so the skipped turn is as tall as the drawn one. */
+function skippableAgain(turn) {
+  requestAnimationFrame(() => requestAnimationFrame(() => turn.style.removeProperty("content-visibility")));
+}
+
 /** The first element after `node` in the page: its next sibling, or its parent's, and so on up. */
 function following(node) {
   for (let at = node; at !== null; at = at.parentElement) {
@@ -374,10 +380,11 @@ function whenNear(element, ops, asked, run, signal, reactions, onRead) {
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           watch.disconnect();
-          // Laid out for good before it grows (item 1165): a turn skipped while its work fills in keeps its last
-          // height, and grows later, nearer, where neither scroll anchoring nor `keepPlace` sees it grow.
+          // Laid out while its work fills in (item 1165): a turn skipped as it grows keeps its last height and grows
+          // later, nearer, where neither scroll anchoring nor `keepPlace` sees it. It may be skipped again once a
+          // frame kept its new height.
           element.style.contentVisibility = "visible";
-          void fillFlow(run, ops, asked, signal, reactions, onRead);
+          void fillFlow(run, ops, asked, signal, reactions, onRead).finally(() => skippableAgain(element));
         }
       },
       { root: scrollBox(element), rootMargin: OPS_MARGIN },
@@ -498,7 +505,7 @@ function skipWhenSized(history, signal) {
  * sight is. Returns what `act` returns. */
 export function laidOut(node, act) {
   const turn = node.closest(".history > .turn");
-  // A turn laid out for good (its work filled in, `whenNear`) keeps that.
+  // A turn laid out while its work fills in (`whenNear`) stays so until it is done.
   if (turn === null || turn.style.contentVisibility !== "") {
     return act(node);
   }

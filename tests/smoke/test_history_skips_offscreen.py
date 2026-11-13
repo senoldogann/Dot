@@ -293,7 +293,29 @@ class _Seen(TypedDict):
 _TOP_OF: str = "(index) => document.querySelectorAll('.run-thread .bubble.user')[index].getBoundingClientRect().top"
 
 
-def _shell_result(index: int) -> dict[str, object]:
+class _ShellResult(TypedDict):
+    """A shell call's result as the loop stores it."""
+
+    call_id: str
+    tool: str
+    ok: bool
+    text: str
+    images: list[str]
+    seconds: float
+    waited_s: float
+    summary: str
+    kind: str
+    risk: str
+    target: str
+    site: str
+    steps: int
+    channel: str
+    tainted: bool
+    flags: list[str]
+    names_dot: str
+
+
+def _shell_result(index: int) -> _ShellResult:
     """A shell call's result with every field the loop stores (as read from a real run's events), so the turn draws
     its work instead of saying that it could not."""
     return {
@@ -404,6 +426,15 @@ async def test_scrolling_up_a_chat_whose_turns_fill_in_keeps_the_message_read_wh
                 assert moves != [], engine.name
                 jumped = [move for move in moves if abs(move[2] - move[1]) > 2]
                 assert jumped == [], (engine.name, jumped)
+                # Back at the foot, the turns filled on the way up are skipped again, as tall as they were drawn.
+                tops: list[int] = (await page.evaluate(_PLACES))["tops"]
+                await _at_foot(page)
+                await page.wait_for_timeout(_FILL_WAIT_MS)
+                held: int = await page.locator(".history > .turn").evaluate_all(
+                    "(turns) => turns.filter((turn) => turn.style.contentVisibility !== '').length"
+                )
+                assert held == 0, (engine.name, held)
+                assert (await page.evaluate(_PLACES))["tops"] == tops, engine.name
                 await page.context.close()
             finally:
                 await browser.close()
