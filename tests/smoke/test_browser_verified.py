@@ -50,6 +50,7 @@ _PAGE: str = f"""<!doctype html><title>Order desk</title>
 <label><input type="checkbox" aria-label="Terms" name="terms"> Terms</label>
 <label><input type="checkbox" aria-label="Bounce" onchange="setTimeout(() => {{ this.checked = false; }}, 0)">
 Bounce</label>
+<label><input type="checkbox" aria-label="Snap" onchange="this.checked = false"> Snap</label>
 <label>Secret <input type="password" aria-label="Secret" name="secret"></label>
 </form>
 <button type="button" aria-label="Dead">Dead</button>
@@ -249,6 +250,17 @@ async def test_a_dropdown_and_a_box_the_page_puts_back_fail_their_steps(browser:
         "put-back", [Step(action="check", ref=_ref(view, "Bounce", "checkbox"))], False, refuse_secret_field, True
     )
     assert (ticked.steps[0].outcome, ticked.steps[0].dispatched, _statuses(ticked.steps[0])) == (
+        "failed",
+        "sent",
+        ["contradicted"],
+    )
+    # A box the page clears at once is clear at Playwright's own reading, which raises (item 1157). It is the same
+    # finding, told the same way: on a slow runner the timer above came first too, and the step read "may have been
+    # sent" with nothing checked.
+    snapped: ActOutcome = await browser.act(
+        "put-back", [Step(action="check", ref=_ref(view, "Snap", "checkbox"))], False, refuse_secret_field, True
+    )
+    assert (snapped.steps[0].outcome, snapped.steps[0].dispatched, _statuses(snapped.steps[0])) == (
         "failed",
         "sent",
         ["contradicted"],
