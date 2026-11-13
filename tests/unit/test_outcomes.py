@@ -51,6 +51,36 @@ def test_a_field_that_holds_what_was_written_is_verified_as_written_or_as_the_pa
     assert judge_replaced("Ada", "Ada", "Ada").status == "verified"
 
 
+def test_a_field_the_page_adds_to_holds_the_text_and_a_short_text_is_not_found_by_chance() -> None:
+    """Item 1149: an address field put ``https://`` before what a run wrote, and the click after it was held back."""
+    scheme: OutcomeCheck = judge_replaced("", "https://gistsmith.example", "gistsmith.example")
+    assert scheme.status == "verified"
+    assert scheme.evidence == "the page added to it: 25 characters where 17 were written"
+    assert judge_replaced("", "100 kg", "100").status == "verified"
+    assert judge_replaced("", "+358 40 123 4567", "0401234567").status == "uncertain"
+    assert judge_replaced("", "+358 40 123 4567", "401234567").status == "verified"
+    # One letter ends many words: a text that short has to be the field's own.
+    assert judge_replaced("", "banana", "a").status == "uncertain"
+    # In the middle of other text, it is not what was written with more around it.
+    assert judge_replaced("", "see gistsmith.example now", "gistsmith.example").status == "uncertain"
+    # Written again into the field that holds it with its scheme, the text is held: the field is as it was, as one
+    # filled again with the very text it holds is (the review of this item: the retry the owner's run made).
+    again: OutcomeCheck = judge_replaced("https://gistsmith.example", "https://gistsmith.example", "gistsmith.example")
+    assert again.status == "verified"
+    # A field that is as it was and holds other text did not take what was written.
+    assert judge_replaced("Ada Lovelace", "Ada Lovelace", "Grace Hopper").status == "contradicted"
+
+
+def test_a_page_that_puts_back_a_value_ending_in_the_text_is_taken_for_one_that_added_to_it() -> None:
+    """The price of item 1149, chosen and not overlooked. A page that answers ``Lovelace`` by showing ``Ada Lovelace``
+    again does what one that puts ``https://`` before an address does: it shows the text with more before it. The
+    two cannot be told apart by the field, so both are held, and the check says how many characters the field holds
+    against how many were written, which is what gives the first one away."""
+    put_back: OutcomeCheck = judge_replaced("Ada Lovelace", "Ada Lovelace", "Lovelace")
+    assert put_back.status == "verified"
+    assert put_back.evidence == "the page added to it: 12 characters where 8 were written"
+
+
 def test_a_field_that_is_as_it_was_contradicts_the_write_and_one_that_changed_otherwise_is_uncertain() -> None:
     kept: OutcomeCheck = judge_replaced("fixed", "fixed", "mine")
     assert kept.status == "contradicted" and "did not take the text" in kept.reason

@@ -3073,9 +3073,12 @@ class BrowserSession:
 
         for index, step in enumerate(steps, start=1):
             if stopped is None and unverified is not None and step.acts_on_what_was_left():
+                # What to do next is said whole (item 1149): a run of the owner's wrote the field again with other
+                # text, twice, where its line below showed that the field held what was meant.
                 stopped = (
-                    f"step {unverified}'s field is not verified to hold what was written, and step {index} acts on "
-                    "it: read the field, then go on"
+                    f"step {unverified}'s field is not verified to hold what was written, so step {index}, which acts "
+                    "on it, was not sent: the field's line in the page below shows what it holds; if that is what "
+                    f"you meant, send the steps from {index} on again without writing it again"
                 )
             if stopped is not None:
                 report(index, step, "skipped", "", "not_sent")
