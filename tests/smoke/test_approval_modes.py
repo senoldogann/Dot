@@ -17,7 +17,7 @@ from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import REVIEWER_DECIDER, YOLO_DECIDER, RunGate, SiteLocks
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict
 from dotagent.config import PaceConfig, SpendCap
-from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
+from dotagent.core.errors import ApprovalNoted, ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.events import EventBus
 from dotagent.policy.paths import CHANGES_DOT
 from dotagent.policy.types import ActionInfo, Amount, ApprovalMode, Preset
@@ -203,13 +203,45 @@ async def _decided(room: Room) -> list[ApprovalRecord]:
 # ------------------------------------------------------------------------------------------------------------ ask
 
 
-async def test_ask_mode_waits_for_the_user_and_hands_back_the_note(room: Room) -> None:
+async def test_ask_mode_waits_for_the_user(room: Room) -> None:
     question: Question = await _ask(room, _gate(room, "task", "cautious", "ask", _nobody), WRITE)
     assert question.record.tool == "write_file"
     assert not question.answer.done()
-    await room.broker.resolve(question.record.id, True, "user", "go ahead")
-    assert await asyncio.wait_for(question.answer, WAIT_S) == "go ahead"
+    await room.broker.resolve(question.record.id, True, "user", "")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == ""
     assert "approval_auto" not in await _kinds(room)
+
+
+async def test_a_yes_with_a_note_waits_until_the_run_read_the_note(room: Room) -> None:
+    """Item 1140 (a mail went out before Dot read "send nothing" written beside the yes): the step is not taken, the
+    run is told the note, and the same step done again exactly so goes through once without asking."""
+    gate: RunGate = _gate(room, "task", "cautious", "ask", _nobody)
+    question: Question = await _ask(room, gate, WRITE)
+    await room.broker.resolve(question.record.id, True, UI_SOURCE, "send nothing")
+    with pytest.raises(ApprovalRejected, match="their note comes first: “send nothing”"):
+        await asyncio.wait_for(question.answer, WAIT_S)
+    assert await asyncio.wait_for(gate.authorize(WRITE), WAIT_S) == ""
+    assert await room.store.list_approvals("pending", 10) == []
+    # Once: the same step after that is asked again.
+    again: Question = await _ask(room, gate, WRITE)
+    await room.broker.resolve(again.record.id, False, UI_SOURCE, "")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(again.answer, WAIT_S)
+
+
+async def test_a_yes_with_a_note_is_let_go_once_the_run_read_outside_content(room: Room) -> None:
+    """Item 1140 (the pre-push review): what the run read after the note may be what calls for the step now, so the
+    same step asks the owner again."""
+    gate: RunGate = _gate(room, "task", "cautious", "ask", _nobody)
+    question: Question = await _ask(room, gate, WRITE)
+    await room.broker.resolve(question.record.id, True, UI_SOURCE, "send nothing")
+    with pytest.raises(ApprovalNoted):
+        await asyncio.wait_for(question.answer, WAIT_S)
+    gate.taint()
+    again: Question = await _ask(room, gate, WRITE)
+    await room.broker.resolve(again.record.id, False, UI_SOURCE, "")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(again.answer, WAIT_S)
 
 
 # ------------------------------------------------------------------------------------------------------------ yolo
@@ -305,8 +337,8 @@ async def test_a_no_is_not_asked_again_in_the_run_until_the_owner_writes(room: R
     # The owner writes: the same action is theirs to answer again.
     gate.add_instruction("use the lock file this time")
     reopened: Question = await _ask(room, gate, COMMAND)
-    await room.broker.resolve(reopened.record.id, True, UI_SOURCE, "go")
-    assert await asyncio.wait_for(reopened.answer, WAIT_S) == "go"
+    await room.broker.resolve(reopened.record.id, True, UI_SOURCE, "")
+    assert await asyncio.wait_for(reopened.answer, WAIT_S) == ""
 
 
 async def test_only_the_owners_no_is_kept(room: Room) -> None:
@@ -380,8 +412,8 @@ async def test_no_rule_of_the_user_lets_a_message_go_without_their_yes(room: Roo
     allowing: RunGate = _gate(room, "task", "aggressive", "ask", _nobody)
     question: Question = await _ask(room, allowing, MESSAGE)
     assert "whatever your rules say" in question.record.summary
-    await room.broker.resolve(question.record.id, True, "user", "send it")
-    assert await asyncio.wait_for(question.answer, WAIT_S) == "send it"
+    await room.broker.resolve(question.record.id, True, "user", "")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == ""
     # A rule that hands the message to the user is stricter, and it holds where the modes ask, the earlier rule that
     # allows mail still there: a hand-off decides wherever it stands (item 481).
     await room.store.add_rule("handoff", "apple_script", "reply", "Replies are mine")
@@ -427,8 +459,8 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
     question: Question = await _ask(room, gate, PAID)
     assert question.record.severity == "high"
     assert "12.00 EUR on shop.example is within its pre-approved caps" in question.record.summary
-    await room.broker.resolve(question.record.id, True, "user", "fine")
-    assert await asyncio.wait_for(question.answer, WAIT_S) == "fine"
+    await room.broker.resolve(question.record.id, True, "user", "")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == ""
     assert await room.store.spent_since("shop.example", 0.0) == 12.0
     # The second purchase would take the day over 30: the money hand-off holds again.
     over: Question = await _ask(room, gate, PAID.model_copy(update={"amount": Amount(value=19.0, currency="EUR")}))
@@ -485,8 +517,8 @@ async def test_a_capped_payment_that_also_posts_asks_and_still_counts_against_th
     sharing: ActionInfo = PAID.model_copy(update={"flags": ("financial", "public_post")})
     question: Question = await _ask(room, gate, sharing)
     assert "Dot asks before a message or a post in your name" in question.record.summary
-    await room.broker.resolve(question.record.id, True, "user", "fine")
-    assert await asyncio.wait_for(question.answer, WAIT_S) == "fine"
+    await room.broker.resolve(question.record.id, True, "user", "")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == ""
     assert await room.store.spent_since("shop.example", 0.0) == 12.0
     # 12 of the day's 30 are spent: 19 more would go over, so the money hand-off holds.
     over: Question = await _ask(room, gate, sharing.model_copy(update={"amount": Amount(value=19.0, currency="EUR")}))
@@ -523,11 +555,11 @@ async def test_a_second_payment_on_the_site_waits_for_the_first_and_counts_what_
         second.authorize(PAID.model_copy(update={"amount": Amount(value=19.0, currency="EUR")}))
     )
     async with room.bus.subscribe(room.run.id) as events, asyncio.timeout(WAIT_S):
-        await room.broker.resolve(asked.record.id, True, "user", "fine")
+        await room.broker.resolve(asked.record.id, True, "user", "")
         event: EventRecord = await events.queue.get()
         while event.kind != "approval_requested":
             event = await events.queue.get()
-    assert await asyncio.wait_for(asked.answer, WAIT_S) == "fine"
+    assert await asyncio.wait_for(asked.answer, WAIT_S) == ""
     approval_id: object = event.data["approval_id"]
     assert isinstance(approval_id, str)
     # 12 of the day's 30 are spent: 19 more would go over, so the money hand-off holds for the second.
@@ -613,8 +645,8 @@ async def test_auto_mode_passes_what_the_review_model_cannot_tell_to_the_user(ro
     question: Question = await _ask(room, _gate(room, "task", "cautious", "auto", _answering("escalate", asked)), WRITE)
     assert "passed this on to you" in question.record.summary
     assert "the review model says escalate" in question.record.summary
-    await room.broker.resolve(question.record.id, True, "user", "yes, that one")
-    assert await asyncio.wait_for(question.answer, WAIT_S) == "yes, that one"
+    await room.broker.resolve(question.record.id, True, "user", "")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == ""
     assert len(asked) == 1
 
 
@@ -647,8 +679,8 @@ async def test_a_change_of_dots_own_files_asks_the_user_and_goes_ahead_when_allo
         assert CHANGES_DOT in question.record.summary
         assert "only the user lets a run change Dot's own files" in question.record.summary
         assert question.record.severity == "high"
-        await room.broker.resolve(question.record.id, True, "user", f"go ahead in {approvals}")
-        assert await asyncio.wait_for(question.answer, WAIT_S) == f"go ahead in {approvals}"
+        await room.broker.resolve(question.record.id, True, "user", "")
+        assert await asyncio.wait_for(question.answer, WAIT_S) == ""
     declined: Question = await _ask(room, _gate(room, "task", "aggressive", "auto", _nobody), OWN_FILE)
     await room.broker.resolve(declined.record.id, False, "user", "not that file")
     with pytest.raises(ApprovalRejected):
@@ -676,8 +708,8 @@ async def test_supervised_waits_for_the_user_before_a_change_the_preset_lets_thr
     question: Question = await _ask(room, _gate(room, "task", "aggressive", "supervised", _nobody), WRITE)
     assert question.record.tool == "write_file"
     assert "Supervised asks before every change" in question.record.summary
-    await room.broker.resolve(question.record.id, True, "user", "fine")
-    assert await asyncio.wait_for(question.answer, WAIT_S) == "fine"
+    await room.broker.resolve(question.record.id, True, "user", "")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == ""
     command: Question = await _ask(room, _gate(room, "task", "aggressive", "supervised", _nobody), COMMAND)
     await room.broker.resolve(command.record.id, False, "user", "")
     with pytest.raises(ApprovalRejected):

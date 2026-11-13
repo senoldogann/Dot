@@ -1,9 +1,9 @@
 """The pages of teams (item 610) in a real Chrome, over a real daemon whose model is the scripted one: the Agents page
-shows Your teams above Your agents, a team a card with its agents' faces (four, the rest counted) and its newest chat,
-and the agents a grid of compact cards, two to four across a wide window and one on a phone; a team's page takes a
-message that starts a run of Dot's in a chat with the team, which the sidebar and the chat's bar name, and the chat's
-next message goes on in it; a team with no agent left takes none; a removed team leaves its agents and its chats, and
-its page says it is gone; and the owner puts agents together as a team and changes it."""
+shows Your teams on a tab beside Your agents (item 1136), a team a card with its agents' faces (four, the rest counted)
+and its newest chat, and the agents a grid of compact cards, two to four across a wide window and one on a phone; a
+team's page takes a message that starts a run of Dot's in a chat with the team, which the sidebar and the chat's bar
+name, and the chat's next message goes on in it; a team with no agent left takes none; a removed team leaves its agents
+and its chats, and its page says it is gone; and the owner puts agents together as a team and changes it."""
 
 import asyncio
 import re
@@ -214,7 +214,7 @@ async def _launch(runtime: Runtime) -> tuple[Any, Browser]:
     return playwright, await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
 
 
-async def test_your_teams_stand_above_your_agents_and_the_agents_are_a_grid_two_to_four_across_and_one_on_a_phone(
+async def test_your_teams_are_a_tab_beside_your_agents_and_the_agents_are_a_grid_two_to_four_across_and_one_on_a_phone(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
     agents: list[JsonObject] = [
@@ -231,10 +231,10 @@ async def test_your_teams_stand_above_your_agents_and_the_agents_are_a_grid_two_
         await expect(teams).to_have_count(2)
         yours_teams: Locator = page.locator("section[aria-label='Your teams']")
         yours_agents: Locator = page.locator("section[aria-label='Your agents']")
+        # The teams are a part of their own, a tab beside the agents' (item 1136).
+        await page.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name="Teams").click()
         await expect(yours_teams.locator(".section-label")).to_contain_text("Your teams")
-        above = await yours_teams.bounding_box()
-        below = await yours_agents.bounding_box()
-        assert above is not None and below is not None and above["y"] + above["height"] <= below["y"]
+        await expect(yours_agents).to_be_hidden()
         # A card names the team and what it is for; the faces of six agents are four and the rest counted, those of two
         # are two; its newest chat is the title of its chat, and a team with none says so.
         first: Locator = page.locator(f".owned-team[data-owned-team='{desk['id']}']")
@@ -249,6 +249,7 @@ async def test_your_teams_stand_above_your_agents_and_the_agents_are_a_grid_two_
         await expect(second.locator(".face-stack-more")).to_have_count(0)
         await expect(second.locator(".agent-card-chat-title")).to_have_text("No chats yet")
         # Your agents: Dot and the eight, as cards; two to four across, none tall, each name and role on one line.
+        await page.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name="Agents").click()
         grid: dict[str, Any] = await page.evaluate(_GRID, ".agent-card")
         assert grid["count"] == 9 and 2 <= grid["across"] <= 4 and grid["columns"] == grid["across"], grid
         assert grid["tallest"] < 140 and grid["sideways"] <= 0, grid
@@ -256,6 +257,7 @@ async def test_your_teams_stand_above_your_agents_and_the_agents_are_a_grid_two_
         assert await card.locator(".agent-card-title").evaluate(_ONE_LINE)
         assert await card.locator(".agent-card-role").evaluate(_ONE_LINE)
         await page.screenshot(path=tmp_path / "agents-1280.png", full_page=True)
+        await page.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name="Teams").click()
         await first.click()
         await expect(page).to_have_url(f"{page.url.split('#')[0]}#/teams/{desk['id']}")
         await page.context.close()
@@ -265,6 +267,7 @@ async def test_your_teams_stand_above_your_agents_and_the_agents_are_a_grid_two_
         narrow: dict[str, Any] = await phone.evaluate(_GRID, ".agent-card")
         assert narrow["count"] == 9 and narrow["across"] == 1 and narrow["columns"] == 1, narrow
         assert narrow["widest"] <= 390 and narrow["sideways"] <= 0, narrow
+        await phone.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name="Teams").click()
         narrow_teams: dict[str, Any] = await phone.evaluate(_GRID, ".owned-team")
         assert narrow_teams["across"] == 1 and narrow_teams["widest"] <= 390, narrow_teams
         await phone.screenshot(path=tmp_path / "agents-390.png", full_page=True)
@@ -286,7 +289,9 @@ async def test_use_team_puts_the_team_under_your_teams_and_a_second_use_keeps_it
         gallery: Locator = page.locator(".team-card[data-team='content']")
         use: Locator = gallery.get_by_role("button", name="Use the team Content team")
         await use.click()
-        await expect(page.locator(".toast.ok", has_text="Content team is under Your teams.")).to_be_visible()
+        await expect(
+            page.locator(".toast.ok", has_text="Content team is under Your teams, on the Teams tab.")
+        ).to_be_visible()
         card: Locator = page.locator(".owned-team")
         await expect(card).to_have_count(1)
         await expect(card.locator(".owned-team-name")).to_have_text("Content team")
@@ -570,7 +575,9 @@ async def test_new_team_puts_the_owners_agents_together_and_edit_changes_its_nam
     playwright, browser = await _launch(runtime)
     try:
         page: Page = await _open(browser, client, "/agents", 1280)
-        await page.get_by_role("button", name="New team").click()
+        # New team is under the page's "…" (item 1136).
+        await page.get_by_role("button", name="More actions").click()
+        await page.get_by_role("menuitem", name="New team").click()
         editor: Locator = page.locator(".team-editor")
         await expect(editor.get_by_role("button", name="Create team")).to_be_disabled()
         await editor.get_by_label("Name").fill("Night desk")

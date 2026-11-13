@@ -341,6 +341,8 @@ async def test_the_row_says_its_notifications_and_a_one_time_schedule_no_switch_
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"http://127.0.0.1:{port}/#/schedules")
                 row: Locator = page.locator(f'[data-schedule="{trouble.id}"]')
+                # How its tasks start stands under the row's Details (item 1136).
+                await row.get_by_role("button", name=f"Details of {trouble.name}").click()
                 await expect(
                     row.locator(".chip", has_text="Notifications: only when it fails or needs me")
                 ).to_be_visible()
@@ -348,6 +350,7 @@ async def test_the_row_says_its_notifications_and_a_one_time_schedule_no_switch_
                 # A one-time schedule is never switched off by its failures (item 458), so its row says no limit.
                 single: Locator = page.locator(f'[data-schedule="{once.id}"]')
                 await expect(single).to_be_visible()
+                await single.get_by_role("button", name=f"Details of {once.name}").click()
                 await expect(single.locator(".chip", has_text="Switch off")).to_have_count(0)
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"notify-{width}-{scheme}.png"), full_page=True)

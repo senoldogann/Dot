@@ -36,10 +36,12 @@ runs:
       with:
         node-version: 22
         cache: npm
+    # Biome and tsc need no package install script. A postinstall in a pull request's package.json must not
+    # run on the runner: one did, and it ran a script checked in beside it.
     - name: Interface tooling
       if: inputs.node == 'true'
       shell: bash
-      run: npm ci
+      run: npm ci --ignore-scripts
     # The archive's own checksum, from the same release. Brew is not asked: it updates itself first, which some
     # runs spent a minute on, for a binary that does not change.
     - name: Ripgrep cache

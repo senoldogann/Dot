@@ -358,9 +358,10 @@ def _links_tool() -> RegisteredTool:
     )
 
 
-# Steps a model writes into a batch that only look, which the result of the batch does already (item 755): they are left
-# out rather than failing the whole batch, as they did in the owner's runs.
-_LOOKING_STEPS: frozenset[str] = frozenset({"snapshot", "screenshot", "look"})
+# Steps a model writes into a batch that only look or wait, which the result of the batch does already, as it waits for
+# the page to settle (items 755 and 1133): they are left out rather than failing the whole batch, as they did in the
+# owner's runs.
+_LOOKING_STEPS: frozenset[str] = frozenset({"snapshot", "screenshot", "look", "wait"})
 
 
 class ActArgs(ToolArgs):
@@ -1409,8 +1410,8 @@ async def _login_secret(ctx: ToolContext, login: LoginChoice, otp: bool) -> Logi
 
 # A new account's password (item 740): Dot makes it, so that no model chooses, sees or records one, and keeps it with
 # the account's username in the owner's vault. Its letters, from each of which one at least: the signs are those most
-# sites take.
-_NEW_PASSWORD_CHARS: int = 20
+# sites take. Sixteen of them (item 1139, the owner's word: twenty were too long), a little under 96 bits.
+_NEW_PASSWORD_CHARS: int = 16
 _PASSWORD_SETS: tuple[str, ...] = (
     "abcdefghijkmnopqrstuvwxyz",
     "ABCDEFGHJKLMNPQRSTUVWXYZ",

@@ -143,6 +143,7 @@ from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.browser.window import chrome_to_watch, focused_app, front_pid, give_focus_back, return_front
 from dotagent.config import BrowserConfig, ServerConfig
 from dotagent.core.errors import (
+    ApprovalNoted,
     ApprovalParked,
     ApprovalRejected,
     BrowserError,
@@ -155,6 +156,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.images import jpeg_of_size
 from dotagent.core.logs import get_logger
+from dotagent.core.noted import noted_in_batch_text
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.desktop.types import AppInfo
@@ -3030,6 +3032,13 @@ class BrowserSession:
                 )
                 stopped = f"step {index} failed"
                 continue
+            except ApprovalNoted as error:
+                # A yes with a note (item 1140): the step waits for the note to be read; the batch's result reads the
+                # page or the screen again, which lets the yes go, so doing it again asks the owner once more.
+                noted: str = f"Not done yet: {noted_in_batch_text(error.note)}."
+                reports.append(StepReport(index=index, description=description, outcome="failed", detail=noted))
+                stopped = "a step waits for the user's note to be read"
+                continue
             except ApprovalParked as error:
                 # Kept for the owner (item 482): its words say that it did not happen and waits for them.
                 reports.append(StepReport(index=index, description=description, outcome="failed", detail=error.message))
@@ -3225,20 +3234,27 @@ class BrowserSession:
         ends: float = started + timeout_s
         # A navigation under way (a click that leaves for a slow page) holds every question to the page until it
         # commits: it is waited for within the wait, and one that outlasts it ends the wait as its time does (item
-        # 1035). Asked while it began, the page's dialogs were not counted in time and the wait failed after 2 s.
+        # 1035). Asked while it began, the page's dialogs were not counted in time and the wait failed after 2 s. A
+        # page whose script holds its main thread (X, Google Cloud) does not say either, and is asked again within the
+        # wait's time (item 1134).
         while True:
+            if time.monotonic() >= ends:
+                return "timeout"
             if not tab.nav_idle.is_set():
                 try:
                     await asyncio.wait_for(tab.nav_idle.wait(), timeout=max(0.0, ends - time.monotonic()))
                 except TimeoutError:
                     return "timeout"
             try:
-                watch_dialogs: bool = await no_dialog_open(tab.page)
-                changes: int | None = (await page_pulse(tab.page)).changes
-                break
+                no_dialog: bool | None = await no_dialog_open(tab.page)
             except BrowserError:
                 if tab.nav_idle.is_set():
                     raise
+                continue
+            if no_dialog is not None:
+                watch_dialogs: bool = no_dialog
+                changes: int | None = (await page_pulse(tab.page)).changes
+                break
         requests: int = tab.requests
         moved: float = started
         while True:

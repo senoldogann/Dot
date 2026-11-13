@@ -428,7 +428,8 @@ vercel puts a project's change live"); why Dot asks once: the line under the box
 initiative and for what yolo asks you, and the words above leave out only that sentence; any other reason (a payment's
 amount and caps, a guard's why) and what the review model passed on to you stay under the words; and no chip that the
 words say already, in whole words. On a phone the note has its row, and Deny and Approve share the
-next one.
+next one. While a note is written, Approve says **Send note** (item 1140): the step waits until Dot read the note, and
+is taken only if the note still calls for it ([Safety](safety.md#safety)).
 
 The **+** at the left of the box (item 318, after Codex's composer) opens a menu: **Add files**, which opens the file
 picker (documents, photos and screenshots alike; a phone opens its own sheet), **Model and options** in a box whose run
@@ -1363,7 +1364,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /health` (public), `GET /status`, `GET /models`, `GET /doctor`             | liveness (and `notifications`: `ok` while the phone push watches run, `down` when one stopped, `off` when none started), state of the daemon (the same `notifications`), models per provider (with their reasoning levels), checks |
 | `POST /models/main` (`{"model": "provider:model"}`)                            | make the default model, kept in `config.toml` (422 for one that cannot call tools or of no known provider; the provider's error, 502, for one it does not know) |
 | `POST /models/roles` (`{"role": "review", "model": "provider:model"}`)         | make the fast, review or vision model, kept in `config.toml` (422 for one that cannot do that work) |
-| `GET\|PUT /policy/free` (`{"free": true}`) | the owner's free mode (item 922): on, no run asks anything; kept in `config.toml` as `[policy] free`; a phone may switch it off, and gets 403 switching it on |
+| `GET\|PUT /policy/free` (`{"free": true}`) | the owner's free mode (item 922): on, no run asks anything (but a post in a meeting's chat, item 1138); kept in `config.toml` as `[policy] free`; a phone may switch it off, and gets 403 switching it on |
 | `PUT /initiative/look-model` (`{"model": "provider:model"}`, `""` for the default model) | make the model that looks for work on Dot's own initiative (item 916), kept in `config.toml` as `[initiative] look_model` (422 for one that cannot use actions, one of Zen's free models or of no known provider; the provider's error, 502, for one it does not know) |
 | `PUT /models/standby` (`{"models": ["provider:model", …]}`)                    | the standby models in their order (item 478), kept in `config.toml` as `[models] standby`; `[]` for none (422 for one named twice, one that cannot call tools or one of Zen's free models) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |

@@ -17,12 +17,13 @@ from dotagent.cli_commands import (
     BrowserDetachCommand,
     BrowserImportChromeCommand,
     BrowserLoginCommand,
+    BrowserMeetingsLoginCommand,
     Command,
 )
 from dotagent.config import AppConfig, BrowserConfig, load_user_config
 from dotagent.config_edit import set_browser_mode
 from dotagent.core.errors import BrowserError, InvalidValueError
-from dotagent.core.paths import chrome_data_dir, config_path, downloads_dir
+from dotagent.core.paths import chrome_data_dir, config_path, downloads_dir, meetings_profile_dir
 
 _MEGABYTE: int = 1_000_000
 _CHECK_THREAD: str = "attach-check"
@@ -125,11 +126,23 @@ async def cmd_browser_login(command: BrowserLoginCommand) -> int:
     return code
 
 
+async def cmd_browser_meetings_login(command: BrowserMeetingsLoginCommand) -> int:
+    sys.stdout.write(
+        "Chrome opens with the profile of Dot's meetings. Sign in Dot's own Google account, never yours: anyone in a "
+        "meeting sees it. Then quit Chrome (Cmd+Q). Dot keeps the cookies; it never sees the password.\n"
+    )
+    code: int = await open_profile_for_login(meetings_profile_dir(), "https://accounts.google.com/")
+    sys.stdout.write("Chrome closed; Dot joins Google Meet calls as that account now.\n")
+    return code
+
+
 async def dispatch(command: Command) -> int:
     """Carry out one of this module's commands."""
     match command:
         case BrowserLoginCommand():
             return await cmd_browser_login(command)
+        case BrowserMeetingsLoginCommand():
+            return await cmd_browser_meetings_login(command)
         case BrowserImportChromeCommand():
             return await cmd_browser_import_chrome(command)
         case BrowserAttachCommand():

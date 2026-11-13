@@ -52,6 +52,10 @@ TodoStatus = Literal["open", "doing", "done", "dropped"]
 # ``returned`` the lead sent it back and the next attempt has not started; ``accepted`` and ``cancelled`` are final;
 # ``escalated`` waits for the owner: the lead can only cancel it.
 WorkOrderStatus = Literal["assigned", "working", "in_review", "returned", "accepted", "escalated", "cancelled"]
+# Where a meeting Dot was asked to join stands (item 1138): asked in, waiting to be let in, in the call, or over (it
+# ended, Dot left, or it failed: its note says which).
+MeetingStatus = Literal["joining", "waiting", "in_call", "ended", "failed"]
+MeetingLineKind = Literal["caption", "chat"]
 # The moves between them: the store refuses any other, so that a late end of an attempt cannot undo a verdict. A move
 # to the status an order has changes only its note and the rest.
 WORK_ORDER_MOVES: dict[WorkOrderStatus, frozenset[WorkOrderStatus]] = {
@@ -481,6 +485,39 @@ class TodoRecord(FrozenModel):
     updated_at: float
 
 
+class MeetingRecord(FrozenModel):
+    """A call Dot was asked to join (item 1138): its address on Meet, the chat and the run that asked, where it stands,
+    and the last thing said of it (``note``: why it ended or failed, or what it waits for). ``notes`` are the notes of
+    its words as the note maker last wrote them (JSON of ``meetings.notes.MeetingNotes``, empty before the first), and
+    ``summary`` the line it left in the chat when it ended. A meeting's words are third parties' content."""
+
+    id: str
+    url: str
+    thread_id: str
+    run_id: str
+    status: MeetingStatus
+    note: str
+    notes: str
+    summary: str
+    lines: int
+    created_at: float
+    admitted_at: float | None
+    ended_at: float | None
+    updated_at: float
+
+
+class MeetingLineRecord(FrozenModel):
+    """One line of a meeting (item 1138): a caption once it stood still, or a chat message; ``seq`` orders a meeting's
+    lines. ``speaker`` is the name the page showed, which anyone in the call can choose."""
+
+    meeting_id: str
+    seq: int
+    kind: MeetingLineKind
+    speaker: str
+    text: str
+    at: float
+
+
 class WorkOrderRecord(FrozenModel):
     """A piece of work the lead (Dot, or an agent that leads a team) handed to one agent (item 907): what it is
     (``title``, ``brief``), what done means (``acceptance``), the objective it serves, who has it and where it stands.
@@ -669,6 +706,10 @@ class MergedSource(FrozenModel):
     tainted: bool
 
 
+# The Memory page's correction of a note a run wrote. Not a run id: run ids are ``run_`` plus a time.
+OWNER_EDIT: str = "owner"
+
+
 class MemoryRecord(FrozenModel):
     """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``agent_id`` is the
     agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and
@@ -678,7 +719,8 @@ class MemoryRecord(FrozenModel):
     that saved it had read content third parties can author: a search that returns it taints the run that read it.
     The fields with a default are NULL in a note written before them (item 584): ``merged_from`` names the notes a
     merged note was made of, ``merged_into`` the merged note a resting one was merged into, ``pinned_at`` is when the
-    owner pinned the note (it never rests) and ``rested_at`` when it began to rest."""
+    owner pinned the note (it never rests) and ``rested_at`` when it began to rest. ``edited_by`` is
+    :data:`OWNER_EDIT` when the owner later corrected a note a run wrote."""
 
     id: str
     content: str
@@ -696,6 +738,10 @@ class MemoryRecord(FrozenModel):
     merged_from: tuple[MergedSource, ...] = ()
     pinned_at: float | None = None
     rested_at: float | None = None
+    # ``owner`` when the owner rewrote the note on the Memory page. The author (``source_run``) stays, and a run
+    # that saved the note is still handed the correction. A run's own rewrite clears it. NULL on a note the owner
+    # has not rewritten, including every note stored before the column.
+    edited_by: str | None = None
 
 
 class ResultStep(FrozenModel):

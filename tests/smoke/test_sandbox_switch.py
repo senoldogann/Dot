@@ -212,7 +212,7 @@ async def test_the_rules_page_shows_the_switch_and_moves_it(login_env: dict[str,
                         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                     )
                     await page.goto(ui_url(host, port, TOKEN))
-                    await page.goto(f"{address}/#/settings/rules")
+                    await _open_rules(page, address)
                     # The switch is in Advanced, which is shut until it is asked for (item 622).
                     advanced: Locator = page.locator("details.rule-advanced")
                     await expect(advanced).not_to_have_attribute("open", "")
@@ -251,6 +251,16 @@ async def test_the_rules_page_shows_the_switch_and_moves_it(login_env: dict[str,
 
 
 FREE: str = "Free mode: Dot asks you nothing"
+# The sidebar is painted when the route is chosen. The Rules section is added only once the settings module has
+# loaded and mounted (views/rules.js, the title "How Dot asks"). Playwright's five-second expect ends while that
+# import is still running on a busy runner, with the sidebar up and the section not in the page yet.
+_SECTION_READY_MS: int = 30_000
+
+
+async def _open_rules(page: Page, address: str) -> None:
+    """Open Rules and wait until its section is in the page, which is when the view has mounted."""
+    await page.goto(f"{address}/#/settings/rules")
+    await page.locator("main .set-section-title").first.wait_for(state="attached", timeout=_SECTION_READY_MS)
 
 
 async def test_free_mode_is_switched_on_the_rules_page_and_kept(login_env: dict[str, str], tmp_path: Path) -> None:
@@ -268,7 +278,7 @@ async def test_free_mode_is_switched_on_the_rules_page_and_kept(login_env: dict[
                         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                     )
                     await page.goto(ui_url(host, port, TOKEN))
-                    await page.goto(f"{address}/#/settings/rules")
+                    await _open_rules(page, address)
                     await expect(page.locator(".set-section-title").first).to_have_text("How Dot asks")
                     switch: Locator = page.get_by_role("switch", name=FREE)
                     await expect(switch).to_be_enabled()

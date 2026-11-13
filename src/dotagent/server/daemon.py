@@ -172,6 +172,11 @@ def _end_with_scheduler(server: DotServer, scheduler_loop: asyncio.Task[None]) -
     server.should_exit = True
 
 
+async def _keep_meeting_line(manager: RunManager, thread_id: str, goal: str, text: str) -> None:
+    """Keep a meeting's line in its chat (item 1138), as the watchers' tells are kept."""
+    await manager.keep_notice(thread_id, goal, text)
+
+
 def _log_push_end(health: NotifyHealth, channel: str, pusher: asyncio.Task[None]) -> None:
     """Pushes that stop before the daemon does are logged, and the health check says the phone is down, so a process
     that still answers HTTP is not taken for a phone that can hear."""
@@ -275,6 +280,10 @@ async def run_daemon(config: AppConfig) -> int:
             if config.server.keep_awake:
                 await runtime.awake.start()
             manager: RunManager = RunManager(runtime)
+            # A meeting's summary is a line in its chat, which the run manager keeps (item 1138); a meeting a
+            # restart cut is marked failed.
+            runtime.meetings.tell_with(functools.partial(_keep_meeting_line, manager))
+            await runtime.meetings.start()
             scheduler: Scheduler = Scheduler(runtime, manager, scout=True)
             cleanup.push_async_callback(scheduler.drain)
             cleanup.push_async_callback(manager.shutdown)

@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { explain, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
+import { explain, serviceWords, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
 
 class ApiError extends Error {
   constructor(status, message, context = {}) {
@@ -76,4 +76,14 @@ test("a plain error written for the person is told as it was written, and a thin
   });
   assert.equal(explain("boom").text, "Something went wrong on this page. Reload the page and try again.");
   assert.equal(explain(null).details, "null");
+});
+
+test("a model service's failure reads as its own sentence, the code and the log's reference kept for the Details", () => {
+  const line = "provider answered HTTP 410: minimax-m2.7 was retired on November 9, 2026. Try glm-5.3-flash:cloud. (ref: 645db52d-ba1a-4da3-9645-f361963f8b37)";
+  assert.deepEqual(serviceWords(line), {
+    text: "minimax-m2.7 was retired on November 9, 2026. Try glm-5.3-flash:cloud.",
+    details: line,
+  });
+  assert.deepEqual(serviceWords("provider answered HTTP 503"), { text: "The AI service answered with an error (HTTP 503).", details: "provider answered HTTP 503" });
+  assert.deepEqual(serviceWords("No OpenAI key is set."), { text: "No OpenAI key is set.", details: "" });
 });

@@ -52,7 +52,7 @@ from dotagent.tools.memory import _own_tags, build_memory_tools
 DAY_S: float = 86400.0
 TWIN: str = "pdftotext keeps the columns of a table only with the -layout flag."
 OTHER: str = "Use pdftotext with -layout when a table must keep its columns."
-_COLUMNS: tuple[str, ...] = ("merged_into", "merged_from", "pinned_at", "rested_at")
+_COLUMNS: tuple[str, ...] = ("merged_into", "merged_from", "pinned_at", "rested_at", "edited_by")
 
 
 @asynccontextmanager
@@ -112,7 +112,13 @@ async def test_a_store_from_before_the_item_opens_with_its_notes_whole(tmp_path:
     try:
         found: MemoryRecord = await store.get_memory(kept.id)
         assert (found.content, found.tags, found.created_at) == (TWIN, ("lesson", "pdf"), kept.created_at)
-        assert (found.merged_into, found.merged_from, found.pinned_at, found.rested_at) == (None, (), None, None)
+        assert (found.merged_into, found.merged_from, found.pinned_at, found.rested_at, found.edited_by) == (
+            None,
+            (),
+            None,
+            None,
+            None,
+        )
         assert await store.count_trashed() == 0
     finally:
         await store.close()

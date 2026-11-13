@@ -46,6 +46,8 @@ _HELD_REDIRECT: threading.Event = threading.Event()
 # /leave-when-told answers once the test lets it (``_LEAVE``), and /to-blocked leaves then: a timer of 0.9 s fired while
 # a slow runner's click still settled, which then waited for the navigation it had set off, the refusal with it.
 _LEAVE: threading.Event = threading.Event()
+# /busy-when-told answers once the test lets it (``_BUSY``), and /busy then holds its main thread (item 1134).
+_BUSY: threading.Event = threading.Event()
 _HELD_WAIT_S: float = 5.0
 _HELD_REDIRECT_S: float = _HELD_WAIT_S + 2.0
 # The most a page held for the test (/later-tab, /held-redirect) waits for it, and the test for what it then does.
@@ -155,6 +157,12 @@ window.addEventListener("pointerup", (event) => {
 <script>let polls = 0; const tick = () => fetch('/poll').then(() => { polls += 1;
   if (polls === 4) { document.getElementById('s').textContent = 'Approved' } else { setTimeout(tick, 1500) } });
 setTimeout(tick, 1500)</script>""",
+    # A page whose script holds its main thread for 3.5 s, as X's or Google Cloud's do while they build a view, and then
+    # shows its text (item 1134): nothing of it answers meanwhile.
+    "/busy": """<!doctype html><title>Busy</title>
+<button onclick="fetch('/busy-when-told').then(() => { const end = Date.now() + 3500; while (Date.now() < end) {}
+  document.getElementById('s').textContent = 'Synced' })">Sync</button>
+<p id="s">Syncing</p>""",
     "/pending": """<!doctype html><title>Pending</title>
 <button onclick="fetch('/answer-late').then((r) => r.text()).then(() => {
   document.getElementById('s').textContent = 'Sent' })">Send</button>
@@ -326,6 +334,10 @@ for (const list of document.querySelectorAll('ul')) {
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = self.path.split("?", 1)[0]
+        if path == "/busy-when-told":
+            _BUSY.wait(_HELD_FOR_TEST_MOST_S)
+            self._plain(b"go")
+            return
         if path == "/leave-when-told":
             _LEAVE.wait(_HELD_FOR_TEST_MOST_S)
             self._plain(b"go")
@@ -875,6 +887,21 @@ async def test_a_dialog_that_opens_during_a_wait_ends_it_and_one_that_brings_the
     await act(browser, "wait-asks", [Step(action="click", ref=ref_of(view.body, 'button "Order"'))], False)
     placed: TextWait = await browser.wait_text("wait-asks", "Order placed", 10.0, True)
     assert placed.appeared and placed.ended_by is None, placed
+
+
+async def test_a_wait_for_text_waits_out_a_page_that_holds_its_main_thread(browser: BrowserSession, site: str) -> None:
+    """Item 1134: a page whose script answers nothing for longer than a count may take, when the wait begins, is waited
+    for within the wait's time; the wait failed after 2 s with "the page did not say in time what it shows"."""
+    view: PageView = await browser.open_url("wait-busy", f"{site}/busy", True)
+    _BUSY.clear()
+    await act(browser, "wait-busy", [Step(action="click", ref=ref_of(view.body, 'button "Sync"'))], False)
+    _BUSY.set()
+    # The answer reaches the page and its script takes the main thread before the wait begins.
+    await asyncio.sleep(0.5)
+    wait: TextWait = await browser.wait_text("wait-busy", "Synced", 15.0, True)
+    assert wait.appeared, wait
+    assert wait.waited_s < 6.0, wait.waited_s
+    assert "Synced" in wait.view.body
 
 
 async def test_a_wait_that_times_out_while_a_page_still_loads_shows_it_without_waiting_for_the_rest(

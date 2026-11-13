@@ -161,11 +161,39 @@ def _profile(record: AgentRecord) -> JsonObject:
     return {field: dumped[field] for field in PROFILE}
 
 
-async def _import(page: Page, file: Path) -> None:
-    """Import ``file`` with the Agents page's Import button."""
+# Resolves once nothing on the page has scrolled for 300 ms.
+_STILL: str = (
+    "() => new Promise((done) => { const again = () => { clearTimeout(wait); wait = setTimeout(end, 300); };"
+    " const end = () => { removeEventListener('scroll', again, true); done(); }; let wait = setTimeout(end, 300);"
+    " addEventListener('scroll', again, true); })"
+)
+
+
+async def _import_opens_a_chooser(page: Page) -> None:
+    """Import an agent, under the Agents page's "…" (item 1136), asks for a file. Pressed from the keyboard once the
+    page stands still: a scroll closes the menu, and the scroll that brings a button into view is told later."""
+    more: Locator = page.get_by_role("button", name="More actions")
+    await more.scroll_into_view_if_needed()
+    await page.evaluate(_STILL)
+    # The wait for the chooser starts before the menu opens. Playwright asks for choosers without waiting for the answer
+    # (`updateSubscription` is sent with no reply): a key pressed at once could reach the page before Chrome was told to
+    # hand the chooser over, and the chooser then went to headless Chrome, which shows none (CI, 2026-11-09 to 11-12).
+    # The checks of the menu in between are round trips to the same page, after which the hand-over is in place.
     async with page.expect_file_chooser() as choosing:
-        await page.get_by_title(IMPORT_TITLE).click()
-    await (await choosing.value).set_files(file)
+        await more.focus()
+        await page.keyboard.press("Enter")
+        menu: Locator = page.get_by_role("menu", name="More actions")
+        await expect(menu.get_by_role("menuitem", name="New team")).to_be_focused()
+        await page.keyboard.press("ArrowDown")
+        await expect(menu.get_by_title(IMPORT_TITLE)).to_be_focused()
+        await page.keyboard.press("Enter")
+    await (await choosing.value).set_files([])
+
+
+async def _import(page: Page, file: Path) -> None:
+    """Import ``file`` through the Agents page's file field, the one Import an agent opens (`_import_opens_a_chooser`
+    shows that it opens a chooser)."""
+    await page.get_by_label("Agent file").set_input_files(file)
 
 
 def _toast(page: Page, kind: Literal["ok", "error"], words: str) -> Locator:
@@ -407,6 +435,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await chief.locator(".template-tools > summary").click()
                 await expect(chief.locator(".template-tool-chips .chip.missing")).to_have_text(["apple_script"])
                 await expect(phone.locator(".template-card").first.locator(".chip.missing")).to_have_count(0)
+                await _import_opens_a_chooser(phone)
                 await _import(phone, broken)
                 await expect(_toast(phone, "error", "broken.json is not an agent file")).to_be_visible()
                 await _import(phone, stranger)

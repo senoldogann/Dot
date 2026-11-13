@@ -10722,6 +10722,42 @@ button.attach-chip {
   margin-top: 0;
 }
 
+/* The parts of the Agents page (item 1136): one shown at a time under the tabs, the agents and the ready-made ones
+   spaced as two parts of one. */
+.agents-head {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agents-head > .spacer {
+  flex: 1;
+}
+
+/* On a phone the actions keep the first line and the tabs take the next, whole. */
+@media (max-width: 700px) {
+  .agents-head > .agents-tabs {
+    order: 1;
+    width: 100%;
+  }
+
+  .agents-head > .agents-tabs > button {
+    flex: 1;
+    padding-inline: var(--space-1);
+    white-space: nowrap;
+  }
+}
+
+.page-head ~ .agents-part {
+  margin-top: 0;
+}
+
+.page-head ~ .agents-part:not([hidden]) ~ .agents-part:not([hidden]) {
+  margin-top: var(--space-5);
+}
+
 .agents-part > .hint {
   margin: 0;
 }

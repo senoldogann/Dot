@@ -4,7 +4,7 @@ from bisect import bisect_left
 from collections.abc import Sequence
 
 from dotagent.core.jsonutil import dumps_compact
-from dotagent.core.text import CHARS_PER_TOKEN, truncate_middle
+from dotagent.core.text import CHARS_PER_TOKEN, redact_secrets, truncate_middle
 from dotagent.llm.types import Message, ToolCall, ToolSpec
 
 # Characters per token in the estimate; the loop calibrates the estimate against the provider's own counts.
@@ -13,6 +13,10 @@ _OLD_RESULT_CHARS: int = 700
 _OMITTED_IMAGE_NOTE: str = "\n[screenshot omitted: it is out of date]"
 _TRANSCRIPT_RESULT_CHARS: int = 1500
 _MISSING_RESULT: str = "[no result was recorded: the run was interrupted before this tool finished]"
+# A line of :func:`render_recent_steps`: a call's arguments, the start of a result and of what the model wrote.
+_STEP_CALL_CHARS: int = 300
+_STEP_RESULT_CHARS: int = 400
+_STEP_TEXT_CHARS: int = 600
 
 
 def estimate_tokens(messages: Sequence[Message], tools: Sequence[ToolSpec]) -> int:
@@ -175,3 +179,49 @@ def render_transcript(messages: Sequence[Message]) -> str:
         else:
             lines.append(f"{message.role.upper()}: {message.content}")
     return "\n".join(lines)
+
+
+def _step_lines(message: Message) -> list[str]:
+    """The lines of :func:`render_recent_steps` for one message, each masked before it is shortened, so that a cut
+    never leaves a part of a secret too short to be recognised."""
+    if message.role == "assistant":
+        text: list[str] = [f"ASSISTANT: {message.content}"] if message.content else []
+        calls: list[str] = [
+            truncate_middle(
+                redact_secrets(f"ASSISTANT CALLS {call.name}: {dumps_compact(call.arguments)}"), _STEP_CALL_CHARS
+            )
+            for call in message.tool_calls
+        ]
+        return [truncate_middle(redact_secrets(line), _STEP_TEXT_CHARS) for line in text] + calls
+    if message.role == "tool":
+        return [
+            truncate_middle(redact_secrets(f"TOOL RESULT ({message.tool_name}): {message.content}"), _STEP_RESULT_CHARS)
+        ]
+    return [truncate_middle(redact_secrets(f"{message.role.upper()}: {message.content}"), _STEP_TEXT_CHARS)]
+
+
+def _left_out_note(count: int) -> str:
+    return f"[the {count} oldest lines of this run are left out here; the plan says what was done before]"
+
+
+def render_recent_steps(messages: Sequence[Message], max_chars: int) -> str:
+    """The newest steps of a run that fit ``max_chars``, for the judge of a checkpoint (item 1132): every call with its
+    arguments, the start of each result and of what the model wrote, one shortened line each, secrets masked. Whole
+    lines are left out, the oldest first, and a first line says how many: a run's progress is in its steps, and the
+    transcript cut in the middle at 30,000 characters had taken out the steps where the work was done (the judge said
+    no call had applied a branch protection five minutes after the run applied it, and that no mail had been deleted
+    after ten were moved to the trash)."""
+    lines: list[str] = [line for message in messages for line in _step_lines(message)]
+    whole: str = "\n".join(lines)
+    if len(whole) <= max_chars:
+        return whole
+    # Room for the note at its longest and its line break, so the text with it stays within ``max_chars``.
+    room: int = max_chars - len(_left_out_note(len(lines))) - 1
+    kept: list[str] = []
+    size: int = 0
+    for line in reversed(lines):
+        size += len(line) + 1
+        if size > room:
+            break
+        kept.append(line)
+    return "\n".join([_left_out_note(len(lines) - len(kept)), *reversed(kept)])

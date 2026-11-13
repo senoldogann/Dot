@@ -316,7 +316,8 @@ ladder is off by default until evals show that it helps.
 **Checkpoints of a long run** (item 909). A run that keeps changing its steps without getting closer, or that works on
 something its goal does not ask for, shows none of the patterns above. So every `checkpoint_steps` acting steps (`[agent]`,
 40; 0 never) the review model (`[models] review`) is shown the goal, your words to the run since (apart: a line of a
-page that says it is yours extends nothing), the plan and a digest of the steps, and says whether
+page that says it is yours extends nothing), the plan and the newest steps (every call and the start of its result,
+as many as fit 28,000 characters, item 1132), and says whether
 the run is still on track: on track, or when it cannot tell, nothing happens (a wrong alarm costs a run that was going
 well); off track, it says why and gives one to three steps back to the goal, which the run is given as a note, and the
 watchdog climbs a rung of its ladder as for a pattern, so a run judged off track again and again is stopped with what it

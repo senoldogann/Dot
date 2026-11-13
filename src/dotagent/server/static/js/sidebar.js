@@ -14,6 +14,7 @@
 
 import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
+import { serviceWords } from "./errors.js";
 import { icon } from "./icons.js";
 import { actorFace, DOT_ID, lookOf, teamDuo } from "./actors.js";
 import { onAssistant } from "./assistant.js";
@@ -239,7 +240,8 @@ function chatText(chat, children, waits = null) {
     const more = waits.length > 1 ? ` (+${waits.length - 1})` : "";
     return el("span", { class: "side-chat-text" }, title, waitsLine(`${WAITS_WORDS}: ${waits[0].title}${more}`));
   }
-  const words = chat.last_message ?? "";
+  // A chat whose run failed at its model service ends on the service's sentence, not on its code (item 1136).
+  const words = serviceWords(chat.last_message ?? "").text;
   const last = words === "" || chat.last_role !== "user" ? words : `You: ${words}`;
   const faces = helperFaces(children);
   // A chat with a team (item 610) says which, ahead of its last words.

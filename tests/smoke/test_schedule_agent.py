@@ -340,6 +340,8 @@ async def test_the_form_offers_the_agents_and_the_row_names_its_agent(
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"http://127.0.0.1:{port}/#/schedules")
                 row: Locator = page.locator(f'[data-schedule="{shown.id}"]')
+                # How its tasks start stands under the row's Details (item 1136).
+                await row.get_by_role("button", name=f"Details of {shown.name}").click()
                 await expect(row.locator(".chip", has_text="As Guide")).to_be_visible()
                 await expect(row.locator(".chip", has_text="Approvals: Auto-accept edits")).to_be_visible()
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")

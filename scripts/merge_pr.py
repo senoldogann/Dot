@@ -15,22 +15,23 @@ event fires and the run some time after, seconds or, with the runners all busy, 
 between was not checked. The margin errs one way only, toward bringing a branch up to `main` that did not need it.
 A head that holds `main` as it is now was checked on all of it, the margin aside: it is merged (item 1078).
 
-A pull request that changes only what the gate's `paths-ignore` names (prose) has no run of the gate to wait for, and
-nothing of it can break `main`: it is merged as it stands.
+A pull request that changes only prose has a run of the gate to wait for too, since the gate starts for every pull
+request and its `prose` job skips the heavy work and reports `ci` for a change that is prose alone: it is merged once
+that run passed, as any other is.
+
+The pull request has to be one this automation opened. Its opener is read from GitHub and must be the account `gh`
+is signed in as. A pull request anyone else opened is left alone, one that only changes docs included: looking like
+docs is not a reason to update its branch or to merge it.
 
 Usage: uv run python scripts/merge_pr.py <number> <rebase|squash>
 Exit 0: merged. Exit 2: brought up to main, run it again once its checks pass. Exit 1: it cannot be merged as it stands.
 """
 
 import json
-import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
-
-import yaml
 
 _METHODS: tuple[str, ...] = ("rebase", "squash")
 # How long before its run was made the merge a pull request's checks run on may have been made.
@@ -55,34 +56,6 @@ class MergeRefused(Exception):
 def shared_files(changed: list[str], moved: list[str]) -> list[str]:
     """The files the pull request changes that `main` changed too since its checks began, sorted."""
     return sorted(set(changed) & set(moved))
-
-
-def path_pattern(pattern: str) -> re.Pattern[str]:
-    """A GitHub workflow path filter as a regular expression: ``**`` any characters, ``*`` any but ``/``."""
-    parts: list[str] = [
-        ".*" if piece == "**" else "[^/]*" if piece == "*" else re.escape(piece)
-        for piece in re.split(r"(\*\*|\*)", pattern)
-    ]
-    return re.compile("".join(parts) + r"\Z")
-
-
-def gate_runs_for(files: list[str], ignored: list[str]) -> bool:
-    """Whether the gate runs for a pull request changing ``files``, its ``paths-ignore`` being ``ignored``: when one
-    of them is not ignored."""
-    patterns: list[re.Pattern[str]] = [path_pattern(pattern) for pattern in ignored]
-    return any(not any(pattern.match(path) for pattern in patterns) for path in files)
-
-
-def _gate_ignored(workflow: Path) -> list[str]:
-    """The ``paths-ignore`` of the gate's ``pull_request`` trigger, read from ``workflow``."""
-    loaded: object = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-    # PyYAML reads the key ``on`` as True.
-    triggers: object = loaded.get(True) if isinstance(loaded, dict) else None
-    pull: object = triggers.get("pull_request") if isinstance(triggers, dict) else None
-    ignored: object = pull.get("paths-ignore") if isinstance(pull, dict) else None
-    if not isinstance(ignored, list) or not all(isinstance(item, str) for item in ignored):
-        raise MergeRefused(f"{workflow} names no paths-ignore of its pull_request trigger")
-    return [str(item) for item in ignored]
 
 
 def counted_since(created_at: str, margin: timedelta) -> str:
@@ -151,8 +124,17 @@ def _gate_runs(head: str) -> list[GateRun]:
     return runs
 
 
-def _state_and_head(raw: str) -> tuple[str, str]:
-    """The state and the head of a pull request as `gh pr view --json headRefOid,state` says them."""
+def opened_by_us(login: str, expected: str) -> bool:
+    """Whether ``login`` is the account this automation acts as (``expected``, whoever `gh` is signed in as).
+
+    An empty login, an empty account, or any other login is not. A pull request that only looks like docs is judged
+    the same way: the opener is what matters."""
+    return bool(expected) and login.casefold() == expected.casefold()
+
+
+def _state_head_author(raw: str) -> tuple[str, str, str]:
+    """The state, the head and the opener's login of a pull request, as `gh pr view --json
+    headRefOid,state,author` says them. A missing opener is an empty login, which :func:`opened_by_us` refuses."""
     view: object = json.loads(raw)
     if not isinstance(view, dict):
         raise MergeRefused(f"gh pr view gave no object: {raw[:400]}")
@@ -160,7 +142,14 @@ def _state_and_head(raw: str) -> tuple[str, str]:
     head: object = view.get("headRefOid")
     if not isinstance(state, str) or not isinstance(head, str) or not head:
         raise MergeRefused(f"gh pr view gave no state or head: {raw[:400]}")
-    return state, head
+    author: object = view.get("author")
+    login: object = author.get("login") if isinstance(author, dict) else ""
+    return state, head, login if isinstance(login, str) else ""
+
+
+def _actor() -> str:
+    """The login `gh` is signed in as. Empty when it names none, which refuses every pull request."""
+    return _run(["gh", "api", "user", "--jq", ".login"]).strip()
 
 
 def _changed_files(number: int) -> list[str]:
@@ -176,20 +165,26 @@ def _changed_files(number: int) -> list[str]:
 
 
 def merge(number: int, method: str) -> int:
-    """Merge the pull request ``number`` by ``method``, or bring it up to main; the script's exit code."""
-    state, head = _state_and_head(_run(["gh", "pr", "view", str(number), "--json", "headRefOid,state"]))
+    """Merge the pull request ``number`` by ``method``, or bring it up to main; the script's exit code.
+
+    A pull request opened by anyone but the account this automation acts as is left alone: no update of its branch
+    and no merge."""
+    state, head, login = _state_head_author(
+        _run(["gh", "pr", "view", str(number), "--json", "headRefOid,state,author"])
+    )
+    expected: str = _actor()
+    if not opened_by_us(login, expected):
+        who: str = login or "an unknown actor"
+        account: str = f" ({expected})" if expected else ""
+        raise MergeRefused(
+            f"pull request {number} was opened by {who}, not by the account this automation acts as{account}: "
+            "left alone"
+        )
     changed: list[str] = _changed_files(number)
     if state != "OPEN":
         raise MergeRefused(f"pull request {number} is {state}, not open")
     if not changed:
         raise MergeRefused(f"pull request {number} changes no file")
-    workflow: Path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "gate.yml"
-    if not gate_runs_for(changed, _gate_ignored(workflow)):
-        _run(["gh", "pr", "merge", str(number), f"--{method}", "--delete-branch", "--match-head-commit", head])
-        print(
-            f"merged pull request {number} at {head} ({method}): it changes only prose, which the gate does not run for"
-        )
-        return 0
     run: GateRun = latest_gate_run(_gate_runs(head), head)
     if run.status != "completed" or run.conclusion != "success":
         raise MergeRefused(

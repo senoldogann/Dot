@@ -465,6 +465,8 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await page_ui.wait_for_timeout(_SETTLE_MS)
             dot_look = page_ui.locator('section[aria-label="Dot\'s look"]')
             await dot_look.scroll_into_view_if_needed()
+            # Its face and Change, which opens the picker (item 1136).
+            await dot_look.get_by_role("button", name="Change").click()
             await expect(dot_look.locator(".look-preview .character[data-colour='amber']")).to_have_count(1)
             await dot_look.screenshot(path=str(out / "dot-look.png"))
             await page_ui.screenshot(path=str(out / "run.png"))

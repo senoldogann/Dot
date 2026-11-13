@@ -38,6 +38,7 @@ from dotagent.store.models import (
     NO_PICKS,
     OBJECTIVE_MOVES,
     OCCUPIED_STATUSES,
+    OWNER_EDIT,
     TAINT_EVENTS,
     WORK_ORDER_MOVES,
     WORKING_STATUSES,
@@ -73,6 +74,10 @@ from dotagent.store.models import (
     HarnessTask,
     HarnessVersion,
     LiveActivity,
+    MeetingLineKind,
+    MeetingLineRecord,
+    MeetingRecord,
+    MeetingStatus,
     MemoryOrder,
     MemoryRecord,
     MemoryScore,
@@ -178,6 +183,16 @@ CREATE TABLE IF NOT EXISTS todos (
 );
 CREATE INDEX IF NOT EXISTS todos_status ON todos(status, created_at);
 CREATE INDEX IF NOT EXISTS todos_title_key ON todos(title_key, updated_at);
+CREATE TABLE IF NOT EXISTS meetings (
+    id TEXT PRIMARY KEY, url TEXT NOT NULL, thread_id TEXT NOT NULL, run_id TEXT NOT NULL, status TEXT NOT NULL,
+    note TEXT NOT NULL, notes TEXT NOT NULL, summary TEXT NOT NULL, lines INTEGER NOT NULL, created_at REAL NOT NULL,
+    admitted_at REAL, ended_at REAL, updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS meetings_status ON meetings(status, created_at);
+CREATE TABLE IF NOT EXISTS meeting_lines (
+    meeting_id TEXT NOT NULL, seq INTEGER NOT NULL, kind TEXT NOT NULL, speaker TEXT NOT NULL, text TEXT NOT NULL,
+    at REAL NOT NULL, PRIMARY KEY (meeting_id, seq)
+);
 CREATE TABLE IF NOT EXISTS work_orders (
     id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, title TEXT NOT NULL, brief TEXT NOT NULL, acceptance TEXT NOT NULL,
     objective_id TEXT, status TEXT NOT NULL, attempts INTEGER NOT NULL, run_ids TEXT NOT NULL, run_id TEXT,
@@ -940,6 +955,35 @@ _RUN_IDS: TypeAdapter[tuple[str, ...]] = TypeAdapter(tuple[str, ...])
 _OBJECTIVE_NOTES: TypeAdapter[tuple[ObjectiveNote, ...]] = TypeAdapter(tuple[ObjectiveNote, ...])
 
 
+def _meeting(row: aiosqlite.Row) -> MeetingRecord:
+    return MeetingRecord(
+        id=row["id"],
+        url=row["url"],
+        thread_id=row["thread_id"],
+        run_id=row["run_id"],
+        status=row["status"],
+        note=row["note"],
+        notes=row["notes"],
+        summary=row["summary"],
+        lines=row["lines"],
+        created_at=row["created_at"],
+        admitted_at=row["admitted_at"],
+        ended_at=row["ended_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def _meeting_line(row: aiosqlite.Row) -> MeetingLineRecord:
+    return MeetingLineRecord(
+        meeting_id=row["meeting_id"],
+        seq=row["seq"],
+        kind=row["kind"],
+        speaker=row["speaker"],
+        text=row["text"],
+        at=row["at"],
+    )
+
+
 def _work_order(row: aiosqlite.Row) -> WorkOrderRecord:
     return WorkOrderRecord(
         id=row["id"],
@@ -1104,6 +1148,7 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         merged_from=_merged_sources(row["merged_from"], row["id"]),
         pinned_at=row["pinned_at"],
         rested_at=row["rested_at"],
+        edited_by=row["edited_by"],
     )
 
 
@@ -1263,6 +1308,8 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("merged_from", "TEXT"),
     ("pinned_at", "REAL"),
     ("rested_at", "REAL"),
+    # The owner corrected a note a run wrote (the Memory page, item 1141). NULL until then, and before the column.
+    ("edited_by", "TEXT"),
 )
 # The status of a schedule switched off because the agent its runs ran as was deleted (item 462); switching it on
 # again, as Dot or as another agent, clears it as it clears item 458's.
@@ -4286,6 +4333,134 @@ class Store:
     # ----- work orders (item 907) -----------------------------------------------------------
 
     @_writing
+    async def add_meeting(self, url: str, thread_id: str, run_id: str) -> MeetingRecord:
+        """Record a call Dot was asked to join at ``url`` by the run ``run_id`` of the chat ``thread_id``: ``joining``,
+        with no line yet."""
+        now: float = time.time()
+        record: MeetingRecord = MeetingRecord(
+            id=new_id("mtg"),
+            url=url,
+            thread_id=thread_id,
+            run_id=run_id,
+            status="joining",
+            note="",
+            notes="",
+            summary="",
+            lines=0,
+            created_at=now,
+            admitted_at=None,
+            ended_at=None,
+            updated_at=now,
+        )
+        await self._db.execute(
+            "INSERT INTO meetings(id, url, thread_id, run_id, status, note, notes, summary, lines, created_at,"
+            " admitted_at, ended_at, updated_at) VALUES(?, ?, ?, ?, 'joining', '', '', '', 0, ?, NULL, NULL, ?)",
+            (record.id, url, thread_id, run_id, now, now),
+        )
+        await self._db.commit()
+        return record
+
+    async def get_meeting(self, meeting_id: str) -> MeetingRecord:
+        row = await self._one("SELECT * FROM meetings WHERE id = ?", (meeting_id,))
+        if row is None:
+            raise NotFoundError("no such meeting", {"meeting_id": meeting_id})
+        return _meeting(row)
+
+    async def meetings_of_thread(self, thread_id: str) -> list[MeetingRecord]:
+        """The meetings asked in the chat ``thread_id``, the newest first."""
+        rows = await self._all(
+            "SELECT * FROM meetings WHERE thread_id = ? ORDER BY created_at DESC, rowid DESC", (thread_id,)
+        )
+        return [_meeting(row) for row in rows]
+
+    async def open_meetings(self) -> list[MeetingRecord]:
+        """The meetings not over: joining, waiting to be let in, or in the call."""
+        rows = await self._all(
+            "SELECT * FROM meetings WHERE status IN ('joining', 'waiting', 'in_call') ORDER BY created_at, rowid", ()
+        )
+        return [_meeting(row) for row in rows]
+
+    @_writing
+    async def set_meeting_status(self, meeting_id: str, status: MeetingStatus, note: str) -> MeetingRecord:
+        """Move the meeting to ``status`` with ``note``; the first move into the call stamps when Dot was let in, and a
+        move to ``ended`` or ``failed`` when it was over."""
+        now: float = time.time()
+        await self._db.execute(
+            "UPDATE meetings SET status = ?, note = ?, updated_at = ?,"
+            " admitted_at = CASE WHEN ? = 'in_call' AND admitted_at IS NULL THEN ? ELSE admitted_at END,"
+            " ended_at = CASE WHEN ? IN ('ended', 'failed') AND ended_at IS NULL THEN ? ELSE ended_at END"
+            " WHERE id = ?",
+            (status, note, now, status, now, status, now, meeting_id),
+        )
+        await self._db.commit()
+        return await self.get_meeting(meeting_id)
+
+    @_writing
+    async def set_meeting_notes(self, meeting_id: str, notes: str) -> None:
+        """Keep the notes the note maker wrote of the meeting's words (JSON of ``MeetingNotes``)."""
+        await self._db.execute(
+            "UPDATE meetings SET notes = ?, updated_at = ? WHERE id = ?", (notes, time.time(), meeting_id)
+        )
+        await self._db.commit()
+
+    @_writing
+    async def set_meeting_summary(self, meeting_id: str, summary: str) -> None:
+        """Keep the line the meeting left in its chat when it ended."""
+        await self._db.execute(
+            "UPDATE meetings SET summary = ?, updated_at = ? WHERE id = ?", (summary, time.time(), meeting_id)
+        )
+        await self._db.commit()
+
+    @_writing
+    async def add_meeting_lines(self, meeting_id: str, lines: Sequence[tuple[MeetingLineKind, str, str, float]]) -> int:
+        """Add ``lines`` (kind, speaker, text, when) to the meeting after those it has, in their order; returns how
+        many lines it has then."""
+        if not lines:
+            return (await self.get_meeting(meeting_id)).lines
+        row = await self._one("SELECT lines FROM meetings WHERE id = ?", (meeting_id,))
+        if row is None:
+            raise NotFoundError("no such meeting", {"meeting_id": meeting_id})
+        first: int = int(row["lines"])
+        await self._db.executemany(
+            "INSERT INTO meeting_lines(meeting_id, seq, kind, speaker, text, at) VALUES(?, ?, ?, ?, ?, ?)",
+            [
+                (meeting_id, first + index, kind, speaker, text, at)
+                for index, (kind, speaker, text, at) in enumerate(lines)
+            ],
+        )
+        total: int = first + len(lines)
+        await self._db.execute(
+            "UPDATE meetings SET lines = ?, updated_at = ? WHERE id = ?", (total, time.time(), meeting_id)
+        )
+        await self._db.commit()
+        return total
+
+    async def meeting_lines(self, meeting_id: str, after: int, limit: int) -> list[MeetingLineRecord]:
+        """The meeting's lines after the ``after``-th (0: from its first), in their order, ``limit`` at most."""
+        rows = await self._all(
+            "SELECT * FROM meeting_lines WHERE meeting_id = ? AND seq >= ? ORDER BY seq LIMIT ?",
+            (meeting_id, after, limit),
+        )
+        return [_meeting_line(row) for row in rows]
+
+    @_writing
+    async def forget_meeting_lines(self, ended_before: float) -> int:
+        """Delete the lines of the meetings that were over before ``ended_before`` (``[meetings] keep_days``), and their
+        count: their summary and notes stay. Returns how many lines went."""
+        cursor = await self._db.execute(
+            "DELETE FROM meeting_lines WHERE meeting_id IN"
+            " (SELECT id FROM meetings WHERE ended_at IS NOT NULL AND ended_at < ?)",
+            (ended_before,),
+        )
+        gone: int = cursor.rowcount
+        # Their count goes with them: a meeting whose lines are gone has none to read; its summary says how many.
+        await self._db.execute(
+            "UPDATE meetings SET lines = 0 WHERE ended_at IS NOT NULL AND ended_at < ? AND lines > 0", (ended_before,)
+        )
+        await self._db.commit()
+        return gone
+
+    @_writing
     async def add_work_order(
         self,
         agent_id: str,
@@ -5438,8 +5613,11 @@ class Store:
         tainted: bool,
     ) -> MemoryRecord:
         """Rewrite a memory's text and tags, written now by ``source_run``. A tainted run's rewrite marks the note
-        tainted; a clean one leaves the mark a note had."""
-        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted))
+        tainted; a clean one leaves the mark a note had. The owner's correction mark comes off: this text is the
+        run's."""
+        return await self._rewrite_memory(
+            memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted), None
+        )
 
     @_writing
     async def update_memory_vouched(
@@ -5452,8 +5630,8 @@ class Store:
     ) -> MemoryRecord:
         """The user's rewrite of a memory's text and tags, as :meth:`update_memory`; in the same write the mark of
         having been saved while reading outside content comes off, as the user vouches for the text they save (item
-        384)."""
-        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "?", 0)
+        384), and the note is marked as the owner's correction so a run that wrote it is handed the new text."""
+        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "?", 0, OWNER_EDIT)
 
     async def _rewrite_memory(
         self,
@@ -5464,12 +5642,15 @@ class Store:
         source_run: str | None,
         mark: Literal["MAX(tainted, ?)", "?"],
         tainted: int,
+        edited_by: str | None,
     ) -> MemoryRecord:
-        """The statements of a rewrite, committed together; ``mark`` is how the note's mark is set from ``tainted``."""
+        """The statements of a rewrite, committed together; ``mark`` is how the note's mark is set from ``tainted``,
+        and ``edited_by`` is who corrected it apart from the author (``None`` when the rewrite is a run's)."""
         tag_text: str = ",".join(tags)
         updated = await self._db.execute(
-            f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark} WHERE id = ?",
-            (content, tag_text, time.time(), source_run, tainted, memory_id),
+            f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark},"
+            " edited_by = ? WHERE id = ?",
+            (content, tag_text, time.time(), source_run, tainted, edited_by, memory_id),
         )
         if updated.rowcount == 0:
             # The note was deleted while its rewrite waited on the embedding (item 556): nothing of it is written, as
@@ -5835,8 +6016,8 @@ class Store:
             tag_text: str = ",".join(record.tags)
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, used_count,"
-                " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at)"
-                " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL)",
+                " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at,"
+                " edited_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?)",
                 (
                     record.id,
                     record.content,
@@ -5851,6 +6032,7 @@ class Store:
                     int(record.tainted),
                     _MERGED_SOURCES.dump_json(record.merged_from).decode() if record.merged_from else None,
                     record.pinned_at,
+                    record.edited_by,
                 ),
             )
             await self._db.execute(
@@ -5944,11 +6126,14 @@ class Store:
         return [_memory(row) for row in rows]
 
     async def memories_changed_since(self, since: float, run_id: str) -> list[MemoryRecord]:
-        """Notes written or changed after ``since`` that the run ``run_id`` did not save itself, oldest first."""
+        """Notes written or changed after ``since`` that the run ``run_id`` did not write itself, oldest first. A note
+        the run authored and the owner then corrected (``edited_by`` is the owner, item 1141) is one of them: the
+        author stays the run, and the correction is still a change the run is handed. The run's own save and its own
+        rewrite are not."""
         rows = await self._all(
-            "SELECT * FROM memories WHERE updated_at > ? AND (source_run IS NULL OR source_run != ?) "
-            "ORDER BY updated_at",
-            (since, run_id),
+            "SELECT * FROM memories WHERE updated_at > ? AND ("
+            " source_run IS NULL OR source_run != ? OR edited_by = ?) ORDER BY updated_at",
+            (since, run_id, OWNER_EDIT),
         )
         return [_memory(row) for row in rows]
 

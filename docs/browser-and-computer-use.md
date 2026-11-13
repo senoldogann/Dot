@@ -191,14 +191,16 @@ Both modes share what follows.
   `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag`, `click_at` and
   `drag_at`. A step
   written as plainly meant is read so (item 755): a `click` at `x` and `y` with no ref is a `click_at`, a step that only
-  looks (`snapshot`, `screenshot`, `look`) is left out, as the result shows the page, and an `upload` step fails naming
-  `browser_upload`. After a step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets
+  looks or waits (`snapshot`, `screenshot`, `look`, a bare `wait`, item 1133) is left out, as the result shows the
+  settled page, and an `upload` step fails naming `browser_upload`. A `fill`, `type` or `insert` with no ref, as after a
+  `click_at` on a field's pixel, is refused with where the field's ref comes from (`browser_find`, the snapshot, a
+  field inside a frame too): text goes only into a field the step names, which the policy weighs (item 1133). After a step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets
   the page take one turn of its event loop, by which Chrome has told of a dialog, a file chooser, a navigation or a tab
   the step set off, and waits for such a tab until it is the run's, at most a second (item 342): a tab whose page
   answers later stops the batch with a line that it is opening. Then Dot waits until the page has settled (no DOM change
   for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared (two
   downloads of one name at once are saved as `name` and `name-1`, item 800). A read
-  of the page (its settling, its size, its snapshot) whose document is replaced under it, as a sign-in that hops through
+  of the page (its settling, its size, its snapshot, its whole text, item 1135) whose document is replaced under it, as a sign-in that hops through
   several pages replaces it, is made again on the new document once it is parsed, five times at most (item 752). The
   result is the part of the page that changed, with the refs of the last snapshot still valid; a page that did not
   change comes back as one line that says so. A click, a double click, a click at a point and Enter are watched for what
@@ -285,7 +287,9 @@ Both modes share what follows.
   is the Fast-Track click a snapshot, a find and a step would take three calls to reach.
   selector written for it, as a button that a click of `browser_act` does not move because it listens for other events
   (some of Slack's). A ref gone since the snapshot, of another shape, or refs of two frames fail the call with what to
-  do. A script that throws fails the call with its message; one still running when the wait ends goes on in the page,
+  do. A page that answers nothing fails that lookup within two seconds, as a step does; one that has answered is given
+  as long as an action to hand the element over, so a busy Chrome is not told the page is stuck. A script that throws
+  fails the call with its message; one still running when the wait ends goes on in the page,
   and the call says so. The page is settled after every script as after a step, so a script that leads the tab elsewhere
   lets it land, also when the page answers after the script's value came back (item 270), and says where, and the URL
   rules hold after it as after a step: a forbidden address resets the tab and fails the call. The value is fenced as the
@@ -310,8 +314,9 @@ Both modes share what follows.
   that does not answer where it stands, is waited for one second at most.
 - `browser_wait_text` waits until a text is visible and says after how long. A wait that begins while the page is
   leaving for another (a click that went to a slow page) waits for that page within its time first (item 1035): the
-  page answers nothing while it goes, and the wait failed after 2 s. When the text does not come in time the
-  call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A dialog
+  page answers nothing while it goes, and the wait failed after 2 s. A page whose script holds its main thread (X or
+  Google Cloud building a view) is asked again within the wait's time too (item 1134). When the text does not come in
+  time the call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A dialog
   that opens in front of the page during the wait ends it at once, saying so (item 698): the text would not come until
   the dialog is answered. A dialog that holds the text is the text appearing; a cookie banner ends no wait. A wait that
   has gone on for 5 s ends too once the page has stood still for 3 s, no change in its documents (those of its first ten
@@ -334,7 +339,7 @@ Both modes share what follows.
   show in no result of the chat's tools. The logins of Dot's own vault (Settings › Vault, item 621) are filled the same
   way (its cards are kept there and filled into no page). A new account's password is made by Dot (item 740):
   `browser_create_login`, given the refs of a sign-up form's password field, of the field that repeats it and of the
-  username's, and the account's username, makes a password of 20 characters (`secrets`, each of lower and upper case,
+  username's, and the account's username, makes a password of 16 characters (`secrets`, each of lower and upper case,
   digits and signs), keeps the login in Dot's vault first (its website the page's origin, a note of when it was made),
   then fills it as a vault login is filled, under the same rules (outside `yolo` you are asked first, as for a fill; in
   `yolo` it runs at once), and takes the login back out of the vault when the fill fails; the model never chooses, sees

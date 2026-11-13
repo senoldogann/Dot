@@ -38,6 +38,7 @@ it). Two environment variables of the process move things: `DOT_HOME` (the home 
 | `browser-profile/`                               | the Default profile of Dot's Chrome, the browser tools' own          |
 | `browser-incognito/`                             | the Incognito profile of Dot's Chrome, emptied as Chrome starts and closes |
 | `browser-profiles/`                              | the profiles of Dot's Chrome added in Settings › Browser, one folder each |
+| `meetings-profile/`                              | the Chrome profile of Dot's meetings, where only Dot's own Google account is signed in (item 1138) |
 | `looks/`                                         | Quick Look's drawings of the Office files the panel showed, and copies of the web pages it showed (item 1077) |
 | `screenshots/`, `downloads/`                     | what the tools capture and download                                  |
 | `undo/`                                          | journals of the file changes of runs, for `dotx undo`                |

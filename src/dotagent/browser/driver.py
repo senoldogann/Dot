@@ -49,6 +49,12 @@ _FIELD_PROBE_TIMEOUT_MS: int = 1500
 # How long a page may take to count the elements a locator names (item 471): Playwright's count takes no timeout, and
 # a frame whose script holds its main thread never answers.
 _COUNT_TIMEOUT_S: float = 2.0
+# How long a page that has already answered may take to hand over an element for a script, and then its frame.
+# The count's two seconds say a page that answers nothing is stuck. A page that just answered can still be slow to
+# hand an element over when Chrome is busy: one budget of those two seconds for both calls cancels the second while
+# it is running, and a free page (a fixture of a few lines) is reported as stuck. Each call is given as long as an
+# action, the default of ``action_timeout_s``, and a page that never hands the element over still fails.
+_ELEMENT_TIMEOUT_S: float = 8.0
 # The shortest cookie value that the value of a script is searched for (item 533).
 _MIN_HIDDEN_VALUE_CHARS: int = 8
 # A cookie value that is a word of lower case letters (a consent: ``dismissed``) is no session.
@@ -1368,11 +1374,16 @@ async def screenshot_jpeg(
 
 
 async def visible_text(page: Page, ref: str | None, timeout_ms: int) -> str:
-    """The rendered text of the whole page, or of the element ``ref``."""
+    """The rendered text of the whole page, or of the element ``ref``. The whole page is read again on the document
+    that replaced it while it was read (:func:`_again_after_navigation`, item 1135): a job ad or an application form
+    that sends itself on as it loads failed the read; an element's ref belongs to the document it was read on, and its
+    read is not repeated."""
+    if ref is None:
+        text: object = await _again_after_navigation(
+            page, "reading the page text failed", lambda: page.evaluate(_BODY_TEXT_SCRIPT)
+        )
+        return text if isinstance(text, str) else ""
     try:
-        if ref is None:
-            text: object = await page.evaluate(_BODY_TEXT_SCRIPT)
-            return text if isinstance(text, str) else ""
         locator: Locator = await live_locator(page, ref, "read")
         return await locator.inner_text(timeout=timeout_ms)
     except PlaywrightError as error:
@@ -1416,16 +1427,21 @@ async def _elements_of(page: Page, refs: Sequence[str]) -> tuple[Frame, list[Ele
     handles: list[ElementHandle] = []
     frames: list[Frame] = []
     for ref in refs:
+        # The count inside live_locator is what says the page is stuck: it answers nothing within two seconds.
+        # Handing over the element is a further call, and so is asking which frame it belongs to. A busy Chrome
+        # answers both, later than those two seconds; cancelling them on the count's clock reports that page as stuck.
         locator: Locator = await live_locator(page, ref, "script")
         try:
-            # Both ask the page, which a script still running from before may hold: as long as a count waits.
-            async with asyncio.timeout(_COUNT_TIMEOUT_S):
-                handle: ElementHandle | None = await locator.element_handle(timeout=_COUNT_TIMEOUT_S * 1000)
+            # Each call has its own bound. One shared clock cancels the frame query when the element was slow to
+            # arrive, which is the cancelled script a loaded runner reports for a page that is not stuck.
+            async with asyncio.timeout(_ELEMENT_TIMEOUT_S):
+                handle: ElementHandle | None = await locator.element_handle(timeout=int(_ELEMENT_TIMEOUT_S * 1000))
+            async with asyncio.timeout(_ELEMENT_TIMEOUT_S):
                 frame: Frame | None = None if handle is None else await handle.owner_frame()
-        except TimeoutError as error:
+        except (TimeoutError, PlaywrightTimeoutError) as error:
             raise BrowserError(
                 "the page did not answer in time (a script may be holding it); wait, then take a new snapshot",
-                {"action": "script", "ref": ref, "url": page.url, "waited_s": _COUNT_TIMEOUT_S},
+                {"action": "script", "ref": ref, "url": page.url, "waited_s": _ELEMENT_TIMEOUT_S},
             ) from error
         except PlaywrightError as error:
             raise _failure("finding the element for the script failed", page, {"ref": ref}, error) from error
@@ -1559,12 +1575,14 @@ _MODALS: str = f":is([role='dialog'], [role='alertdialog'], dialog[open], [aria-
 TextWaitEnd = Literal["text", "dialog", "timeout"]
 
 
-async def no_dialog_open(page: Page) -> bool:
-    """Whether no dialog stands in front of ``page`` (:data:`_MODALS`): one that opens then ends a wait for a text."""
+async def no_dialog_open(page: Page) -> bool | None:
+    """Whether no dialog stands in front of ``page`` (:data:`_MODALS`): one that opens then ends a wait for a text.
+    ``None`` when the page did not say within ``_COUNT_TIMEOUT_S`` (item 1134): its script holds its main thread, as
+    X's or Google Cloud's does while it builds a view, and the wait asks again within its own time."""
     try:
         return await _count(page.locator(_MODALS).filter(visible=True)) == 0
-    except TimeoutError as error:
-        raise BrowserError("the page did not say in time what it shows", {"url": page.url}) from error
+    except TimeoutError:
+        return None
     except PlaywrightError as error:
         raise _failure("looking for a dialog failed", page, {}, error) from error
 
@@ -1577,7 +1595,8 @@ async def wait_for_text_or_dialog(
     of the page while none was open when the wait began (item 698; the text would not come until it is answered), or
     the time. A dialog that brings the text with it is the text. One wait in the page, for either, so nothing is left
     waiting behind it. ``watch_dialogs`` says whether no dialog was open when a wait made of several began (item 774);
-    ``None`` looks now."""
+    ``None`` looks now. A page that does not say within ``_COUNT_TIMEOUT_S`` which of them it shows ends this slice of
+    the wait as its time does (item 1134): the wait looks again within its own time."""
     wanted: Locator = page.get_by_text(text).filter(visible=True)
     dialogs: Locator = page.locator(_MODALS).filter(visible=True)
     try:
@@ -1587,10 +1606,8 @@ async def wait_for_text_or_dialog(
         await target.first.wait_for(state="visible", timeout=timeout_ms)
         if not watch_dialogs or await _count(wanted) > 0:
             return "text"
-    except PlaywrightTimeoutError:
+    except (PlaywrightTimeoutError, TimeoutError):
         return "timeout"
-    except TimeoutError as error:
-        raise BrowserError("the page did not say in time what it shows", {"text": text, "url": page.url}) from error
     except PlaywrightError as error:
         raise _failure("waiting for the text failed", page, {"text": text}, error) from error
     return "dialog"

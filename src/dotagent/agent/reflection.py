@@ -93,7 +93,7 @@ from dotagent.memory.service import (
     owner_section,
     recent_scores,
     save_memory,
-    set_owner_section,
+    set_dot_lines,
     stands,
     vetted_dot_lines,
 )
@@ -680,9 +680,9 @@ async def _describe_owner(runtime: Runtime, runs: Sequence[RunRecord], now: floa
     lines: tuple[str, ...] = owner_lines_within(vetted, runtime.config.memory.owner_chars)
     if lines == before.dot_lines:
         return False
-    await set_owner_section(
-        runtime.store, OwnerSection(dot_lines=lines, owner_lines=before.owner_lines, updated_at=now)
-    )
+    # Read the owner's lines at the write, not as they were when the model was asked: they may have saved new ones
+    # while it answered, and those are theirs.
+    await set_dot_lines(runtime.store, lines, now)
     log.info("owner_section_written", lines=len(lines), owner_lines=len(before.owner_lines))
     return True
 

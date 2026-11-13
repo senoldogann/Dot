@@ -41,8 +41,10 @@ from dotagent.memory.service import (
     recent_scores,
     resting,
     save_memory,
-    set_owner_section,
     update_memory_note,
+)
+from dotagent.memory.service import (
+    set_owner_lines as write_owner_lines,
 )
 from dotagent.policy.drafting import DraftedRule
 from dotagent.proactive.brief import read_state
@@ -356,13 +358,9 @@ def memories_router(ctx: ServerContext) -> APIRouter:
 
     @router.put("/memories/owner")
     async def set_owner_lines(request: OwnerLinesRequest) -> OwnerSection:
-        """Replace the owner's own lines; the reflection's lines stay, and the next reflection keeps the owner's."""
-        before: OwnerSection = await owner_section(index.store)
-        section: OwnerSection = OwnerSection(
-            dot_lines=before.dot_lines, owner_lines=tuple(request.lines), updated_at=time.time()
-        )
-        await set_owner_section(index.store, section)
-        return section
+        """Replace the owner's own lines; the reflection's lines stay as they are at this write, including lines the
+        reflection wrote since the page was read, and the next reflection keeps the owner's."""
+        return await write_owner_lines(index.store, tuple(request.lines), time.time())
 
     @router.get("/memories/learning")
     async def learning_health() -> LearningHealthView:

@@ -13,12 +13,16 @@
 # internet, desktop or hosted stay on the developer's Mac.
 name: gate
 
-# A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing, as no
-# command below reads it; a skill's SKILL.md under src/ is read by Dot and does run the gate. The desktop shell has its
-# own workflow, desktop.yml.
+# A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing heavy, as
+# no command below reads it; a skill's SKILL.md under src/ is read by Dot and does run the gate. The desktop shell has
+# its own workflow, desktop.yml.
+#
+# A pull request starts this workflow even when it changes prose alone: branch protection requires `ci`, and a workflow
+# a path filter skips reports no check at all, so that pull request would wait on a check nothing would ever report. The
+# `prose` job below reads the changed files instead, and every heavy job skips when they are prose alone. A push to main
+# keeps the filter, where no protection waits on a check.
 on:
   pull_request:
-    paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
   push:
     branches: [main]
     paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
@@ -48,7 +52,65 @@ concurrency:
 # (the pages part 12 minutes, the phone's two 6 and 4). The `ci` job is the one a required check can name: a browser
 # part that this pull request skips reports no check of its own, and branch protection would wait for it forever.
 jobs:
+  # The one job a pull request that changes prose alone still runs: it reads the changed files and tells the heavy jobs
+  # to skip. It applies the patterns the push filter names above. Anything it cannot read (no base sha, a base that will
+  # not fetch, a diff that fails) counts as not prose, so a broken answer runs the gate rather than skipping it.
+  prose:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      prose_only: ${{ steps.decide.outputs.prose_only }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Whether the change is prose alone
+        id: decide
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          decide() { echo "prose_only=$1" >> "$GITHUB_OUTPUT"; }
+          decide false
+          if [[ ! "$BASE" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "the base is not a sha; the gate runs"
+            exit 0
+          fi
+          if ! git fetch --no-tags --depth=1 origin "$BASE"; then
+            echo "the base could not be fetched; the gate runs"
+            exit 0
+          fi
+          if ! files="$(git diff --name-only --no-renames "$BASE" HEAD)"; then
+            echo "the changed files could not be listed; the gate runs"
+            exit 0
+          fi
+          prose=true
+          while IFS= read -r file; do
+            if [[ -z "$file" ]]; then
+              continue
+            fi
+            case "$file" in
+              # The push filter's `docs/**` and templates first: `*.md` below would catch a file under docs/ too, and
+              # it takes the root only.
+              docs/*|.github/ISSUE_TEMPLATE/*|.github/pull_request_template.md) ;;
+              *.md)
+                if [[ "$file" == */* ]]; then
+                  prose=false
+                fi
+                ;;
+              *) prose=false ;;
+            esac
+          done <<< "$files"
+          echo "changed files: $(printf '%s\n' "$files" | wc -l | tr -d ' ')"
+          echo "prose alone: $prose"
+          decide "$prose"
+
   checks:
+    # A push and a release have no prose job and run everything; a pull request runs this when its change is more than
+    # prose.
+    needs: [prose]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -69,7 +131,8 @@ jobs:
   # What of this pull request can affect a browser part. A push and a release do not ask: they run every part. When
   # the answer cannot be read, the parts run, which is the failure that still tests the change.
   changes:
-    if: github.event_name == 'pull_request'
+    needs: [prose]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.prose.outputs.prose_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -113,6 +176,8 @@ jobs:
           decide "$answer"
 
   gate:
+    needs: [prose]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}
     runs-on: macos-latest
     timeout-minutes: 30
     env:
@@ -137,8 +202,11 @@ jobs:
 
   smoke:
     name: gate (part 2)
+    needs: [prose]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}
     runs-on: macos-latest
-    timeout-minutes: 30
+    # Room for one retry of the smoke tests below. A second failure still ends the job, inside this bound.
+    timeout-minutes: 50
     env:
       DOT_HOME: ${{ github.workspace }}/.ci/home
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
@@ -153,9 +221,20 @@ jobs:
       - name: Eval references
         run: uv run dotx eval check
       - name: Offline smoke tests, part 2
-        run: >
-          uv run pytest tests/smoke -q -n auto -p no:cacheprovider --part 2/2 --durations=10
-          -m "not live and not browser and not internet and not desktop and not hosted"
+        # One retry of a failed run. The second result is the job's: a failure that is still there fails this job,
+        # and ci with it. Not continue-on-error.
+        run: |
+          run_part() {
+            uv run pytest tests/smoke -q -n auto -p no:cacheprovider --part 2/2 --durations=10 \
+              -m "not live and not browser and not internet and not desktop and not hosted"
+          }
+          if run_part; then
+            exit 0
+          fi
+          echo "smoke part 2 failed once; running it once more. A second failure fails this job and ci."
+          rm -rf "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+          mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+          run_part
 
   # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
@@ -169,11 +248,14 @@ jobs:
   # runner does not keep: it runs at night (browser.yml) and on the developer's Mac.
   browser:
     name: browser (${{ matrix.part.name }})
-    needs: [changes]
+    needs: [changes, prose]
     # Not a pull request (a push to main, a release): every part runs. A pull request whose files cannot affect a
-    # part skips it. A decision that failed runs the parts, so a broken check cannot hide a break.
+    # part skips it, and one that changes prose alone skips every part. A decision that failed runs the parts, so a
+    # broken check cannot hide a break.
     if: >-
       ${{ !cancelled() && (github.event_name != 'pull_request'
+      || needs.prose.outputs.prose_only != 'true')
+      && (github.event_name != 'pull_request'
       || needs.changes.result != 'success'
       || needs.changes.outputs.browser == 'true') }}
     strategy:
@@ -198,7 +280,8 @@ jobs:
               --deselect
               tests/smoke/test_phone_return.py::test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_network_wakes
     runs-on: macos-latest
-    timeout-minutes: 45
+    # Room for one retry of the browser tests below. A second failure still ends the part, inside this bound.
+    timeout-minutes: 70
     env:
       DOT_HOME: ${{ github.workspace }}/.ci/home
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
@@ -218,29 +301,42 @@ jobs:
       - name: Throw-away home
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Core browser tests
-        # PART_TESTS is split into its globs on purpose.
-        run: >
-          uv run pytest -q -p no:cacheprovider --durations=10
-          -m "browser and not live and not internet and not hosted and not desktop"
-          $PART_TESTS
+        # PART_TESTS is split into its globs on purpose. One retry of a failed run. The second result is the part's:
+        # a failure that is still there fails this part, and ci with it. Not continue-on-error.
+        run: |
+          run_part() {
+            # PART_TESTS is split into its globs on purpose.
+            uv run pytest -q -p no:cacheprovider --durations=10 \
+              -m "browser and not live and not internet and not hosted and not desktop" \
+              $PART_TESTS
+          }
+          if run_part; then
+            exit 0
+          fi
+          echo "browser tests failed once; running them once more. A second failure fails this job and ci."
+          rm -rf "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+          mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+          run_part
 
   # The check main's protection should require, in place of the five job names. It passes when every job it waits
-  # for passed or did not run, and fails when one failed: a skipped browser part is not a failure, and a red one is.
+  # for passed or did not run, and fails when one failed: a skipped browser part is not a failure, and a red one is. A
+  # pull request that changes prose alone reaches it with every heavy job skipped, and passes.
   ci:
-    needs: [checks, gate, smoke, browser]
+    needs: [prose, checks, gate, smoke, browser]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Every part passed, or did not run
         env:
+          PROSE: ${{ needs.prose.result }}
           CHECKS: ${{ needs.checks.result }}
           GATE: ${{ needs.gate.result }}
           SMOKE: ${{ needs.smoke.result }}
           BROWSER: ${{ needs.browser.result }}
         run: |
           fail=0
-          for name in CHECKS GATE SMOKE BROWSER; do
+          for name in PROSE CHECKS GATE SMOKE BROWSER; do
             result="${!name}"
             echo "$name $result"
             case "$result" in

@@ -512,9 +512,77 @@ async def items_on_main(repo: Path, main: str, items: Sequence[int], env: Mappin
     return tuple(item for item in items if f"roadmap/{item}.md" in held)
 
 
+# The only branch prefix the night opens a pull request on. A pull request on any other branch, one that only
+# changes docs among them, was not opened by this automation.
+REPAIR_BRANCH_PREFIX: str = "repair/"
+
+
+def repair_opened(login: str, branch: str, expected_login: str) -> bool:
+    """Whether the repair night may update or merge the pull request.
+
+    The branch must be one the night opens (:data:`REPAIR_BRANCH_PREFIX`). A branch such as ``wfx-docs`` is left
+    alone. When GitHub names both the opener and the account ``gh`` is signed in as, they must be the same account.
+    A stand-in of ``gh`` often names the branch and not the account: a ``repair/`` branch is still the night's."""
+    if not branch.startswith(REPAIR_BRANCH_PREFIX):
+        return False
+    if login and expected_login:
+        return login.casefold() == expected_login.casefold()
+    return True
+
+
+def _opener(raw: str) -> tuple[str, str]:
+    """The opener's login and the head branch from ``gh pr view --json author,headRefName``. A missing login or
+    branch is empty, which :func:`repair_opened` refuses."""
+    data: object = _json(raw, "who opened it")
+    if not isinstance(data, dict):
+        raise RepairError("GitHub named no opener of a pull request", {"output": raw[:_OUTPUT_KEPT]})
+    author: object = data.get("author")
+    login: object = author.get("login") if isinstance(author, dict) else ""
+    branch: object = data.get("headRefName")
+    return (login if isinstance(login, str) else "", branch if isinstance(branch, str) else "")
+
+
+async def _signed_in_login(repo: Path, env: Mapping[str, str]) -> str:
+    """The login ``gh`` is signed in as, or empty when that command is not available (a stand-in of ``gh``)."""
+    try:
+        return (await command(("gh", "api", "user", "--jq", ".login"), repo, env)).strip()
+    except RepairError:
+        return ""
+
+
+async def _pull_request_actor(repo: Path, number: int, env: Mapping[str, str]) -> tuple[str, str]:
+    """The opener's login and the head branch. A stand-in that answers the head on the fields the night already asks
+    for, and not ``author``, is read that way: the branch is what it knows."""
+    login, branch = _opener(await command(("gh", "pr", "view", str(number), "--json", "author,headRefName"), repo, env))
+    if branch:
+        return login, branch
+    again_login, branch = _opener(
+        await command(
+            ("gh", "pr", "view", str(number), "--json", "state,headRefName,headRefOid,mergeStateStatus"), repo, env
+        )
+    )
+    return login or again_login, branch
+
+
+async def _require_repair_pr(repo: Path, number: int, env: Mapping[str, str]) -> None:
+    """Refuse to update or merge pull request ``number`` unless the night opened it (:func:`repair_opened`). Raises
+    :class:`RepairError` when it did not, before any change. A stand-in of ``gh`` with no ``api user`` does not fail
+    the night: a ``repair/`` branch is still its own."""
+    login, branch = await _pull_request_actor(repo, number, env)
+    expected: str = await _signed_in_login(repo, env)
+    if repair_opened(login, branch, expected):
+        return
+    raise RepairError(
+        "the pull request was not opened by the repair night, so it is left alone",
+        {"number": number, "opened_by": login or "an unknown actor", "branch": branch, "expected": expected},
+    )
+
+
 async def update_branch(repo: Path, number: int, env: Mapping[str, str]) -> None:
     """Bring the branch of the pull request ``number`` up to main on GitHub (a merge of main into it), so that its
-    checks run on what a merge would make."""
+    checks run on what a merge would make. A pull request the night did not open is left alone
+    (:func:`_require_repair_pr`)."""
+    await _require_repair_pr(repo, number, env)
     await command(("gh", "pr", "update-branch", str(number)), repo, env)
 
 
@@ -539,9 +607,11 @@ async def merge_pr(
     repo: Path, number: int, head: str, method: Literal["squash", "rebase"], env: Mapping[str, str]
 ) -> None:
     """Merge the pull request ``number`` into main by ``method``, only while its head is still ``head``, the commit
-    whose files and checks were looked at. Its branch is not deleted here: the session's checkout still holds it, and
+    whose files and checks were looked at. A pull request the night did not open is left alone
+    (:func:`_require_repair_pr`). Its branch is not deleted here: the session's checkout still holds it, and
     ``gh``'s ``--delete-branch`` fails on a branch checked out in a worktree after the merge has gone through (the
     seventh review). A merge that reports a failure is read back from GitHub: merged is merged."""
+    await _require_repair_pr(repo, number, env)
     try:
         await command(("gh", "pr", "merge", str(number), f"--{method}", "--match-head-commit", head), repo, env)
     except RepairError:

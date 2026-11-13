@@ -256,6 +256,8 @@ async def test_dots_look_card_previews_the_pick_under_reduced_motion(
     await expect(page.locator("[data-reduced-motion]")).to_be_visible()
     await page.goto(f"http://{host}:{port}/#/settings/general")
     card = page.locator('section[aria-label="Dot\'s look"]')
+    # The picker opens from Change (item 1136).
+    await card.get_by_role("button", name="Change").click()
     # A screen reader names each group by what it picks, not by the machine name of its inputs (item 559).
     for group in ("Shape", "Expression", "Colour"):
         await expect(card.get_by_role("radiogroup", name=group, exact=True)).to_have_count(1)

@@ -43,6 +43,9 @@ _REF_ACTIONS: frozenset[str] = frozenset(
     }
 )
 _TEXT_ACTIONS: frozenset[str] = frozenset({"fill", "type", "select", "insert"})
+# The steps that write text into a field (item 1133): written with no ref, as after a click_at on the field's pixel,
+# their refusal says where the field's ref comes from.
+_WRITING_ACTIONS: frozenset[str] = frozenset({"fill", "type", "insert"})
 _SIDE_EFFECT_ACTIONS: frozenset[str] = frozenset(
     {"click", "double_click", "right_click", "select", "press", "check", "uncheck", "click_at", "drag_at", "drag"}
 )
@@ -95,6 +98,11 @@ class Step(BaseModel):
     @model_validator(mode="after")
     def _check_fields(self) -> Self:
         action: str = self.action
+        if action in _WRITING_ACTIONS and self.ref is None:
+            raise ValueError(
+                f"{action} needs a ref: the ref of the field to write in, from browser_find (for example 'textbox') "
+                "or the snapshot, a field inside a frame too; a click_at gives the steps after it no field"
+            )
         if action in _REF_ACTIONS and self.ref is None:
             raise ValueError(f"{action} needs a ref")
         if action in _TEXT_ACTIONS and self.text is None:

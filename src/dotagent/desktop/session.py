@@ -20,6 +20,7 @@ from pathlib import Path
 
 from dotagent.config import DesktopConfig
 from dotagent.core.errors import (
+    ApprovalNoted,
     ApprovalParked,
     ApprovalRejected,
     DesktopError,
@@ -28,6 +29,7 @@ from dotagent.core.errors import (
     PolicyDenied,
 )
 from dotagent.core.logs import get_logger
+from dotagent.core.noted import noted_in_batch_text
 from dotagent.core.types import FrozenModel
 from dotagent.desktop import actions, apps, ax, memory, perms, safety, screen, shots, views
 from dotagent.desktop import input as hid
@@ -848,6 +850,13 @@ class DesktopSession:
                 continue
             try:
                 effect: Effect = await self._run_step(env, step, index, reviewer)
+            except ApprovalNoted as error:
+                # A yes with a note (item 1140): the step waits for the note to be read; the batch's result reads the
+                # page or the screen again, which lets the yes go, so doing it again asks the owner once more.
+                noted: str = f"Not done yet: {noted_in_batch_text(error.note)}."
+                reports.append(StepReport(index=index, description=description, outcome="failed", detail=noted))
+                stopped = "a step waits for the user's note to be read"
+                continue
             except ApprovalParked as error:
                 # Kept for the owner (item 482): its words say that it did not happen and waits for them.
                 reports.append(StepReport(index=index, description=description, outcome="failed", detail=error.message))

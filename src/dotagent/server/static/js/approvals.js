@@ -394,6 +394,16 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           );
     const yes = isQuestion ? "Send answer" : isHandoff ? "I did it" : isKept ? "Allow once" : "Approve";
     const no = isQuestion ? "Skip" : isHandoff ? "Skip this step" : isKept ? "Skip" : "Deny";
+    const yesButton = el("button", { class: "btn primary", type: "button", onclick: () => submit(true) }, yes);
+    // A yes with a note is the note first (item 1140): the daemon holds the step until the run read it, and the step
+    // goes through once if the note still calls for it. The button says so while a note is written.
+    if (!isQuestion && !isHandoff && !isLeft) {
+      note.addEventListener("input", () => {
+        const noted = note.value.trim() !== "";
+        yesButton.textContent = noted ? "Send note" : yes;
+        yesButton.title = noted ? "Dot reads your note first and takes this step only if the note still calls for it" : "";
+      });
+    }
     node.replaceChildren(
       ...present(
         el(
@@ -419,7 +429,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           note,
           remember === null ? null : el("label", { class: "approval-remember", title: "Steps of this kind (the same action, in the same place) go without asking in this chat" }, remember, "Don't ask again in this chat"),
           el("button", { class: "btn", type: "button", onclick: () => submit(false) }, no),
-          el("button", { class: "btn primary", type: "button", onclick: () => submit(true) }, yes),
+          yesButton,
         ),
       ),
     );

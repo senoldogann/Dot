@@ -49,6 +49,8 @@ type CallPurpose = Literal[
     "scout",
     # Which free agents could help an agent at work (item 896), asked while the office is open.
     "offer",
+    # The notes of a meeting Dot is in (item 1138), written by a call with no tool but its answer's.
+    "meeting",
 ]
 
 CALL_EVENT: str = "model_call"

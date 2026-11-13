@@ -49,6 +49,7 @@ _FAMILIES: dict[str, str] = {
     "setup": "dotagent.cli_setup",
     "reflect": "dotagent.cli_reflect",
     "browser-login": "dotagent.cli_browser",
+    "browser-meetings-login": "dotagent.cli_browser",
     "browser-import-chrome": "dotagent.cli_browser",
     "browser-attach": "dotagent.cli_browser",
     "browser-detach": "dotagent.cli_browser",
@@ -244,6 +245,13 @@ def build_parser() -> argparse.ArgumentParser:
         "login", help="open Dot's Chrome profile as a normal window so you can sign in to sites"
     )
     browser_login.add_argument("url", nargs="?", default=None, help="page to open first, e.g. accounts.google.com")
+    browser_commands.add_parser(
+        "meetings-login",
+        help=(
+            "open the Chrome profile of Dot's meetings so you can sign in Dot's own Google account (never yours); "
+            "quit Chrome when done"
+        ),
+    )
     browser_import = browser_commands.add_parser(
         "import-chrome",
         help=(

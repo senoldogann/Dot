@@ -150,7 +150,9 @@ def test_what_the_run_is_told_of_a_question_kept_allowed_or_skipped() -> None:
         "The user allowed the step that waited for their yes (apr-2): do it now, exactly as it was, once; it is not "
         "allowed again."
     )
-    assert allowed_text("apr-2", " Go ahead. ").endswith(" They wrote: Go ahead.")
+    assert allowed_text("apr-2", " Go ahead. ").startswith(
+        "The user allowed the step that waited for their yes (apr-2) and wrote: Go ahead. Read that first"
+    )
     assert "skipped this exact step when it was kept for them (apr-2)" in skipped_text("apr-2")
 
 

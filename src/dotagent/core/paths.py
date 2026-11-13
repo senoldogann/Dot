@@ -62,6 +62,12 @@ def screenshots_dir() -> Path:
     return dot_home() / "screenshots"
 
 
+def meetings_profile_dir() -> Path:
+    """The Chrome profile of Dot's meetings (item 1138): only Dot's own Google account is signed in there, never the
+    owner's."""
+    return dot_home() / "meetings-profile"
+
+
 def downloads_dir() -> Path:
     return dot_home() / "downloads"
 

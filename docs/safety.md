@@ -677,8 +677,11 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   refused before it runs, and its `policy` event says why, with the secret masked. A command that reads a secret from a
   file or a variable as it runs (`curl -d @file`) carries none in its words, and is not seen here: the shell guard's
   flags (an upload, a read of a secret), the questions they raise or the taint check in yolo, and the sandbox are what
-  stand there. A run you start with your own message is not marked, so it can still send a key where you tell it to. A
-  path, an address or a command line with a NUL character in it names no file, host or command: the step is refused for
+  stand there. A run you start with your own message is not marked, so it can still send a key where you tell it to,
+  including a host Dot does not already use. Once the run is marked, that send is refused in every mode, `yolo` too,
+  whether the host is one Dot already sends keys to or not. Free mode still refuses none of this (item 1097). A path,
+  an address or a command line with a NUL
+  character in it names no file, host or command: the step is refused for
   what it gave, on every way a run acts, and the run goes on (item 727).
 
 **Secrets.**
@@ -1235,7 +1238,11 @@ it** on it gives the run no authority, and the words it sends restore no trust. 
 step that reaches nobody (a command, a file read or a folder listing, a page read or a web search; never one the run's
 untrusted reading raised, nor one about Dot's own files) is kept too, and your **Allow once** lets the run do that exact
 step once in that conversation, within `[policy] permit_hours`, after the policy decided it again (item 483). The note
-you write with your answer reaches the model. Your no stands for the rest of the run (item 456): the same action, as its
+you write with your answer reaches the model, and comes first (item 1140): a yes with a note does not take the step;
+the run is told the note, and if it still calls for that exact step, the run does it again and it goes through once
+without asking you again, unless the run read content others write since (a page, a mail), when you are asked once more
+(a kept step's **Allow once** with a note tells the run to read the note before the step).
+Your no stands for the rest of the run (item 456): the same action, as its
 card showed it, is refused at once, with no new card, nor a question to the review model in `auto`, until you write to
 the run again (a steer, the answer to its question); the policy's event records the refusal, as it does the first. Only
 your no is kept, given in the web UI or the terminal: a refusal of the review model, of the eval harness and an approval
@@ -1261,7 +1268,8 @@ and any other answer skips it (item 558).
 
 **Free mode** (item 922, `[policy] free`, Settings › Rules › How Dot asks, `GET|PUT /api/policy/free`): on, no run asks
 anything, in every chat and every approval mode, from its next step: a payment, a message or mail sent for you, a
-public post and a release too, in your chats and in Dot's own, as a `yolo` run of a chat nobody watches does; each step
+public post and a release too (but a post in the chat of a meeting Dot is in, which you are asked about with its words
+whole in every mode, item 1138, [Meetings](meetings.md)), in your chats and in Dot's own, as a `yolo` run of a chat nobody watches does; each step
 is recorded with why it would have asked. A refusal still stands (a research run stays read-only, the pace of a site
 and the limits of trading hold), and so does the review model's check of a `yolo` run that read outside content when
 `yolo_taint_check` is on. A step of such a run that carries a secret out of the Mac is not refused in it (item 1097:

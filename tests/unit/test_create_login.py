@@ -9,7 +9,7 @@ def test_a_new_password_holds_each_kind_of_character_and_none_repeats_across_man
     made: set[str] = {new_password() for _ in range(200)}
     assert len(made) == 200
     for password in made:
-        assert len(password) == 20
+        assert len(password) == 16
         assert any(char.islower() for char in password) and any(char.isupper() for char in password)
         assert any(char.isdigit() for char in password) and any(char in "-_.!@#%" for char in password)
         # Letters and digits that read alike (l, 1, O, 0, I) are left out, for a password the owner may read aloud.
