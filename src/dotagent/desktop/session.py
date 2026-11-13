@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from functools import partial
 from pathlib import Path
+from typing import Literal
 
 from dotagent.config import DesktopConfig
 from dotagent.core.errors import (
@@ -24,12 +25,17 @@ from dotagent.core.errors import (
     ApprovalParked,
     ApprovalRejected,
     DesktopError,
+    DesktopPermissionError,
+    DesktopStepNotSent,
     FailSafeTriggered,
     HandedOff,
     PolicyDenied,
+    ValueNotKept,
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.noted import noted_in_batch_text
+from dotagent.core.outcomes import Dispatch, OutcomeCheck, SightEnd, already_shown, holds_back, judge_sight
+from dotagent.core.text import fold_search
 from dotagent.core.types import FrozenModel
 from dotagent.desktop import actions, apps, ax, memory, perms, safety, screen, shots, views
 from dotagent.desktop import input as hid
@@ -85,6 +91,21 @@ _FRONT_ACTIONS: frozenset[str] = frozenset({"click", "double_click", "right_clic
 # how long that wait has lasted before it counts as one (a policy check answers in milliseconds), item 555.
 _TURN_POLL_S: float = 0.5
 _ASKING_GRACE_S: float = 2.0
+# How long a step waits for the words it was expected to show (item 1146), how often the window is read meanwhile, and
+# how long the steps of one batch may wait together, so that the waits cannot carry a batch past its tool's time.
+_EXPECT_WAIT_S: float = 5.0
+_EXPECT_POLL_S: float = 0.25
+_EXPECT_BATCH_S: float = 10.0
+_EXPECTED_TEXT: str = "the window shows the expected text"
+_LOOK_AGAIN: str = "look again with desktop_snapshot"
+# What an accessibility call that failed says when the step it was for did not go out (:data:`ax._ACT_RETRY`).
+_NOTHING_DONE: str = "nothing was done"
+_VALUE_NOT_KEPT: OutcomeCheck = OutcomeCheck(
+    condition="the field holds the value set",
+    status="contradicted",
+    evidence="it reads something else after the step",
+    reason="the field did not keep the value: click it and use type or paste instead",
+)
 
 
 class StepReview(FrozenModel):
@@ -307,6 +328,29 @@ def _needs_front(steps: Sequence[Step], known: Mapping[int, Node]) -> bool:
                 continue
             return True
     return False
+
+
+def _shows_job(config: DesktopConfig, pid: int, text: str) -> bool:
+    """Whether an element of the application's front window shows ``text`` in its name or its value (worker thread):
+    what a step that expects to see it is asked (item 1146). A secure field is never one: what it holds is not read.
+    The walk is one of its own, so the refs and the views the thread was shown stay as they are."""
+    element: AXElement = ax.app_element(pid, config.ax_timeout_s)
+    limits: ax.WalkLimits = ax.WalkLimits(config.ax_max_nodes, config.ax_max_depth, config.ax_budget_s)
+    walked: Snapshot = ax.snapshot(None, ax.roots_for(element, pid, "window"), pid, 1, limits)
+    wanted: str = fold_search(text)
+    return any(
+        not node.secure() and (wanted in fold_search(node.label) or wanted in fold_search(node.value))
+        for node in walked.nodes
+    )
+
+
+def _dispatch_of(error: DesktopError) -> Dispatch:
+    """Whether a step that failed with ``error`` went out: one refused before any input was sent, or whose
+    accessibility call says nothing was done, did not; any other may have."""
+    retry: object = error.context.get("retry")
+    if isinstance(error, DesktopStepNotSent) or (isinstance(retry, str) and retry.startswith(_NOTHING_DONE)):
+        return "not_sent"
+    return "unknown"
 
 
 def _seconds_of(step: Step) -> float:
@@ -805,22 +849,28 @@ class DesktopSession:
             await asyncio.sleep(seconds)
             return Effect(detail=f"waited {seconds:g} s", pointer=None, opens_ui=False, switched_to=None)
         typed: dict[str, str] = self._lines
-        inspection: Inspection = await self._call(partial(actions.inspect_step, env, step, typed))
-        actions.refuse_secrets(inspection.context)
-        # No terminal line is known while the step is reviewed and runs: one that is refused, taken over or fails
-        # halfway may leave any text behind.
-        self._lines = {}
-        asked_at: float = time.monotonic()
-        await self._ask(
-            reviewer,
-            StepReview(
-                index=index,
-                step=step,
-                description=describe_step(step),
-                context=inspection.context,
-                target=inspection.target,
-            ),
-        )
+        try:
+            inspection: Inspection = await self._call(partial(actions.inspect_step, env, step, typed))
+            actions.refuse_secrets(inspection.context)
+            # No terminal line is known while the step is reviewed and runs: one that is refused, taken over or fails
+            # halfway may leave any text behind.
+            self._lines = {}
+            asked_at: float = time.monotonic()
+            await self._ask(
+                reviewer,
+                StepReview(
+                    index=index,
+                    step=step,
+                    description=describe_step(step),
+                    context=inspection.context,
+                    target=inspection.target,
+                ),
+            )
+        except (FailSafeTriggered, DesktopPermissionError):
+            raise
+        except DesktopError as error:
+            # Reading what the step touches, and its review, send nothing to any application (item 1146).
+            raise DesktopStepNotSent(error.message, error.context) from error
         # An answer that took a while may have been given with the mouse, on this Mac: the pointer is not where the step
         # before left it, and that is no one else at the mouse (item 683's check of it). The step still goes to what it
         # was reviewed for, not to whatever is there after the wait (item 555).
@@ -839,46 +889,83 @@ class DesktopSession:
         reviewer: StepReviewer,
         who: str = DOT_NAME,
     ) -> _Batch:
-        """Run the steps in order until one fails, is refused or is taken over by the user."""
+        """Run the steps in order until one fails, is refused or is taken over by the user, each with whether it went
+        out and what was checked of it (item 1146). The batch stops too at a step whose expected words were not seen,
+        and before a step that acts on what the steps before it left when one of their own checks is not verified."""
         reports: list[StepReport] = []
         stopped: str | None = None
         side_effects: bool = False
+        unverified: int | None = None
+        expect_left: float = _EXPECT_BATCH_S
+
+        def report(index: int, step: Step, outcome: Literal["failed", "skipped"], detail: str, sent: Dispatch) -> None:
+            reports.append(
+                StepReport(
+                    index=index, description=describe_step(step), outcome=outcome, detail=detail, dispatched=sent
+                )
+            )
+
         for index, step in enumerate(steps, start=1):
-            description: str = describe_step(step)
+            if stopped is None and unverified is not None and step.acts_on_what_was_left():
+                stopped = (
+                    f"step {unverified}'s field is not verified to hold what was written, and step {index} acts on "
+                    "it: read the field, then go on"
+                )
             if stopped is not None:
-                reports.append(StepReport(index=index, description=description, outcome="skipped", detail=""))
+                report(index, step, "skipped", "", "not_sent")
                 continue
             try:
+                await self._refuse_shown_already(env.app, step)
                 effect: Effect = await self._run_step(env, step, index, reviewer)
             except ApprovalNoted as error:
                 # A yes with a note (item 1140): the step waits for the note to be read; the batch's result reads the
                 # page or the screen again, which lets the yes go, so doing it again asks the owner once more.
-                noted: str = f"Not done yet: {noted_in_batch_text(error.note)}."
-                reports.append(StepReport(index=index, description=description, outcome="failed", detail=noted))
+                report(index, step, "failed", f"Not done yet: {noted_in_batch_text(error.note)}.", "not_sent")
                 stopped = "a step waits for the user's note to be read"
                 continue
             except ApprovalParked as error:
                 # Kept for the owner (item 482): its words say that it did not happen and waits for them.
-                reports.append(StepReport(index=index, description=description, outcome="failed", detail=error.message))
+                report(index, step, "failed", error.message, "not_sent")
                 stopped = "a step waits for the user"
                 continue
             except (PolicyDenied, ApprovalRejected) as error:
                 detail: str = f"Not allowed: {error.message}. Do not retry this step or look for a way around it."
-                reports.append(StepReport(index=index, description=description, outcome="failed", detail=detail))
+                report(index, step, "failed", detail, "not_sent")
                 stopped = "a step was not allowed"
                 continue
             except HandedOff as error:
                 detail = f"the user handled this step themselves ({error.message})"
-                reports.append(StepReport(index=index, description=description, outcome="done", detail=detail))
+                reports.append(
+                    StepReport(
+                        index=index,
+                        description=describe_step(step),
+                        outcome="done",
+                        detail=detail,
+                        dispatched="not_sent",
+                    )
+                )
                 stopped = "the user took over this step; look at the screen before going on"
                 continue
             except FailSafeTriggered:
                 raise
-            except DesktopError as error:
-                reports.append(StepReport(index=index, description=description, outcome="failed", detail=str(error)))
+            except ValueNotKept as error:
+                # The value was set and the field reads something else: the step went out and did not take.
+                reports.append(
+                    StepReport(
+                        index=index,
+                        description=describe_step(step),
+                        outcome="failed",
+                        detail=str(error),
+                        dispatched="sent",
+                        checks=(_VALUE_NOT_KEPT,),
+                    )
+                )
                 stopped = "a step failed"
                 continue
-            reports.append(StepReport(index=index, description=description, outcome="done", detail=effect.detail))
+            except DesktopError as error:
+                report(index, step, "failed", str(error), _dispatch_of(error))
+                stopped = "a step failed"
+                continue
             drawn: Point | None = effect.pointer if effect.pointer is not None else effect.aim
             if drawn is not None and self._config.show_pointer:
                 # Dot's pointer glides to where the step went, the Mac's pointer moved or not (a press through
@@ -893,6 +980,28 @@ class DesktopSession:
             if effect.switched_to is not None:
                 state = memory.targeting(state, effect.switched_to.pid)
                 env = await self._call(partial(_switch_job, self._config, env, state, effect.switched_to))
+            sights: tuple[OutcomeCheck, ...] = ()
+            if step.expect_text is not None:
+                began: float = time.monotonic()
+                sights = (await self._await_expected(env.app, step.expect_text, expect_left),)
+                expect_left = max(0.0, expect_left - (time.monotonic() - began))
+            reports.append(
+                StepReport(
+                    index=index,
+                    description=describe_step(step),
+                    outcome="done",
+                    detail=effect.detail,
+                    dispatched="sent",
+                    checks=(*effect.checks, *sights),
+                )
+            )
+            if holds_back(sights):
+                stopped = (
+                    f"step {index} was sent, and what it was expected to show was not seen: look at the screen before "
+                    "going on, and do not send the step again unseen"
+                )
+            if unverified is None and holds_back(effect.checks):
+                unverified = index
             if index < len(steps):
                 pause: float = self._config.settle_ms / 3000 if effect.opens_ui else _STEP_GAP_S
                 await asyncio.sleep(pause)
@@ -905,6 +1014,60 @@ class DesktopSession:
                 if taker is not None:
                     stopped = f"{taker} came to the front after step {index}; look at the screen before going on"
         return _Batch(reports=tuple(reports), stopped=stopped, env=env, state=state, side_effects=side_effects)
+
+    async def _shows(self, app: AppInfo, text: str) -> bool:
+        """Whether the front window of ``app`` shows ``text`` (:func:`_shows_job`), under the rules a look at it
+        holds: a password manager's window, and Dot's own while the vault shows a secret, are never read."""
+        _refuse_secrets(app)
+        await self._refuse_own_while_shown(app)
+        return await self._call(partial(_shows_job, self._config, app.pid, text))
+
+    async def _refuse_shown_already(self, app: AppInfo, step: Step) -> None:
+        """Refuse, before it goes, a step that expects to see words the window shows already (item 1146): seen after
+        the step, they could not tell what the step did. A window that cannot be read is refused too."""
+        if step.expect_text is None:
+            return
+        try:
+            shown: bool = await self._shows(app, step.expect_text)
+        except (FailSafeTriggered, DesktopPermissionError):
+            raise
+        except DesktopError as error:
+            raise DesktopStepNotSent(
+                f"the window could not be read for the expected text before the step ({error.message}), so nothing "
+                "was sent; take a new desktop_snapshot, or leave expect_text out",
+                error.context,
+            ) from error
+        if shown:
+            raise DesktopStepNotSent(already_shown("the expected text"), {"app": app.name})
+
+    async def _await_expected(self, app: AppInfo, text: str, left_s: float) -> OutcomeCheck:
+        """The words a step that went out was expected to show (item 1146), looked for in the window of ``app`` every
+        :data:`_EXPECT_POLL_S` within what is left of :data:`_EXPECT_WAIT_S` and of the batch's ``left_s``: seen is
+        verified, not seen uncertain. A window that cannot be read at a look does not show them at that look."""
+        began: float = time.monotonic()
+        room: float = min(_EXPECT_WAIT_S, left_s)
+        end: SightEnd = "timeout" if room > 0 else "no_time"
+        unread: str | None = None
+        while True:
+            try:
+                seen: bool = await self._shows(app, text)
+                unread = None
+            except (FailSafeTriggered, DesktopPermissionError):
+                raise
+            except DesktopError as error:
+                seen, unread = False, error.message
+            if seen:
+                end = "seen"
+                break
+            if time.monotonic() - began >= room:
+                break
+            await asyncio.sleep(_EXPECT_POLL_S)
+        check: OutcomeCheck = judge_sight(_EXPECTED_TEXT, end, time.monotonic() - began, _LOOK_AGAIN)
+        if unread is None:
+            return check
+        # The last look could not read the window: not seen is then said with why.
+        _log.warning("desktop_expected_unread", app=app.name, error=unread)
+        return check.model_copy(update={"evidence": f"{check.evidence}; the window could not be read ({unread})"})
 
     async def act(
         self,

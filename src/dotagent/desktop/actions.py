@@ -15,8 +15,15 @@ from math import hypot
 from pathlib import Path
 
 from dotagent.config import DesktopConfig
-from dotagent.core.errors import DesktopError, DesktopPermissionError, FailSafeTriggered
+from dotagent.core.errors import (
+    DesktopError,
+    DesktopPermissionError,
+    DesktopStepNotSent,
+    FailSafeTriggered,
+    ValueNotKept,
+)
 from dotagent.core.logs import get_logger
+from dotagent.core.outcomes import OutcomeCheck, judge_added, still_on_its_way
 from dotagent.desktop import apps, ax, screen
 from dotagent.desktop import input as hid
 from dotagent.desktop.ax import ElementState
@@ -54,6 +61,13 @@ _MIN_DRAG_MOVES: int = 8
 _MAX_DRAG_MOVES: int = 40
 _HOVER_HOLD_S: float = 0.15
 _FOCUS_SETTLE_S: float = 0.05
+# How long a field is read again for the text a step typed or pasted into it (item 1146): the keys reach the
+# application after the step returns.
+_READ_BACK_WAIT_S: float = 1.0
+_READ_BACK_POLL_S: float = 0.05
+_VALUE_KEPT: OutcomeCheck = OutcomeCheck(
+    condition="the field holds the value set", status="verified", evidence="read back after the step", reason=""
+)
 _LABEL_CLIP: int = 50
 _SCROLL_UNITS: dict[str, tuple[int, int]] = {"down": (0, -1), "up": (0, 1), "right": (-1, 0), "left": (1, 0)}
 _NO_APP: AppInfo = AppInfo(
@@ -142,6 +156,8 @@ class Effect:
     switched_to: AppInfo | None
     aim: Point | None = None
     about: str = ""
+    # What the step checked of itself (item 1146): the field it wrote into, read back.
+    checks: tuple[OutcomeCheck, ...] = ()
 
 
 def _clip(text: str, limit: int) -> str:
@@ -761,12 +777,74 @@ def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
         return _effect(f"set the value of {inspection.target} ({len(wanted)} chars, not read back)", None, False, aim)
     _, actual, _ = ax.read_text(element, env.app.pid)
     if _normalised(actual) != _normalised(wanted):
-        raise DesktopError(
+        raise ValueNotKept(
             f"a{number} did not keep the value: it now reads {_clip(actual, 80)!r}. "
             "Click the field and use type or paste instead",
             {"ref": f"a{number}", "wanted_chars": len(wanted), "actual_chars": len(actual)},
         )
-    return _effect(f"set the value of {inspection.target} ({len(wanted)} chars)", None, False, aim)
+    kept: Effect = _effect(f"set the value of {inspection.target} ({len(wanted)} chars)", None, False, aim)
+    return replace(kept, checks=(_VALUE_KEPT,))
+
+
+@dataclass(frozen=True, slots=True)
+class _Field:
+    """The field a step's keys go to, and what it held before them; ``held`` is ``None`` for a field that is not read
+    back (:func:`dotagent.desktop.ax.read_value`)."""
+
+    element: AXElement
+    pid: int
+    held: str | None
+
+
+def _field(element: AXElement, pid: int) -> _Field:
+    return _Field(element=element, pid=pid, held=ax.read_value(element, pid))
+
+
+def _field_of(env: StepEnv, ref: str | None) -> _Field | None:
+    """The field a ``type`` or ``paste`` step writes into (item 1146): the element its ref names, or the one that has
+    the keyboard in the application in front. ``None`` when there is none, or it cannot be read: the step is then not
+    checked, and goes as before."""
+    try:
+        if ref is not None:
+            return _field(_element_for(env, ref)[1], env.app.pid)
+        pid: int | None = apps.frontmost_pid()
+        if pid is None:
+            return None
+        root: AXElement = env.app_element if pid == env.app.pid else ax.app_element(pid, env.config.ax_timeout_s)
+        focused: AXElement | None = ax.focused_element(root, pid)
+        return None if focused is None else _field(focused, pid)
+    except DesktopPermissionError:
+        raise
+    except DesktopError as error:
+        # The step goes as it did before there was a check, and its line says that nothing was checked.
+        _log.warning("desktop_field_unread", when="before the step", error=error.message, **error.context)
+        return None
+
+
+def _written_checks(field: _Field | None, text: str) -> tuple[OutcomeCheck, ...]:
+    """What a field holds once keys or a paste put ``text`` into it (item 1146), read again for up to
+    :data:`_READ_BACK_WAIT_S` since the keys reach the application after the step returns: verified once the text is
+    in it one more time than before; otherwise uncertain, never contradicted, as the keys may still be on their way.
+    Nothing is checked for a text that presses Return or Tab (it may send or leave the field), for a field that is not
+    read back, and for one that can no longer be read."""
+    if field is None or field.held is None or hid.presses_keys(text) or "\r" in text:
+        return ()
+    waited: float = 0.0
+    while True:
+        try:
+            now: str | None = ax.read_value(field.element, field.pid)
+        except DesktopPermissionError:
+            raise
+        except DesktopError as error:
+            _log.warning("desktop_field_unread", when="after the step", error=error.message, **error.context)
+            return ()
+        if now is None:
+            return ()
+        check: OutcomeCheck = judge_added(field.held, now, text)
+        if check.status == "verified" or waited >= _READ_BACK_WAIT_S:
+            return (still_on_its_way(check, waited),)
+        time.sleep(_READ_BACK_POLL_S)
+        waited += _READ_BACK_POLL_S
 
 
 def _pastes(text: str, context: StepContext, threshold: int) -> bool:
@@ -791,9 +869,11 @@ def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     if step.ref is not None:
         _focus(env, step.ref)
         _require_keyboard(env)
+    field: _Field | None = _field_of(env, step.ref)
     # A long text is typed key by key over seconds: the emergency stop ends it between keys (item 683).
     hid.post(hid.text_events(env.source, text), partial(check_failsafe, env))
-    return _effect(f"typed {len(text)} chars into {inspection.target}", None, False, aim)
+    typed: Effect = _effect(f"typed {len(text)} chars into {inspection.target}", None, False, aim)
+    return replace(typed, checks=_written_checks(field, text))
 
 
 def _paste(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
@@ -803,8 +883,10 @@ def _paste(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
         _focus(env, step.ref)
         _require_keyboard(env)
     text: str = _required(step.text, "text")
+    field: _Field | None = _field_of(env, step.ref)
     hid.paste_text(env.source, text, env.config.paste_settle_ms / 1000)
-    return _effect(f"pasted {len(text)} chars into {inspection.target}", None, False, aim)
+    pasted: Effect = _effect(f"pasted {len(text)} chars into {inspection.target}", None, False, aim)
+    return replace(pasted, checks=_written_checks(field, text))
 
 
 def _key(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
@@ -888,23 +970,36 @@ def _seen(pid: int, drop_pid: int, context: StepContext) -> tuple[object, ...]:
     return (pid, context.role, context.app, context.element, context.secure, context.default_button, drop)
 
 
+def _reviewed_again(env: StepEnv, step: Step, reviewed: Inspection) -> Inspection:
+    """What ``step`` touches now, read again right before it goes. A step that may not go (the pointer is not where
+    the step before left it, its target holds passwords, it would touch something else than ``reviewed``) raises
+    :class:`DesktopStepNotSent`: no input went to any application (item 1146)."""
+    try:
+        # Someone else moving the pointer since the previous step stops the batch, as docs/safety.md says (item 683).
+        check_drift(env)
+        # Performing a step does not depend on what Dot typed on a terminal's line, only judging it does.
+        inspection: Inspection = inspect_step(env, step, {})
+        refuse_secrets(inspection.context)
+        if _changed_since(reviewed, inspection):
+            raise DesktopError(
+                f"the screen changed after this step was reviewed: it was to touch {reviewed.target}, and it would "
+                f"now touch {inspection.target}; nothing was done. Take a new desktop_snapshot and look again",
+                {"reviewed": reviewed.target, "now": inspection.target},
+            )
+    except (FailSafeTriggered, DesktopPermissionError):
+        raise
+    except DesktopError as error:
+        raise DesktopStepNotSent(error.message, error.context) from error
+    return inspection
+
+
 def execute_step(env: StepEnv, step: Step, reviewed: Inspection) -> Effect:
     """Perform one step. The failsafe is checked first and the context re-read, since time passed after the review: a
     question to the owner takes minutes, and a page can put another control where the one they approved was. A step that
     would touch something else than ``reviewed``, what the review judged and the owner approved, is not performed (item
     555)."""
     check_failsafe(env)
-    # Someone else moving the pointer since the previous step stops the batch, as docs/safety.md says (item 683).
-    check_drift(env)
-    # Performing a step does not depend on what Dot typed on a terminal's line, only judging it does.
-    inspection: Inspection = inspect_step(env, step, {})
-    refuse_secrets(inspection.context)
-    if _changed_since(reviewed, inspection):
-        raise DesktopError(
-            f"the screen changed after this step was reviewed: it was to touch {reviewed.target}, and it would now "
-            f"touch {inspection.target}; nothing was done. Take a new desktop_snapshot and look again",
-            {"reviewed": reviewed.target, "now": inspection.target},
-        )
+    inspection: Inspection = _reviewed_again(env, step, reviewed)
     match step.action:
         case "click":
             return _click(env, step, inspection, 1)

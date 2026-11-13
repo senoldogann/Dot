@@ -67,6 +67,7 @@ class FixtureEvent(BaseModel):
     x: float | None = None
     y: float | None = None
     pid: int | None = None
+    front: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -403,3 +404,141 @@ async def test_the_failsafe_file_stops_a_batch_and_work_resumes_when_it_is_remov
     mark: int = _mark(app)
     await _act(session, app, [Step(action="click", ref=button)])
     assert _since(app, mark, "button")
+
+
+def _statuses(outcome: ActOutcome, index: int) -> list[str]:
+    return [check.status for check in outcome.steps[index].checks]
+
+
+async def test_a_typed_text_is_read_back_and_verified(session: DesktopSession, app: FixtureApp) -> None:
+    """What a step typed is read back from the field (item 1146): a step that is done was sent, and one that is
+    verified was seen to have landed; the press after it goes on."""
+    body: str = await _body(session, app)
+    name: str = _ref_of(body, r'textfield "Name"')
+    mark: int = _mark(app)
+    outcome: ActOutcome = await _act(
+        session,
+        app,
+        [
+            Step(action="click", ref=name),
+            Step(action="key", key="cmd+a"),
+            Step(action="type", text="Ada Lovelace"),
+            Step(action="press", ref=_ref_of(body, r'button "Increment"')),
+        ],
+    )
+    assert [(step.outcome, step.dispatched) for step in outcome.steps] == [("done", "sent")] * 4, outcome.steps
+    assert _statuses(outcome, 2) == ["verified"]
+    # A press with nothing named to expect is sent and not checked: done is not verified.
+    assert outcome.steps[3].checks == ()
+    typed: list[FixtureEvent] = [event for event in _since(app, mark, "text") if event.field == "name"]
+    assert typed and typed[-1].value == "Ada Lovelace"
+    assert len(_since(app, mark, "button")) == 1
+
+
+async def test_a_field_that_refuses_what_is_typed_is_not_verified_and_holds_the_next_press_back(
+    session: DesktopSession, app: FixtureApp
+) -> None:
+    body: str = await _body(session, app)
+    digits: str = _ref_of(body, r'textfield "Digits"')
+    mark: int = _mark(app)
+    outcome: ActOutcome = await _act(
+        session,
+        app,
+        [
+            Step(action="type", ref=digits, text="letters"),
+            Step(action="press", ref=_ref_of(body, r'button "Increment"')),
+        ],
+    )
+    typed, pressed = outcome.steps
+    assert (typed.outcome, typed.dispatched, _statuses(outcome, 0)) == ("done", "sent", ["uncertain"]), outcome.steps
+    # Keys reach an application after the step returns, so a field that is as it was is uncertain, never contradicted.
+    assert "before typing again" in typed.checks[0].reason
+    assert "letters" not in typed.model_dump_json()
+    assert (pressed.outcome, pressed.dispatched) == ("skipped", "not_sent")
+    assert outcome.stopped is not None and "step 1's field is not verified" in outcome.stopped
+    assert _since(app, mark, "button") == []
+    assert all(event.value == "" for event in _since(app, mark, "text") if event.field == "digits")
+
+
+async def test_a_button_that_does_nothing_is_not_verified_and_the_batch_stops(
+    session: DesktopSession, app: FixtureApp
+) -> None:
+    body: str = await _body(session, app)
+    mark: int = _mark(app)
+    outcome: ActOutcome = await _act(
+        session,
+        app,
+        [
+            Step(action="press", ref=_ref_of(body, r'button "Idle"'), expect_text="Idle is done"),
+            Step(action="press", ref=_ref_of(body, r'button "Increment"')),
+        ],
+    )
+    idle, after = outcome.steps
+    assert (idle.outcome, idle.dispatched, _statuses(outcome, 0)) == ("done", "sent", ["uncertain"]), outcome.steps
+    assert "not seen" in idle.checks[0].evidence and "before sending it again" in idle.checks[0].reason
+    assert (after.outcome, after.dispatched) == ("skipped", "not_sent")
+    assert outcome.stopped is not None and "was not seen" in outcome.stopped
+    assert _since(app, mark, "button") == []
+
+
+async def test_a_result_that_shows_later_is_waited_for_and_the_button_is_pressed_once(
+    session: DesktopSession, app: FixtureApp
+) -> None:
+    body: str = await _body(session, app)
+    saved: re.Match[str] | None = re.search(r"Saved (\d+)", body)
+    assert saved is not None, body
+    mark: int = _mark(app)
+    outcome: ActOutcome = await _act(
+        session,
+        app,
+        [
+            Step(
+                action="press", ref=_ref_of(body, r'button "Slow save"'), expect_text=f"Saved {int(saved.group(1)) + 1}"
+            )
+        ],
+    )
+    (slow,) = outcome.steps
+    assert (slow.outcome, _statuses(outcome, 0)) == ("done", ["verified"]), outcome.steps
+    assert len(_since(app, mark, "slow_press")) == 1
+    assert len(_since(app, mark, "slow_done")) == 1
+
+
+async def test_a_step_that_expects_what_the_window_shows_already_is_not_sent(
+    session: DesktopSession, app: FixtureApp
+) -> None:
+    body: str = await _body(session, app)
+    mark: int = _mark(app)
+    outcome: ActOutcome = await _act(
+        session, app, [Step(action="press", ref=_ref_of(body, r'button "Increment"'), expect_text="Counter:")]
+    )
+    (pressed,) = outcome.steps
+    assert (pressed.outcome, pressed.dispatched, pressed.checks) == ("failed", "not_sent", ()), outcome.steps
+    assert "shows already" in pressed.detail
+    assert _since(app, mark, "button") == []
+
+
+async def test_another_application_coming_forward_stops_the_keys_that_were_to_follow(
+    session: DesktopSession, app: FixtureApp
+) -> None:
+    """A step that brings another application to the front leaves the keyboard with it (item 749): the text that was
+    to follow is not typed, into the fixture or into what came forward."""
+    body: str = await _body(session, app)
+    mark: int = _mark(app)
+    try:
+        outcome: ActOutcome = await _act(
+            session,
+            app,
+            [
+                Step(action="activate", text=str(app.pid)),
+                Step(action="press", ref=_ref_of(body, r'button "Bring Finder"')),
+                Step(action="type", text="lost keys"),
+            ],
+        )
+    finally:
+        await _act(session, app, [Step(action="activate", text=str(app.pid))])
+    fronts: list[FixtureEvent] = _since(app, mark, "front_other")
+    assert fronts and fronts[-1].front is True, "Finder did not come to the front, so the test shows nothing"
+    typed = outcome.steps[2]
+    assert typed.outcome != "done" and typed.dispatched == "not_sent", outcome.steps
+    assert outcome.stopped is not None and "came to the front" in outcome.stopped
+    assert _since(app, mark, "text") == [] and _since(app, mark, "key") == []
