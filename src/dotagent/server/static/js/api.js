@@ -290,6 +290,10 @@ export async function request(method, path, body) {
   } catch (cause) {
     throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
   }
+  if (method !== "GET") {
+    // What a read on its way returns may be from before this change.
+    sharedReads.clear();
+  }
   if (!response.ok) {
     throw await errorOf(response, path);
   }
@@ -373,6 +377,27 @@ export const api = {
   put: (path, body) => request("PUT", path, body),
   del: (path) => request("DELETE", path, null),
 };
+
+// The reads of a path that are on their way (item 1169): parts of the page that want the same thing at once (the
+// agents, as Dot opens) share one request. Nothing is kept once it answered.
+const sharedReads = new Map();
+
+/** `GET path`, shared with the same read already on its way; each caller gets a copy of its own, so that none sees
+ * what another changes in it. A change sent meanwhile (`request`) lets the next read go to the daemon again. */
+export function sharedGet(path) {
+  let pending = sharedReads.get(path);
+  if (pending === undefined) {
+    pending = request("GET", path, null);
+    sharedReads.set(path, pending);
+    const done = () => {
+      if (sharedReads.get(path) === pending) {
+        sharedReads.delete(path);
+      }
+    };
+    pending.then(done, done);
+  }
+  return pending.then((value) => structuredClone(value));
+}
 
 /** `?a=1&b=2` from an object; undefined, null and empty values are left out. */
 export function query(params) {
