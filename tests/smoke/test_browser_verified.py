@@ -66,6 +66,8 @@ Bounce</label>
   onclick="this.dataset.pressed = 1; setTimeout(() => send('/submit'), 200); return false">Checked</button></form>
 <button type="button" aria-label="Pulse" onclick="later(); setTimeout(() => send('/submit'), 700)">Pulse</button>
 <button type="button" aria-label="Poll" onclick="setTimeout(() => fetch('/done'), 1200)">Poll</button>
+<form action="/slow" method="post" target="_blank"><input type="hidden" name="name" value="Elsa">
+<button aria-label="Elsewhere">Elsewhere</button></form>
 <p id="out"></p>
 <script>
 const out = document.getElementById('out');
@@ -547,6 +549,24 @@ async def test_what_a_page_reads_by_itself_during_a_steps_wait_leaves_its_unchan
     (click,) = outcome.steps
     assert _statuses(click) == ["uncertain"]
     assert click.detail.startswith("but the page did not change"), click.detail
+
+
+async def test_a_form_sent_to_a_new_tab_is_not_said_to_have_sent_nothing(browser: BrowserSession, site: _Site) -> None:
+    """A form whose answer opens in a new tab goes out from that tab, so this one sends nothing: the batch stops for
+    the new tab and the line does not say that the form sent nothing, however late the server answers. (The pre-push
+    review of item 1158 named the case of a tab still on its way, which `_run_one` now excludes by itself; here
+    Chrome reports the tab at once, so this test holds the behaviour and not that one branch.)"""
+    view: PageView = await browser.open_url("elsewhere", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "elsewhere", [Step(action="click", ref=_ref(view, "Elsewhere", "button"))], False, refuse_secret_field, True
+    )
+    assert "sent nothing" not in outcome.steps[0].detail, outcome.steps[0].detail
+    assert outcome.stopped is not None and "tab" in outcome.stopped
+    for _ in range(50):
+        if site.orders:
+            break
+        await asyncio.sleep(0.1)
+    assert site.orders == [{"name": "Elsa"}]
 
 
 async def test_a_step_that_failed_after_its_page_sent_something_says_what_was_sent(
