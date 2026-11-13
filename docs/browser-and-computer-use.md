@@ -236,6 +236,14 @@ Both modes share what follows.
   **contradicted** (Dot read the opposite), **uncertain** (sent, and its result was not seen), or **not checked**
   (nothing was looked at). A failed step says whether it went out: not sent (a ref that is gone, an option the dropdown
   does not have, a click something in front took), sent, or may have been sent. The line above the result counts them.
+- A press (a click, a double or right click, a check or uncheck) first looks whether its element takes the pointer
+  (item 1153): Playwright's own trial of it, which sends nothing and lets the cookie banner's decliner run, twice for at
+  most 1.5 s. The same thing still in front of the element on both looks is said at once, named, with how to close it
+  (on the owner's Dot such a press waited its whole 8 s to be told, 24 times in a week); a cover that goes or changes
+  between the looks (an animation, a toast, a loading mask) leaves the press to wait its own time, what is left of it.
+  When what lies in front is the element's own label (a styled checkbox or radio whose field hides under it, as
+  Shopify's and Okta's do), a click, check or uncheck lands on the label, as a person's would, and the box is read
+  back; a link or a button inside that label is never pressed in the field's place.
   Two kinds of check are made, both by reading the page, with no model:
   - What a step wrote is read back once the page took a turn: the field a `fill`, `type` or `insert` wrote into, the
     option a `select` left chosen, the box of a `check` or `uncheck`. A field that holds the text is verified, as
