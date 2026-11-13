@@ -3,7 +3,7 @@
 // shape and colour its id's hue gives it (hues.js), so it keeps its face wherever it shows: the rows of a chat, the
 // sidebar, the Campaigns and Schedules pages, the bar of its own page. A face is a still frame; its state (face.js)
 // picks the animation posed and the expression worn.
-import { api } from "./api.js";
+import { sharedGet } from "./api.js";
 import { mountCharacter } from "./character/character.js";
 import { el } from "./dom.js";
 import { hueLook, hueOf } from "./hues.js";
@@ -62,7 +62,7 @@ function hasLook(id, look) {
 
 /** Read every agent's look from the daemon, Dot's included, so the faces wear them. */
 export async function loadLooks() {
-  const agents = await api.get("/agents");
+  const agents = await sharedGet("/agents");
   for (const { record } of agents) {
     rememberLook(record.id, record.look);
   }

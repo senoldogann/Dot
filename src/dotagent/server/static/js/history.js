@@ -483,16 +483,30 @@ export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal, rea
 }
 
 /** Lets the browser skip laying out the turns of `history` that are far from what is seen (item 1165, app.css), once
- * every one of them was laid out in the page: its first size is seen, and a frame later, when each turn's size is kept
- * for it, `data-sized` goes on. Nothing is set once `signal` aborted (the page went). A turn is laid out while its work
- * fills in (`whenNear`), so that `keepPlace` sees it grow, and may be skipped again after (`skippableAgain`). */
+ * every one of them was laid out in the page: its first size is seen, and a frame later, when each turn's size is
+ * kept for it, `data-sized` goes on; again at every new width. Nothing is set once `signal` aborted (the page went).
+ * A turn is laid out while its work fills in (`whenNear`), so that `keepPlace` sees it grow, and may be skipped again
+ * after (`skippableAgain`). */
 function skipWhenSized(history, signal) {
-  const watch = new ResizeObserver(() => {
-    watch.disconnect();
+  let width = null;
+  const watch = new ResizeObserver((entries) => {
+    const now = entries[entries.length - 1].contentRect.width;
+    if (now === width) {
+      return;
+    }
+    width = now;
+    // At a new width (a phone turned, a window narrowed) the height each turn kept is of the old one (item 1171):
+    // every turn is laid out again, in the next frame (not in this callback, whose change of sizes the browser would
+    // report as a loop), and a frame after that, its new height kept, the far ones are skipped again.
     requestAnimationFrame(() => {
-      if (!signal.aborted) {
-        history.dataset.sized = "";
-      }
+      delete history.dataset.sized;
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (!signal.aborted && width === now) {
+            history.dataset.sized = "";
+          }
+        }),
+      );
     });
   });
   watch.observe(history);

@@ -172,6 +172,9 @@ async def _walk(
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    # The steps shown open (item 830): the words a run writes on its way to its calls fold into its steps (item 1131),
+    # and the chat at work is tall with them only when they show.
+    await page.add_init_script("localStorage.setItem('dot.work', 'steps')")
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     await page.goto(f"{address}/#/runs/{first.id}")
     await page.wait_for_selector(".run-main", timeout=15000)

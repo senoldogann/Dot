@@ -4,7 +4,7 @@
 import { actorFace, dotFace, setActorState, teamDuo } from "../actors.js";
 import { agentList } from "../agentlist.js";
 import { agentPanel } from "../agentpanel.js";
-import { api, eventNotShown, follow, query, sse } from "../api.js";
+import { api, eventNotShown, follow, query, sharedGet, sse } from "../api.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAsksDock } from "../asksdock.js";
@@ -2133,7 +2133,8 @@ export function mount(root, ctx) {
     let detail;
     let messages = [];
     try {
-      detail = await api.get(`/runs/${runId}`);
+      // Shared with the side menu, which looks up the run's chat as it opens (item 1169).
+      detail = await sharedGet(`/runs/${runId}`);
       // Found: a later read that finds nothing (a Reload after it was deleted) says Task not found (item 810).
       opening.found();
       // A run is read whole before it is drawn (item 454), not filled in as its stream comes; one at work up to now
