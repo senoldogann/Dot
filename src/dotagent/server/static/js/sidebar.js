@@ -13,9 +13,9 @@
 // schedules stand folded at the foot, so that the days hold the owner's own chats.
 
 import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
-import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
+import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, setText, workingFor } from "./dom.js";
 import { serviceFailure, serviceWords } from "./errors.js";
-import { t } from "./i18n.js";
+import { t, tCount } from "./i18n.js";
 import { icon } from "./icons.js";
 import { actorFace, DOT_ID, lookOf, teamDuo } from "./actors.js";
 import { onAssistant } from "./assistant.js";
@@ -560,7 +560,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   });
   // On a touch screen the drawer has no X (item 888, the owner's ask): a chat chosen closes it, and so does a swipe to
   // the left; a narrow window of the Mac, with no touch, keeps the button.
-  const close = el("button", { class: "icon-btn side-close", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse });
+  const close = el("button", { class: "icon-btn side-close", type: "button", title: t("sidebar.hide"), "aria-label": t("sidebar.hide"), onclick: onCollapse });
   const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, t("side.select"));
   let folds = readFolds(FOLDS_KEY);
   // Whether a section is folded: as the owner left it, else as it starts (item 822: Dot's own work starts folded).
@@ -576,16 +576,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // the days no longer fold away under a "Chats" that only named the list.
   const head = el("div", { class: "side-list-head" }, selectButton);
   const count = el("span", { class: "grow side-count" });
-  const allButton = el("button", { class: "btn sm", type: "button", onclick: () => toggleAll() }, "Select all");
+  const allButton = el("button", { class: "btn sm", type: "button", onclick: () => toggleAll() }, t("sidebar.selectAll"));
   const deleteButton = el(
     "button",
     { class: "btn danger solid sm", type: "button", onclick: () => attempt(deleteSelected) },
     icon("trash"),
-    "Delete",
+    t("sidebar.delete"),
   );
   const cancelButton = el(
     "button",
-    { class: "icon-btn", type: "button", title: "Cancel selection", "aria-label": "Cancel selection", onclick: () => leaveSelectMode() },
+    { class: "icon-btn", type: "button", title: t("sidebar.cancelSelection"), "aria-label": t("sidebar.cancelSelection"), onclick: () => leaveSelectMode() },
     icon("x"),
   );
   const bar = el(
@@ -608,7 +608,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, t("side.agents")));
   // Campaigns and Schedules are icons in the head, beside the "+" (item 855, the owner's ask: two rows of their own
   // before the chats).
-  const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: "Campaigns", "aria-label": "Campaigns", onclick: onNavigate }, icon("target"));
+  const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: t("sidebar.campaigns"), "aria-label": t("sidebar.campaigns"), onclick: onNavigate }, icon("target"));
   // Settings is your account's row at the foot, under Connect apps, on a Mac (item 999, as the other chat apps have it):
   // your initials and your name; on a phone your initials at the head (item 991). Its name for a reader of the screen
   // holds the name it shows (WCAG 2.5.3).
@@ -616,21 +616,21 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const accountName = el("span", { class: "side-account-name" });
   const settingsLink = el(
     "a",
-    { class: "side-link side-settings", href: "#/settings", title: "Settings", onclick: onNavigate },
+    { class: "side-link side-settings", href: "#/settings", title: t("sidebar.settings"), onclick: onNavigate },
     accountInitials,
     accountName,
   );
-  const schedulesLink = el("a", { class: "icon-btn side-page", href: "#/schedules", title: "Schedules", "aria-label": "Schedules", onclick: onNavigate }, icon("calendar"));
+  const schedulesLink = el("a", { class: "icon-btn side-page", href: "#/schedules", title: t("sidebar.schedules"), "aria-label": t("sidebar.schedules"), onclick: onNavigate }, icon("calendar"));
   // The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name, to its
   // page, where a message to it starts; the three that worked last (item 855: the row scrolled and cut a face), and its
   // last tile, All, is the page of every agent and team, which the Agents row is while the owner has no agent of their
   // own. A list that did not load leaves the row as it was.
-  const facesNav = el("nav", { class: "side-agent-faces", "aria-label": "Your agents", hidden: true });
+  const facesNav = el("nav", { class: "side-agent-faces", "aria-label": t("sidebar.yourAgents"), hidden: true });
   const allAgents = el(
     "a",
-    { class: "side-agent-face side-agent-all", href: "#/agents", title: "All agents", "aria-label": "All agents", onclick: onNavigate },
+    { class: "side-agent-face side-agent-all", href: "#/agents", title: t("sidebar.allAgents"), "aria-label": t("sidebar.allAgents"), onclick: onNavigate },
     el("span", { class: "side-agent-mark" }, icon("users")),
-    el("span", { class: "side-agent-name", "aria-hidden": "true" }, "All"),
+    el("span", { class: "side-agent-name", "aria-hidden": "true" }, t("sidebar.all")),
   );
   const faceLinks = new Map();
   let facesTicket = 0;
@@ -770,8 +770,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function paintBar() {
     const shown = shownChats();
     const allChosen = shown.length > 0 && shown.every((chat) => selected.has(chat.id));
-    setText(count, selected.size === 0 ? "Choose chats to delete" : `${plural(selected.size, "chat", "chats")} selected`);
-    setText(allButton, allChosen ? "Clear" : "Select all");
+    setText(count, selected.size === 0 ? t("sidebar.chooseToDelete") : tCount(selected.size, "sidebar.selectedOne", "sidebar.selectedMany"));
+    setText(allButton, allChosen ? t("sidebar.clear") : t("sidebar.selectAll"));
     allButton.disabled = shown.length === 0;
     deleteButton.disabled = selected.size === 0;
   }
@@ -783,7 +783,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return [];
     }
     if (listLimit >= LIST_CAP) {
-      return [el("div", { class: "side-note" }, el("span", null, `Only the latest ${listLimit} chats are listed.`))];
+      return [el("div", { class: "side-note" }, el("span", null, t("sidebar.onlyLatest", { count: listLimit })))];
     }
     return [
       el(
@@ -812,9 +812,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       const found =
         inChannels ||
         [...work.working, ...waits.waiting].some((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
-      return found ? [] : [el("div", { class: "side-note" }, `No chat matches “${search.value.trim()}”.`)];
+      return found ? [] : [el("div", { class: "side-note" }, t("sidebar.noMatch", { query: search.value.trim() }))];
     }
-    return chats.length === 0 ? [el("div", { class: "side-note" }, "No chats yet. Start one with the +.")] : [];
+    return chats.length === 0 ? [el("div", { class: "side-note" }, t("sidebar.noChats"))] : [];
   }
 
   // The "…" button beside the link `node` of a chat; null beside a box.
@@ -889,7 +889,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         el(
           "div",
           { class: "side-note" },
-          el("span", null, "The chats could not be loaded."),
+          el("span", null, t("sidebar.loadFailed")),
           el(
             "button",
             {
@@ -902,7 +902,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
               },
             },
             icon("refresh"),
-            "Try again",
+            t("sidebar.tryAgain"),
           ),
         ),
       );
@@ -910,7 +910,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
     if (chats === null) {
       channelsNav.replaceChildren();
-      list.replaceChildren(el("div", { class: "side-note" }, el("div", { class: "spinner" }), el("span", null, "Loading chats…")));
+      list.replaceChildren(el("div", { class: "side-note" }, el("div", { class: "spinner" }), el("span", null, t("sidebar.loading"))));
       return;
     }
     const shown = shownChats();
@@ -1105,8 +1105,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       {
         class: "side-more",
         type: "button",
-        title: "More",
-        "aria-label": `More for ${clip(chat.title, 120)}`,
+        title: t("sidebar.more"),
+        "aria-label": t("sidebar.moreFor", { title: clip(chat.title, 120) }),
         "aria-haspopup": "menu",
         "aria-expanded": "false",
       },
@@ -1146,15 +1146,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     /** @type {Array<import("./menu.js").MenuEntry | null>} */
     const actions = [
       chat.pinned_at === null
-        ? { label: "Pin", icon: "pin", run: () => attempt(() => pinChat(chat, true)) }
-        : { label: "Unpin", icon: "pinOff", run: () => attempt(() => pinChat(chat, false)) },
+        ? { label: t("sidebar.pin"), icon: "pin", run: () => attempt(() => pinChat(chat, true)) }
+        : { label: t("sidebar.unpin"), icon: "pinOff", run: () => attempt(() => pinChat(chat, false)) },
       readAction(chat),
-      { label: "Rename", icon: "pencil", run: () => renameChat(chat) },
-      { label: "Copy link", icon: "link", run: () => attempt(() => copyLink(chat)) },
+      { label: t("sidebar.rename"), icon: "pencil", run: () => renameChat(chat) },
+      { label: t("sidebar.copyLink"), icon: "link", run: () => attempt(() => copyLink(chat)) },
       "separator",
       // A chat above the list, with what waits or what works, is not in it, where the chats are chosen.
-      aboveTheList(chat) ? null : { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
-      { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
+      aboveTheList(chat) ? null : { label: t("sidebar.select"), icon: "squareCheck", run: () => enterSelectMode(chat.id) },
+      { label: t("sidebar.delete"), icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
     ];
     return actions.filter((item) => item !== null);
   }
@@ -1163,10 +1163,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // item 131 sends no `unread`, and neither is offered.
   function readAction(chat) {
     if (chat.unread === true) {
-      return { label: "Mark read", icon: "eye", run: () => attempt(() => markChat(chat, true)) };
+      return { label: t("sidebar.markRead"), icon: "eye", run: () => attempt(() => markChat(chat, true)) };
     }
     if (chat.unread === false && ENDED.has(chat.latest_status)) {
-      return { label: "Mark unread", icon: "eyeOff", run: () => attempt(() => markChat(chat, false)) };
+      return { label: t("sidebar.markUnread"), icon: "eyeOff", run: () => attempt(() => markChat(chat, false)) };
     }
     return null;
   }
@@ -1202,7 +1202,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       maxlength: "120",
       spellcheck: "false",
       autocomplete: "off",
-      "aria-label": "Chat name",
+      "aria-label": t("sidebar.chatName"),
     });
     let ended = false;
     // The row comes back at once, under the new name while the daemon keeps it.
@@ -1243,7 +1243,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // The chat's address, which opens it in this browser or another one signed in to this Dot.
   async function copyLink(chat) {
     await copyText(`${location.origin}${location.pathname}#/runs/${chat.latest_run_id}`);
-    toast("ok", "Link copied.");
+    toast("ok", t("sidebar.linkCopied"));
   }
 
   function toggle(id, checked) {
@@ -1302,12 +1302,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return;
     }
     const confirmed = await confirmDialog({
-      title: ids.length === 1 && !selecting ? "Delete this chat?" : `Delete ${plural(ids.length, "chat", "chats")}?`,
+      title: ids.length === 1 && !selecting ? t("sidebar.deleteThis") : tCount(ids.length, "sidebar.deleteOne", "sidebar.deleteMany"),
       message:
         ids.length === 1
-          ? "Its tasks go with it, with every step and approval of those. This cannot be undone."
-          : "Their tasks go with them, with every step and approval of those. This cannot be undone.",
-      confirmLabel: "Delete",
+          ? t("sidebar.itsTasksGo")
+          : t("sidebar.theirTasksGo"),
+      confirmLabel: t("sidebar.delete"),
       danger: true,
       focusCancel: true,
     });
@@ -1328,7 +1328,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return;
     }
     const gone = new Set(outcome.deleted);
-    toast("ok", `Deleted ${plural(gone.size, "chat", "chats")}.`);
+    toast("ok", tCount(gone.size, "sidebar.deletedOne", "sidebar.deletedMany"));
     chats = chats.filter((chat) => !gone.has(chat.id));
     if (selecting) {
       leaveSelectMode();
@@ -1390,7 +1390,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       if (activity === null) {
         console.warn("the activity of the sidebar could not be loaded", error);
       } else {
-        readFailed("The sidebar", error);
+        readFailed("readFailed.sidebar", error);
       }
       return;
     }
@@ -1418,7 +1418,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         return;
       }
       if (chats !== null) {
-        readFailed("The chat list", error);
+        readFailed("readFailed.chatList", error);
         return;
       }
       failure = error;
@@ -1534,8 +1534,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     {
       class: "icon-btn side-compose",
       href: homeHref,
-      title: "New chat (⇧⌘O)",
-      "aria-label": "New chat",
+      title: t("sidebar.newChatKeys"),
+      "aria-label": t("sidebar.newChat"),
       onclick: () => {
         requestCompose();
         onNavigate();
@@ -1562,14 +1562,14 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     {
       class: "side-connect",
       type: "button",
-      title: "Connect apps",
-      "aria-label": "Connect apps",
+      title: t("sidebar.connectApps"),
+      "aria-label": t("sidebar.connectApps"),
       onclick: () => {
         location.hash = CONNECTORS_PATH;
       },
     },
     icon("plug"),
-    el("span", { class: "side-connect-label" }, "Connect apps"),
+    el("span", { class: "side-connect-label" }, t("sidebar.connectApps")),
     connectMarks,
   );
   // The logos of the services whose servers are ready, each as its tile wears it (items 408 and 477): only a service's
@@ -1608,7 +1608,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // left lead to the settings, the "+" at the right starts a chat, Dot's own face stands large over the faces of the
   // other agents, and the foot holds the apps and the search.
   const ownerInitials = el("span", { class: "side-owner-initials", "aria-hidden": "true" });
-  const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate }, ownerInitials);
+  const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: t("sidebar.settings"), "aria-label": t("sidebar.settings"), onclick: onNavigate }, ownerInitials);
   function paintOwner() {
     const owner = shownOwner().trim();
     const words = owner.split(/\s+/).filter((word) => word !== "");
@@ -1619,8 +1619,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       .join("");
     ownerInitials.replaceChildren(initials === "" ? icon("user") : initials);
     accountInitials.replaceChildren(initials === "" ? icon("user") : initials);
-    setText(accountName, owner === "" ? "Settings" : owner);
-    settingsLink.setAttribute("aria-label", owner === "" ? "Settings" : `Settings, ${owner}`);
+    setText(accountName, owner === "" ? t("sidebar.settings") : owner);
+    settingsLink.setAttribute("aria-label", owner === "" ? t("sidebar.settings") : t("sidebar.settingsOf", { owner }));
   }
   paintOwner();
   const heroName = el("span", { class: "side-dot-name" }, dotName());

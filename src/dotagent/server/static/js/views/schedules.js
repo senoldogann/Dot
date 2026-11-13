@@ -816,7 +816,7 @@ export function mount(root, ctx) {
       if (views === null) {
         holder.replaceChildren(errorPanel(error, () => attempt(retry)));
       } else {
-        readFailed("The schedules", error);
+        readFailed("readFailed.schedules", error);
       }
     }
   }

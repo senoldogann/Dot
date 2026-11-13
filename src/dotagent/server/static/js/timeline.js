@@ -1620,10 +1620,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // The run's start found its notes or its skills by their words alone: the embedding service failed (item 256).
     embedding_failed(scope, record) {
       const skills = record.data.purpose === "skills";
-      // The short words stay as they are: setup.js says them in an English sentence of its own ("notes and skills found
-      // by their words alone").
+      // The short words go into setup.js's sentence ("notes and skills found by their words alone", item 1173).
       const text = skills ? t("timeline.skillsByWords") : t("timeline.notesByWords");
-      setupLine(scope, "words", skills ? "skills" : "notes", "database", text, "warn", clip(record.data.error, 240));
+      const short = skills ? t("setup.wordsSkills") : t("setup.wordsNotes");
+      setupLine(scope, "words", short, "database", text, "warn", clip(record.data.error, 240));
     },
 
     // A compaction is a quiet line across the conversation where it happened, with the size of the context before and

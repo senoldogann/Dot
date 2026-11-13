@@ -814,7 +814,7 @@ export function mount(root, ctx) {
       if (view === null) {
         holder.replaceChildren(errorPanel(error, () => attempt(retry)));
       } else {
-        readFailed("The learning", error);
+        readFailed("readFailed.learning", error);
       }
     }
   }

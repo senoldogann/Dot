@@ -18,7 +18,7 @@ import { createDetails } from "../details.js";
 import { CHAT_BOX_PX, composerFrame, keepDraft, moveDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
 import { createContextPanel } from "../contextpanelview.js";
-import { clip, debounce, duration, el, modelName, OPEN_FILE_EVENT, plural, setText, showFrom } from "../dom.js";
+import { clip, debounce, duration, el, modelName, OPEN_FILE_EVENT, setText, showFrom } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import {
   BACKGROUND_SOURCE,
@@ -56,7 +56,7 @@ import { getSnapshot, onChange, onLifecycle, onStreamBack, breakToldAt, readFail
 import { createTimeline } from "../timeline.js";
 import { createWorkStatus } from "../workstatus.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
-import { t } from "../i18n.js";
+import { t, tCount } from "../i18n.js";
 import { stopReading } from "../voice.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
 import { narrowOr, PHONE, touchFirst } from "../layout.js";
@@ -64,7 +64,7 @@ import { narrowOr, PHONE, touchFirst } from "../layout.js";
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
 const CRUMB_CHARS = 56;
-const FOOT_WORDS = { done: "Completed in", failed: "Failed after", cancelled: "Stopped after" };
+const FOOT_WORDS = { done: t("run.footDone"), failed: t("run.footFailed"), cancelled: t("run.footCancelled") };
 // The approval modes a delegated run's pill names, but for the default's, which needs none.
 const NAMED_APPROVALS = new Set(["supervised", "auto", "yolo"]);
 const NEAR_BOTTOM_PX = 140;
@@ -86,15 +86,15 @@ const RESUME_WITHOUT_CUT = "resume.stopped";
 // A run that ended on what only the owner can give (item 1061): what it asked stands above, in "What Dot needs from you".
 const RESUME_WHEN_ASKED = "resume.asked";
 // Edit from here (item 282): the dialog's line and the owner's two ways of rewinding.
-const REWIND_MESSAGE = "Take this chat back to before this message. Your message and its files go back in the message box.";
+const REWIND_MESSAGE = t("run.rewindMessage");
 const REWIND_CHOICES = [
-  { value: "revert", label: "Also undo the file changes", tone: "danger" },
-  { value: "keep", label: "Keep the file changes", tone: "primary" },
+  { value: "revert", label: t("run.rewindRevert"), tone: "danger" },
+  { value: "keep", label: t("run.rewindKeep"), tone: "primary" },
 ];
 // The events that change what became of the lessons of a run; they come on the lifecycle stream, after the run's end.
 const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismissed", "lessons_failed"]);
 // What a decision on a lesson says once it is made.
-const LESSON_DONE = { save: "Saved to memory: later tasks find it like any note.", dismiss: "The lesson is dismissed.", undo: "Undone: the lesson is no longer in memory." };
+const LESSON_DONE = { save: t("run.lessonSaved"), dismiss: t("run.lessonDismissed"), undo: t("run.lessonUndone") };
 // A replayed run brings its question events in a burst: one refresh after it is enough.
 const QUESTIONS_SETTLE_MS = 120;
 // The tools whose results change a file the Changes tab lists (item 368), and how long its read waits for more.
@@ -115,16 +115,17 @@ const NEWEST_READ = 20;
 
 /** What a rewind did (item 282), said in a toast, and the files it left as they are, with why, in one of its own. */
 function tellRewound(cut) {
-  const taken = cut.reverted.length === 0 ? "" : `, and ${plural(cut.reverted.length, "file is as it was", "files are as they were")}`;
-  toast("ok", `The chat went back to before your message${taken}.`);
+  const back =
+    cut.reverted.length === 0 ? t("run.wentBack") : tCount(cut.reverted.length, "run.wentBackFilesOne", "run.wentBackFilesMany");
+  toast("ok", back);
   if (cut.left.length > 0) {
     const named = cut.left.map((edit) => `${edit.path} (${edit.reason})`).join("; ");
-    toast("error", `${plural(cut.left.length, "file was", "files were")} left as they are: ${named}`);
+    toast("error", tCount(cut.left.length, "run.leftAsTheyAreOne", "run.leftAsTheyAreMany", { named }));
   }
 }
 
 function backLink() {
-  return el("a", { class: "back", href: "#/runs" }, icon("arrowLeft"), "All chats");
+  return el("a", { class: "back", href: "#/runs" }, icon("arrowLeft"), t("run.allChats"));
 }
 
 /**
@@ -141,13 +142,13 @@ function openedGone(runId, opening) {
   if (readPref(LAST_CHAT_KEY) === path) {
     removePref(LAST_CHAT_KEY);
   }
-  toast("info", "The chat that was open last is gone, so Dot opened a new one.");
+  toast("info", t("run.lastGone"));
   location.replace(`${location.pathname}${location.search}#/runs`);
   return true;
 }
 
 // What the Plan tab says of a run without a plan (item 203).
-const NO_PLAN = "This task has no plan: Dot writes one for work of several steps.";
+const NO_PLAN = t("run.noPlan");
 
 /**
  * Build the page of a loaded run and start following it. `history` is `loadHistory`'s `{ earlier, read }`, the runs of
@@ -262,18 +263,18 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // A phone's way back from a chat's page is the sidebar in place, never a page of chats to walk through; from a
   // delegated run it is the run that started it (item 401). The shell draws the button, the page says where it leads.
   window.dispatchEvent(new CustomEvent(RUN_BACK_EVENT, { detail: { to: parentId === null ? null : `#/runs/${parentId}` } }));
-  const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, "Main task");
+  const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, t("run.mainTask"));
   const crumbSep = parentId === null ? null : el("span", { class: "stage-sep", "aria-hidden": "true" }, "/");
   // Whose chat it is, named in the bar: the agent, the team (item 610) or Dot.
   const chatWith = agent !== null ? agent.name : team !== null ? team.name : dotName();
   const stageName = el("span", { class: "stage-name" }, parentId !== null ? clip(run.goal, CRUMB_CHARS) : chatWith);
   const footTime = el("span", null);
-  const footParent = el("span", null, "Part of another task");
+  const footParent = el("span", null, t("run.partOfAnother"));
   const footStop = el(
     "button",
-    { class: "child-stop", type: "button", title: "Stop this task", hidden: true, onclick: stopRun },
+    { class: "child-stop", type: "button", title: t("run.stopThis"), hidden: true, onclick: stopRun },
     icon("stop"),
-    el("span", null, "Stop"),
+    el("span", null, t("run.stop")),
   );
   const foot =
     parentId === null
@@ -288,7 +289,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
             NAMED_APPROVALS.has(run.approvals) ? el("span", null, approvalLabel(run.approvals)) : null,
             footTime,
             footParent,
-            el("a", { href: `#/runs/${parentId}` }, "Open parent"),
+            el("a", { href: `#/runs/${parentId}` }, t("run.openParent")),
             footStop,
           ),
         );
@@ -299,7 +300,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       return;
     }
     const seconds = Math.max((finishedAt ?? Date.now() / 1000) - run.created_at, 0);
-    footTime.textContent = `${FOOT_WORDS[status] ?? "Working for"} ${duration(seconds)}`;
+    footTime.textContent = `${FOOT_WORDS[status] ?? t("run.footWorking")} ${duration(seconds)}`;
   }
 
   if (parentId !== null) {
@@ -311,11 +312,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         }
         crumb.textContent = clip(parent.run.goal, CRUMB_CHARS);
         crumb.title = parent.run.goal;
-        footParent.textContent = parent.active ? "Part of a task that is working" : "Works on its own";
+        footParent.textContent = parent.active ? t("run.parentWorking") : t("run.onItsOwn");
       })
       .catch((error) => console.warn("the parent run could not be loaded", error));
   }
-  const connectionNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Connection lost. Reconnecting…"));
+  const connectionNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, t("run.connectionLost")));
   // A break that mends at once, as when the page comes back into view, says nothing (items 286 and 328); one that lasts
   // is told over the conversation, never in its way: what is read does not move (item 328).
   const showConnectionNote = showFrom(connectionNote, breakToldAt);
@@ -345,7 +346,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   }
   const details = createDetails(run, parentId === null ? detail.title : null, agent, detail.campaign, detail.keep_going, team);
   const planBody = el("div", { class: "plan-list" }, el("div", { class: "hint" }, NO_PLAN));
-  const plan = panelSection({ id: "run-plan", title: "Plan", actions: null, body: planBody });
+  const plan = panelSection({ id: "run-plan", title: t("run.plan"), actions: null, body: planBody });
 
   // The plan as it stands, with how many of its steps are done: the Plan tab, the capsule's part over the composer and
   // its popover (item 644) draw it.
@@ -424,7 +425,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
 
   function paintMore() {
     const warnings = setup.warnings();
-    more.setSummary(warnings === 0 ? null : el("span", { class: "run-more-warning" }, icon("alert"), plural(warnings, "warning", "warnings")));
+    more.setSummary(warnings === 0 ? null : el("span", { class: "run-more-warning" }, icon("alert"), tCount(warnings, "run.warningOne", "run.warningMany")));
   }
 
   async function paintCost() {
@@ -456,12 +457,12 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // its head says what waits inside (paintLessons).
   const lessonsCard = el(
     "details",
-    { class: "card lessons-card", hidden: true, role: "region", "aria-label": "Lessons from this task" },
+    { class: "card lessons-card", hidden: true, role: "region", "aria-label": t("run.lessonsTitle") },
     el(
       "summary",
       { class: "lessons-head" },
       el("span", { class: "lessons-mark" }, icon("brain")),
-      el("span", { class: "lessons-title" }, "Lessons from this task"),
+      el("span", { class: "lessons-title" }, t("run.lessonsTitle")),
       lessonsCount,
       el("span", { class: "lessons-chevron" }, icon("chevron")),
     ),
@@ -504,10 +505,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // with More beside it, and what became of it is a quiet word under the text, the actions the only buttons.
   function lessonRow(lesson) {
     const text = el("div", { class: "lesson-text" }, lesson.text);
-    const more = el("button", { class: "lesson-more", type: "button", hidden: true }, "More");
+    const more = el("button", { class: "lesson-more", type: "button", hidden: true }, t("run.more"));
     more.addEventListener("click", () => {
       const open = text.classList.toggle("open");
-      more.textContent = open ? "Less" : "More";
+      more.textContent = open ? t("run.less") : t("run.more");
       more.setAttribute("aria-expanded", open ? "true" : "false");
     });
     lessonCuts.observe(text);
@@ -521,8 +522,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         el(
           "div",
           { class: "lesson-foot" },
-          el("span", { class: "lesson-state" }, icon("check"), lesson.by === "auto" ? "Saved on its own" : "Saved to memory"),
-          lessonButton(lesson, "undo", "Undo"),
+          el("span", { class: "lesson-state" }, icon("check"), lesson.by === "auto" ? t("run.savedOnItsOwn") : t("run.savedToMemory")),
+          lessonButton(lesson, "undo", t("run.undo")),
         ),
       );
     }
@@ -532,15 +533,15 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         "div",
         { class: "lesson dismissed" },
         body,
-        el("div", { class: "lesson-foot" }, el("span", { class: "lesson-why" }, `Left out: ${lesson.reason}`), lessonButton(lesson, "save", "Save anyway")),
+        el("div", { class: "lesson-foot" }, el("span", { class: "lesson-why" }, t("run.leftOut", { reason: lesson.reason })), lessonButton(lesson, "save", t("run.saveAnyway"))),
       );
     }
     if (lesson.state === "dismissed") {
-      return el("div", { class: "lesson dismissed" }, body, el("div", { class: "lesson-foot" }, el("span", { class: "lesson-state" }, icon("x"), "Dismissed")));
+      return el("div", { class: "lesson dismissed" }, body, el("div", { class: "lesson-foot" }, el("span", { class: "lesson-state" }, icon("x"), t("run.dismissed"))));
     }
     // The words sit in the buttons themselves, as on an approval card, so that a phone keeps them.
-    const save = el("button", { class: "btn primary sm", type: "button", onclick: () => decideLesson(lesson.index, "save") }, icon("check"), "Save to memory");
-    const dismiss = el("button", { class: "btn ghost sm", type: "button", onclick: () => decideLesson(lesson.index, "dismiss") }, "Dismiss");
+    const save = el("button", { class: "btn primary sm", type: "button", onclick: () => decideLesson(lesson.index, "save") }, icon("check"), t("run.saveToMemory"));
+    const dismiss = el("button", { class: "btn ghost sm", type: "button", onclick: () => decideLesson(lesson.index, "dismiss") }, t("run.dismiss"));
     return el("div", { class: "lesson" }, body, el("div", { class: "lesson-foot" }, save, dismiss));
   }
 
@@ -551,16 +552,16 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   /** A note the disliked run was handed, with Forget: it goes to the trash, which keeps it 30 days. */
   function doubtedRow(note) {
     if (forgottenNotes.has(note.id)) {
-      return el("div", { class: "lesson dismissed" }, el("div", { class: "lesson-text" }, note.text), el("div", { class: "lesson-foot" }, el("span", { class: "lesson-state" }, icon("check"), "Forgotten: in the trash for 30 days")));
+      return el("div", { class: "lesson dismissed" }, el("div", { class: "lesson-text" }, note.text), el("div", { class: "lesson-foot" }, el("span", { class: "lesson-state" }, icon("check"), t("run.forgottenState"))));
     }
-    const forget = el("button", { class: "btn ghost sm", type: "button" }, "Forget");
+    const forget = el("button", { class: "btn ghost sm", type: "button" }, t("run.forget"));
     forget.addEventListener("click", async () => {
       forget.disabled = true;
       try {
         await attempt(async () => {
           await api.del(`/memories/${encodeURIComponent(note.id)}`);
           forgottenNotes.set(note.id, note);
-          toast("ok", "Forgotten: it waits in the trash for 30 days");
+          toast("ok", t("run.forgottenTrash"));
         });
         await reconcile();
       } finally {
@@ -571,7 +572,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       "div",
       { class: "lesson doubted" },
       el("div", { class: "lesson-text" }, note.text),
-      el("div", { class: "lesson-foot" }, note.pinned ? el("span", { class: "lesson-state" }, icon("pin"), "Pinned") : null, forget),
+      el("div", { class: "lesson-foot" }, note.pinned ? el("span", { class: "lesson-state" }, icon("pin"), t("run.pinned")) : null, forget),
     );
   }
 
@@ -623,7 +624,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
               "div",
               { class: "note warn" },
               icon("alert"),
-              el("span", null, "This task read things that other people can write (web pages, mail, downloads): read each lesson before you save it."),
+              el("span", null, t("run.readOthers")),
             )
           : null,
         lessons.error === null ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, lessons.error)),
@@ -690,12 +691,12 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // The shared frame (composer.js): Enter or ⌘Enter sends, as Settings › General chooses (never plain Return on a touch screen); "/" opens the slash menu,
   // whose one command here asks on the side; what is typed and not sent is kept for this run.
   const frame = composerFrame({
-    label: "Message",
-    boxLabel: `Message for ${agent !== null ? agent.name : dotName()}`,
+    label: t("run.message"),
+    boxLabel: t("run.messageFor", { name: agent !== null ? agent.name : dotName() }),
     placeholder: "",
     maxPx: CHAT_BOX_PX,
     commands: [
-      { label: "/btw", hint: "Ask on the side: the task never sees the question.", insert: "/btw " },
+      { label: "/btw", hint: t("run.btwHint"), insert: "/btw " },
       // The dock shows no mode on Auto (item 495): a mode is named for the chat's next messages by its command.
       ...MESSAGE_MODES.map((option) => ({
         label: `/${option.id}`,
@@ -891,7 +892,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       goalMode: heldChoice(start.goal_mode),
       once: null,
     },
-    optionsTitle: "Approvals",
+    optionsTitle: t("run.approvals"),
     more: () => [],
     onMode: () => input.focus(),
     onChange: () => {
@@ -931,7 +932,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const waitingList = el("div", { class: "stack tight", hidden: true });
 
   function holdMessage(text) {
-    const label = el("span", null, `Sending to Dot: “${clip(text, QUOTE_CHARS)}”`);
+    const label = el("span", null, t("run.sending", { text: clip(text, QUOTE_CHARS) }));
     const node = el("div", { class: "note" }, icon("clock"), label);
     const entry = { text, node, label };
     waitingMessages.push(entry);
@@ -959,13 +960,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   function messagesMissed() {
     for (const entry of waitingMessages.splice(0)) {
       entry.node.className = "note warn";
-      entry.label.textContent = `The task ended before Dot read: “${clip(entry.text, QUOTE_CHARS)}”`;
+      entry.label.textContent = t("run.endedBeforeRead", { text: clip(entry.text, QUOTE_CHARS) });
     }
   }
 
   // Side questions on their way; the answer itself arrives on the run's stream.
   function holdAside(question) {
-    const node = el("div", { class: "note" }, icon("clock"), el("span", null, `Asking on the side: “${clip(question, QUOTE_CHARS)}”`));
+    const node = el("div", { class: "note" }, icon("clock"), el("span", null, t("run.askingSide", { text: clip(question, QUOTE_CHARS) })));
     waitingList.append(node);
     waitingList.hidden = false;
     return () => {
@@ -1170,7 +1171,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // with its files goes to the composer of the run the chat ends with now, or of a new chat when none is left; the files
   // the runs taken out changed are taken back too when the owner chooses so.
   async function editFromHere(past) {
-    const files = await choiceDialog({ title: "Edit from here?", message: REWIND_MESSAGE, choices: REWIND_CHOICES });
+    const files = await choiceDialog({ title: t("run.editFromHere"), message: REWIND_MESSAGE, choices: REWIND_CHOICES });
     if (files === null) {
       return;
     }
@@ -1326,7 +1327,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     const show = below && !landing;
     jumpVisible = show;
     jump.hidden = !show;
-    const words = answerNode !== null ? "Jump to the answer" : "Jump to latest";
+    const words = answerNode !== null ? t("run.jumpAnswer") : t("run.jumpLatest");
     jump.title = words;
     jump.setAttribute("aria-label", words);
     paintBar();
@@ -1434,7 +1435,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         reload();
         return;
       }
-      readFailed("The task", error);
+      readFailed("readFailed.task", error);
     }
   }
 
@@ -1493,7 +1494,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       runs = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${NEWEST_READ}`);
     } catch (error) {
       if (!signal.aborted) {
-        readFailed("The chat", error);
+        readFailed("readFailed.chat", error);
       }
       return;
     }
@@ -1557,7 +1558,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   /** Under the heading's title: the agent, or Helper on a helper's page, and the model the run uses now. A phone's bar
    * shows it on a helper's page; a chat's names whom it is with instead (item 1101). */
   function paintHeading() {
-    headingSub.textContent = `${parentId === null ? chatWith : "Helper"} · ${modelName(model)}`;
+    headingSub.textContent = `${parentId === null ? chatWith : t("run.helper")} · ${modelName(model)}`;
     keepLook();
   }
 
@@ -1604,14 +1605,14 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // (item 846), Dot or one of your agents, as a messaging app's panel shows the contact.
   const agents = agentList({ threadId: run.thread_id, helper: (id) => timeline.helper(id) });
   const withAgent = agentPanel({ agent });
-  const withSection = panelSection({ id: "run-agent", title: "Agent", actions: null, body: withAgent.element });
+  const withSection = panelSection({ id: "run-agent", title: t("run.agent"), actions: null, body: withAgent.element });
   // The Screen tab with nothing yet (item 401): Dot's computer is quiet, and what it shows and the screenshots it takes
   // stand there once it works. The empty panel is the page's own, in Dot's voice; the card of the page takes its place
   // as soon as there is a page.
   const screenQuiet = emptyPanel(
     "monitor",
-    "Dot's computer is quiet",
-    "The screenshots it takes while it works will appear here. Settings › Browser opens Dot's computer when a task starts its browser.",
+    t("run.computerQuiet"),
+    t("run.computerQuietHint"),
   );
   let screenContent = detail.held;
   function paintScreen() {
@@ -1660,7 +1661,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       }
     } catch (error) {
       if (!signal.aborted) {
-        agents.fail(`The agents could not be loaded: ${error.message}`);
+        agents.fail(t("run.agentsFailed", { problem: error.message }));
       }
     }
   }
@@ -1791,7 +1792,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const problem =
     historyProblem === null
       ? null
-      : el("div", { class: "note warn" }, icon("alert"), el("span", null, `The earlier part of this conversation could not be loaded: ${historyProblem.message}`));
+      : el("div", { class: "note warn" }, icon("alert"), el("span", null, t("run.historyFailed", { problem: historyProblem.message })));
   // Dot's face and name, or a delegated run's breadcrumb, name the page in the top bar (item 78), and the side panel's
   // switch is the bar's one tool (item 120): the run's state, start, agent, model, approvals and campaign are in the
   // Details of the panel's Run tab. The goal, the first message, is the page's heading for a reader of the structure.
@@ -1810,13 +1811,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // switch alone (app.css).
   const screenButton = el(
     "button",
-    { class: "icon-btn stage-quick", type: "button", title: "Dot's computer", "aria-label": "Show Dot's computer", hidden: !detail.held, onclick: () => computer.openFull() },
+    { class: "icon-btn stage-quick", type: "button", title: t("run.computer"), "aria-label": t("run.showComputer"), hidden: !detail.held, onclick: () => computer.openFull() },
     icon("monitor"),
   );
   const helpersCount = el("span", { class: "stage-quick-count" });
   const helpersButton = el(
     "button",
-    { class: "icon-btn stage-quick stage-helpers", type: "button", title: "Helpers", "aria-label": "Show the helpers", hidden: true, onclick: () => inspector.openTab("agents") },
+    { class: "icon-btn stage-quick stage-helpers", type: "button", title: t("run.helpers"), "aria-label": t("run.showHelpers"), hidden: true, onclick: () => inspector.openTab("agents") },
     icon("users"),
     helpersCount,
   );
@@ -2014,17 +2015,17 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
     console.error("the run stream ended", error);
     if (error.status === 404) {
-      root.replaceChildren(backLink(), emptyPanel("circleDashed", "Task not found", `No task has the ID ${runId}.`));
+      root.replaceChildren(backLink(), emptyPanel("circleDashed", t("run.notFound"), t("run.noSuchTask", { id: runId })));
       return;
     }
-    toast("error", "Live updates stopped. Reload the page to get them again.", null, error.message);
+    toast("error", t("run.liveStoppedReload"), null, error.message);
     root.prepend(
       el(
         "div",
         { class: "note bad" },
         icon("alert"),
-        el("span", null, "Live updates stopped."),
-        el("button", { class: "btn sm", type: "button", onclick: reload }, "Reload"),
+        el("span", null, t("run.liveStopped")),
+        el("button", { class: "btn sm", type: "button", onclick: reload }, t("run.reload")),
       ),
     );
   });
@@ -2151,7 +2152,7 @@ export function mount(root, ctx) {
         shown();
         return;
       }
-      const problem = error.status === 404 ? emptyPanel("circleDashed", "Task not found", `No task has the ID ${runId}.`) : errorPanel(error, () => attempt(open));
+      const problem = error.status === 404 ? emptyPanel("circleDashed", t("run.notFound"), t("run.noSuchTask", { id: runId })) : errorPanel(error, () => attempt(open));
       root.replaceChildren(backLink(), problem);
       shown();
       return;
