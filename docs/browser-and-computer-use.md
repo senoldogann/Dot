@@ -357,7 +357,9 @@ Both modes share what follows.
   page once the wheel has moved it and it stands still (item 1029): a wheel lands after the call that sends it, late on
   a busy Mac, where a page read too soon said "no change". A wheel that moves nothing (a page at its end), or a page
   that does not answer where it stands, is waited for one second at most.
-- `browser_wait_text` waits until a text is visible and says after how long. A wait that begins while the page is
+- `browser_wait_text` waits until a text is visible and says after how long. The text counts as the page view names
+  it (item 1154): visible words, or the placeholder of a field, the `aria-label` or label of an element (an icon
+  button) and the alt text of an image; a step's `expect_text` is read the same way. A wait that begins while the page is
   leaving for another (a click that went to a slow page) waits for that page within its time first (item 1035): the
   page answers nothing while it goes, and the wait failed after 2 s. A page whose script holds its main thread (X or
   Google Cloud building a view) is asked again within the wait's time too (item 1134). When the text does not come in

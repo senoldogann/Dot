@@ -353,6 +353,13 @@ style="position:absolute;inset:0">Terms</a></label></span>
 <button onclick="document.getElementById('k').textContent = 'saved'">Save</button><span id="k"></span>
 <div id="mask" style="position:fixed;inset:0;background:rgba(255,255,255,.6)">Loading…</div>
 <script>setTimeout(() => document.getElementById('mask').remove(), 2000);</script>""",
+    # What comes half a second after the page, named only as the page view names it: a field by its placeholder, a
+    # button drawn as an icon by its aria-label, an image by its alt text; and a region that never shows.
+    "/named-later": """<!doctype html><title>Named later</title><div id="slot"></div>
+<div aria-label="Hidden region" style="display:none">x</div>
+<script>setTimeout(() => { document.getElementById('slot').innerHTML = '<input placeholder="Subject">'
++ '<button aria-label="Select image 6">+</button><img alt="Gallery image" width="20" height="20" src="data:,">'; },
+500);</script>""",
 }
 
 
@@ -1394,3 +1401,16 @@ async def test_a_press_waits_for_a_mask_that_goes_by_itself(browser: BrowserSess
     )
     assert [report.outcome for report in saved.steps] == ["done"], saved.steps
     assert "saved" in (await browser.read_text("mask", None, 0, 1000)).text
+
+
+async def test_a_wait_finds_words_the_page_view_shows_as_names(browser: BrowserSession, site: str) -> None:
+    """Item 1154: a field's placeholder, an icon button's aria-label and an image's alt text are what the page view
+    names them by (`textbox "Subject"`), and a wait for those words ends when they come; a name that never shows is
+    still waited for."""
+    await browser.open_url("named", f"{site}/named-later", True)
+    for words in ("Subject", "Select image 6", "Gallery image"):
+        wait: TextWait = await browser.wait_text("named", words, 5.0, True)
+        assert wait.appeared, words
+        assert wait.waited_s < 3.0, (words, wait.waited_s)
+    hidden: TextWait = await browser.wait_text("named", "Hidden region", 1.5, True)
+    assert not hidden.appeared
