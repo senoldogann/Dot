@@ -208,12 +208,15 @@ Both modes share what follows.
   the click, a dropdown it opened), its requests, its address, its tabs and its dialogs all stayed as they were for half
   a second, the step's line says it is done but the page did not change, with the fields the page marks invalid (a form
   a required field held back), so that a run does not take a click that did nothing (a button behind something in front
-  of it, one that waits for another event: `browser_eval` with its ref reaches it) for one that worked. A click whose
-  batch left the page unchanged is tried once the other way before the result returns (item 781): the same ref gets the
-  pointer sequence a script sends, and the page is read again, so a step that a script can move does not need a model
-  round trip; a click that already moved the page is never sent twice, a step that failed is left alone, and a batch
-  that sends, posts, pays, removes, installs or hands over a credential is never clicked again this way (item 792: such
-  a button may act slower than half a second, and a second click would do it twice). A page that has not settled when
+  of it, one that waits for another event: `browser_eval` with its ref reaches it) for one that worked. A click at a
+  point has no ref, and the field it focuses is watched all the same (item 1142): putting the keyboard in a field,
+  moving the caret there or opening its dropdown is a change, and a click that only takes the keyboard off a field is
+  not. A click whose batch left the page unchanged is tried once the other way before the result returns (item 781):
+  the same ref gets the pointer sequence a script sends, and the page is read again, so a step that a script can move
+  does not need a model round trip; a click that already moved the page is never sent twice, a step that failed is left
+  alone, and a batch that sends, posts, pays, removes, installs or hands over a credential is never clicked again this
+  way (item 792: such a button may act slower than half a second, and a second click would do it twice). A page that has
+  not settled when
   the steps, a script or an upload went through is said, rather than failing the call, which a run took for a step that
   did not happen (item 792): after steps or an upload in the page's notes ("do not repeat it"), after a script in what
   it says happened ("then: …"), with any surprise of the tab. When the page cannot be read after steps or an upload

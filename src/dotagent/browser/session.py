@@ -54,6 +54,7 @@ from dotagent.browser.driver import (
     cookie_secrets,
     document_of,
     fill_login_field,
+    focus_landed,
     go_back,
     holds_field_focus,
     holds_secret_field,
@@ -3075,9 +3076,10 @@ class BrowserSession:
         """What a step that should change the page did (item 739), as its report says it: nothing when the page
         changed and shows nothing new to read; what it shows new (an alert, a field it marks invalid) when it did; and,
         when nothing changed within :data:`_EFFECT_WAIT_S` (no change to its documents, no box ticked or field typed
-        in, no request, no new address, tab or dialog, and the element clicked took no focus as a field), that it did
+        in, no request, no new address, tab or dialog, and the keyboard did not land in a field), that it did
         not, with what the page marks invalid, so that the run does not take a click that
-        did nothing for one that worked. A page that could not be read counts as changed."""
+        did nothing for one that worked. A click at a point has no ref: the field it focuses is read from the page,
+        not from the step (item 1142). A page that could not be read counts as changed."""
         after: Pulse = pulse
         moved: bool = False
         waited: float = 0.0
@@ -3087,6 +3089,7 @@ class BrowserSession:
                 after.changes is None
                 or pulse.changes is None
                 or after.changes != pulse.changes
+                or focus_landed(pulse.focus, after.focus)
                 or tab.requests != requests
                 or describe_surprise(before, self._watch(thread, tab)) is not None
             )
@@ -3099,7 +3102,7 @@ class BrowserSession:
         if not moved:
             invalid: str = f"; fields it marks invalid: {'; '.join(after.invalid)}" if after.invalid else ""
             return (
-                "but the page did not change (no new content, request or address)"
+                "but the page did not change (no new content, request, address or keyboard focus)"
                 f"{invalid}. Something in front may have taken the click, or the control may wait for another event: "
                 "look at the page, close what is in front, or reach the element with browser_eval and its ref"
             )
