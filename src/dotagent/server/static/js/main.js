@@ -13,6 +13,7 @@ import { wireConversationCopy } from "./clipboard.js";
 import { el, OPEN_FILE_EVENT } from "./dom.js";
 import { listenForHolds } from "./messagesheet.js";
 import { explain } from "./errors.js";
+import { t } from "./i18n.js";
 import { fileDialog } from "./filepanel.js";
 import { icon, wordmark } from "./icons.js";
 import { buildShell } from "./shell.js";
@@ -212,10 +213,17 @@ function onEnter(input, action) {
   });
 }
 
+/** Whether the page was opened on the Mac Dot runs on (a loopback address), where the Dot app or Terminal signs it in
+ * and a pairing code is for a phone. Only what the screen says depends on it: the ways in are the same everywhere. */
+function onThisMac() {
+  return ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
+}
+
 /**
- * The sign-in screen (item 625): a person who has not signed in yet gets one thing to do, type the code that Settings ›
- * Phone shows; the access key and the commands of Terminal are the other ways in, in a fold that is shut unless the key
- * is what failed (`keyFailed`).
+ * The sign-in screen (item 625): on a phone, one thing to do, type the code that Settings › Phone shows; on the Mac
+ * Dot runs on, the Dot app or Terminal's `dotx open` signs the page in, and the code is said to be a phone's. The access
+ * key and the commands of Terminal are the other ways in, in a fold that is shut unless the key is what failed
+ * (`keyFailed`).
  */
 function renderSignIn(message, keyFailed = false) {
   // A sign-in code from Settings › Phone (item 267): the way in for an app on a phone's home screen, whose storage is
@@ -226,8 +234,8 @@ function renderSignIn(message, keyFailed = false) {
     autocomplete: "one-time-code",
     autocapitalize: "characters",
     spellcheck: "false",
-    placeholder: "Sign-in code",
-    "aria-label": "Sign-in code",
+    placeholder: t("signin.code"),
+    "aria-label": t("signin.code"),
   });
   const input = el("input", {
     class: "input mono",
@@ -235,10 +243,11 @@ function renderSignIn(message, keyFailed = false) {
     autocomplete: "off",
     autocapitalize: "off",
     spellcheck: "false",
-    placeholder: "Access key",
-    "aria-label": "Access key",
+    placeholder: t("signin.key"),
+    "aria-label": t("signin.key"),
   });
-  const pairButton = el("button", { class: "btn primary", type: "button" }, "Sign in");
+  const local = onThisMac();
+  const pairButton = el("button", { class: local ? "btn" : "btn primary", type: "button" }, t("signin.signIn"));
   const pair = async () => {
     const value = code.value.trim();
     if (value === "") {
@@ -268,35 +277,44 @@ function renderSignIn(message, keyFailed = false) {
   pairButton.addEventListener("click", () => attempt(pair));
   onEnter(code, () => attempt(pair));
   onEnter(input, submit);
+  const problem = message === "" ? null : el("div", { class: "note bad", role: "alert" }, icon("alert"), el("span", null, message));
+  // On the Mac Dot runs on the code is not the way: the Dot app, or Terminal, opens this page signed in. The code is a
+  // phone's, said as such under it.
+  const intro = local
+    ? [
+        el("p", null, t("signin.macIntro")),
+        el("p", { class: "muted" }, t("signin.macPhone")),
+      ]
+    : [el("p", { class: "muted" }, t("signin.phoneIntro"))];
   screen(
-    el("p", { class: "muted" }, "Open Dot on your Mac, go to Settings › Phone and choose Show code. Then type the code here."),
-    message === "" ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, message)),
+    ...intro,
+    problem,
     code,
     pairButton,
     el(
       "details",
       { class: "signin-other", open: keyFailed },
-      el("summary", null, "Other ways to sign in"),
+      el("summary", null, t("signin.other")),
       el(
         "div",
         { class: "stack tight" },
-        el("div", { class: "hint" }, "If you have Dot's access key, paste it here:"),
+        el("div", { class: "hint" }, t("signin.keyHint")),
         input,
-        el("button", { class: "btn", type: "button", onclick: submit }, "Sign in with the key"),
+        el("button", { class: "btn", type: "button", onclick: submit }, t("signin.withKey")),
         // The commands are the expert's: one fold further in, so that they stay out of sight when a key that was typed
         // and refused has opened the other ways.
         el(
           "details",
           { class: "error-details" },
-          el("summary", null, "Sign in from Terminal"),
+          el("summary", null, t("signin.terminal")),
           el(
             "div",
             { class: "stack tight" },
-            el("div", { class: "hint" }, "On your Mac, this command in Terminal opens this page already signed in:"),
+            el("div", { class: "hint" }, t("signin.terminalOpen")),
             el("code", { class: "code-line" }, "dotx open"),
-            el("div", { class: "hint" }, "Or it prints the address, with the key in it:"),
+            el("div", { class: "hint" }, t("signin.terminalUrl")),
             el("code", { class: "code-line" }, "dotx url"),
-            el("div", { class: "hint" }, "If Terminal does not find dotx, run this from the project folder:"),
+            el("div", { class: "hint" }, t("signin.terminalVenv")),
             el("code", { class: "code-line" }, ".venv/bin/dotx open"),
           ),
         ),
@@ -670,7 +688,7 @@ function handleAuthLost() {
   }
   endSession();
   clearToken();
-  renderSignIn("Dot did not accept the access key this browser had saved. Get a new sign-in code in Settings › Phone and type it here.");
+  renderSignIn(onThisMac() ? t("signin.keyLostMac") : t("signin.keyLost"));
 }
 
 async function connect() {
@@ -693,7 +711,7 @@ async function connect() {
         return;
       }
       clearToken();
-      renderSignIn("Dot did not accept that access key. Check it and try again.", true);
+      renderSignIn(t("signin.keyRefused"), true);
       return;
     }
     // A status is the daemon's answer; without one (0, or no ApiError) nothing that is the daemon answered.

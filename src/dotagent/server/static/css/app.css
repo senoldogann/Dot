@@ -4004,7 +4004,7 @@ dialog.modal.versions-dialog {
   flex: 1 0 100%;
 }
 
-.composer-bar.recording > :is(.plus-button, .composer-options, .mic-button, .send, .context-meter) {
+.composer-bar.recording > :is(.plus-button, .choices-toggle, .composer-options, .mic-button, .send, .context-meter) {
   display: none;
 }
 
@@ -7210,12 +7210,6 @@ summary:has(> .chev)::-webkit-details-marker {
   margin-left: auto;
 }
 
-/* While an answer is written in (item 366), what stands under its words waits until they are all in: its foot, and the
-   line of what the run changed. */
-.answer[data-revealing] > :is(.answer-foot, .run-changes) {
-  visibility: hidden;
-}
-
 /* The answer's foot follows its last line closely (item 336): its row is the copy button's height, whose band above the
    button's mark stands for the space under the line, and it rises into the line's own spacing below its letters. */
 .answer-foot {
@@ -7894,6 +7888,7 @@ dialog.message-sheet::backdrop {
 /* The head of the loops (item 591): a button that folds their rows away, with how many there are and, folded, when
    the next one asks, in the rows' own line. */
 .chat-loops > .chat-loops-toggle {
+  flex-wrap: nowrap;
   width: 100%;
   min-height: 32px;
   margin: 0;
@@ -7910,6 +7905,26 @@ dialog.message-sheet::backdrop {
   }
 }
 
+/* The mark of a repeat beside its words (the sidebar's own mark of a looping chat, item 580), and words that give way
+   with an ellipsis before the time of the next. */
+.chat-loops-mark {
+  display: inline-grid;
+  color: var(--muted);
+}
+
+.chat-loops-mark .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.chat-loops-title {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-loops-count,
 .chat-loops-next {
   color: var(--muted);
@@ -7918,6 +7933,7 @@ dialog.message-sheet::backdrop {
 }
 
 .chat-loops-next {
+  flex: none;
   min-width: 0;
   margin-left: auto;
   overflow: hidden;
@@ -9969,8 +9985,101 @@ button.attach-chip {
 }
 
 .plus-button,
-.mic-button {
+.mic-button,
+.choices-toggle {
   flex: none;
+}
+
+/* The run's choices have a button of their own beside the "+" (the "+" adds to the message): pressed while they show.
+   A box whose page gives it no choices has none, and a phone shows them while the box is used (item 1120). */
+.composer-bar:not(:has(> .composer-options > *)) > .choices-toggle {
+  display: none;
+}
+
+.choices-toggle[aria-pressed="true"] {
+  background: var(--control);
+  color: var(--text);
+}
+
+@media (max-width: 720px) {
+  .choices-toggle {
+    display: none;
+  }
+}
+
+/* What a send does while the task works (the run's page): a choice of two over the box, the shortcut for the other way
+   beside it on a keyboard's device, and the note on what waits for the next task. */
+.composer-head:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.intent-row:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.intent {
+  display: inline-flex;
+  padding: var(--space-half);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+}
+
+.intent-option {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.intent-option[aria-checked="true"] {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border-strong);
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.intent-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.intent-key {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+@media (hover: none) {
+  .intent-key {
+    display: none;
+  }
+}
+
+.intent-note {
+  font-size: var(--text-xs);
+}
+
+/* A phone's box at rest is one line (item 1120): the choice comes with the line under the words once the box is used,
+   or once it holds words. */
+@media (max-width: 720px) {
+  .composer[data-quiet][data-empty] > .composer-head {
+    display: none;
+  }
+
+  .intent-option {
+    min-height: 32px;
+  }
 }
 
 .dropping {
@@ -11180,6 +11289,18 @@ button.attach-chip {
 .capsule-work[data-state="waiting"],
 .capsule-work[data-state="waiting"] .icon {
   color: var(--warn);
+}
+
+/* The run's Stop at the line's end: in the danger's ink, so that it reads as the one that ends the task. */
+.capsule-stop,
+.capsule-stop .icon {
+  color: var(--bad);
+}
+
+@media (hover: hover) {
+  .capsule-stop:hover {
+    background: var(--bad-weak);
+  }
 }
 
 @keyframes capsule-in {

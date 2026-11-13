@@ -8,6 +8,7 @@
 
 import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
+import { t } from "./i18n.js";
 import { readPref, writePref } from "./prefs.js";
 import { getSnapshot } from "./state.js";
 
@@ -19,34 +20,35 @@ const GOAL_MODE_KEY = "dot.goalMode";
 const GOAL_MODE_DEFAULT = true;
 
 // The approval modes, strictest first (item 398), each with its name, the shorter one the Options pill wears, what it
-// does and its icon. "ask" keeps its id, so the choices kept under it hold as they were.
+// does and its icon, in the interface's language. "ask" keeps its id, so the choices kept under it hold as they were;
+// so does "yolo", whose name says what it still asks (it was "YOLO", which said nothing of it).
 export const APPROVAL_OPTIONS = [
   {
     id: "supervised",
-    label: "Supervised",
-    short: "Supervised",
-    hint: "You approve every change: files, commands, clicks, messages",
+    label: t("approvals.supervised"),
+    short: t("approvals.supervisedShort"),
+    hint: t("approvals.supervisedHint"),
     icon: "lock",
   },
   {
     id: "ask",
-    label: "Auto-accept edits",
-    short: "Edits",
-    hint: "Edits and everyday work go ahead; Dot asks you about the rest",
+    label: t("approvals.ask"),
+    short: t("approvals.askShort"),
+    hint: t("approvals.askHint"),
     icon: "pencil",
   },
   {
     id: "auto",
-    label: "Auto",
-    short: "Auto",
-    hint: "A second AI answers for you; you are asked only what it is unsure about, and about Dot's own files",
+    label: t("approvals.auto"),
+    short: t("approvals.autoShort"),
+    hint: t("approvals.autoHint"),
     icon: "shield",
   },
   {
     id: "yolo",
-    label: "YOLO",
-    short: "YOLO",
-    hint: "Dot asks only before a payment, a message or mail sent for you or a public post, in a chat you opened. Every other step runs and is recorded, with why it would have asked",
+    label: t("approvals.yolo"),
+    short: t("approvals.yoloShort"),
+    hint: t("approvals.yoloHint"),
     icon: "lockOpen",
   },
 ];

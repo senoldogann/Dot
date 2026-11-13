@@ -133,7 +133,7 @@ async def test_the_agents_tab_opens_with_the_chats_agent_and_edits_it_in_the_pan
             await expect(card.locator(".avatar")).to_have_count(1)
             facts: Locator = card.locator(".agent-panel-facts")
             await expect(facts.locator("dt")).to_have_text(["Model", "Approvals", "Actions"])
-            await expect(facts.locator("dd")).to_have_text(["Default (scripted)", "YOLO", "All"])
+            await expect(facts.locator("dd")).to_have_text(["Default (scripted)", "Ask only to pay or send", "All"])
             await expect(card.get_by_role("region", name="Instructions")).to_contain_text("Prefer primary sources.")
             await expect(card.get_by_role("link", name="Open its page")).to_have_attribute(
                 "href", f"#/agents/{agent_id}"

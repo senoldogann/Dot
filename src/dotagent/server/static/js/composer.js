@@ -6,11 +6,14 @@
 // file draws it and listens to the keys, after the APG combobox pattern: the arrows move, Enter and Tab pick, Escape
 // closes, letters filter); the "+" opens the menu that adds files and picks plugins and skills for the message (item
 // 318, picks.js); a draft keeps the text, the ready files and the picks in this browser until they are sent. The
-// markdown in the box shows as it reads, its marks quiet (mirror.js, item 207).
+// markdown in the box shows as it reads, its marks quiet (mirror.js, item 207). The "+" adds to the message on every
+// pointer: files, and teaching Dot a task; the run's choices (model, reasoning, options) have a button of their own
+// beside it, and "Teach a task" is /teach in the slash menu too, so that no way in needs a long press.
 
 import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { markContent, wearsDot } from "./marks.js";
 import { PHONE, touchFirst, trackHeight } from "./layout.js";
@@ -34,8 +37,6 @@ const CHOICES_KEY = "dot.composer.choices";
 // The event that tells every box on the page that the choices were shown or hidden in one of them: the curtain's box
 // while Dot opens (waiting.js) stands beside the page's.
 const CHOICES_EVENT = "dot:composer-choices";
-// What the "+" opens, said by its tooltip and to a screen reader: the run's choices are behind it too (item 833).
-const PLUS_WORDS = "Add files, model and options, or teach a task";
 
 /** The draft kept under `key` (`{ text, files, picks }`, `picks` missing from a draft of before item 318), or null when
  * there is none or it is not one. */
@@ -295,13 +296,18 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
  * `handler`; a word typed or a file listed (a long paste among them, item 269) brings the send back, and
  * `setStop(null)` ends it. Returns `element`, `textarea`, `attachments`,
  * `picks` (picks.js: `body()` goes into the message's request, `sent()` once a message that starts a run went),
- * `options`,
+ * `options`, `head` (a row over the box that the page fills, hidden until it shows it),
  * `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `watchText(watcher)` (runs `watcher()` after
  * every change of the text, a clear among them, and returns what stops it; item 259), `clear()` (the text and the
  * files; the picks wait for `picks.sent()`), `pauseDraft()` and `resumeDraft()` (while the box holds what is not the
  * draft, a queued message being edited, item 376, the draft stays as it was) and `dispose()`.
  */
-export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, send, sendLabel, draftKey, listener, threadId = null }) {
+export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: ownCommands, send, sendLabel, draftKey, listener, threadId = null }) {
+  // A box with a chat behind it offers /teach (item 423, teach.js) in its slash menu, as its "+" does.
+  const commands =
+    threadId === null
+      ? ownCommands
+      : [...ownCommands, { label: "/teach", hint: t("composer.teachHint"), insert: "", run: () => openTeachPanel({ threadId, onSaved: (name) => listener?.({ kind: "taught", name }) }) }];
   const textarea = el("textarea", {
     class: "textarea",
     rows: "1",
@@ -389,6 +395,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   PHONE.addEventListener("change", paintQuiet);
   function choicesChanged() {
     choicesShown = readPref(CHOICES_KEY) === "shown";
+    choicesButton.setAttribute("aria-pressed", String(choicesShown));
     paintQuiet();
   }
   window.addEventListener(CHOICES_EVENT, choicesChanged);
@@ -415,7 +422,9 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   }
 
   const attachments = createAttachments({ dropTarget: element, input: textarea, onChange: filesChanged });
-  const picks = createPicks({ onChange: keep });
+  // A pick added or taken away is a change of the message as a change of its text is: the draft keeps it and the
+  // watchers hear it (the run's page says before the send what a pick does on a task at work).
+  const picks = createPicks({ onChange: () => edited() });
   const sendText = el("span", { class: "label" }, sendLabel);
   const arrow = icon("arrowUp");
   const square = icon("stop");
@@ -432,10 +441,10 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     element.toggleAttribute("data-empty", textarea.value.trim() === "");
     const stopShown = stopping();
     element.toggleAttribute("data-stop", stopShown);
-    const words = stopShown ? "Stop" : sendWords;
+    const words = stopShown ? t("composer.stop") : sendWords;
     sendButton.replaceChildren(stopShown ? square : arrow, sendText);
     sendText.textContent = words;
-    sendButton.title = stopShown ? "Stop this task" : words;
+    sendButton.title = stopShown ? t("composer.stopHint") : words;
     sendButton.setAttribute("aria-label", words);
   }
 
@@ -459,32 +468,39 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   // messaging app's "+" does: the phone's own menu of the photos, the camera, a scan and the files comes up without a
   // second tap; a finger's hold opens Dot's menu; a mouse's click, and a tablet's tap, as before.
   function plusItems() {
-    const items = [{ label: "Add files", icon: "plus", run: () => attachments.openPicker() }];
-    // A box whose run has choices (its mode, agent, model, reasoning and options) offers them here (item 833); a
-    // phone's box shows them while it is used (item 1120).
-    if (options.childElementCount > 0 && !PHONE.matches) {
-      items.push({
-        label: choicesShown ? "Hide the model and options" : "Model and options",
-        icon: "sliders",
-        run: () => {
-          if (choicesShown) {
-            removePref(CHOICES_KEY);
-          } else {
-            writePref(CHOICES_KEY, "shown");
-          }
-          window.dispatchEvent(new CustomEvent(CHOICES_EVENT));
-        },
-      });
-    }
+    const items = [{ label: t("composer.addFiles"), icon: "plus", run: () => attachments.openPicker() }];
     if (threadId !== null) {
       items.push({
-        label: "Teach a task",
+        label: t("composer.teach"),
         icon: "monitor",
         run: () => openTeachPanel({ threadId, onSaved: (name) => listener?.({ kind: "taught", name }) }),
       });
     }
     return items;
   }
+
+  // The run's choices (its mode, model, reasoning and options) shown on the box's line or put away (item 833), from a
+  // button of their own beside the "+" on a wider window; a phone's box shows them while it is used (item 1120), and
+  // the button is not drawn there (app.css). A box whose page puts no choices in it has none (app.css).
+  const choicesButton = el(
+    "button",
+    {
+      class: "btn ghost sm icon-only choices-toggle",
+      type: "button",
+      title: t("composer.modelOptions"),
+      "aria-label": t("composer.modelOptions"),
+      "aria-pressed": String(choicesShown),
+      onclick: () => {
+        if (choicesShown) {
+          removePref(CHOICES_KEY);
+        } else {
+          writePref(CHOICES_KEY, "shown");
+        }
+        window.dispatchEvent(new CustomEvent(CHOICES_EVENT));
+      },
+    },
+    icon("sliders"),
+  );
 
   // How the press that clicks the "+" was made: `pointerdown` comes before its `click`.
   let plusPointer = "mouse";
@@ -498,12 +514,12 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       return;
     }
     const box = plusButton.getBoundingClientRect();
-    openMenu({ label: "Add", items: plusItems(), at: { x: box.left, y: box.top - 4 }, back: plusButton, button: plusButton });
+    openMenu({ label: t("composer.add"), items: plusItems(), at: { x: box.left, y: box.top - 4 }, back: plusButton, button: plusButton });
   }
 
   const plusButton = el(
     "button",
-    { class: "btn ghost sm plus-button", type: "button", title: PLUS_WORDS, "aria-label": PLUS_WORDS, onclick: plusMenu },
+    { class: "btn ghost sm plus-button", type: "button", title: t("composer.plus"), "aria-label": t("composer.plus"), onclick: plusMenu },
     icon("plus"),
   );
   plusButton.addEventListener("pointerdown", (event) => {
@@ -513,9 +529,13 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   plusButton.addEventListener("pointercancel", () => {
     plusPointer = "mouse";
   });
-  openOnHold(plusButton, () => ({ label: "Add", items: plusItems(), back: plusButton }));
+  openOnHold(plusButton, () => ({ label: t("composer.add"), items: plusItems(), back: plusButton }));
+  // A row over the box for what the page has to say about the next send (the run's page: what a message does while a
+  // task works), empty and out of sight until the page fills it.
+  const head = el("div", { class: "composer-head", hidden: true });
   element.append(
     wired.menu,
+    head,
     attachments.list,
     picks.list,
     attachments.picker,
@@ -524,6 +544,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       { class: microphone === null ? "composer-bar" : "composer-bar has-mic" },
       plusButton,
       wired.field,
+      choicesButton,
       options,
       microphone?.button,
       microphone?.recorder,
@@ -574,6 +595,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     attachments,
     picks,
     options,
+    head,
     sendButton,
     setSendLabel: (text) => {
       sendWords = text;

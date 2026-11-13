@@ -30,11 +30,14 @@ no dots, no "Show the steps", the line itself is the way), close under the last 
 three dots that rise in turn in the face's place, and "Typing…"; "Thinking…" while the model streams its thinking. A
 command, a file, a search or a page is said with what it is about ("Running gh repo view…", "Reading README.md…",
 "Searching the web for “Dot”…", "Reading github.com…", one line cut at its end); other work in its own words ("Working
-on the Mac…", "Asking Scout…" for a message to an agent, and so on), turning every four seconds ("Working in the
-terminal…") so that a long step reads as alive. What the run says on the way to its calls ("Checking the domain now")
+on the Mac…", "Waiting for Scout…" for a message to an agent, and so on). The words change only when an event
+changes what the run does, never on a timer while the same work goes on (they turned every four seconds before, which
+said nothing new). States of their own are said too, each from its event: "Waiting to start…" for a run in the queue,
+"Waiting for you…" while an approval asks you, until it is answered (a question left for later is no wait), and "Stopping…" once Stop was pressed; a screen reader is told each change of
+state once, through a status region, never each call nor the seconds of the bar over the box. What the run says on the way to its calls ("Checking the domain now")
 is its work told, not a message (item 1131): it folds with the steps, and the line says the newest of it while the step's
-calls run ("Checking the domain now…"); shown with the steps, it reads as a quiet note among them. Nothing is said that the run is not doing: while it writes a message, or a card waits for you, the
-line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
+calls run ("Checking the domain now…"); shown with the steps, it reads as a quiet note among them, with a rule at its
+left and named a progress update to a screen reader, where the answer is named Answer. Nothing is said that the run is not doing: while it writes a message the line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
 over and has its answer, the line goes and **Show the steps** stands in the answer's foot, beside the copy, the speaker
 and the time, where the pointer rests (item 842; on a touch screen it is a row of the sheet a hold of the answer opens, item 1064),
 and turns to *Hide the steps* once
@@ -331,9 +334,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   deletes its schedule (`schedule_delete`) once the work is done for good. Right above the composer, in the bar that
   also says how long the run has worked and how its helpers stand (one pane of glass on a phone, item 401), a line shows
   each loop of the chat, how often it asks again ("every 30 minutes", and "every day at 10:00" for a schedule a run of
-  it made, where it read `cron 0 10 * * *` before item 590), when next, and a Stop that deletes it; the Stops stand in
-  one column, on a phone the message stands over how often it asks again, which wraps rather than end in dots (item 787), and the rows fold under a head that says how
-  many loops there are and, folded, when the next one asks, the fold kept in the browser (item 591). A rhythm a cron
+  it made, where it read `cron 0 10 * * *` before item 590), when next, and a **Stop repeating** that deletes it (the
+  task at work goes on; the bar's **Stop task** stops that); the Stops stand in one column, on a phone the message
+  stands over how often it asks again, which wraps rather than end in dots (item 787), and the rows fold under a head
+  that says, folded, how often the loop repeats ("Repeats every 30 minutes", or how many there are) and when the next one
+  asks, the fold kept in the browser (item 591). Until the owner opens them the rows are folded, so that a loop at rest
+  is one line over the composer, not a card over a phone's reading room; a list that could not be read says why. A rhythm a cron
   expression cannot keep exactly, or one shorter than `[scheduler] min_interval_s`, is refused (422); a new chat then
   starts nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going,
   whose campaign goes on by itself.

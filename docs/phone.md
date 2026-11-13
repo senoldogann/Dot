@@ -221,8 +221,8 @@ page's colour behind it, and the conversation scrolls under it, its last line ke
 composer grows (items 374 and 401). At rest the composer is the "+", the words and the send (item 1120); once its
 words are touched or typed in, the words take their whole line and the line under them holds the "+", the model, the
 context meter, the microphone and the send, each 36 px, and a touch elsewhere puts that line away again. The model's
-pill stands for every choice of the run (item 1121): after the name it says the approvals (first, so that YOLO is
-never the word cut), the mode when one is named and the reasoning level in small words, and its menu holds them in
+pill stands for every choice of the run (item 1121): after the name it says the approvals (first, so that the
+least-asking mode's "Pay or send" is never the word cut), the mode when one is named and the reasoning level in small words, and its menu holds them in
 tabs under a bar at its top (item 1122): Model, Reasoning when the model offers a choice, Options (the approvals and
 How Dot works) and Mode, the menu keeping one height as the tabs change and opening on Model. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
@@ -254,7 +254,9 @@ the chats, and the browser's Back skips the run it went on from (item 345). The 
 window only.
 
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
-that the signed-in address gave Safari, and its sign-in screen asks for a sign-in code instead (item 267): Settings ›
+that the signed-in address gave Safari, and its sign-in screen asks for a sign-in code instead (item 267; the same
+screen opened on the Mac itself, at a loopback address, says to open the Dot app or to sign in from Terminal, and that
+the code is for pairing a phone, which it takes too): Settings ›
 Phone, on the Mac or in Safari where Dot is open with the Mac's own key, shows one with **Show code**, eight characters
 in two groups (Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a
 new code takes the place of the one before, and five wrong tries use a code up. The app trades it for a key of the

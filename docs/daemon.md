@@ -127,7 +127,8 @@ Over the home's **Today** strip, when a new chat shows the day (below), **While 
 campaigns did since this browser last marked it read: how many of their runs ended done, failed or stopped, how many
 work and how many were campaign sessions; their newest runs, two then **Show N more**, each with its schedule's or
 campaign's name, how it ended, when, and the first line of its answer with its secrets masked; the approvals the review
-model and YOLO answered for you in those runs and their helpers, by who and how many were denied, with the runs that had
+model answered for you and those `yolo` let through without asking in those runs and their helpers, by who and how
+many were denied, with the runs that had
 the most, two then **Show N more** too; and the drafts they wrote that wait for you. It carries no summary and no
 arguments of an approval. **Mark as read** moves the moment on, kept in this browser (each device has its own); the
 first visit marks it and shows nothing, so the card never pours out the past, and the server reads a week back at most.
@@ -197,13 +198,14 @@ white), as a model reads it at about that size (one the browser cannot read fail
 words); a send pressed while files upload says to wait, once however often it is pressed, as the same toast is never
 shown twice at a time (item 990). On that line the send
 comes beside the microphone once there are words or a file (it stays where the browser cannot listen), and a Stop is
-always in sight. The run's choices wait behind the **+** menu's **Model and options**, which brings them on a bar of
-their own under the words, with the send, and **Hide the model and options** puts them away again; the choice is kept
-in that browser for every box, those open at the time included. While they are away, YOLO still shows as its pill,
-since the run then asks next to nothing (item 860: a payment, a message or a post), and so does the size of the chat
-once it is near full. A phone's box rests quieter, at the owner's ask (item 1120): the "+", the words and the send
-alone, YOLO's pill too out of sight until the words are touched; then the model's pill says the approvals first, YOLO
-among them, before the mode and the reasoning ([Phone](phone.md)). The bar of the choices never wraps: the **+** and the mode at
+always in sight. The run's choices wait behind their own **Model and options** button (sliders) beside the **+**,
+which brings them on a bar of their own under the words, with the send, and puts them away again when pressed again
+(it is pressed while they show); the choice is kept in that browser for every box, those open at the time included.
+While they are away, the least-asking approval mode still shows as its pill ("Pay or send"), since the run then asks
+next to nothing (item 860: a payment, a message or a post), and so does the size of the chat once it is near full. A
+phone's box rests quieter, at the owner's ask (item 1120): the "+", the words and the send alone, the approvals' pill
+too out of sight until the words are touched; then the model's pill says the approvals first before the mode and the
+reasoning ([Phone](phone.md)), and a phone has no Model and options button. The bar of the choices never wraps: the **+** and the mode at
 the left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
 reads, when they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir
 şeyi değiştirme", "sadece araştır"; "read-only" or "salt okunur" opening a sentence counts, "stay", "remain", "work", "operate",
@@ -216,8 +218,9 @@ menu says what each does and leads back to Auto); `POST /api/runs` takes `mode: 
 exists (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's
 default or one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser
 per model) and **Options** (the approval mode, which the pill always shows by its icon and a short name: a lock for
-Supervised, a pencil and "Edits" for Auto-accept edits, a shield for Auto, an open lock for YOLO, on no fill; its menu
-lists the four modes with what each does, YOLO's in the warning ink while it is chosen, item 398, see
+Supervised, a pencil and "Edits" for Auto-accept edits, a shield for Auto, an open lock and "Pay or send" for **Ask
+only to pay or send** (stored as `yolo`; it was named YOLO, which said nothing of what it still asks), on no fill; its
+menu lists the four modes with what each does, the last in the warning ink while it is chosen, item 398, see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)) and the round send, quiet while the box is
 empty. The files under the box stand in one row that wraps only when the frame runs out of width: a photo shows itself
 at a thumbnail's size, its name its tooltip and its × at its corner, where another file keeps its icon, its name and its
@@ -246,7 +249,12 @@ the mode, the model, the agent, Keep going and a choice for one message picked f
 a new chat after that starts on Auto, the default model, Dot and Keep going off. Dot's face
 looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line, or
 ⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Messages chooses for every composer of this
-browser (item 230); on a touch screen Return always adds a line and the round send button sends (item 440). The markdown
+browser (item 230); on a touch screen Return always adds a line and the round send button sends (item 440). Settings ›
+General › Messages › **Language** chooses the language of Dot's own words in the chats, the sidebar and the sign-in
+screen (English or Türkçe, kept in this browser, English until chosen; it never follows the browser, the model or a
+chat's words, and what you and Dot write stays as it was written; a change draws the page again): the words are in
+`js/lang/en.js` and `js/lang/tr.js`, whose keys `tsc` and `tests/js/i18n.test.js` hold together, and the dates follow
+the language too. The other settings pages are in English yet. The markdown
 in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
@@ -431,12 +439,13 @@ words say already, in whole words. On a phone the note has its row, and Deny and
 next one. While a note is written, Approve says **Send note** (item 1140): the step waits until Dot read the note, and
 is taken only if the note still calls for it ([Safety](safety.md#safety)).
 
-The **+** at the left of the box (item 318, after Codex's composer) opens a menu: **Add files**, which opens the file
-picker (documents, photos and screenshots alike; a phone opens its own sheet), **Model and options** in a box whose run
-has choices (item 833, above), and **Teach a task** in a chat (item 423, [Teaching a
-task](browser-and-computer-use.md#teaching-a-task)); its tooltip says so: "Add files, model and options, or teach a
-task". On a phone a finger's tap of the **+** opens the file picker at once, so the phone's own menu of the photos, the
-camera, a scan and the files comes up with no second tap, and a finger's hold opens the menu (item 1089). The slash menu picks **Plugins** (the MCP servers with tools) and
+The **+** at the left of the box (item 318, after Codex's composer) adds to the message, on every pointer: it opens a
+menu of **Add files**, which opens the file picker (documents, photos and screenshots alike; a phone opens its own
+sheet), and **Teach a task** in a chat (item 423, [Teaching a task](browser-and-computer-use.md#teaching-a-task)); its
+tooltip says so: "Add files or teach a task". The run's choices have their own button beside it (above). On a phone a
+finger's tap of the **+** opens the file picker at once, so the phone's own menu of the photos, the camera, a scan and
+the files comes up with no second tap, and a finger's hold opens the menu (item 1089); **/teach** in the slash menu
+teaches a task too, on every pointer, so that no way in needs the hold. The slash menu picks **Plugins** (the MCP servers with tools) and
 **Skills**, as `GET /api/palette` lists them; the at menu picks the plugins and the Google and Microsoft accounts signed
 in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
 model; one that is no longer signed in is refused). The model is told first what the chips of the message are, each
@@ -450,7 +459,7 @@ palette names it, and its address with the mail icon until then and for an accou
 chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **Options** menu's
 **How Dot works** group, under the approvals (item 353). The picks go with the message (`plugins`, `skills`, `accounts` and
 `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is sent they stand at the head of its text as
-words in their colours, with no border, as a skill stands in a line of text (the run's `picks` event; item 858); a message that steers the run under way leaves them for the next one, and the page says so,
+words in their colours, with no border, as a skill stands in a line of text (the run's `picks` event; item 858); a message added to the run under way leaves them for the next one, which a note over the box says before the send (with **Send after this task instead**), and a toast after a send the other way with ⌘⇧Enter,
 and a queued message with picks is not steered into the run at work: it stays queued to start a run of its own. A run
 sent with picks starts with each picked server's tool group on from its first step when its tools are grouped (with
 every tool offered they are on anyway), and its first message is your words, then a line that names the servers to use,
@@ -459,7 +468,7 @@ wait for your answer, item 508, and the prompt asks the rest; nothing holds the 
 skill's instructions as the `skill` tool gives them; the run's goal stays your words. Picks a run cannot start with are
 refused, with why, and nothing starts: a server that is not connected, or none of whose tools a run of its mode may use
 (a chat's, when the server's tools all act), each in its own words, a skill it is not offered, Plan first in a chat or
-under YOLO (a YOLO run does not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is
+under `yolo` (a `yolo` run does not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is
 OpenCode's own agent. A server picked for a message is open to its run whatever the agent's tools are (item 415): the
 owner's word for the message widens the agent's bounds, and a server picked for an earlier message of the chat stays
 open to the agent's later runs in it (the runs' picks events say which; a server the model only called opens nothing);
@@ -559,10 +568,11 @@ under the step's own number when it ends (item 660; OpenCode's run let it go und
 message of its own). A message that loses its place still streaming (another step's words come, a
 step's end comes for another step, or the run ends) ends as it stands, drawn whole without its caret; the next step's
 words that end the step's own text are its tail and go, the step's end draws its message where it stands, and an answer that
-repeats it leaves it out. An answer that ends a run while its page is open is written
-in the same way (item 366), a few words a frame for two seconds at most, into the room it will take, so the page lands
-on it as it will stand and the words come in sight, its foot once it is all in; a run opened after it ended, a reply
-that streamed already and reduced motion show it at once. A chat whose run is over opens drawn whole (item 454): its
+repeats it leaves it out. An answer that ends a run while its page is open is drawn whole
+at once, with its foot (its copy, its speaker, its reactions): its words were all there when it came, so typing them in
+again (item 366 did, over two seconds, the foot waiting on the show) only held up the copy; a run opened after it
+ended and a reply that streamed already draw it the same way. The page lands on it when the reader was at the end, and
+leaves a reader of older messages where they are, with the way down offered. A chat whose run is over opens drawn whole (item 454): its
 events, those of the runs it delegated to, and the work of the turn before it are read before the page is drawn, so
 nothing fills in as the stream comes. A chat at work opens the same way with what is stored so far (item 734; the
 stream's `stored=true` ends after it), and the run's record is put over it: the rows of its helpers say how each stands
@@ -644,16 +654,21 @@ took `[recap] first_after_steps` steps (4), then every `every_steps` steps more 
 after the last; a page asks for one only
 while the section is in sight, and as the run takes steps at most every 20 seconds, never two at once for one run, and
 after a write that failed it shows why and asks no more until its button is pressed or a recap arrives;
-`[recap] enabled = false` writes none and hides the section. Under the recap stand what the run is made of, each
-section only when it has a row (item 539): **Skills & connected apps** (the skills and MCP servers the run used, with how many
-times it used each, opening Customize; a skill is the `skill` tool's name, a server the one in `mcp__server__tool`;
-the section stays out of sight until the run uses one, item 546), **Files made** (the files the chat wrote with their
-added and removed lines, each opening the Changes tab where the diff is), **Web reading** (the pages it fetched and
-the searches it made, a page opening in a new tab; a fetch that failed is not a page it read) and **Memory updated**
-(the notes it saved, corrected or forgot, each opening its note in Settings › Memory). These sections are the chat's,
+`[recap] enabled = false` writes none and hides the section. What came of the task stands over the recap, each
+section only when it has something to say: **Results**, the files the run's answer names (its file chips and file
+words), each by its name over its folder and its kind ("CSV", "MD"), opening beside the conversation, and **Outcome**,
+how the run ended as its end says it (the task ended and Dot wrote its answer; ended without finishing; stopped; or
+stopped for something only you can give, with what it needs), never more than that: a file that exists or a "done"
+is not a check that the work holds. Under the recap stand the run's sources and then what it is made of, each section
+only when it has a row (item 539): **Sources** (the pages it fetched and the searches it made, a page opening in a new
+tab; a fetch that failed is not a page it read), **Changed files** (the files the chat wrote with their added and
+removed lines, each opening the Changes tab where the diff is), **Skills & connected apps** (the skills and MCP servers
+the run used, with how many times it used each, opening Customize; a skill is the `skill` tool's name, a server the one
+in `mcp__server__tool`; the section stays out of sight until the run uses one, item 546) and **Memory updated** (the
+notes it saved, corrected or forgot, each opening its note in Settings › Memory). These sections are the chat's,
 from its start (item 650): a new message opens a new run, whose page shows what the chat's earlier turns used, read and
 remembered (`GET /runs/{id}/chat-context`) under what this run does, and, until this run has a recap of its own, the
-recap of the turn before, saying it is that turn's ("From the task before"). Web reading keeps up to a hundred readings
+recap of the turn before, saying it is that turn's ("From the task before"). Sources keeps up to a hundred readings
 and Memory updated forty notes, and each scrolls inside itself past about eight rows. Each row wears its mark on a
 tile: a skill or a server its icon, a file its language's own logo (Simple Icons, version 16.35.0, CC0, under
 `icons/languages/`, item 547), or the letters of its kind where the language has no mark. In a tab of
@@ -670,17 +685,25 @@ it delegated and the web searches by engine, and a figure of none has no line (i
 ID`), read again every ten seconds while the run works and once at its end. A strip under the head links the other runs
 of the same thread, and the box at the bottom queues a message for after a run that is going on, or follows up on a
 finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in the
-danger colour with a square) and cancels it; a word typed turns it back into the send, **Queue**, and the message waits
-in the chat's queue (see [How a run works](runs.md#how-a-run-works)), shown above the box: a sheet whose head (Queued
+danger colour with a square) and cancels it; a word typed turns it back into the send, and the line over the box keeps
+**Stop task** at its end, so the task stops from one place while the box holds words (the loops of the chat have
+**Stop repeating** of their own, below). What the send does is said before it is pressed: over the box, while the run
+works, a choice of two (a group of radio buttons, its arrows moving the choice) says **Add to task**, which steers the
+run now, or **After this task**, whose message waits in the chat's queue (see [How a run works](runs.md#how-a-run-works));
+the send, its tooltip and its name to a screen reader are the chosen one's words, the box's placeholder says the same,
+and on a keyboard's device the hint beside the choice says what ⌘⇧Enter does instead. The choice starts from Settings ›
+General › Messages and holds for the page; it is not shown where one way alone is open (a held run, a campaign's
+session, a run a Terminal command drives). A message queued waits above the box: a sheet whose head (Queued
 and the count) folds it, with a row per message: a handle to drag it to another place or move it with the arrow keys,
 its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
 gives the box its draft back; item 376: the message's files come into the box with its text, small, a photo as its own
 picture and each file with its ×, its name the tooltip, and the files the box holds when it is saved are the message's),
-**Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run with what the box holds, past the
-queue, or with the queue's next message when the box is empty. Settings › General › Messages can have a message steer
-the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the queue. A held queue
+**Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter sends what the box holds the other way than
+the choice over the box says, or the queue's next message to the run when the box is empty. Settings › General ›
+Messages chooses where the choice starts (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
-box (items 352 and 360) says in a few quiet words how long the run has worked, or that it waits for you,
+box (items 352 and 360) says in a few quiet words how long the run has worked, that it waits to start, that it waits
+for you or that it stops (once Stop was pressed, until it has), ends in **Stop task**,
 how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
 parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the
@@ -792,7 +815,7 @@ what you typed in a password, one-time-code or card field outside `yolo` (item 4
 no window to use), and the run page keeps the last frame once the run has ended. The page can also be used from the
 screen that shows it, a phone's too (`POST /api/runs/{id}/takeover/screen`, then `POST /api/runs/{id}/input`, item 470):
 the run is held the same way, but nothing comes to the front of the Mac, so a browser without a window is held as well.
-In Auto and YOLO a step that reads files on this Mac (a file read, listed or searched; item 809) goes on while you hold
+In Auto and `yolo` a step that reads files on this Mac (a file read, listed or searched; item 809) goes on while you hold
 the run, decided by the gate as ever; a step that reads the page or the screen, which could read what you type there, a
 web search and a page fetch (which may open a tab of their own in the run's browser) and every step that acts wait for
 you.

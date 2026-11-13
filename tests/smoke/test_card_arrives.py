@@ -209,8 +209,11 @@ async def test_the_owners_questions_in_yolo_say_so_and_offer_no_rule(
             )
             # "Don't ask again in this chat" (item 866): on the owner's question, never on one of Dot's initiative.
             assert owners_box and not initiative_box
-            assert "Dot opened on its own initiative, Dot always asks you about this, YOLO too" in initiative
-            assert "wait for you in YOLO too" in owners
+            assert (
+                "Dot opened on its own initiative, Dot always asks you about this, whatever the approval mode"
+                in initiative
+            )
+            assert "wait for you whatever the approval mode" in owners
             assert not initiative_rule and not owners_rule
         finally:
             await browser.close()

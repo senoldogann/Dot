@@ -346,10 +346,10 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                     "yolo",
                 ]
                 await expect(modes.locator(".pop-option-text > span:first-child")).to_have_text(
-                    ["Supervised", "Auto-accept edits", "Auto", "YOLO"]
+                    ["Supervised", "Auto-accept edits", "Auto", "Ask only to pay or send"]
                 )
                 await popover.locator(".pop-option[data-mode='yolo']").click()
-                await expect(options_pill).to_contain_text("YOLO")
+                await expect(options_pill).to_contain_text("Pay or send")
                 # YOLO warns of nothing (item 500): the pill wears no tint and the menu carries no note.
                 await expect(options_pill).not_to_have_attribute("data-tone", "warn")
                 await expect(popover.locator(".note.warn")).to_have_count(0)
@@ -390,6 +390,7 @@ _BAR: str = """(() => {
       : node.classList.contains('plus-button') ? 'plus'
       : node.classList.contains('mic-button') ? 'mic'
       : node.classList.contains('composer-field') ? 'field'
+      : node.classList.contains('choices-toggle') ? 'choices'
       : node.className);
   const parts = [...document.querySelectorAll(
     '.composer-bar > button, .composer-bar > .composer-field, .composer-options > :not([hidden])'
@@ -455,9 +456,12 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                 right, parts = bar["right"], bar["parts"]
                 assert isinstance(right, float | int)
                 # On Auto (item 495) the bar has no mode pill; Chrome has speech recognition, so it has a microphone.
-                assert isinstance(parts, list) and len(parts) == 8, (width, bar)
+                # A wider window has the choices' own button beside the "+"; a phone shows them while the box is used.
+                wide: bool = width > _PHONE_PX
+                assert isinstance(parts, list) and len(parts) == (9 if wide else 8), (width, bar)
                 by_name: dict[str, list[float]] = {str(part[0]): [float(value) for value in part[1:]] for part in parts}
-                assert set(by_name) == {"plus", "mic", "send", "field", "agent", "model", "reasoning", "options"}, bar
+                named: set[str] = {"plus", "mic", "send", "field", "agent", "model", "reasoning", "options"}
+                assert set(by_name) == (named | {"choices"} if wide else named), bar
                 # The pills keep one line at every width, and their height is the bar's (item 273).
                 pills = [by_name[name] for name in ("agent", "model", "reasoning", "options")]
                 assert max(float(pill[0]) for pill in pills) - min(float(pill[0]) for pill in pills) <= 1, (width, bar)
@@ -472,6 +476,7 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                     # The desk keeps the box above its controls: one line of pills, the field over it, and the
                     # microphone on the send's line, left of it.
                     assert max(abs(float(plus[0]) - float(pill[0])) for pill in pills) <= 1, (width, bar)
+                    assert abs(float(by_name["choices"][0]) - float(plus[0])) <= 1, (width, bar)
                     assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
                     assert float(field[3]) < float(pills[0][2]) - 1, (width, bar)
                     assert abs(float(mic[0]) - float(send[0])) <= 1 and float(mic[1]) < float(send[1]), (width, bar)
@@ -700,9 +705,9 @@ async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) ->
     await expect(menu.get_by_role("listbox", name="Mode", exact=True)).to_be_visible()
     await menu.get_by_role("tab", name="Options", exact=True).click()
     await menu.locator(".pop-option[data-mode='yolo']").click()
-    await expect(model).to_contain_text("YOLO")
+    await expect(model).to_contain_text("Pay or send")
     await menu.locator(".pop-option[data-mode='ask']").click()
-    await expect(model).not_to_contain_text("YOLO")
+    await expect(model).not_to_contain_text("Pay or send")
     # A pick repaints the menu (item 1128): the box keeps its line, and the menu stays over it, its tabs in sight.
     await menu.locator(".pop-option[data-mode='yolo']").click()
     await expect(composer).not_to_have_attribute("data-quiet", "")
@@ -716,9 +721,8 @@ async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) ->
     await page.keyboard.press("Escape")
     await page.mouse.click(4, 240)
     await expect(composer).to_have_attribute("data-quiet", "")
-    await composer.locator(".plus-button").click()
-    await expect(page.get_by_role("menuitem", name="Add files")).to_be_visible()
-    await expect(page.get_by_role("menuitem", name="Model and options")).to_have_count(0)
+    # A phone's "+" holds what adds to the message; the choices come with the box in use, and have no button.
+    await expect(composer.locator(".choices-toggle")).to_be_hidden()
     await page.close()
 
 
@@ -726,7 +730,8 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
     runtime: Runtime, client: httpx.AsyncClient
 ) -> None:
     """Item 833: the box as one line, the "+", the words and the microphone, as a messaging app's; the run's choices
-    wait behind the "+" menu's "Model and options", which shows and hides them and is kept; YOLO stays in sight while
+    wait behind their own "Model and options" button beside the "+", which shows and hides them and is kept; the
+    least-asking mode stays in sight while
     they are away; the microphone stands alone until words are typed, and the send then comes beside it."""
     host: str = client.base_url.host
     port: int | None = client.base_url.port
@@ -766,9 +771,15 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
                 )
                 assert all(abs(bottom - bottoms[-1]) <= 4 for bottom in bottoms[:-1]), bottoms
                 await composer.locator("textarea").fill("")
-                # The "+" shows the choices, and the choice is kept.
+                # The "+" adds to the message alone; the button beside it shows the choices, and the choice is kept.
                 await plus.click()
-                await page.get_by_role("menuitem", name="Model and options").click()
+                await expect(page.get_by_role("menuitem", name="Add files")).to_be_visible()
+                await expect(page.get_by_role("menuitem", name="Model and options")).to_have_count(0)
+                await page.keyboard.press("Escape")
+                choices: Locator = composer.get_by_role("button", name="Model and options")
+                await expect(choices).to_have_attribute("aria-pressed", "false")
+                await choices.click()
+                await expect(choices).to_have_attribute("aria-pressed", "true")
                 await expect(composer).not_to_have_attribute("data-quiet", "")
                 options: Locator = composer.locator(".composer-pill[data-pill='options']")
                 await expect(options).to_be_visible()
@@ -777,15 +788,14 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
                 await options.click()
                 await page.locator(".composer-popover .pop-option[data-mode='yolo']").click()
                 await page.keyboard.press("Escape")
-                await plus.click()
-                await page.get_by_role("menuitem", name="Hide the model and options").click()
+                await choices.click()
                 await expect(composer).to_have_attribute("data-quiet", "")
                 await expect(options).to_be_visible()
-                await expect(options).to_contain_text("YOLO")
+                await expect(options).to_contain_text("Pay or send")
                 await expect(options).not_to_have_attribute("data-tone", "warn")
                 # On a line of 440 px or less (the bar's own width, which its container query reads) its open lock
-                # alone, so that the words keep their room; its name still says YOLO.
-                await expect(options).to_have_accessible_name(re.compile(r"\bYOLO\b"))
+                # alone, so that the words keep their room; its name still says the mode.
+                await expect(options).to_have_accessible_name(re.compile(r"\bPay or send\b"))
                 pill = await options.bounding_box()
                 assert pill is not None
                 line: float = await composer.locator(".composer-bar").evaluate(
@@ -798,8 +808,7 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
                 await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_hidden()
                 assert await page.evaluate("() => localStorage.getItem('dot.composer.choices')") is None
                 # Back to the mode the module's other tests expect.
-                await plus.click()
-                await page.get_by_role("menuitem", name="Model and options").click()
+                await choices.click()
                 await options.click()
                 await page.locator(".composer-popover .pop-option[data-mode='ask']").click()
                 await page.close()

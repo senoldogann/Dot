@@ -29,6 +29,8 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_work_status.py::test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answered` — the
+  line of the work kept saying "Waiting for you" after the owner's yes, while the step's command ran (item 1148).
 - `tests/unit/test_noted_yes_words.py::test_a_yes_with_a_note_is_no_refusal_to_the_model` — a yes with a note
   was told to the model as a refusal ("do not retry") while asking it to do the step again (item 1140).
 - `tests/unit/test_noted_yes_words.py::test_a_batched_step_says_the_owner_is_asked_once_more` — a batched browser

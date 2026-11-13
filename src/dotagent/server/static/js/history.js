@@ -1,6 +1,7 @@
 // What a conversation holds outside one run: the runs before it in the thread, each as the question and its answer, so a
 // follow-up reads as the next turn of one chat.
 
+import { t } from "./i18n.js";
 import { api, query } from "./api.js";
 import { el, plural, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
@@ -304,7 +305,7 @@ function drawFlow(past, flow, asked, events, reactions) {
       ? el("div", { class: "note" }, icon("hand"), el("span", null, block.kept))
       : block.say === undefined
         ? stepsBlock(block)
-        : el("div", { class: block.progress ? "turn-say say-progress" : "turn-say" }, prose(block.say), reactions === null ? null : sayFoot(reactions, past.id, stepMessage(block.step))),
+        : el("div", { class: block.progress ? "turn-say say-progress" : "turn-say", role: "article", "aria-label": block.progress ? t("outcome.update") : t("outcome.message") }, prose(block.say), reactions === null ? null : sayFoot(reactions, past.id, stepMessage(block.step))),
   );
   keepPlace(flow, () => {
     if (files !== null) {

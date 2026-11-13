@@ -4,6 +4,7 @@
 
 import { el, setText, showFrom } from "./dom.js";
 import { releaseFailsafe } from "./failsafe.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { followSeen, PHONE, setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
@@ -14,16 +15,16 @@ import { SCHEMES, chooseScheme, nextScheme } from "./theme.js";
 import { attempt, toast } from "./ui.js";
 
 const NARROW = "(max-width: 859.98px)";
-const STREAM_LABEL = { connecting: "Connecting", live: "Live", reconnecting: "Reconnecting" };
+const STREAM_LABEL = { connecting: t("shell.connecting"), live: t("shell.live"), reconnecting: t("shell.reconnecting") };
 
 function buildIndicators() {
   const waitingCount = el("span");
   const waiting = el(
     "a",
-    { class: "pill warn", href: "#/runs", hidden: true, title: "Approvals that wait for you" },
+    { class: "pill warn", href: "#/runs", hidden: true, title: t("shell.waitingHint") },
     icon("bell"),
     waitingCount,
-    el("span", { class: "label" }, "waiting"),
+    el("span", { class: "label" }, t("shell.waiting")),
   );
   const dot = el("span", { class: "live-dot connecting" });
   const connectionLabel = el("span", { class: "label" }, STREAM_LABEL.connecting);

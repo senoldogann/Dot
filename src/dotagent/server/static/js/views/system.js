@@ -53,6 +53,8 @@ import { anchoredPopover } from "../popover.js";
 import { voiceLanguage } from "../readaloud.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
+import { t, UI_LANGUAGE_KEY, UI_LANGUAGES, uiLanguage } from "../i18n.js";
+import { removePref, writePref } from "../prefs.js";
 import { scrollCue } from "../scrollcue.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, formDialog, settingFold, toast } from "../ui.js";
@@ -271,16 +273,32 @@ function buildComposerCard() {
     onSelect: (id) => setValue(SEND_KEY, id),
   });
   const busy = choiceSetting({
-    label: "While a task works",
-    hint: "A message waits in the chat's queue and starts the next task once this one has ended, or steers the task at once; ⌘⇧Enter sends it the other way. A campaign's session is always steered.",
+    label: t("settings.busy"),
+    hint: t("settings.busyHint"),
     options: [
-      { id: "queue", label: "Queue", hint: "The message waits in the chat's queue." },
-      { id: "steer", label: "Steer", hint: "The message goes to the task at work at once." },
+      { id: "queue", label: t("intent.queue"), hint: t("settings.busyQueueHint") },
+      { id: "steer", label: t("intent.steer"), hint: t("settings.busySteerHint") },
     ],
     selected: settingValue(BUSY_SEND),
     onSelect: (id) => setValue(BUSY_SEND, id),
   });
-  return section("Messages", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
+  // The interface's own language (i18n.js), kept in this browser; English until another is chosen. The page is drawn
+  // again in it, so that no screen mixes the two.
+  const language = choiceSetting({
+    label: t("settings.language"),
+    hint: t("settings.languageHint"),
+    options: UI_LANGUAGES.map((choice) => ({ id: choice.id, label: choice.label, hint: "" })),
+    selected: uiLanguage(),
+    onSelect: (id) => {
+      if (id === "en") {
+        removePref(UI_LANGUAGE_KEY);
+      } else {
+        writePref(UI_LANGUAGE_KEY, id);
+      }
+      location.reload();
+    },
+  });
+  return section("Messages", null, el("div", { class: "card-pad stack" }, language.element, sendKey.element, busy.element));
 }
 
 /** What the Voice card says of how the microphone listens and where the voice goes (items 574 and 626), for the way the
@@ -472,7 +490,7 @@ function buildReactionsCard() {
 function buildChatCard() {
   const lines = switchSetting({
     label: "Show what ran without asking",
-    hint: "A line under a step for each action the reviewer approved. Off, as it starts, the chat leaves them out; a refusal still shows, and a step YOLO let through shows no line. Kept in this browser.",
+    hint: "A line under a step for each action the reviewer approved. Off, as it starts, the chat leaves them out; a refusal still shows, and a step let through without asking shows no line. Kept in this browser.",
     read: () => settingValue(AUTO_LINES) === "shown",
     write: async (on) => setValue(AUTO_LINES, on ? "shown" : "hidden"),
     onToggled: () => lines.paint(),

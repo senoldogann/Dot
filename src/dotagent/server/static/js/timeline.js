@@ -11,6 +11,7 @@ import { sentFiles, sentPictures } from "./attachments.js";
 import { memoryChange } from "./contextpanel.js";
 import { stillAsks } from "./openasks.js";
 import { clip, clock, compact, dateTime, duration, el, plural, repeatsAnswer, setText } from "./dom.js";
+import { t } from "./i18n.js";
 import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
@@ -28,11 +29,6 @@ import { detailsFold } from "./ui.js";
 
 const GOAL_CHARS = 160;
 const LATEST_CHARS = 140;
-// The answer of a run that ends under the reader's eyes is written in (item 366): at least REVEAL_MIN_CHARS a frame,
-// and in REVEAL_MOST_FRAMES frames at most, about two seconds, however long it is.
-const REVEAL_MIN_CHARS = 4;
-const REVEAL_MOST_FRAMES = 120;
-const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 // The tool that ends a run. Its answer is shown as the answer, so the call itself stays out of the steps unless it failed.
 const FINISH_TOOL = "finish";
 // The calls whose row shows only once they are refused: the answer stands for a finish, and the badge on your message
@@ -208,64 +204,10 @@ function drawLive(live) {
 }
 
 /** Draw a step's live message: as `drawLive`, and a message whose model has sent only spaces so far is marked blank
- * (item 1091), which run.css keeps out of sight. An answer written in (`revealAnswer`) is drawn with `drawLive` alone:
- * it has no bubble of a step to mark, and the mark of its first frame stopped it there (item 1112). */
+ * (item 1091), which run.css keeps out of sight. */
 function drawStreaming(live) {
   drawLive(live);
   live.node.toggleAttribute("data-blank", live.drawn.length === 0);
-}
-
-/** Where the reveal of `text` stops after `at`: the end of the word it reaches, so that a word comes whole. */
-function revealStop(text, at) {
-  if (at >= text.length) {
-    return text.length;
-  }
-  const space = text.slice(at).search(/\s/);
-  return space === -1 ? text.length : at + space;
-}
-
-/**
- * The answer `answer` of a run that ended under the reader's eyes, its words `text` written in as a live message is
- * drawn (item 366): a few words a frame, formatted as they will stay, the caret at their end, and the answer's foot
- * once they are all in. The answer keeps the room it will take from the start, so the page lands on it as it will
- * stand and the words are written into it in sight; once they are in, the answer is the one drawn at once, so their
- * end moves nothing. The room is the answer's, not its words': on a phone the words are a bubble, which grows with
- * them rather than standing empty at its full height (item 1099). An answer the page let go of (the reader went
- * elsewhere) is not written on.
- */
-function revealAnswer(answer, text) {
-  const body = answer.querySelector(":scope > .prose");
-  if (body === null) {
-    return;
-  }
-  const live = { body, text: "", drawn: [], caret: el("span", { class: "stream-caret", "aria-hidden": "true" }), queued: false, ended: false };
-  const room = answer.offsetHeight;
-  body.replaceChildren();
-  body.classList.add("stream");
-  answer.style.minHeight = `${room}px`;
-  // What stands under the words, the foot and the line of what the run changed (item 597), waits until they are all in.
-  answer.dataset.revealing = "";
-  const step = Math.max(REVEAL_MIN_CHARS, Math.ceil(text.length / REVEAL_MOST_FRAMES));
-  let at = 0;
-  function finish() {
-    body.replaceWith(prose(text));
-    answer.style.removeProperty("min-height");
-    delete answer.dataset.revealing;
-  }
-  function frame() {
-    if (!answer.isConnected) {
-      return;
-    }
-    at = revealStop(text, at + step);
-    live.text = text.slice(0, at);
-    drawLive(live);
-    if (at < text.length) {
-      requestAnimationFrame(frame);
-      return;
-    }
-    finish();
-  }
-  requestAnimationFrame(frame);
 }
 
 // How a call of the step a resumed run was in ended (agent/resume.py).
@@ -409,7 +351,7 @@ function buildFlock() {
  * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row),
  * `helperStatuses()` the statuses of the delegated runs, and `draft(record)` paints a draft's card as the draft now
  * stands (item 314: one answered after the run's stream ended). `revealing()` says whether an answer that arrives now
- * ends a run under the reader's eyes, to be written in (item 366), rather than one read again; the
+ * ends a run under the reader's eyes, to be read aloud when Settings › General says so, rather than one read again; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
  * review, a description of images), `onScaffold({ model, contextTokens, window, chosen, summariseAt })` for the run's
@@ -418,8 +360,8 @@ function buildFlock() {
  * conversation keeps none), `onCalls({ calls, failed })` after every tool call of the run, `onCompacted({ count, flagged })` after
  * every compaction of the run (item 260; the conversation shows a quiet line where it happened, item 312; `flagged`
  * counts the checks that found a section missing or a name the conversation never had),
- * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
- * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
+ * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node, { status, needs })` when
+ * the answer is on the page, with how the run ended as the answer says it (`outcomeOf`) and what it needs from the owner, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
  * browser tool call (Dot's computer starts its view on it). `onGoalFiles(files)` takes the files that came
  * with the run's goal, to show them under it, and `onGoalPicks(picks)` what the owner picked for it in the composer
  * (item 318); null where the page shows no goal, and they stand in the timeline. `reactions` are the page's reactions of
@@ -1076,8 +1018,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const isRoot = scope.runId === rootRunId;
       settleGroups(scope, record.ts);
       closeLive(scope);
-      // A reply that streamed the same words was read as they came: its answer does not write them in again.
-      const readAlready = dropRepeatedReply(scope, result, record.data.restated ?? []);
+      // A reply that streamed the same words was read as they came: the bubble that held them goes for the answer.
+      dropRepeatedReply(scope, result, record.data.restated ?? []);
       const answer = answerMessage({
         actorId: scope.actorId,
         // A run that stopped for what only the owner gives waits on them, and says so (item 1061).
@@ -1098,10 +1040,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         place(scope, needsAside(needs), record.ts);
       }
       if (isRoot) {
-        if (!readAlready && revealing() && !REDUCED_MOTION.matches) {
-          revealAnswer(answer, result);
-        }
-        onAnswer(answer);
+        // The answer is drawn whole, its foot with it (item 366 typed a finished answer in again over two seconds; the
+        // words were all there, so the copy and the foot waited on a show).
+        onAnswer(answer, { status: outcomeOf(status, needs), needs });
         onRunStatus({ status, model: null, endedAt: record.ts });
         return;
       }
@@ -1172,7 +1113,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const target = bubble ?? (settled !== undefined ? { node: settled.node, body: settled.body } : newBubble(scope, data.step, false));
       // A message said on the way to a step's calls is the run telling what it does next (item 1131): it folds with the
       // steps, and the line of the work says it while the run is at it. A message with no call after it stays one.
-      target.node.className = narrates(data.tool_calls) ? "bubble say say-progress" : "bubble say";
+      const progress = narrates(data.tool_calls);
+      target.node.className = progress ? "bubble say say-progress" : "bubble say";
+      // A screen reader hears it as an update on the way, apart from the answer (whose article is named Answer): the
+      // kind comes from the event (a message with calls after it), never from its words. The article keeps its
+      // speaker's name first.
+      const speaker = target.node.dataset.speaker ?? target.node.getAttribute("aria-label") ?? "";
+      target.node.dataset.speaker = speaker;
+      target.node.setAttribute("aria-label", progress ? t("outcome.updateOf", { speaker }) : speaker);
       target.body.replaceWith(prose(data.text));
       scope.replies.push({ node: target.node, text: data.text, step: data.step });
       if (!ORDINARY_ENDS.has(data.finish)) {
