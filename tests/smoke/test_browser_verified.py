@@ -37,6 +37,8 @@ _PAGE: str = f"""<!doctype html><title>Order desk</title>
 <label>Phone <input aria-label="Phone" name="phone"></label>
 <label>Locked <input aria-label="Locked" name="locked" value="fixed" oninput="this.value = 'fixed'"></label>
 <label>Code <input aria-label="Code" name="code" oninput="this.value = this.value.slice(0, 5)"></label>
+<label>Site <input aria-label="Site" name="site"
+  oninput="if (this.value && !this.value.startsWith('https://')) this.value = 'https://' + this.value"></label>
 <label>Plan <select aria-label="Plan" name="plan"><option>Basic</option><option>Pro</option></select></label>
 <label>Stuck <select aria-label="Stuck" onchange="this.selectedIndex = 0"><option>One</option><option>Two</option>
 </select></label>
@@ -182,6 +184,7 @@ async def test_a_fill_a_choice_and_a_tick_are_read_back_and_the_order_the_site_t
             "phone": "(555) 123-4567",
             "locked": "fixed",
             "code": "",
+            "site": "",
             "plan": "Pro",
             "terms": "on",
             "secret": "",
@@ -256,7 +259,33 @@ async def test_a_value_the_page_cuts_is_uncertain_and_holds_the_click_after_it_b
     assert (name.outcome, _statuses(name)) == ("done", ["verified"])
     assert (click.outcome, click.dispatched) == ("skipped", "not_sent")
     assert outcome.stopped is not None and "step 1's field is not verified" in outcome.stopped
+    # What to do next is said: where the field's value shows, and that the steps go again without the write.
+    assert "send the steps from 3 on again without writing it again" in outcome.stopped
     assert site.orders == []
+
+
+async def test_an_address_the_page_puts_its_scheme_before_is_held_and_the_click_after_it_goes(
+    browser: BrowserSession, site: _Site
+) -> None:
+    """Item 1149, from a run of the owner's: the field held what was written with ``https://`` before it, the fill
+    was called uncertain and the click after it held back, twice."""
+    view: PageView = await browser.open_url("scheme", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "scheme",
+        [
+            Step(action="fill", ref=_ref(view, "Site", "textbox"), text="gistsmith.example"),
+            Step(action="click", ref=_ref(view, "Send", "button"), expect_text="Order 1 received"),
+        ],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    wrote, click = outcome.steps
+    assert (wrote.outcome, _statuses(wrote)) == ("done", ["verified"]), outcome
+    assert wrote.checks[0].evidence == "the page added to it: 25 characters where 17 were written"
+    assert (click.outcome, _statuses(click)) == ("done", ["verified"])
+    assert outcome.stopped is None
+    assert [order["site"] for order in site.orders] == ["https://gistsmith.example"]
 
 
 async def test_a_field_that_takes_a_secret_is_never_read_back(browser: BrowserSession, site: _Site) -> None:

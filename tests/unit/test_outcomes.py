@@ -51,6 +51,22 @@ def test_a_field_that_holds_what_was_written_is_verified_as_written_or_as_the_pa
     assert judge_replaced("Ada", "Ada", "Ada").status == "verified"
 
 
+def test_a_field_the_page_adds_to_holds_the_text_and_a_short_text_is_not_found_by_chance() -> None:
+    """Item 1149: an address field put ``https://`` before what a run wrote, and the click after it was held back."""
+    scheme: OutcomeCheck = judge_replaced("", "https://gistsmith.example", "gistsmith.example")
+    assert scheme.status == "verified"
+    assert scheme.evidence == "the page added to it: 25 characters where 17 were written"
+    assert judge_replaced("", "100 kg", "100").status == "verified"
+    assert judge_replaced("", "+358 40 123 4567", "0401234567").status == "uncertain"
+    assert judge_replaced("", "+358 40 123 4567", "401234567").status == "verified"
+    # One letter ends many words: a text that short has to be the field's own.
+    assert judge_replaced("", "banana", "a").status == "uncertain"
+    # In the middle of other text, it is not what was written with more around it.
+    assert judge_replaced("", "see gistsmith.example now", "gistsmith.example").status == "uncertain"
+    # A field that is as it was did not take the text, though the text it held ends with it.
+    assert judge_replaced("Ada Lovelace", "Ada Lovelace", "Lovelace").status == "contradicted"
+
+
 def test_a_field_that_is_as_it_was_contradicts_the_write_and_one_that_changed_otherwise_is_uncertain() -> None:
     kept: OutcomeCheck = judge_replaced("fixed", "fixed", "mine")
     assert kept.status == "contradicted" and "did not take the text" in kept.reason

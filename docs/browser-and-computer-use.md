@@ -239,7 +239,9 @@ Both modes share what follows.
   Two kinds of check are made, both by reading the page, with no model:
   - What a step wrote is read back once the page took a turn: the field a `fill`, `type` or `insert` wrote into, the
     option a `select` left chosen, the box of a `check` or `uncheck`. A field that holds the text is verified, as
-    written or as the page formats it (`5551234567` shown as `(555) 123-4567`: the same letters and digits). A field, a
+    written, as the page formats it (`5551234567` shown as `(555) 123-4567`: the same letters and digits), or with
+    what the page adds before or after it (`example.org` shown as `https://example.org`, `100` as `100 kg`; a text of
+    fewer than three letters and digits has to be the field's own, item 1149). A field, a
     dropdown or a box that is as it was fails its step, which went out and did not take, as a rich editor that drops a
     write does; a field that changed to something else (cut short, replaced) is uncertain, told by how many characters
     it holds and never by what they are, since a password typed into a plain field is no secret field to the page. A

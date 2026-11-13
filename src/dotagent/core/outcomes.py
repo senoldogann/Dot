@@ -28,6 +28,9 @@ type SightEnd = Literal["seen", "timeout", "still", "dialog", "no_time"]
 EXPECT_MIN_CHARS: int = 4
 EXPECT_MAX_CHARS: int = 200
 
+# The fewest letters and digits of a written text that count as found at the start or the end of what a field holds:
+# a shorter one ends too many other words ("a" ends "banana").
+_ADDED_TO_MIN_CHARS: int = 3
 _HOLDS_TEXT: str = "the field holds the text written"
 _TOOK_TEXT: str = "the field took the text written"
 _AS_WRITTEN: str = "as written"
@@ -75,10 +78,18 @@ def _verified(condition: str, evidence: str) -> OutcomeCheck:
     return OutcomeCheck(condition=condition, status="verified", evidence=evidence, reason="")
 
 
+def _added_to(core: str, held: str) -> bool:
+    """Whether what a field holds (``held``, its letters and digits) is the written text (``core``) with more before
+    or after it: an address the page put ``https://`` before, an amount it put a unit after."""
+    return len(core) >= _ADDED_TO_MIN_CHARS and (held.startswith(core) or held.endswith(core))
+
+
 def judge_replaced(before: str, after: str, written: str) -> OutcomeCheck:
     """What a field holds once a step replaced its value with ``written`` (a fill): verified when it holds the text,
-    as written or as a page formats it; contradicted when it still holds what it held, which is not the text;
-    uncertain when it holds something else, told by its length alone."""
+    as written, as a page formats it, or with what a page adds before or after it (item 1149: an address field that
+    puts ``https://`` first was taken for one that changed the text, in the owner's run); contradicted when it still
+    holds what it held, which is not the text; uncertain when it holds something else (cut short, replaced), told by
+    its length alone."""
     if _plain(after) == _plain(written):
         return _verified(_HOLDS_TEXT, _AS_WRITTEN)
     core: str = written_core(written)
@@ -90,6 +101,10 @@ def judge_replaced(before: str, after: str, written: str) -> OutcomeCheck:
             status="contradicted",
             evidence=_UNCHANGED,
             reason="the field did not take the text: it may be read-only or the page put its value back; look at it",
+        )
+    if _added_to(core, written_core(after)):
+        return _verified(
+            _HOLDS_TEXT, f"the page added to it: {len(after)} characters where {len(written)} were written"
         )
     return OutcomeCheck(
         condition=_HOLDS_TEXT,
