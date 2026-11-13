@@ -28,6 +28,7 @@ from dotagent.browser.snapshot import (
 )
 from dotagent.browser.types import (
     Dropdown,
+    DropdownOption,
     HeldValue,
     ScriptEnd,
     SecretField,
@@ -37,8 +38,9 @@ from dotagent.browser.types import (
     VaultFieldKind,
     Viewport,
 )
-from dotagent.core.errors import BrowserError, TabSilentError
+from dotagent.core.errors import BrowserError, StepNotSent, TabSilentError
 from dotagent.core.logs import get_logger
+from dotagent.core.outcomes import OutcomeCheck, judge_added, judge_chosen, judge_replaced, judge_ticked
 from dotagent.core.text import truncate_middle
 
 _log = get_logger("dotagent.browser.driver")
@@ -984,26 +986,195 @@ async def _dropdown_of(page: Page, locator: Locator, ref: str, timeout_ms: int) 
 
 def _ref_of(step: Step) -> str:
     if step.ref is None:
-        raise BrowserError("the step needs a ref", {"action": step.action})
+        raise StepNotSent("the step needs a ref", {"action": step.action})
     return step.ref
 
 
 def _to_ref_of(step: Step) -> str:
     if step.to_ref is None:
-        raise BrowserError("the step needs a to_ref", {"action": step.action})
+        raise StepNotSent("the step needs a to_ref", {"action": step.action})
     return step.to_ref
 
 
 def _text_of(step: Step) -> str:
     if step.text is None:
-        raise BrowserError("the step needs text", {"action": step.action})
+        raise StepNotSent("the step needs text", {"action": step.action})
     return step.text
 
 
 def _key_of(step: Step) -> str:
     if step.key is None:
-        raise BrowserError("the step needs a key", {"action": step.action})
+        raise StepNotSent("the step needs a key", {"action": step.action})
     return step.key
+
+
+async def _step_locator(page: Page, ref: str, action: str) -> Locator:
+    """:func:`live_locator` for a step of a batch: a ref that cannot be reached means nothing went to the page (item
+    1145)."""
+    try:
+        return await live_locator(page, ref, action)
+    except BrowserError as error:
+        raise StepNotSent(error.message, error.context) from error
+
+
+# What a form field holds, read for the check of a step that wrote into it (item 1145), on the control the step
+# writes (:data:`_CONTROL_OF`). The value of a field that takes a secret, or that Dot filled a login into, never
+# leaves the page: the script answers "secret" for it. "none" for what holds no text to read back (a box, a button,
+# an editor, which has its own check) and for a text longer than a form field's.
+_READ_BACK_CHARS: int = 20_000
+_FIELD_READ_SCRIPT: str = (
+    "(element, [secret, most]) => {\n"
+    + _CONTROL_OF
+    + """
+  const field = controlOf(element);
+  const takesValue = field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement
+    || field instanceof HTMLSelectElement;
+  if (!takesValue) return { kind: 'none' };
+  if (field.matches(secret)) return { kind: 'secret' };
+  if (field instanceof HTMLSelectElement) {
+    const shown = field.selectedOptions.length ? field.selectedOptions[0].label : '';
+    return { kind: 'value', value: field.value, label: shown };
+  }
+  const typed = ['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'image', 'range', 'color'];
+  if (field instanceof HTMLInputElement && typed.includes(field.type)) return { kind: 'none' };
+  if (field.value.length > most) return { kind: 'none' };
+  return { kind: 'value', value: field.value, label: '' };
+}"""
+)
+# How long a field that is as it was is looked at again before a step is said not to have written into it: a page
+# that takes a key a moment late has it by then.
+_READ_BACK_WAIT_S: float = 0.3
+_READ_BACK_POLL_S: float = 0.05
+_NOT_READ_BACK: str = "a field that takes a secret is not read back"
+_UNREADABLE: str = "the field could not be read after the step"
+
+
+@dataclass(frozen=True, slots=True)
+class FieldReading:
+    """A form field as :data:`_FIELD_READ_SCRIPT` reads it: ``value`` (with the ``label`` of the option a dropdown
+    shows chosen) for one that holds a text, ``secret`` for one whose value is never read, ``none`` for an element
+    with no text to read back, ``unreadable`` when the page did not say."""
+
+    kind: Literal["value", "secret", "none", "unreadable"]
+    value: str
+    label: str
+
+
+async def _read_field(locator: Locator) -> FieldReading:
+    """What the field ``locator`` names holds (:class:`FieldReading`); a page that does not answer, or an element that
+    is gone, is ``unreadable``."""
+    try:
+        raw: object = await locator.evaluate(
+            _FIELD_READ_SCRIPT,
+            [f"{secret_selector()}, {_FILLED_SELECTOR}", _READ_BACK_CHARS],
+            timeout=_FIELD_PROBE_TIMEOUT_MS,
+        )
+    except (PlaywrightError, TimeoutError) as error:
+        # The step's check says that the field could not be read; why is kept here.
+        _log.warning(
+            "browser_field_unread",
+            url=truncate_middle(locator.page.url, _ERROR_CHARS),
+            error=truncate_middle(str(error), _ERROR_CHARS),
+        )
+        return FieldReading(kind="unreadable", value="", label="")
+    if not isinstance(raw, dict) or raw.get("kind") not in ("value", "secret", "none"):
+        _log.warning("browser_field_unread", url=truncate_middle(locator.page.url, _ERROR_CHARS), error="no answer")
+        return FieldReading(kind="unreadable", value="", label="")
+    value: object = raw.get("value")
+    label: object = raw.get("label")
+    return FieldReading(
+        kind=raw["kind"], value=value if isinstance(value, str) else "", label=label if isinstance(label, str) else ""
+    )
+
+
+async def _read_after(page: Page, locator: Locator, before: FieldReading, timeout_ms: int) -> FieldReading:
+    """The field once the page took a turn after a step wrote into it, so that a page that puts its own value back
+    has done so. A field that is as it was is read again for :data:`_READ_BACK_WAIT_S`: only then did it not take
+    what was written."""
+    try:
+        await let_page_turn(page, timeout_ms)
+    except BrowserError:
+        return FieldReading(kind="unreadable", value="", label="")
+    after: FieldReading = await _read_field(locator)
+    waited: float = 0.0
+    while after == before and after.kind == "value" and waited < _READ_BACK_WAIT_S:
+        await asyncio.sleep(_READ_BACK_POLL_S)
+        waited += _READ_BACK_POLL_S
+        after = await _read_field(locator)
+    return after
+
+
+@dataclass(frozen=True, slots=True)
+class StepResult:
+    """What a step that went through checked of itself (item 1145): ``checks``, and ``note`` for the step's line when a
+    value is never read back."""
+
+    checks: tuple[OutcomeCheck, ...]
+    note: str
+
+
+_NO_CHECK: StepResult = StepResult(checks=(), note="")
+# What a rich editor made of a write (:func:`_into_editor`): its text changed, or holds what a fill wrote; or it did
+# not, which fails the step.
+_EDITOR_TOOK: OutcomeCheck = OutcomeCheck(
+    condition="the editor took the text", status="verified", evidence="its text changed", reason=""
+)
+_EDITOR_DROPPED: OutcomeCheck = OutcomeCheck(
+    condition="the editor took the text",
+    status="contradicted",
+    evidence="its text did not change",
+    reason="the editor did not take the text: its text did not change. Look at the page, then try the step again",
+)
+
+
+def _unreadable(condition: str) -> StepResult:
+    check: OutcomeCheck = OutcomeCheck(
+        condition=condition,
+        status="uncertain",
+        evidence=_UNREADABLE,
+        reason="take a new snapshot and read the field before going on",
+    )
+    return StepResult(checks=(check,), note="")
+
+
+def _written(
+    before: FieldReading, after: FieldReading, text: str, judge: Callable[[str, str, str], OutcomeCheck]
+) -> StepResult:
+    """The check of a step that wrote ``text`` into a field read ``before`` and ``after`` it, by ``judge``
+    (:func:`judge_replaced` for a fill, :func:`judge_added` for keys). A field that takes a secret at either reading
+    is not checked: a page may turn a password field into a plain one while the step runs."""
+    if "secret" in (before.kind, after.kind):
+        return StepResult(checks=(), note=_NOT_READ_BACK)
+    if before.kind == "none":
+        return _NO_CHECK
+    if before.kind == "unreadable" or after.kind != "value":
+        return _unreadable("the field holds the text written")
+    return StepResult(checks=(judge(before.value, after.value, text),), note="")
+
+
+def _chosen(before: FieldReading, after: FieldReading, wanted: str) -> StepResult:
+    """The check of a step that chose ``wanted`` in a dropdown, by the option it shows chosen after it."""
+    if "secret" in (before.kind, after.kind):
+        return StepResult(checks=(), note=_NOT_READ_BACK)
+    if before.kind == "none":
+        return _NO_CHECK
+    if before.kind == "unreadable" or after.kind != "value":
+        return _unreadable("the dropdown shows the option chosen")
+    shown: Dropdown = Dropdown(
+        options=(DropdownOption(label=after.label, value=after.value, selected=True, disabled=False),)
+    )
+    return StepResult(checks=(judge_chosen(has_option(shown, wanted), after == before),), note="")
+
+
+async def _ticked(page: Page, locator: Locator, asked: bool, timeout_ms: int) -> StepResult:
+    """The check of a step that ticked or cleared a box, read once the page took a turn: a page that puts the box
+    back has done so by then."""
+    try:
+        await let_page_turn(page, timeout_ms)
+        now: bool = await locator.is_checked(timeout=_FIELD_PROBE_TIMEOUT_MS)
+    except (PlaywrightError, BrowserError):
+        return _unreadable(f"the box is {'ticked' if asked else 'clear'}")
+    return StepResult(checks=(judge_ticked(asked, now),), note="")
 
 
 async def _check_secret_field(
@@ -1051,7 +1222,7 @@ async def _select_option(page: Page, locator: Locator, ref: str, wanted: str, ti
     a native dropdown without it answers after a second at most, with the options it has."""
     dropdown: Dropdown | None = await _dropdown_offering(page, locator, ref, wanted, timeout_ms)
     if dropdown is not None and not has_option(dropdown, wanted):
-        raise BrowserError(
+        raise StepNotSent(
             "the dropdown has no option with that value or label",
             {
                 "action": "select",
@@ -1072,18 +1243,19 @@ async def _into_editor(
     secret_field: SecretFieldCheck,
     expected: str | None,
     write: Callable[[], Awaitable[None]],
-) -> bool:
+) -> StepResult | None:
     """Run ``write`` into the editor the element is in (:data:`_EDITOR_READY_SCRIPT`): once the editor has the focus and
-    is ready, the field that has the focus goes to ``secret_field``; after the write, a step the editor did not take
-    fails instead of reporting done (:data:`_EDITOR_TOOK_SCRIPT`, with ``expected`` as there). ``False``, with nothing
-    done, when the element is in no editor."""
+    is ready, the field that has the focus goes to ``secret_field``; after the write, what the editor made of it is the
+    step's check (:data:`_EDITOR_TOOK_SCRIPT`, with ``expected`` as there): verified when its text changed, and
+    contradicted, which fails the step instead of reporting done, when it did not. ``None``, with nothing done, when
+    the element is in no editor."""
     element: ElementHandle = await locator.element_handle(timeout=timeout_ms)
     try:
         state: object = await element.evaluate(_EDITOR_READY_SCRIPT, [_EDITOR_QUIET_MS, _EDITOR_MAX_MS])
         if state == "plain":
-            return False
+            return None
         if state == "replaced":
-            raise BrowserError(
+            raise StepNotSent(
                 "the editor was replaced when it took the focus; take a new snapshot", {"ref": ref, "url": page.url}
             )
         await _check_secret_field(page, await _focused_marking(page), ref, secret_field, expected)
@@ -1093,21 +1265,18 @@ async def _into_editor(
         except PlaywrightError as error:
             if not _document_replaced(error):
                 raise
-            return True  # the write made the page navigate, as Enter in a search box does
+            return _NO_CHECK  # the write made the page navigate, as Enter in a search box does
     finally:
         await element.dispose()
     if took == "dropped":
-        raise BrowserError(
-            "the editor did not take the text: its text did not change. Look at the page, then try the step again",
-            {"ref": ref, "url": page.url},
-        )
+        return StepResult(checks=(_EDITOR_DROPPED,), note="")
     if took == "replaced":
         raise BrowserError(
             "the editor was replaced while the text went in, so it is not known whether it took the text: look at the "
             "page before writing again",
             {"ref": ref, "url": page.url},
         )
-    return True
+    return StepResult(checks=(_EDITOR_TOOK,), note="")
 
 
 # Why a value is not typed into an element that is no form field: only an input, a textarea or a dropdown is hidden in
@@ -1217,13 +1386,17 @@ async def fill_login_field(
         await named.dispose()
 
 
-async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> None:
-    """Perform one step against the latest snapshot. A field that takes a secret goes to ``secret_field`` first, which
-    raises to refuse the step: the field ``fill`` writes into, the one ``drag`` drops onto, and the one that has the
-    keyboard focus when ``type``, ``insert``, or ``press`` with a key that puts text in, is about to send its text."""
+async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> StepResult:
+    """Perform one step against the latest snapshot, and return what it checked of itself (item 1145): what the field
+    a ``fill``, ``type`` or ``insert`` wrote into holds after it, the option a ``select`` left chosen, whether the box
+    of a ``check`` or ``uncheck`` is as asked; nothing for a step with no state of its own to read. A field that takes
+    a secret goes to ``secret_field`` first, which raises to refuse the step: the field ``fill`` writes into, the one
+    ``drag`` drops onto, and the one that has the keyboard focus when ``type``, ``insert``, or ``press`` with a key
+    that puts text in, is about to send its text. A step refused before anything went to the page raises
+    :class:`StepNotSent`."""
     if step.action == "drag_at":
         if step.x is None or step.y is None or step.to_x is None or step.to_y is None:
-            raise BrowserError("drag_at needs x, y, to_x and to_y", {"url": page.url})
+            raise StepNotSent("drag_at needs x, y, to_x and to_y", {"url": page.url})
         try:
             await page.mouse.move(step.x, step.y)
             await page.mouse.down()
@@ -1235,15 +1408,15 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             raise _failure(
                 "drag_at failed", page, {"from": f"{step.x},{step.y}", "to": f"{step.to_x},{step.to_y}"}, error
             ) from error
-        return
+        return _NO_CHECK
     if step.action == "click_at":
         if step.x is None or step.y is None:
-            raise BrowserError("click_at needs x and y", {"url": page.url})
+            raise StepNotSent("click_at needs x and y", {"url": page.url})
         try:
             await page.mouse.click(step.x, step.y)
         except PlaywrightError as error:
             raise _failure("click_at failed", page, {"x": str(step.x), "y": str(step.y)}, error) from error
-        return
+        return _NO_CHECK
     if step.action == "press" and step.ref is None:
         key: str = _key_of(step)
         try:
@@ -1252,9 +1425,9 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             await page.keyboard.press(key)
         except PlaywrightError as error:
             raise _failure("press failed", page, {"key": step.key}, error) from error
-        return
+        return _NO_CHECK
     ref: str = _ref_of(step)
-    locator: Locator = await live_locator(page, ref, step.action)
+    locator: Locator = await _step_locator(page, ref, step.action)
     try:
         match step.action:
             case "click":
@@ -1269,7 +1442,7 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                 await _check_secret_field(
                     page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field, _text_of(step)
                 )
-                if not await _into_editor(
+                edited: StepResult | None = await _into_editor(
                     page,
                     locator,
                     ref,
@@ -1277,10 +1450,16 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     secret_field,
                     _text_of(step),
                     lambda: locator.fill(_text_of(step), timeout=timeout_ms),
-                ):
-                    await locator.fill(_text_of(step), timeout=timeout_ms)
+                )
+                if edited is not None:
+                    return edited
+                held: FieldReading = await _read_field(locator)
+                await locator.fill(_text_of(step), timeout=timeout_ms)
+                return _written(
+                    held, await _read_after(page, locator, held, timeout_ms), _text_of(step), judge_replaced
+                )
             case "type":
-                if not await _into_editor(
+                edited = await _into_editor(
                     page,
                     locator,
                     ref,
@@ -1288,12 +1467,16 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     secret_field,
                     _text_of(step),
                     lambda: page.keyboard.type(_text_of(step)),
-                ):
-                    await locator.focus(timeout=timeout_ms)
-                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field, _text_of(step))
-                    await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
+                )
+                if edited is not None:
+                    return edited
+                await locator.focus(timeout=timeout_ms)
+                await _check_secret_field(page, await _focused_marking(page), ref, secret_field, _text_of(step))
+                held = await _read_field(locator)
+                await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
+                return await _keyed(page, locator, held, _text_of(step), timeout_ms)
             case "insert":
-                if not await _into_editor(
+                edited = await _into_editor(
                     page,
                     locator,
                     ref,
@@ -1301,17 +1484,21 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     secret_field,
                     _text_of(step),
                     lambda: page.keyboard.insert_text(_text_of(step)),
-                ):
-                    await locator.focus(timeout=timeout_ms)
-                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field, _text_of(step))
-                    if not await locator.evaluate(_TAKES_TEXT_SCRIPT, timeout=timeout_ms):
-                        raise BrowserError(
-                            "insert needs a text field or an editor that takes the focus; this element takes no text",
-                            {"ref": ref, "url": page.url},
-                        )
-                    await page.keyboard.insert_text(_text_of(step))
+                )
+                if edited is not None:
+                    return edited
+                await locator.focus(timeout=timeout_ms)
+                await _check_secret_field(page, await _focused_marking(page), ref, secret_field, _text_of(step))
+                if not await locator.evaluate(_TAKES_TEXT_SCRIPT, timeout=timeout_ms):
+                    raise StepNotSent(
+                        "insert needs a text field or an editor that takes the focus; this element takes no text",
+                        {"ref": ref, "url": page.url},
+                    )
+                held = await _read_field(locator)
+                await page.keyboard.insert_text(_text_of(step))
+                return await _keyed(page, locator, held, _text_of(step), timeout_ms)
             case "drag":
-                target: Locator = await live_locator(page, _to_ref_of(step), "drag")
+                target: Locator = await _step_locator(page, _to_ref_of(step), "drag")
                 await _check_secret_field(
                     page, await target.evaluate(_FIELD_MARKING_SCRIPT, timeout=timeout_ms), step.to_ref, secret_field
                 )
@@ -1324,7 +1511,9 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                 await _check_secret_field(
                     page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field, _text_of(step)
                 )
+                held = await _read_field(locator)
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
+                return _chosen(held, await _read_after(page, locator, held, timeout_ms), _text_of(step))
             case "press":
                 if key_enters_text(_key_of(step)):
                     await locator.focus(timeout=timeout_ms)
@@ -1332,14 +1521,25 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                 await locator.press(_key_of(step), timeout=timeout_ms)
             case "check":
                 await locator.check(timeout=timeout_ms)
+                return await _ticked(page, locator, True, timeout_ms)
             case "uncheck":
                 await locator.uncheck(timeout=timeout_ms)
+                return await _ticked(page, locator, False, timeout_ms)
             case "scroll_into_view":
                 await locator.scroll_into_view_if_needed(timeout=timeout_ms)
             case "click_at":
                 raise BrowserError("click_at is handled before refs are resolved", {"url": page.url})
     except PlaywrightError as error:
         raise _failure(f"{step.action} failed", page, {"ref": ref}, error) from error
+    return _NO_CHECK
+
+
+async def _keyed(page: Page, locator: Locator, before: FieldReading, text: str, timeout_ms: int) -> StepResult:
+    """The check of a step that put ``text`` into a field with keys or at its caret. A text with a line break is not
+    checked: the break may have sent the form and emptied the field, which is no refusal of the text."""
+    if "\n" in text or "\r" in text:
+        return _NO_CHECK
+    return _written(before, await _read_after(page, locator, before, timeout_ms), text, judge_added)
 
 
 async def _scroll_state(page: Page, locator: Locator | None, centre: list[float], timeout_s: float) -> str | None:
@@ -1685,6 +1885,19 @@ async def text_in_frames(page: Page, text: str) -> bool:
             return False
 
     return any(await asyncio.gather(*(shows(frame) for frame in frames[:_PULSE_FRAMES])))
+
+
+async def text_shown(page: Page, text: str) -> bool | None:
+    """Whether ``text`` is visible on ``page`` now, in its main document or a frame below it (item 1145): what a step
+    that expects to see it is asked before it goes. ``None`` when the page did not say within ``_COUNT_TIMEOUT_S``."""
+    try:
+        if await _count(page.get_by_text(text).filter(visible=True)) > 0:
+            return True
+    except TimeoutError:
+        return None
+    except PlaywrightError as error:
+        raise _failure("looking for the text failed", page, {"text": text}, error) from error
+    return await text_in_frames(page, text)
 
 
 # The file field that a control named by label or by ``aria-controls`` hands its files to, which a custom "choose file"

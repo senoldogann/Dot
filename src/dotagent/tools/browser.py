@@ -53,6 +53,7 @@ from dotagent.browser.safety import (
 )
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.browser.types import (
+    PAGE_UNCHANGED,
     ActOutcome,
     FindResult,
     PageView,
@@ -72,6 +73,7 @@ from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import DotError, ToolExecutionError, ToolInputError
 from dotagent.core.held import held_folder, open_regular
 from dotagent.core.logs import get_logger
+from dotagent.core.outcomes import echoes_written
 from dotagent.core.paths import uploads_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData
@@ -377,6 +379,19 @@ class ActArgs(ToolArgs):
         ]
         return {**data, "steps": steps or data["steps"]}
 
+    @model_validator(mode="after")
+    def _expects_what_only_the_result_shows(self) -> Self:
+        """A step may not expect to see words the batch itself writes (item 1145): a page that repeats what was typed
+        would show them whatever the step did."""
+        written: list[str] = [step.text for step in self.steps if step.text is not None]
+        for step in self.steps:
+            if step.expect_text is not None and echoes_written(step.expect_text, written):
+                raise ValueError(
+                    "expect_text is within a text this batch writes, which a page can repeat whatever the step did: "
+                    "expect words only the result shows (the line a sent form answers with), or leave it out"
+                )
+        return self
+
     steps: list[Step] = Field(
         min_length=1,
         description=(
@@ -402,7 +417,8 @@ class ActArgs(ToolArgs):
         description=(
             "What the page should show after the steps, in a few words ('the reply shows under the post', 'the order "
             "confirmation'). When the typed judge is on, the result opens with the probability that the page shows it "
-            "and that it is a login wall, a CAPTCHA or an error page, so you need not read the whole page to know."
+            "and that it is a login wall, a CAPTCHA or an error page, so you need not read the whole page to know. An "
+            "estimate; a step's expect_text is the check."
         ),
     )
     retry: bool = Field(
@@ -410,7 +426,7 @@ class ActArgs(ToolArgs):
         description=(
             "When a click leaves the page unchanged, reach the same element once with the full pointer sequence a "
             "script sends (`browser_eval`'s way) and take the page again, instead of returning to the model for "
-            "another method. A click that already moved the page is never sent twice."
+            "another method. A click that already moved the page, or that names what it expects, is never sent twice."
         ),
     )
 
@@ -441,15 +457,17 @@ async def _retry_unchanged(
     """A click whose batch left the page unchanged is tried once the other way (item 781): the steps' refs are still
     on the page, so a script sends the pointer sequence to each such element, and the page is read again when one of
     them ran. A click that moved the page, a step that failed and a script that surprised the tab are left alone, and
-    so is a batch whose ``flags`` say it sends, posts, pays or removes (:data:`_NOT_RETRIED`)."""
+    so is a batch whose ``flags`` say it sends, posts, pays or removes (:data:`_NOT_RETRIED`). A click that named what
+    it expects is never clicked again here (item 1145): its wait may have ended while the first click was still
+    being answered, and a second one would do it twice."""
     if set(flags) & _NOT_RETRIED:
         return outcome
     steps: list[StepReport] = list(outcome.steps)
     retried: bool = False
     for index, (step, report) in enumerate(zip(args.steps, steps, strict=False)):
-        if step.action != "click" or step.ref is None:
+        if step.action != "click" or step.ref is None or step.expects() or report.checks:
             continue
-        if report.outcome != "done" or not report.detail.startswith("but the page did not change"):
+        if report.outcome != "done" or not report.detail.startswith(PAGE_UNCHANGED):
             continue
         try:
             run: ScriptRun = await ctx.browser.run_script(
@@ -691,7 +709,9 @@ def _act_tool() -> RegisteredTool:
             "area) fill, type and insert wait until it is ready and fail when it did not take the text; insert goes "
             "only into a text field or an editor. A click that leaves the page unchanged is tried once the other way "
             "with a script before the result returns. Batch the steps you can predict, such as filling a whole form "
-            "and pressing submit. The result shows what changed on the page. Passwords, card numbers and one-time "
+            "and pressing submit. The result shows what changed on the page and, for each step, done (sent) and what "
+            "Dot checked: verified (seen), uncertain (sent, result unseen: look before sending again) or not checked. "
+            "Passwords, card numbers and one-time "
             "codes go in only as your instructions on secrets say: otherwise the browser refuses the step. " + _REF_HELP
         ),
         args_model=ActArgs,

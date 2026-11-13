@@ -215,7 +215,8 @@ Both modes share what follows.
   the same ref gets the pointer sequence a script sends, and the page is read again, so a step that a script can move
   does not need a model round trip; a click that already moved the page is never sent twice, a step that failed is left
   alone, and a batch that sends, posts, pays, removes, installs or hands over a credential is never clicked again this
-  way (item 792: such a button may act slower than half a second, and a second click would do it twice). A page that has
+  way (item 792: such a button may act slower than half a second, and a second click would do it twice); neither is a
+  click that names what it expects (item 1145, below). A page that has
   not settled when
   the steps, a script or an upload went through is said, rather than failing the call, which a run took for a step that
   did not happen (item 792): after steps or an upload in the page's notes ("do not repeat it"), after a script in what
@@ -230,6 +231,36 @@ Both modes share what follows.
   [Safety](safety.md#safety)). A batch carries one payment step at most (a click on a control that asks to pay, by its
   words or by the typed judge's reading): two payments in one call would pass for the larger of their amounts under the
   caps of `[policy.spend]`, so the call is refused and the steps are sent one call at a time, in every mode.
+- A step's line says whether it was sent and what Dot checked of it (item 1145). **done** says that the step went
+  through; it does not say that what the step was for happened. Beside it stands each check: **verified** (Dot saw it),
+  **contradicted** (Dot read the opposite), **uncertain** (sent, and its result was not seen), or **not checked**
+  (nothing was looked at). A failed step says whether it went out: not sent (a ref that is gone, an option the dropdown
+  does not have, a click something in front took), sent, or may have been sent. The line above the result counts them.
+  Two kinds of check are made, both by reading the page, with no model:
+  - What a step wrote is read back once the page took a turn: the field a `fill`, `type` or `insert` wrote into, the
+    option a `select` left chosen, the box of a `check` or `uncheck`. A field that holds the text is verified, as
+    written or as the page formats it (`5551234567` shown as `(555) 123-4567`: the same letters and digits). A field, a
+    dropdown or a box that is as it was fails its step, which went out and did not take, as a rich editor that drops a
+    write does; a field that changed to something else (cut short, replaced) is uncertain, told by how many characters
+    it holds and never by what they are, since a password typed into a plain field is no secret field to the page. A
+    field that takes a secret (a password, a one-time code, a card, a login Dot filled in) is never read back, in any
+    mode, and is neither verified nor contradicted: nothing Dot answers tells what such a field holds. A text with a
+    line break is not read back, as the break may have sent the form.
+  - `expect_text` and `expect_url` on a step name what the page must show once the step is done: exact words (4 to 200
+    characters) that become visible, or a part of the address the tab comes to (looked for in its host and path, and
+    anywhere when the part itself names a `?` or a `#`). Dot looks before the step goes: when the page shows it
+    already the step is not sent, since seeing it afterwards could not tell what the step did; and words the same batch
+    writes are refused, as a page that repeats them shows them whatever happened. After the step Dot waits for it, 10 s
+    at most and 20 s over the steps of one batch, and less once the page has stood still for 3 s or a dialog opened.
+    Seen is verified. Not seen is uncertain and never contradicted: what was sent may still land. The batch stops
+    there, and the click is not tried again with a script: a second click of a form that answers slowly would send it
+    twice. Look again (`browser_wait_text`, `browser_snapshot`) before sending the step again.
+
+  A batch stops before a step that acts on what the steps before it left (a click, a key, a drag, a box, a dropdown, a
+  text with a line break) when one of their own checks is not verified, while the steps that only write into a field go
+  on: the fields of one form do not wait for each other, and its button waits for a look. Verified says that the page
+  showed it, not that a server took it, and a change the page makes later than its turn shows in the next look. The
+  call's own `expect` stays what it was, the typed judge's estimate of words the model chose, and is no check.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a

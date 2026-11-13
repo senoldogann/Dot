@@ -6,6 +6,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
+from dotagent.core.outcomes import EXPECT_MAX_CHARS, EXPECT_MIN_CHARS
+from dotagent.core.outcomes import StepReport as StepReport
 from dotagent.core.types import FrozenModel
 
 type StepAction = Literal[
@@ -49,6 +51,12 @@ _WRITING_ACTIONS: frozenset[str] = frozenset({"fill", "type", "insert"})
 _SIDE_EFFECT_ACTIONS: frozenset[str] = frozenset(
     {"click", "double_click", "right_click", "select", "press", "check", "uncheck", "click_at", "drag_at", "drag"}
 )
+# The steps that only put text into a field or move the view (item 1145): they run on after a step whose check is not
+# verified, as the fields of one form do not depend on each other. Every other step acts on what the steps before it
+# left (a press of the form's button, a box whose change sends the form) and waits for a look.
+_INDEPENDENT_ACTIONS: frozenset[str] = frozenset({"fill", "type", "insert", "hover", "scroll_into_view"})
+# How a step's report begins when the page stayed as it was (item 739), which the retry of a click reads (item 781).
+PAGE_UNCHANGED: str = "but the page did not change"
 
 
 class Step(BaseModel):
@@ -80,6 +88,21 @@ class Step(BaseModel):
     y: float | None = Field(default=None, description="Viewport y in CSS pixels, for click_at and drag_at's start.")
     to_x: float | None = Field(default=None, description="Viewport x in CSS pixels where a drag_at lets go.")
     to_y: float | None = Field(default=None, description="Viewport y in CSS pixels where a drag_at lets go.")
+    expect_text: str | None = Field(
+        default=None,
+        min_length=EXPECT_MIN_CHARS,
+        max_length=EXPECT_MAX_CHARS,
+        description=(
+            "Exact words the page must show after this step and not before (the line a sent form answers with). "
+            "Dot waits for them and says verified or uncertain; unseen, the later steps are not run."
+        ),
+    )
+    expect_url: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=EXPECT_MAX_CHARS,
+        description="Part of the address the tab must come to after this step (/order/done); like expect_text.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -93,6 +116,11 @@ class Step(BaseModel):
             return {**data, "action": "click_at"}
         if action == "upload":
             raise ValueError("upload is not a step: call browser_upload with the ref of the upload control and paths")
+        if "expect" in data:
+            raise ValueError(
+                "expect belongs to the call, beside steps, and is a guess in your own words; a step takes expect_text "
+                "(exact words the page must show after it) or expect_url (part of the address it must come to)"
+            )
         return data
 
     @model_validator(mode="after")
@@ -144,12 +172,17 @@ class Step(BaseModel):
     def has_side_effects(self) -> bool:
         return self.action in _SIDE_EFFECT_ACTIONS
 
+    def expects(self) -> bool:
+        """Whether the step names what the page must show after it (item 1145)."""
+        return self.expect_text is not None or self.expect_url is not None
 
-class StepReport(FrozenModel):
-    index: int
-    description: str
-    outcome: Literal["done", "failed", "skipped"]
-    detail: str
+    def acts_on_what_was_left(self) -> bool:
+        """Whether the step acts on what the steps before it left, so that it waits when one of their checks is not
+        verified (item 1145): every step but one that only writes into a field or moves the view; a text with a line
+        break sends what its field holds."""
+        if self.action not in _INDEPENDENT_ACTIONS:
+            return True
+        return self.text is not None and ("\n" in self.text or "\r" in self.text)
 
 
 class DropdownOption(FrozenModel):

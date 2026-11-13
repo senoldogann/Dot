@@ -39,7 +39,7 @@ def _context(browser: _Browser) -> ToolContext:
 
 
 def _outcome(detail: str) -> ActOutcome:
-    report = StepReport(index=0, description='click "Send"', outcome="done", detail=detail)
+    report = StepReport(index=0, description='click "Send"', outcome="done", detail=detail, dispatched="sent")
     return ActOutcome(steps=(report,), stopped=None, view=PageView.model_construct(url="https://example.com/"))
 
 
@@ -69,4 +69,17 @@ async def test_a_click_that_sends_or_pays_is_never_clicked_again_by_the_retry() 
     original = _outcome("but the page did not change; nothing was sent")
     for flags in (("external_send", "message_send"), ("public_post",), ("financial",)):
         assert await _retry_unchanged(args, original, _context(browser), flags) is original
+    assert browser.calls == []
+
+
+async def test_a_click_that_named_what_it_expects_is_never_clicked_again() -> None:
+    """Item 1145: its wait may have ended while the first click was still being answered, half a second after which
+    the page had not changed; a second click would send the form twice."""
+    browser = _Browser()
+    original = _outcome("but the page did not change (no new content, request, address or keyboard focus)")
+    for expecting in (
+        Step(action="click", ref="e12", expect_text="Order received"),
+        Step(action="click", ref="e12", expect_url="/order/confirmed"),
+    ):
+        assert await _retry_unchanged(ActArgs(steps=[expecting]), original, _context(browser)) is original
     assert browser.calls == []

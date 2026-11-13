@@ -18,6 +18,7 @@ from dotagent.browser.types import (
     TextView,
     TextWait,
 )
+from dotagent.core.outcomes import render_outcomes, render_step
 from dotagent.core.text import truncate_middle
 
 _TITLE_CHARS: int = 120
@@ -64,8 +65,7 @@ def describe_step(step: Step) -> str:
 
 
 def _step_line(report: StepReport) -> str:
-    detail: str = f": {_clip(report.detail, _DETAIL_CHARS)}" if report.detail else ""
-    return f"  {report.index}. {report.description} — {report.outcome}{detail}"
+    return render_step(report, _clip(report.detail, _DETAIL_CHARS))
 
 
 def _tab_line(tab: TabSummary) -> str:
@@ -111,7 +111,11 @@ def render_page_view(view: PageView, nonce: str, body_budget: int) -> str:
 
 def render_act_outcome(outcome: ActOutcome, nonce: str, body_budget: int) -> str:
     counts: Counter[str] = Counter(report.outcome for report in outcome.steps)
-    summary: str = f"Steps: {counts['done']} done, {counts['failed']} failed, {counts['skipped']} skipped"
+    # Done says that a step went through; what was checked of it stands beside it (item 1145).
+    summary: str = (
+        f"Steps: {counts['done']} done, {counts['failed']} failed, {counts['skipped']} skipped · "
+        f"{render_outcomes(outcome.steps)}"
+    )
     inner: list[str] = ["steps:", *(_step_line(report) for report in outcome.steps)]
     if outcome.stopped is not None:
         inner.append(f"stopped: {_clip(outcome.stopped, _DETAIL_CHARS)}")
