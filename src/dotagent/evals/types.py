@@ -56,6 +56,24 @@ class SitePage(FrozenModel):
     location: str | None
 
 
+class SiteEndpoint(FrozenModel):
+    """A path of a task's site that takes a POST (item 1147). The site keeps what it was sent there, one record a
+    request in the order they came, and answers after ``delay_s`` with ``answer`` (HTML; a ``{name}`` in it is filled
+    from the fields it was sent, an absent name with nothing, and ``{count}`` with how many requests the path has
+    taken, this one among them). A task with one is judged by what its site took, not by what the run says."""
+
+    path: str
+    delay_s: float = Field(ge=0)
+    answer: str
+
+
+class SiteRecord(FrozenModel):
+    """One request an endpoint of a task's site took: where, and the fields it was sent."""
+
+    path: str
+    fields: dict[str, str]
+
+
 class FileExists(FrozenModel):
     kind: Literal["file_exists"]
     path: str
@@ -174,6 +192,17 @@ class NoPicks(FrozenModel):
     kind: Literal["no_picks"]
 
 
+class SiteRecorded(FrozenModel):
+    """The task's site took exactly ``count`` requests at its endpoint ``at``, each of them with ``fields`` (what else
+    it was sent does not matter): what the run did, whatever it says it did (item 1147). Twice is not once, and a page
+    that only looks like the answer is none."""
+
+    kind: Literal["site_recorded"]
+    at: str
+    count: int = Field(ge=0)
+    fields: dict[str, str]
+
+
 type Check = Annotated[
     FileExists
     | FileAbsent
@@ -190,7 +219,8 @@ type Check = Annotated[
     | SkillUnread
     | ToolRan
     | GroupStaysOff
-    | NoPicks,
+    | NoPicks
+    | SiteRecorded,
     Field(discriminator="kind"),
 ]
 
@@ -220,7 +250,9 @@ class EvalTask(FrozenModel):
     attempts that failed one as having followed the injection. ``reference`` is a script that does the task;
     ``dotx eval check`` replays it to prove that the task can be passed and that the checks accept it. ``site`` are the
     pages of a local site the attempt serves on a loopback port for the task (none for most tasks); the goal and the
-    reference name its address as ``{site}``. ``goal_mode`` runs the task in goal mode, where the review model checks
+    reference name its address as ``{site}``, and ``endpoints`` are the paths of that site that take a POST and keep
+    what they were sent (item 1147), which a ``site_recorded`` check reads. ``goal_mode`` runs the task in goal mode,
+    where the review model checks
     the end against the goal. ``skills`` are the skills the attempt's home holds and ``servers`` the MCP servers its run
     is given, help that makes the task short; ``easy_way`` names the tool of that help (item 167), ``None`` for a task
     without one. ``grouped`` plays the task with its tools in groups, as a run of more than 128 tools has them, so that
@@ -244,3 +276,4 @@ class EvalTask(FrozenModel):
     servers: tuple[McpServerConfig, ...]
     easy_way: EasyWay | None
     grouped: bool
+    endpoints: tuple[SiteEndpoint, ...] = ()

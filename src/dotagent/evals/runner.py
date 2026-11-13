@@ -13,7 +13,7 @@ import json
 import os
 import tempfile
 import time
-from collections.abc import AsyncGenerator, Iterator, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -28,8 +28,8 @@ from dotagent.evals.checks import evaluate_checks, workspace_path
 from dotagent.evals.metrics import run_metrics, took_easy_way
 from dotagent.evals.results import CheckOutcome, Cut, RunMetrics, TaskOutcome
 from dotagent.evals.scripted import ScriptedProvider
-from dotagent.evals.site import serve_site, with_site
-from dotagent.evals.types import EvalTask, FileSeed, SkillSeed
+from dotagent.evals.site import serve_recording_site, with_site
+from dotagent.evals.types import EvalTask, FileSeed, SiteRecord, SkillSeed
 from dotagent.events import Subscription
 from dotagent.harness.components import NO_HARNESS, GivenText
 from dotagent.harness.service import install
@@ -330,11 +330,18 @@ async def _supervise(
 
 
 async def _run_in(
-    runtime: Runtime, task: EvalTask, model: str, stand_in: ChatProvider | None, attempt: int, harness: GivenText
+    runtime: Runtime,
+    task: EvalTask,
+    model: str,
+    stand_in: ChatProvider | None,
+    attempt: int,
+    harness: GivenText,
+    taken: Callable[[], tuple[SiteRecord, ...]],
 ) -> TaskOutcome:
     """One attempt in an open runtime: seed the workspace, adopt ``harness`` in the attempt's own store as it stands
     when it is not Dot's own text alone (item 391: a probe of the harness; the owner's limits of now apply to new text
-    only, item 589), run the goal, judge what is left."""
+    only, item 589), run the goal, judge what is left: the workspace, the answer, the run's events and what the task's
+    site took (``taken``, read once the run is over; item 1147)."""
     if stand_in is not None:
         await runtime.router.register(parse_model_ref(model).provider, stand_in)
     if harness != NO_HARNESS:
@@ -364,11 +371,12 @@ async def _run_in(
         await manager.shutdown()
     seconds: float = time.monotonic() - started
     events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _MAX_EVENTS)
+    records: tuple[SiteRecord, ...] = taken()
     checks: tuple[CheckOutcome, ...] = await evaluate_checks(
-        task.checks, runtime.workspace, record.result, runtime.shell_env, events
+        task.checks, runtime.workspace, record.result, runtime.shell_env, events, records
     )
     injection_checks: tuple[CheckOutcome, ...] = await evaluate_checks(
-        task.injection_checks, runtime.workspace, record.result, runtime.shell_env, events
+        task.injection_checks, runtime.workspace, record.result, runtime.shell_env, events, records
     )
     delegated_input, delegated_output = await runtime.store.delegated_usage(record.id)
     return judge(
@@ -397,8 +405,12 @@ async def _attempt(
     """One attempt in a throw-away home that is removed afterwards, holding the skills the task brings, its run given
     the MCP servers the task brings, with the task's site (if it has one) served for its length and its address put
     into the goal and the reference. ``scripted`` plays the reference through a scripted model instead of ``model``."""
-    with scratch_home() as home, eval_environment(home, secrets), serve_site(task.site) as address:
-        placed: EvalTask = with_site(task, address) if task.site else task
+    with (
+        scratch_home() as home,
+        eval_environment(home, secrets),
+        serve_recording_site(task.site, task.endpoints) as served,
+    ):
+        placed: EvalTask = with_site(task, served.address) if task.site else task
         stand_in: ChatProvider | None = ScriptedProvider(_SCRIPTED_PROVIDER, placed.reference) if scripted else None
         await asyncio.to_thread(seed_skills, skills_dir(), task.skills)
         runtime: Runtime = await open_runtime(
@@ -406,7 +418,7 @@ async def _attempt(
             {**login_env, **_ATTEMPT_ENV},
         )
         try:
-            outcome: TaskOutcome = await _run_in(runtime, placed, model, stand_in, attempt, harness)
+            outcome: TaskOutcome = await _run_in(runtime, placed, model, stand_in, attempt, harness, served.taken)
         finally:
             await close_runtime(runtime)
     log.info(
@@ -455,7 +467,7 @@ async def replay_reference(task: EvalTask, config: AppConfig, login_env: Mapping
 
 async def do_nothing_passes(task: EvalTask, env: Mapping[str, str]) -> bool:
     """Whether a run that touches nothing and says it is done passes the task. A sound task is not passed that way. Such
-    a run leaves no events, so no check of what it read or called holds."""
+    a run leaves no events, so no check of what it read or called holds, and its site took nothing."""
     with scratch_home() as workspace:
         await asyncio.to_thread(seed_workspace, workspace, task.files)
         checks: tuple[CheckOutcome, ...] = await evaluate_checks(

@@ -30,6 +30,8 @@ from dotagent.evals.types import (
     JsonEquals,
     NoFileNamed,
     NoPicks,
+    SiteRecord,
+    SiteRecorded,
     SkillRead,
     SkillUnread,
     ToolRan,
@@ -86,10 +88,18 @@ def describe_check(check: Check) -> str:
             return f"the tool group {check.group} stayed off"
         case NoPicks():
             return "the message of the run had no picks from the composer"
+        case SiteRecorded():
+            times: str = "1 request" if check.count == 1 else f"{check.count} requests"
+            return f"the site took {times} at {check.at} with {_sent(check.fields)}"
 
 
 def _dump(value: JsonValue) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def _sent(fields: Mapping[str, str]) -> str:
+    """The fields of a form as a check names them and as a site took them, in one order."""
+    return json.dumps(dict(fields), ensure_ascii=False, sort_keys=True)
 
 
 def _outcome(check: Check, passed: bool, detail: str) -> CheckOutcome:
@@ -233,12 +243,32 @@ def _judge_events(
             return _outcome(check, not any(event.kind == PICKS_EVENT for event in events), "the message had picks")
 
 
+def _judge_site(check: SiteRecorded, records: Sequence[SiteRecord]) -> CheckOutcome:
+    """Whether the task's site took what ``check`` asks (item 1147): as many requests at its endpoint, each with the
+    fields it names. What the run says does not enter into it."""
+    there: list[SiteRecord] = [record for record in records if record.path == check.at]
+    other: list[SiteRecord] = [
+        record for record in there if any(record.fields.get(name) != value for name, value in check.fields.items())
+    ]
+    found: str = f"the site took {len(there)} there"
+    if other:
+        found = f"{found}, {len(other)} with other fields: {_shown(_sent(other[0].fields))}"
+    return _outcome(check, len(there) == check.count and not other, found)
+
+
 async def evaluate_check(
-    check: Check, workspace: Path, answer: str, env: Mapping[str, str], events: Sequence[EventRecord] = ()
+    check: Check,
+    workspace: Path,
+    answer: str,
+    env: Mapping[str, str],
+    events: Sequence[EventRecord] = (),
+    records: Sequence[SiteRecord] = (),
 ) -> CheckOutcome:
-    """Whether one check holds for the workspace a run left, the answer it gave and the ``events`` it left. ``env`` is
-    the environment of the commands of the checks."""
+    """Whether one check holds for the workspace a run left, the answer it gave, the ``events`` it left and the
+    ``records`` of what its task's site took. ``env`` is the environment of the commands of the checks."""
     match check:
+        case SiteRecorded():
+            return _judge_site(check, records)
         case CommandSucceeds():
             return await _judge_command(check, workspace, env)
         case AnswerContains() | AnswerMatches() | AnswerLacks() | AnswerLacksPattern():
@@ -252,8 +282,13 @@ async def evaluate_check(
 
 
 async def evaluate_checks(
-    checks: Sequence[Check], workspace: Path, answer: str, env: Mapping[str, str], events: Sequence[EventRecord] = ()
+    checks: Sequence[Check],
+    workspace: Path,
+    answer: str,
+    env: Mapping[str, str],
+    events: Sequence[EventRecord] = (),
+    records: Sequence[SiteRecord] = (),
 ) -> tuple[CheckOutcome, ...]:
     """Every check of a task, in order. None is skipped when an earlier one fails, so a report shows all that is
     wrong."""
-    return tuple([await evaluate_check(check, workspace, answer, env, events) for check in checks])
+    return tuple([await evaluate_check(check, workspace, answer, env, events, records) for check in checks])

@@ -24,6 +24,7 @@ from dotagent.config import McpServerConfig
 from dotagent.core.errors import EvalError
 from dotagent.evals.office_tasks import AUGUST, NEW_NAME, OLD_NAME, letter_document, sales_workbook
 from dotagent.evals.speed_tasks import speed_tasks
+from dotagent.evals.state_tasks import state_tasks
 from dotagent.evals.tool_server import HOLIDAYS, SERVER_NAME, WORKING_DAYS, StandIn, stand_in
 from dotagent.evals.types import (
     AnswerContains,
@@ -1961,8 +1962,9 @@ def select_tasks(task_ids: Sequence[str]) -> tuple[EvalTask, ...]:
     """The tasks called ``task_ids``, in the order of the catalog; every task when ``task_ids`` is empty."""
     if not task_ids:
         return all_tasks()
-    # A task of the speed set is played by its id too (`dotx eval speed`), though the catalog leaves the set out.
-    catalog: tuple[EvalTask, ...] = (*all_tasks(), *speed_tasks())
+    # A task of the speed set is played by its id too (`dotx eval speed`), though the catalog leaves the set out, and
+    # so is one of the state set (item 1147).
+    catalog: tuple[EvalTask, ...] = (*all_tasks(), *speed_tasks(), *state_tasks())
     known: set[str] = {task.id for task in catalog}
     unknown: list[str] = sorted(set(task_ids) - known)
     if unknown:

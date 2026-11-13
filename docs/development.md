@@ -37,6 +37,21 @@ service are marked:
 | `desktop`  | a logged-in screen and `DOT_DESKTOP_TESTS=1`; it moves the real pointer and keyboard against a local AppKit window |
 | `hosted`   | your own `OPENAI_API_KEY`, `OPENCODE_API_KEY`, `ANTHROPIC_API_KEY` and `OLLAMA_API_KEY`; a few tiny requests, skipped per missing key |
 
+Three kinds of check answer three questions about browser and computer use, and none stands for another (items 1145
+to 1147):
+
+| Kind                 | Asks                                         | Where                                                                                              | Calls a model |
+| -------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------- |
+| deterministic checks | does the harness do what it says             | `tests/unit`, the smoke tests on local fixtures with a scripted model, `dotx eval check`           | no            |
+| model evaluations    | does a model pass the tasks, and at what cost | `dotx eval run`, `dotx eval speed`, in the isolated configuration [below](#measuring-the-agent)     | yes           |
+| product acceptance   | does the whole product do it on this Mac     | the `live` tests of a run end to end (`test_agent_browser.py`, `test_agent_desktop.py`)            | yes           |
+
+A scripted pass says nothing about a model: it shows that the tools, the checks and the fixtures hold together. What a
+step came to is checked there against what the fixture kept, not against what a result says: the orders a local site
+took (`tests/smoke/test_browser_verified.py`, `tests/smoke/test_browser_state_tasks.py`) and the events an AppKit window saw
+(`tests/smoke/test_desktop.py`, whose window has a field that refuses what is typed, a button that does nothing, one
+whose result shows later and one that brings another application forward).
+
 `pytest -m "not live and not internet"` skips the first and third kind, `pytest -m "not hosted"` the requests that use
 your keys. A few smoke tests that use the local Ollama server's embedding model skip themselves without it; that model
 runs on this Mac. A test that asks the server for a cloud model (a name that ends in `:cloud`, which Ollama answers from
@@ -558,6 +573,16 @@ a report saved before model calls were timed counted the steps' tokens only and 
 no seconds, and one saved before acts and cached tokens were counted shows `-` for their shares. `dotx eval run` saves
 its report after every attempt, so an interrupted run keeps what it measured.
 
+**The state set** (item 1147, `src/dotagent/evals/state_tasks.py`) is two browser tasks whose site keeps every form it
+was sent, and which pass by that record: exactly one request with the right fields, whatever the answer says. One
+answers a sent application a moment late, where pressing again would send it twice; the other has a button that takes
+its first press and does nothing, where reporting done would leave the form unsent. `dotx eval check` plays their
+references and `tests/smoke/test_browser_state_tasks.py` the ways of seeming done that must fail: saying so, opening a page
+that looks like the answer, pressing once, sending twice. `dotx eval run --task state-apply-once --task
+state-save-second-press` plays them with a model; they are not in the catalog's own list, so the weekly score stays
+the set it was. The speed set judges an answer's words, which times a run and does not prove that a form was sent (its
+references open the last page directly): the state set is where that is proved.
+
 A weekly score is `scripts/weekly-eval.sh`: it plays the catalog once, compares the new report with the one before it, and
 prints the difference. Run it from cron or a Dot schedule, so a model or harness change is seen as a score rather than
 as a few runs that felt worse.
@@ -566,7 +591,9 @@ A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts
 Office file in Base64), the goal, checks (a file exists, holds or equals something, a JSON file equals a value, a
 command exits with 0, the answer contains, matches or does not contain something, no file or folder anywhere in the
 workspace is named like a glob), the checks that read the run's events (item 659: the skill it read or left unread, the
-tool of an MCP server that ran, a tool group that stayed off, no pick made in the composer), the checks that hold unless
+tool of an MCP server that ran, a tool group that stayed off, no pick made in the composer), the check of what the
+task's own site took (item 1147: so many requests at a path that takes a POST, each with these fields), the checks that
+hold unless
 the run followed an instruction hidden in a file (`dotx eval check` reports one that an answer quoting the files the
 goal names would fail), the skills and MCP servers it brings and the easy way they offer (or a skill that comes with
 Dot), whether its tools are grouped, and a reference solution as a script of tool calls. The two tasks on Office files
