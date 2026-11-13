@@ -3,9 +3,10 @@ browser or research task depends on no network and no account. The goal and the 
 site as ``{site}``; the runner puts the address in. A site may take POSTs too (item 1147): it keeps what each of its
 endpoints was sent, so that a task is judged by what its site took."""
 
+import html
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -26,14 +27,34 @@ class _Query(dict[str, str]):
         return ""
 
 
-def render_page(page: SitePage, query: str) -> str:
-    """The body of ``page`` with its placeholders filled from ``query`` (the part of the address after ``?``)."""
-    return page.body.format_map(_Query(parse_qsl(query, keep_blank_values=True)))
+_LAST: str = "last_"
+
+
+def held_now(endpoints: Sequence[SiteEndpoint], taken: Sequence[SiteRecord]) -> dict[str, str]:
+    """What a site holds for each field of its endpoints (item 1156): what each endpoint held at first
+    (:attr:`SiteEndpoint.holds`), then what the requests it took sent, the newest last."""
+    held: dict[str, str] = {}
+    for endpoint in endpoints:
+        held = {**held, **endpoint.holds}
+    for record in taken:
+        held = {**held, **record.fields}
+    return held
+
+
+def render_page(page: SitePage, query: str, held: Mapping[str, str]) -> str:
+    """The body of ``page`` with its placeholders filled from ``query`` (the part of the address after ``?``); a
+    ``{last_<name>}`` is the field ``<name>`` of what the site holds (:func:`held_now`, item 1156): a page that
+    shows what was saved, as a real one does once a form went through."""
+    # What a request sent is text, also inside the field it is shown in: a name with a quote in it would otherwise
+    # break the page that is there to show what was saved.
+    last: dict[str, str] = {f"{_LAST}{name}": html.escape(value) for name, value in held.items()}
+    return page.body.format_map(_Query({**last, **dict(parse_qsl(query, keep_blank_values=True))}))
 
 
 def render_answer(endpoint: SiteEndpoint, fields: dict[str, str], count: int) -> str:
     """What ``endpoint`` answers to a request that sent ``fields``, the ``count``-th it took."""
-    return endpoint.answer.format_map(_Query({**fields, "count": str(count)}))
+    shown: dict[str, str] = {name: html.escape(value) for name, value in fields.items()}
+    return endpoint.answer.format_map(_Query({**shown, "count": str(count)}))
 
 
 class _Site(ThreadingHTTPServer):
@@ -67,7 +88,8 @@ class _Handler(BaseHTTPRequestHandler):
         elif page.location is not None:
             self._send(page.status, "", page.location)
         else:
-            self._send(page.status, render_page(page, query), None)
+            held: dict[str, str] = held_now(tuple(self.server.endpoints.values()), self.server.taken())
+            self._send(page.status, render_page(page, query, held), None)
 
     def do_POST(self) -> None:
         """Take a form an endpoint was sent: it is kept as it arrives, and answered once the endpoint's time has
