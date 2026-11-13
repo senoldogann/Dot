@@ -1,5 +1,6 @@
 """The end of a run tidies its chat's tabs (item 696): the manager tells the browsers, as the run's end is stored and
-before the chat's queue moves on, that a helper's chat may close all its tabs and another chat all but its current one.
+before the chat's queue moves on, that a helper's chat and the chat of a run nobody watches (item 1168) may close all
+their tabs and another chat all but its current one.
 
 The runs play in the real loop with the scripted model; the browsers are only asked, no Chrome starts.
 """
@@ -31,17 +32,21 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 )
 
 
-async def test_a_runs_end_keeps_its_current_tab_and_a_helpers_end_closes_all(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_a_runs_end_keeps_its_current_tab_and_a_helpers_or_a_schedules_end_closes_all(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     config: AppConfig = eval_config(load_default_config())
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     told: list[tuple[str, bool]] = []
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(config, login_env)
         try:
-            await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [_FINISH, _FINISH]))
+            await runtime.router.register(
+                _PROVIDER, ScriptedProvider(_PROVIDER, [_FINISH, _FINISH, _FINISH, _FINISH, _FINISH])
+            )
 
-            async def end_of_run(thread_id: str, *, helper: bool) -> None:
-                told.append((thread_id, helper))
+            async def end_of_run(thread_id: str, *, keep_current: bool) -> None:
+                told.append((thread_id, keep_current))
 
             monkeypatch.setattr(runtime.browsers, "end_of_run", end_of_run)
             manager: RunManager = RunManager(runtime)
@@ -58,6 +63,22 @@ async def test_a_runs_end_keeps_its_current_tab_and_a_helpers_end_closes_all(mon
                         "standard", None, "ask", False, None, None, None,
                     )  # fmt: skip
                     helped: DelegateOutcome = await manager.delegate(asker.id, "Read a page", "task", None, None)
+                    scheduled: RunRecord = await manager.start(
+                        "Check the page", "task", SCRIPTED_MODEL, None, SCHEDULE_SOURCE, None, None, "standard", None,
+                        "ask", False, (),
+                    )  # fmt: skip
+                    scheduled = await manager.wait(scheduled.id)
+                    # A loop of the owner's chat is a schedule's run in it: the chat keeps its tab (item 1168).
+                    owners: RunRecord = await manager.start(
+                        "Open the shop", "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, "ask",
+                        False, (),
+                    )  # fmt: skip
+                    owners = await manager.wait(owners.id)
+                    looped: RunRecord = await manager.start(
+                        "Check the shop again", "task", SCRIPTED_MODEL, owners.thread_id, SCHEDULE_SOURCE, None, None,
+                        "standard", None, "ask", False, (),
+                    )  # fmt: skip
+                    looped = await manager.wait(looped.id)
             finally:
                 await manager.shutdown()
         finally:
@@ -65,7 +86,15 @@ async def test_a_runs_end_keeps_its_current_tab_and_a_helpers_end_closes_all(mon
     assert parent.status == "done", parent
     assert helped.run.status == "done", helped.run
     assert helped.run.thread_id != parent.thread_id
-    assert told == [(parent.thread_id, False), (helped.run.thread_id, True)]
+    assert scheduled.status == "done", scheduled
+    assert looped.status == "done", looped
+    assert told == [
+        (parent.thread_id, True),
+        (helped.run.thread_id, False),
+        (scheduled.thread_id, False),
+        (owners.thread_id, True),
+        (owners.thread_id, True),
+    ]
 
 
 async def test_a_run_nobody_watches_is_marked_for_the_browser_while_it_works(monkeypatch: pytest.MonkeyPatch) -> None:

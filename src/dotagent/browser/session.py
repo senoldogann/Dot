@@ -1715,10 +1715,11 @@ class BrowserSession:
                 _log.info("browser_idle_background_tabs_closed", thread_id=thread_id, tabs=len(closed))
 
     async def end_of_run(self, thread_id: str, *, keep_current: bool) -> None:
-        """Tidy the tabs of a chat whose run has ended (item 696): every one when ``keep_current`` is false (a helper's
-        chat, which no message continues), else every one but the current tab, which stays for a message that goes on
-        from it until ``tab_idle_s``. Nothing is closed while another run works in the chat. Only the chat's own tabs
-        are closed: those of other chats, at work or not, and the owner's tabs are not touched."""
+        """Tidy the tabs of a chat whose run has ended (item 696): every one when ``keep_current`` is false (a chat no
+        message continues: a helper's, one an unwatched run opened, item 1168), else every one but the current tab,
+        which stays for a message that goes on from it until ``tab_idle_s``. Nothing is closed while another run works
+        in the chat. Only the chat's own tabs are closed: those of other chats, at work or not, and the owner's tabs
+        are not touched."""
         thread: ThreadTabs | None = self._threads.get(thread_id)
         if thread is None or thread_id in self._kept():
             return

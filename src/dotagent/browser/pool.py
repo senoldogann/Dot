@@ -78,13 +78,13 @@ class BrowserPool:
     def is_unattended(self, thread_id: str) -> bool:
         return thread_id in self._unattended
 
-    async def end_of_run(self, thread_id: str, *, helper: bool) -> None:
+    async def end_of_run(self, thread_id: str, *, keep_current: bool) -> None:
         """Tidy the chat's tabs in every session once its run has ended (item 696, :meth:`BrowserSession.end_of_run`):
-        all of a helper's, every one but the current tab of another run's. A session that fails to tidy is logged and
-        the others are still tidied."""
+        every one but the current tab when ``keep_current``, else all of them. A session that fails to tidy is logged
+        and the others are still tidied."""
         for session in (self.main, *self._others.values()):
             try:
-                await session.end_of_run(thread_id, keep_current=not helper)
+                await session.end_of_run(thread_id, keep_current=keep_current)
             except Exception:  # noqa: BLE001 - logged with its traceback
                 _log.exception("browser_end_of_run_tidy_failed", thread_id=thread_id, mode=session.mode)
 
