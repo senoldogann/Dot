@@ -227,6 +227,31 @@ def url_shows(url: str, part: str) -> bool:
     return part in urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
 
 
+# What a browser step expects to see after it (item 1145), which a model writes beside the steps of the call as often
+# as on the step (two attempts of fifteen of the speed set on 2026-11-13, each a round trip to write the call again).
+# A desktop step takes the words alone.
+BROWSER_EXPECTATIONS: tuple[str, ...] = ("expect_text", "expect_url")
+DESKTOP_EXPECTATIONS: tuple[str, ...] = ("expect_text",)
+
+
+def expectation_on_last_step(data: object, expectations: tuple[str, ...]) -> object:
+    """An act call (``data``, as the model wrote it) whose fields of ``expectations`` (what its steps expect to see)
+    stand beside its steps, where the call has no such field, with them moved onto its last step (item 1161): the plain
+    meaning of words the page is to show after the batch, as the last step's are. Left as written when the last step
+    has its own, so that the call is refused for the field it does not take, as before: two expectations are not
+    merged."""
+    if not isinstance(data, dict):
+        return data
+    steps: object = data.get("steps")
+    if not isinstance(steps, list) or not steps or not isinstance(steps[-1], dict):
+        return data
+    moved: dict[str, object] = {key: data[key] for key in expectations if key in data and key not in steps[-1]}
+    if not moved or any(key in steps[-1] for key in expectations if key in data):
+        return data
+    rest: dict[str, object] = {key: value for key, value in data.items() if key not in moved}
+    return {**rest, "steps": [*steps[:-1], {**steps[-1], **moved}]}
+
+
 def echoes_written(expected: str, written: Sequence[str]) -> bool:
     """Whether the text a step expects to see is within a text the same batch writes: a page that repeats what was
     typed (a search box's "results for …", an error that quotes it) would show it whatever the step did."""

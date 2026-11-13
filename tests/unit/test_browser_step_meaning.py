@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from dotagent.browser.render import describe_step
 from dotagent.browser.types import Step
 from dotagent.tools.browser import ActArgs
+from dotagent.tools.desktop import ActArgs as DesktopActArgs
 
 
 def test_a_click_at_a_point_with_no_ref_is_a_click_at() -> None:
@@ -64,3 +65,34 @@ def test_text_with_no_field_says_where_the_ref_of_the_field_comes_from() -> None
 def test_an_upload_step_names_the_tool_that_uploads() -> None:
     with pytest.raises(ValidationError, match="call browser_upload"):
         ActArgs.model_validate({"steps": [{"action": "upload", "ref": "e362", "paths": ["/tmp/cv.pdf"]}]})
+
+
+def test_an_expectation_beside_the_steps_is_the_last_steps() -> None:
+    """Item 1161: expect_text or expect_url written beside the steps of a call (two speed-set attempts in fifteen did,
+    each refused and written again) is the last step's, as the words the page is to show after the batch."""
+    args = ActArgs.model_validate(
+        {
+            "steps": [{"action": "fill", "ref": "e1", "text": "Ada"}, {"action": "click", "ref": "e2"}],
+            "expect_text": "Saved",
+        }
+    )
+    assert (args.steps[0].expect_text, args.steps[1].expect_text) == (None, "Saved")
+    after_a_look = ActArgs.model_validate(
+        {"steps": [{"action": "click", "ref": "e9"}, {"action": "snapshot"}], "expect_text": "Thank you"}
+    )
+    assert [(step.action, step.expect_text) for step in after_a_look.steps] == [("click", "Thank you")]
+    to_url = ActArgs.model_validate({"steps": [{"action": "click", "ref": "e2"}], "expect_url": "/done"})
+    assert to_url.steps[0].expect_url == "/done"
+    # The last step's own is not merged with another: the call is refused for the field it does not take, as before.
+    with pytest.raises(ValidationError, match="expect_text"):
+        ActArgs.model_validate(
+            {"steps": [{"action": "click", "ref": "e2", "expect_text": "Saved"}], "expect_text": "Thank you"}
+        )
+
+
+def test_a_desktop_expectation_beside_the_steps_is_the_last_steps() -> None:
+    args = DesktopActArgs.model_validate({"steps": [{"action": "press", "ref": "a7"}], "expect_text": "Saved to notes"})
+    assert args.steps[0].expect_text == "Saved to notes"
+    # A desktop step takes no address: the call is refused for its own field, as before.
+    with pytest.raises(ValidationError, match="expect_url"):
+        DesktopActArgs.model_validate({"steps": [{"action": "press", "ref": "a7"}], "expect_url": "/done"})

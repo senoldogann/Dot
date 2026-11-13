@@ -192,7 +192,9 @@ Both modes share what follows.
   `drag_at`. A step
   written as plainly meant is read so (item 755): a `click` at `x` and `y` with no ref is a `click_at`, a step that only
   looks or waits (`snapshot`, `screenshot`, `look`, a bare `wait`, item 1133) is left out, as the result shows the
-  settled page, and an `upload` step fails naming `browser_upload`. A `fill`, `type` or `insert` with no ref, as after a
+  settled page, an `expect_text` or `expect_url` written beside the steps is the last step's when it has none (item
+  1161; `desktop_act` reads an `expect_text` so too), and an `upload` step fails naming `browser_upload`. A `fill`,
+  `type` or `insert` with no ref, as after a
   `click_at` on a field's pixel, is refused with where the field's ref comes from (`browser_find`, the snapshot, a
   field inside a frame too): text goes only into a field the step names, which the policy weighs (item 1133). After a step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets
   the page take one turn of its event loop, by which Chrome has told of a dialog, a file chooser, a navigation or a tab
