@@ -243,9 +243,10 @@ _TEACH_START_PAGE: str = "https://www.google.com/"
 _TAB_MARK_BYTES: int = 6
 # How long Chrome is given to list its tabs for the error of a new tab it did not hand over (item 1002).
 _ASK_TABS_S: float = 2.0
-# How many pages reported meanwhile the error of a tab not handed over names, and how much of each address.
-_TABS_NAMED: int = 4
-_TAB_URL_CHARS: int = 120
+# What the address of a new tab of Dot's begins with (its mark follows), and what a page that has no address yet
+# is reported with.
+_TAB_MARK: str = "about:blank#dot-"
+_NO_ADDRESS_YET: frozenset[str] = frozenset({"", ":", "about:blank"})
 # Dot's own Chrome at this zoom draws a page at the size it was given, which the page need not be asked for (item 358).
 _UNZOOMED: int = 100
 # The height of a tab given a width alone (``browser_viewport``, item 746): a phone's, 390 by 844 being an iPhone's.
@@ -523,14 +524,27 @@ def idle_background_tabs(thread: ThreadTabs, cutoff: float) -> list[Tab]:
     return [tab for index, tab in enumerate(thread.tabs) if index != thread.active and tab.last_used < cutoff]
 
 
-def reported_meanwhile(urls: Sequence[str]) -> str:
-    """What Playwright reported while a tab that was not handed over was waited for: no page at all, or the pages
-    of others, the first :data:`_TABS_NAMED` by their addresses."""
-    if not urls:
+type ReportedPage = Literal["blank", "new tab of Dot's", "at an address"]
+
+
+def reported_kind(url: str) -> ReportedPage:
+    """What kind of page Playwright reported, by its address when it was reported: blank (which the tab waited for
+    is too, until its address commits), one of the new tabs Dot marks, or a page at an address. The address itself
+    is not kept: in the owner's Chrome it may be of a tab the owner opened, with whatever its query carries."""
+    if url.startswith(_TAB_MARK):
+        return "new tab of Dot's"
+    return "blank" if url in _NO_ADDRESS_YET else "at an address"
+
+
+def reported_meanwhile(kinds: Sequence[ReportedPage]) -> str:
+    """What Playwright reported while a tab that was not handed over was waited for: no page at all, or how many of
+    which kind (:func:`reported_kind`). The tab itself may be among them: one reported and not matched in time (its
+    id not told) shows here, where one never reported does not."""
+    if not kinds:
         return "Playwright reported no page meanwhile"
-    named: str = ", ".join(repr(url) for url in urls[:_TABS_NAMED])
-    more: str = f" and {len(urls) - _TABS_NAMED} more" if len(urls) > _TABS_NAMED else ""
-    return f"Playwright reported {len(urls)} other page{'s' if len(urls) != 1 else ''} meanwhile: {named}{more}"
+    counted: Counter[ReportedPage] = Counter(kinds)
+    parts: str = ", ".join(f"{count} {kind}" for kind, count in sorted(counted.items()))
+    return f"Playwright reported {len(kinds)} page{'s' if len(kinds) != 1 else ''} meanwhile: {parts}"
 
 
 async def _what_chrome_made(cdp: CDPSession, made: str | None) -> str:
@@ -2641,18 +2655,19 @@ class BrowserSession:
         # a plain blank page at once, the address the URL rules and the tab views know.
         # A page Playwright reports before its address committed is told by the id Chrome gave the tab (the review of
         # every module): matched by its address once, it was let pass and the call waited out its time.
-        mark: str = f"about:blank#dot-{secrets.token_hex(_TAB_MARK_BYTES)}"
+        mark: str = f"{_TAB_MARK}{secrets.token_hex(_TAB_MARK_BYTES)}"
         target: dict[str, object] = {"url": mark, "background": True}
         if self._config.mode == "attach":
             target["newWindow"] = True
         cdp: CDPSession = await browser.new_browser_cdp_session()
         arrived: asyncio.Queue[Page] = asyncio.Queue()
-        # The addresses of the pages Playwright reported while this tab was waited for, for the error of a tab that
-        # was not among them (item 1160): none says that Playwright reported nothing, some that it reported others.
-        reported: list[str] = []
+        # What kind of pages Playwright reported while this tab was waited for, for the error of a tab not handed
+        # over (item 1160): none says that Playwright reported nothing, some that it reported pages and none was
+        # matched. Never their addresses.
+        reported: list[ReportedPage] = []
 
         def heard(page: Page) -> None:
-            reported.append(truncate_middle(page.url, _TAB_URL_CHARS))
+            reported.append(reported_kind(page.url))
             arrived.put_nowait(page)
 
         context.on("page", heard)

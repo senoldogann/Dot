@@ -494,8 +494,9 @@ Both modes share what follows.
   error of one not handed over says what Chrome lists of it (item 1002): gone, or its address, whether Playwright
   attached to it and whether it is in the browser context of the other tabs. For a tab Chrome still lists it also
   says whether Chrome names the tab's window, which is the first thing Playwright asks of a new tab before it reports
-  it, and which pages Playwright did report meanwhile (item 1160): the cause of such a tab is not known yet, and
-  these tell the browser's side of the handover from the page's the next time it happens. A
+  it, and how many pages Playwright did report meanwhile and of what kind (blank, a new tab of Dot's, or at an
+  address, which is never named: in the owner's Chrome it may be a tab of the owner's; item 1160). The cause of such
+  a tab is not known yet, and these tell the browser's side of the handover from the page's the next time. A
   quiet read's tab is closed the way it was made, through Chrome's own `Target.closeTarget`: Playwright's close never
   came back for a tab whose failed navigation Chrome was still committing its error page in (item 960).
   macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own

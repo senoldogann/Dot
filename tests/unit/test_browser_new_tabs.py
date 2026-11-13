@@ -193,13 +193,16 @@ async def test_a_tab_not_handed_over_says_whether_chrome_names_its_window_and_wh
     with pytest.raises(BrowserError, match="opening a tab failed") as failed:
         await _tab_session()._background_tab(cast(Any, context))
     assert failed.value.context["chrome"].endswith("; Chrome did not name the tab's window within 0.05 s")
-    assert failed.value.context["reported"] == (
-        "Playwright reported 1 other page meanwhile: 'https://shop.example/basket'"
-    )
+    # The page is told by its kind and never by its address: in the owner's Chrome it may be a tab of the owner's.
+    assert failed.value.context["reported"] == "Playwright reported 1 page meanwhile: 1 at an address"
+    assert "shop.example" not in str(failed.value.context)
     assert _closed(context)
-    assert session.reported_meanwhile([f"https://a/{n}" for n in range(6)]) == (
-        "Playwright reported 6 other pages meanwhile: 'https://a/0', 'https://a/1', 'https://a/2', 'https://a/3' "
-        "and 2 more"
+    kinds = [
+        session.reported_kind(url) for url in ("", "about:blank", "about:blank#dot-0a1b", "https://a/?code=s3cret")
+    ]
+    assert kinds == ["blank", "blank", "new tab of Dot's", "at an address"]
+    assert session.reported_meanwhile(kinds) == (
+        "Playwright reported 4 pages meanwhile: 1 at an address, 2 blank, 1 new tab of Dot's"
     )
 
 
