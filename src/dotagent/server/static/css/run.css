@@ -142,6 +142,26 @@
   display: none;
 }
 
+/* What the run says on the way to its calls ("Checking the domain now") is its work told, not a message (item 1131, the
+   owner's ask after a screenshot of ten such lines one under another): it folds with the steps, and the line under the
+   conversation says the newest of it while the run works. Shown with the steps, it reads as a quiet note among them. */
+:root[data-work="status"] .run-thread:not(.steps-shown) .say-progress {
+  display: none;
+}
+
+.run-thread :is(.bubble.say, .turn-say).say-progress,
+.run-thread :is(.bubble.say, .turn-say).say-progress > .prose {
+  background: none;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* No bubble on a phone (run.css gives its words one): the words start on the conversation's lane, as the answer's. */
+.run-thread :is(.bubble.say, .turn-say).say-progress > .prose {
+  padding-inline: 0;
+}
+
 /* What the run saved to memory is the run's bookkeeping, not what it says: with "What it is doing" chosen it stands with
    the steps, out of the conversation until they are shown (item 830). */
 :root[data-work="status"] .run-thread:not(.steps-shown) .note.memory-line {

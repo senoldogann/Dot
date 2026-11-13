@@ -15,7 +15,7 @@
 // the face, as before.
 
 import { clip, el, setText } from "./dom.js";
-import { callKind, describeArguments } from "./tools.js";
+import { callKind, describeArguments, narrates } from "./tools.js";
 
 // How long one phrase stands before the next words for the same work take its place.
 const TURN_MS = 4000;
@@ -52,6 +52,17 @@ const DETAILED = {
   search: (detail) => `Searching the web for “${clip(detail, DETAIL_CHARS)}”`,
   page: (detail) => `Reading ${clip(hostOf(detail), DETAIL_CHARS)}`,
 };
+
+/** What a step's message says it does next, as the line says it (item 1131): its first line, without the marks of
+ * markdown or the stop at its end ("Kanıt netleşti. Son bir kontrol yapıp sonucu yazıyorum." stays whole). */
+function toldWords(text) {
+  const first = text.trim().split("\n")[0] ?? "";
+  return first
+    .replace(/[*_`#>]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.:;…]+$/u, "");
+}
 
 /** The name a path ends with ("README.md" of "~/work/README.md"). */
 function lastPart(path) {
@@ -99,8 +110,14 @@ export function createWorkStatus({ rootRunId, active, onToggle, face = null }) {
   let quiet = false;
   let shown = false;
   let timer = 0;
+  // What the run's latest message said it does next (item 1131), "" once a step says nothing: the line says it while
+  // the step's calls run and the model is asked again, as the message folded with the steps.
+  let told = "";
 
   function phrase() {
+    if (told !== "") {
+      return told;
+    }
     if (detail !== "") {
       return detail;
     }
@@ -172,7 +189,13 @@ export function createWorkStatus({ rootRunId, active, onToggle, face = null }) {
     }
     // The model is asked again once the last of the step's calls came back, and `model_call` is told when an answer
     // came: in between the run waits for the model, which is it typing.
-    if (record.kind === "model_call" || (record.kind === "tool_result" && open === 0)) {
+    if (record.kind === "assistant") {
+      const text = typeof data.text === "string" ? data.text : "";
+      told = text.trim() !== "" && narrates(Array.isArray(data.tool_calls) ? data.tool_calls : []) ? toldWords(text) : "";
+      quiet = false;
+      restart();
+      paint();
+    } else if (record.kind === "model_call" || (record.kind === "tool_result" && open === 0)) {
       become("typing");
     } else if (record.kind === "delta" && data.kind === "thinking") {
       become("thinking");
@@ -201,6 +224,7 @@ export function createWorkStatus({ rootRunId, active, onToggle, face = null }) {
     if (value !== working) {
       working = value;
       if (working) {
+        told = "";
         kind = "typing";
         name = "";
         detail = "";

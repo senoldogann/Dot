@@ -10,7 +10,7 @@ import { answerMessage, besideLine, chatNoteLine,
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
-import { countKinds, flowIcon, flowWords, toolRow } from "./tools.js";
+import { countKinds, flowIcon, flowWords, narrates, toolRow } from "./tools.js";
 
 const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read before the page is drawn (items 374 and 708), side by side: they stand right
@@ -220,7 +220,7 @@ function drawFlow(past, flow, asked, events, reactions) {
       const said = (event.data.text ?? "").trim();
       if (said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer)) {
         batch = null;
-        blocks.push({ say: said, step: event.data.step });
+        blocks.push({ say: said, step: event.data.step, progress: narrates(event.data.tool_calls ?? []) });
       }
     } else if (event.kind === "attachments" && message !== null) {
       files = event.data.files;
@@ -304,7 +304,7 @@ function drawFlow(past, flow, asked, events, reactions) {
       ? el("div", { class: "note" }, icon("hand"), el("span", null, block.kept))
       : block.say === undefined
         ? stepsBlock(block)
-        : el("div", { class: "turn-say" }, prose(block.say), reactions === null ? null : sayFoot(reactions, past.id, stepMessage(block.step))),
+        : el("div", { class: block.progress ? "turn-say say-progress" : "turn-say" }, prose(block.say), reactions === null ? null : sayFoot(reactions, past.id, stepMessage(block.step))),
   );
   keepPlace(flow, () => {
     if (files !== null) {
