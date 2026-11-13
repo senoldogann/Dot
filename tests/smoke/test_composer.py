@@ -704,10 +704,11 @@ async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) ->
     await menu.get_by_role("tab", name="Mode", exact=True).click()
     await expect(menu.get_by_role("listbox", name="Mode", exact=True)).to_be_visible()
     await menu.get_by_role("tab", name="Options", exact=True).click()
+    # The approval mode is no part of the model's name (the owner read "Pay or send" as one).
     await menu.locator(".pop-option[data-mode='yolo']").click()
-    await expect(model).to_contain_text("Pay or send")
-    await menu.locator(".pop-option[data-mode='ask']").click()
+    await expect(menu.locator(".pop-option[data-mode='yolo']")).to_have_attribute("aria-selected", "true")
     await expect(model).not_to_contain_text("Pay or send")
+    await menu.locator(".pop-option[data-mode='ask']").click()
     # A pick repaints the menu (item 1128): the box keeps its line, and the menu stays over it, its tabs in sight.
     await menu.locator(".pop-option[data-mode='yolo']").click()
     await expect(composer).not_to_have_attribute("data-quiet", "")
