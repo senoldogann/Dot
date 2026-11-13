@@ -55,7 +55,7 @@ WorkOrderStatus = Literal["assigned", "working", "in_review", "returned", "accep
 # Where a meeting Dot was asked to join stands (item 1138): asked in, waiting to be let in, in the call, or over (it
 # ended, Dot left, or it failed: its note says which).
 MeetingStatus = Literal["joining", "waiting", "in_call", "ended", "failed"]
-MeetingLineKind = Literal["caption", "chat"]
+MeetingLineKind = Literal["caption", "chat", "dot"]
 # The moves between them: the store refuses any other, so that a late end of an attempt cannot undo a verdict. A move
 # to the status an order has changes only its note and the rest.
 WORK_ORDER_MOVES: dict[WorkOrderStatus, frozenset[WorkOrderStatus]] = {

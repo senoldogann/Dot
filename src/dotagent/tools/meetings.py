@@ -2,8 +2,9 @@
 far, post in its chat, and leave. The meeting is watched by the daemon's desk (:mod:`dotagent.meetings.desk`) with no
 model; these tools only start it, read its record and ask it to act.
 
-- ``meeting_join`` takes the address the owner gave; Dot joins as itself, with camera and microphone off, and takes
-  no note before the meeting is told, on the owner's yes.
+- ``meeting_join`` takes the address the owner gave; Dot joins as itself, with camera and microphone off, tells the
+  meeting it is there before it keeps a word, and answers whoever speaks to it (item 1150). A join that is not the
+  owner's own word (the run or its chat read outside content, or Dot opened the chat) asks the owner first.
 - ``meeting_read`` gives the notes and the newest lines: other people's words, so its result is untrusted and the run
   reads them as it reads a web page.
 - ``meeting_post`` asks the owner itself, with the words whole, every time and in every mode: the gate classifies it
@@ -19,6 +20,7 @@ from dotagent.meetings.desk import MEETING_LEAVE_TOOL, POST_CHARS, MeetingDesk, 
 from dotagent.meetings.meet import MeetPageError
 from dotagent.meetings.notes import MeetingNotes, notes_text
 from dotagent.policy.types import ActionInfo
+from dotagent.proactive import INITIATIVE_SOURCE
 from dotagent.store.models import MeetingLineRecord, MeetingRecord
 from dotagent.tools.base import ACTING_MODES, ALL_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, ok
 from dotagent.tools.context import ToolContext
@@ -97,14 +99,25 @@ def _failed(error: MeetingError | MeetPageError) -> ToolResult:
     return ToolResult(text=f"{error.message}.", images=(), is_error=True)
 
 
+async def _not_owners_word(ctx: ToolContext) -> str | None:
+    """Why the join is not the owner's own word, or ``None`` when it is (item 1150): the run or its chat read outside
+    content, or the chat is one Dot opened on its own. A link in a mail or an invitation is no word of the owner's, so
+    the desk asks, and says which."""
+    if ctx.ever_tainted() or await ctx.runtime.store.chat_ever_tainted(ctx.thread_id):
+        return "the task or its chat read outside content (a page, a mail, an invitation)"
+    if await ctx.runtime.store.opened_by(ctx.thread_id) == INITIATIVE_SOURCE:
+        return "Dot opened this chat on its own"
+    return None
+
+
 async def _join(args: JoinArgs, ctx: ToolContext) -> ToolResult:
     try:
-        meeting: MeetingRecord = await _desk(ctx).join(args.url, ctx.thread_id, ctx.run_id)
+        meeting: MeetingRecord = await _desk(ctx).join(args.url, ctx.thread_id, ctx.run_id, await _not_owners_word(ctx))
     except (MeetingError, MeetPageError) as error:
         return _failed(error)
     return ok(
-        f"Dot is in the meeting ({meeting.id}) and takes notes; the meeting was told. Its notes come to this chat when "
-        "it ends; meeting_read gives them sooner."
+        f"Dot is in the meeting ({meeting.id}), takes notes and answers whoever speaks to it there; the meeting was "
+        "told. Its notes come to this chat when it ends; meeting_read gives them sooner."
     )
 
 
@@ -209,8 +222,8 @@ def build_meeting_tools() -> tuple[RegisteredTool, ...]:
         make_tool(
             name=MEETING_JOIN_TOOL,
             description=(
-                "Join the owner's Google Meet call at the address they gave, as Dot, camera and microphone off, and "
-                "take notes. The meeting is told first, on the owner's yes. Only when the owner asks."
+                "Join the owner's Google Meet call at the address they gave, as Dot, camera and microphone off: it "
+                "takes notes and answers who asks it. Only when the owner asks."
             ),
             args_model=JoinArgs,
             modes=ACTING_MODES,
