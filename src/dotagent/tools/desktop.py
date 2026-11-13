@@ -17,7 +17,7 @@ from pydantic import Field, model_validator
 
 from dotagent.config import AppConfig
 from dotagent.core.errors import DesktopError, NotFoundError, ToolInputError
-from dotagent.core.outcomes import echoes_written
+from dotagent.core.outcomes import DESKTOP_EXPECTATIONS, echoes_written, expectation_on_last_step
 from dotagent.core.text import truncate_tail
 from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
 from dotagent.desktop.apps import bundle_path
@@ -368,6 +368,11 @@ class ActArgs(ToolArgs):
     app: str | None = Field(
         default=None, description="Application name, bundle id or pid. Default: the application you are working in."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _expectation_on_last_step(cls, data: object) -> object:
+        return expectation_on_last_step(data, DESKTOP_EXPECTATIONS)
 
     @model_validator(mode="after")
     def _expects_what_only_the_result_shows(self) -> Self:

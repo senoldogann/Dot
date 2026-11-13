@@ -73,7 +73,7 @@ from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import DotError, ToolExecutionError, ToolInputError
 from dotagent.core.held import held_folder, open_regular
 from dotagent.core.logs import get_logger
-from dotagent.core.outcomes import echoes_written
+from dotagent.core.outcomes import BROWSER_EXPECTATIONS, echoes_written, expectation_on_last_step
 from dotagent.core.paths import uploads_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData
@@ -377,7 +377,8 @@ class ActArgs(ToolArgs):
             for step in data["steps"]
             if not (isinstance(step, dict) and step.get("action") in _LOOKING_STEPS and len(step) == 1)
         ]
-        return {**data, "steps": steps or data["steps"]}
+        # The looks go first, so that an expectation beside the steps lands on the last step that acts (item 1161).
+        return expectation_on_last_step({**data, "steps": steps or data["steps"]}, BROWSER_EXPECTATIONS)
 
     @model_validator(mode="after")
     def _expects_what_only_the_result_shows(self) -> Self:
