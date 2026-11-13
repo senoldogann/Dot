@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from Foundation import NSData
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, JsonValue
 from Quartz import PDFDocument
 
 from dotagent.core.errors import ToolExecutionError
@@ -361,6 +361,10 @@ def _write_file_tool() -> RegisteredTool:
     )
 
 
+# How many lines an ambiguous edit names at most (item 1145).
+_MAX_LINES_NAMED: int = 20
+
+
 class EditFileArgs(ToolArgs):
     path: str = Field(description="File to edit.")
     # Never empty (item 556): an empty text is found between every two characters, and replace_all wrote new there.
@@ -382,6 +386,19 @@ def _closest_lines(text: str, needle: str) -> str:
         first, [line.strip() for line in text.splitlines()], n=3, cutoff=0.6
     )
     return "; ".join(repr(candidate) for candidate in candidates)
+
+
+def _lines_of(text: str, needle: str) -> list[int]:
+    """The line (1-based) where each of the first ``_MAX_LINES_NAMED`` occurrences of ``needle`` in ``text`` starts,
+    counted as :meth:`str.count` counts them (item 1145): an ambiguous edit names where its text is, so the model widens
+    it from the lines it read rather than reading the file again. Numbers only, so a third party's file says nothing of
+    its own through them."""
+    found: list[int] = []
+    start: int = text.find(needle)
+    while start != -1 and len(found) < _MAX_LINES_NAMED:
+        found.append(text.count("\n", 0, start) + 1)
+        start = text.find(needle, start + len(needle))
+    return found
 
 
 def _crlf_only(text: str) -> bool:
@@ -420,8 +437,10 @@ def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: J
             "the text to replace was not found; re-read the file and copy it exactly", {"path": str(path), **closest}
         )
     if occurrences > 1 and not replace_all:
+        at_lines: list[JsonValue] = list(_lines_of(text, old))
         raise ToolExecutionError(
-            f"the text occurs {occurrences} times; add surrounding context or set replace_all", {"path": str(path)}
+            f"the text occurs {occurrences} times; add surrounding context or set replace_all",
+            {"path": str(path), "at_lines": at_lines},
         )
     updated: str = text.replace(old, new) if replace_all else text.replace(old, new, 1)
     atomic_write(path, updated, journal)
