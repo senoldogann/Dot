@@ -382,7 +382,8 @@ async def test_scrolling_up_a_chat_whose_turns_fill_in_keeps_the_message_read_wh
     filling: tuple[str, list[RunRecord]], phone: bool
 ) -> None:
     """A turn above the reader filled while it was skipped grew with nothing to keep their place: WebKit moved the
-    message read by 4 to 20 px a step, which `main` did not. A turn is laid out for good before it is filled."""
+    message read by 4 to 20 px a step, which `main` did not. A turn is laid out while it is filled, and skipped again
+    after."""
     address, runs = filling
     read: list[str] = []
     async with async_playwright() as playwright:
