@@ -186,6 +186,9 @@ def test_a_guess_a_step_carries_is_the_calls_and_none_is_dropped() -> None:
     assert len(long) < 300 < len(f"{long}; the results list")
     assert guesses_to_the_call({"expect": long, "steps": [guessed]}) == {"steps": [click], "expect": long}
     assert BrowserActArgs.model_validate({"expect": long, "steps": [guessed]}).expect == long
+    # A step's guess longer than the call's may be is cut to that length, not refused under the call's name.
+    wordy: dict[str, object] = {**click, "expect": "the confirmation " * 30}
+    assert len(BrowserActArgs.model_validate({"steps": [wordy]}).expect or "") == 300
     # Through the tool's arguments, beside item 1161's reading of words written beside the steps: a step that only
     # looks is left out first, the words are the last step's, and the guess is the call's.
     args: BrowserActArgs = BrowserActArgs.model_validate(
