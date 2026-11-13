@@ -1364,6 +1364,8 @@ async def _tick(locator: Locator, asked: bool, timeout_ms: int, through_label: b
     except PlaywrightError as error:
         if _TICK_NOT_KEPT not in str(error):
             raise
+        # Kept in the log: where the step's own reading then finds the box as asked, Playwright had read too early.
+        _log.info("browser_box_read_early", url=truncate_middle(locator.page.url, _ERROR_CHARS), asked=asked)
     return await _ticked(locator, asked, timeout_ms)
 
 
