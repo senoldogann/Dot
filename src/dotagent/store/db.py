@@ -38,6 +38,7 @@ from dotagent.store.models import (
     NO_PICKS,
     OBJECTIVE_MOVES,
     OCCUPIED_STATUSES,
+    OWNER_EDIT,
     TAINT_EVENTS,
     WORK_ORDER_MOVES,
     WORKING_STATUSES,
@@ -1147,6 +1148,7 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         merged_from=_merged_sources(row["merged_from"], row["id"]),
         pinned_at=row["pinned_at"],
         rested_at=row["rested_at"],
+        edited_by=row["edited_by"],
     )
 
 
@@ -1306,6 +1308,8 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("merged_from", "TEXT"),
     ("pinned_at", "REAL"),
     ("rested_at", "REAL"),
+    # The owner corrected a note a run wrote (the Memory page, item 1141). NULL until then, and before the column.
+    ("edited_by", "TEXT"),
 )
 # The status of a schedule switched off because the agent its runs ran as was deleted (item 462); switching it on
 # again, as Dot or as another agent, clears it as it clears item 458's.
@@ -5609,8 +5613,11 @@ class Store:
         tainted: bool,
     ) -> MemoryRecord:
         """Rewrite a memory's text and tags, written now by ``source_run``. A tainted run's rewrite marks the note
-        tainted; a clean one leaves the mark a note had."""
-        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted))
+        tainted; a clean one leaves the mark a note had. The owner's correction mark comes off: this text is the
+        run's."""
+        return await self._rewrite_memory(
+            memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted), None
+        )
 
     @_writing
     async def update_memory_vouched(
@@ -5623,8 +5630,8 @@ class Store:
     ) -> MemoryRecord:
         """The user's rewrite of a memory's text and tags, as :meth:`update_memory`; in the same write the mark of
         having been saved while reading outside content comes off, as the user vouches for the text they save (item
-        384)."""
-        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "?", 0)
+        384), and the note is marked as the owner's correction so a run that wrote it is handed the new text."""
+        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "?", 0, OWNER_EDIT)
 
     async def _rewrite_memory(
         self,
@@ -5635,12 +5642,15 @@ class Store:
         source_run: str | None,
         mark: Literal["MAX(tainted, ?)", "?"],
         tainted: int,
+        edited_by: str | None,
     ) -> MemoryRecord:
-        """The statements of a rewrite, committed together; ``mark`` is how the note's mark is set from ``tainted``."""
+        """The statements of a rewrite, committed together; ``mark`` is how the note's mark is set from ``tainted``,
+        and ``edited_by`` is who corrected it apart from the author (``None`` when the rewrite is a run's)."""
         tag_text: str = ",".join(tags)
         updated = await self._db.execute(
-            f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark} WHERE id = ?",
-            (content, tag_text, time.time(), source_run, tainted, memory_id),
+            f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark},"
+            " edited_by = ? WHERE id = ?",
+            (content, tag_text, time.time(), source_run, tainted, edited_by, memory_id),
         )
         if updated.rowcount == 0:
             # The note was deleted while its rewrite waited on the embedding (item 556): nothing of it is written, as
@@ -6006,8 +6016,8 @@ class Store:
             tag_text: str = ",".join(record.tags)
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, used_count,"
-                " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at)"
-                " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL)",
+                " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at,"
+                " edited_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?)",
                 (
                     record.id,
                     record.content,
@@ -6022,6 +6032,7 @@ class Store:
                     int(record.tainted),
                     _MERGED_SOURCES.dump_json(record.merged_from).decode() if record.merged_from else None,
                     record.pinned_at,
+                    record.edited_by,
                 ),
             )
             await self._db.execute(
@@ -6115,11 +6126,14 @@ class Store:
         return [_memory(row) for row in rows]
 
     async def memories_changed_since(self, since: float, run_id: str) -> list[MemoryRecord]:
-        """Notes written or changed after ``since`` that the run ``run_id`` did not save itself, oldest first."""
+        """Notes written or changed after ``since`` that the run ``run_id`` did not write itself, oldest first. A note
+        the run authored and the owner then corrected (``edited_by`` is the owner, item 1141) is one of them: the
+        author stays the run, and the correction is still a change the run is handed. The run's own save and its own
+        rewrite are not."""
         rows = await self._all(
-            "SELECT * FROM memories WHERE updated_at > ? AND (source_run IS NULL OR source_run != ?) "
-            "ORDER BY updated_at",
-            (since, run_id),
+            "SELECT * FROM memories WHERE updated_at > ? AND ("
+            " source_run IS NULL OR source_run != ? OR edited_by = ?) ORDER BY updated_at",
+            (since, run_id, OWNER_EDIT),
         )
         return [_memory(row) for row in rows]
 
