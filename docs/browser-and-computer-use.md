@@ -235,9 +235,9 @@ Both modes share what follows.
   through; it does not say that what the step was for happened. Beside it stands each check: **verified** (Dot saw it),
   **contradicted** (Dot read the opposite), **uncertain** (sent, and its result was not seen), or **not checked**
   (nothing was looked at). A failed step says whether it went out: not sent (a ref that is gone, an option the dropdown
-  does not have, a click something in front took, a click or a hover whose element was not shown, enabled and still
-  in time (a button that stayed disabled too), which Playwright's own log tells as tried and never made, item 1158),
-  sent, or may have been sent.
+  does not have, a click something in front took, a click whose element was not shown, enabled and still in time (a
+  button that stayed disabled too) or a hover whose element was not shown and still, which Playwright's own log
+  tells as tried and never made, item 1158), sent, or may have been sent.
   The line above the result counts them.
 - A press (a click, a double or right click, a check or uncheck) first looks whether its element takes the pointer
   (item 1153): Playwright's own trial of it, which sends nothing and lets the cookie banner's decliner run, twice for at
