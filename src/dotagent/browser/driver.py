@@ -1041,6 +1041,38 @@ _FIELD_READ_SCRIPT: str = (
   return { kind: 'value', value: field.value, label: '' };
 }"""
 )
+# One answer of the page where a step asked two, one after the other (item 1151: three more round trips to the page
+# for each field a form's batch wrote made a form of eleven steps 0.2 s slower, measured on a local page).
+# Before the step: the marking its secret check reads, exactly as :data:`_FIELD_MARKING_SCRIPT` gives it, with what
+# the field holds. A reading that throws is no reading and leaves the marking as it is: the secret check never
+# depends on it.
+_MARKED_READ_SCRIPT: str = (
+    "(element, args) => ({ marking: ("
+    + _FIELD_MARKING_SCRIPT
+    + ")(element), reading: (() => { try { return ("
+    + _FIELD_READ_SCRIPT
+    + ")(element, args); } catch (error) { return null; } })() })"
+)
+# After the step: the field once the page took a turn of its event loop, so that a page that puts its own value back
+# has done so; the turn is the frame's own, which a field in a frame of another site needs.
+_TURN_SCRIPT_HEAD: str = "await new Promise((resolve) => setTimeout(resolve, 0));"
+_TURN_READ_SCRIPT: str = (
+    "async (element, args) => { " + _TURN_SCRIPT_HEAD + " return (" + _FIELD_READ_SCRIPT + ")(element, args); }"
+)
+# After a tick: whether the box is ticked once the page took its turn; null for what is no box this script knows (a
+# state that is neither true nor false), which Playwright is then asked.
+_TURN_TICKED_SCRIPT: str = (
+    "async (element) => {\n"
+    + _CONTROL_OF
+    + "\n  "
+    + _TURN_SCRIPT_HEAD
+    + """
+  const field = controlOf(element);
+  if (field instanceof HTMLInputElement && (field.type === 'checkbox' || field.type === 'radio')) return field.checked;
+  const state = field.getAttribute('aria-checked');
+  return state === 'true' ? true : state === 'false' ? false : null;
+}"""
+)
 # How long a field that is as it was is looked at again before a step is said not to have written into it: a page
 # that takes a key a moment late has it by then.
 _READ_BACK_WAIT_S: float = 0.3
@@ -1060,31 +1092,52 @@ class FieldReading:
     label: str
 
 
-async def _read_field(locator: Locator) -> FieldReading:
-    """What the field ``locator`` names holds (:class:`FieldReading`); a page that does not answer, or an element that
-    is gone, is ``unreadable``."""
-    try:
-        raw: object = await locator.evaluate(
-            _FIELD_READ_SCRIPT,
-            [f"{secret_selector()}, {_FILLED_SELECTOR}", _READ_BACK_CHARS],
-            timeout=_FIELD_PROBE_TIMEOUT_MS,
-        )
-    except (PlaywrightError, TimeoutError) as error:
-        # The step's check says that the field could not be read; why is kept here.
-        _log.warning(
-            "browser_field_unread",
-            url=truncate_middle(locator.page.url, _ERROR_CHARS),
-            error=truncate_middle(str(error), _ERROR_CHARS),
-        )
-        return FieldReading(kind="unreadable", value="", label="")
+_UNREAD: FieldReading = FieldReading(kind="unreadable", value="", label="")
+
+
+def _read_args() -> list[str | int]:
+    """What :data:`_FIELD_READ_SCRIPT` is given: the fields whose value never leaves the page, and the longest text a
+    reading carries."""
+    return [f"{secret_selector()}, {_FILLED_SELECTOR}", _READ_BACK_CHARS]
+
+
+def _unread(locator: Locator, why: str) -> FieldReading:
+    """A field that could not be read: the step's check says so, and why is kept in the log."""
+    _log.warning("browser_field_unread", url=truncate_middle(locator.page.url, _ERROR_CHARS), error=why)
+    return _UNREAD
+
+
+def _reading_of(raw: object, locator: Locator) -> FieldReading:
+    """What :data:`_FIELD_READ_SCRIPT` answered, as a reading; anything else is ``unreadable``."""
     if not isinstance(raw, dict) or raw.get("kind") not in ("value", "secret", "none"):
-        _log.warning("browser_field_unread", url=truncate_middle(locator.page.url, _ERROR_CHARS), error="no answer")
-        return FieldReading(kind="unreadable", value="", label="")
+        return _unread(locator, "no answer")
     value: object = raw.get("value")
     label: object = raw.get("label")
     return FieldReading(
         kind=raw["kind"], value=value if isinstance(value, str) else "", label=label if isinstance(label, str) else ""
     )
+
+
+async def _read_field(locator: Locator) -> FieldReading:
+    """What the field ``locator`` names holds (:class:`FieldReading`); a page that does not answer, or an element that
+    is gone, is ``unreadable``."""
+    try:
+        raw: object = await locator.evaluate(_FIELD_READ_SCRIPT, _read_args(), timeout=_FIELD_PROBE_TIMEOUT_MS)
+    except (PlaywrightError, TimeoutError) as error:
+        return _unread(locator, truncate_middle(str(error), _ERROR_CHARS))
+    return _reading_of(raw, locator)
+
+
+async def _marked_reading(locator: Locator) -> tuple[object, FieldReading]:
+    """The marking of the field ``locator`` names, which the step's secret check reads, and what the field holds
+    before the step, in one answer of the page (:data:`_MARKED_READ_SCRIPT`, item 1151). A page that does not answer
+    fails the step, as asking for the marking alone did; an answer that is not the script's is no marking to go by."""
+    raw: object = await locator.evaluate(_MARKED_READ_SCRIPT, _read_args())
+    if not isinstance(raw, dict) or "marking" not in raw:
+        raise BrowserError(
+            "the field could not be read before the step; take a new snapshot", {"url": locator.page.url}
+        )
+    return raw["marking"], _reading_of(raw.get("reading"), locator)
 
 
 def _shows_option(reading: FieldReading, wanted: str) -> bool:
@@ -1103,17 +1156,18 @@ def _never(reading: FieldReading) -> bool:
 
 
 async def _read_after(
-    page: Page, locator: Locator, before: FieldReading, timeout_ms: int, holds: Callable[[FieldReading], bool]
+    locator: Locator, before: FieldReading, timeout_ms: int, holds: Callable[[FieldReading], bool]
 ) -> FieldReading:
     """The field once the page took a turn after a step wrote into it, so that a page that puts its own value back
-    has done so. A field that is as it was is read again for :data:`_READ_BACK_WAIT_S`, since only then did it not
-    take what was written; unless it holds what was asked already (``holds``), which leaves nothing to wait for."""
+    has done so, the turn and the reading in one answer of the page (:data:`_TURN_READ_SCRIPT`), given the time a
+    step is given: a page at work is slow, not unreadable. A field that is as it was is read again for
+    :data:`_READ_BACK_WAIT_S`, since only then did it not take what was written; unless it holds what was asked
+    already (``holds``), which leaves nothing to wait for."""
     try:
-        await let_page_turn(page, timeout_ms)
-    except BrowserError as error:
-        _log.warning("browser_field_unread", url=truncate_middle(page.url, _ERROR_CHARS), error=error.message)
-        return FieldReading(kind="unreadable", value="", label="")
-    after: FieldReading = await _read_field(locator)
+        raw: object = await locator.evaluate(_TURN_READ_SCRIPT, _read_args(), timeout=timeout_ms)
+    except (PlaywrightError, TimeoutError) as error:
+        return _unread(locator, truncate_middle(str(error), _ERROR_CHARS))
+    after: FieldReading = _reading_of(raw, locator)
     waited: float = 0.0
     while after == before and after.kind == "value" and not holds(after) and waited < _READ_BACK_WAIT_S:
         await asyncio.sleep(_READ_BACK_POLL_S)
@@ -1181,18 +1235,15 @@ def _chosen(before: FieldReading, after: FieldReading, wanted: str) -> StepResul
     return StepResult(checks=(judge_chosen(_shows_option(after, wanted), after == before),), note="")
 
 
-async def _ticked(page: Page, locator: Locator, asked: bool, timeout_ms: int) -> StepResult:
-    """The check of a step that ticked or cleared a box, read once the page took a turn: a page that puts the box
-    back has done so by then."""
+async def _ticked(locator: Locator, asked: bool, timeout_ms: int) -> StepResult:
+    """The check of a step that ticked or cleared a box, read once the page took a turn, in one answer of the page
+    (:data:`_TURN_TICKED_SCRIPT`): a page that puts the box back has done so by then. A box whose state the script
+    does not know is asked of Playwright."""
     try:
-        await let_page_turn(page, timeout_ms)
-        now: bool = await locator.is_checked(timeout=_FIELD_PROBE_TIMEOUT_MS)
-    except (PlaywrightError, BrowserError) as error:
-        _log.warning(
-            "browser_field_unread",
-            url=truncate_middle(page.url, _ERROR_CHARS),
-            error=truncate_middle(str(error), _ERROR_CHARS),
-        )
+        raw: object = await locator.evaluate(_TURN_TICKED_SCRIPT, timeout=timeout_ms)
+        now: bool = raw if isinstance(raw, bool) else await locator.is_checked(timeout=_FIELD_PROBE_TIMEOUT_MS)
+    except (PlaywrightError, TimeoutError) as error:
+        _unread(locator, truncate_middle(str(error), _ERROR_CHARS))
         return _unreadable(f"the box is {'ticked' if asked else 'clear'}")
     return StepResult(checks=(judge_ticked(asked, now),), note="")
 
@@ -1459,9 +1510,8 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             case "hover":
                 await locator.hover(timeout=timeout_ms)
             case "fill":
-                await _check_secret_field(
-                    page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field, _text_of(step)
-                )
+                marking, held = await _marked_reading(locator)
+                await _check_secret_field(page, marking, ref, secret_field, _text_of(step))
                 edited: StepResult | None = await _into_editor(
                     page,
                     locator,
@@ -1473,10 +1523,8 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                 )
                 if edited is not None:
                     return edited
-                held: FieldReading = await _read_field(locator)
                 await locator.fill(_text_of(step), timeout=timeout_ms)
                 filled: FieldReading = await _read_after(
-                    page,
                     locator,
                     held,
                     timeout_ms,
@@ -1500,7 +1548,7 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                 await _check_secret_field(page, await _focused_marking(page), ref, secret_field, _text_of(step))
                 held = await _read_field(locator)
                 await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
-                return await _keyed(page, locator, held, _text_of(step), timeout_ms)
+                return await _keyed(locator, held, _text_of(step), timeout_ms)
             case "insert":
                 edited = await _into_editor(
                     page,
@@ -1522,7 +1570,7 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     )
                 held = await _read_field(locator)
                 await page.keyboard.insert_text(_text_of(step))
-                return await _keyed(page, locator, held, _text_of(step), timeout_ms)
+                return await _keyed(locator, held, _text_of(step), timeout_ms)
             case "drag":
                 target: Locator = await _step_locator(page, _to_ref_of(step), "drag")
                 await _check_secret_field(
@@ -1534,13 +1582,11 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     await page.mouse.up()  # a drag that fails or is cancelled after the press leaves the button down
                     raise
             case "select":
-                await _check_secret_field(
-                    page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field, _text_of(step)
-                )
-                held = await _read_field(locator)
+                marking, held = await _marked_reading(locator)
+                await _check_secret_field(page, marking, ref, secret_field, _text_of(step))
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
                 chosen: FieldReading = await _read_after(
-                    page, locator, held, timeout_ms, lambda reading: _shows_option(reading, _text_of(step))
+                    locator, held, timeout_ms, lambda reading: _shows_option(reading, _text_of(step))
                 )
                 return _chosen(held, chosen, _text_of(step))
             case "press":
@@ -1550,10 +1596,10 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                 await locator.press(_key_of(step), timeout=timeout_ms)
             case "check":
                 await locator.check(timeout=timeout_ms)
-                return await _ticked(page, locator, True, timeout_ms)
+                return await _ticked(locator, True, timeout_ms)
             case "uncheck":
                 await locator.uncheck(timeout=timeout_ms)
-                return await _ticked(page, locator, False, timeout_ms)
+                return await _ticked(locator, False, timeout_ms)
             case "scroll_into_view":
                 await locator.scroll_into_view_if_needed(timeout=timeout_ms)
             case "click_at":
@@ -1563,12 +1609,12 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
     return _NO_CHECK
 
 
-async def _keyed(page: Page, locator: Locator, before: FieldReading, text: str, timeout_ms: int) -> StepResult:
+async def _keyed(locator: Locator, before: FieldReading, text: str, timeout_ms: int) -> StepResult:
     """The check of a step that put ``text`` into a field with keys or at its caret. A text with a line break is not
     checked: the break may have sent the form and emptied the field, which is no refusal of the text."""
     if "\n" in text or "\r" in text:
         return _NO_CHECK
-    return _written(before, await _read_after(page, locator, before, timeout_ms, _never), text, judge_added)
+    return _written(before, await _read_after(locator, before, timeout_ms, _never), text, judge_added)
 
 
 async def _scroll_state(page: Page, locator: Locator | None, centre: list[float], timeout_s: float) -> str | None:
