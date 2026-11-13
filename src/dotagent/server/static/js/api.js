@@ -17,6 +17,15 @@ const STALL_MS = 45000;
 // A page back in view whose stream has been silent for longer than a keepalive takes was put away (a phone that locked,
 // a Mac that slept): its stream is cut at once and followed again, rather than after the rest of `STALL_MS` (item 286).
 const BACK_SILENCE_MS = 20000;
+// A page back in view after being put away this long is followed again too, however recently its stream spoke: a phone
+// put away for a few seconds (a glance at a notification) can come back to a connection that stays open and passes
+// nothing, as a VPN that woke anew leaves it, which only `STALL_MS` would cut (item 1152). The cost is one request that
+// starts after the last event seen, so only a stream that is followed again from there (`follow`) is cut so; a bounded
+// read with no retry (a chat's stored steps) would end in an error. It is the phone's: iOS puts a page away with its
+// network, while a Mac keeps both for a tab or an app the owner switched from (⌘-Tab), whose return would make every
+// stream and read the page again each time; there the silence decides, as before.
+const BACK_AWAY_MS =
+  typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches ? 2000 : BACK_SILENCE_MS;
 // An event the page fails to show, or a read of a page that fails, is logged every time and told at most this often,
 // so a fault that hits every event of a busy run does not bury the page in toasts.
 const NOT_SHOWN_TOLD_EVERY_MS = 10000;
@@ -403,9 +412,14 @@ function parseBlock(block) {
  * Read a server-sent event stream with fetch, so the bearer token travels in a header and not in the URL. `onOpen` is
  * called once the server has taken the stream, before its first event. A stream from which nothing came for
  * `STALL_MS`, not even a keepalive, is cut: the read fails, as for a stream that broke; so is one silent for
- * `BACK_SILENCE_MS` when the page comes back into view.
+ * `BACK_SILENCE_MS`, or whose page was put away for `awayMs` (`Infinity`: however long), when the page comes back into
+ * view.
+ * @param {string} path
+ * @param {AbortSignal} signal
+ * @param {() => void} onOpen
+ * @param {number} awayMs
  */
-export async function* sse(path, signal, onOpen) {
+export async function* sse(path, signal, onOpen, awayMs) {
   await proven();
   const cut = new AbortController();
   const stop = () => cut.abort();
@@ -415,13 +429,20 @@ export async function* sse(path, signal, onOpen) {
   }
   let silence = null;
   let heardAt = Date.now();
+  let awayAt = document.visibilityState === "visible" ? null : Date.now();
   const watch = () => {
     heardAt = Date.now();
     clearTimeout(silence);
     silence = setTimeout(() => cut.abort(new ApiError(0, "Dot stopped sending updates.", { path })), STALL_MS);
   };
   const back = () => {
-    if (document.visibilityState === "visible" && Date.now() - heardAt >= BACK_SILENCE_MS) {
+    if (document.visibilityState !== "visible") {
+      awayAt = awayAt ?? Date.now();
+      return;
+    }
+    const away = awayAt !== null && Date.now() - awayAt >= awayMs;
+    awayAt = null;
+    if (away || Date.now() - heardAt >= BACK_SILENCE_MS) {
       cut.abort(new ApiError(0, "Dot stopped sending updates while this page was away.", { path }));
     }
   };
@@ -558,7 +579,7 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
         pause = RECONNECT_MIN_MS;
         onState("live");
       };
-      for await (const message of sse(withAfter(path, lastId), signal, opened)) {
+      for await (const message of sse(withAfter(path, lastId), signal, opened, BACK_AWAY_MS)) {
         lastId = Math.max(lastId, message.id);
         try {
           onMessage(message);
@@ -615,7 +636,8 @@ export async function watchInView({ path, signal, onMessage }) {
       const opened = () => {
         pause = RECONNECT_MIN_MS;
       };
-      for await (const message of sse(path, seen.signal, opened)) {
+      // Closed while the page is away, so its return never finds it open.
+      for await (const message of sse(path, seen.signal, opened, Infinity)) {
         try {
           onMessage(message);
         } catch (error) {
