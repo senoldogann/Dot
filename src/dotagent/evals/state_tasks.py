@@ -118,15 +118,16 @@ APPLY_ENDPOINT: SiteEndpoint = SiteEndpoint(
 )
 
 # A settings page whose Save takes its first press and does nothing, as a page whose script is not ready yet does: the
-# form goes on the second.
+# form goes on the second. The page shows the name on file, so that a run which opens it again sees what it saved
+# (item 1156: it showed the old name whatever was saved, and runs went looking for the server's state with a shell).
 SAVE_SITE: tuple[SitePage, ...] = (
     _page(
         "/settings",
         _html(
             "Profile settings",
-            "<h1>Profile settings</h1>",
+            "<h1>Profile settings</h1><p>Display name on file: {last_name}</p>",
             '<form action="/settings/save" method="post">',
-            '<label>Display name <input name="name" value="ada"></label>',
+            '<label>Display name <input name="name" value="{last_name}"></label>',
             '<button type="submit" onclick="this.dataset.pressed = (this.dataset.pressed | 0) + 1; '
             'return this.dataset.pressed > 1">Save changes</button></form>',
         ),
@@ -136,6 +137,7 @@ SAVE_ENDPOINT: SiteEndpoint = SiteEndpoint(
     path="/settings/save",
     delay_s=0.0,
     answer=_html("Settings saved", "<h1>Saved</h1><p>Settings saved: display name {name} (change {count}).</p>"),
+    holds={"name": "ada"},
 )
 
 
@@ -183,11 +185,11 @@ def state_tasks() -> tuple[EvalTask, ...]:
                 _turn(
                     "browser_act",
                     steps=[
-                        {"action": "fill", "ref": "e5", "text": _SAVE_NAME},
-                        {"action": "click", "ref": "e6", "expect_text": "Settings saved"},
+                        {"action": "fill", "ref": "e6", "text": _SAVE_NAME},
+                        {"action": "click", "ref": "e7", "expect_text": "Settings saved"},
                     ],
                 ),
-                _turn("browser_act", steps=[{"action": "click", "ref": "e6", "expect_text": "Settings saved"}]),
+                _turn("browser_act", steps=[{"action": "click", "ref": "e7", "expect_text": "Settings saved"}]),
                 _finish(f"{_SAVE_LINE} (change 1)."),
             ),
         ),

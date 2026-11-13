@@ -12,9 +12,9 @@ from dotagent.evals.audit import catalog_problems, task_problems
 from dotagent.evals.catalog import all_tasks, select_tasks
 from dotagent.evals.checks import describe_check, evaluate_check
 from dotagent.evals.results import CheckOutcome
-from dotagent.evals.site import serve_recording_site, serve_site
+from dotagent.evals.site import held_now, render_answer, render_page, serve_recording_site, serve_site
 from dotagent.evals.state_tasks import APPLY_ENDPOINT, APPLY_SITE, STATE_TASKS, state_tasks
-from dotagent.evals.types import EvalTask, SiteEndpoint, SiteRecord, SiteRecorded
+from dotagent.evals.types import EvalTask, SiteEndpoint, SitePage, SiteRecord, SiteRecorded
 
 ENV: dict[str, str] = {}
 _ONCE: SiteRecorded = SiteRecorded(
@@ -50,6 +50,33 @@ def test_a_site_keeps_what_its_endpoint_was_sent_and_a_page_keeps_nothing() -> N
             SiteRecord(path="/jobs/7/apply", fields=_SENT),
             SiteRecord(path="/jobs/7/apply", fields={"email": "b@example.org"}),
         )
+
+
+def test_a_page_shows_what_its_site_took_last_and_nothing_before_it_took_any() -> None:
+    """Item 1156: the settings page showed its old name whatever was saved, and runs went looking for the server's
+    state another way. A page may name a field of what its site holds: what it held at first, then what the newest
+    request sent."""
+    name: SitePage = SitePage(path="/settings", status=200, body="<p>On file: {last_name}, as {q}</p>", location=None)
+    saved: SiteRecord = SiteRecord(path="/settings/save", fields={"name": "Ada L."})
+    older: SiteRecord = SiteRecord(path="/settings/save", fields={"name": "Ada"})
+    save: SiteEndpoint = SiteEndpoint(path="/settings/save", delay_s=0.0, answer="saved {name}", holds={"name": "ada"})
+    bare: SiteEndpoint = SiteEndpoint(path="/other", delay_s=0.0, answer="")
+    assert held_now((bare,), ()) == {}
+    assert held_now((bare, save), ()) == {"name": "ada"}
+    assert held_now((bare, save), (older, saved)) == {"name": "Ada L."}
+    assert render_page(name, "q=asked", {}) == "<p>On file: , as asked</p>"
+    assert render_page(name, "q=asked", {"name": "Ada L."}) == "<p>On file: Ada L., as asked</p>"
+    # What was sent is shown as text: a quote or a tag in it does not become the page's own.
+    assert render_page(name, "q=asked", {"name": 'Ada "L" <b>'}) == (
+        "<p>On file: Ada &quot;L&quot; &lt;b&gt;, as asked</p>"
+    )
+    assert render_answer(save, {"name": "<Ada>"}, 1) == "saved &lt;Ada&gt;"
+    with serve_recording_site((name,), (save,)) as served:
+        with urllib.request.urlopen(served.address + "/settings", timeout=10) as page:
+            assert "On file: ada," in page.read().decode("utf-8")
+        _post(served.address, "/settings/save", {"name": "Ada L."})
+        with urllib.request.urlopen(served.address + "/settings", timeout=10) as page:
+            assert "On file: Ada L." in page.read().decode("utf-8")
 
 
 def test_a_site_without_endpoints_is_served_as_before_and_takes_no_post() -> None:

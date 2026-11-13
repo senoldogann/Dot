@@ -116,7 +116,7 @@ async def test_a_press_the_page_took_and_did_nothing_with_is_no_save(
         _turn("browser_open", url="{site}/settings"),
         _turn(
             "browser_act",
-            steps=[{"action": "fill", "ref": "e5", "text": "Ada L."}, {"action": "click", "ref": "e6"}],
+            steps=[{"action": "fill", "ref": "e6", "text": "Ada L."}, {"action": "click", "ref": "e7"}],
         ),
         _finish(_SAVED),
     )

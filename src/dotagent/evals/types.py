@@ -60,11 +60,15 @@ class SiteEndpoint(FrozenModel):
     """A path of a task's site that takes a POST (item 1147). The site keeps what it was sent there, one record a
     request in the order they came, and answers after ``delay_s`` with ``answer`` (HTML; a ``{name}`` in it is filled
     from the fields it was sent, an absent name with nothing, and ``{count}`` with how many requests the path has
-    taken, this one among them). A task with one is judged by what its site took, not by what the run says."""
+    taken, this one among them). A task with one is judged by what its site took, not by what the run says.
+
+    ``holds`` is what the site has for the endpoint's fields before it took a request (item 1156): a page of the
+    site shows a field as ``{last_<name>}``, which is what the newest request sent for it, and this until one came."""
 
     path: str
     delay_s: float = Field(ge=0)
     answer: str
+    holds: dict[str, str] = Field(default_factory=dict)
 
 
 class SiteRecord(FrozenModel):

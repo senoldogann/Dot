@@ -795,8 +795,8 @@ def test_the_site_of_a_task_is_served_for_the_attempt_and_named_in_its_goal_and_
         SitePage(path="/done", status=200, body="<h1>Received: {name}, {color}</h1>", location=None),
         SitePage(path="/old", status=301, body="", location="/form"),
     )
-    assert render_page(pages[1], "name=Ada&color=blue") == "<h1>Received: Ada, blue</h1>"
-    assert render_page(pages[1], "") == "<h1>Received: , </h1>"
+    assert render_page(pages[1], "name=Ada&color=blue", {}) == "<h1>Received: Ada, blue</h1>"
+    assert render_page(pages[1], "", {}) == "<h1>Received: , </h1>"
     with serve_site(pages) as address:
         assert address.startswith("http://127.0.0.1:")
         assert httpx.get(f"{address}/done?name=Ada&color=blue").text == "<h1>Received: Ada, blue</h1>"
