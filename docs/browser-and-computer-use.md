@@ -382,7 +382,9 @@ Both modes share what follows.
   which sites move off the screen or put under an icon (a click on such a field waited eight seconds and failed), the
   one file field inside it, as in a label that wraps a hidden field, or (item 745) the field its label (`for`) or its
   `aria-controls` names, or (item 754) the file field a click at its middle reaches, one made see-through and laid over
-  the button it looks like; a control of a web component finds its field in the component's own shadow root. Otherwise
+  the button it looks like, read once the element is scrolled into view, as a click would be (item 1144), so that a
+  dropzone below a long form or in a dialog's list is found too; a control of a web component finds its field in the
+  component's own shadow root. Otherwise
   the element is clicked and the file chooser it opens takes them; a click that waits for the element to hold still and
   does not get it within `action_timeout_s` (a custom "choose file" button a script keeps redrawing) is made once more
   without that wait, but only when the element itself lies at its middle: a forced click lands on what is there, so a
