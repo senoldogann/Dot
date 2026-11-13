@@ -22,8 +22,6 @@ const READ_FIRST = 6;
 const OPS_MARGIN = "800px";
 // The events of a run are read this many at a time (the most `GET /runs/{id}/events` gives).
 const EVENTS_PAGE = 2000;
-// Whether the browser keeps the reader's place itself when something above it grows (CSS scroll anchoring).
-const ANCHORS = CSS.supports("overflow-anchor", "auto");
 const FINISH_TOOL = "finish";
 // The calls whose row shows only once they are refused, as on the run's own page: a finish, and a reaction (item 664).
 const QUIET_TOOLS = new Set([FINISH_TOOL, "react"]);
@@ -330,6 +328,12 @@ function scrollBox(node) {
   return PHONE.matches && document.documentElement.classList.contains("chat-shell") ? node.closest(".run-thread") : null;
 }
 
+/** Lets `turn`, laid out while its work filled in, be skipped again (item 1165), two frames on: the first lays it
+ * out with its work and keeps its height, so the skipped turn is as tall as the drawn one. */
+function skippableAgain(turn) {
+  requestAnimationFrame(() => requestAnimationFrame(() => turn.style.removeProperty("content-visibility")));
+}
+
 /** The first element after `node` in the page: its next sibling, or its parent's, and so on up. */
 function following(node) {
   for (let at = node; at !== null; at = at.parentElement) {
@@ -340,14 +344,12 @@ function following(node) {
   return node;
 }
 
-/** `change()` grows `part`: fills a turn's flow, or adds to its answer. A browser that keeps the reader's place by
- * itself does (scroll anchoring); elsewhere, when it grows above what is seen, the conversation scrolls by as much as
- * what follows it moved, so what is read stays where it was. What grows where it is seen grows in place. */
+/** `change()` grows `part`: fills a turn's flow, or adds to its answer. When it grows above what is seen, the
+ * conversation scrolls by as much as what follows it moved, so what is read stays where it was; a browser that kept
+ * the place itself (scroll anchoring) moved nothing, and nothing is scrolled. WebKit says it anchors and, with earlier
+ * turns skipped (item 1165), did not: the move is measured in every browser. What grows where it is seen grows in
+ * place. */
 function keepPlace(part, change) {
-  if (ANCHORS) {
-    change();
-    return;
-  }
   const box = scrollBox(part);
   const seenFrom = box === null ? 0 : box.getBoundingClientRect().top;
   const follows = following(part);
@@ -378,7 +380,11 @@ function whenNear(element, ops, asked, run, signal, reactions, onRead) {
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           watch.disconnect();
-          void fillFlow(run, ops, asked, signal, reactions, onRead);
+          // Laid out while its work fills in (item 1165): a turn skipped as it grows keeps its last height and grows
+          // later, nearer, where neither scroll anchoring nor `keepPlace` sees it. It may be skipped again once a
+          // frame kept its new height.
+          element.style.contentVisibility = "visible";
+          void fillFlow(run, ops, asked, signal, reactions, onRead).finally(() => skippableAgain(element));
         }
       },
       { root: scrollBox(element), rootMargin: OPS_MARGIN },
@@ -466,11 +472,48 @@ export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal, rea
           el("span", null, `${plural(left, "earlier task is", "earlier tasks are")} not shown.`),
           el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first task"),
         );
-  return el(
+  const history = el(
     "div",
     { class: "history", role: "region", "aria-label": "Earlier in this conversation" },
     note,
     shown.map((past) => turn(past, editFromHereOf, read.get(past.id), signal, reactions)),
   );
+  skipWhenSized(history, signal);
+  return history;
+}
+
+/** Lets the browser skip laying out the turns of `history` that are far from what is seen (item 1165, app.css), once
+ * every one of them was laid out in the page: its first size is seen, and a frame later, when each turn's size is kept
+ * for it, `data-sized` goes on. Nothing is set once `signal` aborted (the page went). A turn is laid out while its work
+ * fills in (`whenNear`), so that `keepPlace` sees it grow, and may be skipped again after (`skippableAgain`). */
+function skipWhenSized(history, signal) {
+  const watch = new ResizeObserver(() => {
+    watch.disconnect();
+    requestAnimationFrame(() => {
+      if (!signal.aborted) {
+        history.dataset.sized = "";
+      }
+    });
+  });
+  watch.observe(history);
+  signal.addEventListener("abort", () => watch.disconnect(), { once: true });
+}
+
+/** `act(node)` with the earlier turn `node` stands in laid out (item 1165): a turn far from what is seen is not, and
+ * then Chromium gives no words of it (`innerText`) and WebKit does not scroll to it (`scrollIntoView`); the focus goes
+ * to it in both. Only that turn is laid out, while `act` runs; one scrolled into sight stays laid out, as every turn in
+ * sight is. Returns what `act` returns. */
+export function laidOut(node, act) {
+  const turn = node.closest(".history > .turn");
+  // A turn laid out while its work fills in (`whenNear`) stays so until it is done.
+  if (turn === null || turn.style.contentVisibility !== "") {
+    return act(node);
+  }
+  turn.style.contentVisibility = "visible";
+  try {
+    return act(node);
+  } finally {
+    turn.style.removeProperty("content-visibility");
+  }
 }
 

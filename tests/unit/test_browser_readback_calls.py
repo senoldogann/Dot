@@ -6,6 +6,7 @@ import time
 from typing import cast
 
 import pytest
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Locator
 
 from dotagent.browser import driver
@@ -26,17 +27,44 @@ class _Element:
         self.page: _Page = _Page()
         self.asked: list[str] = []
         self._answers: list[object] = answers
+        self._answered: int = 0
 
     async def evaluate(self, script: str, *given: object, **options: object) -> object:
         """Playwright's ``evaluate``, with whatever argument and time it is given."""
         del given, options
         self.asked.append(script)
-        return self._answers[len(self.asked) - 1]
+        self._answered += 1
+        return self._answers[self._answered - 1]
 
     async def is_checked(self, **options: object) -> bool:
         del options
         self.asked.append("is_checked")
         return True
+
+    async def check(self, **options: object) -> None:
+        del options
+        self.asked.append("check")
+
+    async def uncheck(self, **options: object) -> None:
+        del options
+        self.asked.append("uncheck")
+
+
+class _PutBack(_Element):
+    """A box the page puts back before Playwright's own reading of it: its ``check`` raises as Playwright does."""
+
+    async def check(self, **options: object) -> None:
+        del options
+        self.asked.append("check")
+        raise PlaywrightError("Locator.check: Clicking the checkbox did not change its state")
+
+
+class _Covered(_Element):
+    """A box something lies in front of: the click itself fails."""
+
+    async def check(self, **options: object) -> None:
+        del options
+        raise PlaywrightError("Locator.check: Timeout 8000ms exceeded.")
 
 
 class _Frozen(_Element):
@@ -123,3 +151,22 @@ async def test_a_box_is_read_with_its_turn_and_playwright_is_asked_only_for_one_
     unknown: _Element = _Element([None])
     await driver._ticked(_locator(unknown), True, 8000)
     assert unknown.asked == [driver._TURN_TICKED_SCRIPT, "is_checked"]
+
+
+async def test_a_box_playwright_read_too_early_is_told_by_the_reading_after_the_pages_turn() -> None:
+    """Item 1157: on a slow runner a page's own timer cleared the box before Playwright read it, Playwright raised,
+    and the step read "failed, may have been sent" with nothing checked, where the same box on a quick machine read
+    "failed, sent, contradicted". The click went out either way, and the reading after the turn says what the box
+    holds: cleared again, or ticked by a script a moment after Playwright looked."""
+    cleared: _PutBack = _PutBack([False])
+    result = await driver._tick(_locator(cleared), True, 8000, False)
+    assert [check.status for check in result.checks] == ["contradicted"]
+    assert cleared.asked == ["check", driver._TURN_TICKED_SCRIPT]
+    late: _PutBack = _PutBack([True])
+    assert [check.status for check in (await driver._tick(_locator(late), True, 8000, False)).checks] == ["verified"]
+    # A box that took the tick is read the same way, and a click that failed for another reason fails the step.
+    plain: _Element = _Element([False])
+    assert [check.status for check in (await driver._tick(_locator(plain), False, 8000, True)).checks] == ["verified"]
+    assert plain.asked == ["uncheck", driver._TURN_TICKED_SCRIPT]
+    with pytest.raises(PlaywrightError, match="Timeout 8000ms"):
+        await driver._tick(_locator(_Covered([])), True, 8000, False)

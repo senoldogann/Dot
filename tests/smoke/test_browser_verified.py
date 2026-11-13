@@ -5,7 +5,7 @@ Every claim is checked twice: by the step's own report, and by what the site rec
 for verified by its report's words alone. A fill, a choice and a tick are read back; a field that puts its value back
 fails its step; a value the page cuts holds the next click back; a click that named what it expects is waited for,
 verified when that shows and uncertain when it does not, and is never sent twice; a step that expects what the page
-shows already is not sent at all.
+shows already, or what the batch itself writes, is sent once and is not checked by it.
 """
 
 import asyncio
@@ -50,6 +50,7 @@ _PAGE: str = f"""<!doctype html><title>Order desk</title>
 <label><input type="checkbox" aria-label="Terms" name="terms"> Terms</label>
 <label><input type="checkbox" aria-label="Bounce" onchange="setTimeout(() => {{ this.checked = false; }}, 0)">
 Bounce</label>
+<label><input type="checkbox" aria-label="Snap" onchange="this.checked = false"> Snap</label>
 <label>Secret <input type="password" aria-label="Secret" name="secret"></label>
 </form>
 <button type="button" aria-label="Dead">Dead</button>
@@ -253,6 +254,17 @@ async def test_a_dropdown_and_a_box_the_page_puts_back_fail_their_steps(browser:
         "sent",
         ["contradicted"],
     )
+    # A box the page clears at once is clear at Playwright's own reading, which raises (item 1157). It is the same
+    # finding, told the same way: on a slow runner the timer above came first too, and the step read "may have been
+    # sent" with nothing checked.
+    snapped: ActOutcome = await browser.act(
+        "put-back", [Step(action="check", ref=_ref(view, "Snap", "checkbox"))], False, refuse_secret_field, True
+    )
+    assert (snapped.steps[0].outcome, snapped.steps[0].dispatched, _statuses(snapped.steps[0])) == (
+        "failed",
+        "sent",
+        ["contradicted"],
+    )
 
 
 async def test_a_value_the_page_cuts_is_uncertain_and_holds_the_click_after_it_back(
@@ -390,9 +402,12 @@ async def test_a_result_the_page_shows_by_itself_later_is_seen_and_not_called_un
     assert (click.outcome, click.detail, _statuses(click)) == ("done", "", ["verified"])
 
 
-async def test_a_step_that_expects_what_the_page_shows_already_is_not_sent(
+async def test_a_step_that_expects_what_the_page_shows_already_is_sent_once_and_not_checked_by_it(
     browser: BrowserSession, site: _Site
 ) -> None:
+    """Item 1164: such a step was refused before it went, which cost a round trip of the model, and it came back
+    with nothing to expect every time. It goes once, what it named is not looked for (seen, it would tell nothing),
+    and nothing calls it verified."""
     view: PageView = await browser.open_url("shown", f"{_address(site)}/", True)
     outcome: ActOutcome = await browser.act(
         "shown",
@@ -402,8 +417,104 @@ async def test_a_step_that_expects_what_the_page_shows_already_is_not_sent(
         True,
     )
     (click,) = outcome.steps
-    assert (click.outcome, click.dispatched, click.checks) == ("failed", "not_sent", ())
-    assert "shows already" in click.detail
+    assert (click.outcome, click.dispatched, click.checks) == ("done", "sent", ())
+    assert click.detail == (
+        f"its page sent POST {_address(site)}/submit → 200; what it expected was not looked for (the page showed "
+        "those words already before the step)"
+    )
+    assert outcome.stopped is None and len(site.orders) == 1
+
+
+async def test_words_the_batch_writes_are_not_looked_for_and_an_address_held_already_is_not_either(
+    browser: BrowserSession, site: _Site
+) -> None:
+    view: PageView = await browser.open_url("echo", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "echo",
+        [
+            Step(action="fill", ref=_ref(view, "Name", "textbox"), text="Ada Lovelace"),
+            Step(action="click", ref=_ref(view, "Send", "button"), expect_text="Lovelace"),
+        ],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    fill, click = outcome.steps
+    assert (_statuses(fill), click.outcome, click.checks) == (["verified"], "done", ())
+    # The answer does repeat the name: seen, it would have passed for the order's receipt whatever came back.
+    assert "Order 1 received for Ada Lovelace" in outcome.view.body
+    assert click.detail.endswith(
+        "what it expected was not looked for (those words are within a text this batch writes, which a page repeats "
+        "whatever happened)"
+    )
+    assert len(site.orders) == 1
+    held: ActOutcome = await browser.act(
+        "echo",
+        [Step(action="click", ref=_ref(view, "Dead", "button"), expect_url="127.0.0.1")],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    assert held.steps[0].checks == ()
+    assert "what it expected was not looked for (the address held that part already before the step)" in (
+        held.steps[0].detail
+    )
+
+
+async def test_what_a_step_named_that_can_tell_is_looked_for_beside_what_cannot(
+    browser: BrowserSession, site: _Site
+) -> None:
+    """The pre-push review of item 1164: a step that names an address the tab is on already and words that only its
+    result shows was not checked by either. The words are looked for, the address is said to have told nothing, and
+    the batch goes on, since what could tell did."""
+    view: PageView = await browser.open_url("both", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "both",
+        [
+            Step(
+                action="click",
+                ref=_ref(view, "Send", "button"),
+                expect_url="127.0.0.1",
+                expect_text="Order 1 received",
+            ),
+            Step(action="click", ref=_ref(view, "Dead", "button")),
+        ],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    sent, after = outcome.steps
+    assert (_statuses(sent), after.outcome) == (["verified"], "done")
+    assert sent.detail.endswith(
+        "what it expected was not looked for (the address held that part already before the step)"
+    )
+    assert len(site.orders) == 1
+
+
+async def test_a_batch_stops_after_a_step_whose_expectation_was_to_let_the_next_ones_run(
+    browser: BrowserSession, site: _Site
+) -> None:
+    """A step in the middle of a batch that names what it expects is a gate for the steps after it. What could not
+    be looked for lets none of them through: the order is not sent on a page nobody looked at."""
+    view: PageView = await browser.open_url("gate", f"{_address(site)}/", True)
+    outcome: ActOutcome = await browser.act(
+        "gate",
+        [
+            Step(action="click", ref=_ref(view, "Dead", "button"), expect_text="Finished orders"),
+            Step(action="click", ref=_ref(view, "Send", "button")),
+        ],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    first, second = outcome.steps
+    assert (first.outcome, first.dispatched, second.outcome, second.dispatched) == (
+        "done",
+        "sent",
+        "skipped",
+        "not_sent",
+    )
+    assert outcome.stopped is not None and outcome.stopped.startswith("what step 1 expected could not be looked for")
     assert site.orders == []
 
 
