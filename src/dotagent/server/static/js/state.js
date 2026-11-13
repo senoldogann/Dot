@@ -2,6 +2,8 @@
 
 import { api, eventNotShown, follow, QUIET_BREAK_MS, tellOutOfDate, unreachable } from "./api.js";
 import { debounce, rememberModelLabels } from "./dom.js";
+import { t } from "./i18n.js";
+import { EN } from "./lang/en.js";
 
 const REFRESH_EVERY_MS = 15000;
 // After a break of the stream, or once the page is back in view, the network may not answer every request at once (a
@@ -119,7 +121,7 @@ export async function refresh() {
 // A read that fails is told as the pages tell theirs (item 559): the waiting pill, the tab's count and the emergency
 // stop's banner would otherwise stand as they were while the page says it is live.
 const refreshSoon = debounce(() => {
-  refresh().catch((error) => readFailed("Dot's status", error));
+  refresh().catch((error) => readFailed("readFailed.status", error));
 }, 120);
 
 let modelsPending = null;
@@ -183,16 +185,19 @@ const readAgainSoon = debounce(() => readAgain("settled"), READ_AGAIN_AFTER_MS);
  * Tell that a page could not read again what it shows, after an event of the stream or once the stream is back: logged,
  * and told in a toast while the stream is live (item 160). While the stream is down the page says so already, and it
  * reads again once the stream is back; a read that got no answer while the page settles is read again a moment later
- * (item 286). The page keeps what it showed.
+ * (item 286). The page keeps what it showed. `what` is the catalogue key of what could not be read ("readFailed.task").
+ * @param {import("./i18n.js").WordKey} what
+ * @param {unknown} error
  */
 export function readFailed(what, error) {
-  console.warn(`${what} could not be read again`, error);
+  // The log stays in English, whatever the page speaks; the toast speaks the page's language (item 1173).
+  console.warn(`${EN[what]} could not be read again`, error);
   if (readSoonInstead(error)) {
     return;
   }
   if (snapshot.stream === "live") {
     const why = error instanceof Error ? error.message : String(error);
-    tellOutOfDate(`${what} could not be updated. Reload the page to see it.`, why);
+    tellOutOfDate(t("readFailed.toast", { what: t(what) }), why);
   }
 }
 

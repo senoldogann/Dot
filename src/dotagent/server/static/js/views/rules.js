@@ -249,7 +249,7 @@ function buildFreeMode(isDisposed) {
       setting.paint();
     } catch (error) {
       if (!isDisposed()) {
-        readFailed("Free mode", error);
+        readFailed("readFailed.freeMode", error);
       }
     }
   }
@@ -296,7 +296,7 @@ function buildSandbox(isDisposed) {
       setting.paint();
     } catch (error) {
       if (!isDisposed()) {
-        readFailed("The sandbox", error);
+        readFailed("readFailed.sandbox", error);
       }
     }
   }
@@ -388,7 +388,7 @@ export function mount(root, ctx) {
       if (rules === null) {
         holder.replaceChildren(inlineError(error, () => attempt(retry)));
       } else {
-        readFailed("The rules", error);
+        readFailed("readFailed.rules", error);
       }
     }
   }

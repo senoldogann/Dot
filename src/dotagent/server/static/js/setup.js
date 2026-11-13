@@ -5,6 +5,7 @@
 // failed, so the notes were found by their words alone) keeps its tone there, and More counts it beside its title.
 
 import { el } from "./dom.js";
+import { t, tCount } from "./i18n.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 import { detailsFold } from "./ui.js";
@@ -13,10 +14,10 @@ import { detailsFold } from "./ui.js";
 // repeated to the model, each step sent to another model, and each such step asked again on the run's model. The
 // lines said once a run (how often the goal is repeated: "cadence") are kinds of their own.
 const REPEATED = {
-  reminder: (count) => `goal repeated ${count} times`,
-  route: (count) => `${count} steps on another model`,
-  "route-back": (count) => `${count} steps back on the task's own model`,
-  correction: (count) => `${count} corrections`,
+  reminder: (count) => tCount(count, "setup.repeatedReminderOne", "setup.repeatedReminderMany"),
+  route: (count) => tCount(count, "setup.repeatedRouteOne", "setup.repeatedRouteMany"),
+  "route-back": (count) => tCount(count, "setup.repeatedRouteBackOne", "setup.repeatedRouteBackMany"),
+  correction: (count) => tCount(count, "setup.repeatedCorrectionOne", "setup.repeatedCorrectionMany"),
 };
 
 /**
@@ -36,7 +37,9 @@ export function setupSummary(lines) {
     if (line.kind === "words") {
       if (!said.has("words")) {
         said.add("words");
-        parts.push(`${alone.join(" and ")} found by their words alone`);
+        // Every words-alone line, the last joined with "and" (the notes and the skills, today one of each at most).
+        const what = alone.length === 1 ? alone[0] : t("tools.flowAnd", { first: alone.slice(0, -1).join(", "), last: alone[alone.length - 1] });
+        parts.push(t("setup.foundAlone", { what }));
       }
     } else if (line.kind in REPEATED && counts.get(line.kind) > 1) {
       if (!said.has(line.kind)) {
@@ -56,7 +59,7 @@ export function setupSummary(lines) {
  */
 export function setupSection() {
   const body = el("div", { class: "setup-lines" });
-  const section = panelSection({ id: "run-setup", title: "Set up", actions: null, body });
+  const section = panelSection({ id: "run-setup", title: t("setup.title"), actions: null, body });
   section.element.hidden = true;
   const lines = [];
 

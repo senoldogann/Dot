@@ -203,7 +203,7 @@ export function createReactions({ threadId, signal }) {
    * time from the first read, which item 1109 has go through here too). */
   function tell(error) {
     if (!signal.aborted && !(error instanceof ApiError && error.status === 404)) {
-      readFailed("The reactions", error);
+      readFailed("readFailed.reactions", error);
     }
   }
 

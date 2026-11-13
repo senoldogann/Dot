@@ -2,24 +2,26 @@
 // means there is nothing to choose); the choice is kept per browser and goes with every run started from here. Beside
 // it, fast mode (item 223), for the Claude models that have it, and the choices for one message (item 251).
 
+import { t } from "./i18n.js";
 import { readPref, writePref } from "./prefs.js";
 
 const KEY_PREFIX = "dot.effort.";
 const SPEED_KEY = "dot.speed";
 // What each speed is, under its name in the reasoning menu.
 export const SPEED_HINTS = {
-  standard: "The model's usual speed",
-  fast: "Up to 2.5 times faster, at twice the price",
+  standard: t("efforts.standardHint"),
+  fast: t("efforts.fastHint"),
 };
+// The names of the levels a person reads; the ids (the keys) are what the daemon and the models take, never these.
 const LABELS = {
-  off: "Off",
-  on: "On",
-  minimal: "Minimal",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  xhigh: "Extra high",
-  max: "Max",
+  off: t("efforts.off"),
+  on: t("efforts.on"),
+  minimal: t("efforts.minimal"),
+  low: t("efforts.low"),
+  medium: t("efforts.medium"),
+  high: t("efforts.high"),
+  xhigh: t("efforts.xhigh"),
+  max: t("efforts.max"),
 };
 
 function keyOf(model) {
@@ -30,13 +32,13 @@ function keyOf(model) {
 // ONE_MESSAGE_LEVELS in llm/types.py), and what it does, under its name in the reasoning menu. Nothing keeps them: the
 // message after goes with the level chosen before.
 export const ONE_MESSAGE = [
-  { id: "ultrathink", label: "Ultrathink", level: "max", icon: "sparkle", hint: "Max reasoning for this message only" },
+  { id: "ultrathink", label: "Ultrathink", level: "max", icon: "sparkle", hint: t("efforts.ultrathinkHint") },
   {
     id: "ultracode",
     label: "Ultracode",
     level: "xhigh",
     icon: "branch",
-    hint: "Extra high for this message only, its independent parts given to helpers that work at the same time",
+    hint: t("efforts.ultracodeHint"),
   },
 ];
 
