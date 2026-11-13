@@ -360,15 +360,16 @@ def goes_on_from(run: RunRecord, earlier: RunRecord) -> bool:
     )
 
 
-def keeps_current_tab(run: RunRecord, nobody_watched: bool, chat_source: str, status: RunStatus) -> bool:
-    """Whether the chat of ``run``, once it has ended with ``status``, keeps its current tab for a message that goes on
+def keeps_current_tab(run: RunRecord, nobody_watched: bool, chat_source: str, needs: str) -> bool:
+    """Whether the chat of ``run``, once it has ended, keeps its current tab for a message that goes on
     from it (item 696). A helper's chat does not: no message continues it. Nor does a chat that a run nobody watches
     opened (``chat_source``: a schedule's, a watcher's, Dot's own initiative, a reply; item 1168) once such a run in it
-    ends with no question left: its tab would only hold Chrome open. The owner's chat keeps it whoever ran in it last (a
-    loop of the chat, a reply in it), and so does a run that asks, which the answer goes on from."""
+    ends needing nothing of the owner (``needs``, what its finish call said it needs): its tab would only hold Chrome
+    open. The owner's chat keeps it whoever ran in it last (a loop of the chat, a reply in it), and so does a run that
+    needs something, which the owner's answer goes on from."""
     if run.parent_run_id is not None:
         return False
-    return not (nobody_watched and chat_source in UNWATCHED_SOURCES and status != "blocked")
+    return not (nobody_watched and chat_source in UNWATCHED_SOURCES and not needs.strip())
 
 
 def stricter_approvals(first: ApprovalMode, second: ApprovalMode) -> ApprovalMode:
@@ -3592,9 +3593,7 @@ class RunManager:
             keep_current: bool = False
             with contextlib.suppress(NotFoundError):
                 chat: ThreadRecord = await runtime.store.get_thread(run.thread_id)
-                keep_current = keeps_current_tab(
-                    run, runtime.browsers.is_unattended(run.thread_id), chat.source, status
-                )
+                keep_current = keeps_current_tab(run, runtime.browsers.is_unattended(run.thread_id), chat.source, needs)
             await runtime.browsers.end_of_run(run.thread_id, keep_current=keep_current)
             # And the front of the Mac goes back to the application the run took it from (item 702).
             await runtime.desktop.end_of_run(run.thread_id)

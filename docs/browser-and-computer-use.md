@@ -444,9 +444,8 @@ Both modes share what follows.
   a run ends, the chat's background tabs, keeping the current one for a message that goes on from it until `tab_idle_s`;
   and every tab of a chat that no message goes on from when its run ends: a helper's (a delegated run, an agent's), and
   one a run nobody watches opened (a schedule's, a watcher's, Dot's own initiative, a reply) once such a run in it ends
-  with no question left (item 1168). Your own chat keeps its current tab whoever ran in it last (a loop of the chat, a
-  reply in it). `tab_idle_s` is
-  600 s by default (item 1168). `browser_close_tab` without an index
+  needing nothing of you (item 1168). Your own chat keeps its current tab whoever ran in it last (a loop of the chat, a
+  reply in it), and so does a run that ends needing something of you. `tab_idle_s` is 600 s by default (item 1168). `browser_close_tab` without an index
   closes every tab of the chat but the current one. Only the chat's own tabs are closed: those of a chat at work at the
   same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a link or a page that
   opens a new tab) is the chat's, also when you opened it that way (a middle click in a tab of Dot's in your Chrome).
