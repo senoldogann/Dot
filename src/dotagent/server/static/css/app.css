@@ -6055,7 +6055,7 @@ details:not([open]) > :not(summary) {
   gap: 12px;
   width: fit-content;
   max-width: 100%;
-  padding: 10px 12px 10px 10px;
+  padding: 8px 12px 8px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -6077,7 +6077,7 @@ details:not([open]) > :not(summary) {
 .schedule-card-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
 }
 
