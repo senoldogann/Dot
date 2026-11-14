@@ -533,6 +533,7 @@ export const TR = {
   "messages.scheduleMade": "Zamanlama kuruldu",
   "messages.scheduleRepeating": "tekrarlanan bir zamanlamayla",
   "messages.scheduleLabel": "Zamanlama kuruldu: {name}, {when}. Zamanlamalar sayfasında açar.",
+  "messages.scheduleLabelBare": "Zamanlama kuruldu: {name}. Zamanlamalar sayfasında açar.",
   "messages.startedBeside": "Kendi sohbetinde başladı",
   "messages.noteFromChat": "Başka bir sohbetten not:",
   "messages.editFromHere": "Buradan düzenle",

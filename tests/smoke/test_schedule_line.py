@@ -37,13 +37,16 @@ _MADE: dict[str, str] = {"name": "Overnight outbound", "goal": "Draft the outbou
 _ONCE: dict[str, str] = {"name": "Invite check", "goal": "Look at the invite", "at": "2030-11-19T10:00"}
 _TURNS: tuple[ScriptedTurn, ...] = (
     ScriptedTurn(
-        text="",
+        text="Making the schedules.",
         calls=(
             ScriptedCall(tool="schedule_create", arguments=dict(_MADE)),
             ScriptedCall(tool="schedule_create", arguments=dict(_ONCE)),
         ),
     ),
-    ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
+    ScriptedTurn(
+        text="Both are set.",
+        calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),),
+    ),
     ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Sure.", "success": True}),)),
 )
 
@@ -134,6 +137,11 @@ async def test_a_schedule_the_run_made_is_a_line_that_leads_to_it(own_home: Path
                         "aria-label",
                         f"Schedule made: Invite check, {when}. Opens it on the Schedules page.",
                     )
+                    # The cards are not someone speaking (item 859): Dot's words after them go on from those before,
+                    # without a face of their own.
+                    if work == "steps":
+                        await expect(page.locator(".bubble.say")).to_have_count(2)
+                        await expect(page.locator(".bubble.say .turn-face")).to_have_count(1)
                     await page.screenshot(path=str(tmp_path / f"line-{work}.png"))
                     await page.close()
                 page = await _page(browser, port, address, f"runs/{run.id}", "steps")

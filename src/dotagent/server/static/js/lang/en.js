@@ -543,6 +543,7 @@ export const EN = {
   "messages.scheduleMade": "Schedule made",
   "messages.scheduleRepeating": "on a repeating schedule",
   "messages.scheduleLabel": "Schedule made: {name}, {when}. Opens it on the Schedules page.",
+  "messages.scheduleLabelBare": "Schedule made: {name}. Opens it on the Schedules page.",
   "messages.startedBeside": "Started in a chat of its own",
   "messages.noteFromChat": "Note from another chat:",
   "messages.editFromHere": "Edit from here",

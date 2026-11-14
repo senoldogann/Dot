@@ -166,7 +166,7 @@ function sayKind(node, progress, live) {
 
 // What stands between two of the agent's lines without anyone else speaking: its steps, thoughts and notes, and what
 // it asks or shows on the way (a card, a hand-off to an agent, a page, a restart).
-const NOT_SPEAKING = "details.steps, details.thought, .note, .approval, .agent-handoff, .shown-page, details.restart";
+const NOT_SPEAKING = "details.steps, details.thought, .note, .schedule-card, .approval, .agent-handoff, .shown-page, details.restart";
 
 /** Whether a line of the agent's put at the end of `container` is the first since someone else spoke. */
 function speaksFirst(container) {

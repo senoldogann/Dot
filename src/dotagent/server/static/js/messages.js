@@ -133,7 +133,7 @@ export function scheduleLine(made) {
     {
       class: "schedule-card",
       href: `#/schedules?schedule=${encodeURIComponent(made.schedule_id)}`,
-      "aria-label": t("messages.scheduleLabel", { name: made.name, when: when === "" ? t("messages.scheduleRepeating") : when }),
+      "aria-label": when === "" ? t("messages.scheduleLabelBare", { name: made.name }) : t("messages.scheduleLabel", { name: made.name, when }),
     },
     el("span", { class: "schedule-card-mark" }, icon("calendar")),
     el("span", { class: "schedule-card-body" }, el("span", { class: "schedule-card-name" }, made.name), el("span", { class: "schedule-card-when" }, said)),

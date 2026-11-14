@@ -6018,8 +6018,8 @@ details:not([open]) > :not(summary) {
   }
 }
 
-/* A schedule a run made (item 665): a quiet line of the conversation, as a change of the memory is, that leads to it on
-   the Schedules page; its name stands out. */
+/* A quiet line of the conversation, as a change of the memory is, that leads elsewhere: a message started in a chat of
+   its own (item 915) and a note from another chat (item 957); what it names stands out. */
 .schedule-line {
   align-items: center;
 }
