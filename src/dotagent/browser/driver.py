@@ -1481,6 +1481,18 @@ _NOT_A_FORM_FIELD: str = (
 )
 
 
+# Whether a form field is read-only, as Playwright reads it before it types (``readonly`` on an input, a textarea or a
+# dropdown): its fill waits the whole action time for a field that takes no typing, then fails. A sign-in in two steps
+# keeps the username so once it went on to the password (auth.webmail.zone.fi: ``readonly: activeStep !== 1``), and a
+# run that gave that field again with the password waited 8 s for "the field did not take the login" (item 1175).
+_READ_ONLY_SCRIPT: str = "(element) => Element.prototype.hasAttribute.call(element, 'readonly')"
+_READ_ONLY: str = (
+    "the field {ref} is read-only: the page takes no typing there, so nothing of the login went into it. A sign-in in "
+    "two steps keeps the username so once it asks for the password: give only the refs of the fields that take "
+    "typing (the password alone, there)"
+)
+
+
 def _takes(kind: VaultFieldKind, field: SecretKind | None) -> bool:
     """Whether a field marked ``field`` may take the part ``kind`` of a login."""
     if kind == "password":
@@ -1502,7 +1514,8 @@ async def fill_login_field(
     """Fill the field ``ref`` with ``value``, the part ``kind`` of a login of the password manager (item 493) or of
     Dot's vault (item 621), once the field is one that part may go into and the document that holds it is one of the
     login's sites (``fills_on`` of the address of its frame): every part into a form field alone, a password into a
-    password field, nothing into a frame of another site. ``ref`` may name an element inside the label of the field;
+    password field, nothing into a frame of another site, nothing into a read-only field (:data:`_READ_ONLY`), which
+    is refused at once rather than waited on. ``ref`` may name an element inside the label of the field;
     the field is the control of that label (:data:`_CONTROL_OF`), found once, and every check, the mark and the fill
     are of it. The frame and its address are the browser's: a script of the frame can make the element itself name
     another document. ``typing(document)`` runs once the field passed, just before the value goes into the element
@@ -1528,6 +1541,7 @@ async def fill_login_field(
                 raise BrowserError(_NOT_A_FORM_FIELD.format(ref=ref, kind=kind), {"ref": ref, "url": page.url})
             frame: Frame | None = await element.owner_frame()
             marking: object = await element.evaluate(_FIELD_MARKING_SCRIPT)
+            read_only: object = await element.evaluate(_READ_ONLY_SCRIPT)
         except PlaywrightError as error:
             raise BrowserError(
                 "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
@@ -1550,6 +1564,8 @@ async def fill_login_field(
                 "that it shows in no text",
                 {"ref": ref, "url": page.url, "part": kind, "field": field},
             )
+        if read_only is True:
+            raise BrowserError(_READ_ONLY.format(ref=ref), {"ref": ref, "url": page.url, "part": kind})
         if kind != "username":
             # An address is written into the page's views, its history and logs, and shortened where it is long: the
             # form sends by POST before the value goes in, or nothing goes in.
