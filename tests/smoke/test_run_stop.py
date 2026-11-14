@@ -136,6 +136,9 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                 box: Locator = page.locator(".dock textarea")
                 await expect(send).to_have_attribute("aria-label", "Stop")
                 await expect(page.locator(".dock .composer[data-stop]")).to_have_count(1)
+                # One Stop at a time (item 1174): the empty box's send is it, so the bar over the box shows none.
+                line_stop: Locator = page.locator(".capsule").get_by_role("button", name="Stop task")
+                await expect(line_stop).to_be_hidden()
                 await page.wait_for_timeout(_SETTLE_MS)
                 await page.screenshot(path=str(tmp_path / f"stop-{width}-{scheme}.png"))
                 await box.fill("Look at the other file too")
@@ -148,7 +151,7 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                     "aria-checked", "true"
                 )
                 await expect(intent.get_by_role("radio", name="Add to task")).to_have_attribute("aria-checked", "false")
-                await expect(page.locator(".capsule").get_by_role("button", name="Stop task")).to_be_visible()
+                await expect(line_stop).to_be_visible()
                 await intent.get_by_role("radio", name="After this task").focus()
                 await page.keyboard.press("ArrowLeft")
                 await expect(intent.get_by_role("radio", name="Add to task")).to_be_focused()
@@ -159,6 +162,7 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                 await page.screenshot(path=str(tmp_path / f"queue-{width}-{scheme}.png"))
                 await box.fill("")
                 await expect(send).to_have_attribute("aria-label", "Stop")
+                await expect(line_stop).to_be_hidden()
                 await send.click()
                 async with asyncio.timeout(_RUN_WAIT_S):
                     ended: RunRecord = await manager.wait(run.id)
