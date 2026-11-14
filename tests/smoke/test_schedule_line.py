@@ -1,7 +1,7 @@
-"""A schedule a run made is a line of the conversation (item 665): "Made a schedule", its name and when it runs in
-words, a link that opens the Schedules page with its row marked and in sight. The line stays in sight when the chat
-shows only what Dot is doing (item 663), and an earlier turn keeps it. Measured in Chrome on a real run of a scripted
-model."""
+"""A schedule a run made is a card of the conversation (items 665 and 1178): its name, "Schedule made" and when it
+runs in words, a link that opens the Schedules page with its row marked and in sight. The card stays in sight when the
+chat shows only what Dot is doing (item 663), and an earlier turn keeps it. Measured in Chrome on a real run of a
+scripted model."""
 
 import asyncio
 import re
@@ -33,8 +33,16 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 TOKEN: str = "schedule-line-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _MADE: dict[str, str] = {"name": "Overnight outbound", "goal": "Draft the outbound emails", "cron": "0 9 * * 1"}
+# A schedule that runs once, in a year after this one, so the card names its year (item 1178).
+_ONCE: dict[str, str] = {"name": "Invite check", "goal": "Look at the invite", "at": "2030-11-19T10:00"}
 _TURNS: tuple[ScriptedTurn, ...] = (
-    ScriptedTurn(text="", calls=(ScriptedCall(tool="schedule_create", arguments=dict(_MADE)),)),
+    ScriptedTurn(
+        text="",
+        calls=(
+            ScriptedCall(tool="schedule_create", arguments=dict(_MADE)),
+            ScriptedCall(tool="schedule_create", arguments=dict(_ONCE)),
+        ),
+    ),
     ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
     ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Sure.", "success": True}),)),
 )
@@ -116,13 +124,20 @@ async def test_a_schedule_the_run_made_is_a_line_that_leads_to_it(own_home: Path
                 for work in ("steps", "status"):
                     page: Page = await _page(browser, port, address, f"runs/{run.id}", work)
                     await expect(page.locator(".answer .prose")).to_have_text("Done.")
-                    line = page.locator("a.schedule-line")
-                    await expect(line).to_have_text("Made a schedule Overnight outbound · on Mondays at 09:00")
+                    line = page.locator("a.schedule-card").first
+                    await expect(line).to_have_text("Overnight outboundSchedule made · on Mondays at 09:00")
                     await expect(line).to_be_visible()
+                    once = page.locator("a.schedule-card").nth(1)
+                    when: str = "once, Tuesday 19 November 2030 at 10:00"
+                    await expect(once).to_have_text(f"Invite checkSchedule made · {when}")
+                    await expect(once).to_have_attribute(
+                        "aria-label",
+                        f"Schedule made: Invite check, {when}. Opens it on the Schedules page.",
+                    )
                     await page.screenshot(path=str(tmp_path / f"line-{work}.png"))
                     await page.close()
                 page = await _page(browser, port, address, f"runs/{run.id}", "steps")
-                await page.locator("a.schedule-line").click()
+                await page.locator("a.schedule-card").first.click()
                 await expect(page).to_have_url(re.compile(r"#/schedules\?schedule="))
                 row = page.locator(".list-row.asked")
                 await expect(row).to_have_count(1)
@@ -133,7 +148,7 @@ async def test_a_schedule_the_run_made_is_a_line_that_leads_to_it(own_home: Path
                 second: RunRecord = await _run(manager, "Thanks", run.thread_id)
                 page = await _page(browser, port, address, f"runs/{second.id}", "steps")
                 await expect(page.locator(".answer .prose").last).to_have_text("Sure.")
-                await expect(page.locator("a.schedule-line")).to_have_count(1)
+                await expect(page.locator("a.schedule-card")).to_have_count(2)
                 await page.close()
             finally:
                 await browser.close()

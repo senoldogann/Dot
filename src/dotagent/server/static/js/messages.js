@@ -11,7 +11,7 @@ import { icon } from "./icons.js";
 import { sentPicks } from "./picks.js";
 import { prose } from "./prose.js";
 import { readAloudButton } from "./readaloud.js";
-import { loopRhythm } from "./rhythm.js";
+import { loopRhythm, onceAt } from "./rhythm.js";
 
 /** @type {Record<string, { label: import("./i18n.js").WordKey, empty: import("./i18n.js").WordKey }>} */
 const OUTCOMES = {
@@ -74,8 +74,8 @@ function editFromHereButton(editFromHere) {
     {
       class: "btn ghost sm icon-only",
       type: "button",
-      title: "Edit from here",
-      "aria-label": "Edit from here",
+      title: t("messages.editFromHere"),
+      "aria-label": t("messages.editFromHere"),
       onclick: () => {
         button.disabled = true;
         editFromHere().finally(() => {
@@ -106,23 +106,38 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
       "div",
       { class: "message-foot" },
       stamp(sentAt, dateTimeFull(sentAt)),
-      copyButton(text, "Copy the message"),
+      copyButton(text, t("messages.copyMessage")),
       editFromHere === null ? null : editFromHereButton(editFromHere),
     ),
   );
 }
 
-/** The line a schedule a run made leaves in the conversation (item 665): the calendar, "Made a schedule", its name and
- * when it runs ("every Monday at 09:00", "once, 25 Oct 08:00"), a link to it on the Schedules page. `made` is the
- * `schedule_made` event's data. */
+/** When a schedule a run made runs, in words: its rhythm from the cron ("on Mondays at 09:00"), a one-time one's time
+ * from `run_at` ("once, Tuesday 17 November at 10:00"); an event written before item 1178 has no `run_at` and keeps
+ * the daemon's own words (`when`). */
+function madeWhen(made) {
+  if (typeof made.cron === "string") {
+    return loopRhythm(made.cron) ?? t("messages.scheduleRepeating");
+  }
+  return typeof made.run_at === "number" ? onceAt(made.run_at, Date.now() / 1000) : String(made.when ?? "");
+}
+
+/** The card a schedule a run made leaves in the conversation (items 665 and 1178): the calendar in a tile, the
+ * schedule's name over "Schedule made" and when it runs, and a chevron; the card leads to it on the Schedules page.
+ * `made` is the `schedule_made` event's data. */
 export function scheduleLine(made) {
-  const rhythm = typeof made.cron === "string" ? loopRhythm(made.cron) : null;
-  const when = rhythm ?? (typeof made.cron === "string" ? "on a repeating schedule" : String(made.when ?? ""));
+  const when = madeWhen(made);
+  const said = when === "" ? t("messages.scheduleMade") : `${t("messages.scheduleMade")} · ${when}`;
   return el(
     "a",
-    { class: "note schedule-line", href: `#/schedules?schedule=${encodeURIComponent(made.schedule_id)}` },
-    icon("calendar"),
-    el("span", null, el("span", { class: "schedule-made" }, "Made a schedule"), " ", el("strong", null, made.name), when === "" ? null : ` · ${when}`),
+    {
+      class: "schedule-card",
+      href: `#/schedules?schedule=${encodeURIComponent(made.schedule_id)}`,
+      "aria-label": t("messages.scheduleLabel", { name: made.name, when: when === "" ? t("messages.scheduleRepeating") : when }),
+    },
+    el("span", { class: "schedule-card-mark" }, icon("calendar")),
+    el("span", { class: "schedule-card-body" }, el("span", { class: "schedule-card-name" }, made.name), el("span", { class: "schedule-card-when" }, said)),
+    icon("chevron"),
   );
 }
 
@@ -134,7 +149,7 @@ export function besideLine(started) {
     "a",
     { class: "note schedule-line beside-line", href: `#/runs/${encodeURIComponent(started.run_id)}` },
     icon("branch"),
-    el("span", null, el("span", { class: "schedule-made" }, "Started in a chat of its own"), " ", el("strong", null, started.text)),
+    el("span", null, el("span", { class: "schedule-made" }, t("messages.startedBeside")), " ", el("strong", null, started.text)),
   );
 }
 
@@ -145,12 +160,13 @@ export function chatNoteLine(noted) {
     "a",
     { class: "note schedule-line chat-note-line", href: `#/runs/${encodeURIComponent(noted.from_run_id)}` },
     icon("message"),
-    el("span", null, el("span", { class: "schedule-made" }, "Note from another chat:"), " ", noted.text),
+    el("span", null, el("span", { class: "schedule-made" }, t("messages.noteFromChat")), " ", noted.text),
   );
 }
 
 // What each reaction of Dot's on a message of yours says, for its tooltip and a screen reader (item 664).
-const DOT_REACTION_WORDS = { "👍": "understood", "👀": "looking into it" };
+/** @type {Record<string, import("./i18n.js").WordKey>} */
+const DOT_REACTION_WORDS = { "👍": "messages.reactionUnderstood", "👀": "messages.reactionLooking" };
 
 /** Dot's reaction `reaction` on the message `message` (a `userMessage`, item 664): a small round badge on the corner of
  * its bubble, as a chat shows one. A second one takes the first one's place. Its name says what it means, the same on
@@ -160,7 +176,7 @@ export function showDotReaction(message, reaction) {
   if (words === undefined) {
     return;
   }
-  const label = `Reacted ${reaction}: ${words}`;
+  const label = t("messages.reacted", { reaction, words: t(words) });
   const badge = el("span", { class: "dot-reaction", role: "img", "aria-label": label, title: label }, reaction);
   const bubble = message.querySelector(".bubble.user");
   message.querySelector(".dot-reaction")?.remove();

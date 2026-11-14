@@ -173,13 +173,15 @@ def _create_tool() -> RegisteredTool:
         record: ScheduleRecord = await create_schedule(
             store, ctx.runtime.config.scheduler, zone, request, time.time(), owner.thread_id
         )
-        # The conversation says so in a line of its own that leads to the schedule (item 665): its rhythm in words from
-        # the cron, which the page reads as the Schedules page does, else the daemon's words ("once, 25 Oct 08:00"),
-        # both of the schedule as it was kept.
+        # The conversation says so in a card of its own that leads to the schedule (items 665 and 1178): its rhythm in
+        # words from the cron, which the page reads as the Schedules page does, else its one time (`run_at`, which the
+        # page says in its language; `when` is the daemon's words, for the events written before), both of the schedule
+        # as it was kept.
         made: JsonObject = {
             "schedule_id": record.id,
             "name": record.name,
             "cron": record.cron,
+            "run_at": record.run_at,
             "when": schedule_timing(record, zone),
         }
         await ctx.runtime.bus.emit(ctx.run_id, SCHEDULE_MADE_EVENT, made, True)
