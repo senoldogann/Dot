@@ -542,7 +542,9 @@ export const TR = {
   "messages.reactionUnderstood": "anlaşıldı",
   "messages.reactionLooking": "bakılıyor",
   // How often a schedule asks again, and when one that runs once runs (rhythm.js).
-  "rhythm.onceAt": "bir kez, {date} {weekday} {time}",
+  "rhythm.onceAt": "{date} {time}",
+  "rhythm.today": "bugün",
+  "rhythm.tomorrow": "yarın",
   "rhythm.listed": "{first} ve {last}",
   "rhythm.everyDay": "her gün",
   "rhythm.weekdays": "hafta içi",

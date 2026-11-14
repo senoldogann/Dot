@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { loopRhythm, nextFiring, repeatCron } from "../../src/dotagent/server/static/js/rhythm.js";
+import { loopRhythm, nextFiring, onceAt, repeatCron } from "../../src/dotagent/server/static/js/rhythm.js";
 
 test("the rhythms /loop makes read as they are written", () => {
   assert.equal(loopRhythm("*/30 * * * *"), "every 30 minutes");
@@ -54,4 +54,16 @@ test("a taught task repeats on the cron of its rhythm, day and time, which the p
   assert.equal(repeatCron("week", "0", "07:05"), "5 7 * * 0");
   assert.equal(loopRhythm(repeatCron("week", "1", "09:00")), "on Mondays at 09:00");
   assert.equal(loopRhythm(repeatCron("weekdays", "1", "18:30")), "on weekdays at 18:30");
+});
+
+test("a schedule that runs once says its time in few words (item 1179)", () => {
+  // Friday 23 October 2026, nine in the morning, in the zone the test runs in.
+  const now = new Date(2026, 9, 23, 9, 0).getTime() / 1000;
+  assert.equal(onceAt(new Date(2026, 9, 23, 18, 53).getTime() / 1000, now), "today at 18:53");
+  assert.equal(onceAt(new Date(2026, 9, 24, 10, 0).getTime() / 1000, now), "tomorrow at 10:00");
+  assert.equal(onceAt(new Date(2026, 9, 27, 9, 0).getTime() / 1000, now), "Tuesday at 09:00");
+  // A week away or more, or gone by, by its date; another year's with its year.
+  assert.equal(onceAt(new Date(2026, 10, 3, 9, 0).getTime() / 1000, now), "3 Nov at 09:00");
+  assert.equal(onceAt(new Date(2026, 9, 20, 9, 0).getTime() / 1000, now), "20 Oct at 09:00");
+  assert.equal(onceAt(new Date(2030, 10, 19, 10, 0).getTime() / 1000, now), "19 Nov 2030 at 10:00");
 });

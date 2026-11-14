@@ -113,8 +113,8 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
 }
 
 /** When a schedule a run made runs, in words: its rhythm from the cron ("on Mondays at 09:00"), a one-time one's time
- * from `run_at` ("once, Tuesday 17 November at 10:00"); an event written before item 1178 has no `run_at` and keeps
- * the daemon's own words (`when`). */
+ * from `run_at` ("today at 18:53"); an event written before item 1178 has no `run_at` and keeps the daemon's own words
+ * (`when`). */
 function madeWhen(made) {
   if (typeof made.cron === "string") {
     return loopRhythm(made.cron) ?? t("messages.scheduleRepeating");
@@ -122,22 +122,23 @@ function madeWhen(made) {
   return typeof made.run_at === "number" ? onceAt(made.run_at, Date.now() / 1000) : String(made.when ?? "");
 }
 
-/** The card a schedule a run made leaves in the conversation (items 665 and 1178): the calendar in a tile, the
- * schedule's name over "Schedule made" and when it runs, and a chevron; the card leads to it on the Schedules page.
+/** The line a schedule a run made leaves in the conversation (items 665, 1178 and 1179): one quiet line, as a change
+ * of the memory is, the calendar, the schedule's name (cut with an ellipsis where the line is short) and when it runs;
+ * it leads to the schedule on the Schedules page, and its tooltip and its name to a screen reader say "Schedule made".
  * `made` is the `schedule_made` event's data. */
 export function scheduleLine(made) {
   const when = madeWhen(made);
-  const said = when === "" ? t("messages.scheduleMade") : `${t("messages.scheduleMade")} · ${when}`;
+  const label = when === "" ? t("messages.scheduleLabelBare", { name: made.name }) : t("messages.scheduleLabel", { name: made.name, when });
   return el(
     "a",
-    {
-      class: "schedule-card",
-      href: `#/schedules?schedule=${encodeURIComponent(made.schedule_id)}`,
-      "aria-label": when === "" ? t("messages.scheduleLabelBare", { name: made.name }) : t("messages.scheduleLabel", { name: made.name, when }),
-    },
-    el("span", { class: "schedule-card-mark" }, icon("calendar")),
-    el("span", { class: "schedule-card-body" }, el("span", { class: "schedule-card-name" }, made.name), el("span", { class: "schedule-card-when" }, said)),
-    icon("chevron"),
+    { class: "note schedule-line schedule-made-line", href: `#/schedules?schedule=${encodeURIComponent(made.schedule_id)}`, title: label, "aria-label": label },
+    icon("calendar"),
+    el(
+      "span",
+      { class: "schedule-made-words" },
+      el("strong", { class: "schedule-made-name" }, made.name),
+      when === "" ? null : el("span", { class: "schedule-made-when" }, `\u00a0· ${when}`),
+    ),
   );
 }
 

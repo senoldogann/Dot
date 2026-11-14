@@ -6047,64 +6047,21 @@ details:not([open]) > :not(summary) {
   }
 }
 
-/* A schedule a run made (item 1178): a small card of the conversation, the calendar in a tile, the schedule's name over
-   what it is and when it runs, and a chevron to it on the Schedules page; as wide as its words, up to the column. */
-.schedule-card {
+/* A schedule a run made (items 1178 and 1179): one line, its name cut with an ellipsis before its time is. */
+.schedule-made-words {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 8px 12px 8px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--muted);
-  text-decoration: none;
-}
-
-.schedule-card-mark {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-.schedule-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
   min-width: 0;
+  white-space: nowrap;
 }
 
-.schedule-card-name {
-  color: var(--text);
-  font-size: var(--text-ui);
-  line-height: var(--leading-ui);
-  font-weight: var(--weight-label);
-  overflow-wrap: anywhere;
+.schedule-made-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.schedule-card-when {
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
-}
-
-.schedule-card > .icon {
+.schedule-made-when {
   flex: none;
-  color: var(--muted);
-}
-
-@media (hover: hover) {
-  a.schedule-card:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-2);
-    text-decoration: none;
-  }
 }
 
 /* The schedule a line of a conversation led to, on the Schedules page: its row in the accent's light, fading. */

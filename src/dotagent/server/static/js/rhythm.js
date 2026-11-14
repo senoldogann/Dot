@@ -16,9 +16,9 @@ const WEEKDAY = new Intl.DateTimeFormat(uiLocale(), { weekday: "short" });
 const DAY_MONTH = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "short" });
 const DAY_KEY = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
 const LONG_WEEKDAY = new Intl.DateTimeFormat(uiLocale(), { weekday: "long" });
-const LONG_DAY_MONTH = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "long" });
-const LONG_DATE = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "long", year: "numeric" });
+const DAY_MONTH_YEAR = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "short", year: "numeric" });
 const YEAR = new Intl.DateTimeFormat("en-CA", { year: "numeric" });
+const DAY_S = 24 * 3600;
 // A next firing this far away or more is named by its date: a day's name alone would read as the coming one.
 const WEEK_S = 6 * 24 * 3600;
 // A firing this little past its time is happening now (the scheduler moves the next one on at its tick); one past it
@@ -99,13 +99,24 @@ export function nextFiring(at, now) {
   return DAY_KEY.format(when) === DAY_KEY.format(new Date(now * 1000)) ? time : `${WEEKDAY.format(when)} ${time}`;
 }
 
-/** When a schedule that runs once runs (`at`, seconds), in words (item 1178): "once, Tuesday 17 November at 10:00",
- * with its year when that is not the year of `now` (seconds too). */
+/** When a schedule that runs once runs (`at`, seconds), in few words (items 1178 and 1179), from `now` (seconds too):
+ * "today at 18:53", "tomorrow at 10:00", "Saturday at 09:00" within the coming week, else "17 Nov at 10:00", with the
+ * year when it is not this one. */
 export function onceAt(at, now) {
   const when = new Date(at * 1000);
-  const sameYear = YEAR.format(when) === YEAR.format(new Date(now * 1000));
-  const date = (sameYear ? LONG_DAY_MONTH : LONG_DATE).format(when);
-  return t("rhythm.onceAt", { weekday: LONG_WEEKDAY.format(when), date, time: HOUR_MINUTE.format(when) });
+  const time = HOUR_MINUTE.format(when);
+  const day = DAY_KEY.format(when);
+  const date =
+    day === DAY_KEY.format(new Date(now * 1000))
+      ? t("rhythm.today")
+      : day === DAY_KEY.format(new Date((now + DAY_S) * 1000))
+        ? t("rhythm.tomorrow")
+        : at > now && at - now < WEEK_S
+          ? LONG_WEEKDAY.format(when)
+          : YEAR.format(when) === YEAR.format(new Date(now * 1000))
+            ? DAY_MONTH.format(when)
+            : DAY_MONTH_YEAR.format(when);
+  return t("rhythm.onceAt", { date, time });
 }
 
 // How often a taught task can repeat, as the cron's day-of-week field says it (a week's day is chosen beside it).

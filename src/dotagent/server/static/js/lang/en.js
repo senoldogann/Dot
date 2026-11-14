@@ -552,7 +552,9 @@ export const EN = {
   "messages.reactionUnderstood": "understood",
   "messages.reactionLooking": "looking into it",
   // How often a schedule asks again, and when one that runs once runs (rhythm.js).
-  "rhythm.onceAt": "once, {weekday} {date} at {time}",
+  "rhythm.onceAt": "{date} at {time}",
+  "rhythm.today": "today",
+  "rhythm.tomorrow": "tomorrow",
   "rhythm.listed": "{first} and {last}",
   "rhythm.everyDay": "every day",
   "rhythm.weekdays": "on weekdays",
