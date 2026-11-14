@@ -584,7 +584,8 @@ the file tools change goes into the undo journal, shows in Changes and can be un
 a file's size and a run's copies, under [Autonomy](autonomy.md)), and what a command writes does not. Nothing stops a
 command from writing a file. `edit_file` also reads its texts by
 the names other agents' edit tools give them (`old_text` and `new_text`, `old_string` and `new_string`; item 879:
-a model on the owner's Mac sent them 17 times in two days, each call refused), and a wait or a count asked past its
+a model on the owner's Mac sent them 17 times in two days, each call refused), `search_files` reads its `pattern` as
+`query` too (item 1176: a run on the Claude plan sent that name four times), and a wait or a count asked past its
 bound is read as the bound (`terminal_send` and `terminal_read`'s `wait_s`, 60 s; `browser_wait_text`'s `timeout_s`,
 60 s; `memory_search`'s `limit`, 20), never a bound that keeps an action safe. Any error of a tool fails that
 call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the log

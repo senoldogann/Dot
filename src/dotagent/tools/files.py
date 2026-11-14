@@ -622,7 +622,12 @@ def _with_unread(found: str, unread: list[str]) -> str:
 
 
 class SearchFilesArgs(ToolArgs):
-    pattern: str = Field(description="Regular expression to search for in file contents.")
+    # Also read as ``query`` (item 1176): on the owner's Mac a run on the Claude plan sent it four times, each call
+    # refused and sent again.
+    pattern: str = Field(
+        validation_alias=AliasChoices("pattern", "query"),
+        description="Regular expression to search for in file contents.",
+    )
     path: str | None = Field(default=None, description="Directory or file to search. Defaults to the workspace.")
     glob: str | None = Field(default=None, description="Only search files matching this glob, e.g. '*.py'.")
     ignore_case: bool = Field(default=False, description="Case-insensitive match.")
