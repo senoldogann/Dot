@@ -279,7 +279,7 @@ every firing of them to start); a level chosen for a chat's run is still refused
 the calendar in a tile, the schedule's name over "Schedule made" and when it runs in the words the Schedules page uses
 ("on Mondays at 09:00"; a form the page cannot say in words is "on a repeating schedule", and a schedule that runs once
 says its day and time in the page's language, "once, Tuesday 17 November at 10:00"), and a chevron,
-in sight when the chat shows only what Dot is doing too, and kept by the turn once the chat goes on. The line leads to
+in sight when the chat shows only what Dot is doing too, and kept by the turn once the chat goes on. The card leads to
 the Schedules page (`#/schedules?schedule=ID`), whose row of that schedule is marked in the accent's light, fading, and
 scrolled into sight. `/loop 30m <message>` in the box of a run or of a new chat makes such a schedule from the
 composer (items 281 and 400; see [Runs](runs.md)); a chat with such a schedule wears its mark in the sidebar
