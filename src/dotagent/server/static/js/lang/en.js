@@ -539,7 +539,20 @@ export const EN = {
   "timeline.stallStop": "The task stops; its result says what it tried.",
   "timeline.stallNoAnswer": "It could not answer ({error}), so the task stops.",
   "timeline.stallNext": "Next: {steps}",
-  // How often a schedule asks again (rhythm.js).
+  // The lines of a conversation's messages (messages.js).
+  "messages.scheduleMade": "Schedule made",
+  "messages.scheduleRepeating": "on a repeating schedule",
+  "messages.scheduleLabel": "Schedule made: {name}, {when}. Opens it on the Schedules page.",
+  "messages.scheduleLabelBare": "Schedule made: {name}. Opens it on the Schedules page.",
+  "messages.startedBeside": "Started in a chat of its own",
+  "messages.noteFromChat": "Note from another chat:",
+  "messages.editFromHere": "Edit from here",
+  "messages.copyMessage": "Copy the message",
+  "messages.reacted": "Reacted {reaction}: {words}",
+  "messages.reactionUnderstood": "understood",
+  "messages.reactionLooking": "looking into it",
+  // How often a schedule asks again, and when one that runs once runs (rhythm.js).
+  "rhythm.onceAt": "once, {weekday} {date} at {time}",
   "rhythm.listed": "{first} and {last}",
   "rhythm.everyDay": "every day",
   "rhythm.weekdays": "on weekdays",

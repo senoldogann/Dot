@@ -15,6 +15,10 @@ const HOUR_MINUTE = new Intl.DateTimeFormat(uiLocale(), { hour: "2-digit", minut
 const WEEKDAY = new Intl.DateTimeFormat(uiLocale(), { weekday: "short" });
 const DAY_MONTH = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "short" });
 const DAY_KEY = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
+const LONG_WEEKDAY = new Intl.DateTimeFormat(uiLocale(), { weekday: "long" });
+const LONG_DAY_MONTH = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "long" });
+const LONG_DATE = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "long", year: "numeric" });
+const YEAR = new Intl.DateTimeFormat("en-CA", { year: "numeric" });
 // A next firing this far away or more is named by its date: a day's name alone would read as the coming one.
 const WEEK_S = 6 * 24 * 3600;
 // A firing this little past its time is happening now (the scheduler moves the next one on at its tick); one past it
@@ -93,6 +97,15 @@ export function nextFiring(at, now) {
     return time;
   }
   return DAY_KEY.format(when) === DAY_KEY.format(new Date(now * 1000)) ? time : `${WEEKDAY.format(when)} ${time}`;
+}
+
+/** When a schedule that runs once runs (`at`, seconds), in words (item 1178): "once, Tuesday 17 November at 10:00",
+ * with its year when that is not the year of `now` (seconds too). */
+export function onceAt(at, now) {
+  const when = new Date(at * 1000);
+  const sameYear = YEAR.format(when) === YEAR.format(new Date(now * 1000));
+  const date = (sameYear ? LONG_DAY_MONTH : LONG_DATE).format(when);
+  return t("rhythm.onceAt", { weekday: LONG_WEEKDAY.format(when), date, time: HOUR_MINUTE.format(when) });
 }
 
 // How often a taught task can repeat, as the cron's day-of-week field says it (a week's day is chosen beside it).
