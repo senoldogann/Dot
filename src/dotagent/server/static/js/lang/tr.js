@@ -530,7 +530,6 @@ export const TR = {
   "timeline.stallNoAnswer": "Yanıt veremedi ({error}), bu yüzden görev duruyor.",
   "timeline.stallNext": "Sonraki adımlar: {steps}",
   // The lines of a conversation's messages (messages.js).
-  "messages.scheduleMade": "Zamanlama kuruldu",
   "messages.scheduleRepeating": "tekrarlanan bir zamanlamayla",
   "messages.scheduleLabel": "Zamanlama kuruldu: {name}, {when}. Zamanlamalar sayfasında açar.",
   "messages.scheduleLabelBare": "Zamanlama kuruldu: {name}. Zamanlamalar sayfasında açar.",
@@ -542,7 +541,9 @@ export const TR = {
   "messages.reactionUnderstood": "anlaşıldı",
   "messages.reactionLooking": "bakılıyor",
   // How often a schedule asks again, and when one that runs once runs (rhythm.js).
-  "rhythm.onceAt": "bir kez, {date} {weekday} {time}",
+  "rhythm.onceAt": "{date} {time}",
+  "rhythm.today": "bugün",
+  "rhythm.tomorrow": "yarın",
   "rhythm.listed": "{first} ve {last}",
   "rhythm.everyDay": "her gün",
   "rhythm.weekdays": "hafta içi",
