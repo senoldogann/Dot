@@ -3,8 +3,9 @@
 // in the queue. Each part is the way to where it is told of. It says neither what the run does now, which the
 // conversation shows, nor how many commands run in the chat, which stand right under it (item 360). The line shows on
 // every width while one of its parts has something to say, and goes once none has; a part comes and goes as what it
-// tells does. While the run works the line ends in its Stop: one place that stays while the box below holds words,
-// where the composer's own Stop shows only while the box is empty; pressed, the line says it stops until the run ends.
+// tells does. While the run works and the box below holds words the line ends in its Stop; while the box is empty the
+// composer's send is the Stop and the line shows none (item 1174, app.css); pressed, the line says it stops until the
+// run ends.
 
 import { duration, el, setText } from "./dom.js";
 import { t } from "./i18n.js";

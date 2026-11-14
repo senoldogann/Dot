@@ -11315,6 +11315,12 @@ button.attach-chip {
   }
 }
 
+/* While the box is empty its send is the Stop, so the line does not show a second one (item 1174); a word typed brings
+   the line's back. */
+.dock:has(> .composer[data-stop]) .capsule-stop {
+  display: none;
+}
+
 @keyframes capsule-in {
   from {
     opacity: 0;

@@ -693,8 +693,9 @@ it delegated and the web searches by engine, and a figure of none has no line (i
 ID`), read again every ten seconds while the run works and once at its end. A strip under the head links the other runs
 of the same thread, and the box at the bottom queues a message for after a run that is going on, or follows up on a
 finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in the
-danger colour with a square) and cancels it; a word typed turns it back into the send, and the line over the box keeps
-**Stop task** at its end, so the task stops from one place while the box holds words (the loops of the chat have
+danger colour with a square) and cancels it; a word typed turns it back into the send, and the line over the box then
+shows **Stop task** at its end, so the task stops from one place while the box holds words and the empty box's Stop is
+the only one (item 1174; the loops of the chat have
 **Stop repeating** of their own, below). What the send does is said before it is pressed: over the box, while the run
 works, a choice of two (a group of radio buttons, its arrows moving the choice) says **Add to task**, which steers the
 run now, or **After this task**, whose message waits in the chat's queue (see [How a run works](runs.md#how-a-run-works));
@@ -711,7 +712,7 @@ the choice over the box says, or the queue's next message to the run when the bo
 Messages chooses where the choice starts (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
 box (items 352 and 360) says in a few quiet words how long the run has worked, that it waits to start, that it waits
-for you or that it stops (once Stop was pressed, until it has), ends in **Stop task**,
+for you or that it stops (once Stop was pressed, until it has), ends in **Stop task** while the box holds words,
 how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
 parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the
