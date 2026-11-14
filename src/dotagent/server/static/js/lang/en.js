@@ -540,7 +540,6 @@ export const EN = {
   "timeline.stallNoAnswer": "It could not answer ({error}), so the task stops.",
   "timeline.stallNext": "Next: {steps}",
   // The lines of a conversation's messages (messages.js).
-  "messages.scheduleMade": "Schedule made",
   "messages.scheduleRepeating": "on a repeating schedule",
   "messages.scheduleLabel": "Schedule made: {name}, {when}. Opens it on the Schedules page.",
   "messages.scheduleLabelBare": "Schedule made: {name}. Opens it on the Schedules page.",

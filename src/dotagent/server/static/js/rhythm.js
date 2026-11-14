@@ -18,7 +18,6 @@ const DAY_KEY = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-di
 const LONG_WEEKDAY = new Intl.DateTimeFormat(uiLocale(), { weekday: "long" });
 const DAY_MONTH_YEAR = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "short", year: "numeric" });
 const YEAR = new Intl.DateTimeFormat("en-CA", { year: "numeric" });
-const DAY_S = 24 * 3600;
 // A next firing this far away or more is named by its date: a day's name alone would read as the coming one.
 const WEEK_S = 6 * 24 * 3600;
 // A firing this little past its time is happening now (the scheduler moves the next one on at its tick); one past it
@@ -106,10 +105,13 @@ export function onceAt(at, now) {
   const when = new Date(at * 1000);
   const time = HOUR_MINUTE.format(when);
   const day = DAY_KEY.format(when);
+  const today = new Date(now * 1000);
+  // Tomorrow by the calendar, not 24 hours on: a day a clock change shortens or lengthens is a day still.
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
   const date =
-    day === DAY_KEY.format(new Date(now * 1000))
+    day === DAY_KEY.format(today)
       ? t("rhythm.today")
-      : day === DAY_KEY.format(new Date((now + DAY_S) * 1000))
+      : day === DAY_KEY.format(tomorrow)
         ? t("rhythm.tomorrow")
         : at > now && at - now < WEEK_S
           ? LONG_WEEKDAY.format(when)
