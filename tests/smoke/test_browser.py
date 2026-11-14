@@ -120,6 +120,11 @@ window.addEventListener("pointerup", (event) => {
 <label>State <select name="state"><option value="">Choose a state</option></select></label>
 <button onclick="{_LOAD_STATES}">Load states</button>
 <label>Number <select name="number">{_NUMBERS}</select></label>""",
+    # A page whose library replaces Array.from with one that ignores its mapping function, as Prototype.js does.
+    "/dropdown-own-array-from": """<!doctype html><title>Dropdown</title>
+<script>Array.from = function (items) { return Array.prototype.slice.call(items); };</script>
+<label>Shipping <select name="ship"><option value="std">Standard (3-5 days)</option>
+<option value="exp">Express (next day)</option></select></label>""",
     "/done": """<!doctype html><title>Done</title><h1>Received</h1><p id="q"></p>
 <script>document.getElementById('q').textContent = decodeURIComponent(location.search)</script>""",
     "/popup": """<!doctype html><title>Popup</title><h1>Popup page</h1><button>Close me</button>
@@ -1239,6 +1244,18 @@ async def test_an_option_a_script_adds_a_moment_later_is_still_chosen(browser: B
     outcome: ActOutcome = await act(browser, "dropdown-late", steps, False)
     assert [report.outcome for report in outcome.steps] == ["done", "done"], outcome
     assert '"Texas" [selected]' in line_of((await browser.snapshot("dropdown-late", True)).body, 'combobox "State"')
+
+
+async def test_a_dropdown_is_chosen_on_a_page_that_replaces_array_from(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("dropdown-own-from", f"{site}/dropdown-own-array-from", True)
+    outcome: ActOutcome = await act(
+        browser,
+        "dropdown-own-from",
+        [Step(action="select", ref=ref_of(view.body, 'combobox "Shipping"'), text="Express (next day)")],
+        False,
+    )
+    assert [report.outcome for report in outcome.steps] == ["done"], outcome
+    assert '"Express (next day)" [selected]' in outcome.view.body
 
 
 async def test_a_long_dropdown_keeps_its_line_short_and_names_a_choice_it_cannot_show(
