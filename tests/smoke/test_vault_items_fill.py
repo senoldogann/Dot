@@ -130,6 +130,13 @@ _EDITABLE: str = """<!doctype html><title>Editable</title><h1>Editable</h1>
   root.innerHTML = '<div id="inner" contenteditable="true" role="textbox" aria-label="Inner code"></div>'
     + '<label>Inner password <input id="secret" name="shadow" type="password"></label>';
 </script>"""
+# The second step of a sign-in in two (auth.webmail.zone.fi's, item 1175): the username it was given stays in its field,
+# read-only, beside the password field it asks for now.
+_PASSWORD_STEP: str = """<!doctype html><title>Password step</title><h1>Password step</h1>
+<form action="/received" method="post">
+<label>Email <input name="user" autocomplete="username" value="ada@example.com" readonly></label>
+<label>Password <input name="pass" type="password" autocomplete="current-password"></label>
+<button type="submit">Sign in</button></form>"""
 # What a page of any other origin can do with a guard that acts by what was filled: try addresses, and see which of them
 # the browser refused (``search`` halves a list of candidates until one is left).
 _TRY: str = """
@@ -260,6 +267,7 @@ class _Sites:
         self.shop.pages = {
             "/signin": _LOGIN.format(extra=""),
             "/signup": _SIGNUP,
+            "/password-step": _PASSWORD_STEP,
             "/signin-widget": _LOGIN.format(extra=f'<iframe title="A third party" src="{widget}"></iframe>'),
             "/signin-frames": _LOGIN.format(extra=f'<iframe title="Another host" src="{near}"></iframe>'),
             "/widget": _WIDGET,
@@ -581,6 +589,30 @@ async def test_a_password_goes_only_into_an_input_a_textarea_or_a_dropdown_and_n
     assert await page.locator("#secret").input_value() == PASSWORD
     seen: ToolResult = await _call(ctx, gate, "browser_snapshot", {})
     assert PASSWORD not in seen.text and "[hidden]" in seen.text, seen.text
+
+
+async def test_a_read_only_field_is_refused_at_once_with_why_and_the_password_alone_then_goes_in(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
+) -> None:
+    """The password step of a sign-in in two keeps the username read-only (item 1175): a run that gave its ref with the
+    password was told only "the field did not take the login", after the whole action time. It is told the field is
+    read-only, nothing goes into the page, and the password given alone goes in."""
+    runtime, _, _ = parts
+    login: str = await _a_login(await _vault(runtime), sites)
+    ctx, gate = await _context(runtime, "yolo")
+    refs: dict[str, str] = await _refs(
+        ctx, gate, f"https://127.0.0.1:{sites.shop.port}/password-step", {"user": "Email", "pass": "Password"}
+    )
+    page: Page = _page(runtime, ctx.thread_id)
+    with pytest.raises(BrowserError, match="is read-only") as refused:
+        await _call(
+            ctx, gate, "browser_fill_login", {"login": login, "username": refs["user"], "password": refs["pass"]}
+        )
+    assert PASSWORD not in str(refused.value)
+    assert await page.locator("[name=pass]").input_value() == ""
+    assert not runtime.browser.holds_back(ctx.thread_id)
+    await _call(ctx, gate, "browser_fill_login", {"login": login, "password": refs["pass"]})
+    assert await page.locator("[name=pass]").input_value() == PASSWORD
 
 
 def _ref_in(view: str, pattern: str) -> str:

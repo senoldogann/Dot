@@ -423,8 +423,10 @@ Both modes share what follows.
   `yolo` it runs at once), and takes the login back out of the vault when the fill fails; the model never chooses, sees
   or records the password, and the run is told to make no password itself. A password or a code goes only into an input,
   a textarea or a dropdown, never into an element that is edited (`contenteditable`); a ref that names an element inside
-  the label of a field names that field. A form with no method is a form that sends by GET, to a browser: before a
-  password or a code goes into it, Dot makes it send by POST, and keeps it so as it is sent (item 775). A vault login's
+  the label of a field names that field. A read-only field takes no part of a login, and is refused at once, saying so
+  (item 1175): a sign-in in two steps keeps the username read-only on its password step, where the password goes
+  alone. A form with no method is a form that sends by GET, to a browser: before a password or a code goes into it, Dot
+  makes it send by POST, and keeps it so as it is sent (item 775). A vault login's
   password is in the Mac's Keychain (service `dot-vault`), never in Dot's database, whose record of a login holds its
   site and username alone. It fills only on the login's own site, never a password or a code in your own Chrome
   (`attach`: that Chrome's requests are not held, so nothing would keep a value out of an address), and not in a chat in
