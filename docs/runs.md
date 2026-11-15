@@ -596,14 +596,18 @@ a read of the page or the window (`browser_snapshot`, `desktop_snapshot` of the 
 the gate and waiting while you hold the run (item 809).
 `edit_file` changes the text it is given and nothing else: a file that breaks its
 lines with CRLF keeps them, in the new text too, a file that is not UTF-8 text is refused, saying so, for the shell
-to change, and an empty text to replace is refused (item 556). A file the file tools make gets the permission bits
+to change, and an empty text to replace is refused (item 556). A text found more than once is refused
+unless `replace_all` is set, and the error names the line where each one starts (item 1181), so the run widens
+the text from what it read rather than reading the file again. A file the file tools make gets the permission bits
 any program's new file gets (`0666` less your umask), and a file that was there keeps its own. `read_file` reads a
 long file in pages of lines, the text of a PDF too, each page ending with the line to go on from, so no part of it is
 out of reach; an image goes to the model as an image, an iPhone's HEIC photo too, which macOS draws first (item
 556). A shell command runs with the `PATH` of your login shell, in its own process
 group (cancelling a run ends the whole group) and under a timeout (`[shell] default_timeout_s`, at most
 `max_timeout_s`). An AppleScript (`apple_script`) ends with its call as well: one whose run is stopped or whose call
-times out is killed. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
+times out is killed, after `[desktop] osascript_timeout_s` or the `timeout_s` the run gives a script that starts an
+application or works on a large document (at most 110 s, item 1180); the application may go on with what it was asked,
+which the timeout says. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
 655 and 657, `[web] search_order`): each engine in the owner's order, one whose key is not set passed over and said
 to be, the browser rung only with Dot's own browser and the web-research rung only while that server runs; its Try asks
 one engine one search. The search APIs that take a key of their own are Brave's Search API (`BRAVE_SEARCH_API_KEY`),

@@ -6018,8 +6018,8 @@ details:not([open]) > :not(summary) {
   }
 }
 
-/* A schedule a run made (item 665): a quiet line of the conversation, as a change of the memory is, that leads to it on
-   the Schedules page; its name stands out. */
+/* A quiet line of the conversation, as a change of the memory is, that leads elsewhere: a message started in a chat of
+   its own (item 915) and a note from another chat (item 957); what it names stands out. */
 .schedule-line {
   align-items: center;
 }
@@ -6045,6 +6045,23 @@ details:not([open]) > :not(summary) {
     text-decoration: underline;
     text-underline-offset: 2px;
   }
+}
+
+/* A schedule a run made (items 1178 and 1179): one line, its name cut with an ellipsis before its time is. */
+.schedule-made-words {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.schedule-made-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.schedule-made-when {
+  flex: none;
 }
 
 /* The schedule a line of a conversation led to, on the Schedules page: its row in the accent's light, fading. */

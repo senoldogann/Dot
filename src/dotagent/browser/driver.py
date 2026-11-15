@@ -327,13 +327,20 @@ _FOCUSED_SCRIPT: str = """() => {
   return element;
 }"""
 
-# Lists the options of a native <select> in page order, or null for any other element.
+# Lists the options of a native <select> in page order, or null for any other element. A plain loop, not
+# Array.from(options, mapper): a page's library may replace Array.from with one that ignores the mapper (Prototype.js
+# does), which handed back the <option> elements themselves (item 1177).
 _DROPDOWN_SCRIPT: str = """(element) => {
   if (!(element instanceof HTMLSelectElement)) return null;
   const group = (option) => option.parentElement instanceof HTMLOptGroupElement && option.parentElement.disabled;
-  return { options: Array.from(element.options, (option) => ({
-    label: option.label, value: option.value, selected: option.selected, disabled: option.disabled || group(option),
-  })) };
+  const options = [];
+  for (let index = 0; index < element.options.length; index += 1) {
+    const option = element.options[index];
+    options.push({
+      label: option.label, value: option.value, selected: option.selected, disabled: option.disabled || group(option),
+    });
+  }
+  return { options };
 }"""
 # A script may still be filling a dropdown when a step asks for one of its options, for example a list of states.
 _OPTION_GRACE_S: float = 1.0

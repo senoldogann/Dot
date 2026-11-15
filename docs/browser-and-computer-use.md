@@ -185,7 +185,9 @@ Both modes share what follows.
   `combobox "Shipping" [ref=e3]: options "Standard (3-5 days)" [selected], "Express (next day)"`. `select` takes the
   label or the value of one of them, written as listed; a choice that is not there is refused at once with the options
   that are, the closest first, instead of waiting for the timeout. An option that a script adds within a second of the
-  call is still found. A very long list is cut with the number of options left out and the current choice.
+  call is still found. A very long list is cut with the number of options left out and the current choice. The
+  options are read in a way a page's own scripts cannot bend: a library that replaces `Array.from` (Prototype.js)
+  no longer fails every `select` on its page (item 1177).
 - `browser_act` runs up to `max_batch_steps` steps in one call (10 by default; a longer batch is cut to the first ones
   and the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`,
   `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag`, `click_at` and
