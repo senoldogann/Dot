@@ -436,6 +436,10 @@ _COMPACTION_ROOM: float = 0.15
 _WORDS_PER_TOKEN: float = 0.75
 # A summary longer than its limit by more than this factor is asked for again.
 _SUMMARY_SLACK: float = 1.5
+# The tokens a summary's writer may spend thinking besides the words it may write (item 1191): a writer asked with no
+# reasoning may still think (glm-5.3-flash on OpenCode Go wrote 2,600 to 4,500 tokens a summary in the owner's week to
+# 2026-11-15), and the longest summary seen that passed, 6,434 tokens, fits with the words.
+_SUMMARY_THINKING_TOKENS: int = 4000
 _SUMMARY_PROMPT: str = (
     "You compress the history of an autonomous agent so that the same agent can continue the same run without "
     "starting over. Write a dense, factual summary with exactly these sections: GOAL (the task and the user's "
@@ -461,6 +465,10 @@ _SUMMARY_SHORTER_PROMPT: str = (
     "finished work to one line per step and keep every identifier. "
 )
 _SUMMARY_DRAFT_HEADING: str = "\n\n## Your earlier summary, which lacked the sections {sections}\n"
+_SUMMARY_CUT_PROMPT: str = (
+    "Your summary ran past {tokens} tokens and was cut off. Write it again, whole, under {max_words} words: shorten "
+    "finished work to one line per step and keep every identifier. "
+)
 _NO_TOOL_NOTE: str = (
     "[system note] You replied without calling a tool. If the goal is achieved or impossible, call finish with your "
     "complete final answer. Otherwise continue by calling the tools you need."
@@ -640,6 +648,13 @@ async def _current_plan(agent: AgentRun) -> PlanPayload:
     return EMPTY_PLAN if latest is None else plan_from_event(latest)
 
 
+def summary_output_cap(max_words: int) -> int:
+    """The most tokens the writer of a summary of at most ``max_words`` words may write (item 1191): the words of a
+    summary at the edge of its slack and room for thinking. Without it a writer that ran on held its run for minutes:
+    35,060 tokens in 400 s on the owner's Mac on 2026-11-15."""
+    return round(max_words * _SUMMARY_SLACK / _WORDS_PER_TOKEN) + _SUMMARY_THINKING_TOKENS
+
+
 async def _model_summary(
     agent: AgentRun, ref: ModelRef, transcript: str, context_tokens: int, window: int | None
 ) -> tuple[str | None, int, str | None]:
@@ -647,27 +662,32 @@ async def _model_summary(
     attempts made, last problem)``.
 
     An empty reply is asked again (the first try without reasoning, later ones with a little, since some models spend
-    their whole answer on thinking). A summary far over its word limit is asked again with the limit and the overrun
-    in front of the prompt; one that lacks a section is asked again once, with the missing sections named and the
-    first reply carried along as a draft. The attempts stay within ``_SUMMARY_ATTEMPTS``; a second reply that still
+    their whole answer on thinking). The writer may write :func:`summary_output_cap` tokens at most: a reply cut there
+    is asked again once, whole and shorter. A summary far over its word limit is asked again with the limit and the
+    overrun in front of the prompt; one that lacks a section is asked again once, with the missing sections named and
+    the first reply carried along as a draft. The attempts stay within ``_SUMMARY_ATTEMPTS``; a second reply that still
     lacks a section is returned as it is, for the check to say so. A provider error or a timeout ends the attempts at
     once, as the provider already retried what can be retried.
     """
     max_words: int = min(_SUMMARY_MAX_WORDS, round(context_tokens * _SUMMARY_SHARE * _WORDS_PER_TOKEN))
+    cap: int = summary_output_cap(max_words)
     base: str = _SUMMARY_PROMPT.format(max_words=max_words)
     prompt: str = base
     history: str = transcript
     problem: str | None = None
     asked_shorter: bool = False
     asked_sections: bool = False
+    # Whether the last reply ran on to the cap: the try after it is asked without reasoning again, as the first is,
+    # since a writer that spent the cap thinking would think more with a little reasoning allowed (item 1191).
+    cut_last: bool = False
     for attempt in range(1, _SUMMARY_ATTEMPTS + 1):
         request: ChatRequest = ChatRequest(
             model=ref.model,
             messages=(system_message(prompt), user_message(history, ())),
             tools=(),
             temperature=0.2,
-            max_output_tokens=None,
-            effort="off" if attempt == 1 else "low",
+            max_output_tokens=cap,
+            effort="off" if attempt == 1 or cut_last else "low",
             speed="standard",
             session_key=f"{agent.run.thread_id}:summary",
             cache_mark=None,
@@ -685,6 +705,26 @@ async def _model_summary(
             return None, attempt, problem
         text: str = reply.text.strip()
         words: int = len(text.split())
+        cut_last = reply.finish == "length"
+        if cut_last:
+            # A writer that ran on to the cap left a summary cut short: it is asked once to write it whole and shorter,
+            # and the run waits for the cap at most, never for a writer that does not stop (item 1191).
+            problem = f"the summary ran past its limit of {cap} tokens and was cut off"
+            # A writer that spent the cap thinking leaves no words: its thinking's length says so, as for an empty
+            # reply.
+            log.warning(
+                "summary_cut",
+                run_id=agent.run.id,
+                model=ref.label,
+                attempt=attempt,
+                cap=cap,
+                words=words,
+                thinking_chars=len(reply.thinking),
+            )
+            if not asked_shorter:
+                asked_shorter = True
+                prompt = _SUMMARY_CUT_PROMPT.format(tokens=cap, max_words=max_words) + base
+            continue
         if words > max_words * _SUMMARY_SLACK:
             problem = f"the summary had {words} words, over the limit of {max_words}"
             log.warning("summary_too_long", run_id=agent.run.id, model=ref.label, attempt=attempt, words=words)
@@ -728,9 +768,9 @@ async def _compact(
 ) -> Compaction:
     """Fold ``head`` into a continuity note written by the fast model (``[models] fast``), the side work of a run that
     its own, slower model need not do; the run's own model writes it when the fast one gives no usable summary (a
-    provider error, a timeout, no text, a summary far too long, a window that cannot be read) and, without asking the
-    fast one, while the router has paused it (item 240). The compaction event names the fast model's problem, so that a
-    fast model that never answers is seen, not hidden.
+    provider error, a timeout, no text, a summary far too long or cut off at its cap at every try, a window that cannot
+    be read) and, without asking the fast one, while the router has paused it (item 240). The compaction event names
+    the fast model's problem, so that a fast model that never answers is seen, not hidden.
 
     The ledger and the plan are pinned into the note in about ``part_chars`` characters; the model's summary is checked
     against ``head``, and a section it still lacks after it was asked for again goes into the note as an empty heading,

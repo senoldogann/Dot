@@ -84,11 +84,16 @@ is the answer (a small model that is offered both writes the call out as text).
   many of the newest messages as fit next to the system prompt, the tool definitions and its note in 85 % of the size at
   which it starts (`context_summarise_share` of the model's context size, or the whole budget when the window leaves
   less), and
-  never less than the model's last reply with its results, so the steps after it have room. It is tried three times:
-  a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section (a
-  section is there as a heading, not as a word of a sentence) is asked again once with the missing sections named and
+  never less than the model's last reply with its results, so the steps after it have room. Its writer may write the
+  words of a summary at its limit and slack and 4 000 tokens of thinking at most (7 000 tokens for 1 500 words, item
+  1191: a writer that ran on wrote 35 060 tokens in 400 s while its run waited; a writer on the Claude plan,
+  `claude_code`, is not held to it, as the `claude` command takes no such limit). It is tried three times: a summary
+  cut off at that cap is asked again once, whole and shorter and without reasoning, a summary far over the limit is
+  asked again with the limit and the overrun in front, and one that lacks a section (a section is there as a heading,
+  not as a word of a sentence) is asked again once with the missing sections named and
   the first draft carried along; when the fast model gives no text,
-  a summary far too long, an error or a timeout, or when its window cannot be read (an Ollama model whose server does not
+  a summary far too long or cut off at its cap at every try, an error or a timeout, or when its window cannot be read
+  (an Ollama model whose server does not
   answer, item 552), the run's own model writes it, and while the fast model is paused after
   a quota, rate-limit or key error (see `standby`) the run's own model writes it without asking the fast one (item 240);
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
@@ -198,7 +203,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   - say of the user's own products only what their source says, and mark what it could not check as not verified;
   - keep to the plan and the timing it wrote, or say first that it departs from them.
 - `prompt` in `[agent]` decides how much the system prompt says (item 280). `full`, the default, says how to work and
-  each kind of tool at length (the web, the browser, the desktop, memory, schedules). `lean` keeps the rules of trust
+  each kind of tool at length (the web, the browser, the desktop, memory, schedules), and that a file is found by name
+  with Spotlight (`mdfind -onlyin ~ -name`), not with `find` or `grep -r` over the home folder, and with `find` in one
+  folder for a hidden or new file Spotlight does not index (item 1188: 0.4 s where `find` took 100 s for the same file
+  on the owner's Mac). `lean` keeps the rules of trust
   and safety, of hesitating and of how a run ends as `full` has them, word for word where they are the same rule, and
   says how to work and each kind of tool in a line or two; the rest is in the tools' own descriptions. With
   `tool_surface = "grouped"` as well, a run starts lean: the shortest prompt and the core tools. Eval reports keep the

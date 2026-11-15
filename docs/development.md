@@ -202,8 +202,11 @@ slow runner does not keep, so the core leaves it to the night and to your Mac. A
 test's state fails there, as the browser tests run without the others: each makes what it needs; and one that saves a
 note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama server runs there. When something under
 `desktop/` changes, `.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and `cargo test` for the desktop
-shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved later cannot change what
-runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and when asked,
+shell, with the Rust that `desktop/src-tauri/rust-toolchain.toml` names (on your Mac, rustup's `cargo` first in `PATH`
+installs it the first time it runs there; Homebrew's ignores the file); a pull request runs it from the gate, so that
+`ci` waits for it (item 1189). Each action the workflows use is pinned by the commit its tag named, so a tag moved
+later cannot change what runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and
+when asked,
 `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for `uv.lock`,
 cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). The advisories
 `desktop/src-tauri/.cargo/audit.toml` ignores are of crates that are not in the Mac build, the only one Dot makes
@@ -212,13 +215,30 @@ fails the desktop checks the day one of them reaches it. It exports the whole of
 `uv.lock`, `dotagent-web-research` with it, since PyPI has it and the lock holds its hashes (item 623; while uv got it
 from its repository, item 583, it was left out, as `pip-audit --disable-pip` refuses a requirement with no hash).
 When something under
-`.github/` changes, every week and when asked, `.github/workflows/zizmor.yml` audits the workflows and Dependabot's file
+`.github/` changes (in a pull request from the gate, so that `ci` waits for it, item 1189), every week and when asked,
+`.github/workflows/zizmor.yml` audits the workflows and Dependabot's file
 with [zizmor](https://docs.zizmor.sh/audits/) (item 487): an event's text run as a script, a checkout that keeps its
 token, an action pinned by a commit its repository does not have, a known vulnerable action, a cache read by a release,
 Dependabot taking a release the day it is out (it waits a week, `cooldown` in `dependabot.yml`). Any finding fails the
 job; one accepted is in `.github/zizmor.yml` with its reason. zizmor is pinned by its version in the workflow, as
 pip-audit is; raise it by hand when a release brings an audit worth having (`uvx zizmor@<version> --min-severity low .`
 first, on your Mac).
+
+A Dependabot pull request that raises versions by a patch or a minor step merges by itself
+(`.github/workflows/dependabot-merge.yml`, item 1190): a job marks it with the label `dependabot-merge`, and every
+twenty minutes another merges at most one marked pull request whose `ci` passed, the oldest, and only when main's gate
+passed on main's head; then it starts main's gate on what it merged, since a merge made with a workflow's token starts
+no push run, and the desktop checks and zizmor when it changed what they read. One merge at a time, each after the
+previous one's run passed: look at those runs as at any merge's. One with a major version in it is not marked and waits
+for a person, who reads what the release changed; one whose `ci` fails stays open; one that cannot merge is put on hold,
+with the label `dependabot-hold`, and says why in a comment, as is one that changes more than the locks and manifests
+Dependabot raises versions in (`pyproject.toml`, under "Always needs a human", is not one of them). Put
+`dependabot-hold` on a pull request to keep it from merging; it stays through Dependabot's rebases until a person takes
+it off. Put `dependabot-merge` on one by hand to have it merged the same way, a major version too, which is then your
+decision; Dependabot's next push to it takes a mark the job would not set off again. A workflow's token cannot hold the
+`workflows` permission, so GitHub may refuse it a merge that changes `.github/workflows/`: the actions' pull requests
+then come to a person with that comment. A red run of the desktop checks on main holds the merges as a red gate does.
+Both labels are the repository's, made once with `gh label create`; without them the jobs fail.
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](../ROADMAP.md) and, from item 459 on, in [roadmap/](../roadmap/); read them before
@@ -354,7 +374,9 @@ notary service other than Accepted, with the log of what it found.
 Once, on the Mac that builds releases:
 
 - Rust from rustup, first in `PATH` (Homebrew's Rust builds for this Mac only), with the targets of both kinds of Mac:
-  `rustup target add aarch64-apple-darwin x86_64-apple-darwin`; and Node, as for any build of the shell.
+  `rustup target add aarch64-apple-darwin x86_64-apple-darwin`, which `release.sh` checks on the default toolchain; the
+  build itself runs with the version `desktop/src-tauri/rust-toolchain.toml` names, which rustup installs with both
+  targets (item 1189). And Node, as for any build of the shell.
 - A Developer ID Application certificate in the login keychain, the only one there: Xcode › Settings › Accounts ›
   Manage Certificates, or developer.apple.com › Certificates.
 - The notary service's credentials, saved as the profile `dot-notary`:
