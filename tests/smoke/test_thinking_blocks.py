@@ -182,7 +182,8 @@ async def _order(page: Page) -> list[str]:
         "(timeline) => [...timeline.children].flatMap((node) =>"
         " node.matches('details.steps') ? ['group']"
         " : node.matches('details.thought') ? ['thought']"
-        " : node.matches(\".bubble[aria-label='Dot']\") ? ['message']"
+        # An update on the way is named "Progress update" (item 1148); its speaker stays in data-speaker.
+        " : node.matches(\".bubble[aria-label='Dot'], .bubble[data-speaker='Dot']\") ? ['message']"
         " : node.matches('.answer') ? ['answer'] : [])"
     )
 

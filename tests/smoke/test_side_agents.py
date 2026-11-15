@@ -184,12 +184,12 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                         scout: Locator = faces.get_by_role("link", name=re.compile(r"^Scout( Two)?$"))
                         await expect(scout).to_have_attribute("href", f"#/agents/{agents['Scout']}")
                         await expect(scout).to_have_attribute("title", re.compile(r"^Scout( Two)?: Looks things up$"))
-                        # A name is one line, cut with an ellipsis where it is long, its whole in the tile's name; each
+                        # A name takes two lines before it is cut (item 1148), its whole in the tile's name; each
                         # tile is a finger's size and more.
                         watch: Locator = faces.get_by_role("link", name="Competitor Watch")
                         assert await watch.locator(".side-agent-name").evaluate(
-                            "name => getComputedStyle(name).whiteSpace === 'nowrap'"
-                            " && getComputedStyle(name).textOverflow === 'ellipsis'"
+                            "name => getComputedStyle(name).webkitLineClamp === '2'"
+                            " && getComputedStyle(name).overflow === 'hidden'"
                         )
                         tile = await watch.bounding_box()
                         assert tile is not None and tile["height"] >= 44 and tile["width"] >= 44, tile

@@ -149,9 +149,9 @@ async def _one_size(browser: Browser, manager: RunManager, address: str, width: 
         recap: Locator = details.locator(".panel-section", has=page.locator(".panel-section-title", has_text="Recap"))
         await expect(recap.locator(".recap-text p")).to_have_text(RECAP.split("\n"))
         await expect(recap.locator(".recap-meta")).to_contain_text("As of step 5")
-        # It heads the Run tab, before the details.
+        # It follows the Results and the Outcome of the run, before the details (item 1148).
         titles: list[str] = await details.locator(".panel-section-title").all_inner_texts()
-        assert titles[0] == "Recap", titles
+        assert titles[:3] == ["Results", "Outcome", "Recap"], titles
         await page.screenshot(path=str(shots / f"recap-{width}-{scheme}.png"))
         # Its button writes it again.
         await recap.get_by_role("button", name="Write the recap again").click()

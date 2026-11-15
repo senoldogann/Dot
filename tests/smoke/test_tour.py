@@ -268,7 +268,10 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
                 await page.wait_for_timeout(_SETTLE_MS)
             await page.evaluate("delete document.documentElement.dataset.shell")
         if name == "run":
-            # From the top of a conversation taller than the window, the way down to the answer (item 96).
+            # From the top of a conversation taller than the window, the way down to the answer (item 96). Its steps are
+            # folded under "What it is doing" (item 1131); shown, they make the conversation taller than the window.
+            await page.get_by_role("button", name="Show the steps").first.click()
+            await page.wait_for_timeout(_SETTLE_MS)
             await page.evaluate(f"{_SCROLLER}.scrollTo(0, 0)")
             await page.wait_for_timeout(_SETTLE_MS)
             await expect(page.get_by_role("button", name="Jump to the answer")).to_be_visible()
