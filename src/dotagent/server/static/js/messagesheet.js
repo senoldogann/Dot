@@ -9,6 +9,7 @@
  * sheet, open or not, one at a time.
  */
 import { el } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { REACTIONS, reactionsOf } from "./reactions.js";
 
@@ -71,14 +72,14 @@ function openMessageSheet(container) {
   ].filter((part) => part !== "");
   const button = foot?.querySelector(".react-button");
   const reacting = button ? reactionsOf(button) : undefined;
-  const dialog = el("dialog", { class: "message-sheet", "aria-label": "Message actions", tabindex: "-1" });
+  const dialog = el("dialog", { class: "message-sheet", "aria-label": t("sheet.actions"), tabindex: "-1" });
   const close = () => dialog.close();
   const reactionRow =
     reacting === undefined
       ? null
       : el(
           "div",
-          { class: "sheet-reactions", role: "group", "aria-label": "React to this message" },
+          { class: "sheet-reactions", role: "group", "aria-label": t("sheet.react") },
           ...REACTIONS.map((reaction) =>
             el(
               "button",
@@ -115,7 +116,7 @@ function openMessageSheet(container) {
     rows.splice(
       Math.min(1, rows.length),
       0,
-      row(icon("textCursor"), "Select text", () => {
+      row(icon("textCursor"), t("sheet.selectText"), () => {
         close();
         selectText(container);
       }),

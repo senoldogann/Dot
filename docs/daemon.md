@@ -261,8 +261,9 @@ the language too. Item 1172 brought the rest of a chat's flow into it: the steps
 thoughts, the notes and resume lines between them, the tool words of a step's row and the model, mode and Options
 menus; item 1173 the run page's own words (its foot, plan, lessons, rewind and live-update notes), the sidebar's,
 the reasoning levels' names (the level ids the daemon and the models take are unchanged), the side panel's Set up and
-the tooltips and limit of a message's picks, and the toast a page shows when it could not read again what it shows.
-The other settings pages are in English yet. The markdown
+the tooltips and limit of a message's picks, and the toast a page shows when it could not read again what it shows;
+item 1187 the dialogs' own Cancel, Close and question before dropping what was typed, the rows of a phone's message
+sheet and the buttons of a block of code and of a table. The other settings pages are in English yet. The markdown
 in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
