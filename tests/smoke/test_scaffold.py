@@ -60,9 +60,10 @@ _BROKEN_FAST: str = "broken"
 # `nothing_new` on `finish` and `refuses` on `create_agent` (items 880 and 875) and the shell's pointer to wait_until
 # and its group's line (item 887), 33 000 for the office's `agents_now` and `read_agent_chat` (item 890), 35 000 for the
 # work orders and the objectives (items 907 and 908), 36 000 for the line that has a run do a request however bluntly it
-# is put (item 1102; the gate's runner, whose paths are longer, was 14 tokens over); the window is rounded up so that
-# the summary still has room.
-_SMALL_WINDOW: int = 36_000
+# is put (item 1102; the gate's runner, whose paths are longer, was 14 tokens over), 37 000 for the line that has a run
+# find a file by name with Spotlight (item 1188, 56 tokens over); the window is rounded up so that the summary still has
+# room.
+_SMALL_WINDOW: int = 37_000
 # Every section the continuity check asks for, and no identifier the run's history does not hold.
 _SUMMARY: str = (
     "GOAL: find why the backup failed.\nDONE: read the log page by page.\nSTATE: no failure found so far.\n"
