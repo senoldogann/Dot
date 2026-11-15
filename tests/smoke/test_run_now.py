@@ -378,7 +378,9 @@ async def test_run_now_starts_the_run_its_page_opens_and_the_firings_list_it(
                 await page.screenshot(path=str(tmp_path / f"schedules-{width}-{scheme}.png"), full_page=True)
                 button: Locator = await item_of(page.locator("[data-schedule]", has_text="page check").first, "Run now")
                 await expect(button).to_be_visible()
-                await expect(button).to_have_attribute("title", re.compile(r"approvals: YOLO.*asking nothing", re.I))
+                await expect(button).to_have_attribute(
+                    "title", re.compile(r"approvals: Ask only to pay or send.*asking only to pay or send", re.I)
+                )
                 await button.click()
                 await expect(page).to_have_url(re.compile(r"#/runs/run_"))
                 run_id: str = page.url.rsplit("/", 1)[-1]

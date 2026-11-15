@@ -1,5 +1,7 @@
 // DOM helpers and formatters. Text always goes in as text nodes; nothing here ever builds markup from a string.
 
+import { t, uiLocale } from "./i18n.js";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function applyProps(node, props) {
@@ -297,22 +299,22 @@ export function foldSearch(text) {
   return lower.normalize("NFKD").replace(/\p{M}/gu, "").trim();
 }
 
-const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
+const DATE_TIME = new Intl.DateTimeFormat(uiLocale(), {
   day: "numeric",
   month: "short",
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,
 });
-const DATE_TIME_FULL = new Intl.DateTimeFormat("en-GB", {
+const DATE_TIME_FULL = new Intl.DateTimeFormat(uiLocale(), {
   dateStyle: "medium",
   timeStyle: "medium",
   hour12: false,
 });
-const CLOCK = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-const HOUR_MINUTE = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
-const DAY_YEAR = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const CLOCK = new Intl.DateTimeFormat(uiLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+const HOUR_MINUTE = new Intl.DateTimeFormat(uiLocale(), { hour: "2-digit", minute: "2-digit", hour12: false });
+const DAY = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "short" });
+const DAY_YEAR = new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "short", year: "numeric" });
 const DAY_MS = 86400 * 1000;
 const WEEK_S = 7 * 86400;
 
@@ -398,7 +400,7 @@ export function ago(ts) {
 export function age(ts) {
   const seconds = Math.max(0, Date.now() / 1000 - ts);
   if (seconds < 60) {
-    return "now";
+    return t("age.now");
   }
   if (seconds < 3600) {
     return `${Math.floor(seconds / 60)}m`;

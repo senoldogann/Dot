@@ -8,6 +8,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from dotagent.core.outcomes import render_outcomes, render_step
 from dotagent.core.text import fold_search, truncate_middle, unclosing
 from dotagent.desktop.ax import INTERACTIVE_ROLES
 from dotagent.desktop.types import (
@@ -344,13 +345,16 @@ def render_opened_app(opened: OpenedApp, nonce: str) -> str:
 
 
 def _step_line(report: StepReport) -> str:
-    detail: str = f": {_clip(report.detail, _DETAIL_CHARS)}" if report.detail else ""
-    return f"  {report.index}. {report.description} — {report.outcome}{detail}"
+    return render_step(report, _clip(report.detail, _DETAIL_CHARS))
 
 
 def render_act_outcome(outcome: ActOutcome, source: str, nonce: str) -> str:
     counts: Counter[str] = Counter(report.outcome for report in outcome.steps)
-    summary: str = f"Steps: {counts['done']} done, {counts['failed']} failed, {counts['skipped']} skipped"
+    # Done says that a step went through; what was checked of it stands beside it (item 1146).
+    summary: str = (
+        f"Steps: {counts['done']} done, {counts['failed']} failed, {counts['skipped']} skipped · "
+        f"{render_outcomes(outcome.steps)}"
+    )
     inner: list[str] = ["steps:", *(_step_line(report) for report in outcome.steps)]
     if outcome.stopped is not None:
         inner.append(f"stopped: {_clip(outcome.stopped, _DETAIL_CHARS)}")

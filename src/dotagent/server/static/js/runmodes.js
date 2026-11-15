@@ -8,6 +8,7 @@
 
 import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
+import { t } from "./i18n.js";
 import { readPref, writePref } from "./prefs.js";
 import { getSnapshot } from "./state.js";
 
@@ -19,40 +20,41 @@ const GOAL_MODE_KEY = "dot.goalMode";
 const GOAL_MODE_DEFAULT = true;
 
 // The approval modes, strictest first (item 398), each with its name, the shorter one the Options pill wears, what it
-// does and its icon. "ask" keeps its id, so the choices kept under it hold as they were.
+// does and its icon, in the interface's language. "ask" keeps its id, so the choices kept under it hold as they were;
+// so does "yolo", whose name says what it still asks (it was "YOLO", which said nothing of it).
 export const APPROVAL_OPTIONS = [
   {
     id: "supervised",
-    label: "Supervised",
-    short: "Supervised",
-    hint: "You approve every change: files, commands, clicks, messages",
+    label: t("approvals.supervised"),
+    short: t("approvals.supervisedShort"),
+    hint: t("approvals.supervisedHint"),
     icon: "lock",
   },
   {
     id: "ask",
-    label: "Auto-accept edits",
-    short: "Edits",
-    hint: "Edits and everyday work go ahead; Dot asks you about the rest",
+    label: t("approvals.ask"),
+    short: t("approvals.askShort"),
+    hint: t("approvals.askHint"),
     icon: "pencil",
   },
   {
     id: "auto",
-    label: "Auto",
-    short: "Auto",
-    hint: "A second AI answers for you; you are asked only what it is unsure about, and about Dot's own files",
+    label: t("approvals.auto"),
+    short: t("approvals.autoShort"),
+    hint: t("approvals.autoHint"),
     icon: "shield",
   },
   {
     id: "yolo",
-    label: "YOLO",
-    short: "YOLO",
-    hint: "Dot asks only before a payment, a message or mail sent for you or a public post, in a chat you opened. Every other step runs and is recorded, with why it would have asked",
+    label: t("approvals.yolo"),
+    short: t("approvals.yoloShort"),
+    hint: t("approvals.yoloHint"),
     icon: "lockOpen",
   },
 ];
-const GOAL_MODE_HINT = "Dot checks its answer against your goal and keeps working until the goal is really reached";
-const STANDING_HINT = "Keep going until done: Dot works on the goal in several sessions until a check confirms it is done, or you stop it";
-const STANDING_NOTE = "Keep going is on: Dot works on this goal in several sessions until a check confirms it is done. You can follow it under Campaigns.";
+const GOAL_MODE_HINT = t("options.goalModeHint");
+const STANDING_HINT = t("options.keepGoingHint");
+const STANDING_NOTE = t("options.keepGoingNote");
 
 /** The words for an approval mode, for chips and facts. */
 export function approvalLabel(id) {
@@ -118,7 +120,7 @@ function pick(caption, control, hint) {
 function approvalList(selected, onSelect) {
   let current = selected;
   const rows = new Map();
-  const element = el("div", { class: "approval-list", role: "listbox", "aria-label": "Approval mode" });
+  const element = el("div", { class: "approval-list", role: "listbox", "aria-label": t("options.approvalMode") });
 
   function paint() {
     for (const [id, row] of rows) {
@@ -183,7 +185,7 @@ export function approvalsPicker(onPaint, kept) {
 
   paint();
   return {
-    element: el("div", { class: "pop-group", role: "group", "aria-label": "Approvals" }, el("div", { class: "pop-heading", "aria-hidden": "true" }, "Approvals"), control.element),
+    element: el("div", { class: "pop-group", role: "group", "aria-label": t("options.approvals") }, el("div", { class: "pop-heading", "aria-hidden": "true" }, t("options.approvals")), control.element),
     value: kept.read,
     sync: () => {
       control.set(shown());
@@ -200,8 +202,8 @@ export function approvalsPicker(onPaint, kept) {
  */
 export function standingPicker(onToggle) {
   let on = false;
-  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Keep going until done" });
-  const element = switchRow(pick("Keep going", toggle, "Work in several sessions until the result is checked"), toggle);
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": t("options.keepGoingName") });
+  const element = switchRow(pick(t("options.keepGoing"), toggle, t("options.keepGoingShort")), toggle);
   element.title = STANDING_HINT;
   const note = el("div", { class: "composer-note", hidden: true }, icon("target"), el("span", null, STANDING_NOTE));
 
@@ -244,8 +246,8 @@ export function goalModePicker(kept) {
     }
     return status.goal_mode === true;
   }
-  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Goal mode" });
-  const element = switchRow(pick("Goal mode", toggle, "Keep working until the goal is reached"), toggle);
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": t("options.goalMode") });
+  const element = switchRow(pick(t("options.goalMode"), toggle, t("options.goalModeShort")), toggle);
   element.title = GOAL_MODE_HINT;
 
   function paint() {

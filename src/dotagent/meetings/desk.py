@@ -6,12 +6,20 @@ What holds, whatever a run or a meeting says:
   be signed in (``dotx browser meetings-login``): never the owner's profile, cookies or vault. Camera and microphone are
   fake devices, turned off before Dot asks to join.
 - The tab stays on Meet: a navigation of it to another host leaves the meeting (Google's sign-in is told as such).
-- Nothing is captured before the meeting is told: the fixed line :data:`ANNOUNCEMENT` is posted on the owner's yes, and
-  a no, or no answer, leaves at once.
-- Every post asks the owner, with its words whole, through :meth:`ApprovalBroker.request` itself: no mode, free mode
-  included, and no "don't ask again" reaches it, since it is no decision of a run's gate.
-- The meeting's words go to the store as lines and to the tool-less note maker (:mod:`dotagent.meetings.notes`), never
-  to a run: a run reads them through ``meeting_read``, whose result is untrusted.
+- Nothing is captured before the meeting is told: the fixed line :data:`ANNOUNCEMENT` (:data:`NOTES_ONLY` with answers
+  off), whose one slot is the owner's name, is posted once Dot is let in (item 1150: the owner asked Dot to join, as one
+  adds Claude to a call). A join that is not the owner's own word (asked by a run or chat that read outside content, or
+  in a chat Dot opened on its own) asks the owner first, in every mode, through the broker itself: a link in a mail is
+  no invitation.
+- A line that speaks to Dot is answered in the chat without asking (item 1150, as Claude Meetings does), by the
+  tool-less answerer (:mod:`dotagent.meetings.answers`), which reads the call's own lines and nothing of the owner's;
+  one answer at a time, :data:`_ANSWERS_A_MINUTE` a minute and :data:`_MOST_ANSWERS` a meeting at most, never one with a
+  link or one that speaks to Dot, each kept as a line of the meeting.
+- Every other post (a run's ``meeting_post``) asks the owner, with its words whole, through
+  :meth:`ApprovalBroker.request` itself: no mode, free mode included, and no "don't ask again" reaches it, since it is
+  no decision of a run's gate.
+- The meeting's words go to the store as lines and to the tool-less note maker (:mod:`dotagent.meetings.notes`) and
+  answerer, never to a run: a run reads them through ``meeting_read``, whose result is untrusted.
 - It leaves when the meeting ends, when Dot is removed, after ``[meetings] most_hours``, at the emergency stop and when
   the daemon stops; a meeting a restart cut is marked failed. Its lines are deleted ``keep_days`` after it ended."""
 
@@ -35,10 +43,11 @@ from dotagent.config import BrowserConfig, MeetingsConfig
 from dotagent.core.errors import DotError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
+from dotagent.meetings.answers import NO_QUESTIONS, Asking, answer_refused, take_questions
 from dotagent.meetings.meet import MEET_HOST, MeetPage, MeetPageError, meeting_address
 from dotagent.meetings.notes import NO_NOTES, MeetingNotes, notes_text
 from dotagent.meetings.transcript import CaptionBook, clean_words, fold_captions, fold_page, new_chat
-from dotagent.meetings.types import MAX_TEXT_CHARS, MeetingLine, MeetState, PageBatch
+from dotagent.meetings.types import MAX_TEXT_CHARS, MeetingLine, MeetState, PageBatch, PageTick
 from dotagent.store.db import Store
 from dotagent.store.models import MeetingLineRecord, MeetingRecord
 
@@ -46,13 +55,19 @@ log = get_logger(__name__)
 
 MEETING_POST_TOOL: str = "meeting_post"
 MEETING_LEAVE_TOOL: str = "meeting_leave"
-# The line that tells the meeting Dot is there, posted on the owner's yes before anything is captured. Its one slot is
-# the owner's name from Settings, never a model's words.
-ANNOUNCEMENT: str = "Dot is taking notes for {owner}. Its notes stay on {owner}'s Mac."
+MEETING_JOIN_TOOL: str = "meeting_join"
+# The line that tells the meeting Dot is there, posted once Dot is let in, before anything is captured (item 1150). Its
+# one slot is the owner's name from Settings, never a model's words.
+ANNOUNCEMENT: str = (
+    "Dot is taking notes for {owner} and answers what you ask it here. It is an AI: its answers are its own, not "
+    "{owner}'s word. Its notes stay on {owner}'s Mac."
+)
+NOTES_ONLY: str = "Dot is taking notes for {owner}. Its notes stay on {owner}'s Mac."
 # The most of a post, in characters, on its one line.
 POST_CHARS: int = 500
-# How often the page is read while Dot is in the call, and while it waits to be let in.
-_READ_EVERY_S: float = 2.0
+# How often the page is read while Dot is in the call (a question to Dot is seen within it), and while it waits to be
+# let in.
+_READ_EVERY_S: float = 0.5
 _WAIT_EVERY_S: float = 2.0
 # Google's own sign-in, where a meeting that wants an account sends the tab: told, never followed.
 _SIGN_IN_HOST: str = "accounts.google.com"
@@ -64,6 +79,10 @@ _MEETING_ARGS: tuple[str, ...] = (
     "--no-first-run",
     "--no-default-browser-check",
     "--disable-blink-features=AutomationControlled",
+    # A window behind others, or none, still reads the call as often: a question is seen within _READ_EVERY_S.
+    "--disable-background-timer-throttling",
+    "--disable-renderer-backgrounding",
+    "--disable-backgrounding-occluded-windows",
 )
 # How long the captions may stay off in the call (the host turned them off) before Dot leaves: it takes no notes
 # another way.
@@ -77,6 +96,20 @@ _SUMMARY_WAIT_S: float = 3600.0
 _LEAVE_WAIT_S: float = 30.0
 # How often the lines of meetings over for ``keep_days`` are looked for.
 _FORGET_EVERY_S: float = 6 * 3600.0
+# A question to Dot that waited longer than this when its turn comes is dropped, as the talk has gone on (item 1150).
+_QUESTION_STALE_S: float = 60.0
+# How many of a meeting's newest lines the answerer reads.
+_ANSWER_LINES: int = 300
+# The most questions Dot puts to its model in a minute and in a meeting, counted when the call starts, whatever comes of
+# it (an empty or refused answer, a failure): a call that floods it, or another bot that answers it, does not spend the
+# owner's model for hours (the pre-push review). Past the second, Dot answers no more there and its summary says so.
+_ANSWERS_A_MINUTE: int = 6
+_MOST_ANSWERS: int = 60
+# How often Dot opens the call's chat again when it finds it closed (its messages are on the page only while it is
+# open), and how many times in a row before it stops: a host who turned the chat off leaves no box to show, and the
+# button would only open and close the panel for the rest of the call.
+_CHAT_AGAIN_S: float = 10.0
+_CHAT_TRIES: int = 3
 
 
 class MeetingError(DotError):
@@ -87,6 +120,9 @@ type Notice = Callable[[str, str, str], Awaitable[None]]
 # The note maker: the notes of a meeting from its lines, its earlier notes and its id
 # (:func:`dotagent.meetings.notes.make_notes`, with the daemon's router and fast model).
 type Noter = Callable[[Sequence[MeetingLineRecord], MeetingNotes, str], Awaitable[MeetingNotes]]
+# The answerer: the line Dot says in the chat to the line that spoke to it, from the meeting's lines and its id; empty
+# to say nothing (:func:`dotagent.meetings.answers.make_answer`, with the daemon's router and fast model).
+type Answerer = Callable[[Sequence[MeetingLineRecord], MeetingLine, str], Awaitable[str]]
 
 
 async def untold(thread_id: str, goal: str, text: str) -> None:
@@ -114,6 +150,19 @@ class _Live:
     # The notes as they last stood, which a summary after a failure gives, and the note maker at work, if it is.
     notes: MeetingNotes = NO_NOTES
     making: "asyncio.Task[tuple[MeetingNotes, str | None]] | None" = None
+    # The questions to Dot (item 1150), the answer at work if one is, when each question went to the model, how many
+    # answers were posted, and why Dot answers no more in this meeting, once it does not.
+    asking: Asking = NO_QUESTIONS
+    answering: asyncio.Task[None] | None = None
+    tried: tuple[float, ...] = ()
+    answered: int = 0
+    answers_off: str = ""
+    # When Dot last opened the chat, which it keeps open to read it, and how many times in a row it did without the box
+    # showing.
+    chat_opened_at: float = 0.0
+    chat_tries: int = 0
+    # Held while Dot types in the chat: an answer and a run's post never type into the box at once.
+    posting: asyncio.Lock = field(default_factory=asyncio.Lock)
     task: asyncio.Task[None] | None = None
 
 
@@ -203,15 +252,17 @@ def on_meet(url: str) -> bool:
 
 
 class MeetingDesk:
-    """The daemon's meetings: joins one, watches it with no model, keeps its lines and notes, posts only on the owner's
-    yes, and leaves. ``noter`` writes the notes, ``launch`` opens the meeting's Chrome, ``owner`` gives the owner's name
-    as Settings has it now; :meth:`tell_with` gives it the way to keep a line in a chat."""
+    """The daemon's meetings: joins one, watches it with no model, keeps its lines and notes, answers whoever names Dot,
+    posts a run's words only on the owner's yes, and leaves. ``noter`` writes the notes, ``answerer`` the answers,
+    ``launch`` opens the meeting's Chrome, ``owner`` gives the owner's name as Settings has it now; :meth:`tell_with`
+    gives it the way to keep a line in a chat."""
 
     def __init__(
         self,
         store: Store,
         approvals: ApprovalBroker,
         noter: Noter,
+        answerer: Answerer,
         config: MeetingsConfig,
         launch: "Launcher",
         owner: Callable[[], str],
@@ -219,6 +270,7 @@ class MeetingDesk:
         self._store: Store = store
         self._approvals: ApprovalBroker = approvals
         self._noter: Noter = noter
+        self._answerer: Answerer = answerer
         self._config: MeetingsConfig = config
         self._launch: Launcher = launch
         self._owner: Callable[[], str] = owner
@@ -275,16 +327,29 @@ class MeetingDesk:
         """The id of the meeting Dot is in, or ``None``."""
         return None if self._live is None else self._live.meeting_id
 
-    async def join(self, url: str, thread_id: str, run_id: str) -> MeetingRecord:
+    async def join(self, url: str, thread_id: str, run_id: str, not_owners_word: str | None) -> MeetingRecord:
         """Join the Meet call at ``url`` for the run ``run_id`` of the chat ``thread_id``: ask to be let in, wait for
-        it, tell the meeting Dot is there on the owner's yes, and watch it. Returns the meeting in the call; raises
-        :class:`MeetingError`, with the meeting recorded as failed, when it cannot."""
+        it, tell the meeting Dot is there, and watch it. A join that is not the owner's own word asks them first, in
+        every mode, saying why (``not_owners_word``: the run or its chat read outside content, or Dot opened the chat
+        on its own; ``None`` for the owner's word). Returns the meeting in the call; raises :class:`MeetingError`, with
+        the meeting recorded as failed, when it cannot."""
         try:
             address: str = meeting_address(url)
         except MeetPageError as error:
             raise MeetingError(error.message, error.context) from error
         if not self._told:
             raise MeetingError("Dot joins meetings from its chats, while its daemon runs: ask there", {"url": address})
+        if not_owners_word is not None:
+            outcome: ApprovalOutcome = await self._approvals.request(
+                run_id,
+                MEETING_JOIN_TOOL,
+                f"Dot would join the meeting {address}, tell it Dot is there, take notes and answer what it is asked. "
+                f"It is asked because {not_owners_word}",
+                "high",
+                {"url": address},
+            )
+            if outcome.status != "approved":
+                raise MeetingError("Dot did not join: the owner did not say yes", {"answer": outcome.status})
         async with self._lock:
             if self._live is not None:
                 raise MeetingError(
@@ -377,37 +442,26 @@ class MeetingDesk:
             state = await live.page.state()
 
     async def _announce(self, live: _Live) -> None:
-        """Post :data:`ANNOUNCEMENT` on the owner's yes; a no, or no answer, is a :class:`MeetingError`."""
-        line: str = ANNOUNCEMENT.format(owner=self._owner())
-        outcome: ApprovalOutcome = await self._ask(live, line, "Tell the meeting that Dot takes notes")
-        if outcome.status != "approved":
-            raise MeetingError(
-                "Dot left without taking notes: the meeting was not told Dot is there", {"answer": outcome.status}
-            )
+        """Post :data:`ANNOUNCEMENT` once Dot is let in, before anything is kept (item 1150): its words are fixed, the
+        owner's name their one slot, and the owner asked Dot to join."""
         if live.stop.is_set():
-            raise MeetingError(_why(live, "the join was stopped"), {"answer": outcome.status})
-        await self._post_as_dot(live, line)
+            raise MeetingError(_why(live, "the join was stopped"), {"meeting_id": live.meeting_id})
+        told: str = ANNOUNCEMENT if self._config.answers else NOTES_ONLY
+        await self._post_as_dot(live, told.format(owner=self._owner()))
+        live.chat_opened_at = time.monotonic()
 
     async def _post_as_dot(self, live: _Live, text: str) -> None:
-        """Type ``text`` in the meeting's chat. Its words are marked as Dot's before it goes, since the watch may read
-        it back while the page confirms it, and unmarked when it did not go, so that someone else's same words count."""
+        """Type ``text`` in the meeting's chat, one post at a time. Its words are marked as Dot's before it goes, since
+        the watch may read it back while the page confirms it, and unmarked when it did not go, so that someone else's
+        same words count."""
         words: str = clean_words(text, MAX_TEXT_CHARS)
-        live.posted = live.posted | {words}
-        try:
-            await live.page.post(text)
-        except BaseException:
-            live.posted = live.posted - {words}
-            raise
-
-    async def _ask(self, live: _Live, text: str, why: str) -> ApprovalOutcome:
-        """The owner's answer to a post of ``text`` in the meeting, asked in the run that asked for the meeting."""
-        return await self._approvals.request(
-            live.run_id,
-            MEETING_POST_TOOL,
-            f"{why}. Dot would post in the meeting's chat: {text}",
-            "high",
-            {"meeting_id": live.meeting_id, "text": text},
-        )
+        async with live.posting:
+            live.posted = live.posted | {words}
+            try:
+                await live.page.post(text)
+            except BaseException:
+                live.posted = live.posted - {words}
+                raise
 
     # ------------------------------------------------------------------ posting and leaving
 
@@ -478,6 +532,8 @@ class MeetingDesk:
             live.no_model = True
             if live.making is not None and not live.making.done():
                 live.making.cancel()
+            if live.answering is not None and not live.answering.done():
+                live.answering.cancel()
 
     def _the_live(self, meeting_id: str) -> _Live:
         if self._live is None or self._live.meeting_id != meeting_id:
@@ -509,6 +565,10 @@ class MeetingDesk:
         finally:
             if live.making is not None and not live.making.done():
                 live.making.cancel()
+            if live.answering is not None and not live.answering.done():
+                live.answering.cancel()
+            elif live.answering is not None:
+                _log_broken(live)
             if not live.left.is_set():
                 await self._close(live, status, end_note)
         # A meeting that ended in a failure (its page lost, the store refusing) is summed up all the same: its notes and
@@ -529,24 +589,34 @@ class MeetingDesk:
             if time.monotonic() > ends:
                 end_note = f"Dot left after {self._config.most_hours:g} hours, its most"
                 break
-            state: MeetState = await live.page.state()
-            if state in ("ended", "removed"):
-                end_note = _STATE_WORDS[state]
-                break
-            if await live.page.captions_on():
+            tick: PageTick = await live.page.tick()
+            if not tick.in_call:
+                # Leave call is gone: the whole page says why (or Meet draws its next screen, and the next read sees).
+                state: MeetState = await live.page.state()
+                if state in ("ended", "removed"):
+                    end_note = _STATE_WORDS[state]
+                    break
+            if tick.captions_on:
                 captions_off_since = None
             else:
                 captions_off_since = captions_off_since if captions_off_since is not None else time.monotonic()
                 if time.monotonic() - captions_off_since > _CAPTIONS_OFF_S:
                     end_note = "the meeting's captions were turned off, and Dot takes no notes without them"
                     break
-            batch: PageBatch = await live.page.drain()
+            if tick.chat_open:
+                live.chat_tries = 0
+            elif tick.in_call:
+                await self._open_chat(live)
+            batch: PageBatch = tick.batch
             if batch.dropped:
                 log.warning("meeting_page_dropped", meeting_id=live.meeting_id, dropped=batch.dropped)
             book, captions = fold_page(book, batch.captions, batch.vanished, time.time(), self._config.settle_s)
             seen_chat, chat = new_chat(seen_chat, batch.chat)
             theirs, live.posted = not_dots(chat, live.posted)
             total: int = await self._keep(live, (*captions, *theirs))
+            if self._config.answers:
+                self._take(live, (*captions, *theirs))
+                self._answer_next(live)
             if live.making is not None and live.making.done():
                 # A note maker the stop cut leaves the notes as they stood.
                 if not live.making.cancelled():
@@ -578,6 +648,103 @@ class MeetingDesk:
         if live.why:
             end_note = live.why[-1]
         return end_note
+
+    async def _open_chat(self, live: _Live) -> None:
+        """Open the call's chat again, found closed, at most every :data:`_CHAT_AGAIN_S` and :data:`_CHAT_TRIES` times
+        in a row: its messages, and the questions among them, are on the page only while it is open. One that will not
+        open is logged; the captions are still read."""
+        if live.chat_tries >= _CHAT_TRIES or time.monotonic() - live.chat_opened_at < _CHAT_AGAIN_S:
+            return
+        live.chat_opened_at = time.monotonic()
+        live.chat_tries += 1
+        if live.chat_tries == _CHAT_TRIES:
+            log.warning("meeting_chat_given_up", meeting_id=live.meeting_id, tries=_CHAT_TRIES)
+        try:
+            await live.page.open_chat()
+        except MeetPageError as error:
+            log.warning("meeting_chat_closed", meeting_id=live.meeting_id, error=error.message)
+
+    def _take(self, live: _Live, lines: tuple[MeetingLine, ...]) -> None:
+        """Take the questions to Dot among ``lines`` (:func:`take_questions`), logging those dropped."""
+        live.asking, dropped = take_questions(live.asking, lines, self._config.name or "Dot", time.time())
+        if dropped:
+            log.warning("meeting_question_dropped", meeting_id=live.meeting_id, dropped=dropped)
+
+    def _answer_next(self, live: _Live) -> None:
+        """Start the answer to the next question that waits, once the one at work is done: one at a time, none after a
+        stop, none past :data:`_ANSWERS_A_MINUTE` questions to the model in the last minute (it waits) or
+        :data:`_MOST_ANSWERS` in the meeting (Dot answers no more), and none to a question older than
+        :data:`_QUESTION_STALE_S`. An answer that ended in an error :meth:`_answered` does not know is logged as one."""
+        if live.answering is not None:
+            if not live.answering.done():
+                return
+            _log_broken(live)
+            live.answering = None
+        if live.stop.is_set() or live.no_model or live.answers_off or not live.asking.waiting:
+            return
+        if len(live.tried) >= _MOST_ANSWERS:
+            live.answers_off = f"Dot took {_MOST_ANSWERS} questions, its most in a meeting, and answered no more"
+            log.warning("meeting_answers_stopped", meeting_id=live.meeting_id, questions=len(live.tried))
+            return
+        now: float = time.time()
+        if sum(1 for at in live.tried if now - at < 60.0) >= _ANSWERS_A_MINUTE:
+            return
+        fresh: tuple[MeetingLine, ...] = tuple(
+            line for line in live.asking.waiting if now - line.at <= _QUESTION_STALE_S
+        )
+        if len(fresh) < len(live.asking.waiting):
+            log.info(
+                "meeting_question_stale", meeting_id=live.meeting_id, dropped=len(live.asking.waiting) - len(fresh)
+            )
+        live.asking = live.asking.model_copy(update={"waiting": fresh[1:]})
+        if fresh:
+            live.tried = (*live.tried, now)
+            live.answering = asyncio.create_task(
+                self._answered(live, fresh[0]), name=f"meeting-answer-{live.meeting_id}"
+            )
+
+    async def _answered(self, live: _Live, question: MeetingLine) -> None:
+        """Answer ``question`` in the chat with the answerer's line, unasked, and keep it as a line of Dot's. An answer
+        that fails, is empty, or is no post Dot types (:func:`post_refused`, :func:`answer_refused`) is logged and
+        nothing is posted; the call goes on either way."""
+        name: str = self._config.name or "Dot"
+        try:
+            meeting: MeetingRecord = await self._store.get_meeting(live.meeting_id)
+            lines: list[MeetingLineRecord] = await self._store.meeting_lines(
+                live.meeting_id, max(0, meeting.lines - _ANSWER_LINES), _ANSWER_LINES
+            )
+            text: str = (await self._answerer(lines, question, live.meeting_id)).strip()
+        except DotError as error:
+            log.warning("meeting_answer_failed", meeting_id=live.meeting_id, error=error.message, context=error.context)
+            return
+        except sqlite3.Error as error:
+            log.warning("meeting_answer_failed", meeting_id=live.meeting_id, error=str(error))
+            return
+        if text == "":
+            log.info("meeting_answer_none", meeting_id=live.meeting_id)
+            return
+        refused: str | None = post_refused(text) or answer_refused(text, name)
+        if refused is not None:
+            log.warning("meeting_answer_refused", meeting_id=live.meeting_id, why=refused, chars=len(text))
+            return
+        if live.stop.is_set() or live.no_model:
+            return
+        try:
+            await self._post_as_dot(live, text)
+        except (DotError, PlaywrightError) as error:
+            log.warning("meeting_answer_not_posted", meeting_id=live.meeting_id, error=str(error)[:300])
+            return
+        live.answered += 1
+        said: MeetingLine = MeetingLine(
+            kind="dot", speaker=name, text=clean_words(text, MAX_TEXT_CHARS), at=time.time()
+        )
+        try:
+            await self._keep(live, (said,))
+        except (DotError, sqlite3.Error) as error:
+            # Posted, but not kept: the log says so, as the record does not.
+            log.warning("meeting_answer_not_kept", meeting_id=live.meeting_id, error=str(error)[:300])
+            return
+        log.info("meeting_answered", meeting_id=live.meeting_id, chars=len(text), asked_kind=question.kind)
 
     async def _keep(self, live: _Live, lines: tuple[MeetingLine, ...]) -> int:
         return await self._store.add_meeting_lines(
@@ -613,9 +780,13 @@ class MeetingDesk:
                 final, unmade = live.making.result()
         meeting: MeetingRecord = await self._store.get_meeting(live.meeting_id)
         stale: str = "" if unmade is None else f"These are the notes as they last stood: {unmade}.\n\n"
+        answered: str = (
+            f" Dot was asked {len(live.tried)} times in the call and answered {live.answered}." if live.tried else ""
+        )
+        stopped: str = f" {live.answers_off}." if live.answers_off else ""
         text: str = (
             f"Dot left the meeting ({end_note}). {meeting.lines} lines were kept for "
-            f"{self._config.keep_days} days.\n\n{stale}{notes_text(final, self._owner())}"
+            f"{self._config.keep_days} days.{answered}{stopped}\n\n{stale}{notes_text(final, self._owner())}"
         )
         await self._store.set_meeting_summary(live.meeting_id, text)
         await self._tell(live, "The notes of the meeting", text)
@@ -670,6 +841,17 @@ def not_dots(chat: tuple[MeetingLine, ...], posted: frozenset[str]) -> tuple[tup
 
 
 _STOPPED: str = "Dot was stopped, so they were not made again"
+
+
+def _log_broken(live: _Live) -> None:
+    """Log the error a finished answer of ``live`` ended in that :meth:`MeetingDesk._answered` does not know, so that
+    it is read and told, whether the next answer or the end of the watch finds it."""
+    task: asyncio.Task[None] | None = live.answering
+    if task is None or not task.done() or task.cancelled():
+        return
+    error: BaseException | None = task.exception()
+    if error is not None:
+        log.error("meeting_answer_broke", meeting_id=live.meeting_id, error_type=type(error).__name__, error=str(error))
 
 
 def _why(live: _Live, otherwise: str) -> str:

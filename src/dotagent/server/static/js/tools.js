@@ -2,7 +2,8 @@
 
 import { imageUrl } from "./api.js";
 import { codeBlock } from "./codeblock.js";
-import { clip, duration, el, plural } from "./dom.js";
+import { clip, duration, el } from "./dom.js";
+import { t, tCount, uiLocale } from "./i18n.js";
 import { icon, toolIconName } from "./icons.js";
 import { showImage } from "./ui.js";
 import { showsWhy, whyText } from "./why.js";
@@ -44,18 +45,19 @@ export function callKind(tool) {
   return "other";
 }
 
-// How each count reads: the first part says what it did, the others go on with it ("Ran 2 commands and read 1 file").
+// How each count reads, a whole clause in each language: the first part says what it did, the others go on with it
+// ("Ran 2 commands and read 1 file").
 const FLOW_WORDS = {
-  command: (count) => `Ran ${plural(count, "command", "commands")}`,
-  read: (count) => `read ${plural(count, "file", "files")}`,
-  write: (count) => `wrote ${plural(count, "file", "files")}`,
-  search: (count) => `searched the web ${count === 1 ? "once" : `${count} times`}`,
-  page: (count) => `opened ${plural(count, "page", "pages")}`,
-  browser: (count) => `took ${plural(count, "browser step", "browser steps")}`,
-  desktop: (count) => `used the desktop ${count === 1 ? "once" : `${count} times`}`,
-  schedule: (count) => `changed ${plural(count, "schedule", "schedules")}`,
-  memory: (count) => `kept ${plural(count, "note", "notes")}`,
-  other: (count, alone) => `took ${plural(count, alone ? "step" : "other step", alone ? "steps" : "other steps")}`,
+  command: (count) => tCount(count, "tools.flowCommandOne", "tools.flowCommandMany"),
+  read: (count) => tCount(count, "tools.flowReadOne", "tools.flowReadMany"),
+  write: (count) => tCount(count, "tools.flowWriteOne", "tools.flowWriteMany"),
+  search: (count) => tCount(count, "tools.flowSearchOne", "tools.flowSearchMany"),
+  page: (count) => tCount(count, "tools.flowPageOne", "tools.flowPageMany"),
+  browser: (count) => tCount(count, "tools.flowBrowserOne", "tools.flowBrowserMany"),
+  desktop: (count) => tCount(count, "tools.flowDesktopOne", "tools.flowDesktopMany"),
+  schedule: (count) => tCount(count, "tools.flowScheduleOne", "tools.flowScheduleMany"),
+  memory: (count) => tCount(count, "tools.flowMemoryOne", "tools.flowMemoryMany"),
+  other: (count, alone) => (alone ? tCount(count, "tools.flowStepOne", "tools.flowStepMany") : tCount(count, "tools.flowOtherOne", "tools.flowOtherMany")),
 };
 // The order the parts are said in, whatever order the calls came in.
 const FLOW_ORDER = ["command", "read", "write", "search", "page", "browser", "desktop", "schedule", "memory", "other"];
@@ -88,8 +90,8 @@ export function flowWords(kinds) {
   if (parts.length === 0) {
     return "";
   }
-  const said = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
-  return `${said[0].toUpperCase()}${said.slice(1)}`;
+  const said = parts.length === 1 ? parts[0] : t("tools.flowAnd", { first: parts.slice(0, -1).join(", "), last: parts[parts.length - 1] });
+  return `${said[0].toLocaleUpperCase(uiLocale())}${said.slice(1)}`;
 }
 
 /** The counts of the calls a group of steps made, by `callKind`. */
@@ -129,7 +131,7 @@ function stepBlock(label, text, failed, copyText = text) {
 }
 
 function textBlock(text, failed) {
-  const view = stepBlock(failed ? "Error" : "Result", text.length > TEXT_PREVIEW_CHARS ? text.slice(0, TEXT_PREVIEW_CHARS) : text, failed, text);
+  const view = stepBlock(failed ? t("tools.error") : t("tools.result"), text.length > TEXT_PREVIEW_CHARS ? text.slice(0, TEXT_PREVIEW_CHARS) : text, failed, text);
   if (text.length <= TEXT_PREVIEW_CHARS) {
     return view;
   }
@@ -143,21 +145,21 @@ function textBlock(text, failed) {
         more.remove();
       },
     },
-    `Show all (${text.length.toLocaleString("en-GB")} characters)`,
+    t("tools.showAll", { count: text.length.toLocaleString(uiLocale()) }),
   );
   return el("div", { class: "stack tight" }, view, more);
 }
 
 function thumbnail(name) {
-  const image = el("img", { alt: "Screenshot", loading: "lazy" });
-  const holder = el("button", { class: "shot", type: "button", "aria-label": "Show the screenshot at full size" }, image);
+  const image = el("img", { alt: t("tools.screenshot"), loading: "lazy" });
+  const holder = el("button", { class: "shot", type: "button", "aria-label": t("tools.screenshotFull") }, image);
   imageUrl(name).then(
     (url) => {
       image.src = url;
-      holder.addEventListener("click", () => showImage(url, "Screenshot"));
+      holder.addEventListener("click", () => showImage(url, t("tools.screenshot")));
     },
     (error) => {
-      holder.replaceChildren(el("span", { class: "small muted" }, `Image unavailable: ${error.message}`));
+      holder.replaceChildren(el("span", { class: "small muted" }, t("tools.imageUnavailable", { problem: error.message })));
       holder.disabled = true;
     },
   );
@@ -171,7 +173,7 @@ function whyLine(decision, flags) {
     { class: "small why-line" },
     whyText(decision, flags),
     decision.source === "rule" ? " " : null,
-    decision.source === "rule" ? el("a", { class: "why-rules", href: "#/settings/rules" }, "Rules") : null,
+    decision.source === "rule" ? el("a", { class: "why-rules", href: "#/settings/rules" }, t("tools.rules")) : null,
   );
 }
 
@@ -180,77 +182,78 @@ function section(title, content) {
 }
 
 // What a row calls each of Dot's own tools (item 513): what it does, in a few words, rather than the name a model calls.
+/** @type {Record<string, import("./i18n.js").WordKey>} */
 const TOOL_WORDS = {
-  shell: "Command",
-  terminal_open: "Open terminal",
-  terminal_send: "Type in terminal",
-  terminal_read: "Read terminal",
-  terminal_close: "Close terminal",
-  read_file: "Read file",
-  write_file: "Write file",
-  edit_file: "Edit file",
-  list_dir: "List folder",
-  search_files: "Search in files",
-  find_files: "Find files",
-  web_search: "Web search",
-  web_fetch: "Fetch page",
-  web_extract: "Read page",
-  web_crawl: "Crawl site",
-  browser_open: "Open page",
-  browser_new_tab: "New tab",
-  browser_snapshot: "Look at page",
-  browser_find: "Find on page",
-  browser_links: "List links",
-  browser_act: "Act on page",
-  browser_eval: "Run script on page",
-  browser_scroll: "Scroll page",
-  browser_read_text: "Read page text",
-  browser_screenshot: "Screenshot page",
-  browser_wait_text: "Wait for text",
-  browser_back: "Go back",
-  browser_switch_tab: "Switch tab",
-  browser_close_tab: "Close tab",
-  browser_upload: "Upload file",
-  browser_fill_login: "Fill in login",
-  browser_create_login: "Make a new login",
-  browser_logins: "List logins",
-  desktop_apps: "List apps",
-  desktop_open_app: "Open app",
-  desktop_read: "Read window",
-  desktop_screenshot: "Screenshot screen",
-  desktop_snapshot: "Look at window",
-  desktop_act: "Act in app",
-  desktop_clipboard_read: "Read clipboard",
-  desktop_clipboard_write: "Copy to clipboard",
-  apple_script: "Control an app",
-  mail_read: "Read mail",
-  mail_search: "Search mail",
-  calendar_events: "Calendar",
-  memory_save: "Save note",
-  memory_search: "Search notes",
-  memory_update: "Update note",
-  memory_forget: "Forget note",
-  write_notes: "Write notes",
-  update_plan: "Update plan",
-  mark_plan_step: "Mark plan step",
-  skill: "Use skill",
-  delegate: "Delegate",
-  message_agent: "Message agent",
-  create_agent: "Make agent",
-  create_team: "Make team",
-  consult: "Ask a helper",
-  notify: "Notify",
-  show_page: "Show page",
-  draft_message: "Draft message",
-  ask_user: "Ask you",
-  ask_secret: "Ask you for a secret",
-  finish: "Finish",
-  use_tools: "Turn on more actions",
-  schedule_create: "Add schedule",
-  schedule_list: "List schedules",
-  schedule_delete: "Delete schedule",
-  find_help: "Find help",
-  code_fetch: "Fetch code",
+  shell: "tools.shell",
+  terminal_open: "tools.terminalOpen",
+  terminal_send: "tools.terminalSend",
+  terminal_read: "tools.terminalRead",
+  terminal_close: "tools.terminalClose",
+  read_file: "tools.readFile",
+  write_file: "tools.writeFile",
+  edit_file: "tools.editFile",
+  list_dir: "tools.listDir",
+  search_files: "tools.searchFiles",
+  find_files: "tools.findFiles",
+  web_search: "tools.webSearch",
+  web_fetch: "tools.webFetch",
+  web_extract: "tools.webExtract",
+  web_crawl: "tools.webCrawl",
+  browser_open: "tools.browserOpen",
+  browser_new_tab: "tools.browserNewTab",
+  browser_snapshot: "tools.browserSnapshot",
+  browser_find: "tools.browserFind",
+  browser_links: "tools.browserLinks",
+  browser_act: "tools.browserAct",
+  browser_eval: "tools.browserEval",
+  browser_scroll: "tools.browserScroll",
+  browser_read_text: "tools.browserReadText",
+  browser_screenshot: "tools.browserScreenshot",
+  browser_wait_text: "tools.browserWaitText",
+  browser_back: "tools.browserBack",
+  browser_switch_tab: "tools.browserSwitchTab",
+  browser_close_tab: "tools.browserCloseTab",
+  browser_upload: "tools.browserUpload",
+  browser_fill_login: "tools.browserFillLogin",
+  browser_create_login: "tools.browserCreateLogin",
+  browser_logins: "tools.browserLogins",
+  desktop_apps: "tools.desktopApps",
+  desktop_open_app: "tools.desktopOpenApp",
+  desktop_read: "tools.desktopRead",
+  desktop_screenshot: "tools.desktopScreenshot",
+  desktop_snapshot: "tools.desktopSnapshot",
+  desktop_act: "tools.desktopAct",
+  desktop_clipboard_read: "tools.desktopClipboardRead",
+  desktop_clipboard_write: "tools.desktopClipboardWrite",
+  apple_script: "tools.appleScript",
+  mail_read: "tools.mailRead",
+  mail_search: "tools.mailSearch",
+  calendar_events: "tools.calendarEvents",
+  memory_save: "tools.memorySave",
+  memory_search: "tools.memorySearch",
+  memory_update: "tools.memoryUpdate",
+  memory_forget: "tools.memoryForget",
+  write_notes: "tools.writeNotes",
+  update_plan: "tools.updatePlan",
+  mark_plan_step: "tools.markPlanStep",
+  skill: "tools.skill",
+  delegate: "tools.delegate",
+  message_agent: "tools.messageAgent",
+  create_agent: "tools.createAgent",
+  create_team: "tools.createTeam",
+  consult: "tools.consult",
+  notify: "tools.notify",
+  show_page: "tools.showPage",
+  draft_message: "tools.draftMessage",
+  ask_user: "tools.askUser",
+  ask_secret: "tools.askSecret",
+  finish: "tools.finish",
+  use_tools: "tools.useTools",
+  schedule_create: "tools.scheduleCreate",
+  schedule_list: "tools.scheduleList",
+  schedule_delete: "tools.scheduleDelete",
+  find_help: "tools.findHelp",
+  code_fetch: "tools.codeFetch",
 };
 
 /** A name in words, its first letter capital: `draft_reply` reads "Draft reply". */
@@ -287,7 +290,7 @@ export function shortPaths(text) {
  * any other in words of its name. The name itself is the words' title. */
 export function toolWords(tool) {
   if (Object.hasOwn(TOOL_WORDS, tool)) {
-    return TOOL_WORDS[tool];
+    return t(TOOL_WORDS[tool]);
   }
   const mcp = /^mcp__(.+?)__(.+)$/.exec(tool);
   if (mcp === null) {
@@ -322,8 +325,8 @@ export function toolRow({ tool, args }) {
   const named = words === "" || (!command && kind !== "read" && kind !== "write");
   // A read or a write says which it is before its result comes, so a call still running, or one cut off, is read as what
   // it was; the policy's words take its place once it is done.
-  const spoken = kind === "read" ? "Read" : kind === "write" ? (tool === "edit_file" ? "Edit" : "Write") : "";
-  const summary = el("span", { class: "tool-sum" }, spoken === "" || words === "" ? words : `${spoken} ${words}`);
+  const spoken = kind === "read" ? "tools.readOf" : kind === "write" ? (tool === "edit_file" ? "tools.editOf" : "tools.writeOf") : null;
+  const summary = el("span", { class: "tool-sum" }, spoken === null || words === "" ? words : t(spoken, { what: words }));
   const time = el("span", { class: "tool-time" });
   const badges = el("span", { class: "cluster" });
   const head = el(
@@ -350,13 +353,13 @@ export function toolRow({ tool, args }) {
     const argsText = JSON.stringify(args, null, 2);
     // replaceChildren writes a null as the word "null": a section that is not there is left out before (item 472).
     const parts = [
-      plain === null ? stepBlock("What Dot sent", argsText, false) : stepBlock("Command", plain, false),
+      plain === null ? stepBlock(t("tools.sent"), argsText, false) : stepBlock(t("tools.commandLabel"), plain, false),
       result === null
-        ? el("div", { class: "small muted" }, cut ? "Cut off: the task ended before this step reported back." : "Still running…")
+        ? el("div", { class: "small muted" }, cut ? t("tools.cutOff") : t("tools.stillRunning"))
         : result.text === ""
-          ? section(result.ok ? "Result" : "Error", el("div", { class: "small muted" }, "(no text)"))
+          ? section(result.ok ? t("tools.result") : t("tools.error"), el("div", { class: "small muted" }, t("tools.noText")))
           : textBlock(result.text, !result.ok),
-      result === null || !showsWhy(result.decision, result.kind) ? null : section("Why it ran", whyLine(result.decision, result.flags ?? [])),
+      result === null || !showsWhy(result.decision, result.kind) ? null : section(t("tools.whyItRan"), whyLine(result.decision, result.flags ?? [])),
     ];
     body.replaceChildren(...parts.filter((part) => part !== null));
   }
@@ -378,7 +381,7 @@ export function toolRow({ tool, args }) {
       summary.textContent = clip(outcome.summary, SUMMARY_CHARS);
     }
     // A command keeps its own words, what it came to its tooltip; a failure's first line is the tooltip of any call.
-    head.title = outcome.ok ? outcome.summary || tool : firstLine(outcome.text) || "failed";
+    head.title = outcome.ok ? outcome.summary || tool : firstLine(outcome.text) || t("tools.failed");
     time.textContent = duration(outcome.seconds);
     shots.replaceChildren(...outcome.images.map(thumbnail));
     if (details.open) {
@@ -395,7 +398,7 @@ export function toolRow({ tool, args }) {
     details.classList.remove("running");
     state.replaceChildren(icon("alert"));
     state.className = "tool-state cut";
-    badges.replaceChildren(el("span", { class: "badge b-warn" }, "cut off"));
+    badges.replaceChildren(el("span", { class: "badge b-warn" }, t("tools.cutBadge")));
     if (details.open) {
       buildBody();
     }

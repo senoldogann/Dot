@@ -60,6 +60,10 @@ TOKEN: str = "browser-settings-test-token"
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
 _RUN_WAIT_S: float = 60.0
 _SCRIPT_WAIT_S: float = 5.0
+# How long a request that makes the daemon start Chrome is waited for (the check of what Chrome reads from a
+# profile): httpx waits 5 s by itself, and Chrome took 6 s to start on the gate's runner (2026-11-13), which failed
+# the test with a ReadTimeout for a check that was about to answer.
+_CHROME_WAIT_S: float = 60.0
 _FINISH: ScriptedTurn = ScriptedTurn(
     text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)
 )
@@ -623,7 +627,9 @@ async def test_settings_browser_imports_the_sign_ins_of_a_chrome_profile_into_a_
                 await page.close()
         finally:
             await browser.close()
-        async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
+        async with httpx.AsyncClient(
+            base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}, timeout=_CHROME_WAIT_S
+        ) as http:
             refused: httpx.Response = await http.post(
                 "/api/browser/chrome-import",
                 json={"source": "Default", "into": "Senol", "replace": False, "use": False},

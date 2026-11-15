@@ -78,7 +78,7 @@ _GROUP_OF_TOOL: dict[str, str] = {
 }
 _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
-    "meetings": "the owner's Google Meet call: joining it to take notes, reading them, posting on the owner's yes",
+    "meetings": "the owner's Google Meet call: joining it to take notes and answer, reading them, posting on their yes",
     "desktop": "the Mac's applications, windows, clipboard and AppleScript",
     "schedule": "goals that run later, once or on a cron expression",
     "terminal": "programs that ask questions, REPLs and servers that stay up, on a terminal of their own",

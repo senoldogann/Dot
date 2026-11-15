@@ -1044,8 +1044,7 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_words_o
             # With the run's choices shown, the box takes a line of its own. On a desk the microphone stands left of
             # the send, on the line of the choices; on a phone the box keeps its line with the "+" and the send, and
             # the microphone is under it, at the right.
-            await composer.locator(".plus-button").click()
-            await page.get_by_role("menuitem", name="Model and options").click()
+            await composer.get_by_role("button", name="Model and options").click()
             await expect(composer).not_to_have_attribute("data-quiet", "")
             box, sent, field = await _rects(composer, ".mic-button", ".btn.send", ".composer-field")
             assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
@@ -1064,8 +1063,7 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_words_o
                 assert abs((box["y"] + box["height"]) - (sent["y"] + sent["height"])) < 2
             await _fits(page, f"{width} {place}")
             # The choices away again, for the next place and the tests after this one.
-            await composer.locator(".plus-button").click()
-            await page.get_by_role("menuitem", name="Hide the model and options").click()
+            await composer.get_by_role("button", name="Model and options").click()
             await expect(composer).to_have_attribute("data-quiet", "")
             await _fits(page, f"{width} {place} as one line")
         await page.context.close()

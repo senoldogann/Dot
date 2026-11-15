@@ -12,9 +12,10 @@
 // finds its chats as it finds the others. Dot's own work does too (item 822): the chats of On its own and of the
 // schedules stand folded at the foot, so that the days hold the owner's own chats.
 
-import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
-import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
-import { serviceWords } from "./errors.js";
+import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, sharedGet, TEAMS_CHANGED_EVENT } from "./api.js";
+import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, setText, workingFor } from "./dom.js";
+import { serviceFailure, serviceWords } from "./errors.js";
+import { t, tCount } from "./i18n.js";
 import { icon } from "./icons.js";
 import { actorFace, DOT_ID, lookOf, teamDuo } from "./actors.js";
 import { onAssistant } from "./assistant.js";
@@ -49,12 +50,12 @@ const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "appr
 // are rows as a messaging app's (item 836), with no heading: a row says that it waits or works itself, and its group's
 // name is for a screen reader.
 const ACTIVITY_SECTIONS = [
-  { key: "waiting", label: "Waiting for you" },
-  { key: "working", label: "Working" },
+  { key: "waiting", label: t("side.waiting") },
+  { key: "working", label: t("side.working") },
 ];
 // What a chat's row says while something of it waits for the owner, ahead of what waits (item 836).
-const WAITS_WORDS = "Waiting for you";
-const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
+const WAITS_WORDS = t("side.waiting");
+const DAY_LABELS = [t("side.today"), t("side.yesterday"), t("side.week"), t("side.older")];
 // Connect apps at the foot shows the logos of this many services (item 492; four since item 959, the owner's ask): the
 // ones it is connected to, the same ones while they stay connected (item 853), and while fewer are, the logos of the
 // services most connect first, in this order, as what it leads to.
@@ -73,22 +74,22 @@ const FOLDS_KEY = "dot.sideFolds";
 // the owner found the list full of them); iMessage's another. A thread of any other source is a chat among the days.
 // No label has a mark, so that it stands where the days' labels do (items 827, 828 and 855).
 const CHANNEL_SECTIONS = {
-  work: { label: "Dot's work", folded: true, sources: ["initiative", "schedule"] },
-  agents: { label: "Agents' work", folded: true, sources: ["team"] },
+  work: { label: t("side.dotsWork"), folded: true, sources: ["initiative", "schedule"] },
+  agents: { label: t("side.agentsWork"), folded: true, sources: ["team"] },
   imessage: { label: "iMessage", folded: false, sources: ["imessage"] },
 };
 const SECTION_OF_SOURCE = new Map(Object.entries(CHANNEL_SECTIONS).flatMap(([id, section]) => section.sources.map((source) => [source, id])));
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = {
-  queued: "queued",
-  running: "running",
-  blocked: "waiting for you",
-  failed: "failed",
-  ending: "saving the end",
+  queued: t("side.statusQueued"),
+  running: t("side.statusRunning"),
+  blocked: t("side.statusBlocked"),
+  failed: t("side.statusFailed"),
+  ending: t("side.statusEnding"),
 };
 // The states of a run that is over: only such a chat can be marked unread (item 131).
 const ENDED = new Set(["done", "failed", "cancelled"]);
-const BUSY_MESSAGE = "A chat with a task under way cannot be deleted. Wait for the task to end, or stop it, and try again.";
+const BUSY_MESSAGE = t("side.busy");
 // How often the ages at the right of the chats are read again, so a "5m" does not stay while the page rests.
 const AGE_REFRESH_MS = 60_000;
 // The states of a run that works; one that waits for you is "blocked" and keeps its dot and its age.
@@ -125,7 +126,7 @@ function groupChats(chats, now) {
     chats.filter((chat) => chat.pinned_at === null),
     now,
   );
-  return pinned.length === 0 ? days : [{ label: "Pinned", chats: pinned }, ...days];
+  return pinned.length === 0 ? days : [{ label: t("side.pinned"), chats: pinned }, ...days];
 }
 
 /** The channel whose messages made `chat` (item 619), or null: a thread whose source is a channel's id. A chat the
@@ -160,9 +161,9 @@ function mark(node, current) {
 function workingSlot(since) {
   return el(
     "span",
-    { class: "side-working", title: `Working since ${dateTime(since)}` },
+    { class: "side-working", title: t("side.workingSince", { when: dateTime(since) }) },
     icon("circleDashed"),
-    el("span", null, "Working"),
+    el("span", null, t("side.working")),
     el("span", { class: "side-working-time", "data-since": String(since) }, workingFor(since)),
   );
 }
@@ -199,7 +200,7 @@ const SIDE_FACES = 3;
 
 /** What a row delegated, in words: "1 helper", "4 helpers", nothing for a row that delegated none (item 507). */
 function helperWords(children) {
-  return children.length === 1 ? "1 helper" : children.length > 1 ? `${children.length} helpers` : "";
+  return children.length === 1 ? t("side.helper") : children.length > 1 ? t("side.helpers", { count: children.length }) : "";
 }
 
 /** The runs a row delegated, as small faces laid over one another (item 507): three at most, the rest counted, a run
@@ -240,9 +241,11 @@ function chatText(chat, children, waits = null) {
     const more = waits.length > 1 ? ` (+${waits.length - 1})` : "";
     return el("span", { class: "side-chat-text" }, title, waitsLine(`${WAITS_WORDS}: ${waits[0].title}${more}`));
   }
-  // A chat whose run failed at its model service ends on the service's sentence, not on its code (item 1136).
-  const words = serviceWords(chat.last_message ?? "").text;
-  const last = words === "" || chat.last_role !== "user" ? words : `You: ${words}`;
+  // A chat its model service stopped says so in a few words of what stopped it (the service's sentence, a billing link
+  // and all, stood here after item 1136); its own line stands in the chat. Any other chat ends on its last words.
+  const stopped = chat.latest_status === "failed" ? serviceFailure(chat.last_message ?? "") : null;
+  const words = stopped === null ? serviceWords(chat.last_message ?? "").text : stopped.short;
+  const last = words === "" || chat.last_role !== "user" || stopped !== null ? words : t("side.you", { words });
   const faces = helperFaces(children);
   // A chat with a team (item 610) says which, ahead of its last words.
   const team = chat.team === null || chat.team === undefined ? null : el("span", { class: "side-chat-team", title: chat.team.name }, chat.team.name);
@@ -250,7 +253,12 @@ function chatText(chat, children, waits = null) {
     faces === null
       ? last === "" && team === null
         ? null
-        : el("span", { class: "side-chat-last" }, team, last === "" ? null : el("span", { class: "side-chat-words" }, last))
+        : el(
+          "span",
+          { class: "side-chat-last" },
+          team,
+          last === "" ? null : el("span", { class: "side-chat-words", dataset: stopped === null ? {} : { stopped: "" } }, last),
+        )
       : el("span", { class: "side-chat-last side-chat-helpers" }, team, faces);
   return el("span", { class: "side-chat-text" }, title, under);
 }
@@ -274,14 +282,14 @@ function loopWords(chat) {
     return null;
   }
   const next = chat.loop_next_at ?? null;
-  const rhythm = `Loops ${loopRhythm(cron) ?? "on its schedule"}`;
-  return next === null ? rhythm : `${rhythm}, next ${nextFiring(next, Date.now() / 1000)}`;
+  const rhythm = t("side.loops", { rhythm: loopRhythm(cron) ?? t("side.onSchedule") });
+  return next === null ? rhythm : t("side.loopsNext", { rhythm, when: nextFiring(next, Date.now() / 1000) });
 }
 
 /** What a chat or a row at work says of its campaign (item 705), or null: the conversation of a campaign, or one of its
  * sessions, which the Campaigns page lists. */
-const CAMPAIGN_CHAT = "A campaign's conversation";
-const CAMPAIGN_SESSION = "A session of a campaign";
+const CAMPAIGN_CHAT = t("side.campaignChat");
+const CAMPAIGN_SESSION = t("side.campaignSession");
 
 /** A chat's creature, with the mark of its loop at its foot (item 580): arrows that turn slowly in a glow, so that a
  * chat that asks again by itself stands out in the list; and the mark of its campaign at its other foot (item 705), a
@@ -312,11 +320,11 @@ function campaignWords(chat) {
 function chatLink(chat, onNavigate, face, children, waits = null) {
   const loop = loopWords(chat);
   const word = [
-    chat.team === null || chat.team === undefined ? undefined : `with ${chat.team.name}`,
+    chat.team === null || chat.team === undefined ? undefined : t("side.withTeam", { name: chat.team.name }),
     waits === null ? STATUS_WORD[chat.latest_status] : `${WAITS_WORDS.toLowerCase()}: ${waits.map((row) => `${row.title}, ${row.detail}`).join("; ")}`,
     helperWords(children),
     // While it waits its row shows no dot of an unread chat, so its name says none either (the pre-push review).
-    chat.unread === true && waits === null ? "unread" : undefined,
+    chat.unread === true && waits === null ? t("side.unread") : undefined,
     loop === null ? undefined : loop.toLowerCase(),
     campaignWords(chat)?.toLowerCase(),
   ]
@@ -545,15 +553,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const search = el("input", {
     class: "side-search-input",
     type: "search",
-    placeholder: "Search chats",
-    "aria-label": "Search chats",
+    placeholder: t("side.search"),
+    "aria-label": t("side.search"),
     autocomplete: "off",
     spellcheck: "false",
   });
   // On a touch screen the drawer has no X (item 888, the owner's ask): a chat chosen closes it, and so does a swipe to
   // the left; a narrow window of the Mac, with no touch, keeps the button.
-  const close = el("button", { class: "icon-btn side-close", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse });
-  const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, "Select");
+  const close = el("button", { class: "icon-btn side-close", type: "button", title: t("sidebar.hide"), "aria-label": t("sidebar.hide"), onclick: onCollapse });
+  const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, t("side.select"));
   let folds = readFolds(FOLDS_KEY);
   // Whether a section is folded: as the owner left it, else as it starts (item 822: Dot's own work starts folded).
   function isFolded(key) {
@@ -568,16 +576,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // the days no longer fold away under a "Chats" that only named the list.
   const head = el("div", { class: "side-list-head" }, selectButton);
   const count = el("span", { class: "grow side-count" });
-  const allButton = el("button", { class: "btn sm", type: "button", onclick: () => toggleAll() }, "Select all");
+  const allButton = el("button", { class: "btn sm", type: "button", onclick: () => toggleAll() }, t("sidebar.selectAll"));
   const deleteButton = el(
     "button",
     { class: "btn danger solid sm", type: "button", onclick: () => attempt(deleteSelected) },
     icon("trash"),
-    "Delete",
+    t("sidebar.delete"),
   );
   const cancelButton = el(
     "button",
-    { class: "icon-btn", type: "button", title: "Cancel selection", "aria-label": "Cancel selection", onclick: () => leaveSelectMode() },
+    { class: "icon-btn", type: "button", title: t("sidebar.cancelSelection"), "aria-label": t("sidebar.cancelSelection"), onclick: () => leaveSelectMode() },
     icon("x"),
   );
   const bar = el(
@@ -597,10 +605,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // missing a group).
   let above = new Set();
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
-  const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
+  const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, t("side.agents")));
   // Campaigns and Schedules are icons in the head, beside the "+" (item 855, the owner's ask: two rows of their own
   // before the chats).
-  const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: "Campaigns", "aria-label": "Campaigns", onclick: onNavigate }, icon("target"));
+  const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: t("sidebar.campaigns"), "aria-label": t("sidebar.campaigns"), onclick: onNavigate }, icon("target"));
   // Settings is your account's row at the foot, under Connect apps, on a Mac (item 999, as the other chat apps have it):
   // your initials and your name; on a phone your initials at the head (item 991). Its name for a reader of the screen
   // holds the name it shows (WCAG 2.5.3).
@@ -608,21 +616,21 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const accountName = el("span", { class: "side-account-name" });
   const settingsLink = el(
     "a",
-    { class: "side-link side-settings", href: "#/settings", title: "Settings", onclick: onNavigate },
+    { class: "side-link side-settings", href: "#/settings", title: t("sidebar.settings"), onclick: onNavigate },
     accountInitials,
     accountName,
   );
-  const schedulesLink = el("a", { class: "icon-btn side-page", href: "#/schedules", title: "Schedules", "aria-label": "Schedules", onclick: onNavigate }, icon("calendar"));
+  const schedulesLink = el("a", { class: "icon-btn side-page", href: "#/schedules", title: t("sidebar.schedules"), "aria-label": t("sidebar.schedules"), onclick: onNavigate }, icon("calendar"));
   // The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name, to its
   // page, where a message to it starts; the three that worked last (item 855: the row scrolled and cut a face), and its
   // last tile, All, is the page of every agent and team, which the Agents row is while the owner has no agent of their
   // own. A list that did not load leaves the row as it was.
-  const facesNav = el("nav", { class: "side-agent-faces", "aria-label": "Your agents", hidden: true });
+  const facesNav = el("nav", { class: "side-agent-faces", "aria-label": t("sidebar.yourAgents"), hidden: true });
   const allAgents = el(
     "a",
-    { class: "side-agent-face side-agent-all", href: "#/agents", title: "All agents", "aria-label": "All agents", onclick: onNavigate },
+    { class: "side-agent-face side-agent-all", href: "#/agents", title: t("sidebar.allAgents"), "aria-label": t("sidebar.allAgents"), onclick: onNavigate },
     el("span", { class: "side-agent-mark" }, icon("users")),
-    el("span", { class: "side-agent-name", "aria-hidden": "true" }, "All"),
+    el("span", { class: "side-agent-name", "aria-hidden": "true" }, t("sidebar.all")),
   );
   const faceLinks = new Map();
   let facesTicket = 0;
@@ -678,7 +686,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const mine = ++facesTicket;
     let found;
     try {
-      found = await api.get("/agents");
+      found = await sharedGet("/agents");
     } catch (error) {
       console.warn("the agents could not be read for their faces in the sidebar", error);
       return;
@@ -762,8 +770,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function paintBar() {
     const shown = shownChats();
     const allChosen = shown.length > 0 && shown.every((chat) => selected.has(chat.id));
-    setText(count, selected.size === 0 ? "Choose chats to delete" : `${plural(selected.size, "chat", "chats")} selected`);
-    setText(allButton, allChosen ? "Clear" : "Select all");
+    setText(count, selected.size === 0 ? t("sidebar.chooseToDelete") : tCount(selected.size, "sidebar.selectedOne", "sidebar.selectedMany"));
+    setText(allButton, allChosen ? t("sidebar.clear") : t("sidebar.selectAll"));
     allButton.disabled = shown.length === 0;
     deleteButton.disabled = selected.size === 0;
   }
@@ -775,7 +783,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return [];
     }
     if (listLimit >= LIST_CAP) {
-      return [el("div", { class: "side-note" }, el("span", null, `Only the latest ${listLimit} chats are listed.`))];
+      return [el("div", { class: "side-note" }, el("span", null, t("sidebar.onlyLatest", { count: listLimit })))];
     }
     return [
       el(
@@ -791,7 +799,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
               load();
             },
           },
-          "Show older chats",
+          t("side.showOlder"),
         ),
       ),
     ];
@@ -804,9 +812,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       const found =
         inChannels ||
         [...work.working, ...waits.waiting].some((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
-      return found ? [] : [el("div", { class: "side-note" }, `No chat matches “${search.value.trim()}”.`)];
+      return found ? [] : [el("div", { class: "side-note" }, t("sidebar.noMatch", { query: search.value.trim() }))];
     }
-    return chats.length === 0 ? [el("div", { class: "side-note" }, "No chats yet. Start one with the +.")] : [];
+    return chats.length === 0 ? [el("div", { class: "side-note" }, t("sidebar.noChats"))] : [];
   }
 
   // The "…" button beside the link `node` of a chat; null beside a box.
@@ -881,7 +889,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         el(
           "div",
           { class: "side-note" },
-          el("span", null, "The chats could not be loaded."),
+          el("span", null, t("sidebar.loadFailed")),
           el(
             "button",
             {
@@ -894,7 +902,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
               },
             },
             icon("refresh"),
-            "Try again",
+            t("sidebar.tryAgain"),
           ),
         ),
       );
@@ -902,7 +910,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
     if (chats === null) {
       channelsNav.replaceChildren();
-      list.replaceChildren(el("div", { class: "side-note" }, el("div", { class: "spinner" }), el("span", null, "Loading chats…")));
+      list.replaceChildren(el("div", { class: "side-note" }, el("div", { class: "spinner" }), el("span", null, t("sidebar.loading"))));
       return;
     }
     const shown = shownChats();
@@ -1097,8 +1105,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       {
         class: "side-more",
         type: "button",
-        title: "More",
-        "aria-label": `More for ${clip(chat.title, 120)}`,
+        title: t("sidebar.more"),
+        "aria-label": t("sidebar.moreFor", { title: clip(chat.title, 120) }),
         "aria-haspopup": "menu",
         "aria-expanded": "false",
       },
@@ -1138,15 +1146,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     /** @type {Array<import("./menu.js").MenuEntry | null>} */
     const actions = [
       chat.pinned_at === null
-        ? { label: "Pin", icon: "pin", run: () => attempt(() => pinChat(chat, true)) }
-        : { label: "Unpin", icon: "pinOff", run: () => attempt(() => pinChat(chat, false)) },
+        ? { label: t("sidebar.pin"), icon: "pin", run: () => attempt(() => pinChat(chat, true)) }
+        : { label: t("sidebar.unpin"), icon: "pinOff", run: () => attempt(() => pinChat(chat, false)) },
       readAction(chat),
-      { label: "Rename", icon: "pencil", run: () => renameChat(chat) },
-      { label: "Copy link", icon: "link", run: () => attempt(() => copyLink(chat)) },
+      { label: t("sidebar.rename"), icon: "pencil", run: () => renameChat(chat) },
+      { label: t("sidebar.copyLink"), icon: "link", run: () => attempt(() => copyLink(chat)) },
       "separator",
       // A chat above the list, with what waits or what works, is not in it, where the chats are chosen.
-      aboveTheList(chat) ? null : { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
-      { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
+      aboveTheList(chat) ? null : { label: t("sidebar.select"), icon: "squareCheck", run: () => enterSelectMode(chat.id) },
+      { label: t("sidebar.delete"), icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
     ];
     return actions.filter((item) => item !== null);
   }
@@ -1155,10 +1163,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // item 131 sends no `unread`, and neither is offered.
   function readAction(chat) {
     if (chat.unread === true) {
-      return { label: "Mark read", icon: "eye", run: () => attempt(() => markChat(chat, true)) };
+      return { label: t("sidebar.markRead"), icon: "eye", run: () => attempt(() => markChat(chat, true)) };
     }
     if (chat.unread === false && ENDED.has(chat.latest_status)) {
-      return { label: "Mark unread", icon: "eyeOff", run: () => attempt(() => markChat(chat, false)) };
+      return { label: t("sidebar.markUnread"), icon: "eyeOff", run: () => attempt(() => markChat(chat, false)) };
     }
     return null;
   }
@@ -1194,7 +1202,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       maxlength: "120",
       spellcheck: "false",
       autocomplete: "off",
-      "aria-label": "Chat name",
+      "aria-label": t("sidebar.chatName"),
     });
     let ended = false;
     // The row comes back at once, under the new name while the daemon keeps it.
@@ -1235,7 +1243,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // The chat's address, which opens it in this browser or another one signed in to this Dot.
   async function copyLink(chat) {
     await copyText(`${location.origin}${location.pathname}#/runs/${chat.latest_run_id}`);
-    toast("ok", "Link copied.");
+    toast("ok", t("sidebar.linkCopied"));
   }
 
   function toggle(id, checked) {
@@ -1294,12 +1302,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return;
     }
     const confirmed = await confirmDialog({
-      title: ids.length === 1 && !selecting ? "Delete this chat?" : `Delete ${plural(ids.length, "chat", "chats")}?`,
+      title: ids.length === 1 && !selecting ? t("sidebar.deleteThis") : tCount(ids.length, "sidebar.deleteOne", "sidebar.deleteMany"),
       message:
         ids.length === 1
-          ? "Its tasks go with it, with every step and approval of those. This cannot be undone."
-          : "Their tasks go with them, with every step and approval of those. This cannot be undone.",
-      confirmLabel: "Delete",
+          ? t("sidebar.itsTasksGo")
+          : t("sidebar.theirTasksGo"),
+      confirmLabel: t("sidebar.delete"),
       danger: true,
       focusCancel: true,
     });
@@ -1320,7 +1328,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return;
     }
     const gone = new Set(outcome.deleted);
-    toast("ok", `Deleted ${plural(gone.size, "chat", "chats")}.`);
+    toast("ok", tCount(gone.size, "sidebar.deletedOne", "sidebar.deletedMany"));
     chats = chats.filter((chat) => !gone.has(chat.id));
     if (selecting) {
       leaveSelectMode();
@@ -1338,7 +1346,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const ticket = resolveTicket;
     let detail;
     try {
-      detail = await api.get(`/runs/${runId}`);
+      // The run's page reads it at the same moment: one request for both (item 1169).
+      detail = await sharedGet(`/runs/${runId}`);
     } catch (error) {
       console.warn("the chat of the open run could not be looked up", error);
       return;
@@ -1382,7 +1391,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       if (activity === null) {
         console.warn("the activity of the sidebar could not be loaded", error);
       } else {
-        readFailed("The sidebar", error);
+        readFailed("readFailed.sidebar", error);
       }
       return;
     }
@@ -1410,7 +1419,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         return;
       }
       if (chats !== null) {
-        readFailed("The chat list", error);
+        readFailed("readFailed.chatList", error);
         return;
       }
       failure = error;
@@ -1526,8 +1535,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     {
       class: "icon-btn side-compose",
       href: homeHref,
-      title: "New chat (⇧⌘O)",
-      "aria-label": "New chat",
+      title: t("sidebar.newChatKeys"),
+      "aria-label": t("sidebar.newChat"),
       onclick: () => {
         requestCompose();
         onNavigate();
@@ -1554,14 +1563,14 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     {
       class: "side-connect",
       type: "button",
-      title: "Connect apps",
-      "aria-label": "Connect apps",
+      title: t("sidebar.connectApps"),
+      "aria-label": t("sidebar.connectApps"),
       onclick: () => {
         location.hash = CONNECTORS_PATH;
       },
     },
     icon("plug"),
-    el("span", { class: "side-connect-label" }, "Connect apps"),
+    el("span", { class: "side-connect-label" }, t("sidebar.connectApps")),
     connectMarks,
   );
   // The logos of the services whose servers are ready, each as its tile wears it (items 408 and 477): only a service's
@@ -1600,7 +1609,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // left lead to the settings, the "+" at the right starts a chat, Dot's own face stands large over the faces of the
   // other agents, and the foot holds the apps and the search.
   const ownerInitials = el("span", { class: "side-owner-initials", "aria-hidden": "true" });
-  const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate }, ownerInitials);
+  const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: t("sidebar.settings"), "aria-label": t("sidebar.settings"), onclick: onNavigate }, ownerInitials);
   function paintOwner() {
     const owner = shownOwner().trim();
     const words = owner.split(/\s+/).filter((word) => word !== "");
@@ -1611,8 +1620,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       .join("");
     ownerInitials.replaceChildren(initials === "" ? icon("user") : initials);
     accountInitials.replaceChildren(initials === "" ? icon("user") : initials);
-    setText(accountName, owner === "" ? "Settings" : owner);
-    settingsLink.setAttribute("aria-label", owner === "" ? "Settings" : `Settings, ${owner}`);
+    setText(accountName, owner === "" ? t("sidebar.settings") : owner);
+    settingsLink.setAttribute("aria-label", owner === "" ? t("sidebar.settings") : t("sidebar.settingsOf", { owner }));
   }
   paintOwner();
   const heroName = el("span", { class: "side-dot-name" }, dotName());

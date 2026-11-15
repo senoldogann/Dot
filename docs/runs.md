@@ -30,11 +30,23 @@ no dots, no "Show the steps", the line itself is the way), close under the last 
 three dots that rise in turn in the face's place, and "Typing…"; "Thinking…" while the model streams its thinking. A
 command, a file, a search or a page is said with what it is about ("Running gh repo view…", "Reading README.md…",
 "Searching the web for “Dot”…", "Reading github.com…", one line cut at its end); other work in its own words ("Working
-on the Mac…", "Asking Scout…" for a message to an agent, and so on), turning every four seconds ("Working in the
-terminal…") so that a long step reads as alive. What the run says on the way to its calls ("Checking the domain now")
+on the Mac…", "Waiting for Scout…" for a message to an agent, and so on). The words change only when an event
+changes what the run does, never on a timer while the same work goes on (they turned every four seconds before, which
+said nothing new). States of their own are said too, each from its event: "Waiting to start…" for a run in the queue,
+"Waiting for you…" while an approval asks you, until it is answered (a question left for later is no wait), and "Stopping…" once Stop was pressed; a screen reader is told each change of
+state once, through a status region, never each call nor the seconds of the bar over the box. What the run says on the way to its calls ("Checking the domain now")
 is its work told, not a message (item 1131): it folds with the steps, and the line says the newest of it while the step's
-calls run ("Checking the domain now…"); shown with the steps, it reads as a quiet note among them. Nothing is said that the run is not doing: while it writes a message, or a card waits for you, the
-line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
+calls run ("Checking the domain now…"); shown with the steps, it reads as a quiet note among them, with a rule at its
+left and named a progress update to a screen reader, where the answer is named Answer. No model says before its
+words whether calls follow them, so what they are is known while they stream only where the run's own rules say a
+reply with no call is not the answer. In Dot's own loop, once a task or research run used a tool, short of its
+limit and of the last time it is told to finish, they are an update from the first word and stream folded with the steps (item 1162; 443 of 498 steps with words
+in the owner's week went on to calls). Elsewhere they may still be the answer: every step of a task on Claude Code or
+OpenCode, whose last reply is the answer when it calls no finish (45 of 68 of the owner's Claude Code tasks in a week),
+and a first step. Those stream in sight as a quiet note (item 1166), and their step's end makes them the message when
+it calls nothing, or nothing but finish, or folds them with the steps; before item 1162 they streamed as a message and
+folded once the step ended. Nothing is said that the run is not doing: while it writes a
+message the line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
 over and has its answer, the line goes and **Show the steps** stands in the answer's foot, beside the copy, the speaker
 and the time, where the pointer rests (item 842; on a touch screen it is a row of the sheet a hold of the answer opens, item 1064),
 and turns to *Hide the steps* once
@@ -331,9 +343,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   deletes its schedule (`schedule_delete`) once the work is done for good. Right above the composer, in the bar that
   also says how long the run has worked and how its helpers stand (one pane of glass on a phone, item 401), a line shows
   each loop of the chat, how often it asks again ("every 30 minutes", and "every day at 10:00" for a schedule a run of
-  it made, where it read `cron 0 10 * * *` before item 590), when next, and a Stop that deletes it; the Stops stand in
-  one column, on a phone the message stands over how often it asks again, which wraps rather than end in dots (item 787), and the rows fold under a head that says how
-  many loops there are and, folded, when the next one asks, the fold kept in the browser (item 591). A rhythm a cron
+  it made, where it read `cron 0 10 * * *` before item 590), when next, and a **Stop repeating** that deletes it (the
+  task at work goes on; the bar's **Stop task** stops that); the Stops stand in one column, on a phone the message
+  stands over how often it asks again, which wraps rather than end in dots (item 787), and the rows fold under a head
+  that says, folded, how often the loop repeats ("Repeats every 30 minutes", or how many there are) and when the next one
+  asks, the fold kept in the browser (item 591). Until the owner opens them the rows are folded, so that a loop at rest
+  is one line over the composer, not a card over a phone's reading room; a list that could not be read says why. A rhythm a cron
   expression cannot keep exactly, or one shorter than `[scheduler] min_interval_s`, is refused (422); a new chat then
   starts nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going,
   whose campaign goes on by itself.
@@ -546,7 +561,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_requests`, `browser_extract` (item 714), `browser_console` and `browser_viewport` (item 746), `browser_wait_text`, `browser_act`, `browser_eval`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab`, `browser_create_login` (item 740), and, while 1Password is connected or the vault holds a login, `browser_logins` and `browser_fill_login` (items 493 and 621) |
 | Vault           | `vault_contacts` (item 621): the contact details you saved in Settings › Vault and the billing address of each card, for a run to type where a form asks; it never shows a password, a card number, an expiry or a security code (a card is kept, and no tool of a run fills it) |
 | Trading         | while trading is on ([Trading](trading.md), items 763 and 764): `trading_market`, `trading_scan` (item 771), `trading_portfolio`, `trading_order`, `trading_exit` (item 770), `trading_history`, `trading_engine` (item 818) |
-| Meetings        | `meeting_join`, `meeting_read`, `meeting_post`, `meeting_leave` (item 1138): notes of the owner's Google Meet call; a post asks the owner every time ([Meetings](meetings.md)) |
+| Meetings        | `meeting_join`, `meeting_read`, `meeting_post`, `meeting_leave` (item 1138): notes of the owner's Google Meet call, answers to whoever speaks to Dot there (item 1150); a task's post asks the owner every time ([Meetings](meetings.md)) |
 | Recon           | `recon` (item 776): the addresses, TLS certificate, HTTP headers and technology of a site, and with `depth = "ports"` the open ports of a host in `[recon] owned_hosts` ([Recon](recon.md)) |
 | Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts`, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
@@ -589,7 +604,9 @@ out of reach; an image goes to the model as an image, an iPhone's HEIC photo too
 556). A shell command runs with the `PATH` of your login shell, in its own process
 group (cancelling a run ends the whole group) and under a timeout (`[shell] default_timeout_s`, at most
 `max_timeout_s`). An AppleScript (`apple_script`) ends with its call as well: one whose run is stopped or whose call
-times out is killed. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
+times out is killed, after `[desktop] osascript_timeout_s` or the `timeout_s` the run gives a script that starts an
+application or works on a large document (at most 110 s, item 1180); the application may go on with what it was asked,
+which the timeout says. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
 655 and 657, `[web] search_order`): each engine in the owner's order, one whose key is not set passed over and said
 to be, the browser rung only with Dot's own browser and the web-research rung only while that server runs; its Try asks
 one engine one search. The search APIs that take a key of their own are Brave's Search API (`BRAVE_SEARCH_API_KEY`),

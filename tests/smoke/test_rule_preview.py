@@ -283,7 +283,9 @@ async def test_the_rules_page_tests_a_rule_before_it_is_added(
                     "It would have applied to 6 of the 8 things Dot did in the last 30 days."
                 )
                 await expect(tried).to_contain_text("Would have matched 6 of 8 steps in the last 30 days.")
-                await expect(tried).to_contain_text("1 ran in YOLO, which asks nothing whatever the rules say.")
+                await expect(tried).to_contain_text(
+                    "1 ran in the mode that asks only to pay or send, where no rule decides them."
+                )
                 await expect(tried).to_contain_text("1 is settled before any rule, by checks no rule changes")
                 await expect(tried).to_contain_text(
                     "It would decide 4 of them: 1 would ask less, 1 the same, 2 with no decision on record."

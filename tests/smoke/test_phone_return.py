@@ -84,6 +84,11 @@ _GRACE_S: float = 8.0
 _LOST_S: float = 15.0
 # The missed steps show within this long of the network's return.
 _CAUGHT_UP_S: float = 2.0
+# A short trip away, longer than the absence after which a followed stream is made again on the page's return
+# (`BACK_AWAY_MS` in api.js, 2 s) and shorter than the silence that cut it before (`BACK_SILENCE_MS`, 20 s), and how
+# soon the missed steps show after it: a reconnect, a proof and a request.
+_SHORT_AWAY_S: float = 6.0
+_BACK_SOON_S: float = 3.0
 # How soon the bar and the composer of the chat stand when Dot is opened again.
 _IN_PLACE_MS: int = 500
 # A network always slower than the service worker waits for it, and how long an opening waits for the network after a
@@ -179,6 +184,8 @@ class Proxy:
     - `wake(seconds)` is the network of a phone that comes back: every connection from before is closed, and new ones
       wait `seconds` before they pass.
     - `slow(seconds)` is a network that is always slow: every part of every answer waits `seconds` before it passes.
+    - `forget()` is the network of a phone back after a few seconds whose VPN woke anew: the connections from before
+      stay open but pass nothing ever again, as a half-open connection does, and new ones pass at once.
     """
 
     def __init__(self) -> None:
@@ -188,6 +195,7 @@ class Proxy:
         self.hold_until: float = 0.0
         self.latency_s: float = 0.0
         self._open: set[asyncio.StreamWriter] = set()
+        self._dead: set[asyncio.StreamWriter] = set()
         self._server: asyncio.Server | None = None
 
     async def start(self) -> None:
@@ -203,6 +211,11 @@ class Proxy:
 
     def slow(self, seconds: float) -> None:
         self.latency_s = seconds
+
+    def forget(self) -> None:
+        self._dead |= self._open
+        self._open = set()
+        self.asleep = False
 
     def wake(self, seconds: float) -> None:
         for writer in list(self._open):
@@ -227,7 +240,7 @@ class Proxy:
         the daemon's ``answers`` wait as long as the network is slow."""
         try:
             while chunk := await source.read(65_536):
-                if self.asleep:
+                if self.asleep or sink in self._dead:
                     continue
                 if answers and self.latency_s > 0:
                     await asyncio.sleep(self.latency_s)
@@ -490,6 +503,38 @@ async def test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_n
             await expect(pill).to_be_hidden(timeout=(_LOST_S - _GRACE_S + 6) * 1000)
             lost: JsonObject = await page.evaluate(_READ, earlier)
             assert lost["moves"] == [], json.dumps(lost)
+            await context.close()
+        finally:
+            await browser.close()
+
+
+async def test_a_phone_back_after_a_few_seconds_on_connections_left_dead_catches_up_at_once(
+    own_home: Path, tmp_path: Path
+) -> None:
+    """Item 1152: a phone put away for a few seconds (a glance at a notification) may come back to connections that
+    stay open and pass nothing, as a VPN that woke anew leaves them. Back in view, the page follows its streams again at
+    once, rather than after a stalled stream's silence (`STALL_MS`, 45 s): what the run did meanwhile, a question to the
+    owner ("Waiting for you") among it, shows in moments, and the chat does not move."""
+    async with _served(own_home) as (runtime, manager, proxy, _asked, _named), async_playwright() as playwright:
+        run, earlier = await _at_work(runtime, manager)
+        browser: Browser = await playwright.webkit.launch(headless=True)
+        try:
+            context: BrowserContext = await _phone(browser, playwright, "dark", "allow")
+            page: Page = await _chat_page(context, proxy, run)
+            await page.evaluate(_RECORD, list(_WORDS))
+            await page.evaluate(_SIGHT, "hidden")
+            proxy.sleep()
+            await asyncio.sleep(_SHORT_AWAY_S)
+            await page.evaluate("() => { window.__calm.start = performance.now(); }")
+            proxy.forget()
+            await page.evaluate(_SIGHT, "visible")
+            await page.wait_for_timeout(_WATCH_S * 1000)
+            await page.screenshot(path=str(tmp_path / "back-soon.png"))
+            back: JsonObject = await page.evaluate(_READ, earlier)
+            steps_at: object = back["steps_at"]
+            assert isinstance(steps_at, int) and steps_at <= _BACK_SOON_S * 1000, json.dumps(back)
+            assert back["moves"] == [], json.dumps(back)
+            assert back["said"] == {}, json.dumps(back)
             await context.close()
         finally:
             await browser.close()

@@ -185,14 +185,18 @@ Both modes share what follows.
   `combobox "Shipping" [ref=e3]: options "Standard (3-5 days)" [selected], "Express (next day)"`. `select` takes the
   label or the value of one of them, written as listed; a choice that is not there is refused at once with the options
   that are, the closest first, instead of waiting for the timeout. An option that a script adds within a second of the
-  call is still found. A very long list is cut with the number of options left out and the current choice.
+  call is still found. A very long list is cut with the number of options left out and the current choice. The
+  options are read in a way a page's own scripts cannot bend: a library that replaces `Array.from` (Prototype.js)
+  no longer fails every `select` on its page (item 1177).
 - `browser_act` runs up to `max_batch_steps` steps in one call (10 by default; a longer batch is cut to the first ones
   and the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`,
   `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag`, `click_at` and
   `drag_at`. A step
   written as plainly meant is read so (item 755): a `click` at `x` and `y` with no ref is a `click_at`, a step that only
   looks or waits (`snapshot`, `screenshot`, `look`, a bare `wait`, item 1133) is left out, as the result shows the
-  settled page, and an `upload` step fails naming `browser_upload`. A `fill`, `type` or `insert` with no ref, as after a
+  settled page, an `expect_text` or `expect_url` written beside the steps is the last step's when it has none (item
+  1161; `desktop_act` reads an `expect_text` so too), and an `upload` step fails naming `browser_upload`. A `fill`,
+  `type` or `insert` with no ref, as after a
   `click_at` on a field's pixel, is refused with where the field's ref comes from (`browser_find`, the snapshot, a
   field inside a frame too): text goes only into a field the step names, which the policy weighs (item 1133). After a step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets
   the page take one turn of its event loop, by which Chrome has told of a dialog, a file chooser, a navigation or a tab
@@ -215,7 +219,8 @@ Both modes share what follows.
   the same ref gets the pointer sequence a script sends, and the page is read again, so a step that a script can move
   does not need a model round trip; a click that already moved the page is never sent twice, a step that failed is left
   alone, and a batch that sends, posts, pays, removes, installs or hands over a credential is never clicked again this
-  way (item 792: such a button may act slower than half a second, and a second click would do it twice). A page that has
+  way (item 792: such a button may act slower than half a second, and a second click would do it twice); neither is a
+  click that names what it expects (item 1145, below). A page that has
   not settled when
   the steps, a script or an upload went through is said, rather than failing the call, which a run took for a step that
   did not happen (item 792): after steps or an upload in the page's notes ("do not repeat it"), after a script in what
@@ -230,6 +235,76 @@ Both modes share what follows.
   [Safety](safety.md#safety)). A batch carries one payment step at most (a click on a control that asks to pay, by its
   words or by the typed judge's reading): two payments in one call would pass for the larger of their amounts under the
   caps of `[policy.spend]`, so the call is refused and the steps are sent one call at a time, in every mode.
+- A step's line says whether it was sent and what Dot checked of it (item 1145). **done** says that the step went
+  through; it does not say that what the step was for happened. Beside it stands each check: **verified** (Dot saw it),
+  **contradicted** (Dot read the opposite), **uncertain** (sent, and its result was not seen), or **not checked**
+  (nothing was looked at). A failed step says whether it went out: not sent (a ref that is gone, an option the dropdown
+  does not have, a click something in front took, a click whose element was not shown, enabled and still in time (a
+  button that stayed disabled too) or a hover whose element was not shown and still, which Playwright's own log
+  tells as tried and never made, item 1158), sent, or may have been sent.
+  The line above the result counts them.
+- A press (a click, a double or right click, a check or uncheck) first looks whether its element takes the pointer
+  (item 1153): Playwright's own trial of it, which sends nothing and lets the cookie banner's decliner run, twice for at
+  most 1.5 s. The same thing still in front of the element on both looks is said at once, named, with how to close it
+  (on the owner's Dot such a press waited its whole 8 s to be told, 24 times in a week); a cover that goes or changes
+  between the looks (an animation, a toast, a loading mask) leaves the press to wait its own time, what is left of it.
+  When what lies in front is the element's own label (a styled checkbox or radio whose field hides under it, as
+  Shopify's and Okta's do), a click, check or uncheck lands on the label, as a person's would, and the box is read
+  back; a link or a button inside that label is never pressed in the field's place.
+  Two kinds of check are made, both by reading the page, with no model:
+  - What a step wrote is read back once the page took a turn: the field a `fill`, `type` or `insert` wrote into, the
+    option a `select` left chosen, the box of a `check` or `uncheck`. A field that holds the text is verified, as
+    written, as the page formats it (`5551234567` shown as `(555) 123-4567`: the same letters and digits), or with
+    what the page adds before or after it (`example.org` shown as `https://example.org`, `100` as `100 kg`; a text of
+    fewer than three letters and digits has to be the field's own, item 1149), whether or not it held that before
+    the step. A field, a dropdown or a box that is as it was and is not what was asked fails its step, which went
+    out and did not take, as a rich editor that drops a
+    write does; a field that changed to something else (cut short, replaced) is uncertain, told by how many characters
+    it holds and never by what they are, since a password typed into a plain field is no secret field to the page. A
+    field that takes a secret (a password, a one-time code, a card, a login Dot filled in) is never read back, in any
+    mode, and is neither verified nor contradicted: nothing Dot answers tells what such a field holds. A text with a
+    line break is not read back, as the break may have sent the form.
+  - `expect_text` and `expect_url` on a step name what the page must show once the step is done: exact words (4 to 200
+    characters) that become visible, or a part of the address the tab comes to (looked for in its host and path, and
+    anywhere when the part itself names a `?` or a `#`). Dot looks before the step goes: words or an address the page
+    shows already, and words the same batch writes, would be seen afterwards whatever the step did, so they are not
+    looked for. The step goes all the same, its line says so (`what it expected was not looked for`), and what else
+    it named that can tell is still looked for. When nothing it named could be looked for, the steps after it in the
+    batch are not run, since they were to wait for that sight (item 1164; such a step was refused before, which cost
+    a round trip of the model and brought the same step back with nothing to expect). A guess in the model's own
+    words given to a step (`expect`) is the call's, after the call's own and as far as its 300 characters have room
+    (item 1164; a guess is an estimate and checks nothing, so one that does not fit is left out); words written
+    beside the steps are the last step's (item 1161, above). After the step Dot waits for what it named, 10 s
+    at most and 20 s over the steps of one batch, and less once the page has stood still for 3 s or a dialog opened.
+    Seen is verified. Not seen is uncertain and never contradicted: what was sent may still land. The batch stops
+    there, and the click is not tried again with a script: a second click of a form that answers slowly would send it
+    twice. Look again (`browser_wait_text`, `browser_snapshot`) before sending the step again.
+
+  A batch stops before a step that acts on what the steps before it left (a click, a key, a drag, a box, a dropdown, a
+  text with a line break) when one of their own checks is not verified, while the steps that only write into a field go
+  on: the fields of one form do not wait for each other, and its button waits for a look. Verified says that the page
+  showed it, not that a server took it, and a change the page makes later than its turn shows in the next look. The
+  call's own `expect` stays what it was, the typed judge's estimate of words the model chose, and is no check.
+
+  A step's line also says what its page sent to its own site while the step ran, and what the server answered (item
+  1158): `its page sent POST https://shop.example/order → 200`. It names the requests that are not reads (a `POST`,
+  `PUT`, `PATCH` or `DELETE` that a form or a script of the page sent; a beacon, whose answer the page never reads, is
+  not one), the first three, each without its query, and only those to the page's own site: the same host, or a name
+  that ends in the same two labels (no list of public suffixes is read, so two names under `co.uk` count as one
+  site). The page is heard from before the step until Dot's own look at what the step did is over, so a request the
+  page makes by itself later, while the step waits for an answer or a sight, is not told as the step's. Dot waits for
+  the answer, 5 s at most for a step and 10 s over the steps of one batch. An answer that has not come is said (`no
+  answer yet`) and the batch stops there: the steps after it would run on a page whose server has not answered, and
+  sending the step again would send it twice. A step that went out and then failed says what its page sent
+  meanwhile, for the same reason. A press on a form's own button after which nothing left the page within half a
+  second says that too (`its form sent nothing to the site within 0.5 s`), which is what was seen and not a failure:
+  a page that keeps its work in itself sends nothing either, and the page below shows which it is. It is not said of
+  a page that holds a socket open, which may have sent its form there, of a press that opened a tab still on its way
+  (a form sent to a new tab goes out from that tab), nor of a dialog's form. A step that was not sent says nothing of
+  what its page sent meanwhile: that was the page's own. None of this is a
+  check: an answer of 200 says that the server took a request, not that what the step was for happened, so such a
+  step stays not checked unless something of it was read back or awaited. It needs no word from the model: a click
+  that names nothing it expects is still told by what it sent.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a
@@ -315,7 +390,9 @@ Both modes share what follows.
   page once the wheel has moved it and it stands still (item 1029): a wheel lands after the call that sends it, late on
   a busy Mac, where a page read too soon said "no change". A wheel that moves nothing (a page at its end), or a page
   that does not answer where it stands, is waited for one second at most.
-- `browser_wait_text` waits until a text is visible and says after how long. A wait that begins while the page is
+- `browser_wait_text` waits until a text is visible and says after how long. The text counts as the page view names
+  it (item 1154): visible words, or the placeholder of a field, the `aria-label` or label of an element (an icon
+  button) and the alt text of an image; a step's `expect_text` is read the same way. A wait that begins while the page is
   leaving for another (a click that went to a slow page) waits for that page within its time first (item 1035): the
   page answers nothing while it goes, and the wait failed after 2 s. A page whose script holds its main thread (X or
   Google Cloud building a view) is asked again within the wait's time too (item 1134). When the text does not come in
@@ -348,8 +425,10 @@ Both modes share what follows.
   `yolo` it runs at once), and takes the login back out of the vault when the fill fails; the model never chooses, sees
   or records the password, and the run is told to make no password itself. A password or a code goes only into an input,
   a textarea or a dropdown, never into an element that is edited (`contenteditable`); a ref that names an element inside
-  the label of a field names that field. A form with no method is a form that sends by GET, to a browser: before a
-  password or a code goes into it, Dot makes it send by POST, and keeps it so as it is sent (item 775). A vault login's
+  the label of a field names that field. A read-only field takes no part of a login, and is refused at once, saying so
+  (item 1175): a sign-in in two steps keeps the username read-only on its password step, where the password goes
+  alone. A form with no method is a form that sends by GET, to a browser: before a password or a code goes into it, Dot
+  makes it send by POST, and keeps it so as it is sent (item 775). A vault login's
   password is in the Mac's Keychain (service `dot-vault`), never in Dot's database, whose record of a login holds its
   site and username alone. It fills only on the login's own site, never a password or a code in your own Chrome
   (`attach`: that Chrome's requests are not held, so nothing would keep a value out of an address), and not in a chat in
@@ -367,7 +446,10 @@ Both modes share what follows.
 - A conversation thread keeps at most `max_tabs` tabs open, and closes the tabs it is done with (item 696): a tab that
   is not its current one once unused for `background_tab_idle_s` (300 s; 0 keeps it), while its run works as well; when
   a run ends, the chat's background tabs, keeping the current one for a message that goes on from it until `tab_idle_s`;
-  and every tab of a helper's chat (a delegated run, an agent's) when it ends. `browser_close_tab` without an index
+  and every tab of a chat that no message goes on from when its run ends: a helper's (a delegated run, an agent's), and
+  one a run nobody watches opened (a schedule's, a watcher's, Dot's own initiative, a reply) once such a run in it ends
+  needing nothing of you (item 1168). Your own chat keeps its current tab whoever ran in it last (a loop of the chat, a
+  reply in it), and so does a run that ends needing something of you. `tab_idle_s` is 600 s by default (item 1168). `browser_close_tab` without an index
   closes every tab of the chat but the current one. Only the chat's own tabs are closed: those of a chat at work at the
   same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a link or a page that
   opens a new tab) is the chat's, also when you opened it that way (a middle click in a tab of Dot's in your Chrome).
@@ -392,7 +474,7 @@ Both modes share what follows.
   clicked in its place. When no chooser opens and the page has exactly one file field, that field takes them, since no
   other control can be the one meant. A field beside the element, on a page with several, is not taken, as it may be
   another control's.
-- With `idle_close_s` (seconds; 1800 by default since item 731, the time after which the chats' own tabs close; 0 keeps
+- With `idle_close_s` (seconds; 600 by default since item 1168, the time after which the chats' own tabs close; 0 keeps
   it open until the daemon stops; item 454), Dot's own Chrome (`own`) closes, the Playwright driver with it, once
   nothing used it for that long: no chat's step is under way in it, no run at work holds tabs in it, no page is being
   read in it for the web tools or watched under "Dot's computer", no task is being taught in it, and its window is not
@@ -448,7 +530,11 @@ Both modes share what follows.
   Chrome reports it before its address commits. A new tab that Chrome does not hand over within `action_timeout_s`,
   that cannot be set up or whose run stops meanwhile is closed, not left open with no chat to close it (item 800). The
   error of one not handed over says what Chrome lists of it (item 1002): gone, or its address, whether Playwright
-  attached to it and whether it is in the browser context of the other tabs. A
+  attached to it and whether it is in the browser context of the other tabs. For a tab Chrome still lists it also
+  says whether Chrome names the tab's window, which is the first thing Playwright asks of a new tab before it reports
+  it, and how many pages Playwright did report meanwhile and of what kind (blank, a new tab of Dot's, or at an
+  address, which is never named: in the owner's Chrome it may be a tab of the owner's; item 1160). The cause of such
+  a tab is not known yet, and these tell the browser's side of the handover from the page's the next time. A
   quiet read's tab is closed the way it was made, through Chrome's own `Target.closeTarget`: Playwright's close never
   came back for a tab whose failed navigation Chrome was still committing its error page in (item 960).
   macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own
@@ -573,6 +659,22 @@ every mode but `yolo` (item 433).
   changed something, the window is read once the application has
   announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
   without announcing anything in between shows in the next view.
+- A step's line says whether it was sent and what Dot checked of it, as a browser step's does (item 1146): done says
+  that it was sent, and verified, uncertain or not checked stands beside it. What `set_value` set is read back as
+  before, and now says so: verified, or the step fails as sent and not kept. What `type` and `paste` put in is read
+  back from the field the step names, or from the one that has the keyboard, for up to a second, since keys reach an
+  application after the step returns: verified once the text is in the field one more time than before (as typed, or
+  with the same letters and digits), otherwise uncertain and never contradicted. A secure field is never read; a field
+  whose value is no text, a text area of more than 4,000 characters (a terminal, a document) and a text that presses
+  Return or Tab are not checked. `expect_text` on a step names exact words (4 to 80 characters) that an element of the
+  front window must show in its name or its value once the step is done: the window is read before the step (words it
+  shows already, or that the batch writes, are refused and nothing is sent) and then every quarter second, 5 s at most
+  and 10 s over one batch. Seen is verified; not seen is uncertain, the batch stops there and the step is not to be
+  sent again unseen. A batch stops before a step that acts on what the steps before it left (a click, a press, a key,
+  a menu item, a drag, a text with Return or Tab) when one of their own checks is not verified. A failed step says
+  whether it went out: one refused before any input was sent (its target changed since the review, the pointer was
+  moved, an accessibility call that says nothing was done) did not. Another window of the same application taking the
+  keyboard does not stop a batch; another application coming forward does (item 749).
 - In a terminal application (Terminal, iTerm2, Ghostty and the like) text and keys are shell input. Dot keeps the
   command line it typed there since the line was last empty and judges it whole, as a `shell` command, when Return or
   a Ctrl- key that may run it goes in, so a command typed in parts is judged as one, from the home folder. After a

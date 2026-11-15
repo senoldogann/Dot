@@ -275,7 +275,7 @@ async def test_while_a_run_works_the_word_goes_with_a_queued_message_and_not_wit
                 pill: Locator = dock.locator(".composer-pill[data-pill='reasoning']")
                 box: Locator = dock.locator("textarea")
                 rows: Locator = page.locator(".queue-row")
-                await expect(box).to_have_attribute("placeholder", re.compile(r"^Queue a message"))
+                await expect(box).to_have_attribute("placeholder", re.compile(r"^Write the next task"))
                 # Queued, the message keeps the word's choice for the run it starts.
                 await box.fill("ultrathink: then this.")
                 await _expect_boost(dock, pill, "ultrathink", "Ultrathink")
@@ -291,11 +291,24 @@ async def test_while_a_run_works_the_word_goes_with_a_queued_message_and_not_wit
                 await box.press("Escape")
                 await expect(box).to_have_value("ultracode: a draft.")
                 await _expect_boost(dock, pill, "ultracode", "Ultracode")
-                # A steer joins the run under way and says the choice waits.
+                # A steer sent the other way joins the run under way and says the choice waits for the next task.
                 await box.press("ControlOrMeta+Shift+Enter")
                 await expect(page.locator(".toast")).to_contain_text("keeps its level")
                 await expect(box).to_have_value("")
                 await _expect_boost(dock, pill, None, "Medium")
+                # Added to the task, a choice for one message armed on the pill is said to wait before the send, not
+                # after it; the note's button sends after the task instead, and the note goes.
+                await page.get_by_role("radio", name="Add to task").click()
+                await pill.click()
+                await page.locator(".composer-popover .pop-option", has_text="Ultrathink").first.click()
+                await page.keyboard.press("Escape")
+                note: Locator = page.locator(".intent-note")
+                await expect(note).to_be_visible()
+                await expect(note).to_contain_text("wait in the box for your next message")
+                await note.get_by_role("button", name="Send after this task instead").click()
+                after: Locator = page.get_by_role("radio", name="After this task")
+                await expect(after).to_have_attribute("aria-checked", "true")
+                await expect(note).to_be_hidden()
                 await page.close()
             finally:
                 await browser.close()

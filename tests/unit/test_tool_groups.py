@@ -262,8 +262,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "- skills: saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way "
         "(skill_save)",
         "- vault: the owner's saved contact details (name, address, phone, email) to type into forms (vault_contacts)",
-        "- meetings: the owner's Google Meet call: joining it to take notes, reading them, posting on the owner's yes "
-        "(meeting_join, meeting_read, meeting_post, meeting_leave)",
+        "- meetings: the owner's Google Meet call: joining it to take notes and answer, reading them, posting on "
+        "their yes (meeting_join, meeting_read, meeting_post, meeting_leave)",
         "- terminal: programs that ask questions, REPLs and servers that stay up, on a terminal of their own "
         "(terminal_open, terminal_send, terminal_read, terminal_close)",
         "- desktop: the Mac's applications, windows, clipboard and AppleScript (desktop_apps, desktop_open_app, "

@@ -85,7 +85,11 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 350 for the meeting tools (item 1138, the owner's ask of 2026-11-12 after Grok Bot 1.0): `meeting_join`,
 # `meeting_read`, `meeting_post` and `meeting_leave`, Dot in the owner's Google Meet call, each described in a line
 # (26,755 measured; tools 18,954).
-BUDGET_TOKENS: int = 26_800
+# Raised by 300 for what a browser step came to (item 1145, the owner's ask of 2026-11-13: browser use that depends
+# less on the model): `expect_text` and `expect_url` on a step of `browser_act`, the words of its result (done is
+# sent, verified is seen, uncertain is not sent again unseen) and one line of the prompt's Browser, each cut to a
+# line after a first wording took 580 (27,069 measured here, on item 1143's words; system 7,847, tools 19,195).
+BUDGET_TOKENS: int = 27_100
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -107,7 +111,8 @@ SYSTEM_BUDGET_TOKENS: int = 7_900
 # Raised by 50 for the line of `show_page` of item 1056 above.
 # Raised by 50 for `review_work`'s `brief` (item 1065) above (tools 18,516 measured).
 # Raised by 450 for the four meeting tools of item 1138 above (18,954 measured).
-TOOLS_BUDGET_TOKENS: int = 19_000
+# Raised by 200 for the two fields of a browser step and the words of its result of item 1145 above (19,195 measured).
+TOOLS_BUDGET_TOKENS: int = 19_200
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

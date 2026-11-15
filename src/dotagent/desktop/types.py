@@ -11,6 +11,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from dotagent.core.outcomes import EXPECT_MIN_CHARS
+from dotagent.core.outcomes import StepReport as StepReport
 from dotagent.core.types import FrozenModel
 
 type AXElement = object
@@ -227,13 +229,6 @@ class ScreenshotView(FrozenModel):
     clipped: str = ""
 
 
-class StepReport(FrozenModel):
-    index: int
-    description: str
-    outcome: Literal["done", "failed", "skipped"]
-    detail: str
-
-
 class ActOutcome(FrozenModel):
     """The result of a batch: what each step did, why the batch stopped early (if it did) and the window afterwards.
     ``view_note`` says why there is no view (the window is gone, the application quit)."""
@@ -287,6 +282,12 @@ _SIDE_EFFECT_ACTIONS: frozenset[str] = frozenset(
         "activate",
     }
 )
+# The steps that only put text into a field, move the view or wait (item 1146): they run on after a step whose check
+# is not verified. Every other step acts on what the steps before it left (a press, a key, a menu item) and waits for
+# a look.
+_INDEPENDENT_ACTIONS: frozenset[str] = frozenset({"set_value", "type", "paste", "focus", "hover", "scroll", "wait"})
+# The most characters of a text a step expects to see: a view of a window shows that much of a field's value.
+EXPECT_VALUE_CHARS: int = 80
 
 
 class Step(BaseModel):
@@ -333,6 +334,24 @@ class Step(BaseModel):
         description='Menu path for menu, as shown by desktop_snapshot with scope menu_bar: ["File", "Save"].',
     )
     seconds: float | None = Field(default=None, gt=0, le=10, description="Seconds to pause for wait.")
+    expect_text: str | None = Field(
+        default=None,
+        min_length=EXPECT_MIN_CHARS,
+        max_length=EXPECT_VALUE_CHARS,
+        description=(
+            "Exact words the window must show once this step is done and does not show before it: the name or the "
+            "value of an element (the label that says Saved, the counter's new value), not text you type. Dot looks "
+            "for them a few seconds and reports verified or uncertain; when they do not show, the steps after this "
+            "one are not run."
+        ),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _expect_is_of_a_step(cls, data: object) -> object:
+        if isinstance(data, dict) and "expect" in data:
+            raise ValueError("a step takes expect_text: exact words the window must show after it")
+        return data
 
     @model_validator(mode="after")
     def _check_fields(self) -> Self:
@@ -387,3 +406,11 @@ class Step(BaseModel):
 
     def has_side_effects(self) -> bool:
         return self.action in _SIDE_EFFECT_ACTIONS
+
+    def acts_on_what_was_left(self) -> bool:
+        """Whether the step acts on what the steps before it left, so that it waits when one of their checks is not
+        verified (item 1146): every step but one that only writes into a field, moves the view or waits; a text with
+        a line break or a tab presses Return or Tab."""
+        if self.action not in _INDEPENDENT_ACTIONS:
+            return True
+        return self.text is not None and self.action != "set_value" and any(key in self.text for key in "\n\r\t")

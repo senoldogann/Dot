@@ -51,6 +51,7 @@ from dotagent.evals.scoring import (
 )
 from dotagent.evals.speed import render_speed, render_speed_change
 from dotagent.evals.speed_tasks import SPEED_TASKS, speed_tasks
+from dotagent.evals.state_tasks import state_tasks
 from dotagent.evals.tool_cases import CASES as TOOL_CASES
 from dotagent.evals.toolcalls import CaseResult, ToolCase, pass_rate
 from dotagent.evals.toolcalls_play import keys_for, play_cases
@@ -114,8 +115,9 @@ async def _task_problems(
 
 async def cmd_eval_check(command: EvalCheckCommand) -> int:
     config: AppConfig = eval_config(load_default_config())
-    # The speed set is checked with the catalog, though only `dotx eval speed` plays it (item 1037).
-    tasks: tuple[EvalTask, ...] = (*all_tasks(), *speed_tasks())
+    # The speed set is checked with the catalog, though only `dotx eval speed` plays it (item 1037), and so is the
+    # state set, which is played by its tasks' ids (item 1147).
+    tasks: tuple[EvalTask, ...] = (*all_tasks(), *speed_tasks(), *state_tasks())
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     broken: list[str] = list(catalog_problems(tasks))

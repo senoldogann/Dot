@@ -53,6 +53,7 @@ from dotagent.browser.safety import (
 )
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.browser.types import (
+    PAGE_UNCHANGED,
     ActOutcome,
     FindResult,
     PageView,
@@ -72,6 +73,7 @@ from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import DotError, ToolExecutionError, ToolInputError
 from dotagent.core.held import held_folder, open_regular
 from dotagent.core.logs import get_logger
+from dotagent.core.outcomes import BROWSER_EXPECTATIONS, expectation_on_last_step
 from dotagent.core.paths import uploads_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData
@@ -364,10 +366,56 @@ def _links_tool() -> RegisteredTool:
 _LOOKING_STEPS: frozenset[str] = frozenset({"snapshot", "screenshot", "look", "wait"})
 
 
+# The call's own guess of what its steps will show, in the model's words, by the name a step may not carry.
+_CALL_GUESS: str = "expect"
+
+
+def guesses_to_the_call(data: object) -> object:
+    """An act call (``data``, as the model wrote it) with a guess in the model's own words that a step carries
+    (``expect``) taken to the call, where it is read (item 1164): after the call's own, none twice. A step's guess
+    is cut to the length the call's may have (:data:`_EXPECT_CHARS`), and one more is added only while the whole
+    still fits, so that the call is never refused for the length of a text the model did not write there. What
+    does not fit is left out: a guess is an estimate for the typed judge and checks nothing. A step was refused
+    for it before, which cost a round trip of the model for a meaning that was plain.
+    Words a step expects to see (``expect_text``) are another thing, and are placed by
+    :func:`dotagent.core.outcomes.expectation_on_last_step` (item 1161)."""
+    if not isinstance(data, dict) or not isinstance(data.get("steps"), list):
+        return data
+    steps: list[object] = data["steps"]
+    guesses: list[str] = [
+        step[_CALL_GUESS][:_EXPECT_CHARS]
+        for step in steps
+        if isinstance(step, dict) and isinstance(step.get(_CALL_GUESS), str)
+    ]
+    if not guesses:
+        return data
+    placed: list[object] = [
+        {name: value for name, value in step.items() if name != _CALL_GUESS}
+        if isinstance(step, dict) and isinstance(step.get(_CALL_GUESS), str)
+        else step
+        for step in steps
+    ]
+    own: object = data.get(_CALL_GUESS)
+    if own is not None and not isinstance(own, str):
+        # A guess of the call's that is no text is the call's to be refused for, as written: nothing replaces it.
+        return data
+    # An empty guess, the call's or a step's, is no guess.
+    every: list[str] = [guess for guess in dict.fromkeys([own or "", *guesses]) if guess]
+    if not every:
+        return {**data, "steps": placed}
+    # The first stands (the call's own as the model wrote it there); each further one only while the whole fits.
+    kept: list[str] = every[:1]
+    for guess in every[1:]:
+        if len("; ".join([*kept, guess])) <= _EXPECT_CHARS:
+            kept = [*kept, guess]
+    return {**data, "steps": placed, _CALL_GUESS: "; ".join(kept)}
+
+
 class ActArgs(ToolArgs):
     @model_validator(mode="before")
     @classmethod
-    def _without_looks(cls, data: object) -> object:
+    def _as_meant(cls, data: object) -> object:
+        """Without the steps that only look, and with what the call expects where it is read."""
         if not isinstance(data, dict) or not isinstance(data.get("steps"), list):
             return data
         steps: list[object] = [
@@ -375,7 +423,10 @@ class ActArgs(ToolArgs):
             for step in data["steps"]
             if not (isinstance(step, dict) and step.get("action") in _LOOKING_STEPS and len(step) == 1)
         ]
-        return {**data, "steps": steps or data["steps"]}
+        # The looks go first, so that an expectation beside the steps lands on the last step that acts (item 1161).
+        return guesses_to_the_call(
+            expectation_on_last_step({**data, "steps": steps or data["steps"]}, BROWSER_EXPECTATIONS)
+        )
 
     steps: list[Step] = Field(
         min_length=1,
@@ -402,7 +453,8 @@ class ActArgs(ToolArgs):
         description=(
             "What the page should show after the steps, in a few words ('the reply shows under the post', 'the order "
             "confirmation'). When the typed judge is on, the result opens with the probability that the page shows it "
-            "and that it is a login wall, a CAPTCHA or an error page, so you need not read the whole page to know."
+            "and that it is a login wall, a CAPTCHA or an error page, so you need not read the whole page to know. An "
+            "estimate; a step's expect_text is the check."
         ),
     )
     retry: bool = Field(
@@ -410,7 +462,7 @@ class ActArgs(ToolArgs):
         description=(
             "When a click leaves the page unchanged, reach the same element once with the full pointer sequence a "
             "script sends (`browser_eval`'s way) and take the page again, instead of returning to the model for "
-            "another method. A click that already moved the page is never sent twice."
+            "another method. A click that already moved the page, or that names what it expects, is never sent twice."
         ),
     )
 
@@ -441,15 +493,17 @@ async def _retry_unchanged(
     """A click whose batch left the page unchanged is tried once the other way (item 781): the steps' refs are still
     on the page, so a script sends the pointer sequence to each such element, and the page is read again when one of
     them ran. A click that moved the page, a step that failed and a script that surprised the tab are left alone, and
-    so is a batch whose ``flags`` say it sends, posts, pays or removes (:data:`_NOT_RETRIED`)."""
+    so is a batch whose ``flags`` say it sends, posts, pays or removes (:data:`_NOT_RETRIED`). A click that named what
+    it expects is never clicked again here (item 1145): its wait may have ended while the first click was still
+    being answered, and a second one would do it twice."""
     if set(flags) & _NOT_RETRIED:
         return outcome
     steps: list[StepReport] = list(outcome.steps)
     retried: bool = False
     for index, (step, report) in enumerate(zip(args.steps, steps, strict=False)):
-        if step.action != "click" or step.ref is None:
+        if step.action != "click" or step.ref is None or step.expects() or report.checks:
             continue
-        if report.outcome != "done" or not report.detail.startswith("but the page did not change"):
+        if report.outcome != "done" or not report.detail.startswith(PAGE_UNCHANGED):
             continue
         try:
             run: ScriptRun = await ctx.browser.run_script(
@@ -691,7 +745,9 @@ def _act_tool() -> RegisteredTool:
             "area) fill, type and insert wait until it is ready and fail when it did not take the text; insert goes "
             "only into a text field or an editor. A click that leaves the page unchanged is tried once the other way "
             "with a script before the result returns. Batch the steps you can predict, such as filling a whole form "
-            "and pressing submit. The result shows what changed on the page. Passwords, card numbers and one-time "
+            "and pressing submit. The result shows what changed on the page and, for each step, done (sent) and what "
+            "Dot checked: verified (seen), uncertain (sent, result unseen: look before sending again) or not checked. "
+            "Passwords, card numbers and one-time "
             "codes go in only as your instructions on secrets say: otherwise the browser refuses the step. " + _REF_HELP
         ),
         args_model=ActArgs,

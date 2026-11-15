@@ -1174,11 +1174,12 @@ class JudgeConfig(FrozenModel):
 
 
 class MeetingsConfig(FrozenModel):
-    """Dot in the owner's calls (item 1138, docs/meetings.md): how it shows, how long it waits to be let in and stays,
-    when a caption is a line, how often the notes are made again, how long a meeting's lines are kept, and whether its
-    Chrome shows a window."""
+    """Dot in the owner's calls (item 1138, docs/meetings.md): how it shows, whether it answers whoever names it (item
+    1150), how long it waits to be let in and stays, when a caption is a line, how often the notes are made again, how
+    long a meeting's lines are kept, and whether its Chrome shows a window."""
 
     name: str = Field(max_length=60)
+    answers: bool
     admit_minutes: float = Field(gt=0, le=60, allow_inf_nan=False)
     most_hours: float = Field(gt=0, le=12, allow_inf_nan=False)
     settle_s: float = Field(gt=0, le=30, allow_inf_nan=False)

@@ -6,7 +6,7 @@ from typing import Literal
 
 import pytest
 
-from dotagent.agent.streammask import StreamMask
+from dotagent.agent.streammask import StreamMask, said_in_harness, said_in_loop
 from dotagent.core.text import redact_known
 from dotagent.llm.types import StreamDelta
 
@@ -163,3 +163,16 @@ async def test_words_that_introduce_a_secret_wait_for_its_value_however_they_com
     before, shown = await _streamed(text, sizes, ())
     assert shown == redact_known(text, ())
     assert value[:6] not in before and value[:6] not in shown
+
+
+def test_a_steps_words_are_an_update_only_where_the_loop_cannot_take_them_as_the_answer() -> None:
+    """Item 1166: in Dot's own loop a task's words are an update once the run used a tool, short of its limit and of
+    the last time it is told to finish; before, they may be the answer. A chat's are its message. Claude Code's and
+    OpenCode's runs take a reply with no call as the answer whenever it comes, so a task's words there are either."""
+    assert said_in_loop("task", True, False, True) == "update"
+    assert said_in_loop("research", True, False, True) == "update"
+    assert said_in_loop("task", False, False, True) == "either"
+    assert said_in_loop("task", True, True, True) == "either"
+    assert said_in_loop("task", True, False, False) == "either"
+    assert said_in_loop("chat", True, False, True) == "message"
+    assert (said_in_harness("task"), said_in_harness("chat")) == ("either", "message")

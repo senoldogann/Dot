@@ -595,9 +595,7 @@ async def test_a_chat_its_messages_menus_and_cards_say_what_they_mean(browser: B
             await reader.opens("The options menu", page.get_by_role("tab", name="Options", exact=True))
         else:
             await reader.opens("The options menu", page.locator("button[title^='Approvals:']").first)
-        await reader.opens(
-            "The plus menu", page.get_by_role("button", name="Add files, model and options, or teach a task")
-        )
+        await reader.opens("The plus menu", page.get_by_role("button", name="Add files or teach a task"))
         goal: Locator = page.get_by_role("textbox", name="Goal")
         for trigger, label in (("/", "The slash menu"), ("@", "The at menu")):
             await goal.fill(trigger)
@@ -622,7 +620,7 @@ async def test_a_chat_its_messages_menus_and_cards_say_what_they_mean(browser: B
         else:
             await page.get_by_role("button", name="Copy the answer").first.click()
             await reader.read("The toast of a copy")
-            await page.locator("button[aria-label='React to this message']").first.click(force=True)
+            await page.locator("article.answer button[aria-label='React to this message']").first.click(force=True)
             await reader.read("The reactions")
             await page.keyboard.press("Escape")
         # A chat at work: the stop button's words and the queue.

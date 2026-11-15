@@ -4,7 +4,7 @@
 // for you, and its card stays in its own chat (item 434).
 
 import { actorFace, DOT_ID } from "../actors.js";
-import { api } from "../api.js";
+import { api, sharedGet } from "../api.js";
 import { assistant, loadAssistant, onAssistant } from "../assistant.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, optionRow, runChoices } from "../choices.js";
@@ -213,8 +213,7 @@ function buildComposer(ctx, listener) {
       ),
     ],
   });
-  api
-    .get("/agents")
+  sharedGet("/agents")
     .then((summaries) => {
       agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
       listed = true;

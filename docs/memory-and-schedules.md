@@ -275,9 +275,11 @@ them (the ones its first run started with until you picked others: its mode, mod
 mode and goal mode; item 291). A firing whose saved reasoning level its model does not offer runs at the nearest one
 it does, the higher of two as near (`medium` on a model of low, high and max runs at high), and the log says so
 (`firing_effort_not_offered`; item 882: a chat's `medium` kept in its schedules, which DeepSeek does not offer, failed
-every firing of them to start); a level chosen for a chat's run is still refused at once. The conversation says so where it happened, in a quiet line of its own (item 665):
-the calendar, "Made a schedule", its name and when it runs in the words the Schedules page uses ("on Mondays at
-09:00"; a form the page cannot say in words is "on a repeating schedule", and a schedule that runs once says its time),
+every firing of them to start); a level chosen for a chat's run is still refused at once. The conversation says so where it happened, in a quiet line of its own (items 665, 1178 and
+1179): the calendar, the schedule's name (cut with an ellipsis on a short line) and when it runs in the words the
+Schedules page uses ("on Mondays at 09:00"; a form the page cannot say in words is "on a repeating schedule", and a
+schedule that runs once says its time in few words in the page's language, "today at 18:53", "tomorrow at 10:00",
+"Saturday at 09:00", "17 Nov at 10:00"); its tooltip says "Schedule made",
 in sight when the chat shows only what Dot is doing too, and kept by the turn once the chat goes on. The line leads to
 the Schedules page (`#/schedules?schedule=ID`), whose row of that schedule is marked in the accent's light, fading, and
 scrolled into sight. `/loop 30m <message>` in the box of a run or of a new chat makes such a schedule from the

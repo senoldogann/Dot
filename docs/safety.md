@@ -1268,8 +1268,9 @@ and any other answer skips it (item 558).
 
 **Free mode** (item 922, `[policy] free`, Settings › Rules › How Dot asks, `GET|PUT /api/policy/free`): on, no run asks
 anything, in every chat and every approval mode, from its next step: a payment, a message or mail sent for you, a
-public post and a release too (but a post in the chat of a meeting Dot is in, which you are asked about with its words
-whole in every mode, item 1138, [Meetings](meetings.md)), in your chats and in Dot's own, as a `yolo` run of a chat nobody watches does; each step
+public post and a release too (but a task's post in the chat of a meeting Dot is in, which you are asked about with its
+words whole in every mode, item 1138, and a join of a meeting that is not your own word, item 1150; Dot's own answers in
+a call, written from the call's words alone, are asked about in no mode, [Meetings](meetings.md)), in your chats and in Dot's own, as a `yolo` run of a chat nobody watches does; each step
 is recorded with why it would have asked. A refusal still stands (a research run stays read-only, the pace of a site
 and the limits of trading hold), and so does the review model's check of a `yolo` run that read outside content when
 `yolo_taint_check` is on. A step of such a run that carries a secret out of the Mac is not refused in it (item 1097:

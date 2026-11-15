@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 import pytest
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
@@ -152,16 +153,16 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 face = await line.locator(".turn-face").bounding_box()
                 assert face is not None
                 await page.mouse.click(face["x"] + face["width"] / 2, face["y"] + face["height"] / 2)
-                await expect(line).to_have_attribute("aria-pressed", "true")
+                await expect(line).to_have_attribute("aria-expanded", "true")
                 await line.click()
-                await expect(line).to_have_attribute("aria-pressed", "false")
+                await expect(line).to_have_attribute("aria-expanded", "false")
                 await expect(page.locator("details.steps")).to_be_hidden()
                 await page.screenshot(path=str(tmp_path / "working.png"))
                 # Pressed while the run works, the line shows the steps; pressed again, it folds them back; pressed a
                 # third time, the steps stay shown when the answer comes.
                 await line.click()
                 await expect(page.locator("details.steps").first).to_be_visible()
-                await expect(line).to_have_attribute("aria-pressed", "true")
+                await expect(line).to_have_attribute("aria-expanded", "true")
                 await line.click()
                 await expect(page.locator("details.steps")).to_be_hidden()
                 await line.click()
@@ -231,3 +232,104 @@ async def test_by_default_the_steps_fold_away_and_the_line_offers_them(own_home:
                 await page.close()
             finally:
                 await browser.close()
+
+
+async def test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answered(own_home: Path) -> None:
+    """Item 1148: while a step waits for the owner's yes the line says so; once it is answered the line says the work
+    it was at again, while its command still runs (the pre-push review: it kept "Waiting for you" until the command
+    ended)."""
+    async with _served(own_home) as (manager, address, port):
+        # A rule has the command ask, as a rule of the owner's would.
+        async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as api:
+            asked = await api.post(
+                "/api/rules",
+                json={"behavior": "ask", "tool_glob": "shell", "match_regex": "sleep", "description": "Ask"},
+            )
+            assert asked.status_code == 201, asked.text
+        run: RunRecord = await manager.start(
+            "List the folder slowly",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            None,
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            (),
+        )
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+            try:
+                page: Page = await _open(browser, port, address, run.id, "status", 1280)
+                words: Locator = page.locator(".work-status .work-status-words")
+                await expect(words).to_have_text("Waiting for you…", timeout=15_000)
+                # Said once to a screen reader, as a change of state.
+                await expect(
+                    page.locator(".run-thread [role='status']").filter(has_text="Waiting for you")
+                ).to_have_count(1)
+                await page.get_by_label("Dot asked you").get_by_role("button", name="Approve").first.click()
+                await expect(words).to_have_text(re.compile(_TOLD_WORDS))
+                async with asyncio.timeout(30):
+                    assert (await manager.wait(run.id)).status == "done"
+            finally:
+                await browser.close()
+
+
+async def test_an_update_streams_under_the_line_and_a_message_steps_it_aside(own_home: Path) -> None:
+    """Items 1162 and 1166: words that are an update (their delta says ``says`` "update") stream folded with the
+    steps, and the line keeps saying the work while they come; words that may be the answer ("either") and a chat's
+    message stream in sight and step the line aside, as they then say what goes on; a live "either" note stays in
+    sight under "What it is doing" until its step ends (run.css)."""
+    async with _served(own_home) as (_manager, _address, port), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await browser.new_page()
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            states: list[str] = await page.evaluate(
+                """async () => {
+                  const { createWorkStatus } = await import("/js/workstatus.js");
+                  const line = createWorkStatus({
+                    rootRunId: "r1", active: true, queued: false, onToggle: () => undefined, face: null,
+                  });
+                  const words = (says) => ({
+                    run_id: "r1", kind: "delta", data: { kind: "text", text: "Checking it", step: 1, says },
+                  });
+                  const states = [];
+                  for (const says of ["update", "either", "message"]) {
+                    line.push({ run_id: "r1", kind: "model_call", data: {} });
+                    line.push(words(says));
+                    states.push(line.element.dataset.state);
+                  }
+                  return states;
+                }"""
+            )
+            # Words that may be the answer stream in sight (item 1166), and step the line aside as a message's do.
+            assert states == ["working", "quiet", "quiet"], states
+            # In sight while they stream: a live update that may be the answer shows under "What it is doing", one
+            # that cannot does not, and neither once its step has ended (run.css).
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            shown: list[str] = await page.evaluate(
+                """() => {
+                  document.documentElement.dataset.work = "status";
+                  const thread = Object.assign(document.createElement("div"), { className: "run-thread" });
+                  document.body.append(thread);
+                  const line = (classes, either) => {
+                    const node = Object.assign(document.createElement("div"), { className: classes });
+                    node.toggleAttribute("data-either", either);
+                    node.append(Object.assign(document.createElement("div"), { textContent: "Hi" }));
+                    thread.append(node);
+                    return getComputedStyle(node).display;
+                  };
+                  return [
+                    line("bubble live say say-progress", true),
+                    line("bubble live say say-progress", false),
+                    line("bubble say say-progress", false),
+                  ];
+                }"""
+            )
+            assert shown[0] != "none" and shown[1:] == ["none", "none"], shown
+        finally:
+            await browser.close()

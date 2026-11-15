@@ -11,9 +11,9 @@ it lets a run do as much as by how it reads.
   credentials, public posts, messages sent for the owner, privilege, system settings) — in every mode but `yolo`, which
   asks nothing (item 443) but a payment, a message or mail and a public post in a chat the owner opened (item 860), and
   in a chat Dot opened on its own initiative a message, a post or a release, in every mode (item 850), and in
-  free mode, which the owner switches, nothing at all (item 922) but a post in the chat of a meeting Dot is in (item
-  1138) — record everything it does, and stop at once when
-  told to.
+  free mode, which the owner switches, nothing at all (item 922) but a task's post in the chat of a meeting Dot is in
+  (item 1138) and a join of a meeting that is not the owner's own word (item 1150; Dot's own answers in a call, from
+  its words alone, ask nothing) — record everything it does, and stop at once when told to.
   [Safety](docs/safety.md) is the contract.
 - Non-goal: any platform but macOS (it depends on PyObjC and drives macOS's own applications).
 

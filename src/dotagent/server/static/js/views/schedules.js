@@ -201,7 +201,7 @@ function runNowTitle(record, agent) {
   if (approvals === null) {
     return "Run now: it does real work, as it does at its time";
   }
-  const asks = approvals === "yolo" ? ", asking nothing" : "";
+  const asks = approvals === "yolo" ? ", asking only to pay or send" : "";
   return `Run now: it does real work, as it does at its time (approvals: ${approvalLabel(approvals)}${asks})`;
 }
 
@@ -816,7 +816,7 @@ export function mount(root, ctx) {
       if (views === null) {
         holder.replaceChildren(errorPanel(error, () => attempt(retry)));
       } else {
-        readFailed("The schedules", error);
+        readFailed("readFailed.schedules", error);
       }
     }
   }

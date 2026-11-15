@@ -3647,6 +3647,20 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def list_events_without(
+        self, run_id: str, after_id: int, limit: int, left_out: tuple[str, ...]
+    ) -> list[EventRecord]:
+        """:meth:`list_events` without the events of the kinds ``left_out``, left out by the query itself, so that a
+        page of ``limit`` events is full whenever more are stored (item 1170: a reader that stops at a short page)."""
+        if not left_out:
+            return await self.list_events(run_id, after_id, limit)
+        marks: str = ", ".join("?" for _ in left_out)
+        rows = await self._all(
+            f"SELECT * FROM events WHERE run_id = ? AND id > ? AND kind NOT IN ({marks}) ORDER BY id LIMIT ?",
+            (run_id, after_id, *left_out, limit),
+        )
+        return [_event(row) for row in rows]
+
     async def turn_tool_steps(self, run_ids: Sequence[str]) -> list[ToolStep]:
         """The tool calls of the runs ``run_ids`` and their results, in the order they were stored, in one read through
         each run's own events (item 650: what the earlier turns of a chat used and read). Only what the Run tab reads

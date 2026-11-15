@@ -6,6 +6,7 @@
 // with the message that starts a run and are put away once it went (`sent()`); a steer leaves them for the next one.
 
 import { el, switchRow } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { markContent, wearsDot } from "./marks.js";
 import { onServerMarks, serverMark, signedAccount, wantServerMarks } from "./palette.js";
@@ -15,13 +16,13 @@ import { toast } from "./ui.js";
 const MAX_PLUGINS = 8;
 const MAX_SKILLS = 4;
 const MAX_ACCOUNTS = 4;
-const PLAN_FIRST = "Plan first";
-const PLAN_FIRST_HINT = "Dot writes its plan and asks you before it changes anything.";
+const PLAN_FIRST = t("options.planFirst");
+const PLAN_FIRST_HINT = t("options.planFirstHint");
 
 const KINDS = {
-  plugin: { icon: "plug", noun: "connected app", many: "connected apps", most: MAX_PLUGINS },
-  account: { icon: "mail", noun: "account", many: "accounts", most: MAX_ACCOUNTS },
-  skill: { icon: "puzzle", noun: "skill", many: "skills", most: MAX_SKILLS },
+  plugin: { icon: "plug", chip: "picks.chipPlugin", most: MAX_PLUGINS, tooMany: "picks.mostPlugins" },
+  account: { icon: "mail", chip: "picks.chipAccount", most: MAX_ACCOUNTS, tooMany: "picks.mostAccounts" },
+  skill: { icon: "puzzle", chip: "picks.chipSkill", most: MAX_SKILLS, tooMany: "picks.mostSkills" },
 };
 
 // The colours a server's or a skill's chip takes, by its name: the characters' (themes.css), without amber, Dot's own.
@@ -84,7 +85,7 @@ function paintAccount(chip) {
   holder.replaceChildren(markContent(account.mark));
   holder.dataset.mark = "service";
   label.textContent = account.provider_name;
-  chip.title = `The ${account.provider_name} account ${address}`;
+  chip.title = t("picks.accountTitle", { provider: account.provider_name, address });
   chip.dataset.provider = account.provider;
 }
 
@@ -104,13 +105,13 @@ function pickMark(kind, name) {
 /** The chip of a pick of `kind` named `name`, which says what it is; `onRemove` takes it away, or null for the chip of
  * a sent message. */
 function pickChip(kind, name, onRemove) {
-  const what = kind === "plan" ? PLAN_FIRST_HINT : `The ${KINDS[kind].noun} ${name}`;
+  const what = kind === "plan" ? PLAN_FIRST_HINT : t(KINDS[kind].chip, { name });
   const chip = el("span", { class: "pick-chip", role: "listitem", title: what, dataset: { kind, name } }, pickMark(kind, name), el("span", { class: "pick-name" }, name));
   if (kind !== "plan") {
     tint(chip, name);
   }
   if (onRemove !== null) {
-    chip.append(el("button", { class: "pick-remove", type: "button", title: `Remove ${name}`, "aria-label": `Remove ${name}`, onclick: onRemove }, icon("x")));
+    chip.append(el("button", { class: "pick-remove", type: "button", title: t("options.remove", { name }), "aria-label": t("options.remove", { name }), onclick: onRemove }, icon("x")));
   }
   if (kind === "account") {
     paintAccount(chip);
@@ -125,7 +126,7 @@ function pickChip(kind, name, onRemove) {
 export function sentPicks(data, inline = false) {
   return el(
     inline ? "span" : "div",
-    { class: inline ? "pick-list sent inline" : "pick-list sent", role: "list", "aria-label": "Picked for this message" },
+    { class: inline ? "pick-list sent inline" : "pick-list sent", role: "list", "aria-label": t("options.picked") },
     spaced(
       [
         data.plan_first ? pickChip("plan", PLAN_FIRST, null) : null,
@@ -171,7 +172,7 @@ export function createPicks({ onChange }) {
   const chosen = { plugin: [], account: [], skill: [] };
   let planFirst = false;
   let planAvailable = true;
-  const list = el("div", { class: "pick-list", role: "list", "aria-label": "Picked for this message", hidden: true });
+  const list = el("div", { class: "pick-list", role: "list", "aria-label": t("options.picked"), hidden: true });
   const planSwitch = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": PLAN_FIRST });
   const planRow = switchRow(
     el(
@@ -181,7 +182,7 @@ export function createPicks({ onChange }) {
         "span",
         { class: "composer-pick-content" },
         el("span", { class: "composer-pick-label" }, PLAN_FIRST),
-        el("span", { class: "composer-pick-hint" }, "Draft a plan and ask before taking action"),
+        el("span", { class: "composer-pick-hint" }, t("options.planFirstShort")),
       ),
       planSwitch,
     ),
@@ -215,7 +216,7 @@ export function createPicks({ onChange }) {
       return;
     }
     if (chosen[kind].length >= KINDS[kind].most) {
-      toast("error", `At most ${KINDS[kind].most} ${KINDS[kind].many} go with one message.`);
+      toast("error", t(KINDS[kind].tooMany, { most: KINDS[kind].most }));
       return;
     }
     chosen[kind] = [...chosen[kind], name];

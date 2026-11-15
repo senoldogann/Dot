@@ -233,8 +233,10 @@ async def test_slash_loop_shows_the_loop_over_the_composer_and_its_stop_ends_it(
                 # The page of that run shows the chat's loop too.
                 await expect(loops).to_contain_text("every 30 minutes")
                 await page.screenshot(path=tmp_path / f"loop-{width}-{scheme}.png")
-                await page.get_by_role("button", name="Stop the loop check the build").click()
-                await page.get_by_role("dialog").get_by_role("button", name="Stop").click()
+                # A loop at rest is one folded line: its Stop is a press on the line away.
+                await page.locator(".chat-loops-toggle").click()
+                await page.get_by_role("button", name="Stop repeating: check the build").click()
+                await page.get_by_role("dialog").get_by_role("button", name="Stop repeating").click()
                 await expect(loops).to_be_hidden()
                 # A loop with no rhythm is said how to write it, and nothing is sent.
                 await box.fill("/loop check the build")
@@ -277,8 +279,10 @@ async def test_slash_loop_in_a_new_chat_starts_it_with_its_loop(tmp_path: Path) 
                 await expect(loops).to_contain_text("every 30 minutes")
                 await page.screenshot(path=tmp_path / f"new-chat-loop-{width}-{scheme}.png")
                 # Stopped, the loop leaves room for the next width's.
-                await page.get_by_role("button", name="Stop the loop check the build").click()
-                await page.get_by_role("dialog").get_by_role("button", name="Stop").click()
+                # A loop at rest is one folded line: its Stop is a press on the line away.
+                await page.locator(".chat-loops-toggle").click()
+                await page.get_by_role("button", name="Stop repeating: check the build").click()
+                await page.get_by_role("dialog").get_by_role("button", name="Stop repeating").click()
                 await expect(loops).to_be_hidden()
                 await page.close()
         finally:
@@ -366,8 +370,10 @@ async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_
                 await sidebar.screenshot(path=tmp_path / f"loop-mark-chosen-{scheme}.png")
                 await sidebar.get_by_role("button", name="Cancel selection").click()
                 await expect(looping).to_have_count(1)
-                await page.get_by_role("button", name="Stop the loop check the build").click()
-                await page.get_by_role("dialog").get_by_role("button", name="Stop").click()
+                # A loop at rest is one folded line: its Stop is a press on the line away.
+                await page.locator(".chat-loops-toggle").click()
+                await page.get_by_role("button", name="Stop repeating: check the build").click()
+                await page.get_by_role("dialog").get_by_role("button", name="Stop repeating").click()
                 await expect(sidebar.locator(".side-loop")).to_have_count(0)
                 await page.close()
         finally:
@@ -402,12 +408,18 @@ async def test_the_loops_of_a_chat_fold_under_their_head_and_keep_their_stops_in
                         await expect(page.locator(".run-thread")).to_contain_text(f"Answer {answer}.")
                 rows: Locator = loops.locator(".loop-row")
                 await expect(rows).to_have_count(2)
-                head: Locator = loops.get_by_role("button", name=re.compile(r"^Loops 2"))
+                # At rest (each page a browser of its own, which kept no fold) the loops are one line, which says how
+                # many there are and when the next one asks; a press opens their rows.
+                head: Locator = loops.locator(".chat-loops-toggle")
+                await expect(head).to_have_attribute("aria-expanded", "false")
+                await expect(head).to_have_accessible_name(re.compile(r"^2 repeats next (\w{3} )?\d"))
+                await expect(rows.first).to_be_hidden()
+                await head.click()
                 await expect(head).to_have_attribute("aria-expanded", "true")
                 # Every Stop ends where the others do, whatever the words beside it.
                 stops: list[float] = []
                 for at in range(2):
-                    found = await rows.nth(at).get_by_role("button", name=re.compile(r"^Stop the loop")).bounding_box()
+                    found = await rows.nth(at).get_by_role("button", name=re.compile(r"^Stop repeating")).bounding_box()
                     assert found is not None
                     stops.append(found["x"] + found["width"])
                 assert abs(stops[0] - stops[1]) <= 1, stops
@@ -419,9 +431,7 @@ async def test_the_loops_of_a_chat_fold_under_their_head_and_keep_their_stops_in
                 await expect(head).to_contain_text(re.compile(r"next (\w{3} )?\d"))
                 await page.screenshot(path=tmp_path / f"loops-folded-{width}-{scheme}.png")
                 await page.reload()
-                head = page.get_by_role("region", name="Loops of this chat").get_by_role(
-                    "button", name=re.compile(r"^Loops 2")
-                )
+                head = page.get_by_role("region", name="Loops of this chat").locator(".chat-loops-toggle")
                 await expect(head).to_have_attribute("aria-expanded", "false")
                 await head.click()
                 await expect(page.get_by_role("region", name="Loops of this chat").locator(".loop-row")).to_have_count(

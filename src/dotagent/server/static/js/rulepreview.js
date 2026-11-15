@@ -9,7 +9,7 @@ function dayOf(seconds) {
 }
 
 /** The lines of what the rule would have done: how many steps it fits, the earlier rules that decide some first, what
- * no rule decides (a YOLO run's steps, and the checks that come before every rule), and how what it would decide
+ * no rule decides (the steps of a run in the mode that asks only to pay or send, and the checks that come before every rule), and how what it would decide
  * compares with what was decided then. */
 export function previewLines(view, days) {
   if (view.scanned === 0) {
@@ -25,7 +25,7 @@ export function previewLines(view, days) {
     lines.push(`An earlier rule decides some of them first: ${firsts}.`);
   }
   if (view.in_yolo > 0) {
-    lines.push(`${view.in_yolo} ran in YOLO, which asks nothing whatever the rules say.`);
+    lines.push(`${view.in_yolo} ran in the mode that asks only to pay or send, where no rule decides them.`);
   }
   if (view.before_rules > 0) {
     lines.push(`${plural(view.before_rules, "is", "are")} settled before any rule, by checks no rule changes, such as money, credentials, messages and posts, and Dot's own files.`);
@@ -60,7 +60,7 @@ export function outcomeLabel(was, ok, recorded) {
     case "reviewer":
       return "the review model approved it";
     case "yolo":
-      return "ran, YOLO";
+      return "ran without asking";
     default:
       return ok ? "ran" : "failed";
   }
@@ -75,7 +75,7 @@ export function usageLine(usage, view, days, numberOf) {
   }
   const parts = [
     `decides ${usage.decides}`,
-    usage.in_yolo > 0 ? `${usage.in_yolo} ${usage.in_yolo === 1 ? "was" : "were"} in YOLO runs, which ask nothing` : null,
+    usage.in_yolo > 0 ? `${usage.in_yolo} ${usage.in_yolo === 1 ? "was" : "were"} in tasks that ask only to pay or send` : null,
     usage.before_rules > 0 ? `${usage.before_rules} ${usage.before_rules === 1 ? "was" : "were"} settled before any rule` : null,
     ...usage.shadowed_by.map((shadow) => `rule #${numberOf(shadow.rule_id)} decides ${shadow.steps} first`),
   ].filter((part) => part !== null);

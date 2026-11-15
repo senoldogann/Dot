@@ -186,6 +186,11 @@ class BrowserError(DotError):
     """Browser automation failed."""
 
 
+class StepNotSent(BrowserError):
+    """A step of a browser batch was refused before anything went to the page (item 1145): a ref that is no longer
+    there, an option the dropdown does not have. Doing it again, corrected, repeats nothing."""
+
+
 class TabSilentError(BrowserError):
     """The page of a tab answered nothing at all within the navigation timeout (item 753): it is stuck, or Chrome is
     overloaded, so nothing can be read of it either; told apart from a page that answers and is still loading (item
@@ -207,6 +212,16 @@ class ForbiddenUrlError(BrowserError):
 
 class DesktopError(DotError):
     """Desktop (computer use) automation failed."""
+
+
+class DesktopStepNotSent(DesktopError):
+    """A step of a desktop batch was refused before any input went to an application (item 1146): its target was no
+    longer what was reviewed, the pointer was not where the step before left it."""
+
+
+class ValueNotKept(DesktopError):
+    """A field whose value a step set reads back as something else (item 1146): the step went out, and what it asked
+    for is not so."""
 
 
 class DesktopPermissionError(DesktopError):

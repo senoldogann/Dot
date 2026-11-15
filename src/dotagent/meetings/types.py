@@ -51,10 +51,21 @@ class PageBatch(FrozenModel):
     dropped: int = Field(ge=0)
 
 
-class MeetingLine(FrozenModel):
-    """One kept line of a meeting: what a speaker said (caption) or typed (chat). Names are unverified."""
+class PageTick(FrozenModel):
+    """One quick read of the call (item 1150): whether Leave call is there (Dot is in the call), whether the captions
+    and the chat's message box show, and what the page buffered since the last read."""
 
-    kind: Literal["caption", "chat"]
+    in_call: bool
+    captions_on: bool
+    chat_open: bool
+    batch: PageBatch
+
+
+class MeetingLine(FrozenModel):
+    """One kept line of a meeting: what a speaker said (caption) or typed (chat), or what Dot answered in the chat
+    (``dot``, item 1150). Names are unverified."""
+
+    kind: Literal["caption", "chat", "dot"]
     speaker: str = Field(max_length=MAX_SPEAKER_CHARS)
     text: str = Field(max_length=MAX_TEXT_CHARS)
     at: float

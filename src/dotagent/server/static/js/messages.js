@@ -4,20 +4,23 @@ import { dateTimeFull, duration, el, messageTime } from "./dom.js";
 import { actorFace } from "./actors.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { copyButton } from "./copybutton.js";
+import { serviceFailure } from "./errors.js";
 import { faceStateAtEnd } from "./face.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { sentPicks } from "./picks.js";
 import { prose } from "./prose.js";
 import { readAloudButton } from "./readaloud.js";
-import { loopRhythm } from "./rhythm.js";
+import { loopRhythm, onceAt } from "./rhythm.js";
 
+/** @type {Record<string, { label: import("./i18n.js").WordKey, empty: import("./i18n.js").WordKey }>} */
 const OUTCOMES = {
-  done: { label: "Finished", empty: "The task finished without a written answer." },
-  failed: { label: "Failed", empty: "The task failed without saying why." },
-  cancelled: { label: "Cancelled", empty: "The task was stopped before it wrote an answer." },
+  done: { label: "outcome.done", empty: "outcome.doneEmpty" },
+  failed: { label: "outcome.failed", empty: "outcome.failedEmpty" },
+  cancelled: { label: "outcome.cancelled", empty: "outcome.cancelledEmpty" },
   // A run that did what it could and stopped for what only the owner gives (item 1061): it is stored failed, and it
   // said what it needs.
-  waiting: { label: "Waiting on you", empty: "The task stopped for something only you can give." },
+  waiting: { label: "outcome.waiting", empty: "outcome.waitingEmpty" },
 };
 
 /**
@@ -33,19 +36,29 @@ export function outcomeOf(status, needs) {
 
 /** What a run said, as it ended, it needs from the owner, under its answer. */
 export function needsAside(needs) {
-  const head = el("div", { class: "aside-head" }, icon("hand"), el("span", null, "What Dot needs from you"));
-  return el("div", { class: "needs", "aria-label": "What Dot needs from you" }, head, prose(needs));
+  const head = el("div", { class: "aside-head" }, icon("hand"), el("span", null, t("outcome.needs")));
+  return el("div", { class: "needs", "aria-label": t("outcome.needs") }, head, prose(needs));
 }
 
 // The line over an answer that did not end done: what went wrong, or what it waits for.
 function outcomeAlert(status) {
   if (status === "failed") {
-    return el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, "The task failed"));
+    return el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, t("outcome.failedAlert")));
   }
   if (status === "waiting") {
-    return el("div", { class: "answer-alert answer-waiting" }, icon("hand"), el("strong", null, "Waiting on you"));
+    return el("div", { class: "answer-alert answer-waiting" }, icon("hand"), el("strong", null, t("outcome.waiting")));
   }
   return null;
+}
+
+/** The words of a run its model service stopped (`serviceFailure`): what stopped, that what was done stays, what the
+ * owner can do, and the service's own words, a link of theirs among them, under a closed Details. */
+function serviceStopped(failure) {
+  return [
+    el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, t("errors.serviceStopped"))),
+    el("div", { class: "prose answer-service" }, el("p", null, failure.next), el("p", { class: "muted" }, t("errors.serviceKept"))),
+    el("details", { class: "error-details answer-service-details" }, el("summary", null, t("errors.details")), prose(failure.details)),
+  ];
 }
 
 /** When a message was sent or an answer came, in sight; `title` says more where the pointer rests. */
@@ -61,8 +74,8 @@ function editFromHereButton(editFromHere) {
     {
       class: "btn ghost sm icon-only",
       type: "button",
-      title: "Edit from here",
-      "aria-label": "Edit from here",
+      title: t("messages.editFromHere"),
+      "aria-label": t("messages.editFromHere"),
       onclick: () => {
         button.disabled = true;
         editFromHere().finally(() => {
@@ -93,23 +106,39 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
       "div",
       { class: "message-foot" },
       stamp(sentAt, dateTimeFull(sentAt)),
-      copyButton(text, "Copy the message"),
+      copyButton(text, t("messages.copyMessage")),
       editFromHere === null ? null : editFromHereButton(editFromHere),
     ),
   );
 }
 
-/** The line a schedule a run made leaves in the conversation (item 665): the calendar, "Made a schedule", its name and
- * when it runs ("every Monday at 09:00", "once, 25 Oct 08:00"), a link to it on the Schedules page. `made` is the
- * `schedule_made` event's data. */
+/** When a schedule a run made runs, in words: its rhythm from the cron ("on Mondays at 09:00"), a one-time one's time
+ * from `run_at` ("today at 18:53"); an event written before item 1178 has no `run_at` and keeps the daemon's own words
+ * (`when`). */
+function madeWhen(made) {
+  if (typeof made.cron === "string") {
+    return loopRhythm(made.cron) ?? t("messages.scheduleRepeating");
+  }
+  return typeof made.run_at === "number" ? onceAt(made.run_at, Date.now() / 1000) : String(made.when ?? "");
+}
+
+/** The line a schedule a run made leaves in the conversation (items 665, 1178 and 1179): one quiet line, as a change
+ * of the memory is, the calendar, the schedule's name (cut with an ellipsis where the line is short) and when it runs;
+ * it leads to the schedule on the Schedules page, and its tooltip and its name to a screen reader say "Schedule made".
+ * `made` is the `schedule_made` event's data. */
 export function scheduleLine(made) {
-  const rhythm = typeof made.cron === "string" ? loopRhythm(made.cron) : null;
-  const when = rhythm ?? (typeof made.cron === "string" ? "on a repeating schedule" : String(made.when ?? ""));
+  const when = madeWhen(made);
+  const label = when === "" ? t("messages.scheduleLabelBare", { name: made.name }) : t("messages.scheduleLabel", { name: made.name, when });
   return el(
     "a",
-    { class: "note schedule-line", href: `#/schedules?schedule=${encodeURIComponent(made.schedule_id)}` },
+    { class: "note schedule-line schedule-made-line", href: `#/schedules?schedule=${encodeURIComponent(made.schedule_id)}`, title: label, "aria-label": label },
     icon("calendar"),
-    el("span", null, el("span", { class: "schedule-made" }, "Made a schedule"), " ", el("strong", null, made.name), when === "" ? null : ` · ${when}`),
+    el(
+      "span",
+      { class: "schedule-made-words" },
+      el("strong", { class: "schedule-made-name" }, made.name),
+      when === "" ? null : el("span", { class: "schedule-made-when" }, `\u00a0· ${when}`),
+    ),
   );
 }
 
@@ -121,7 +150,7 @@ export function besideLine(started) {
     "a",
     { class: "note schedule-line beside-line", href: `#/runs/${encodeURIComponent(started.run_id)}` },
     icon("branch"),
-    el("span", null, el("span", { class: "schedule-made" }, "Started in a chat of its own"), " ", el("strong", null, started.text)),
+    el("span", null, el("span", { class: "schedule-made" }, t("messages.startedBeside")), " ", el("strong", null, started.text)),
   );
 }
 
@@ -132,12 +161,13 @@ export function chatNoteLine(noted) {
     "a",
     { class: "note schedule-line chat-note-line", href: `#/runs/${encodeURIComponent(noted.from_run_id)}` },
     icon("message"),
-    el("span", null, el("span", { class: "schedule-made" }, "Note from another chat:"), " ", noted.text),
+    el("span", null, el("span", { class: "schedule-made" }, t("messages.noteFromChat")), " ", noted.text),
   );
 }
 
 // What each reaction of Dot's on a message of yours says, for its tooltip and a screen reader (item 664).
-const DOT_REACTION_WORDS = { "👍": "understood", "👀": "looking into it" };
+/** @type {Record<string, import("./i18n.js").WordKey>} */
+const DOT_REACTION_WORDS = { "👍": "messages.reactionUnderstood", "👀": "messages.reactionLooking" };
 
 /** Dot's reaction `reaction` on the message `message` (a `userMessage`, item 664): a small round badge on the corner of
  * its bubble, as a chat shows one. A second one takes the first one's place. Its name says what it means, the same on
@@ -147,7 +177,7 @@ export function showDotReaction(message, reaction) {
   if (words === undefined) {
     return;
   }
-  const label = `Reacted ${reaction}: ${words}`;
+  const label = t("messages.reacted", { reaction, words: t(words) });
   const badge = el("span", { class: "dot-reaction", role: "img", "aria-label": label, title: label }, reaction);
   const bubble = message.querySelector(".bubble.user");
   message.querySelector(".dot-reaction")?.remove();
@@ -193,28 +223,33 @@ export function showMessagePicks(message, picks) {
  * answer has just come in, to be read aloud as it appears when Settings › General says so.
  */
 export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false, reactions = null, runId = null }) {
-  const outcome = OUTCOMES[status] ?? { label: status, empty: "" };
+  const outcome = OUTCOMES[status] ?? null;
   const written = text.trim() !== "";
+  // A run its model service stopped says so in words of its own, not the service's line (item 1136 left its sentence,
+  // a billing link and all, as the answer); the line itself stands under Details.
+  const failure = status === "failed" ? serviceFailure(text) : null;
   // A run that ended well needs no word for it, as a message that arrived needs none (item 832); a failure and a stop
   // say so.
-  const facts = [stamp(endedAt, dateTimeFull(endedAt)), status === "done" ? null : el("span", null, outcome.label)];
+  const label = outcome === null ? status : t(outcome.label);
+  const facts = [stamp(endedAt, dateTimeFull(endedAt)), status === "done" ? null : el("span", null, label)];
   if (startedAt !== null) {
     facts.push(el("span", { class: "answer-took" }, duration(Math.max(0, endedAt - startedAt))));
   }
   return el(
     "article",
-    { class: `answer answer-${status}`, "aria-label": "Answer" },
+    { class: `answer answer-${status}`, "aria-label": t("outcome.answer") },
     el("span", { class: "turn-face" }, actorFace(actorId, faceStateAtEnd(status === "waiting" ? "blocked" : status), null)),
-    outcomeAlert(status),
-    written ? prose(text) : el("div", { class: "muted" }, outcome.empty),
+    ...(failure === null
+      ? [outcomeAlert(status), written ? prose(text) : el("div", { class: "muted" }, outcome === null ? "" : t(outcome.empty))]
+      : serviceStopped(failure)),
     el(
       "div",
       { class: "answer-foot" },
-      written ? copyButton(text, "Copy the answer") : null,
+      written ? copyButton(text, t("outcome.copy")) : null,
       written ? readAloudButton(text, readNow && status === "done") : null,
       written && reactions !== null && runId !== null ? reactions.controls(runId, "answer") : null,
       el("span", { class: "answer-facts meta-facts" }, ...facts),
-      href === null ? null : el("a", { class: "small", href }, "Open task"),
+      href === null ? null : el("a", { class: "small", href }, t("outcome.openTask")),
     ),
   );
 }

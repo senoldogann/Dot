@@ -224,7 +224,7 @@ export function buildPresence({ day = true } = {}) {
         console.warn("the activity of the home could not be loaded", error);
         now.textContent = "I could not read what is going on.";
       } else {
-        readFailed("What is going on", error);
+        readFailed("readFailed.presence", error);
       }
     }
   }

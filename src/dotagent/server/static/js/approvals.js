@@ -174,8 +174,8 @@ const GUARDED_FLAGS = new Set([
 // their rules say, so no rule is offered for it; the same step elsewhere keeps its offer.
 const INITIATIVE_WORDS = "On its own initiative, Dot asks before";
 // The line under a card that no rule answers, which says why Dot asks.
-const INITIATIVE_LINE = "In a chat Dot opened on its own initiative, Dot always asks you about this, YOLO too. No rule can turn that off.";
-const OWNERS_LINE = "A payment, a message or mail sent for you and a public post wait for you in YOLO too. No rule can turn that off.";
+const INITIATIVE_LINE = "In a chat Dot opened on its own initiative, Dot always asks you about this, whatever the approval mode. No rule can turn that off.";
+const OWNERS_LINE = "A payment, a message or mail sent for you and a public post wait for you whatever the approval mode. No rule can turn that off.";
 const GUARDED_LINE = "Dot always asks you about this in every mode that asks. No rule can turn that off.";
 
 /** Whether the owner answers `approval` in every mode that asks, whatever their rules say (item 429). */
@@ -192,7 +192,8 @@ const NEVER_REMEMBERED = new Set(["financial", "trade", "credential", "vault_fil
 // `OWNERS_REASON` in policy/engine.py).
 const OWNERS_WORDS = "In yolo too, Dot asks you before";
 
-/** Whether `approval` is the question of a chat Dot opened on its own initiative (item 850), asked in YOLO too. */
+/** Whether `approval` is the question of a chat Dot opened on its own initiative (item 850), asked in every
+ * approval mode. */
 function initiativeAsked(approval) {
   return typeof approval.summary === "string" && approval.summary.includes(INITIATIVE_WORDS);
 }

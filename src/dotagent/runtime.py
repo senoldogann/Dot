@@ -76,8 +76,10 @@ from dotagent.llm.router import ModelRouter
 from dotagent.mcp.builtin import builtin_servers
 from dotagent.mcp.connected import ConnectedServers, read_connected
 from dotagent.mcp.hub import McpHub, open_hub
+from dotagent.meetings.answers import make_answer
 from dotagent.meetings.desk import MeetingDesk, launch_meeting_chrome
 from dotagent.meetings.notes import MeetingNotes, make_notes
+from dotagent.meetings.types import MeetingLine
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
 from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.oauth.accounts import Accounts
@@ -643,6 +645,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
                 store,
                 approvals,
                 partial(_meeting_notes, router, roles, assistant, config.agent.model_call_timeout_s),
+                partial(_meeting_answer, router, roles, assistant, config.meetings.name or "Dot"),
                 config.meetings,
                 partial(launch_meeting_chrome, meetings_profile_dir(), config.browser, config.meetings),
                 lambda: assistant.owner_name() or "the owner",
@@ -668,6 +671,33 @@ async def _meeting_notes(
     return await make_notes(
         router, roles.fast(), assistant.owner_name() or "the owner", lines, earlier, timeout_s, f"meeting-{meeting_id}"
     )
+
+
+async def _meeting_answer(
+    router: ModelRouter,
+    roles: ModelRoles,
+    assistant: Assistant,
+    dot: str,
+    lines: Sequence[MeetingLineRecord],
+    question: MeetingLine,
+    meeting_id: str,
+) -> str:
+    """Dot's line in a meeting's chat to the line that named it (item 1150), written by the fast model with no tool but
+    its answer's and nothing of the owner's."""
+    return await make_answer(
+        router,
+        roles.fast(),
+        assistant.owner_name() or "the owner",
+        dot,
+        lines,
+        question,
+        _ANSWER_TIMEOUT_S,
+        f"meeting-answer-{meeting_id}",
+    )
+
+
+# How long an answer in a call may take: past it, the talk has moved on (item 1150).
+_ANSWER_TIMEOUT_S: float = 30.0
 
 
 async def close_runtime(runtime: Runtime) -> None:

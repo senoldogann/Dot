@@ -190,3 +190,5 @@ async def test_a_step_s_streamed_words_and_their_held_tail_come_under_the_step_t
     (said,) = [data for kind, data in shown if kind == "assistant"]
     assert deltas and {data["step"] for data in deltas} == {said["step"]} == {1}, shown
     assert "".join(str(data["text"]) for data in deltas) == words == said["text"], shown
+    # A task's words on OpenCode may be its answer, which is its last reply: they stream as either (item 1166).
+    assert all(data["says"] == "either" for data in deltas), shown

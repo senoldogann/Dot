@@ -669,7 +669,7 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     # Sent while the run works, a message waits in the queue.
                     for text in (SUMMARY, MAIL, CLOSE):
                         await box.fill(text)
-                        await expect(send).to_have_attribute("aria-label", "Queue")
+                        await expect(send).to_have_attribute("aria-label", "After this task")
                         await box.press("Enter")
                         await expect(box).to_have_value("")
                     await expect(texts).to_have_text([SUMMARY, MAIL, CLOSE])
@@ -707,7 +707,7 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await _shot(page, tmp_path / f"queue-edit-{width}-{scheme}.png")
                     await box.press("Escape")
                     await expect(box).to_have_value("Half a thought")
-                    await expect(send).to_have_attribute("aria-label", "Queue")
+                    await expect(send).to_have_attribute("aria-label", "After this task")
                     await expect(rows.nth(1)).not_to_have_attribute("aria-current", "true")
                     await rows.nth(1).get_by_role("button", name="Edit queued message").click()
                     await box.fill(SHORT_SUMMARY)
@@ -803,11 +803,13 @@ async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_stee
                 await expect(send_with.get_by_role("button", name="Enter", exact=True)).to_have_attribute(
                     "aria-pressed", "true"
                 )
-                await expect(busy.get_by_role("button", name="Queue")).to_have_attribute("aria-pressed", "true")
+                await expect(busy.get_by_role("button", name="After this task")).to_have_attribute(
+                    "aria-pressed", "true"
+                )
                 await send_with.get_by_role("button", name="⌘Enter").click()
-                await busy.get_by_role("button", name="Steer").click()
+                await busy.get_by_role("button", name="Add to task").click()
                 await expect(send_with.get_by_role("button", name="⌘Enter")).to_have_attribute("aria-pressed", "true")
-                await expect(busy.get_by_role("button", name="Steer")).to_have_attribute("aria-pressed", "true")
+                await expect(busy.get_by_role("button", name="Add to task")).to_have_attribute("aria-pressed", "true")
                 kept: list[str | None] = await page.evaluate(
                     "() => [localStorage.getItem('dot.sendKey'), localStorage.getItem('dot.busySend')]"
                 )
@@ -840,12 +842,12 @@ async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_stee
                     # A phone's line holds about thirty characters, so it has the short words (item 437).
                     await expect(box).to_have_attribute(
                         "placeholder",
-                        "Steer this task (or /btw)" if width < 720 else "Steer this task, or /btw to ask on the side",
+                        "Add to task (or /btw)" if width < 720 else "Add to this task, or /btw to ask on the side",
                     )
 
                     # A message steers the run at work, sent with ⌘Enter.
                     await box.fill(NOW)
-                    await expect(send).to_have_attribute("aria-label", "Steer")
+                    await expect(send).to_have_attribute("aria-label", "Add to task")
                     await box.press("Enter")
                     await expect(box).to_have_value(f"{NOW}\n")
                     await box.press("ControlOrMeta+Enter")

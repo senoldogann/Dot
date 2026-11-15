@@ -6,6 +6,7 @@
 // column its room at the left, beside the side panel too (item 228, run.css), so that it never covers the text.
 
 import { debounce, el } from "./dom.js";
+import { laidOut } from "./history.js";
 import { trackHeight } from "./layout.js";
 
 // A conversation of one message has nothing to walk.
@@ -46,6 +47,14 @@ function words(node) {
   if (node === null) {
     return "";
   }
+  return laidOut(node, wordsAsRead);
+}
+
+function goTo(node) {
+  node.scrollIntoView({ block: "start", behavior: REDUCED_MOTION.matches ? "auto" : "smooth" });
+}
+
+function wordsAsRead(node) {
   const all = folded(node.innerText);
   const picks = node.querySelector(".pick-list.inline");
   const named = picks === null ? "" : folded(picks.innerText);
@@ -184,7 +193,7 @@ export function messageOutline({ layout, main, thread, dock }) {
 
   function jump() {
     if (active !== null) {
-      messages[active].node.scrollIntoView({ block: "start", behavior: REDUCED_MOTION.matches ? "auto" : "smooth" });
+      laidOut(messages[active].node, goTo);
     }
   }
 
