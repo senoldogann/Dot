@@ -30,6 +30,9 @@ on:
   # The release runs the whole gate again on the tagged commit before it publishes (release.yml, item 457), the core
   # of the browser tests with it (item 486); a call ignores the paths above, so the gate always runs whole there.
   workflow_call:
+  # dependabot-merge.yml starts main's run after a merge it made (item 1190): a merge made with a workflow's token
+  # starts no push run. A run started so runs whole, as a push does.
+  workflow_dispatch:
 
 # The jobs only read the code: the token GitHub hands them can do nothing more.
 permissions:
