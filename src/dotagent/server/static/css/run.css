@@ -146,14 +146,17 @@
    owner's ask after a screenshot of ten such lines one under another): it folds with the steps, and the line under the
    conversation says the newest of it while the run works. Shown with the steps, it reads as a quiet note among them.
    Words that may be the answer (`data-either`, item 1166: a task's step on Claude Code or OpenCode, a first step
-   of Dot's own loop, or one at its limit) stay in sight while
-   they stream, as a quiet note: their step's end makes them the answer or folds them with the steps. */
+   of Dot's own loop, or one at its limit) stay in sight while they stream, drawn as a message: their step's end makes
+   them the message or the answer, or folds them with the steps. */
 :root[data-work="status"] .run-thread:not(.steps-shown) .say-progress:not([data-either]) {
   display: none;
 }
 
-.run-thread :is(.bubble.say, .turn-say).say-progress,
-.run-thread :is(.bubble.say, .turn-say).say-progress > .prose {
+/* Words that may be the answer (`data-either`) are drawn as the message they most often stay while they stream: 45 of
+   68 of the owner's Claude Code tasks ended with such words as the answer (item 1166), and a quiet note that turned into
+   a message at its step's end grew half again in height under the reader (item 274's rule: drawn as it will stay). */
+.run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either]),
+.run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either]) > .prose {
   background: none;
   box-shadow: none;
   color: var(--muted);
@@ -161,15 +164,16 @@
 }
 
 /* An update on the way reads as one by its shape too, not by its ink alone: a rule at its left, as a note in a log has,
-   where the answer stands with its face and its foot. */
-.run-thread :is(.bubble.say, .turn-say).say-progress {
-  border-left: 2px solid var(--border-strong);
+   where the answer stands with its face and its foot. The rule is drawn down the middle of the face's column, where the
+   steps' marks stand, so the words keep the conversation's lane (a border and padding pushed them off it, item 1182).
+   An update that wears the face has the face in that place instead. */
+.run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either], :has(> .turn-face)) {
+  background: linear-gradient(var(--border-strong), var(--border-strong)) no-repeat calc(28px / 2 - 1px) 0 / 2px 100%;
   border-radius: 0;
-  padding-left: var(--space-2);
 }
 
 /* No bubble on a phone (run.css gives its words one): the words start on the conversation's lane, as the answer's. */
-.run-thread :is(.bubble.say, .turn-say).say-progress > .prose {
+.run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either]) > .prose {
   padding-inline: 0;
 }
 
