@@ -4,12 +4,13 @@
 
 import { READ_ALOUD, VOICE_LANGUAGE, settingValue } from "./appearance/settings.js";
 import { el } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { toast } from "./ui.js";
 import { canSpeak, languageTag, primeVoices, readAloud } from "./voice.js";
 
-const READ = "Read the answer aloud";
-const STOP = "Stop reading";
+const READ = t("sheet.readAloud");
+const STOP = t("sheet.stopReading");
 
 // The voices are asked for as the page loads, so that the first answer read already has the list to choose a local voice from.
 primeVoices();

@@ -6,6 +6,7 @@ import { table as tableMarkdown } from "./clipboard.js";
 import { codeBlock } from "./codeblock.js";
 import { copyButton } from "./copybutton.js";
 import { el, requestFile } from "./dom.js";
+import { t } from "./i18n.js";
 import { parseBlocks } from "./markdown.js";
 
 // A file in the home folder as an agent names one it made or read: under ~ or /Users/<name>, to a name with a suffix,
@@ -148,7 +149,7 @@ export function blockNode(block) {
       return el(
         "div",
         { class: "prose-table" },
-        el("div", { class: "code-head" }, copyButton(() => tableMarkdown(table), "Copy the table")),
+        el("div", { class: "code-head" }, copyButton(() => tableMarkdown(table), t("code.copyTable"))),
         el("div", { class: "prose-table-scroll" }, table),
       );
     }

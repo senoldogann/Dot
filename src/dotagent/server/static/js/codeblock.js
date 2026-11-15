@@ -4,6 +4,7 @@
 
 import { copyButton } from "./copybutton.js";
 import { el } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 
 /** Whether long lines wrap in a block of code that was not switched: Settings › Appearance (item 127) says so. */
@@ -42,8 +43,8 @@ export function codeBlock({ text, label, language = "", copyText = text, tone = 
     {
       class: "btn ghost sm icon-only code-wrap",
       type: "button",
-      title: "Wrap long lines",
-      "aria-label": "Wrap long lines",
+      title: t("code.wrap"),
+      "aria-label": t("code.wrap"),
       "aria-pressed": String(wrapped ?? wrapsByDefault()),
     },
     icon("wrapText"),
@@ -56,7 +57,7 @@ export function codeBlock({ text, label, language = "", copyText = text, tone = 
       "aria-label": label,
       dataset: wrapped === null ? { language } : { language, wrap: wrapped ? "on" : "off" },
     },
-    el("div", { class: "code-head" }, el("span", { class: "code-label" }, label), el("span", { class: "spacer" }), wrap, copyButton(copyText, "Copy the code")),
+    el("div", { class: "code-head" }, el("span", { class: "code-label" }, label), el("span", { class: "spacer" }), wrap, copyButton(copyText, t("code.copy"))),
     el("pre", null, el("code", null, text)),
   );
   wrap.addEventListener("click", () => {

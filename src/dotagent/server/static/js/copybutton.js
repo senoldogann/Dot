@@ -2,6 +2,7 @@
 // there, and a copy that fails says why. Messages, answers, tables and the file panel share it (item 403).
 
 import { copyText, el } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { toast } from "./ui.js";
 
@@ -23,7 +24,7 @@ export function copyButton(text, label) {
           () => {
             clearTimeout(restore);
             button.replaceChildren(icon("check"));
-            button.setAttribute("aria-label", "Copied");
+            button.setAttribute("aria-label", t("code.copied"));
             restore = setTimeout(() => {
               button.replaceChildren(icon("copy"));
               button.setAttribute("aria-label", label);

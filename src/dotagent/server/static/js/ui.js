@@ -1,6 +1,7 @@
 // Overlays shared by every page: toasts, the dialogs (a question, a choice, a form) and the pictures full screen.
 
 import { el } from "./dom.js";
+import { t } from "./i18n.js";
 import { explain } from "./errors.js";
 import { createFormFlow, firstFieldOf, stateOfControls } from "./formflow.js";
 import { icon } from "./icons.js";
@@ -114,7 +115,7 @@ function dialogFrame({ className = "modal", title, line, content = [], actions, 
   const cross =
     onCross === null
       ? null
-      : el("button", { class: "btn ghost icon-only modal-close", type: "button", title: "Close", "aria-label": "Close", onclick: onCross }, icon("x"));
+      : el("button", { class: "btn ghost icon-only modal-close", type: "button", title: t("dialog.close"), "aria-label": t("dialog.close"), onclick: onCross }, icon("x"));
   const dialog = el("dialog", { class: className, "aria-labelledby": titleId, "aria-describedby": said === null ? null : lineId });
   dialog.append(
     el("div", { class: "modal-body modal-head" }, el("div", { class: "modal-titles" }, el("h3", { id: titleId }, title), said), cross),
@@ -130,7 +131,7 @@ function dialogFrame({ className = "modal", title, line, content = [], actions, 
  * @param {{ title: string, message: string, confirmLabel: string, cancelLabel?: string, danger?: boolean, focusCancel?: boolean }} question
  * @returns {Promise<boolean>}
  */
-export function confirmDialog({ title, message, confirmLabel, cancelLabel = "Cancel", danger, focusCancel }) {
+export function confirmDialog({ title, message, confirmLabel, cancelLabel = t("dialog.cancel"), danger, focusCancel }) {
   return new Promise((resolve) => {
     const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, cancelLabel);
     const ok = el(
@@ -159,7 +160,7 @@ const CHOICE_TONES = { plain: "btn", primary: "btn primary", danger: "btn danger
  */
 export function choiceDialog({ title, message, choices }) {
   return new Promise((resolve) => {
-    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("") }, "Cancel");
+    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("") }, t("dialog.cancel"));
     const buttons = choices.map((choice, index) =>
       el("button", { class: CHOICE_TONES[choice.tone], type: "button", onclick: () => dialog.close(String(index)) }, choice.label),
     );
@@ -250,7 +251,7 @@ export function formDialog({
 
   const fields = el("div", { class: "modal-fields" }, ...(Array.isArray(body) ? body : [body]));
   const problem = el("div", { class: "note bad form-dialog-error", role: "alert", hidden: true }, icon("alert"), el("span"));
-  const cancel = el("button", { class: "btn", type: "button", onclick: () => void flow.dismiss() }, "Cancel");
+  const cancel = el("button", { class: "btn", type: "button", onclick: () => void flow.dismiss() }, t("dialog.cancel"));
   // The words of a submit button stand in a box of their own, which keeps its room while the spinner of a request runs
   // over it (item 812).
   const primary = el(
@@ -322,10 +323,10 @@ export function formDialog({
     changed: () => stateNow() !== baseline,
     discard: () =>
       confirmDialog({
-        title: "Discard your changes?",
-        message: "What you typed here is not saved.",
-        confirmLabel: "Discard",
-        cancelLabel: "Keep editing",
+        title: t("dialog.discardTitle"),
+        message: t("dialog.discardMessage"),
+        confirmLabel: t("dialog.discard"),
+        cancelLabel: t("dialog.keepEditing"),
         danger: true,
         focusCancel: true,
       }),
