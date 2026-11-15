@@ -202,8 +202,11 @@ slow runner does not keep, so the core leaves it to the night and to your Mac. A
 test's state fails there, as the browser tests run without the others: each makes what it needs; and one that saves a
 note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama server runs there. When something under
 `desktop/` changes, `.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and `cargo test` for the desktop
-shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved later cannot change what
-runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and when asked,
+shell, with the Rust that `desktop/src-tauri/rust-toolchain.toml` names (on your Mac, rustup's `cargo` first in `PATH`
+installs it the first time it runs there; Homebrew's ignores the file); a pull request runs it from the gate, so that
+`ci` waits for it (item 1189). Each action the workflows use is pinned by the commit its tag named, so a tag moved
+later cannot change what runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and
+when asked,
 `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for `uv.lock`,
 cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). The advisories
 `desktop/src-tauri/.cargo/audit.toml` ignores are of crates that are not in the Mac build, the only one Dot makes
@@ -212,7 +215,8 @@ fails the desktop checks the day one of them reaches it. It exports the whole of
 `uv.lock`, `dotagent-web-research` with it, since PyPI has it and the lock holds its hashes (item 623; while uv got it
 from its repository, item 583, it was left out, as `pip-audit --disable-pip` refuses a requirement with no hash).
 When something under
-`.github/` changes, every week and when asked, `.github/workflows/zizmor.yml` audits the workflows and Dependabot's file
+`.github/` changes (in a pull request from the gate, so that `ci` waits for it, item 1189), every week and when asked,
+`.github/workflows/zizmor.yml` audits the workflows and Dependabot's file
 with [zizmor](https://docs.zizmor.sh/audits/) (item 487): an event's text run as a script, a checkout that keeps its
 token, an action pinned by a commit its repository does not have, a known vulnerable action, a cache read by a release,
 Dependabot taking a release the day it is out (it waits a week, `cooldown` in `dependabot.yml`). Any finding fails the
@@ -354,7 +358,9 @@ notary service other than Accepted, with the log of what it found.
 Once, on the Mac that builds releases:
 
 - Rust from rustup, first in `PATH` (Homebrew's Rust builds for this Mac only), with the targets of both kinds of Mac:
-  `rustup target add aarch64-apple-darwin x86_64-apple-darwin`; and Node, as for any build of the shell.
+  `rustup target add aarch64-apple-darwin x86_64-apple-darwin`, which `release.sh` checks on the default toolchain; the
+  build itself runs with the version `desktop/src-tauri/rust-toolchain.toml` names, which rustup installs with both
+  targets (item 1189). And Node, as for any build of the shell.
 - A Developer ID Application certificate in the login keychain, the only one there: Xcode › Settings › Accounts ›
   Manage Certificates, or developer.apple.com › Certificates.
 - The notary service's credentials, saved as the profile `dot-notary`:

@@ -51,7 +51,7 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     assert gate_jobs["gate"]["runs-on"] == "macos-latest"
     assert gate_jobs["ci"]["runs-on"] == "ubuntu-latest"
     assert gate_jobs["ci"]["if"] == "always()"
-    assert set(gate_jobs["ci"]["needs"]) == {"prose", "checks", "gate", "smoke", "browser"}
+    assert set(gate_jobs["ci"]["needs"]) == {"prose", "checks", "gate", "smoke", "browser", "desktop", "zizmor"}
     assert not any("ruff " in str(step.get("run", "")) for step in gate_jobs["gate"]["steps"])
     assert any("ruff format" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
     assert any("npm run check" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
@@ -95,3 +95,19 @@ def test_the_gate_can_be_called_and_runs_as_before_on_changes_and_on_main() -> N
     browser = _workflow("browser.yml")[True]
     assert isinstance(browser, dict)
     assert set(browser) == {"workflow_dispatch", "schedule"}
+
+
+def test_ci_waits_for_the_desktop_checks_and_zizmor_of_a_pull_request() -> None:
+    # Item 1189: a pull request runs them from the gate, never from a path filter of their own, so that `ci`, which
+    # main's protection requires and Dependabot's auto-merge waits for, is red when one of them is.
+    gate_jobs = _workflow("gate.yml")["jobs"]
+    assert isinstance(gate_jobs, dict)
+    for job, output in (("desktop", "desktop"), ("zizmor", "workflows")):
+        assert gate_jobs[job]["uses"] == f"$/.github/workflows/{job}.yml"
+        condition = str(gate_jobs[job]["if"])
+        assert "github.event_name == 'pull_request'" in condition
+        assert "needs.changes.result != 'success'" in condition
+        assert f"needs.changes.outputs.{output} == 'true'" in condition
+        triggers = _workflow(f"{job}.yml")[True]
+        assert isinstance(triggers, dict)
+        assert "workflow_call" in triggers and "pull_request" not in triggers
