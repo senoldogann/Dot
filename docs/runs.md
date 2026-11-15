@@ -36,14 +36,15 @@ said nothing new). States of their own are said too, each from its event: "Waiti
 "Waiting for you…" while an approval asks you, until it is answered (a question left for later is no wait), and "Stopping…" once Stop was pressed; a screen reader is told each change of
 state once, through a status region, never each call nor the seconds of the bar over the box. What the run says on the way to its calls ("Checking the domain now")
 is its work told, not a message (item 1131): it folds with the steps, and the line says the newest of it while the step's
-calls run ("Checking the domain now…"); shown with the steps, it reads as a quiet note among them, with a rule at its
-left and named a progress update to a screen reader, where the answer is named Answer. No model says before its
+calls run ("Checking the domain now…"); shown with the steps, it reads as a quiet note among them, with a rule down
+the column of the steps' marks, its words on the answer's lane (item 1182), and named a progress update to a screen reader, where the answer is named Answer. No model says before its
 words whether calls follow them, so what they are is known while they stream only where the run's own rules say a
 reply with no call is not the answer. In Dot's own loop, once a task or research run used a tool, short of its
 limit and of the last time it is told to finish, they are an update from the first word and stream folded with the steps (item 1162; 443 of 498 steps with words
 in the owner's week went on to calls). Elsewhere they may still be the answer: every step of a task on Claude Code or
 OpenCode, whose last reply is the answer when it calls no finish (45 of 68 of the owner's Claude Code tasks in a week),
-and a first step. Those stream in sight as a quiet note (item 1166), and their step's end makes them the message when
+and a first step. Those stream in sight (item 1166), drawn as the message they most often stay (item 1182: drawn as a
+quiet note, they grew half again in height at the step's end), and their step's end makes them the message when
 it calls nothing, or nothing but finish, or folds them with the steps; before item 1162 they streamed as a message and
 folded once the step ended. Nothing is said that the run is not doing: while it writes a
 message the line is not there. Pressed, it shows every step of the chat again, and pressed again folds them back; once the run is
