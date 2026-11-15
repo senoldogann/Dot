@@ -198,7 +198,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   - say of the user's own products only what their source says, and mark what it could not check as not verified;
   - keep to the plan and the timing it wrote, or say first that it departs from them.
 - `prompt` in `[agent]` decides how much the system prompt says (item 280). `full`, the default, says how to work and
-  each kind of tool at length (the web, the browser, the desktop, memory, schedules). `lean` keeps the rules of trust
+  each kind of tool at length (the web, the browser, the desktop, memory, schedules), and that a file is found by name
+  with Spotlight (`mdfind -onlyin ~ -name`), not with `find` or `grep -r` over the home folder, and with `find` in one
+  folder for a hidden or new file Spotlight does not index (item 1188: 0.4 s where `find` took 100 s for the same file
+  on the owner's Mac). `lean` keeps the rules of trust
   and safety, of hesitating and of how a run ends as `full` has them, word for word where they are the same rule, and
   says how to work and each kind of tool in a line or two; the rest is in the tools' own descriptions. With
   `tool_surface = "grouped"` as well, a run starts lean: the shortest prompt and the core tools. Eval reports keep the

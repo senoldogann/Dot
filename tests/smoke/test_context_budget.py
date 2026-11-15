@@ -89,14 +89,19 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # less on the model): `expect_text` and `expect_url` on a step of `browser_act`, the words of its result (done is
 # sent, verified is seen, uncertain is not sent again unseen) and one line of the prompt's Browser, each cut to a
 # line after a first wording took 580 (27,069 measured here, on item 1143's words; system 7,847, tools 19,195).
-BUDGET_TOKENS: int = 27_100
+# Raised by 100 for the line that has a run find a file by name with Spotlight (item 1188: `find` and `grep -r` over the
+# home folder took 46 to 100 s a call in the owner's week to 2026-11-15, where `mdfind` answers in 0.4 s; 27,106
+# measured).
+BUDGET_TOKENS: int = 27_200
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
 # Raised by 200 for the lead's paragraph on work orders (item 907).
 # Raised by 100 for the rule of item 1023 above.
 # Raised by 200 for the line of item 1102 above (system 7,838 measured here).
-SYSTEM_BUDGET_TOKENS: int = 7_900
+# Raised by 100 for the Spotlight line of item 1188 (7,901 measured on the CI runner, whose longer paths add to the
+# Environment section; 7,899 here).
+SYSTEM_BUDGET_TOKENS: int = 8_000
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
