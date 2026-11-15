@@ -321,6 +321,13 @@
     border-radius: var(--radius-bubble);
     background: var(--msg-agent);
   }
+
+  /* A block of code or a table in the bubble is set into it, in the page's own colour, with no line of its own around
+     it (item 1186): a box drawn in a box was two frames around one thing. */
+  .run-thread :is(.answer, .bubble.say) > .prose :is(.code-block, .prose-table) {
+    border-color: transparent;
+    background: var(--bg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
