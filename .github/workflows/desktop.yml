@@ -9,6 +9,9 @@ on:
     branches: [main]
     paths: ["desktop/**", ".github/workflows/desktop.yml"]
   workflow_call:
+  # dependabot-merge.yml starts main's run after a merge of desktop/ it made (item 1190): a merge made with a workflow's
+  # token starts no push run.
+  workflow_dispatch:
 
 # The job only reads the code: the token GitHub hands it can do nothing more.
 permissions:

@@ -1,0 +1,225 @@
+# Dependabot's pull requests that raise versions by a patch or a minor step merge by themselves (item 1190), one at a
+# time, each after main's gate passed on main as it is (CLAUDE.md: after a merge, main's run of the gate is looked at
+# before the next merge, and a red main is fixed before anything else is merged).
+#
+# Two jobs. `label` runs on each of Dependabot's pull requests and marks one whose largest step is a patch or a minor
+# one with the label `dependabot-merge`; a major release, where an API changes, waits for a person, as all of them did
+# before, and so does one a person or `merge` put `dependabot-hold` on, which stays through Dependabot's rebases. Both
+# labels are the repository's, made by hand once (`gh label create`). `merge` runs every twenty minutes, and only one at
+# a time: it merges at most one marked pull request whose `ci` passed, and only when main's gate passed on main's head,
+# then starts main's gate on what it merged. The next run sees that gate waiting or running and does nothing until it
+# passed, so a second merge never lands before the first one's run: no two pull requests that pass alone can break main
+# together unseen. `ci` covers every part such a pull request can touch: the whole gate with every browser part (a lock
+# is one of the files that run them, scripts/browser_ci.py), the desktop checks and zizmor (gate.yml, item 1189).
+#
+# A merge made with the token GitHub hands a workflow starts no workflow, not even main's push run of the gate, so
+# `merge` starts it itself, and the desktop checks and zizmor when the pull request changed what they read, as the push
+# would have: a workflow_dispatch is the one event that token may start.
+name: dependabot-merge
+
+on:
+  pull_request:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+# Nothing by default; each job asks for what it needs.
+permissions: {}
+
+jobs:
+  label:
+    # Dependabot's own pull requests only, from a branch of this repository.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # One run per pull request: a newer push (Dependabot's rebase) replaces the run that read the older head.
+    concurrency:
+      group: dependabot-label-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      pull-requests: write # the label is set on the pull request, or taken off
+    steps:
+      # The mark of an earlier head goes first, so that a head whose metadata cannot be read is left unmarked. The
+      # labels are read as they are now, not from the event, which an earlier run may have overtaken.
+      - name: Unmark an earlier head
+        id: labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          labels=$(gh pr view "$PR_URL" --json labels --jq '.labels[].name')
+          if grep -qx dependabot-merge <<< "$labels"; then
+            gh pr edit "$PR_URL" --remove-label dependabot-merge
+          fi
+          if grep -qx dependabot-hold <<< "$labels"; then
+            echo "hold=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hold=false" >> "$GITHUB_OUTPUT"
+          fi
+      # Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml).
+      - name: What the pull request raises
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      # update-type is the largest step among the dependencies the pull request raises, so a group with one major
+      # version in it is not marked. One it cannot name (no update type) is not either, nor one on hold.
+      - name: Mark a patch or a minor one
+        if: >-
+          steps.labels.outputs.hold == 'false'
+          && (steps.metadata.outputs.update-type == 'version-update:semver-patch'
+          || steps.metadata.outputs.update-type == 'version-update:semver-minor')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr edit "$PR_URL" --add-label dependabot-merge
+
+  merge:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # One merge run at a time, never stopped halfway: two at once could each see main's gate passed and merge one
+    # after the other. A run that comes while one goes waits; a third replaces the waiting one, which loses nothing,
+    # as each run looks at everything afresh.
+    concurrency:
+      group: dependabot-merge
+      cancel-in-progress: false
+    permissions:
+      contents: write # the squash writes main
+      pull-requests: write # the merge closes the pull request; one handed over is relabelled and told why
+      checks: read # `ci` of a pull request and main's gate are check runs
+      statuses: read # and part of the status rollup that is read
+      actions: write # main's gate, desktop checks and zizmor are started
+    steps:
+      - name: Merge one marked pull request if main's gate passed on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # GitHub's API, asked again on a failure: three tries, ten and twenty seconds apart, then the job fails. The
+          # warning goes to stderr, out of the answer a caller reads.
+          ask() {
+            local try
+            for try in 1 2; do
+              if "$@"; then
+                return 0
+              fi
+              echo "::warning::gh failed (try $try): $*" >&2
+              sleep $((try * 10))
+            done
+            "$@"
+          }
+          # A marked pull request that is not merged here is put on hold and told why, so that it waits for a person
+          # instead of being tried every run, and stays so through Dependabot's rebases.
+          hand_over() {
+            ask gh pr edit "$1" --remove-label dependabot-merge --add-label dependabot-hold
+            ask gh pr comment "$1" --body "dependabot-merge does not merge this, so it waits for a person: $2"
+          }
+          marked=$(ask gh pr list --label dependabot-merge --state open --limit 50 \
+            --json number,headRefOid,author,labels,mergeable,statusCheckRollup)
+          # The oldest marked pull request of Dependabot's, not on hold and not in conflict with main (Dependabot
+          # rebases that one), whose `ci` passed on its head. The author is checked again: anyone who can set a label
+          # could mark a pull request of their own.
+          pick=$(jq -r 'map(select(.author.login == "app/dependabot"
+              and ([.labels[].name] | index("dependabot-hold") | not)
+              and .mergeable != "CONFLICTING"
+              and ([.statusCheckRollup[] | select(.name == "ci")][0].conclusion // "") == "SUCCESS"))
+            | sort_by(.number) | first | if . == null then "" else "\(.number) \(.headRefOid)" end' <<< "$marked")
+          if [[ -z "$pick" ]]; then
+            echo "no marked pull request has passed ci"
+            exit 0
+          fi
+          read -r number sha <<< "$pick"
+          # The files Dependabot raises versions in, and nothing else: the locks and manifests of its ecosystems, the
+          # Rust version and the CI's actions. Anything more, `pyproject.toml` first (its dependencies are under "Always
+          # needs a human" in REVIEW.md, and a security update can move a requirement there), waits for a person.
+          # The list holds at most 100 files; one that changes more is handed over whole.
+          # Each answer is read into a variable first: a command's failure inside (( )) would not stop the job.
+          changed=$(ask gh pr view "$number" --json changedFiles --jq .changedFiles)
+          if ((changed > 100)); then
+            hand_over "$number" "it changes more than the 100 files the check reads."
+            echo "#$number changes more than 100 files; on hold"
+            exit 0
+          fi
+          files=$(ask gh pr view "$number" --json files --jq '.files[].path')
+          allowed='^(uv\.lock|package\.json|package-lock\.json|desktop/package\.json|desktop/package-lock\.json'
+          allowed+='|desktop/src-tauri/Cargo\.toml|desktop/src-tauri/Cargo\.lock|desktop/src-tauri/rust-toolchain\.toml'
+          allowed+='|\.github/workflows/[^/]+\.yml|\.github/actions/.+)$'
+          if other=$(grep -vE "$allowed" <<< "$files"); then
+            hand_over "$number" "it changes $(tr '\n' ' ' <<< "$other")beyond the locks and manifests it merges."
+            echo "#$number changes files a person reads first; on hold"
+            exit 0
+          fi
+          # Main's gate on main's head as it is now. A run that waits or runs is let finish; a run cancelled before it
+          # began was replaced by a newer one (item 1011). A head with no run of its own ten minutes after it landed (a
+          # push of prose alone, which the gate's paths-ignore spares) gets one started here; a younger one may still
+          # get its push run.
+          main=$(ask gh api "repos/$GH_REPO/commits/main" --jq '.sha + " " + .commit.committer.date')
+          read -r head landed <<< "$main"
+          # Main's own runs only: a fork's pull request from a branch named main has runs on "main" too.
+          runs=$(ask gh run list --workflow gate.yml --branch main --limit 20 --json headSha,status,conclusion,event \
+            --jq 'map(select(.event != "pull_request"))')
+          if jq -e 'any(.[]; .status != "completed")' <<< "$runs" > /dev/null; then
+            echo "main's gate is running; #$number waits for it"
+            exit 0
+          fi
+          last=$(jq -r --arg head "$head" '[.[] | select(.conclusion != "cancelled")][0]
+            | if . == null or .headSha != $head then "none" else .conclusion end' <<< "$runs")
+          case "$last" in
+            success) ;;
+            none)
+              now=$(date +%s)
+              since=$(date -d "$landed" +%s)
+              if ((now - since > 600)); then
+                echo "no gate ran on main's head ${head:0:7}; starting it, and #$number waits for it"
+                ask gh workflow run gate.yml --ref main
+              else
+                echo "main's head ${head:0:7} landed under ten minutes ago; #$number waits for its gate"
+              fi
+              exit 0
+              ;;
+            *)
+              echo "main's gate on ${head:0:7} ended $last; #$number waits until main is fixed"
+              exit 0
+              ;;
+          esac
+          # And main's desktop checks, which run only for what changes desktop/ (item 1189): their last run that waits
+          # or runs is let finish, and a red one keeps everything waiting as a red gate does. zizmor is not waited for:
+          # an advisory against an action turns it red, and Dependabot's pull request raising that action is the fix.
+          desktop=$(ask gh run list --workflow desktop.yml --branch main --limit 10 --json status,conclusion,event \
+            --jq '[.[] | select(.event != "pull_request" and .conclusion != "cancelled")][0]
+              | if . == null then "success" elif .status != "completed" then "running" else .conclusion end')
+          if [[ "$desktop" != "success" ]]; then
+            echo "main's desktop checks are $desktop; #$number waits for them"
+            exit 0
+          fi
+          # --match-head-commit: the head whose ci passed, and whose files were read above, is the one that merges. Not
+          # asked again: a merge whose answer was lost fails on a second try, so the pull request's state says whether
+          # it went through.
+          if ! out=$(gh pr merge "$number" --squash --match-head-commit "$sha" 2>&1); then
+            after=$(ask gh pr view "$number" --json state,headRefOid --jq '.state + " " + .headRefOid')
+            read -r state now_sha <<< "$after"
+            # Dependabot pushed meanwhile: the new head runs `ci` again and the next run looks at it afresh.
+            if [[ "$state" == "OPEN" && "$now_sha" != "$sha" ]]; then
+              echo "#$number moved to ${now_sha:0:7} while it was merged; the next run looks again"
+              exit 0
+            fi
+            if [[ "$state" != "MERGED" ]]; then
+              hand_over "$number" "the merge failed: $out"
+              echo "::error::#$number did not merge: $out" >&2
+              exit 1
+            fi
+          fi
+          echo "merged #$number at ${sha:0:7}; starting main's checks on it"
+          ask gh workflow run gate.yml --ref main
+          if grep -qE '^(desktop/|\.github/workflows/desktop\.yml$)' <<< "$files"; then
+            ask gh workflow run desktop.yml --ref main
+          fi
+          if grep -q '^\.github/' <<< "$files"; then
+            ask gh workflow run zizmor.yml --ref main
+          fi

@@ -205,4 +205,5 @@ each beside them: the Inter and Geist Mono fonts (SIL Open Font License, `static
 Report a security problem privately, as [SECURITY.md](SECURITY.md) says, not in a public issue. Dependabot raises
 alerts and fixes for dependencies with a known vulnerability, and each week one pull request per kind of dependency
 that brings it up to date (`.github/dependabot.yml`: Python, the desktop app's npm and Cargo packages and its Rust, the
-CI's actions); the weekly audit of the CI (`audit.yml`, item 217) stays.
+CI's actions), which merges by itself once the checks pass when it raises no major version; the weekly audit of the CI
+(`audit.yml`, item 217) stays.

@@ -224,6 +224,22 @@ job; one accepted is in `.github/zizmor.yml` with its reason. zizmor is pinned b
 pip-audit is; raise it by hand when a release brings an audit worth having (`uvx zizmor@<version> --min-severity low .`
 first, on your Mac).
 
+A Dependabot pull request that raises versions by a patch or a minor step merges by itself
+(`.github/workflows/dependabot-merge.yml`, item 1190): a job marks it with the label `dependabot-merge`, and every
+twenty minutes another merges at most one marked pull request whose `ci` passed, the oldest, and only when main's gate
+passed on main's head; then it starts main's gate on what it merged, since a merge made with a workflow's token starts
+no push run, and the desktop checks and zizmor when it changed what they read. One merge at a time, each after the
+previous one's run passed: look at those runs as at any merge's. One with a major version in it is not marked and waits
+for a person, who reads what the release changed; one whose `ci` fails stays open; one that cannot merge is put on hold,
+with the label `dependabot-hold`, and says why in a comment, as is one that changes more than the locks and manifests
+Dependabot raises versions in (`pyproject.toml`, under "Always needs a human", is not one of them). Put
+`dependabot-hold` on a pull request to keep it from merging; it stays through Dependabot's rebases until a person takes
+it off. Put `dependabot-merge` on one by hand to have it merged the same way, a major version too, which is then your
+decision; Dependabot's next push to it takes a mark the job would not set off again. A workflow's token cannot hold the
+`workflows` permission, so GitHub may refuse it a merge that changes `.github/workflows/`: the actions' pull requests
+then come to a person with that comment. A red run of the desktop checks on main holds the merges as a red gate does.
+Both labels are the repository's, made once with `gh label create`; without them the jobs fail.
+
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](../ROADMAP.md) and, from item 459 on, in [roadmap/](../roadmap/); read them before
 continuing that work.
