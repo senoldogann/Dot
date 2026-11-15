@@ -66,6 +66,7 @@ from dotagent.server.routes_drafts import drafts_router
 from dotagent.server.routes_files import files_router, looks_router
 from dotagent.server.routes_gallery import gallery_router
 from dotagent.server.routes_harness import harness_router
+from dotagent.server.routes_iphone import iphone_router
 from dotagent.server.routes_keys import keys_router
 from dotagent.server.routes_mcp import mcp_router
 from dotagent.server.routes_pages import pages_router
@@ -202,6 +203,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(queue_router(ctx))
     app.include_router(reactions_router(ctx))
     app.include_router(trading_router(ctx))
+    app.include_router(iphone_router(ctx))
     app.include_router(threads_router(ctx))
     app.include_router(rules_router(ctx))
     app.include_router(memories_router(ctx))

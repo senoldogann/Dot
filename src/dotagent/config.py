@@ -1188,6 +1188,30 @@ class MeetingsConfig(FrozenModel):
     headless: bool
 
 
+class PhoneConfig(FrozenModel):
+    """The owner's iPhone, reached over WebDriverAgent (``[phone]``, item 1196, docs/phone-control.md)."""
+
+    enabled: bool
+    # The addresses of WebDriverAgent's server on the phone, tried in order (Tailscale first, then the home network).
+    wda_urls: list[str]
+    # The phone's UDID for ``xcrun devicectl``; empty leaves the keeper to relaunch nothing.
+    udid: str
+    # The bundle id of the WebDriverAgent runner app that opening starts the server.
+    runner_bundle: str
+    check_every_s: float = Field(gt=0, allow_inf_nan=False)
+    # How long the phone stays locked or out of reach before the owner is told, once for that state.
+    notify_after_s: float = Field(ge=0, allow_inf_nan=False)
+    request_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+
+    @field_validator("wda_urls")
+    @classmethod
+    def _http_urls(cls, urls: list[str]) -> list[str]:
+        wrong: list[str] = [url for url in urls if not url.startswith(("http://", "https://"))]
+        if wrong:
+            raise ValueError("[phone] wda_urls are http(s) addresses, as http://100.64.0.1:8100: " + ", ".join(wrong))
+        return urls
+
+
 class AppConfig(FrozenModel):
     mcp: list[McpServerConfig]
     builtin_mcp: BuiltinMcpConfig
@@ -1220,6 +1244,7 @@ class AppConfig(FrozenModel):
     recon: ReconConfig
     trading: TradingConfig
     meetings: MeetingsConfig
+    phone: PhoneConfig
 
     @field_validator("mcp")
     @classmethod

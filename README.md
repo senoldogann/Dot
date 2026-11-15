@@ -175,6 +175,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Safety and privacy](docs/safety.md): what leaves this Mac, the policy, the sandbox
 - [The daemon, the web UI and the desktop shell](docs/daemon.md)
 - [Dot on the phone](docs/phone.md)
+- [Dot and your iPhone](docs/phone-control.md): the daemon keeps WebDriverAgent on the phone up and says how it stands
 - [Channels](docs/channels.md): reach Dot from the phone's own Messages
 - [Browser and computer use](docs/browser-and-computer-use.md)
 - [Memory and schedules](docs/memory-and-schedules.md)

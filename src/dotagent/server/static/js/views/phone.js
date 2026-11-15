@@ -3,10 +3,12 @@
 // offering what does it (Tailscale from the App Store or opened to sign in, Dot served to the tailnet, the daemon started
 // again to take its name), and the switch that keeps the Mac awake. Under it the phone's own steps, with the QR codes its
 // camera opens, and the code that signs in the app added to its home screen, which iOS keeps apart from Safari. Under
-// that the phones paired with a code, each holding a key of its own, with Remove (item 670).
+// that the phones paired with a code, each holding a key of its own, with Remove (item 670). While `[phone]` is on, a
+// card at the very head says how Dot's own link to the owner's iPhone stands (item 1196), where a tap on the daemon's
+// notice of a locked or unreachable phone lands.
 
 import { api, blobUrl, holdsPhoneKey, unreachable } from "../api.js";
-import { copyText, el } from "../dom.js";
+import { copyText, duration, el } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, inlineLoading, loadingPanel, segmented, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
 import { getSnapshot } from "../state.js";
@@ -36,6 +38,13 @@ const QR_CHOICES = [
 const CODE_GROUPS = 2;
 const CODE_GROUP_CHARS = 4;
 const CODE_HIDDEN = "Hidden until you show it, so it isn't on screen by accident.";
+// Dot's link to the owner's iPhone over WebDriverAgent (item 1196, `GET /api/iphone`): each state, and what to do.
+const IPHONE_STATES = {
+  up: "Reachable and unlocked",
+  locked: "Reachable but locked: unlock it, and Dot reaches it again",
+  unclear: "Answering, but not saying whether it is locked: the daemon's log has what it answered",
+  unreachable: "Out of reach: bring it into reach of this Mac, or open the runner app on it",
+};
 
 function dayOf(seconds) {
   return new Date(seconds * 1000).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
@@ -66,6 +75,24 @@ function addressRow(address) {
       "Copy",
     ),
   );
+}
+
+/** A span of whole seconds, as the card of the iPhone's link says it: "12 s", "4m 05s", "1h 05m". */
+function lasted(seconds) {
+  return seconds < 60 ? `${seconds} s` : duration(seconds);
+}
+
+/** The card of Dot's link to the owner's iPhone, as the keeper's last look left it. */
+function iphoneSection(view) {
+  const lead =
+    view.state === null ? "Not checked yet." : `${IPHONE_STATES[view.state]}. For ${lasted(view.since_s)}, checked ${lasted(view.checked_s)} ago.`;
+  const row = setRow({ title: "iPhone", lead });
+  row.dataset.iphone = view.state ?? "unchecked";
+  return setSection({
+    title: "Dot's link to your iPhone",
+    lead: "WebDriverAgent on the phone, which the daemon keeps up while [phone] is on.",
+    body: setCard(row),
+  });
 }
 
 /** A step's mark: a tick once it is done, else its number; the step to do now stands out in the accent. */
@@ -484,7 +511,16 @@ export function mount(root, ctx) {
   }
   const reachSlot = el("div", null);
   const setupSlot = el("div", null);
-  const sections = el("div", { class: "set-sections" }, reachSlot, setupSlot, signIn, paired);
+  // Dot's link to the owner's iPhone, drawn only while [phone] is on.
+  const iphoneSlot = el("div", null);
+  const sections = el("div", { class: "set-sections" }, iphoneSlot, reachSlot, setupSlot, signIn, paired);
+
+  async function loadIphone() {
+    const view = await api.get("/iphone");
+    if (!disposed) {
+      iphoneSlot.replaceChildren(...(view.enabled ? [iphoneSection(view)] : []));
+    }
+  }
 
   /** Read Tailscale again a moment from now while a step is left: the guide follows an install, a sign-in or a start. */
   function follow(phone) {
@@ -570,10 +606,13 @@ export function mount(root, ctx) {
   root.append(holder);
   attempt(load);
   attempt(loadPhones);
-  // A phone that pairs while this page is open shows up when the page is looked at again.
+  attempt(loadIphone);
+  // A phone that pairs while this page is open shows up when the page is looked at again, and the iPhone's link is read
+  // again then.
   const relist = () => {
     if (document.visibilityState === "visible") {
       attempt(loadPhones);
+      attempt(loadIphone);
     }
   };
   window.addEventListener("focus", relist);

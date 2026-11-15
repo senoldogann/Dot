@@ -214,6 +214,14 @@ class DesktopError(DotError):
     """Desktop (computer use) automation failed."""
 
 
+class PhoneError(DotError):
+    """Reaching the owner's iPhone over WebDriverAgent, or starting its runner app, failed."""
+
+
+class PhoneUnreachableError(PhoneError):
+    """No address of WebDriverAgent on the phone answered."""
+
+
 class DesktopStepNotSent(DesktopError):
     """A step of a desktop batch was refused before any input went to an application (item 1146): its target was no
     longer what was reviewed, the pointer was not where the step before left it."""

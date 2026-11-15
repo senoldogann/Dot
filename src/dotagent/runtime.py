@@ -3,6 +3,7 @@
 import asyncio
 import os
 import sys
+import time
 from collections.abc import Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
@@ -84,6 +85,9 @@ from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory
 from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.oauth.accounts import Accounts
 from dotagent.oauth.keychain import Keychain, keychain_file
+from dotagent.phone.desk import PhoneDesk
+from dotagent.phone.devicectl import XcrunDevicectl, run_command
+from dotagent.phone.wda import WdaClient
 from dotagent.plugins.catalog import PluginShelf, load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
@@ -116,6 +120,7 @@ from dotagent.tools.notes import build_notes_tools
 from dotagent.tools.objectives import build_objective_tools
 from dotagent.tools.office import build_office_tools
 from dotagent.tools.pages import build_page_tools
+from dotagent.tools.phone import build_phone_tools
 from dotagent.tools.posts import build_post_tools
 from dotagent.tools.recall import build_recall_tools
 from dotagent.tools.recon import build_recon_tool
@@ -247,6 +252,8 @@ class Runtime:
     trading: Trading
     # Dot in the owner's calls (item 1138, docs/meetings.md): the meeting it is in, watched with no model.
     meetings: MeetingDesk
+    # The owner's iPhone over WebDriverAgent (docs/phone-control.md); ``None`` while [phone] is off.
+    phone: PhoneDesk | None
 
     @property
     def search_key_present(self) -> bool:
@@ -295,10 +302,24 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
         # The trading tools exist only while the owner has trading on (docs/trading.md).
         *((build_trading_tools(),) if config.trading.mode != "off" else ()),
+        # The phone tool exists only while the owner has [phone] on (docs/phone-control.md).
+        *((build_phone_tools(),) if config.phone.enabled else ()),
     )
     if not config.desktop.enabled:
         return core
     return (*core, build_desktop_tools(), (build_apple_tool(),))
+
+
+def _phone(config: AppConfig) -> PhoneDesk | None:
+    """The owner's iPhone, reached over WebDriverAgent, while ``[phone] enabled``."""
+    if not config.phone.enabled:
+        return None
+    return PhoneDesk(
+        config.phone,
+        WdaClient(config.phone.wda_urls, config.phone.request_timeout_s),
+        XcrunDevicectl(run_command),
+        time.monotonic,
+    )
 
 
 def _trading(config: AppConfig, store: Store, zone: ZoneInfo) -> Trading:
@@ -641,6 +662,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             notify=show_notification,
             peers=peers,
             trading=_trading(config, store, schedule_zone),
+            phone=_phone(config),
             meetings=MeetingDesk(
                 store,
                 approvals,
@@ -717,6 +739,8 @@ async def close_runtime(runtime: Runtime) -> None:
         closing.push_async_callback(runtime.mcp.close)
         closing.push_async_callback(runtime.browsers.aclose)
         closing.push_async_callback(runtime.meetings.aclose)
+        if runtime.phone is not None:
+            closing.push_async_callback(runtime.phone.aclose)
         closing.push_async_callback(runtime.desktop.close)
         closing.push_async_callback(runtime.awake.stop)
         closing.push_async_callback(runtime.terminals.aclose)

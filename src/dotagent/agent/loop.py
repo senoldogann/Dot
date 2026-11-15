@@ -130,6 +130,7 @@ from dotagent.agent.progress import (
 )
 from dotagent.agent.prompt import (
     AgentBrief,
+    PromptInputs,
     TeamBrief,
     build_system_prompt,
     collect_prompt_inputs,
@@ -138,6 +139,7 @@ from dotagent.agent.prompt import (
     notes_missing,
     recalled_again,
     turn_note,
+    with_phone,
 )
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.restating import restates
@@ -263,6 +265,7 @@ from dotagent.memory.service import (
 )
 from dotagent.oauth.providers import PROVIDERS
 from dotagent.oauth.tokens import Account
+from dotagent.phone.keeper import state_word
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -1526,6 +1529,13 @@ async def browser_of(runtime: Runtime, run: RunRecord) -> BrowserSession:
     return runtime.browsers.session_for(campaign.browser)
 
 
+def _with_phone_state(runtime: Runtime, tool_names: Sequence[str], inputs: PromptInputs) -> PromptInputs:
+    """``inputs`` with the iPhone's state when the run has its tool (and the phone is on), else as they are."""
+    if runtime.phone is None or not tools_in(tool_names, "phone"):
+        return inputs
+    return with_phone(inputs, state_word(runtime.phone.state))
+
+
 async def _agent_folder(workspace: Path, agent_id: str) -> Path:
     """The agent's own folder (item 877), made when its run starts, so that the prompt names one that is there."""
     folder: Path = agent_folder(workspace, agent_id)
@@ -2482,57 +2492,61 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     purposes: dict[str, McpPurpose] = runtime.mcp.purposes(held_at_start) if config.mcp_purposes else {}
     system: Message = system_message(
         build_system_prompt(
-            collect_prompt_inputs(
-                run.mode,
-                run.source,
-                runtime.config.policy.preset,
-                run.approvals,
-                questions,
-                run.goal_mode,
-                splits_work(run.once),
-                runtime.workspace,
-                (),
-                0,
-                tools_in_order(specs, thread.title),
-                listing.skills,
-                listing.left,
-                None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
-                helpers,
-                None
-                if agent_record is None
-                else AgentBrief(
-                    name=agent_record.name,
-                    role=agent_record.role,
-                    instructions=agent_record.instructions,
-                    made_by_dot=agent_record.made_by is not None,
-                    team=team_name(agent_record.name),
-                    refuses=agent_record.refuses,
-                    folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
+            _with_phone_state(
+                runtime,
+                [spec.name for spec in specs],
+                collect_prompt_inputs(
+                    run.mode,
+                    run.source,
+                    runtime.config.policy.preset,
+                    run.approvals,
+                    questions,
+                    run.goal_mode,
+                    splits_work(run.once),
+                    runtime.workspace,
+                    (),
+                    0,
+                    tools_in_order(specs, thread.title),
+                    listing.skills,
+                    listing.left,
+                    None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
+                    helpers,
+                    None
+                    if agent_record is None
+                    else AgentBrief(
+                        name=agent_record.name,
+                        role=agent_record.role,
+                        instructions=agent_record.instructions,
+                        made_by_dot=agent_record.made_by is not None,
+                        team=team_name(agent_record.name),
+                        refuses=agent_record.refuses,
+                        folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
+                    ),
+                    [
+                        AgentBrief(
+                            name=member.name,
+                            role=member.role,
+                            instructions="",
+                            made_by_dot=member.made_by is not None,
+                            team=team_name(member.name),
+                        )
+                        for member in team
+                    ],
+                    (
+                        *owner_name_lines(names.owner, names.mac_name),
+                        *(called_lines(names.name) if agent_record is None else ()),
+                        # The accounts are named only to a run that has one of the tools that take them (an agent's may
+                        # have none, or only some).
+                        *(account_lines(signed_in) if tools_in([spec.name for spec in specs], ACCOUNTS_GROUP) else ()),
+                        *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
+                    ),
+                    devtools_address(browser.config),
+                    config.prompt,
+                    harness_text,
+                    lead,
+                    skills_left_names=listing.left_names,
+                    group_purposes=purposes,
                 ),
-                [
-                    AgentBrief(
-                        name=member.name,
-                        role=member.role,
-                        instructions="",
-                        made_by_dot=member.made_by is not None,
-                        team=team_name(member.name),
-                    )
-                    for member in team
-                ],
-                (
-                    *owner_name_lines(names.owner, names.mac_name),
-                    *(called_lines(names.name) if agent_record is None else ()),
-                    # The accounts are named only to a run that has one of the tools that take them (an agent's may
-                    # have none, or only some).
-                    *(account_lines(signed_in) if tools_in([spec.name for spec in specs], ACCOUNTS_GROUP) else ()),
-                    *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
-                ),
-                devtools_address(browser.config),
-                config.prompt,
-                harness_text,
-                lead,
-                skills_left_names=listing.left_names,
-                group_purposes=purposes,
             )
         )
         # The owner's free mode (item 922), as it stands when the run starts: the gate reads it at every step.

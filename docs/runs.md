@@ -574,6 +574,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Recon           | `recon` (item 776): the addresses, TLS certificate, HTTP headers and technology of a site, and with `depth = "ports"` the open ports of a host in `[recon] owned_hosts` ([Recon](recon.md)) |
 | Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts`, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
+| Phone           | while `[phone] enabled` (item 1196): `phone_status`, whether the owner's iPhone answers over WebDriverAgent and is locked ([Dot and your iPhone](phone-control.md)) |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools`, `recall` (a record a compaction named, read back, item 924) |
