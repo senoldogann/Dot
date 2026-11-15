@@ -1,13 +1,14 @@
 # The desktop shell (desktop/): the Rust compiles, is clean and passes its tests; the bundle itself is built on the
-# owner's Mac. It runs only when something under desktop/ or this file changes.
+# owner's Mac. A pull request runs it from the gate (gate.yml's `desktop` job, item 1184) when it changes something
+# under desktop/, this file or the gate, so that `ci`, the check main's protection requires, waits for it. A push to
+# main runs it here when something under desktop/ or this file changes.
 name: desktop
 
 on:
-  pull_request:
-    paths: ["desktop/**", ".github/workflows/desktop.yml"]
   push:
     branches: [main]
     paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  workflow_call:
 
 # The job only reads the code: the token GitHub hands it can do nothing more.
 permissions:
@@ -30,9 +31,12 @@ jobs:
           # The job pushes nothing: the checkout's token is not left in .git/config (item 487).
           persist-credentials: false
       # The runner's own rustup, rather than an action: the branch the action was pinned by is rewritten, so the commit
-      # it named belongs to no branch of its repository any more (zizmor's impostor-commit, item 487).
+      # it named belongs to no branch of its repository any more (zizmor's impostor-commit, item 487). It installs the
+      # version desktop/src-tauri/rust-toolchain.toml names (item 1184), so a new Rust release cannot turn the checks
+      # red without a change here: Dependabot raises that version in a pull request of its own.
       - name: Rust
-        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy && rustup default stable
+        run: rustup toolchain install
+        working-directory: desktop/src-tauri
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: desktop/src-tauri

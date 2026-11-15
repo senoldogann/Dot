@@ -14,8 +14,9 @@
 name: gate
 
 # A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing heavy, as
-# no command below reads it; a skill's SKILL.md under src/ is read by Dot and does run the gate. The desktop shell has
-# its own workflow, desktop.yml.
+# no command below reads it; a skill's SKILL.md under src/ is read by Dot and does run the gate. The desktop shell's
+# checks (desktop.yml) and zizmor's audit of the workflows (zizmor.yml) run from here for a pull request that changes
+# what they read (item 1184), so that `ci` waits for them, and from their own workflows for a push to main.
 #
 # A pull request starts this workflow even when it changes prose alone: branch protection requires `ci`, and a workflow
 # a path filter skips reports no check at all, so that pull request would wait on a check nothing would ever report. The
@@ -128,8 +129,9 @@ jobs:
       - name: Interface checks
         run: npm run check
 
-  # What of this pull request can affect a browser part. A push and a release do not ask: they run every part. When
-  # the answer cannot be read, the parts run, which is the failure that still tests the change.
+  # What of this pull request can affect a browser part, the desktop shell and the workflows. A push and a release do
+  # not ask: they run every browser part, and desktop.yml and zizmor.yml run on their own for a push that changes what
+  # they read. When the answer cannot be read, everything runs, which is the failure that still tests the change.
   changes:
     needs: [prose]
     if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.prose.outputs.prose_only != 'true' }}
@@ -137,43 +139,61 @@ jobs:
     timeout-minutes: 5
     outputs:
       browser: ${{ steps.decide.outputs.browser }}
+      desktop: ${{ steps.decide.outputs.desktop }}
+      workflows: ${{ steps.decide.outputs.workflows }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 1
-      - name: Which files run the browser parts
+      - name: Which files run the browser parts, the desktop checks and zizmor
         id: decide
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          decide() { echo "browser=$1" >> "$GITHUB_OUTPUT"; }
+          decide() {
+            {
+              echo "browser=$1"
+              echo "desktop=$2"
+              echo "workflows=$3"
+            } >> "$GITHUB_OUTPUT"
+          }
           if [[ ! "$BASE" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "the base is not a sha; the browser parts run"
-            decide true
+            echo "the base is not a sha; everything runs"
+            decide true true true
             exit 0
           fi
           if ! git fetch --no-tags --depth=1 origin "$BASE"; then
-            echo "the base could not be fetched; the browser parts run"
-            decide true
+            echo "the base could not be fetched; everything runs"
+            decide true true true
             exit 0
           fi
           if ! files="$(git diff --name-only --no-renames "$BASE" HEAD)"; then
-            echo "the changed files could not be listed; the browser parts run"
-            decide true
+            echo "the changed files could not be listed; everything runs"
+            decide true true true
             exit 0
           fi
+          # The desktop checks read desktop/ and their workflow, which the gate calls; zizmor reads all of .github/.
+          desktop=false
+          if printf '%s\n' "$files" | grep -qE '^(desktop/|\.github/workflows/(desktop|gate)\.yml$)'; then
+            desktop=true
+          fi
+          workflows=false
+          if printf '%s\n' "$files" | grep -q '^\.github/'; then
+            workflows=true
+          fi
+          echo "desktop: $desktop, workflows: $workflows"
           if ! answer="$(printf '%s\n' "$files" | python3 scripts/browser_ci.py)"; then
             echo "the path check failed; the browser parts run"
-            decide true
+            decide true "$desktop" "$workflows"
             exit 0
           fi
           if [[ "$answer" != "true" && "$answer" != "false" ]]; then
             echo "the path check gave no answer; the browser parts run"
-            decide true
+            decide true "$desktop" "$workflows"
             exit 0
           fi
-          decide "$answer"
+          decide "$answer" "$desktop" "$workflows"
 
   gate:
     needs: [prose]
@@ -318,11 +338,34 @@ jobs:
           mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
           run_part
 
-  # The check main's protection should require, in place of the five job names. It passes when every job it waits
-  # for passed or did not run, and fails when one failed: a skipped browser part is not a failure, and a red one is. A
-  # pull request that changes prose alone reaches it with every heavy job skipped, and passes.
+  # The desktop shell's checks (desktop.yml) for a pull request that changes desktop/ or their workflow (item 1184).
+  # Called from here rather than started by their own path filter, so that `ci`, the check main's protection requires,
+  # waits for them and no merge goes through with them red. A push to main runs desktop.yml on its own. A decision that
+  # failed runs them.
+  desktop:
+    needs: [changes, prose]
+    if: >-
+      ${{ !cancelled() && github.event_name == 'pull_request'
+      && needs.prose.outputs.prose_only != 'true'
+      && (needs.changes.result != 'success' || needs.changes.outputs.desktop == 'true') }}
+    uses: $/.github/workflows/desktop.yml
+
+  # zizmor's audit of the workflows and Dependabot's file (zizmor.yml, item 487) for a pull request that changes
+  # .github/, for the same reason as the desktop checks: `ci` waits for it. A push to main, the week and a demand run
+  # zizmor.yml on its own.
+  zizmor:
+    needs: [changes, prose]
+    if: >-
+      ${{ !cancelled() && github.event_name == 'pull_request'
+      && needs.prose.outputs.prose_only != 'true'
+      && (needs.changes.result != 'success' || needs.changes.outputs.workflows == 'true') }}
+    uses: $/.github/workflows/zizmor.yml
+
+  # The check main's protection should require, in place of the job names. It passes when every job it waits for
+  # passed or did not run, and fails when one failed: a skipped browser part, desktop check or audit is not a failure,
+  # and a red one is. A pull request that changes prose alone reaches it with every heavy job skipped, and passes.
   ci:
-    needs: [prose, checks, gate, smoke, browser]
+    needs: [prose, checks, gate, smoke, browser, desktop, zizmor]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -334,9 +377,11 @@ jobs:
           GATE: ${{ needs.gate.result }}
           SMOKE: ${{ needs.smoke.result }}
           BROWSER: ${{ needs.browser.result }}
+          DESKTOP: ${{ needs.desktop.result }}
+          ZIZMOR: ${{ needs.zizmor.result }}
         run: |
           fail=0
-          for name in PROSE CHECKS GATE SMOKE BROWSER; do
+          for name in PROSE CHECKS GATE SMOKE BROWSER DESKTOP ZIZMOR; do
             result="${!name}"
             echo "$name $result"
             case "$result" in

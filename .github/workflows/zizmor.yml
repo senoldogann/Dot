@@ -1,20 +1,21 @@
 # zizmor (item 487) reads the workflows and Dependabot's file for unsafe patterns: an event's text run as a script, a
 # token left in a checkout, an action pinned by a commit its repository does not have, a known vulnerable action, a
-# release that reads a cache, Dependabot taking a release the day it is out, and more (docs.zizmor.sh/audits). It runs
-# when something under .github/ changes, every week, since an advisory or an impostor commit appears without any change
-# here, and on demand. Any finding fails the job; one that is accepted is in .github/zizmor.yml with its reason. The
-# same check on a Mac: `uvx zizmor@1.31.1 --min-severity low .` (CONTRIBUTING.md).
+# release that reads a cache, Dependabot taking a release the day it is out, and more (docs.zizmor.sh/audits). A pull
+# request that changes something under .github/ runs it from the gate (gate.yml's `zizmor` job, item 1184), so that
+# `ci`, the check main's protection requires, waits for it. A push to main that does runs it here, and so does a run
+# every week, since an advisory or an impostor commit appears without any change here, and one on demand. Any finding
+# fails the job; one that is accepted is in .github/zizmor.yml with its reason. The same check on a Mac:
+# `uvx zizmor@1.31.1 --min-severity low .` (CONTRIBUTING.md).
 name: zizmor
 
 on:
-  pull_request:
-    paths: [".github/**"]
   push:
     branches: [main]
     paths: [".github/**"]
   schedule:
     - cron: "29 6 * * 1"
   workflow_dispatch:
+  workflow_call:
 
 # The job only reads the code and asks GitHub's API about the actions: the token it is handed can do nothing more.
 permissions:

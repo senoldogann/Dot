@@ -41,11 +41,14 @@ jobs:
           # The job pushes nothing: the checkout's token is not left in .git/config (item 487).
           persist-credentials: false
       # The runner's own rustup, rather than an action: the branch the action was pinned by is rewritten, so the commit
-      # it named belongs to no branch of its repository any more (zizmor's impostor-commit, item 487).
+      # it named belongs to no branch of its repository any more (zizmor's impostor-commit, item 487). The version is
+      # the desktop shell's own, desktop/src-tauri/rust-toolchain.toml (item 1184).
       - name: Rust
-        run: rustup toolchain install stable --profile minimal && rustup default stable
+        run: rustup toolchain install
+        working-directory: desktop/src-tauri
       - name: cargo-audit
         run: cargo install cargo-audit --locked --version 0.22.2
+        working-directory: desktop/src-tauri
       - name: cargo audit
         run: cargo audit
         working-directory: desktop/src-tauri
