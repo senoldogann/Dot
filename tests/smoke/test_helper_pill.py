@@ -191,6 +191,9 @@ async def test_the_pill_of_a_helpers_page_stays_in_the_window_as_its_conversatio
                     await page.add_init_script(
                         "document.addEventListener('dot:page-ready', () => { window.dotPageReady = true; }, true)"
                     )
+                    # The helper's words on the way are its work told (item 1131), folded unless the steps are shown:
+                    # shown, they make the conversation longer than the window.
+                    await page.add_init_script("localStorage.setItem('dot.work', 'steps')")
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{address}/#/runs/{helpers[0].id}")
                     await _ready(page)
