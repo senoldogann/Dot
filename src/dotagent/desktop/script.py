@@ -86,7 +86,9 @@ async def run_osascript(
             f"osascript did not finish within {timeout_s:g} s"
             + (f"; {shown}" if shown else "")
             + ("; macOS may also be showing" if shown else "; macOS may be showing")
-            + " an Automation approval dialog that has to be answered, or the script waits for something",
+            + " an Automation approval dialog that has to be answered, or the script waits for something; an"
+            " application it was talking to may go on with what it was asked, so a script sent to it again at once"
+            " waits behind that",
             {
                 "language": language,
                 "script": truncate_middle(script, _SCRIPT_CONTEXT_CHARS),

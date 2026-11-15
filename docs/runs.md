@@ -602,7 +602,9 @@ out of reach; an image goes to the model as an image, an iPhone's HEIC photo too
 556). A shell command runs with the `PATH` of your login shell, in its own process
 group (cancelling a run ends the whole group) and under a timeout (`[shell] default_timeout_s`, at most
 `max_timeout_s`). An AppleScript (`apple_script`) ends with its call as well: one whose run is stopped or whose call
-times out is killed. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
+times out is killed, after `[desktop] osascript_timeout_s` or the `timeout_s` the run gives a script that starts an
+application or works on a large document (at most 110 s, item 1180); the application may go on with what it was asked,
+which the timeout says. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
 655 and 657, `[web] search_order`): each engine in the owner's order, one whose key is not set passed over and said
 to be, the browser rung only with Dot's own browser and the web-research rung only while that server runs; its Try asks
 one engine one search. The search APIs that take a key of their own are Brave's Search API (`BRAVE_SEARCH_API_KEY`),
