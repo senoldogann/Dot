@@ -1842,9 +1842,7 @@ impl Installer {
                     .as_ref()
                     .is_some_and(|before| *before != choice)
                 {
-                    for step in MODELS_STEP..STEPS.len() {
-                        inner.states[step] = StepState::Waiting;
-                    }
+                    inner.states[MODELS_STEP..STEPS.len()].fill(StepState::Waiting);
                 }
                 inner.choice = Some(choice);
             }
