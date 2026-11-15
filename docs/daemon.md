@@ -516,7 +516,12 @@ the message comes back into the box of the turn before it with its files, to be 
 chat's box when it was the first. **Also undo the file changes** also takes back what those turns, and their helpers, changed with
 the file tools, each file that is as they left it; a file changed since is left and named, and what a command changed
 stays. A message sent before Dot kept the place of each message in its chat has no Edit from here, nor has one that
-steered a turn at work, and a chat is not rewound while a run works on it or messages wait in its queue. A delegated run
+steered a turn at work, and a chat is not rewound while a run works on it or messages wait in its queue. An answer
+whose turn read pages on the web (`web_fetch`, `web_extract`) has a quiet line between its words and its foot (item
+1184): the first letter of a few of the sites and how many pages ("3 sources"); opened, each page's title over its site,
+a link that opens it in the browser. A page is counted from the address the run asked for (or the one a redirect ended
+at), never from what a page says; its title is the page's own, shown as text and cut at a line. A turn lists 12 pages
+at most and counts the rest; a fetch that failed and a search read none. A delegated run
 is a row: the face with its state at the corner (turning while it works, amber while it waits for you, a check in
 the text's ink when it is done, item 839, red when it failed), its name and its goal over the last thing it did and,
 once it ended, the
