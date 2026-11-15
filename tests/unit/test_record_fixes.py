@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from dotagent.core.errors import McpError, PluginError, SkillError
 from dotagent.server.app import status_for
 from dotagent.tools.browser import WaitTextArgs
-from dotagent.tools.files import EditFileArgs
+from dotagent.tools.files import EditFileArgs, SearchFilesArgs
 from dotagent.tools.memory import SearchArgs
 from dotagent.tools.schema import tool_parameters_schema
 from dotagent.tools.terminal import ReadArgs
@@ -23,6 +23,16 @@ def test_an_edit_that_names_one_text_twice_is_refused_and_the_model_is_shown_old
     with pytest.raises(ValidationError):
         EditFileArgs.model_validate({"path": "a.txt", "old": "x", "new": "y", "new_text": "z"})
     assert set(tool_parameters_schema(EditFileArgs)["properties"]) == {"path", "old", "new", "replace_all"}  # type: ignore[arg-type]
+
+
+def test_a_search_of_files_reads_its_pattern_by_the_name_query_too() -> None:
+    """Item 1176: a run on the Claude plan sent ``query`` for ``pattern`` four times, each call refused."""
+    args: SearchFilesArgs = SearchFilesArgs.model_validate({"query": "HiQ|Bondata", "path": "job-applications.md"})
+    assert args.pattern == "HiQ|Bondata"
+    assert SearchFilesArgs.model_validate({"pattern": "x"}).pattern == "x"
+    with pytest.raises(ValidationError):
+        SearchFilesArgs.model_validate({"pattern": "x", "query": "y"})
+    assert set(tool_parameters_schema(SearchFilesArgs)["properties"]) == {"pattern", "path", "glob", "ignore_case"}  # type: ignore[arg-type]
 
 
 def test_a_wait_or_a_count_past_its_bound_is_read_as_the_bound() -> None:
