@@ -28,7 +28,7 @@ async def test_a_call_that_fails_outside_its_tool_ends_the_other_calls_of_its_gr
             ended.append("cancelled")
             raise
         call: ToolCall = ToolCall(id="call_2", name="read_file", arguments={})
-        return ToolOutcome(call=call, result=ok("read"), seconds=_WAIT_S, action=None)
+        return ToolOutcome(call=call, result=ok("read"), seconds=_WAIT_S, action=None, shown="")
 
     async with asyncio.timeout(_LIMIT_S):
         with pytest.raises(StoreError):

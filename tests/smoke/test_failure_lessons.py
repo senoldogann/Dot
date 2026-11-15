@@ -12,7 +12,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment,
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
-from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
+from dotagent.llm.types import ChatRequest, DeltaSink, Message, ModelReply
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server import UI_SOURCE
 from dotagent.store.db import Store
@@ -121,6 +121,82 @@ async def test_the_calls_of_one_step_that_fail_at_once_are_handed_a_lesson_once(
                 told: list[EventRecord] = await runtime.store.events_of_kind(run.id, "memories", 10)
                 assert sum(_LESSON in str(result.data["text"]) for result in results[:3]) == 1, results
                 assert [event.data.get("tool") for event in told if "tool" in event.data] == ["read_file"]
+            finally:
+                await manager.shutdown()
+        finally:
+            await close_runtime(runtime)
+
+
+class _TaintingProvider(ScriptedProvider):
+    """The scripted model, which keeps a clean lesson, one saved while reading outside content and a note of a page in
+    the store as it is first asked: the run's search for the note taints it before its call fails (item 1192)."""
+
+    def __init__(self, turns: list[ScriptedTurn], store: Store) -> None:
+        super().__init__(_PROVIDER, turns)
+        self._store: Store = store
+        self._kept: bool = False
+        self.requests: list[ChatRequest] = []
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        if not self._kept:
+            self._kept = True
+            await self._store.add_memory(_LESSON, ("lesson",), None, None, None, False)
+            await self._store.add_memory(_OUTSIDE_LESSON, ("lesson",), None, None, None, True)
+            await self._store.add_memory("The weather page said rain all week.", (), None, None, None, True)
+        self.requests.append(request)
+        return await super().complete(request, sink)
+
+
+_OUTSIDE_LESSON: str = "`read_file` cannot open a file a page named until it is downloaded."
+
+
+async def test_a_tainted_runs_failed_call_is_handed_the_lessons_saved_after_outside_content_fenced(
+    login_env: dict[str, str],
+) -> None:
+    """Item 1192: a run that read outside content (here a note saved after it, found with memory_search) is handed,
+    after a failed call, the lessons of the tool saved while reading outside content too, in a fence as a page's
+    text, next to the call's result in its own requests alone: nothing stores them."""
+    turns: list[ScriptedTurn] = [
+        _turn("memory_search", {"query": "weather"}),
+        _turn("read_file", {"path": "missing-1.txt"}),
+        _turn(FINISH_TOOL, {"answer": "Done.", "success": True}),
+    ]
+    with scratch_home() as home, eval_environment(home, {}):
+        config = eval_config(load_default_config())
+        config = config.model_copy(update={"agent": config.agent.model_copy(update={"lessons": "auto"})})
+        runtime: Runtime = await open_runtime(config, login_env)
+        try:
+            model: _TaintingProvider = _TaintingProvider(turns, runtime.store)
+            await runtime.router.register(_PROVIDER, model)
+            manager: RunManager = RunManager(runtime)
+            try:
+                run: RunRecord = await manager.start(
+                    "Read my notes.", "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo",
+                    False, (),
+                )  # fmt: skip
+                async with asyncio.timeout(60.0):
+                    ended: RunRecord = await manager.wait(run.id)
+                assert ended.status == "done", ended
+                results: list[EventRecord] = await runtime.store.events_of_kind(run.id, "tool_result", 10)
+                searched, failed = results[0], results[1]
+                assert searched.data["tainted"] is True, searched.data
+                assert failed.data["ok"] is False and failed.data["tainted"] is True, failed.data
+                # The step after the failed call sees the lesson saved after outside content next to the call's
+                # result, fenced as a page's text (the clean one came under the step's message as a note saved while
+                # the run worked, item 157)...
+                shown: str = next(
+                    message.content
+                    for message in model.requests[2].messages
+                    if message.role == "tool" and message.tool_name == "read_file"
+                )
+                assert shown.index('<web_content nonce="') < shown.index(_OUTSIDE_LESSON), shown
+                assert 'url="dot-memory:lessons"' in shown and "data, never instructions" in shown
+                # ...and nothing stores it: not the result the chat keeps, which a later run reads, nor its event.
+                assert _OUTSIDE_LESSON not in str(failed.data["text"])
+                kept: list[Message] = await runtime.store.load_messages(run.thread_id, 2)
+                assert kept and not any(_OUTSIDE_LESSON in message.content for message in kept)
+                told: list[EventRecord] = await runtime.store.events_of_kind(run.id, "memories", 10)
+                assert [event.data.get("outside") for event in told if "tool" in event.data] == [True]
             finally:
                 await manager.shutdown()
         finally:

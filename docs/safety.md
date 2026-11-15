@@ -621,7 +621,10 @@ message adds is product ids Dot checked against the form of an id and numbers it
 words. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`),
 as does one it saved after your message cleared its mark, since your words clear the run's mark, not the page's
 words a note may quote (item 899; a thing for later, `todo_add`, the same):
-it is never among the notes a run starts with, is handed while it works or as a site's lessons (item 384), a
+it is never among the notes a run starts with, is handed while it works or in a site's note to a run (item 384), nor
+handed to a clean run at all; a run of Dot's own loop that is marked at that moment sees such a lesson, fenced as a
+page's text, next to the result of the call that reached its site or failed with its tool, in its own requests alone,
+and nothing stores it (item 1192: [Memory and schedules](memory-and-schedules.md)); a
 `memory_search` that returns one marks the run that read it, so its next save asks again, and Settings › Memory and
 `dotx memory list` say of such a note that it was saved while reading outside content. A learned skill whose steps may
 come from outside content (its record says so, or is older than the mark) marks the run that reads it with the `skill`

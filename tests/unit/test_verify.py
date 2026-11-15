@@ -34,12 +34,12 @@ def _call(name: str, arguments: JsonObject) -> ToolCall:
 
 def _ran(name: str, arguments: JsonObject, kind: ActionKind, target: str, result: ToolResult) -> ToolOutcome:
     action: ActionInfo = ActionInfo(tool=name, kind=kind, risk="safe", summary=name, target=target, flags=())
-    return ToolOutcome(call=_call(name, arguments), result=result, seconds=0.0, action=action)
+    return ToolOutcome(call=_call(name, arguments), result=result, seconds=0.0, action=action, shown="")
 
 
 def _refused(name: str, arguments: JsonObject, result: ToolResult) -> ToolOutcome:
     """A call that never ran: an unknown tool, or arguments that did not fit it."""
-    return ToolOutcome(call=_call(name, arguments), result=result, seconds=0.0, action=None)
+    return ToolOutcome(call=_call(name, arguments), result=result, seconds=0.0, action=None, shown="")
 
 
 def _shell(command: str, result: ToolResult) -> ToolOutcome:

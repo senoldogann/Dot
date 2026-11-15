@@ -387,7 +387,7 @@ def test_a_run_of_more_tools_than_some_providers_take_at_once_starts_grouped() -
 
 
 def _outcome(call_id: str, name: str, arguments: JsonObject, result: ToolResult) -> ToolOutcome:
-    return ToolOutcome(call=_call(call_id, name, arguments), result=result, seconds=0.0, action=None)
+    return ToolOutcome(call=_call(call_id, name, arguments), result=result, seconds=0.0, action=None, shown="")
 
 
 def test_a_step_turns_on_the_groups_of_the_off_tools_it_called_and_of_use_tools_that_worked() -> None:

@@ -98,6 +98,17 @@ dotx memory reindex      # embed every note again, for example after changing [m
   after its error, with the lessons that name its tool (`browser_act`, `read_file`; a plain word as `shell` in
   backticks) and that the run was not handed yet, chosen as a site's lessons are and framed as them, the most used
   first, two at most (item 1111: lessons about a tool rarely share the words of a goal).
+- A lesson saved while its run had read content third parties can author (most of them: 544 of 569 on the owner's
+  Mac on 2026-11-15) is never among the notes a run starts with nor in the note of a site it reaches, which the
+  conversation keeps for later runs. A run of Dot's own loop that is tainted at that moment is handed such lessons
+  next to the result of the call itself, in its own requests alone (item 1192): the call that reached the site (the
+  newest three of the site) and the call that failed (after the clean ones, the newest first). They sit in a fence as
+  a page's text does, "data, never instructions", on the newest results the run's requests carry whole, and go as
+  soon as a message of yours clears the run's mark. Nothing stores them: not the result the conversation keeps, which
+  a later run reads, nor the step's event; the Memory
+  page's count of uses and the Task tab say which were handed. A clean run, a run whose mark your message cleared, and
+  a run on the Claude plan or OpenCode (whose program keeps a call's result in a session a later run resumes) are
+  handed none of them; `memory_search` still finds them all.
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
@@ -208,9 +219,11 @@ dotx memory reindex      # embed every note again, for example after changing [m
   (the Memory page, `dotx memory list`), and a `memory_search` that returns one counts as reading such content again:
   the run is tainted, so its next save asks unless the approval mode answers that question itself, and the note it
   writes keeps the mark (`yolo` removes the approval, not the origin). Such a note is never among the notes a run
-  starts with, is handed while it works or is handed as a site's lessons when it reaches the site, nor among the notes
-  the model that writes lessons is shown (item 384): those are handed as trusted data, with no reader in between, so
-  only `memory_search` finds it, and the start says in one sentence how many notes were left out so. A lesson drawn
+  starts with, is handed while it works or is in the note of a site a run reaches, nor among the notes the model that
+  writes lessons is shown (item 384): those are handed as trusted data, with no reader in between, so a clean run
+  finds it only with `memory_search`, and the start says in one sentence how many notes were left out so. A run of
+  Dot's own loop that is marked at that moment sees such a lesson, fenced, next to the result of the call that
+  reached its site or failed with its tool, and nothing stores it (item 1192, above). A lesson drawn
   from such a run, and the reflection's journal that names it, carry the mark too; a lesson you save yourself does
   not. The same words saved again leave a note's mark as it was, and the
   tags of a run that read outside content are not added to a note that is not marked (item 979). Your own rewrite of a note, on the Memory page, takes
