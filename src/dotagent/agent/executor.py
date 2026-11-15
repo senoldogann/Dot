@@ -8,10 +8,11 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotagent.agent.authorization import Authorization, StepDecision
-from dotagent.agent.failure_lessons import hand_failure_lessons
+from dotagent.agent.failure_lessons import LessonsNote, hand_failure_lessons
 from dotagent.agent.gate import RunGate, hold_note, masked_action
 from dotagent.agent.held_secrets import all_held_values
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
+from dotagent.agent.sites import hand_outside_site_lessons
 from dotagent.agent.yolo_log import note_checkpoint
 from dotagent.core.errors import (
     ApprovalNoted,
@@ -77,10 +78,15 @@ _BY_ARGUMENTS: frozenset[str] = frozenset({"mcp", "mcp_read"})
 
 @dataclass(frozen=True)
 class ToolOutcome:
+    """A call that ended: its result as the chat keeps it, how long it took, the action it was classified as, and
+    ``shown``, the lessons saved while reading outside content that its run's requests show next to the result and
+    that are stored nowhere (item 1192; empty for none)."""
+
     call: ToolCall
     result: ToolResult
     seconds: float
     action: ActionInfo | None
+    shown: str
 
 
 def _safe_json(value: JsonObject, known: Sequence[str]) -> JsonObject:
@@ -398,7 +404,8 @@ async def _execute_one(
     waited_s: float = 0.0
     decision: StepDecision | None = None
     group: str | None = hidden.get(call.name)
-    learned: str | None = None
+    learned: LessonsNote | None = None
+    outside_words: str = ""
     if refused is not None:
         result: ToolResult = fail(refused)
     elif tool is None:
@@ -415,10 +422,24 @@ async def _execute_one(
     else:
         checked: _Checked = await _run_checked(call, tool, ctx, gate)
         result, action, waited_s, decision = checked.result, checked.action, checked.waited_s, checked.decision
-        if result.is_error and ctx.runtime.config.agent.lessons != "off":
+        lessons_on: bool = ctx.runtime.config.agent.lessons != "off"
+        # A run that is tainted now, in a context that shows them, is handed the lessons saved while reading outside
+        # content too (item 1192): fenced, next to the result in its own requests, stored nowhere.
+        outside_lessons: bool = gate.tainted and ctx.shows_outside_lessons
+        if result.is_error and lessons_on:
             # What earlier runs learned about the tool, at the moment it is of use (item 1111); added after the error
             # is cut to the run's room, so that no lesson is cut in the middle.
-            learned = await hand_failure_lessons(ctx.runtime, ctx.run_id, ctx.agent_id, call.name, ctx.lessons_lock)
+            learned = await hand_failure_lessons(
+                ctx.runtime, ctx.run_id, ctx.agent_id, call.name, ctx.lessons_lock, outside_lessons
+            )
+        elif lessons_on and outside_lessons:
+            # What earlier runs learned, while they read outside content, on the site this call reached.
+            outside_words = (
+                await hand_outside_site_lessons(
+                    ctx.runtime, ctx.run_id, ctx.agent_id, reached_sites(call, action), ctx.lessons_lock
+                )
+                or ""
+            )
     if group is not None:
         # A call of a tool whose group was off ran as any call does (its arguments, the policy, the approval): the loop
         # turns the group on for the next step, and the result says so, since the model chose the call blind.
@@ -432,7 +453,12 @@ async def _execute_one(
     seen: str = mask_known(result.text, known)
     clipped: ToolResult = result.model_copy(update={"text": truncate_middle(seen, ctx.output_chars)})
     if learned is not None:
-        clipped = clipped.model_copy(update={"text": f"{clipped.text}\n\n{learned}"})
+        if learned.kept:
+            clipped = clipped.model_copy(update={"text": f"{clipped.text}\n\n{learned.kept}"})
+        outside_words = learned.shown
+    if outside_words:
+        # The run is tainted already (only then are such lessons handed); kept so by construction.
+        gate.taint()
     seconds: float = time.monotonic() - started
     files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
     # The step as its record shows it: a command or an address carries the secrets Dot holds as the call's arguments do,
@@ -468,7 +494,7 @@ async def _execute_one(
         },
         True,
     )
-    return ToolOutcome(call=call, result=clipped, seconds=seconds, action=action)
+    return ToolOutcome(call=call, result=clipped, seconds=seconds, action=action, shown=outside_words)
 
 
 def _finish_before_calls(after: Sequence[ToolCall]) -> str:

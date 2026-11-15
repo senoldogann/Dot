@@ -29,8 +29,10 @@ from dotagent.agent.compact import (
     render_recent_steps,
     render_transcript,
     repair_history,
+    shown_key,
     shrink_old_tool_results,
     split_for_summary,
+    with_shown,
 )
 from dotagent.agent.context_parts import CONTEXT_PARTS_EVENT, parts_of
 from dotagent.agent.continuity import (
@@ -1376,13 +1378,14 @@ async def _read_same_goal_skills(
     context: ToolContext,
     offered: Sequence[Skill],
     can_see: bool,
-) -> None:
+) -> dict[tuple[str, str], str]:
     """Read, before the run's first step, the learned skills made from a run whose goal was word for word this run's
     (item 1118, :func:`same_goal_playbooks`): the model was told to read a matching skill first and did not (3 of 42
     such runs did, 2026-11-10). The read is a call of the ``skill`` tool as any, so the timeline shows it, the read is
     dated, the run's end counts its use and a skill made from content third parties can author taints the run. Its
     call and result go into ``history`` and the thread. Only a run of its own of a mode that acts, not resumed, with
-    the ``skill`` tool; a skill whose instructions the history already carries is not read again."""
+    the ``skill`` tool; a skill whose instructions the history already carries is not read again. Returns the lessons
+    its calls were handed to be shown next to their results (item 1192), by :func:`shown_key`."""
     runtime: Runtime = agent.runtime
     run: RunRecord = agent.run
     root: Path | None = playbook_root(runtime.config)
@@ -1393,7 +1396,7 @@ async def _read_same_goal_skills(
         or agent.opening.resumed is not None
         or SKILL_TOOL not in registry.tools
     ):
-        return
+        return {}
     entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
     goals: dict[str, str] = await runtime.store.goals_of([r for r in evidence_runs(entries) if r != run.id])
     names: tuple[str, ...] = tuple(
@@ -1402,7 +1405,7 @@ async def _read_same_goal_skills(
         if not _carries_skill(history, name)
     )
     if not names:
-        return
+        return {}
     calls: tuple[ToolCall, ...] = tuple(
         ToolCall(id=f"call_skill_{index}_{run.id}", name=SKILL_TOOL, arguments={"name": name})
         for index, name in enumerate(names)
@@ -1415,6 +1418,9 @@ async def _read_same_goal_skills(
     results: list[Message] = await _tool_messages(agent, outcomes, can_see)
     history.extend(results)
     await runtime.store.append_messages(run.thread_id, results)
+    return {
+        shown_key(message): outcome.shown for outcome, message in zip(outcomes, results, strict=True) if outcome.shown
+    }
 
 
 async def _stored_note(agent: AgentRun, text: str) -> Message:
@@ -2626,6 +2632,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         tainted=lambda: agent.gate.tainted,
         ever_tainted=lambda: agent.gate.ever_tainted,
         run_tools=frozenset(spec.name for spec in specs),
+        # Shown next to their call's result in this run's requests (``shown_lessons``), stored nowhere (item 1192).
+        shows_outside_lessons=True,
     )
     checker: GoalChecker | None = (
         goal_checker_for(
@@ -2638,6 +2646,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # The plan the run was last handed as a note, and at which step (item 825).
     plan_told: str | None = None
     plan_told_at: int = 0
+    # The lessons saved while reading outside content that this run was handed, by the result they came with
+    # (:func:`shown_key`, item 1192): its requests show them next to that result while the run is tainted, and nothing
+    # stores them.
+    shown_lessons: dict[tuple[str, str], str] = {}
     # What the run's first request carries, part by part, recorded once (item 735).
     parts_told: bool = False
     step_origin: CallOrigin = CallOrigin(run_id=run.id, purpose="step")
@@ -2727,7 +2739,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
 
     # A step's stream is masked as its stored message is: a secret split between two deltas is not shown (item 551).
     sink: StreamMask = StreamMask(show)
-    await _read_same_goal_skills(agent, history, callable_tools, context, skills.skills, info.vision)
+    shown_lessons.update(
+        await _read_same_goal_skills(agent, history, callable_tools, context, skills.skills, info.vision)
+    )
 
     while True:
         if agent.cancel.is_set():
@@ -2837,9 +2851,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         effort: Effort = run.effort if run.effort is not None else runtime.config.models.effort
         # The routed model's level nearest to the run's; the run's own where the model offers no choice.
         routed_effort: Effort | None = None if routed is None else effective_effort(routed.info.efforts, effort)
+        if not agent.gate.tainted:
+            # A message of the owner's cleared the run's mark (item 1192): the lessons it was shown while marked go,
+            # and do not come back if it is marked again.
+            shown_lessons.clear()
         request: ChatRequest = ChatRequest(
             model=step_ref.model,
-            messages=(system, *history),
+            messages=(system, *with_shown(history, shown_lessons, config.keep_recent_tool_results)),
             tools=offered,
             temperature=None,
             max_output_tokens=None,
@@ -3115,6 +3133,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             single_last = single_now
             history.extend(results)
             await runtime.store.append_messages(run.thread_id, results)
+            shown_lessons.update(
+                {
+                    shown_key(message): outcome.shown
+                    for outcome, message in zip(outcomes, results, strict=True)
+                    if outcome.shown
+                }
+            )
             delegated_note: str | None = await _close_delegated_steps(agent, outcomes)
             if delegated_note is not None:
                 history.append(await _stored_note(agent, delegated_note))

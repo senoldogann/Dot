@@ -5,31 +5,45 @@ the applications its calls reached, as the ``tool_result`` events record them
 (:func:`dotagent.agent.executor.reached_sites`). A run that reaches a site or drives an application for the first time
 is handed, after that step, the lessons tagged with it and the learned skills written there that it was not handed yet
 (:func:`site_knowledge`, :func:`site_note`): what Dot learned on a site comes back the next time a run is there, also
-when the run's goal does not name it. Every function here is pure except :func:`site_knowledge`.
+when the run's goal does not name it.
+
+A lesson saved while its run had read outside content (``tainted``, item 384) is not in that note, which the chat keeps
+as a message and a later run that starts clean reads. A run that is tainted when one of its calls reaches the site is
+handed such lessons next to that call's result instead (item 1192: :func:`hand_outside_site_lessons`), fenced as
+outside content, in its own requests alone: they are stored nowhere, neither in the note nor in the result the chat
+keeps. Every function here is pure except :func:`site_knowledge` and :func:`hand_outside_site_lessons`.
 """
 
 import asyncio
 import re
+import secrets
 import time
 from collections.abc import Iterable, Sequence, Set
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from dotagent.agent.failure_lessons import LESSONS_NONCE_BYTES, outside_lessons_block
 from dotagent.agent.playbooks import PlaybookEntry, list_playbooks
 from dotagent.config import MemoryConfig
 from dotagent.core.types import FrozenModel
 from dotagent.memory.render import render_note
 from dotagent.memory.service import normalize_tags, recent_scores, resting, visible_to
 from dotagent.memory.words import lowercase
-from dotagent.runtime import Runtime
 from dotagent.skills.catalog import PLAYBOOK_SOURCE, playbook_root
 from dotagent.skills.types import Skill
 from dotagent.store.models import MemoryRecord, MemoryScore
+
+if TYPE_CHECKING:
+    from dotagent.runtime import Runtime
 
 # The first word of a site's tag: ``site-amazon-com``, ``site-notes``.
 SITE_TAG: str = "site"
 # The most lessons and learned skills one site brings a run.
 MOST_SITE_LESSONS: int = 5
 MOST_SITE_SKILLS: int = 3
+# The most lessons saved while reading outside content one site brings a tainted run (item 1192), the newest: such a
+# lesson reaches every tainted run that comes there, so fewer than the clean ones.
+MOST_OUTSIDE_SITE_LESSONS: int = 3
 # The lessons of a site read to pick from, the most recently changed first.
 _SITE_LESSONS_READ: int = 50
 # A host's main label shorter than this names too many things (``x``, ``bbc``) to be matched in a text by itself.
@@ -126,6 +140,29 @@ def site_lessons(
     )[:MOST_SITE_LESSONS]
 
 
+def outside_site_lessons(
+    notes: Sequence[MemoryRecord], taken: Set[str], agent_id: str | None, rested: Set[str]
+) -> tuple[MemoryRecord, ...]:
+    """The lessons of ``notes`` (a site's, the most recently changed first) saved while reading outside content that a
+    tainted run of ``agent_id`` is handed next to the result of the call that reached the site (item 1192): visible to
+    it, neither resting (``rested``) nor handed already (``taken``), at most :data:`MOST_OUTSIDE_SITE_LESSONS`."""
+    return tuple(
+        note
+        for note in notes
+        if note.tainted and note.id not in taken and note.id not in rested and visible_to(note, agent_id)
+    )[:MOST_OUTSIDE_SITE_LESSONS]
+
+
+def outside_site_note(found: Sequence[tuple[str, tuple[MemoryRecord, ...]]], nonce: str) -> str:
+    """The words shown next to the result of a call that reached the sites of ``found`` (each with its lessons saved
+    while reading outside content): one fence for all of them, each site named inside it."""
+    lines: list[str] = []
+    for site, lessons in found:
+        lines.append(f"On {site}:")
+        lines.extend(f"- {render_note(note)}" for note in lessons)
+    return f"[system note] Earlier runs learned this where this call arrived. {outside_lessons_block(lines, nonce)}"
+
+
 def site_note(known: Sequence[SiteKnowledge]) -> str:
     """The note a run is handed when it first reaches the sites of ``known``."""
     lines: list[str] = [
@@ -143,7 +180,7 @@ def site_note(known: Sequence[SiteKnowledge]) -> str:
 
 
 async def site_knowledge(
-    runtime: Runtime,
+    runtime: "Runtime",
     agent_id: str | None,
     sites: Sequence[str],
     offered: Sequence[Skill],
@@ -173,3 +210,45 @@ async def site_knowledge(
         if lessons or skills:
             known.append(SiteKnowledge(site=site, lessons=lessons, skills=skills))
     return tuple(known)
+
+
+async def hand_outside_site_lessons(
+    runtime: "Runtime", run_id: str, agent_id: str | None, sites: Sequence[str], lock: asyncio.Lock
+) -> str | None:
+    """The note of the lessons saved while reading outside content on ``sites``, which a call of the tainted run
+    ``run_id`` just reached (item 1192), to be shown next to its result in the run's requests alone, counted as
+    handed (``site``) and told to its page (``memories``); ``None`` when none is left to hand. The caller asks only
+    for a run that is tainted now and shows such lessons. ``lock`` is the run's, as for the lessons of a failed call:
+    two calls of one step that reach the same site hand a lesson to one of them alone."""
+    if not sites:
+        return None
+    async with lock:
+        now: float = time.time()
+        config: MemoryConfig = runtime.config.memory
+        taken: set[str] = await runtime.store.handed_memory_ids(run_id)
+        found: list[tuple[str, tuple[MemoryRecord, ...]]] = []
+        for site in sites:
+            notes: list[MemoryRecord] = [
+                note
+                for note in await runtime.store.memories_with_tag(site_tag(site), _SITE_LESSONS_READ)
+                if note.tainted
+            ]
+            if not notes:
+                continue
+            scores: dict[str, MemoryScore] = await recent_scores(runtime.memory, [note.id for note in notes], now)
+            rested: set[str] = {
+                note.id
+                for note in notes
+                if resting(note, now, config.rest_days, scores.get(note.id), config.score_min_uses)
+            }
+            lessons: tuple[MemoryRecord, ...] = outside_site_lessons(notes, taken, agent_id, rested)
+            if lessons:
+                taken.update(note.id for note in lessons)
+                found.append((site, lessons))
+        if not found:
+            return None
+        ids: list[str] = [note.id for _, lessons in found for note in lessons]
+        await runtime.store.mark_memories_used(run_id, ids, now, "site")
+        where: str = ", ".join(site for site, _ in found)
+        await runtime.bus.emit(run_id, "memories", {"ids": [*ids], "site": where, "outside": True}, True)
+        return outside_site_note(found, secrets.token_hex(LESSONS_NONCE_BYTES))

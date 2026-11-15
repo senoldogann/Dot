@@ -150,6 +150,10 @@ class ToolContext:
     # Held while the lessons of a failed call are chosen and counted as handed (item 1111): the calls of one step run
     # at once, and each would else be handed the same lesson.
     lessons_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # Whether a tainted run of this context is handed the lessons saved while reading outside content (item 1192): Dot's
+    # own loop shows them next to a call's result in its own requests and stores them nowhere. A run on the Claude plan
+    # or OpenCode is handed none, as the result goes to a session of its program that a later run resumes.
+    shows_outside_lessons: bool = False
 
 
 def run_sandbox(ctx: ToolContext) -> Sandbox:
