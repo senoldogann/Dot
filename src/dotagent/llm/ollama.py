@@ -8,13 +8,15 @@ with an API key.
 import asyncio
 import ipaddress
 import json
+from collections.abc import Sequence
 
 import httpx
 from pydantic import JsonValue
 
 from dotagent.config import OllamaConfig
-from dotagent.core.errors import ProviderProtocolError, ProviderTransportError
+from dotagent.core.errors import ProviderHttpError, ProviderProtocolError, ProviderTransportError
 from dotagent.core.ids import new_id
+from dotagent.core.logs import get_logger
 from dotagent.core.retry import RetryPolicy
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.connector import get_json, post_json, retry_with_reset
@@ -43,6 +45,11 @@ from dotagent.llm.types import (
     empty_usage,
 )
 from dotagent.llm.wire import function_tools, hoist_tool_images, parse_tool_arguments
+
+log = get_logger(__name__)
+# The status Ollama answers for a cloud model its service retired (item 1195): `/api/tags` still lists the model while
+# the account keeps it, and every question of it is refused with this.
+_RETIRED_STATUS: int = 410
 
 
 class StreamState(FrozenModel):
@@ -358,6 +365,30 @@ def _on_this_mac(base_url: str) -> bool:
         return False
 
 
+class DescribedModels(FrozenModel):
+    """What the server said of each model it lists: the ``models`` it described, and the ``retired`` ones its cloud
+    service no longer serves, each with the server's words."""
+
+    models: tuple[ModelInfo, ...]
+    retired: tuple[tuple[str, str], ...]
+
+
+def described_models(names: Sequence[str], outcomes: Sequence[ModelInfo | BaseException]) -> DescribedModels:
+    """The models of ``names`` that ``outcomes`` (their descriptions, in the same order) describe. A model refused as
+    retired (HTTP 410, item 1195) is set apart with the server's words; any other failure is raised, as the list cannot
+    be told without it."""
+    models: list[ModelInfo] = []
+    retired: list[tuple[str, str]] = []
+    for name, outcome in zip(names, outcomes, strict=True):
+        if isinstance(outcome, ProviderHttpError) and outcome.status == _RETIRED_STATUS:
+            retired.append((name, outcome.message))
+        elif isinstance(outcome, BaseException):
+            raise outcome
+        else:
+            models.append(outcome)
+    return DescribedModels(models=tuple(models), retired=tuple(retired))
+
+
 class OllamaProvider:
     """Connector to an Ollama server (local, or ollama.com with an API key)."""
 
@@ -416,9 +447,17 @@ class OllamaProvider:
         return tuple(names)
 
     async def list_models(self) -> tuple[ModelInfo, ...]:
+        """The models the server has and can describe. A cloud model Ollama's service retired is left out and logged
+        (:func:`described_models`, item 1195), so that it does not take the rest of the list with it; any other failure
+        fails the list as before."""
         names: tuple[str, ...] = await self.installed_names()
-        infos: list[ModelInfo] = await asyncio.gather(*(self.model_info(name) for name in names))
-        return tuple(infos)
+        outcomes: list[ModelInfo | BaseException] = await asyncio.gather(
+            *(self.model_info(name) for name in names), return_exceptions=True
+        )
+        described: DescribedModels = described_models(names, outcomes)
+        for name, message in described.retired:
+            log.warning("ollama_model_retired", model=name, error=message, remove=f"ollama rm {name}")
+        return described.models
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         details: OllamaModelDetails = await self._details(request.model)
