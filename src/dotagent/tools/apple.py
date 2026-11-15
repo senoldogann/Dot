@@ -25,6 +25,9 @@ APPLE_SCRIPT_TOOL: str = "apple_script"
 _NONCE_BYTES: int = 8
 _PREVIEW_CHARS: int = 200
 _TIMEOUT_S: float = 120.0
+# The longest a run may give its script: below the tool's own timeout, so that the script's own timeout is the one that
+# ends it, killed and explained, with time left to look at the windows of its targets.
+MAX_SCRIPT_TIMEOUT_S: int = 110
 # Every string of a script, in the quotes of AppleScript or JavaScript: an application, a bundle id or a process of
 # System Events is named in one.
 _STRING: re.Pattern[str] = re.compile(r""""((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`""")
@@ -51,6 +54,16 @@ class AppleScriptArgs(ToolArgs):
     script: str = Field(min_length=1, description="The script source.")
     language: Literal["AppleScript", "JavaScript"] = Field(
         default="AppleScript", description="AppleScript, or JavaScript for Automation (JXA)."
+    )
+    timeout_s: int | None = Field(
+        default=None,
+        ge=1,
+        le=MAX_SCRIPT_TIMEOUT_S,
+        description=(
+            f"Seconds before osascript is killed (at most {MAX_SCRIPT_TIMEOUT_S}; default the configured "
+            "[desktop] osascript_timeout_s). Give more to a script that starts an application or opens and changes a "
+            "large document."
+        ),
     )
 
 
@@ -103,6 +116,13 @@ def script_apps(script: str) -> tuple[str, ...]:
     return tuple(kept.values())
 
 
+def script_timeout_s(asked: int | None, configured: float) -> float:
+    """The seconds a script runs before it is killed: those the run ``asked`` for, or the ``configured`` ones, never
+    past :data:`MAX_SCRIPT_TIMEOUT_S` (item 1180: Word, started, opening a document and updating its table of
+    contents, took longer than the 30 s every script had)."""
+    return min(float(asked) if asked is not None else configured, float(MAX_SCRIPT_TIMEOUT_S))
+
+
 def _classify(args: AppleScriptArgs, ctx: ToolContext, identities: Mapping[str, frozenset[str]]) -> ActionInfo:
     assessment: ShellAssessment = assess_applescript(
         args.script, ctx.workspace, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
@@ -135,7 +155,7 @@ def build_apple_tool() -> RegisteredTool:
 
     async def run(args: AppleScriptArgs, ctx: ToolContext) -> ToolResult:
         language: ScriptLanguage = args.language
-        timeout_s: float = ctx.runtime.config.desktop.osascript_timeout_s
+        timeout_s: float = script_timeout_s(args.timeout_s, ctx.runtime.config.desktop.osascript_timeout_s)
         # The environment a run's commands have, without the variables that look like secrets: what the script starts
         # (`do shell script`) would otherwise sign with the owner's SSH agent and print their exported keys (item 555).
         result: str = await run_osascript(
@@ -164,7 +184,10 @@ def build_apple_tool() -> RegisteredTool:
             'value of range "A1:C3" of active sheet`. '
             "find_help says which applications of this Mac can do a task, from their dictionaries, and `sdef` with "
             "an application's path prints its whole dictionary. The first use of an application can make macOS ask "
-            "the user for Automation permission; a call that times out may be waiting for that answer. Outside "
+            "the user for Automation permission; a call that times out may be waiting for that answer. A script that "
+            f"starts an application or works on a large document may need more than the default: give it timeout_s "
+            f"(at most {MAX_SCRIPT_TIMEOUT_S}). An application may go on with what a killed script asked of it, so a "
+            "script sent again at once waits behind that. Outside "
             "yolo, while the sandbox is on, the script's own files are sealed as a command's are, but macOS does not "
             "hold it back from the application it names: that application acts with its own powers. Prefer "
             "desktop_act for anything that needs the interface itself, and browser_eval for a web page: a script "
