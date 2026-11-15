@@ -215,6 +215,17 @@ class ForgetfulFastProvider(WindowedProvider):
         return await super().complete(request, sink)
 
 
+class RunawayFastProvider(WindowedProvider):
+    """The scripted model next to a fast model that runs on to the cap of a summary until told it was cut off (item
+    1191), as glm-5.3-flash did on the owner's Mac, 35,060 tokens in 400 s."""
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        reply: ModelReply = await super().complete(request, sink)
+        if request.session_key.endswith(_SUMMARY_KEY) and "was cut off" not in _said(request):
+            return reply.model_copy(update={"text": _SUMMARY[:40], "finish": "length", "raw_finish": "length"})
+        return reply
+
+
 class StubbornFastProvider(WindowedProvider):
     """The scripted model next to a fast model that leaves PROBLEMS out of every summary, asked for it or not."""
 
@@ -478,6 +489,29 @@ async def test_a_summary_that_lacks_a_section_is_asked_for_again_with_the_sectio
     assert len(played.summaries) == 2 * len(played.compactions)
     second: str = _said(played.summaries[1])
     assert "lacked the sections PROBLEMS" in second and "DECISIONS: read on to the end." in second
+
+
+async def test_a_summary_cut_off_at_its_cap_is_asked_for_again_whole_and_shorter(login_env: dict[str, str]) -> None:
+    """Item 1191: every summary is asked for with a cap on what its writer writes, and one cut off there is asked for
+    once more, whole and under its word limit, so that a writer that runs on holds its run for the cap at most."""
+    with capture_logs() as logs:
+        played: Played = await _play_with(
+            _config({}, 6), login_env, RunawayFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), _SMALL_WINDOW)
+        )
+    assert played.record.status == "done"
+    assert played.compactions
+    for compaction in played.compactions:
+        assert (compaction["method"], compaction["attempts"]) == ("model", 2)
+        problem: JsonValue = compaction["problem"]
+        assert isinstance(problem, str) and problem.startswith("the summary ran past its limit of "), problem
+    caps: set[int | None] = {request.max_output_tokens for request in played.summaries}
+    assert len(caps) == 1 and None not in caps, caps
+    second: str = _said(played.summaries[1])
+    assert "was cut off. Write it again, whole" in second
+    # The try after a cut-off reply is asked without reasoning, as the first is: a writer that thought the cap away
+    # would think more with some allowed (the pre-push review).
+    assert [request.effort for request in played.summaries[:2]] == ["off", "off"]
+    assert [entry["attempt"] for entry in logs if entry["event"] == "summary_cut"][:1] == [1]
 
 
 async def test_a_summary_that_still_lacks_a_section_keeps_its_heading_empty_and_says_so(
