@@ -361,7 +361,7 @@ def _write_file_tool() -> RegisteredTool:
     )
 
 
-# How many lines an ambiguous edit names at most (item 1145).
+# How many lines an ambiguous edit names at most (item 1181).
 _MAX_LINES_NAMED: int = 20
 
 
@@ -390,7 +390,7 @@ def _closest_lines(text: str, needle: str) -> str:
 
 def _lines_of(text: str, needle: str) -> list[int]:
     """The line (1-based) where each of the first ``_MAX_LINES_NAMED`` occurrences of ``needle`` in ``text`` starts,
-    counted as :meth:`str.count` counts them (item 1145): an ambiguous edit names where its text is, so the model widens
+    counted as :meth:`str.count` counts them (item 1181): an ambiguous edit names where its text is, so the model widens
     it from the lines it read rather than reading the file again. Numbers only, so a third party's file says nothing of
     its own through them."""
     found: list[int] = []
