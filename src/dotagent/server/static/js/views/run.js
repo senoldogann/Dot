@@ -91,6 +91,12 @@ const REWIND_CHOICES = [
   { value: "revert", label: t("run.rewindRevert"), tone: "danger" },
   { value: "keep", label: t("run.rewindKeep"), tone: "primary" },
 ];
+// Retry (item 1185): the same rewind, and the message sent again at once; the dialog's line and its two ways.
+const RETRY_MESSAGE = t("run.retryMessage");
+const RETRY_CHOICES = [
+  { value: "revert", label: t("run.retryRevert"), tone: "danger" },
+  { value: "keep", label: t("run.retryKeep"), tone: "primary" },
+];
 // The events that change what became of the lessons of a run; they come on the lifecycle stream, after the run's end.
 const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismissed", "lessons_failed"]);
 // What a decision on a lesson says once it is made.
@@ -1188,6 +1194,53 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     });
   }
 
+  // Retry (item 1185): the chat goes back to before the message of the run `past`, as Edit from here does (the files
+  // the runs taken out changed taken back when the owner chooses so), and the message goes again with its files, with
+  // the choices the composer holds, as the chat's next run or a new chat's first when no run is left.
+  async function retry(past) {
+    const files = await choiceDialog({ title: t("run.retryTitle"), message: RETRY_MESSAGE, choices: RETRY_CHOICES });
+    if (files === null) {
+      return;
+    }
+    await attempt(async () => {
+      // The choices are read before the chat goes back (their read may reach the daemon for the models): a failure
+      // there leaves the chat as it was.
+      await choices.ready();
+      const chosen = choices.value();
+      const cut = await api.post(`/runs/${past.id}/rewind`, { files });
+      // From here the message is out of the chat: if anything fails before it is sent again, it waits in the box of
+      // the run the chat ends with now, or a new chat's, as after Edit from here, and the failure is told.
+      try {
+        tellRewound(cut);
+        const body = {
+          goal: cut.text,
+          mode: chosen.mode,
+          model: chosen.model,
+          effort: chosen.effort,
+          speed: chosen.speed,
+          once: chosen.once,
+          approvals: chosen.approvals,
+          goal_mode: chosen.goal_mode,
+          thread_id: cut.back_to === null ? null : cut.thread_id,
+          agent_id: past.agent_id,
+          attachments: cut.files.map((file) => file.id),
+        };
+        const next = await api.post("/runs", { ...body, key: keys.of("run", body) });
+        keys.sent();
+        choices.sent();
+        goOn(`/runs/${next.id}`);
+      } catch (error) {
+        keepDraft(cut.back_to ?? NEW_CHAT_DRAFT, { text: cut.text, files: cut.files });
+        if (cut.back_to === null) {
+          ctx.navigate("/runs");
+        } else {
+          goOn(`/runs/${cut.back_to}`);
+        }
+        throw error;
+      }
+    });
+  }
+
   function syncControls() {
     resumeLine.hidden = active || !resumable;
     resumeWords.textContent =
@@ -1374,6 +1427,16 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     // The way to the steps is in the answer's foot, where the pointer rests (item 842), not a line of its own under it.
     // It starts from whether the steps are shown: the line may have shown them while the run worked (the review).
     const stepsShown = workStatus.shown();
+    // Retry (item 1185) under the answer of a message of yours that the chat can go back to before.
+    if (retriable) {
+      node.querySelector(".answer-foot .answer-facts")?.before(
+        el(
+          "button",
+          { class: "btn ghost sm icon-only answer-retry", type: "button", title: t("run.retry"), "aria-label": t("run.retry"), onclick: () => retry(run) },
+          icon("refresh"),
+        ),
+      );
+    }
     node.querySelector(".answer-foot .answer-facts")?.before(
       el(
         "button",
@@ -1582,8 +1645,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run. The goal of a
   // run that tells of a command in the background is Dot's note (item 229). A run that follows up a reaction of yours
   // has no message of yours: the reaction's chip on the message reacted to says it (item 844).
-  const goalMessage =
-    followsReaction(run) || run.source === RESUME_SOURCE || run.source === WELCOME_SOURCE
+  const noMessage = followsReaction(run) || run.source === RESUME_SOURCE || run.source === WELCOME_SOURCE;
+  // A message of yours that the chat can go back to before: its answer has Retry (item 1185) as it has Edit from here.
+  const retriable =
+    ownsMessages && run.rewindable && !noMessage && run.source !== BACKGROUND_SOURCE && run.source !== WORK_ORDER_SOURCE;
+  const goalMessage = noMessage
       ? null
       : run.source === BACKGROUND_SOURCE
         ? backgroundNote(run.goal)
