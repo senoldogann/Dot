@@ -42,36 +42,39 @@ class DeviceControl(Protocol):
     async def launch(self, udid: str, bundle: str) -> None: ...
 
 
+# The parts of ``devicectl list devices --json-output`` that Dot reads, each required: every device of the owner's Mac's
+# listing had all of them (an Apple Watch, iPhones and an iPad, 2026-11-15), and a listing of another shape fails loudly
+# rather than reading as no phone or as one in reach.
 class _Connection(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    tunnelState: str = ""
+    tunnelState: str
 
 
 class _Hardware(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    udid: str = ""
+    udid: str
 
 
 class _Device(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    identifier: str = ""
-    hardwareProperties: _Hardware = _Hardware()
-    connectionProperties: _Connection = _Connection()
+    identifier: str
+    hardwareProperties: _Hardware
+    connectionProperties: _Connection
 
 
 class _Result(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    devices: list[_Device] = []
+    devices: list[_Device]
 
 
 class _Listing(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    result: _Result = _Result()
+    result: _Result
 
 
 def device_available(listing: str, udid: str) -> bool:

@@ -59,6 +59,12 @@ def test_devicectl_listing_says_whether_the_phone_is_available() -> None:
     assert not device_available(listing("connected"), "someone-else")
     with pytest.raises(PhoneError):
         device_available("not json", "x")
+    # A listing of another shape fails loudly, not as no phone or as one in reach (the pre-push review of item 1196).
+    shapeless: dict[str, object] = {"identifier": "AAAA-1", "hardwareProperties": {"udid": "00008110-0001"}}
+    with pytest.raises(PhoneError, match="shape"):
+        device_available(json.dumps({"result": {"devices": [shapeless]}}), "00008110-0001")
+    with pytest.raises(PhoneError, match="shape"):
+        device_available(json.dumps({"info": {}}), "00008110-0001")
     assert launch_argv("U", "dev.dotagent.wda.xctrunner")[-3:] == (
         "U",
         "--terminate-existing",

@@ -77,7 +77,6 @@ function addressRow(address) {
   );
 }
 
-/** A step's mark: a tick once it is done, else its number; the step to do now stands out in the accent. */
 /** A span of whole seconds, as the card of the iPhone's link says it: "12 s", "4m 05s", "1h 05m". */
 function lasted(seconds) {
   return seconds < 60 ? `${seconds} s` : duration(seconds);
@@ -96,6 +95,7 @@ function iphoneSection(view) {
   });
 }
 
+/** A step's mark: a tick once it is done, else its number; the step to do now stands out in the accent. */
 function mark(number, done) {
   return el("span", { class: "phone-mark", "aria-hidden": "true" }, done ? icon("check") : String(number));
 }
