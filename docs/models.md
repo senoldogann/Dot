@@ -37,7 +37,10 @@ model menu (item 1044): the favourites and every provider on a rail, a search, a
 starred as in the composer. A role's menu offers only the models that can do its work: the fast and the vision model
 offer no model of an agent program of its own (OpenCode's free models, the Claude plan), and the own work model none
 of OpenCode's free models, whose provider stays on the rail and says why, while the default model, the review model
-and the night's roles offer the Claude plan's too.
+and the night's roles offer the Claude plan's too. A cloud model that Ollama's service retired stays in Ollama's own
+list until `ollama rm` removes it, and refuses every question with HTTP 410: the menu leaves it out and the log names
+it (`ollama_model_retired`, with the command that removes it), so that it does not take Ollama's other models with it
+(item 1195: `mistral-large-3:675b-cloud`, retired on 2026-11-09, emptied the menu of Ollama).
 A model of your Claude plan (`claude_code:opus`, `claude_code:sonnet`, or any other it offers) may be the review model, as every question of it is a single one the
 plan answers (item 1032), and the own work model, as its look is a run that has every tool of Dot's own loop there
 (its list, your mail and calendar; item 1063); not the fast model, which takes a run's steps, nor the vision model,
