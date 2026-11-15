@@ -343,3 +343,5 @@ copy was kept of it (the first opening from the home screen after the app is add
 `offline.html`, which the service worker keeps as it installs: it says that the Mac cannot be reached, and to check that
 it is on and that Dot runs on it, then to try again. A script or a font that cannot be had is still an error. Without
 Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
+
+Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).

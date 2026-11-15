@@ -104,6 +104,8 @@ class PromptInputs(FrozenModel):
     # Where the run's scripts reach its Chrome with the DevTools Protocol (item 265): Dot's own Chrome with a port set,
     # else None.
     devtools: str | None
+    # The state of the owner's iPhone as the keeper last saw it, when the run has the phone tool; ``None`` otherwise.
+    phone: str | None
     # How much the prompt says of how to work and of each kind of tool (item 280, ``[agent] prompt``).
     style: PromptStyle
     # What the adopted version of the harness adds (item 389, docs/harness.md): habits after how to work, tool
@@ -572,6 +574,11 @@ _DELEGATED: str = (
     "you could not verify."
 )
 
+# The owner's iPhone, told to a run that has the phone tool.
+_PHONE: str = (
+    "The owner's iPhone answers over WebDriverAgent, and phone_status says whether it is reachable and whether it is "
+    "locked; at the last check it was {state}. A locked phone can be neither read nor driven: the owner unlocks it."
+)
 # Where the run's scripts reach Dot's own Chrome (item 265), told to a run with a tool that runs its scripts.
 _DEVTOOLS: str = (
     "Dot's Chrome also takes DevTools connections at {address} once one of your browser calls has started it: a "
@@ -738,6 +745,8 @@ def _environment(inputs: PromptInputs) -> str:
     # Where the user can answer while the run works, the run chooses for each question whether to wait (item 508).
     if inputs.questions == "choose" and ASK_USER_TOOL in inputs.tool_names:
         lines.append(f"- {_QUESTIONS_GO_ON}")
+    if inputs.phone is not None:
+        lines.append(f"- {_PHONE.format(state=inputs.phone)}")
     if inputs.devtools is not None and not _SCRIPT_TOOLS.isdisjoint(inputs.tool_names):
         lines.append(f"- {_DEVTOOLS.format(address=inputs.devtools)}")
     return "\n".join(lines)
@@ -1204,6 +1213,12 @@ def refusal_lines(refuses: str) -> list[str]:
     return [line.strip().lstrip("-•* ").strip() for line in refuses.splitlines() if line.strip().lstrip("-•* ").strip()]
 
 
+def with_phone(inputs: PromptInputs, state: str) -> PromptInputs:
+    """``inputs`` for a run that has the phone tool: the environment names the iPhone and ``state``, its state at the
+    keeper's last look."""
+    return inputs.model_copy(update={"phone": state})
+
+
 def collect_prompt_inputs(
     mode: RunMode,
     source: str,
@@ -1258,6 +1273,7 @@ def collect_prompt_inputs(
         team=tuple(team),
         lead=lead,
         devtools=devtools,
+        phone=None,
         style=style,
         habits=harness.habits,
         tool_guidance=harness.tool_guidance,
