@@ -1,7 +1,8 @@
 # Dependabot (item 247): each week, one pull request per kind of dependency that brings it up to date: the Python
 # packages of uv.lock, the npm packages of the web interface's checks (the root package.json, item 758) and of the
-# desktop app, its Cargo packages, and the actions of the CI. Its alerts and security
-# fixes for known vulnerable dependencies are on in the repository's settings; the weekly audit (audit.yml) stays.
+# desktop app, its Cargo packages and the Rust it is built with (rust-toolchain.toml, item 1189), and the actions of the
+# CI. Its alerts and security fixes for known vulnerable dependencies are on in the repository's settings; the weekly
+# audit (audit.yml) stays.
 # A version is proposed once it is a week old (item 487): a compromised release is usually taken down within days, and
 # a regression found by others first. Security fixes do not wait for it.
 version: 2
@@ -42,6 +43,12 @@ updates:
     groups:
       desktop-cargo:
         patterns: ["*"]
+  - package-ecosystem: "rust-toolchain"
+    directory: "/desktop/src-tauri"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
