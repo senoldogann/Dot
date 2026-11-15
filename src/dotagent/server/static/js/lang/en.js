@@ -641,6 +641,10 @@ export const EN = {
   "outcome.answer": "Answer",
   "outcome.update": "Progress update",
   "outcome.copy": "Copy the answer",
+  "sources.one": "{count} source",
+  "sources.many": "{count} sources",
+  "sources.moreOne": "and {count} more page",
+  "sources.moreMany": "and {count} more pages",
   "outcome.openTask": "Open task",
   // The chat list of the sidebar (sidebar.js).
   "side.waiting": "Waiting for you",

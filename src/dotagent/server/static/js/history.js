@@ -11,6 +11,7 @@ import { answerMessage, besideLine, chatNoteLine,
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
+import { sourcesRow } from "./sources.js";
 import { countKinds, flowIcon, flowWords, narrates, toolRow } from "./tools.js";
 
 const THREAD_LIMIT = 200;
@@ -408,18 +409,28 @@ function turn(past, editFromHereOf, known, signal, reactions) {
     ? answerAs(past.status)
     : el("div", { class: "note" }, icon("clock"), el("span", null, "This task is still going."), el("a", { class: "small", href }, "Open task"));
   // Once the run's events are read: a run that stopped for what only the owner gives waits on them, and says what
-  // (item 1061), where its stored status alone said it failed.
+  // (item 1061), where its stored status alone said it failed; the pages it read on the web go under its answer (item
+  // 1184). Both go in where the answer may be above what is read, so its place is kept (item 708, as for the flow).
   const onRead = (events) => {
-    const finished = events.find((event) => event.kind === "run_finished");
-    const needs = typeof finished?.data.needs === "string" ? finished.data.needs.trim() : "";
-    if (!ended || outcomeOf(past.status, needs) === past.status) {
+    if (!ended) {
       return;
     }
-    const waiting = answerAs(outcomeOf(past.status, needs));
-    // The box goes in under the answer, which may be above what is read (item 708's place kept, as for the flow).
+    const finished = events.find((event) => event.kind === "run_finished");
+    const needs = typeof finished?.data.needs === "string" ? finished.data.needs.trim() : "";
+    const waits = outcomeOf(past.status, needs) !== past.status;
+    const sources = sourcesRow(events);
+    if (!waits && sources === null) {
+      return;
+    }
     keepPlace(answer, () => {
-      answer.replaceWith(waiting, needsAside(needs));
-      answer = waiting;
+      if (waits) {
+        const waiting = answerAs(outcomeOf(past.status, needs));
+        answer.replaceWith(waiting, needsAside(needs));
+        answer = waiting;
+      }
+      if (sources !== null) {
+        answer.querySelector(":scope > .answer-foot")?.before(sources);
+      }
     });
   };
   const asked = followsReaction(past) || past.source === WELCOME_SOURCE

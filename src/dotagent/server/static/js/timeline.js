@@ -22,6 +22,8 @@ import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, besideLine, chatNoteLine, needsAside, outcomeOf, scheduleLine, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
+import { readsPages } from "./sourcelist.js";
+import { showSources } from "./sources.js";
 import { blockNode, prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { callKind, describeArguments, flowIcon, flowWords, narrates, shortPaths, toolRow, toolWords } from "./tools.js";
@@ -439,6 +441,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       live: null,
       // The block of the latest step's thinking (item 246; see startThought).
       thought: null,
+      // The calls of the scope's run that read pages on the web and their results, for the row of its sources (item 1184).
+      reads: [],
       // The messages of the scope's turn, each with its words: an answer that repeats one of them leaves it out.
       replies: [],
       touched: false,
@@ -1073,6 +1077,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         reactions: isRoot ? reactions : null,
         runId: scope.runId,
       });
+      showSources(answer, scope.reads);
       place(scope, answer, record.ts);
       if (isRoot && needs !== "") {
         place(scope, needsAside(needs), record.ts);
@@ -1215,6 +1220,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
     tool_call(scope, record) {
       const data = record.data;
+      if (readsPages(data.tool)) {
+        scope.reads.push(record);
+      }
       if (QUIET_TOOLS.has(data.tool)) {
         scope.finishing.set(data.call_id, data.args);
         return;
@@ -1234,6 +1242,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
     tool_result(scope, record) {
       const data = record.data;
+      if (readsPages(data.tool)) {
+        scope.reads.push(record);
+      }
       const finishArgs = scope.finishing.get(data.call_id);
       if (finishArgs !== undefined) {
         scope.finishing.delete(data.call_id);
