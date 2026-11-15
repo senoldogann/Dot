@@ -33,7 +33,7 @@ url = "2"
 plist = { version = "1", default-features = false }
 tauri-plugin-updater = "2"
 # The updater's questions as the system's dialogs, shown from Rust (tauri-plugin-dialog gives each page a script).
-rfd = { version = "0.17", default-features = false }
+rfd = { version = "0.18", default-features = false }
 
 [dev-dependencies]
 # The tests of the installer run the app with its real capabilities against Tauri's mock runtime, and ask each command
