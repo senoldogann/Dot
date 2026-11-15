@@ -652,8 +652,12 @@ code. A block of code, in an answer, in a message of yours, in a step's row or o
 its place; `text` when it named none; a step's boxes say Command, What Dot sent, Result or Error, an approval's Command or Target), at its right a switch
 that wraps the long lines of this block (Settings › Appearance › Type › long lines of code wrapped says how every block
 begins; a step's boxes begin wrapped) and the copy of its text as it was written (item 439), which, for a step's result
-the page shows only the first part of, is all of it; Show all puts all of it in the box. A table has its head too, with
-its name and a copy that takes the table as markdown (item 403). Code shows its letters as they are: no font turns `->`
+the page shows only the first part of, is all of it; Show all puts all of it in the box. A table has a copy that takes
+it as
+markdown (item 403) at its top right corner, over its head row, shown where the pointer rests on the table or the
+keyboard is in it, and always on a touch screen (item 1186). On a phone, where Dot's words sit in a bubble, a block of
+code or a table in it is set into the bubble in the page's colour, with no frame of its own. Code shows its letters as
+they are: no font turns `->`
 or `!=` into one glyph.
 The box stands at the foot of the window from the first message, the conversation filling the space above it from
 the top, and is the same frame as the home's, with the attach button and the send in its bar; what you typed there and
@@ -662,7 +666,8 @@ above the composer leads there; it stays away while the page follows a working r
 scroll up. At the left of the conversation a column of short marks stands for your messages, one mark for each, top to
 bottom (item 201): resting the pointer on it shows the message nearest to it and the start of its answer, a click goes
 to that message, and from the keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are
-darker. The column needs a pointer that rests, two messages or more, and a window wider than a phone's; there, the
+darker. The column needs a pointer that rests, two messages or more, a conversation taller than the window (item 1186)
+and a window wider than a phone's; there, the
 conversation leaves it its room at the left, beside the side panel too (item 228). In the side panel (Task details),
 the Task tab opens with the **Recap** (item 536): a few short lines on what the run has done, what it is doing now and
 what waits for you, written by the fast model (`[models] fast`; the run's own model when the fast one fails) from the

@@ -215,13 +215,16 @@ export function messageOutline({ layout, main, thread, dock }) {
   }
 
   /** Where a pointer rests, have the conversation leave the column its room (item 228); show the column where it has
-   * that room and something to walk, as wide as the room lets it be. */
+   * that room and something to walk, as wide as the room lets it be: two messages at least, in a conversation taller
+   * than the window (item 1186; one the window holds whole has nowhere for a mark to go, and its marks stood alone by
+   * the sidebar). */
   function arrange() {
     layout.dataset.outline = FINE_POINTER.matches ? "on" : "off";
     const sidebar = document.querySelector(".shell[data-nav='docked'][data-sidebar='open'] .sidebar");
     const leftEdge = sidebar instanceof HTMLElement && sidebar.offsetWidth > 0 ? sidebar.getBoundingClientRect().right : 0;
     const room = main.getBoundingClientRect().left - leftEdge;
-    const shown = FINE_POINTER.matches && messages.length >= MIN_MESSAGES && room >= ROOM_PX;
+    const scrolls = document.documentElement.scrollHeight > window.innerHeight + 1;
+    const shown = FINE_POINTER.matches && messages.length >= MIN_MESSAGES && room >= ROOM_PX && scrolls;
     element.hidden = !shown;
     if (shown) {
       element.style.setProperty("--outline-w", `${Math.min(WIDTH_PX, Math.floor(room) - INSET_PX)}px`);

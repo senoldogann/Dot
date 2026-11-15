@@ -5667,9 +5667,12 @@ dialog.modal.versions-dialog {
   font-weight: var(--weight-title);
 }
 
-/* A table is a box with a head as a block of code is (items 403 and 537): the head carries its copy, and the table
-   scrolls sideways under it. The table's own outer hairlines are left off: the box has them. */
+/* A table is a box (item 537): its copy (item 403) stands at its top right corner, over the head row, where the head
+   row keeps room for it (item 1186; a bar over the table only said "table"), and the table scrolls sideways under it.
+   Where a pointer rests the copy shows with the pointer on the table or the keyboard in it, as the foot's buttons do;
+   a touch screen shows it. The table's own outer hairlines are left off: the box has them. */
 .prose .prose-table {
+  position: relative;
   min-width: 0;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -5677,8 +5680,27 @@ dialog.modal.versions-dialog {
 }
 
 .prose .prose-table .code-head {
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 1;
+  min-height: 0;
+  padding: 0;
+}
+
+.prose .prose-table thead th:last-child {
+  padding-right: 40px;
+}
+
+@media (hover: hover) {
+  .prose .prose-table .code-head {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease);
+  }
+
+  .prose .prose-table:is(:hover, :focus-within) .code-head {
+    opacity: 1;
+  }
 }
 
 /* The table scrolls sideways in a holder of its own under the head, and fills the box when it is narrower than it. */

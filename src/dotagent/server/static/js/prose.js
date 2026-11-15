@@ -143,12 +143,12 @@ export function blockNode(block) {
         el("thead", null, cellRow("th", block.header, block.aligns)),
         el("tbody", null, block.rows.map((row) => cellRow("td", row, block.aligns))),
       );
-      // A table is a box with a head, as a block of code is (item 537), and has a copy of itself as markdown a press away
-      // (item 403); the table scrolls sideways under its head.
+      // A table is a box (item 537) with a copy of itself as markdown a press away (item 403), at its top right corner
+      // over the head row rather than on a bar that only said "table" (item 1186); the table scrolls sideways under it.
       return el(
         "div",
         { class: "prose-table" },
-        el("div", { class: "code-head" }, el("span", { class: "code-label" }, "table"), el("span", { class: "spacer" }), copyButton(() => tableMarkdown(table), "Copy the table")),
+        el("div", { class: "code-head" }, copyButton(() => tableMarkdown(table), "Copy the table")),
         el("div", { class: "prose-table-scroll" }, table),
       );
     }
