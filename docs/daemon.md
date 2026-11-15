@@ -516,7 +516,14 @@ the message comes back into the box of the turn before it with its files, to be 
 chat's box when it was the first. **Also undo the file changes** also takes back what those turns, and their helpers, changed with
 the file tools, each file that is as they left it; a file changed since is left and named, and what a command changed
 stays. A message sent before Dot kept the place of each message in its chat has no Edit from here, nor has one that
-steered a turn at work, and a chat is not rewound while a run works on it or messages wait in its queue. An answer
+steered a turn at work, and a chat is not rewound while a run works on it or messages wait in its queue. Under the
+answer on a chat's page (the answer of the run the page is of) to such a message stands **Retry** (item 1185): the
+same rewind, asked the same way ("Retry" keeps the file
+changes, "Undo the file changes and retry" takes them back), and then the message goes again at once with its files and
+the choices the composer holds, as the chat's next run, or a new chat's first when it was the chat's first message;
+the picks of the first send (an account, a skill, a plugin) are not sent again, as Edit from here does not
+put them back in the box either. When that send fails, the
+message waits in the box of the run the chat ends with now, as after Edit from here, and the failure is told. An answer
 whose turn read pages on the web (`web_fetch`, `web_extract`) has a quiet line between its words and its foot (item
 1184): the first letter of a few of the sites and how many pages ("3 sources"); opened, each page's title over its site,
 a link that opens it in the browser. A page is counted from the address the run asked for (or the one a redirect ended
