@@ -12,6 +12,7 @@ import asyncio
 import base64
 import contextlib
 import math
+import os
 import re
 import secrets
 import time
@@ -95,7 +96,14 @@ from dotagent.browser.pages import (
     unhanded_tab,
     watch_births,
 )
-from dotagent.browser.profile_lock import held_for_start, profile_holder_pid
+from dotagent.browser.profile_lock import (
+    ask_handover,
+    handover_asked,
+    held_for_start,
+    profile_holder_pid,
+    started_by_dot,
+    withdraw_handover,
+)
 from dotagent.browser.profiles import (
     HIDE_CRASH_BUBBLE,
     INCOGNITO_PROFILE,
@@ -350,6 +358,10 @@ _REMARKED_PARTS: frozenset[VaultFieldKind] = frozenset({"password", "otp"})
 # Chrome exits by itself a few seconds after the driver that started it died.
 _CHROME_EXIT_WAIT_S: float = 10.0
 _CHROME_EXIT_POLL_S: float = 0.2
+# How often Dot's own Chrome looks whether another Dot process asks for its profile (item 1198), and how long a start
+# waits for that process to let go of it: it looks each second, and closing its Chrome takes a few more.
+_HANDOVER_POLL_S: float = 1.0
+_HANDOVER_WAIT_S: float = 20.0
 
 
 def _ms(seconds: float) -> int:
@@ -1004,6 +1016,8 @@ class BrowserSession:
         # with the setting up of its session, which a navigation of the page waits for.
         self._guarded: dict[Page, asyncio.Task[None]] = {}
         self._reaper: asyncio.Task[None] | None = None
+        # The watch for another Dot process that asks for the profile of Dot's own Chrome (item 1198).
+        self._handing: asyncio.Task[None] | None = None
         # The uses of Chrome under way that no chat's tabs hold (a page read for the web tools, a count of the cookies),
         # and when Chrome was last started or such a use ended: the idle close counts both as uses (item 454).
         self._uses: int = 0
@@ -1085,6 +1099,23 @@ class BrowserSession:
             case "attach":
                 return await self._attach(unattended)
 
+    async def _ask_for_profile(self) -> int | None:
+        """Ask the Dot process whose own Chrome holds the profile (a ``dotx run`` beside the daemon, or the
+        daemon beside it) to let go of it (item 1198, :meth:`_hand_over_when_asked`), and wait up to
+        ``_HANDOVER_WAIT_S`` for it to: the pid of the Chrome that still holds the profile then, ``None`` once it is
+        free."""
+        request: Path = await asyncio.to_thread(ask_handover, self._profile, os.getpid())
+        try:
+            for _ in range(int(_HANDOVER_WAIT_S / _CHROME_EXIT_POLL_S)):
+                holder: int | None = await asyncio.to_thread(profile_holder_pid, self._profile)
+                if holder is None:
+                    _log.info("browser_profile_handed_over", profile=str(self._profile))
+                    return None
+                await asyncio.sleep(_CHROME_EXIT_POLL_S)
+            return await asyncio.to_thread(profile_holder_pid, self._profile)
+        finally:
+            await asyncio.to_thread(withdraw_handover, request)
+
     async def _launch_own(self) -> _Opened:
         """Start Dot's own Chrome (:meth:`_start_own`) with the profile held for the start (item 554): an import of
         sign-ins (``dotx browser import-chrome``) swaps files into a profile that no Chrome has open, and runs not at
@@ -1098,6 +1129,14 @@ class BrowserSession:
         reach that program instead."""
         config: BrowserConfig = self._config
         holder: int | None = await asyncio.to_thread(profile_holder_pid, self._profile)
+        if holder is not None and await asyncio.to_thread(started_by_dot, holder):
+            holder = await self._ask_for_profile()
+            if holder is not None:
+                raise BrowserError(
+                    "Dot's browser is in use by a run of another Dot process (the daemon or a dotx command); it is "
+                    "let go once that run no longer uses it: wait and try again, and do not quit Chrome",
+                    {"profile": str(self._profile), "pid": holder},
+                )
         if holder is not None:
             raise BrowserError(
                 "the Dot browser profile is open in another process; close that Chrome window and try again",
@@ -1280,6 +1319,8 @@ class BrowserSession:
         self._used_at = time.monotonic()
         if self._reaper is None:
             self._reaper = asyncio.create_task(self._reap_idle())
+        if self._handing is None and self._config.mode == "own":
+            self._handing = asyncio.create_task(self._hand_over_when_asked())
         return context
 
     def _on_context_closed(self, context: BrowserContext) -> None:
@@ -1471,6 +1512,11 @@ class BrowserSession:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._reaper
             self._reaper = None
+        if self._handing is not None:
+            self._handing.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._handing
+            self._handing = None
         await self._let_go()
         # The ledger says, once its writes have landed, that this process has no tab left open (item 703).
         await asyncio.gather(*self._ledger_writes, return_exceptions=True)
@@ -1624,10 +1670,36 @@ class BrowserSession:
         config: BrowserConfig = self._config
         if config.mode != "own" or config.idle_close_s == 0 or self._playwright is None or self._closed:
             return False
-        if self._uses > 0 or self._teaching is not None or threads_in_use(self._threads, self._kept()):
+        if not self._free_now():
             return False
         used: float = max([self._used_at, *(thread.last_used for thread in self._threads.values())])
         return time.monotonic() - used >= config.idle_close_s
+
+    def _free_now(self) -> bool:
+        """Whether no work uses Dot's own Chrome at this moment: no chat's step is under way in it, no run at work holds
+        tabs in it, no use that no chat holds is under way (:meth:`_in_use`) and no task is being taught in it."""
+        return self._uses == 0 and self._teaching is None and not threads_in_use(self._threads, self._kept())
+
+    async def _hand_over_when_asked(self) -> None:
+        """Let go of Dot's own Chrome when another Dot process asks for its profile (item 1198,
+        :meth:`_ask_for_profile`) and no work uses it now (:meth:`_free_now`): a ``dotx run`` beside the daemon, or
+        the daemon beside one, would otherwise find the profile held by a Chrome nothing uses until the idle close
+        (``idle_close_s``), which also waits while that Chrome's window is in front. A run of this process at work
+        keeps it; the asking start then fails and says so. Errors are logged and the watch goes on."""
+        while True:
+            await asyncio.sleep(_HANDOVER_POLL_S)
+            if self._context is None or self._closed or not self._free_now():
+                continue
+            try:
+                if not await asyncio.to_thread(handover_asked, self._profile):
+                    continue
+                async with self._launch_lock:
+                    if self._context is None or self._closed or not self._free_now():
+                        continue
+                    await self._let_go()
+                _log.info("browser_handed_over", profile=str(self._profile))
+            except Exception:  # noqa: BLE001 - logged with its traceback
+                _log.exception("browser_hand_over_failed", profile=str(self._profile))
 
     async def _close_unused(self) -> None:
         """Close Dot's own Chrome and stop the driver once they are unused (:meth:`_unused`, item 454), unless its

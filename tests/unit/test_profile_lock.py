@@ -9,10 +9,13 @@ import pytest
 
 from dotagent.browser.profile_lock import (
     IMPORT_LOCK,
+    ask_handover,
+    handover_asked,
     held_for_import,
     held_for_start,
     profile_holder_pid,
     started_by_dot,
+    withdraw_handover,
 )
 from dotagent.core.errors import BrowserError
 
@@ -118,3 +121,16 @@ def test_a_chrome_is_a_runs_when_playwrights_driver_started_it() -> None:
         other.kill()
         other.wait()
         driver.communicate("")
+
+
+def test_a_request_for_the_profile_asks_while_its_process_lives_and_until_it_is_taken_back(tmp_path: Path) -> None:
+    """Item 1198: a Dot process asks for the profile another Dot process's Chrome holds by a file of its own; one left
+    by a process that has ended asks nothing and is deleted."""
+    assert not handover_asked(tmp_path)
+    stale: Path = ask_handover(tmp_path, exited_pid())
+    assert not handover_asked(tmp_path)
+    assert not stale.exists()
+    request: Path = ask_handover(tmp_path, os.getpid())
+    assert handover_asked(tmp_path)
+    withdraw_handover(request)
+    assert not handover_asked(tmp_path)

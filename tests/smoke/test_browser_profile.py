@@ -18,6 +18,7 @@ import httpx
 import pytest
 from playwright.async_api import BrowserContext, async_playwright
 
+from dotagent.browser import session as session_module
 from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode, write_keychain_mode
 from dotagent.browser.login import chrome_arguments
@@ -25,6 +26,7 @@ from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.readable import readable_cookies
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
+from dotagent.core.errors import BrowserError
 
 pytestmark = pytest.mark.browser
 
@@ -233,3 +235,50 @@ async def test_dots_own_chrome_starts_without_the_switch_that_turns_extensions_o
         assert "--enable-automation" not in switches
     finally:
         await session.aclose()
+
+
+def handover_requests(profile: Path) -> list[Path]:
+    """The requests for ``profile`` that another session left in it (item 1198)."""
+    return list(profile.glob("handover-*"))
+
+
+async def test_a_dot_chrome_that_no_work_uses_lets_go_of_the_profile_when_another_session_asks(
+    profile: Path, headless_config: BrowserConfig, tmp_path: Path
+) -> None:
+    """Item 1198: a ``dotx run`` beside the daemon (or the daemon beside one) found the profile held by the other's
+    Chrome, idle until its idle close, and the run's browser_open failed with "close that Chrome window". The Chrome
+    nothing uses is let go of when asked, and the asking session starts its own."""
+    holder: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "held", no_runs_at_work)
+    asker: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "asks", no_runs_at_work)
+    try:
+        assert await holder.stored_cookie_count() == 0
+        first: int | None = profile_holder_pid(profile)
+        assert first is not None
+        async with asyncio.timeout(_READY_TIMEOUT_S * 2):
+            assert await asker.stored_cookie_count() == 0
+        assert not holder.connected
+        second: int | None = profile_holder_pid(profile)
+        assert second is not None and second != first
+        assert not handover_requests(profile)
+    finally:
+        await asker.aclose()
+        await holder.aclose()
+
+
+async def test_a_dot_chrome_that_work_uses_keeps_the_profile_and_the_asker_is_told_to_wait(
+    profile: Path, headless_config: BrowserConfig, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1198: while a use of the holder's Chrome is under way, the asking start fails and says to wait, not to quit
+    Chrome; the holder keeps its Chrome."""
+    monkeypatch.setattr(session_module, "_HANDOVER_WAIT_S", 3.0)
+    holder: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "held", no_runs_at_work)
+    asker: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "asks", no_runs_at_work)
+    try:
+        assert await holder.stored_cookie_count() == 0
+        with holder._in_use(), pytest.raises(BrowserError, match="do not quit Chrome"):
+            await asker.stored_cookie_count()
+        assert holder.connected
+        assert not handover_requests(profile)
+    finally:
+        await asker.aclose()
+        await holder.aclose()
