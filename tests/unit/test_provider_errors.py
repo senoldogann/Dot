@@ -144,7 +144,7 @@ def test_spent_credits_are_told_apart_from_a_spent_usage_window() -> None:
     assert unavailable_reason(classify_anthropic(400, no_balance, None, {})) == "out of credits"
     assert unavailable_reason(classify_opencode(429, credits, None, {})) == "out of credits"
     assert isinstance(classify_opencode(429, window, None, {}), ProviderWindowError)
-    assert unavailable_reason(classify_opencode(429, window, None, {})) == "quota exhausted"
+    assert unavailable_reason(classify_opencode(429, window, None, {})) == "usage window spent"
 
 
 def test_ollamas_usage_limit_reached_is_no_burst_a_months_is_spent_and_a_weeks_waited_for() -> None:
