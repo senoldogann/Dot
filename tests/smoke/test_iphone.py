@@ -363,11 +363,18 @@ async def test_a_phone_the_mac_does_not_list_is_left_alone_and_the_owner_is_told
         assert devices.launched == []
         assert (first.kind, second.kind, second.notified) == ("unreachable", "unreachable", True)
         assert len(told) == 1 and "cannot reach" in told[0][0]
+        # A lock between two silences is the same stretch, and a lock is never told (item 1197).
         standin.up, standin.locked = True, True
         locked: PhoneState = await keep_once(desk, tell, 0.0)
-        assert locked.kind == "locked" and len(told) == 2 and "locked" in told[1][0]
+        standin.up = False
         await keep_once(desk, tell, 0.0)
-        assert len(told) == 2
+        assert locked.kind == "locked" and len(told) == 1
+        # Up again ends the stretch: the next silence is told.
+        standin.up, standin.locked = True, False
+        await keep_once(desk, tell, 0.0)
+        standin.up = False
+        await keep_once(desk, tell, 0.0)
+        assert len(told) == 2 and "cannot reach" in told[1][0]
     finally:
         await desk.aclose()
 

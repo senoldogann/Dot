@@ -1199,7 +1199,7 @@ class PhoneConfig(FrozenModel):
     # The bundle id of the WebDriverAgent runner app that opening starts the server.
     runner_bundle: str
     check_every_s: float = Field(gt=0, allow_inf_nan=False)
-    # How long the phone stays locked or out of reach before the owner is told, once for that state.
+    # How long the phone stays out of reach (or unclear) before the owner is told, once until it is up again.
     notify_after_s: float = Field(ge=0, allow_inf_nan=False)
     request_timeout_s: float = Field(gt=0, allow_inf_nan=False)
 

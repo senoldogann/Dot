@@ -1268,8 +1268,9 @@ headless = true
 # The owner's iPhone over WebDriverAgent (docs/phone-control.md, item 1196): off until the runner app is on the phone.
 # wda_urls are the addresses of its server (port 8100), tried in order; udid is the phone's id for `xcrun devicectl
 # list devices`, with which the daemon relaunches runner_bundle, the runner app, when the server stops answering and
-# the phone is in reach of this Mac. Every check_every_s seconds the daemon looks; a phone locked or out of reach for
-# notify_after_s seconds is told to the owner once. request_timeout_s bounds one request to the phone.
+# the phone is in reach of this Mac. Every check_every_s seconds the daemon looks; a phone out of reach for
+# notify_after_s seconds is told to the owner once until it is up again (a locked one is not told: locking it is how the
+# owner uses it). request_timeout_s bounds one request to the phone.
 enabled = false
 wda_urls = []
 udid = ""
