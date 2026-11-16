@@ -5,7 +5,8 @@
 // camera opens, and the code that signs in the app added to its home screen, which iOS keeps apart from Safari. Under
 // that the phones paired with a code, each holding a key of its own, with Remove (item 670). While `[phone]` is on, a
 // card at the very head says how Dot's own link to the owner's iPhone stands (item 1196), where a tap on the daemon's
-// notice of a phone out of reach lands (a locked one is not told, item 1197).
+// notice of a phone out of reach, or one that does not say whether it is locked, lands (a locked one is not told,
+// item 1197).
 
 import { api, blobUrl, holdsPhoneKey, unreachable } from "../api.js";
 import { copyText, duration, el } from "../dom.js";
