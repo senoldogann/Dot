@@ -82,6 +82,7 @@ from dotagent.meetings.desk import MeetingDesk, launch_meeting_chrome
 from dotagent.meetings.notes import MeetingNotes, make_notes
 from dotagent.meetings.types import MeetingLine
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
+from dotagent.notify.money import MoneyTeller
 from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.oauth.accounts import Accounts
 from dotagent.oauth.keychain import Keychain, keychain_file
@@ -614,6 +615,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             order=tuple(config.web.search_order),
         )
         router.on_retire(partial(_refresh_search_key, config, search_keys))
+        router.on_money_pause(MoneyTeller(bus))
         approvals: ApprovalBroker = ApprovalBroker(store, bus, config.policy.approval_timeout_s)
         approvals.switch_free(config.policy.free)
         assistant: Assistant = Assistant(config.assistant, await asyncio.to_thread(mac_first_name))

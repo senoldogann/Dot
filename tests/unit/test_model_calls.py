@@ -9,7 +9,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from dotagent.config import load_default_config
-from dotagent.core.errors import ProviderQuotaError, ProviderTransportError
+from dotagent.core.errors import ProviderQuotaError, ProviderRateLimitError, ProviderTransportError
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall, call_event_data
 from dotagent.llm.router import ModelRef, ModelRouter, Pause
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, StreamDelta, Usage
@@ -243,3 +243,33 @@ async def test_a_model_that_cannot_answer_is_paused_until_a_call_it_answers_or_a
 
 async def spent() -> ModelReply:
     raise ProviderQuotaError("credits exhausted", 429, None, {"model": "fake"})
+
+
+async def test_a_model_whose_money_is_spent_is_told_once_while_it_stays_paused_and_a_rate_limit_is_not() -> None:
+    answers: list[Callable[[], Awaitable[ModelReply]]] = [spent, spent, reply, spent, limited]
+    told: list[tuple[str, str, str]] = []
+
+    async def in_turn() -> ModelReply:
+        return await answers.pop(0)()
+
+    async def listen(ref: ModelRef, pause: Pause, words: str) -> None:
+        told.append((ref.label, pause.reason, words))
+
+    router: ModelRouter = await router_with(in_turn, keeping([]))
+    router.on_money_pause(listen)
+    for _ in range(2):
+        with pytest.raises(ProviderQuotaError):
+            await router.complete(REF, REQUEST, no_sink, ORIGIN)
+    assert told == [(REF.label, "quota exhausted", "credits exhausted")]
+    # A reply ends the pause; the next spent balance begins a new one, which is told again.
+    assert await router.complete(REF, REQUEST, no_sink, ORIGIN) == REPLY
+    with pytest.raises(ProviderQuotaError):
+        await router.complete(REF, REQUEST, no_sink, ORIGIN)
+    assert len(told) == 2
+    with pytest.raises(ProviderRateLimitError):
+        await router.complete(OTHER, REQUEST, no_sink, ORIGIN)
+    assert len(told) == 2
+
+
+async def limited() -> ModelReply:
+    raise ProviderRateLimitError("slow down", 429, None, {"model": "fake"})
