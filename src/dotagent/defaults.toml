@@ -1056,8 +1056,14 @@ timezone = ""
 tick_s = 15.0
 # A cron expression may not fire more often than this.
 min_interval_s = 300
-# A schedule that is overdue by more than this (the daemon was off, the Mac asleep) skips that firing and waits for the next.
+# A firing that starts at most this late is on time: it runs as at its time. Several firings of a repeating schedule
+# missed within it collapse into the newest, unsaid.
 misfire_grace_s = 3600
+# A repeating schedule that the daemon being off or the Mac asleep kept from firing runs its newest missed firing late
+# when that is at most this many seconds past its time (12 hours), saying so to its run; the older ones are told as
+# missed, in one notice, and do not run. Several such late starts are 15 seconds apart. Later than this, the firing is
+# skipped and the schedule waits for its next time; 0 never runs one late. A one-time schedule always fires late.
+catch_up_s = 43200
 # Schedules that are switched on.
 max_schedules = 50
 # A firing's run starts with the dated final answers of the schedule's last runs in front of its goal, so it builds

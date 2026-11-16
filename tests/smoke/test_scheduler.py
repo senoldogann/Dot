@@ -53,7 +53,14 @@ from dotagent.scheduler.plans import (
     edit_schedule,
     enable_schedule,
 )
-from dotagent.scheduler.runner import FAILED_TICKS_TO_END, Scheduler
+from dotagent.scheduler.runner import (
+    CATCH_UP_GAP_S,
+    FAILED_TICKS_TO_END,
+    Scheduler,
+    caught_up_goal,
+    late_goal,
+    missed_status,
+)
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
 from dotagent.store.models import (
     NO_PICKS,
@@ -355,11 +362,12 @@ def _missed(feed: Subscription) -> list[tuple[str, str, str]]:
 
 
 async def test_an_overdue_firing_is_skipped_and_the_next_one_planned(runtime: Runtime, scheduler: Scheduler) -> None:
-    grace_s: int = runtime.config.scheduler.misfire_grace_s
+    # Past the window in which a missed firing runs late (item 1204).
+    window_s: int = runtime.config.scheduler.catch_up_s
     threads_before: int = len(await runtime.store.list_threads(1000))
 
     recurring: ScheduleRecord = await _schedule(runtime, _cron("Daily", "0 9 * * *"))
-    late: float = _planned(recurring) + grace_s + 120
+    late: float = _planned(recurring) + window_s + 120
     async with runtime.bus.subscribe_kinds(frozenset({SCHEDULE_MISSED_EVENT})) as feed:
         await scheduler.tick(late)
         told: list[tuple[str, str, str]] = _missed(feed)
@@ -825,6 +833,94 @@ async def test_a_one_time_schedule_overdue_fires_late_saying_when_it_was_due(run
     ]
     assert manager.goals == [GOAL]
     assert (fired.enabled, fired.next_run_at, fired.last_run_at) == (False, None, late)
+
+
+async def test_a_daily_firing_the_mac_slept_through_runs_late_once(runtime: Runtime) -> None:
+    """Item 1204: a daily schedule whose time passed while the Mac slept, by more than the grace but within
+    ``catch_up_s``, runs that firing late once, saying so to its run and in its chat's title, and moves on to its next
+    time first, so neither a later tick nor a new scheduler (a restart) runs it again."""
+    daily: ScheduleRecord = await _schedule(runtime, _cron("Morning", "0 8 * * *"))
+    due: float = _planned(daily)
+    late: float = due + 2 * 3600
+    manager: _Starts = _Starts(runtime)
+    async with runtime.bus.subscribe_kinds(frozenset({SCHEDULE_MISSED_EVENT})) as feed:
+        await Scheduler(runtime, manager).tick(late)
+        await Scheduler(runtime, manager).tick(late + 60)
+        told: list[tuple[str, str, str]] = _missed(feed)
+    zone: ZoneInfo = runtime.schedule_zone
+    assert manager.started == [late_goal(GOAL, due, late, zone)]
+    assert manager.goals == [GOAL]
+    # Nothing before it was missed, so nothing is told.
+    assert told == []
+    fired: ScheduleRecord = await runtime.store.get_schedule(daily.id)
+    assert fired.enabled and fired.next_run_at == next_firing("0 8 * * *", late, zone)
+    assert fired.thread_id is not None
+    chat: ThreadRecord = await runtime.store.get_thread(fired.thread_id)
+    assert chat.title == f"Morning · {format_local(late, zone)} · late"
+
+
+async def test_the_newest_missed_firing_runs_and_the_older_are_told_as_missed(runtime: Runtime) -> None:
+    """Item 1204: of the firings a repeating schedule missed, the newest runs (late, here) and the older ones are
+    told once, by count, in the notice of a missed firing and in the title of the chat the schedule's History lists."""
+    every_six: ScheduleRecord = await _schedule(runtime, _cron("Six-hourly", "0 */6 * * *"))
+    due: float = _planned(every_six)
+    zone: ZoneInfo = runtime.schedule_zone
+    newest: float = due + 3 * 6 * 3600
+    late: float = newest + 2 * 3600
+    manager: _Starts = _Starts(runtime)
+    async with runtime.bus.subscribe_kinds(frozenset({SCHEDULE_MISSED_EVENT})) as feed:
+        await Scheduler(runtime, manager).tick(late)
+        told: list[tuple[str, str, str]] = _missed(feed)
+    assert manager.started == [caught_up_goal(GOAL, newest, late, zone, 3)]
+    assert "The 3 firings before it were missed" in manager.started[0]
+    assert told == [(SYSTEM_RUN_ID, "Six-hourly", missed_status(3, newest, True, zone))]
+    fired: ScheduleRecord = await runtime.store.get_schedule(every_six.id)
+    assert fired.next_run_at == next_firing("0 */6 * * *", late, zone)
+    assert fired.thread_id is not None
+    chat: ThreadRecord = await runtime.store.get_thread(fired.thread_id)
+    assert chat.title.endswith(" · late, 3 missed before")
+
+
+async def test_firings_missed_within_the_grace_collapse_into_the_newest_unsaid(runtime: Runtime) -> None:
+    """Item 1204 keeps ``misfire_grace_s`` as the time a firing is on time: a few firings missed within it run as one,
+    at its time, with no note of lateness and nothing told."""
+    frequent: ScheduleRecord = await _schedule(runtime, _cron("Frequent", "*/10 * * * *"))
+    due: float = _planned(frequent)
+    now: float = due + 25 * 60
+    manager: _Starts = _Starts(runtime)
+    async with runtime.bus.subscribe_kinds(frozenset({SCHEDULE_MISSED_EVENT})) as feed:
+        await Scheduler(runtime, manager).tick(now)
+        told: list[tuple[str, str, str]] = _missed(feed)
+    assert manager.started == [GOAL]
+    assert told == []
+
+
+async def test_late_firings_start_apart_and_one_left_waiting_survives_a_restart(runtime: Runtime) -> None:
+    """Item 1204: several firings found late at one wake start ``CATCH_UP_GAP_S`` apart; one still waiting stays due,
+    so a scheduler made anew (a restart) starts it, and each runs once."""
+    first: ScheduleRecord = await _schedule(runtime, _cron("First", "0 7 * * *"))
+    second: ScheduleRecord = await _schedule(runtime, _cron("Second", "0 7 * * *"))
+    third: ScheduleRecord = await _schedule(runtime, _cron("Third", "0 7 * * *"))
+    late: float = _planned(first) + 3 * 3600
+    manager: _Starts = _Starts(runtime)
+    scheduler: Scheduler = Scheduler(runtime, manager)
+    await scheduler.tick(late)
+    await scheduler.tick(late + CATCH_UP_GAP_S - 1)
+    assert len(manager.started) == 1
+    await scheduler.tick(late + CATCH_UP_GAP_S)
+    assert len(manager.started) == 2
+    # The daemon restarts before the third starts: it is still due, and the new scheduler starts it.
+    waiting: list[ScheduleRecord] = [
+        record
+        for record in [await runtime.store.get_schedule(s.id) for s in (first, second, third)]
+        if record.next_run_at == _planned(first)
+    ]
+    assert len(waiting) == 1
+    await Scheduler(runtime, manager).tick(late + CATCH_UP_GAP_S + 1)
+    await Scheduler(runtime, manager).tick(late + 4 * CATCH_UP_GAP_S)
+    assert len(manager.started) == 3
+    after: list[ScheduleRecord] = [await runtime.store.get_schedule(s.id) for s in (first, second, third)]
+    assert all(_planned(record) > late for record in after)
 
 
 async def test_a_one_time_schedule_due_under_the_emergency_stop_waits_for_its_release(runtime: Runtime) -> None:

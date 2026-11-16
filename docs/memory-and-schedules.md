@@ -376,9 +376,18 @@ what moved; a schedule switched off is not started so, and the end of such a run
 - A firing that is skipped moves the schedule on only while it is still due at the time it was read (item 1047): an
   edit of its times or a switch made while the firing was weighed is kept. A schedule says `running` only while its
   run works, so a run that ended at once shows how it ended, not `running`.
-- A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)
-  is skipped and waits for the next; you are told, as you are when a firing's run cannot start (see the notifications
-  under the web UI). A one-time schedule has no next time and is never dropped: overdue, it fires late, and its run
+- A firing is at most once. A repeating schedule that the daemon being off or the Mac asleep kept from firing runs only
+  the newest of the firings it missed (item 1204): within `[scheduler] misfire_grace_s` (an hour) of its time it
+  starts as at its time; later, up to `[scheduler] catch_up_s` (12 hours; 0 never), it starts late, its run reading
+  first when it was due, when it starts and how many firings before it were missed and do not run, and the title of a
+  chat made for it (which its **History** lists; not one it goes on in, with "the same chat") ending `· late` and
+  `, N missed before`. So the 08:00 brief of a Mac that wakes at 09:30
+  runs at 09:30. Several firings found late start 15 seconds apart; one still waiting stays due, so a restart meanwhile
+  starts it and none runs twice (the schedule's next time is written before a run starts). The older firings it missed
+  are told in one notice of a missed firing, once the oldest is past `misfire_grace_s` (within it, they collapse
+  unsaid). A firing later than `catch_up_s` is skipped and waits for the next; you are told, as you are when a firing's
+  run cannot start (see the notifications under the web UI). A one-time schedule has no next time and is never
+  dropped: overdue, it fires late, however late, and its run
   reads first when it was due and when it starts. One whose run could not start stays due and is tried again a minute
   later, then after twice as long each time, an hour at the most. One whose firing a crash cut before its run was under
   way is due again at the time it fired once the scheduler starts, unless its run had been made (item 386).

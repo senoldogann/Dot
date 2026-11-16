@@ -787,6 +787,9 @@ class SchedulerConfig(FrozenModel):
     tick_s: float = Field(gt=0, allow_inf_nan=False)
     min_interval_s: int
     misfire_grace_s: int
+    # Item 1204: a repeating schedule whose newest missed firing is late by more than misfire_grace_s but at most this
+    # many seconds runs it late, once, and the older ones are told as missed; one later than this skips (0: never).
+    catch_up_s: int = Field(ge=0)
     max_schedules: int
     # Item 257: how many earlier runs of a schedule a firing's opening carries the answers of (0: none), in how many
     # characters at most, and whether a firing goes on in the chat of the one before instead.
