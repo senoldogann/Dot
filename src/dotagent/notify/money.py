@@ -49,5 +49,15 @@ class MoneyTeller:
         now: float = time.time()
         if not due(self._told, ref.provider, now):
             return
-        await tell_owner(self._bus, money_title(ref.provider), money_text(ref, pause, words), MODELS_ROUTE)
+        # Marked before the tell, so that two models of the provider paused at once tell once; a tell that fails
+        # takes the mark back, so the next pause tries again.
+        before: float | None = self._told.get(ref.provider)
         self._told[ref.provider] = now
+        try:
+            await tell_owner(self._bus, money_title(ref.provider), money_text(ref, pause, words), MODELS_ROUTE)
+        except BaseException:
+            if before is None:
+                self._told.pop(ref.provider, None)
+            else:
+                self._told[ref.provider] = before
+            raise

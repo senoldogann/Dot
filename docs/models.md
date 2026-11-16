@@ -123,7 +123,8 @@ model is not paused. A pause for money ("out of credits", "quota exhausted", "no
 replaces a pause for another reason, tells the owner (item 1207): a notice on their phone and desktop, titled
 "<provider> cannot answer: payment needed", with the provider's own words (which say where to top up) and a tap that opens the models page. A
 provider is told about at most once a day while its money stays spent, and once more after the daemon restarts; a rate
-limit or a refused key tells nothing. The fast model's work leaves a paused fast model out as well (item 240): a run's
+limit, a plan's usage window that passes on its own (Ollama's hourly or weekly limit, OpenCode Go's) or a refused
+key tells nothing. The fast model's work leaves a paused fast model out as well (item 240): a run's
 summary is written by the run's own model at once, and `web_extract` reads no source and says until when the fast model
 cannot answer, instead of spending the connector's retries on a provider that has refused already. Each model is paused
 alone: a local Ollama model stays available while a cloud one is paused, and a provider whose key or quota fails all its

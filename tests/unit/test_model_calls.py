@@ -9,7 +9,12 @@ import pytest
 from structlog.testing import capture_logs
 
 from dotagent.config import load_default_config
-from dotagent.core.errors import ProviderQuotaError, ProviderRateLimitError, ProviderTransportError
+from dotagent.core.errors import (
+    ProviderQuotaError,
+    ProviderRateLimitError,
+    ProviderTransportError,
+    ProviderWindowError,
+)
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall, call_event_data
 from dotagent.llm.router import ModelRef, ModelRouter, Pause
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, StreamDelta, Usage
@@ -246,7 +251,7 @@ async def spent() -> ModelReply:
 
 
 async def test_a_model_whose_money_is_spent_is_told_once_while_it_stays_paused_and_a_rate_limit_is_not() -> None:
-    answers: list[Callable[[], Awaitable[ModelReply]]] = [spent, spent, reply, spent, limited, spent]
+    answers: list[Callable[[], Awaitable[ModelReply]]] = [spent, spent, reply, spent, limited, spent, reply, windowed]
     told: list[tuple[str, str, str]] = []
 
     async def in_turn() -> ModelReply:
@@ -273,7 +278,17 @@ async def test_a_model_whose_money_is_spent_is_told_once_while_it_stays_paused_a
     with pytest.raises(ProviderQuotaError):
         await router.complete(OTHER, REQUEST, no_sink, ORIGIN)
     assert [label for label, _, _ in told] == [REF.label, REF.label, OTHER.label]
+    # A plan's usage window that is spent passes on its own: it pauses the model and tells nothing.
+    assert await router.complete(REF, REQUEST, no_sink, ORIGIN) == REPLY
+    with pytest.raises(ProviderWindowError):
+        await router.complete(REF, REQUEST, no_sink, ORIGIN)
+    assert router.paused(time.time())[REF.label].reason == "quota exhausted"
+    assert len(told) == 3
 
 
 async def limited() -> ModelReply:
     raise ProviderRateLimitError("slow down", 429, None, {"model": "fake"})
+
+
+async def windowed() -> ModelReply:
+    raise ProviderWindowError("the 5-hour usage limit is reached", 429, None, {"model": "fake"})
