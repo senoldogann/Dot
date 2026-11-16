@@ -28,19 +28,29 @@ def test_the_state_keeps_its_start_while_the_kind_holds_and_restarts_when_it_cha
     assert state_line(unclear, 75.0) == "answering, but not saying whether it is locked (for 5 s; checked 5 s ago)"
 
 
-def test_the_owner_is_told_once_after_the_wait_and_only_of_a_state_that_needs_them() -> None:
+def test_the_owner_is_told_once_until_the_phone_is_up_and_never_of_a_lock() -> None:
+    # A locked phone is how the owner uses it (item 1197): however long it lasts, it is not told.
     state = next_state(None, PhoneProbe(url="http://x", locked=True), 0.0)
-    assert notice_for(state, 300.0) is None
-    waited = state.model_copy(update={"checked_at": 300.0})
-    notice = notice_for(waited, 300.0)
-    assert notice is not None and "locked" in notice[0].lower()
-    assert notice_for(waited.model_copy(update={"notified": True}), 300.0) is None
-    up = next_state(state, PhoneProbe(url="http://x", locked=False), 400.0)
+    waited = state.model_copy(update={"checked_at": 9_000.0})
+    assert notice_for(waited, 300.0) is None
+    gone = next_state(None, PhoneProbe(url=None, locked=None), 0.0)
+    assert notice_for(gone, 300.0) is None
+    notice = notice_for(gone.model_copy(update={"checked_at": 300.0}), 300.0)
+    assert notice is not None and "cannot reach" in notice[0]
+    told = gone.model_copy(update={"checked_at": 300.0, "notified": True})
+    # Going between locked, unclear and out of reach is one stretch: told once for it.
+    locked = next_state(told, PhoneProbe(url="http://x", locked=True), 400.0)
+    unclear = next_state(locked, PhoneProbe(url="http://x", locked=None), 500.0)
+    again = next_state(unclear, PhoneProbe(url=None, locked=None), 600.0)
+    assert (locked.notified, unclear.notified, again.notified) == (True, True, True)
+    assert notice_for(again.model_copy(update={"checked_at": 9_000.0}), 300.0) is None
+    # Once the phone is up, the next stretch is told again.
+    up = next_state(again, PhoneProbe(url="http://x", locked=False), 700.0)
     assert notice_for(up.model_copy(update={"checked_at": 9_000.0}), 300.0) is None
-    unclear = next_state(up, PhoneProbe(url="http://x", locked=None), 500.0)
-    told = notice_for(unclear, 0.0)
-    assert told is not None and "cannot tell" in told[0]
-    assert state_word(None) == "not checked yet" and state_word(waited) == "reachable but locked"
+    unclear_again = next_state(up, PhoneProbe(url="http://x", locked=None), 800.0)
+    told_again = notice_for(unclear_again, 0.0)
+    assert told_again is not None and "cannot tell" in told_again[0]
+    assert state_word(None) == "not checked yet" and state_word(state) == "reachable but locked"
 
 
 def test_devicectl_listing_says_whether_the_phone_is_available() -> None:

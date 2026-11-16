@@ -54,9 +54,18 @@ class PhoneDesk:
         await self._wda.aclose()
 
     async def check(self) -> PhoneState:
-        """Look at the phone and keep what was found as its state."""
+        """Look at the phone and keep what was found as its state; a change of kind is logged, so that how often the
+        phone goes out of reach after a lock can be read from the log (item 1197)."""
         probe: PhoneProbe = await self._wda.probe()
-        self._state = next_state(self._state, probe, self._clock())
+        before: PhoneState | None = self._state
+        self._state = next_state(before, probe, self._clock())
+        if before is None or before.kind != self._state.kind:
+            log.info(
+                "phone_state_changed",
+                kind=self._state.kind,
+                was=None if before is None else before.kind,
+                notified=self._state.notified,
+            )
         return self._state
 
     def mark_notified(self) -> None:

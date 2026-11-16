@@ -22,8 +22,10 @@ a launch that fails, or whose server stays silent (a phone out of the Mac's reac
 minutes. An address that answers but does not say whether the phone is locked (a refusal, or another device at that
 address on the home network) leaves the link *unclear*, and what it answered goes to the daemon's log, never to a run.
 
-A phone that stays locked, unclear or out of reach for `notify_after_s` seconds is told to you once for that state, as
-any other notice of Dot's; a tap on the notice opens Settings › Phone, whose first card, while `[phone]` is on, says
-how the link stands and for how long. Keep the phone unlocked while it charges: Settings › Display & Brightness ›
+A phone that stays out of reach, or unclear, for `notify_after_s` seconds is told to you once, as any other notice of
+Dot's, and not again until it has been up (reachable and unlocked); a locked phone is never told, since locking it is
+how you use it. A tap on the notice opens Settings › Phone, whose first card, while `[phone]` is on, says
+how the link stands and for how long, locked included, and a run that looks with `phone_status` sees it too. Keep the
+phone unlocked while it charges when Dot is to work on it: Settings › Display & Brightness ›
 Auto-Lock › Never, with Low Power Mode off (it holds Auto-Lock at 30 seconds). `GET /api/iphone` gives the state of
 the last look.

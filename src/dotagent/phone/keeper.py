@@ -3,8 +3,9 @@ is on.
 
 Every ``check_every_s`` seconds the loop looks at the phone. When no address of WebDriverAgent answers and the Mac lists
 the phone as available, it launches the runner app again (opening it starts the server) and looks once more. A phone
-that stays locked or out of reach for ``notify_after_s`` is told to the owner once for that state; the owner is the one
-who unlocks it or brings it back.
+that stays out of reach, or answers without saying whether it is locked, for ``notify_after_s`` is told to the owner
+once until it is up again; the owner is the one who brings it back. A locked phone is not told: locking it is how the
+owner uses it, and a notice after every lock is noise (item 1197). Settings › Phone and ``phone_status`` still say it.
 """
 
 import asyncio
@@ -19,13 +20,8 @@ log = get_logger(__name__)
 
 type Teller = Callable[[str, str], Awaitable[None]]
 
-# The title and the text that tell the owner of a state that needs them; a phone that is up needs nothing.
+# The title and the text that tell the owner of a state that needs them; a phone that is up or locked needs nothing.
 _NOTICES: dict[PhoneStateKind, tuple[str, str]] = {
-    "locked": (
-        "Your iPhone is locked",
-        "Dot can do nothing on it while it is locked. Unlock it, and keep Auto-Lock at Never and Low Power Mode off "
-        "while it charges.",
-    ),
     "unclear": (
         "Dot cannot tell whether your iPhone is locked",
         "WebDriverAgent answers at its address but does not say whether the phone is locked; the daemon's log has what "
@@ -46,18 +42,20 @@ _WORDS: dict[PhoneStateKind, str] = {
 
 
 def next_state(previous: PhoneState | None, probe: PhoneProbe, now: float) -> PhoneState:
-    """The state after ``probe`` at ``now``: ``since`` and ``notified`` carry over while the kind is the same, and
-    start again when it changes."""
+    """The state after ``probe`` at ``now``: ``since`` carries over while the kind is the same and starts again when it
+    changes; ``notified`` carries over until the phone is up, so a phone going between locked, unclear and out of
+    reach is told once for the whole time it is not up."""
     kind: PhoneStateKind = probe.kind
     if previous is not None and previous.kind == kind:
         return previous.model_copy(update={"url": probe.url, "checked_at": now})
-    return PhoneState(kind=kind, since=now, url=probe.url, notified=False, checked_at=now)
+    told: bool = previous is not None and previous.notified and kind != "up"
+    return PhoneState(kind=kind, since=now, url=probe.url, notified=told, checked_at=now)
 
 
 def notice_for(state: PhoneState, notify_after_s: float) -> tuple[str, str] | None:
-    """The title and the text that tell the owner of ``state`` now, or ``None``: a state that needs them is told once,
-    after it has lasted ``notify_after_s``."""
-    if state.kind == "up" or state.notified or state.checked_at - state.since < notify_after_s:
+    """The title and the text that tell the owner of ``state`` now, or ``None``: a state that needs them (out of
+    reach, or unclear) is told once, after it has lasted ``notify_after_s``."""
+    if state.kind not in _NOTICES or state.notified or state.checked_at - state.since < notify_after_s:
         return None
     return _NOTICES[state.kind]
 
