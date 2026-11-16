@@ -46,7 +46,8 @@ _THEMES: tuple[str, ...] = (
     "contrast",
 )
 _SCHEMES: tuple[Scheme, ...] = ("light", "dark")
-# Dot's contrast rule, as tests/unit/test_css_tokens.py holds the looks of themes.css to it.
+# Dot's contrast rule for a palette: the looks of themes.css hold their quiet tiers to 4.5:1 too
+# (tests/unit/test_css_tokens.py), a palette its muted and faint ones to 3:1 (appearance/tokens.js).
 _SURFACES: tuple[str, ...] = ("--bg", "--sidebar", "--surface", "--surface-2", "--surface-3")
 _LEAST: tuple[tuple[str, float], ...] = (("--text", 4.5), ("--text-2", 4.5), ("--muted", 3.0), ("--faint", 3.0))
 _ON: tuple[tuple[str, str], ...] = (

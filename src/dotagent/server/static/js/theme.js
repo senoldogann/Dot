@@ -42,7 +42,7 @@ function palette(id, label, hint) {
 
 /** Dot's own themes. */
 export const THEMES = [
-  look("neutral", "Neutral", "Dot's own: warm grey and ink, plain like a chat app.", true),
+  look("neutral", "Neutral", "Dot's own: neutral grey and ink, plain like a chat app.", true),
   look("paper", "Paper", "Warm paper, serif answers and one terracotta accent.", false),
   palette("clean", "Clean", "Near-white, grey and a blue accent."),
   palette("rose", "Rose", "Blush whites and a raspberry accent."),

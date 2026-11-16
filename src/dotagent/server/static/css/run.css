@@ -3060,6 +3060,14 @@ dialog.computer-full::backdrop {
   box-shadow: var(--shadow-modal);
   outline: none;
   transition: transform var(--motion-quick) var(--ease);
+  /* It rises 32 px into its place as it opens (item 1205), as a message's sheet does. */
+  animation: sheet-rise var(--motion-sheet) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-panel {
+    animation: none;
+  }
 }
 
 .sheet-grip {

@@ -94,8 +94,11 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
   let range = null;
   const mirror = markdownMirror(textarea);
 
+  // The box at its own height of one row is shorter than its text once the text wraps: the frame then closes its
+  // corners (item 1205, app.css `.composer[data-multiline]`).
   function autosize() {
     textarea.style.height = "auto";
+    textarea.closest(".composer")?.toggleAttribute("data-multiline", textarea.scrollHeight > textarea.clientHeight + 1);
     textarea.style.height = `${Math.min(textarea.scrollHeight, maxPx)}px`;
     mirror.paint();
   }

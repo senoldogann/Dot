@@ -4,13 +4,13 @@
    data-theme on the page element and change the colour tokens first and the shape second. app.css holds the shape,
    type and spacing tokens and draws the controls on all of them.
 
-   The scale (item 63): warm greys with little saturation; surfaces step up by lightness (bg, surface, surface-2,
-   surface-3) in both schemes, so depth comes from the step and not from a shadow in dark; borders are the text colour
-   at a small alpha, so they sit on every surface; the text tiers (text, text-2, muted, faint) are measured against
-   every surface by tests/unit/test_css_tokens.py (4.5:1 for the first two, 3:1 for the last two; the neutral and the
-   paper look hold their muted ink to 4.5:1 too, as small labels are set in it, and the sidebar's group labels with
-   it); shadows are nearly gone in dark. The accent is an ink, not the amber of the bubble: an amber reads at under 2:1 on a light
-   surface, and the accent paints text, focus rings and the send button. */
+   The scale (item 63, made neutral by item 1205 after OpenMausBot's Midnight and Daylight greys): greys with no
+   tint; surfaces step up by lightness (bg, surface, surface-2, surface-3) in both schemes, so depth comes from the step
+   and not from a shadow in dark; borders are the text colour at a small alpha, so they sit on every surface; the text
+   tiers (text, text-2, muted, faint) are measured against every surface by tests/unit/test_css_tokens.py, all four at
+   4.5:1, as small labels are set in the quiet ones (item 1205); shadows are nearly gone in dark, and a box is
+   drawn by a hairline ring (--edge) rather than a shadow. The accent is an ink, not the amber of the bubble: an amber
+   reads at under 2:1 on a light surface, and the accent paints text, focus rings and the send button. */
 
 :root {
   color-scheme: light dark;
@@ -24,30 +24,34 @@
   color-scheme: dark;
 }
 
-/* ---------- neutral: warm grey and ink, the base look ---------- */
+/* ---------- neutral: grey and ink, the base look ---------- */
 
 :root {
-  --bg: light-dark(#f8f7f4, #1b1a18);
-  --sidebar: light-dark(#f2f1ed, #151412);
-  --surface: light-dark(#fdfcfa, #22211f);
-  --surface-2: light-dark(#f3f2ee, #2a2927);
-  --surface-3: light-dark(#e9e8e3, #343230);
+  --bg: light-dark(#fcfcfc, #121212);
+  --sidebar: light-dark(#f5f5f5, #0e0e0e);
+  --surface: light-dark(#ffffff, #1f1f1f);
+  --surface-2: light-dark(#efefef, #282828);
+  --surface-3: light-dark(#e4e4e4, #303030);
   /* A chat's messages (item 832), as a messaging app draws them: yours in ink in light and one step raised in the dark,
      Dot's and its agents' on a soft fill. Made of the look's own colours, so that every look and scheme has them. */
   --msg-me: light-dark(var(--text), var(--surface-3));
   --on-msg-me: light-dark(var(--surface), var(--text));
   --msg-agent: var(--surface-2);
-  --border: light-dark(rgb(28 27 25 / 8%), rgb(236 234 229 / 9%));
-  --border-strong: light-dark(rgb(28 27 25 / 16%), rgb(236 234 229 / 18%));
-  --control: light-dark(#85837d, #8a8882);
-  --text: light-dark(#1c1b19, #ecebe6);
-  --text-2: light-dark(#4b4a46, #c6c4bd);
-  --muted: light-dark(#696864, #a19f98);
-  --faint: light-dark(#767470, #94928b);
-  --accent: light-dark(#2b2a27, #e6e4de);
-  --accent-strong: light-dark(#1c1b19, #f5f4f0);
-  --accent-weak: light-dark(#ecebe6, #2f2e2b);
-  --on-accent: light-dark(#fbfaf7, #1b1a18);
+  --border: light-dark(rgb(28 28 28 / 8%), rgb(245 245 245 / 9%));
+  --border-strong: light-dark(rgb(28 28 28 / 16%), rgb(245 245 245 / 18%));
+  /* The hairline ring a box, the composer and a menu are drawn by (item 1205): half a pixel of the text at a
+     tenth, so that it sits on every ground of every look, and the stronger one the composer takes in focus. */
+  --edge: color-mix(in srgb, var(--text) 10%, transparent);
+  --edge-strong: color-mix(in srgb, var(--text) 22%, transparent);
+  --control: light-dark(#858585, #8a8a8a);
+  --text: light-dark(#1c1c1c, #f5f5f5);
+  --text-2: light-dark(#474747, #c8c8c8);
+  --muted: light-dark(#5c5c5c, #a8a8a8);
+  --faint: light-dark(#636363, #9c9c9c);
+  --accent: light-dark(#2a2a2a, #e8e8e8);
+  --accent-strong: light-dark(#1c1c1c, #f5f5f5);
+  --accent-weak: light-dark(#ececec, #2e2e2e);
+  --on-accent: light-dark(#fcfcfc, #121212);
   --ok: light-dark(#1b7349, #62cf98);
   --ok-weak: light-dark(#e3f2e8, #163527);
   --on-ok: light-dark(#ffffff, #0f2419);
@@ -66,7 +70,7 @@
   --on-bad: light-dark(#ffffff, #2a0b0b);
   /* The owner's messages and Dot's face: one warm accent, with dark ink on it in light and dark alike. */
   --bubble: light-dark(#ffcd3c, #e9b93a);
-  --on-bubble: #1c1b19;
+  --on-bubble: #1c1c1c;
   /* Dot's yellow: its face's (the character's amber) and its accents', the same in every look and scheme (it was the
      disc of the mark until item 642). The faint hairline round the mark (white since item 1081), as render.py draws
      it, and the ball's own black, which a copy of the mark without its gradients would still be drawn in. */
@@ -78,7 +82,7 @@
   --boost-start: #35b27a;
   --boost-mid: #f08a24;
   --boost-end: #8a5cf5;
-  --on-brand: #1c1b19;
+  --on-brand: #1c1c1c;
   /* The twelve colours of a character's body (character/skins.js, item 101), bloub's palette; ink and cream follow the
      scheme so a body is never the colour of the ground, and the pastille is bloub's notification blue. */
   --character-ink: light-dark(#0a0a0c, #ecebe6);
@@ -96,13 +100,13 @@
   --character-notify: #2496e8;
   /* The Claude mark of the composer's model pill (item 108), in Anthropic's own colour; every other mark is ink. */
   --mark-claude: #d97757;
-  --knob: light-dark(#ffffff, #f5f4f0);
+  --knob: light-dark(#ffffff, #f5f5f5);
   /* The page of a document as Quick Look draws it (item 268): white in both schemes, as the Mac draws it. */
   --paper: #ffffff;
   /* A light tile in both schemes, for what keeps its own colours: a language's logo, a model provider's, the phone's
      QR code and the sign-in page's mark (item 437; a service's mark is drawn in the theme's ink, item 946). */
   --mark-ground: #ffffff;
-  --mark-ink: #2b2a27;
+  --mark-ink: #2a2a2a;
   --mark-ring: rgb(0 0 0 / 10%);
   /* Six colours dark enough for a white icon in every look and scheme, for the few things drawn in colour on purpose:
      the loop's and the initiative's marks, a file's kind. */
@@ -117,12 +121,12 @@
      file reads as a file in every look. */
   --file-kind: light-dark(#3a6fc4, #7fabf0);
   --on-file-kind: light-dark(#ffffff, #0f2036);
-  --scrim: light-dark(rgb(28 27 25 / 40%), rgb(0 0 0 / 55%));
-  --scrim-strong: light-dark(rgb(28 27 25 / 78%), rgb(0 0 0 / 80%));
+  --scrim: light-dark(rgb(28 28 28 / 40%), rgb(0 0 0 / 55%));
+  --scrim-strong: light-dark(rgb(28 28 28 / 78%), rgb(0 0 0 / 80%));
   /* Shadows: a trace of ink in light, none in dark but under what floats over a scrim. */
-  --shadow-ink: light-dark(rgb(28 27 25 / 5%), transparent);
-  --shadow-ink-soft: light-dark(rgb(28 27 25 / 10%), rgb(0 0 0 / 30%));
-  --shadow-ink-deep: light-dark(rgb(28 27 25 / 24%), rgb(0 0 0 / 60%));
+  --shadow-ink: light-dark(rgb(28 28 28 / 5%), transparent);
+  --shadow-ink-soft: light-dark(rgb(28 28 28 / 10%), rgb(0 0 0 / 30%));
+  --shadow-ink-deep: light-dark(rgb(28 28 28 / 24%), rgb(0 0 0 / 60%));
   --shadow: 0 1px 2px var(--shadow-ink), 0 4px 16px var(--shadow-ink);
   /* Under a box of the pages, which has no frame (item 837): a hairline of shadow and a soft one round it. */
   --shadow-card: 0 1px 2px var(--shadow-ink), 0 4px 14px var(--shadow-ink);
@@ -159,6 +163,21 @@
   --office-bubble-shadow: 0 6px 18px rgb(0 0 0 / 28%);
 }
 
+/* A phone in the neutral look (item 1205): the dark greys a phone's own system draws, a step lighter than a Mac's
+   window, as OpenMausBot draws its Midnight on a phone; light stays as it is. Only the surfaces change, and the text
+   tiers read on these at 4.5:1 too (tests/unit/test_css_tokens.py). A pick of another theme for the other scheme
+   writes the looks' tokens on the page (theme.js), which keeps a Mac's greys. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  :root:not([data-theme]),
+  :root[data-theme="neutral"] {
+    --bg: light-dark(#fcfcfc, #141414);
+    --sidebar: light-dark(#f5f5f5, #1c1c1e);
+    --surface: light-dark(#ffffff, #242426);
+    --surface-2: light-dark(#efefef, #2c2c2e);
+    --surface-3: light-dark(#e4e4e4, #343436);
+  }
+}
+
 /* ---------- paper: warm paper, a serif voice for answers and one terracotta accent ---------- */
 
 :root[data-theme="paper"] {
@@ -173,7 +192,7 @@
   --text: light-dark(#141413, #faf9f5);
   --text-2: light-dark(#3d3d3a, #dcd9cd);
   --muted: light-dark(#66655e, #b9b7ab);
-  --faint: light-dark(#6e6d65, #aeac9f);
+  --faint: light-dark(#69685f, #b3b1a5);
   --accent: light-dark(#b5532f, #d97757);
   --accent-strong: light-dark(#9a4426, #ec9b7e);
   --accent-weak: light-dark(#f6e6dc, #4a3328);
