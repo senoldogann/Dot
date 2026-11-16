@@ -119,9 +119,9 @@ pauses it as "out of credits". Dot sends no `max_tokens` unless a call sets one,
 the model's longest answer (131072 tokens for some), so an account with few credits can be refused a call whose answer
 would be short; when that 402 names the longest answer the credits pay for (`can only afford 29597`) and it is at least
 1,024 tokens, the connector asks once more with that as `max_tokens`, logs `openrouter_max_tokens_lowered`, and the
-model is not paused. A pause for money ("out of credits", "quota exhausted", "not in the plan") that begins while the
-model was answering tells the owner (item 1207): a notice on their phone and desktop, titled "<provider> cannot answer:
-payment needed", with the provider's own words (which say where to top up) and a tap that opens the models page. A
+model is not paused. A pause for money ("out of credits", "quota exhausted", "not in the plan") that begins, or
+replaces a pause for another reason, tells the owner (item 1207): a notice on their phone and desktop, titled
+"<provider> cannot answer: payment needed", with the provider's own words (which say where to top up) and a tap that opens the models page. A
 provider is told about at most once a day while its money stays spent, and once more after the daemon restarts; a rate
 limit or a refused key tells nothing. The fast model's work leaves a paused fast model out as well (item 240): a run's
 summary is written by the run's own model at once, and `web_extract` reads no source and says until when the fast model

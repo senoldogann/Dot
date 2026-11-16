@@ -336,8 +336,8 @@ class ModelRouter:
 
     def _pause(self, ref: ModelRef, error: Exception) -> Pause | None:
         """Pause the model of ``ref`` after ``error``; the newest error decides how long, as the provider's latest
-        word. Returns the pause when it begins one, ``None`` when the error pauses nothing or the model was paused
-        already."""
+        word. Returns the pause when it begins one or changes why the model is paused (a 402 after a rate limit),
+        ``None`` when the error pauses nothing or the model was paused already for the same reason."""
         now: float = time.time()
         pause: Pause | None = pause_for(error, self._config.models.helper_cooldown_s, now)
         if pause is None:
@@ -345,7 +345,7 @@ class ModelRouter:
         before: Pause | None = self._pauses.get(ref.label)
         self._pauses[ref.label] = pause
         log.warning("model_paused", provider=ref.provider, model=ref.label, reason=pause.reason, until=pause.until)
-        return pause if before is None or before.until <= now else None
+        return pause if before is None or before.until <= now or before.reason != pause.reason else None
 
     async def _tell_money(self, ref: ModelRef, pause: Pause, words: str) -> None:
         """Tell the listeners of :meth:`on_money_pause`. The caller gets the call's own error: a listener that fails is

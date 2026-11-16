@@ -246,7 +246,7 @@ async def spent() -> ModelReply:
 
 
 async def test_a_model_whose_money_is_spent_is_told_once_while_it_stays_paused_and_a_rate_limit_is_not() -> None:
-    answers: list[Callable[[], Awaitable[ModelReply]]] = [spent, spent, reply, spent, limited]
+    answers: list[Callable[[], Awaitable[ModelReply]]] = [spent, spent, reply, spent, limited, spent]
     told: list[tuple[str, str, str]] = []
 
     async def in_turn() -> ModelReply:
@@ -269,6 +269,10 @@ async def test_a_model_whose_money_is_spent_is_told_once_while_it_stays_paused_a
     with pytest.raises(ProviderRateLimitError):
         await router.complete(OTHER, REQUEST, no_sink, ORIGIN)
     assert len(told) == 2
+    # A spent balance after a rate limit changes why the model is paused, and is told at once.
+    with pytest.raises(ProviderQuotaError):
+        await router.complete(OTHER, REQUEST, no_sink, ORIGIN)
+    assert [label for label, _, _ in told] == [REF.label, REF.label, OTHER.label]
 
 
 async def limited() -> ModelReply:

@@ -49,5 +49,5 @@ class MoneyTeller:
         now: float = time.time()
         if not due(self._told, ref.provider, now):
             return
-        self._told[ref.provider] = now
         await tell_owner(self._bus, money_title(ref.provider), money_text(ref, pause, words), MODELS_ROUTE)
+        self._told[ref.provider] = now
