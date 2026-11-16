@@ -559,9 +559,12 @@ async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_wit
                     # Options holds Goal mode and Plan first; a phone's model menu holds them (item 1121).
                     held: str = "model" if width < 720 else "options"
                     await composer.locator(f".composer-pill[data-pill='{held}']").click()
-                    if width < 720:
-                        await composer.get_by_role("tab", name="Options", exact=True).click()
-                    options_menu: Locator = composer.locator(f".composer-popover[aria-label='{held.capitalize()}']")
+                    # A phone's chat settings (item 1202) show how Dot works as they open.
+                    options_menu: Locator = (
+                        page.get_by_role("dialog", name="Chat settings")
+                        if width < 720
+                        else composer.locator(".composer-popover[aria-label='Options']")
+                    )
                     await expect(options_menu.get_by_role("switch", name="Goal mode")).to_be_visible()
                     await options_menu.get_by_role("switch", name="Plan first").click()
                     await expect(options_menu.get_by_role("switch", name="Plan first")).to_have_attribute(

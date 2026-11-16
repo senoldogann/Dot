@@ -351,8 +351,8 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
   }
   // A touch outside the box puts its choices away once it ended (its click), unless the words keep the focus (the
   // keyboard is up): put away as the finger came down, the line went and moved what stands over the box, a queued
-  // message's Resume among it, from under the finger. A menu of the box's opens inside it, the "+" menu's over the
-  // page, and a touch there is the box's own.
+  // message's Resume among it, from under the finger. A menu of the box's opens inside it, the "+" menu's and a
+  // phone's chat settings (item 1202) over the page, and a touch there is the box's own.
   let pointerDown = false;
   function onPressAnywhere() {
     pointerDown = true;
@@ -366,7 +366,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
   // and the row touched is no longer in the box by the time the click reaches the page (item 1128).
   function onClickAnywhere(event) {
     const path = event.composedPath();
-    if (!engaged || path.includes(element) || event.target.closest?.(".menu, .sheet-menu") || textarea === document.activeElement) {
+    if (!engaged || path.includes(element) || path.some((node) => node instanceof Element && node.matches(".menu, .sheet-menu, .sheet")) || textarea === document.activeElement) {
       return;
     }
     engage(false);
@@ -375,7 +375,8 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
   // click decides (onClickAnywhere).
   function onFocusOut() {
     setTimeout(() => {
-      const open = element.querySelector(".composer-popover:not([hidden])") !== null;
+      // A menu of the box's open, or a phone's chat settings over the page (item 1202), keep the line.
+      const open = element.querySelector(".composer-popover:not([hidden])") !== null || document.querySelector(".sheet:not([hidden])") !== null;
       if (!pressing && !pointerDown && !open && !element.contains(document.activeElement)) {
         engage(false);
       }
