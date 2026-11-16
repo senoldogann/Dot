@@ -60,7 +60,7 @@ from dotagent.scheduler.failures import (
 from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
 from dotagent.scheduler.notices import BY_HAND_LEVEL, notify_level, said_nothing_new, tells
 from dotagent.scheduler.plans import schedule_zone
-from dotagent.scheduler.timing import format_local, next_firing
+from dotagent.scheduler.timing import MissedFirings, format_local, newest_missed, next_firing
 from dotagent.store.db import Store
 from dotagent.store.models import (
     WORKING_STATUSES,
@@ -90,11 +90,49 @@ FAILED_TICKS_TO_END: int = 20
 # The status of a one-time schedule that is due while the owner's emergency stop is engaged: it waits for the release.
 HELD_STATUS: str = "waiting: the emergency stop is engaged"
 
+# How far apart the late starts of firings missed while the daemon was off or the Mac slept are (item 1204), so that
+# a wake that finds several due does not start them all at once; the others wait, still due, for a later tick.
+CATCH_UP_GAP_S: float = 15.0
+
 
 def late_goal(goal: str, due: float, now: float, zone: ZoneInfo) -> str:
     """The goal of a one-time schedule that fires late, after a note of when it was due and when it starts: what its
     run reads first, while the run keeps the goal alone (:meth:`RunManager.start_firing`)."""
     return f"(Scheduled for {format_local(due, zone)}; it starts late, at {format_local(now, zone)}.)\n\n{goal}"
+
+
+def caught_up_goal(goal: str, due: float, now: float, zone: ZoneInfo, missed: int) -> str:
+    """The goal of a firing that starts late (:func:`late_goal`), after a note, when ``missed`` firings before it were
+    missed too (item 1204), that those do not run."""
+    if missed == 0:
+        return late_goal(goal, due, now, zone)
+    return (
+        f"(Scheduled for {format_local(due, zone)}; it starts late, at {format_local(now, zone)}. The"
+        f" {_firings(missed)} before it were missed (Dot was off, the Mac slept or they could not start), and do not"
+        f" run.)\n\n{goal}"
+    )
+
+
+def missed_status(missed: int, newest: float, late: bool, zone: ZoneInfo) -> str:
+    """What the owner is told of the ``missed`` firings of a repeating schedule that did not run before its newest one,
+    due at ``newest``, which runs (item 1204)."""
+    when: str = "late, now" if late else "now"
+    return (
+        f"missed {_firings(missed)} (Dot was off, the Mac slept or they could not start); the one of"
+        f" {format_local(newest, zone)} runs"
+        f" {when}"
+    )
+
+
+def firing_tail(late: bool, missed: int) -> str:
+    """What the title of a firing's chat says after its name and time: that it started late, and how many firings
+    before it were missed (item 1204), which the schedule's History shows; nothing for one on time."""
+    parts: list[str] = (["late"] if late else []) + ([f"{missed} missed before"] if missed else [])
+    return f" · {', '.join(parts)}" if parts else ""
+
+
+def _firings(count: int) -> str:
+    return "1 firing" if count == 1 else f"{count} firings"
 
 
 def by_hand_goal(goal: str, now: float, zone: ZoneInfo) -> str:
@@ -136,7 +174,9 @@ class Scheduler:
     (:meth:`_firing_chat`).
 
     Every firing advances the schedule's next run before the run starts, so a crash can lose a firing but never repeat
-    one. Firings that were missed collapse into one, and into none when they are overdue by more than the grace period.
+    one. Firings of a repeating schedule that were missed collapse into the newest (item 1204): it starts as at its
+    time within ``misfire_grace_s``, late (saying so, at most one such start every :data:`CATCH_UP_GAP_S`) within
+    ``catch_up_s``, and not at all past that; the older ones are told as missed once the oldest is past the grace.
     A repeating schedule whose previous run is still going skips the firing; a one-time one waits for that run, still
     due. The store is the only persistent state; the instance remembers which schedules have a run in flight.
 
@@ -156,6 +196,8 @@ class Scheduler:
         self._in_flight: dict[str, str] = {}
         # The schedules whose run is being started, by a tick or by hand (item 455), until it is in flight.
         self._starting: set[str] = set()
+        # The earliest moment the next late firing may start (item 1204, :data:`CATCH_UP_GAP_S`).
+        self._next_late_start: float = float("-inf")
         self._watchers: set[asyncio.Task[None]] = set()
         self._loop: asyncio.Task[None] | None = None
         self._reflected_from: float = time.time()
@@ -653,12 +695,14 @@ class Scheduler:
 
     async def _fire(self, record: ScheduleRecord, now: float) -> None:
         """Start the run of a due schedule; a firing the emergency stop, the pause of the agent it runs as (item 465), a
-        run still going or a long absence of the daemon keeps from starting is skipped to the schedule's next time, with
-        the reason as its status. A one-time schedule has no next time and is never dropped: while the emergency stop is
-        engaged, its agent is paused, or a run of it started by hand works, it waits, still due, and one overdue fires
-        late, its opening saying when it was due (:func:`late_goal`). An emergency stop engaged while the run was being
-        started ends it as one. A firing missed where nobody saw it, one overdue or one whose run could not start, is
-        told (:meth:`_tell_missed`)."""
+        run still going or an absence of the daemon longer than ``catch_up_s`` keeps from starting is skipped to the
+        schedule's next time, with the reason as its status. A repeating schedule's newest missed firing within
+        ``catch_up_s`` fires late, as a one-time schedule's overdue firing does, one such start every
+        :data:`CATCH_UP_GAP_S` (item 1204). A one-time schedule has no next time and is never dropped: while the
+        emergency stop is engaged, its agent is paused, or a run of it started by hand works, it waits, still due, and
+        one overdue fires late, its opening saying when it was due (:func:`caught_up_goal`). An emergency stop engaged
+        while the run was being started ends it as one. A firing missed where nobody saw it, one overdue, one whose run
+        could not start or the older ones a late firing leaves behind, is told (:meth:`_tell_missed`)."""
         store: Store = self._runtime.store
         if record.next_run_at is None:
             raise StoreError("a due schedule has no next run", {"schedule_id": record.id})
@@ -666,9 +710,17 @@ class Scheduler:
         due: float = record.next_run_at
         zone: ZoneInfo = await schedule_zone(record.options, self._zone)
         following: float | None = _following(record, now, zone)
-        overdue_s: float = now - record.next_run_at
-        late: bool = overdue_s > self._runtime.config.scheduler.misfire_grace_s
+        config: SchedulerConfig = self._runtime.config.scheduler
         one_time: bool = record.cron is None
+        # The firing that runs: a repeating schedule's newest missed one (item 1204), how late it is, and the older
+        # ones it missed, told only once the oldest is past the grace (within it they collapse unsaid, as before).
+        missed: MissedFirings = (
+            MissedFirings(newest=due, older=0) if record.cron is None else newest_missed(record.cron, due, now, zone)
+        )
+        overdue_s: float = now - missed.newest
+        late: bool = overdue_s > config.misfire_grace_s
+        too_late: bool = late and not one_time and overdue_s > config.catch_up_s
+        told_missed: int = missed.older if now - due > config.misfire_grace_s else 0
         if await _emergency_stop_engaged():
             if one_time:
                 if record.last_status != HELD_STATUS:
@@ -704,23 +756,33 @@ class Scheduler:
             log.warning("schedule_skipped_running", schedule_id=record.id, run_id=self._in_flight.get(record.id))
             await store.record_schedule_skip(record.id, due, following, "skipped: the previous task was still going")
             return
-        if late and not one_time:
+        if too_late:
             log.warning("schedule_skipped_overdue", schedule_id=record.id, overdue_s=round(overdue_s))
-            # The daemon was off or the Mac slept past the grace: the clock cannot tell which (item 553).
+            # The daemon was off or the Mac slept past the catch-up window: the clock cannot tell which (item 553).
             failed_before: FiringFailure | None = await firing_failure(store, record.id)
+            before: str = f"{_firings(missed.older)} missed before it; " if missed.older else ""
             overdue: str = (
-                f"skipped: it could not fire for {round(overdue_s / 60)} minutes: {failed_before.last_error}"
+                f"skipped: it could not fire for {round((now - due) / 60)} minutes: {failed_before.last_error}"
                 if failed_before is not None and failed_before.last_failure_at >= record.next_run_at
-                else f"skipped: {round(overdue_s / 60)} minutes overdue (Dot was off or the Mac slept)"
+                else f"skipped: {before}{round(overdue_s / 60)} minutes overdue (Dot was off or the Mac slept)"
             )
             await store.record_schedule_skip(record.id, due, following, overdue)
             await self._tell_missed(record, overdue)
             return
+        if late:
+            # A late start waits its turn (item 1204): the firing stays due, so a later tick, or the next process
+            # after a restart, starts it; the claim moves the schedule on before its run starts, so none runs twice.
+            if now < self._next_late_start:
+                return
+            self._next_late_start = now + CATCH_UP_GAP_S
         self._starting.add(record.id)
         try:
-            await self._start_due(record, record.next_run_at, now, zone, following, late, overdue_s)
+            await self._start_due(record, missed.newest, told_missed, now, zone, following, late, overdue_s)
         finally:
             self._starting.discard(record.id)
+            if late and record.id not in self._in_flight:
+                # No run started (the claim was dropped, the start failed): the next late firing need not wait.
+                self._next_late_start = now
 
     async def _adopt_resumed(self, record: ScheduleRecord) -> None:
         """Keep as the schedule's run at work one that was resumed by hand (item 553): the daemon's end cut a firing's
@@ -757,16 +819,22 @@ class Scheduler:
     async def _start_due(
         self,
         record: ScheduleRecord,
-        due: float,
+        occurrence: float,
+        missed: int,
         now: float,
         zone: ZoneInfo,
         following: float | None,
         late: bool,
         overdue_s: float,
     ) -> None:
-        """Start the run of the firing of ``record`` that was due at ``due``, once :meth:`_fire` let it: the firing is
-        written (its next time, its chat) before the run starts, so a crash can lose a firing but never repeat one."""
+        """Start the run of the firing of ``record`` that was due at ``occurrence``, once :meth:`_fire` let it, with the
+        ``missed`` firings before it that are told: the firing is written (its next time, its chat) before the run
+        starts, so a crash can lose a firing but never repeat one."""
         store: Store = self._runtime.store
+        if record.next_run_at is None:
+            raise StoreError("a due schedule has no next run", {"schedule_id": record.id})
+        # The schedule's next time as the store has it, which the claim compares; ``occurrence`` is the newest firing.
+        due: float = record.next_run_at
         one_time: bool = record.cron is None
         # As the store had it when it was found due: what the claim below compares (the brief rewrites its goal).
         found: ScheduleRecord = record
@@ -774,7 +842,8 @@ class Scheduler:
         record, digest, title = await self._briefed(
             record, digest, now, zone, thread_title(f"{record.name} · {format_local(now, zone)}")
         )
-        thread_id, made = await self._firing_chat(record, same_chat, title)
+        # After the cut to a title's length, so that a long name keeps it (item 1204); the brief's own title too.
+        thread_id, made = await self._firing_chat(record, same_chat, f"{title}{firing_tail(late, missed)}")
         if not await store.claim_schedule_fire(record.id, due, found, now, following, thread_id):
             # Changed, switched off or deleted while the firing was being prepared: the owner's change stands.
             log.info("schedule_fire_dropped", schedule_id=record.id)
@@ -782,8 +851,8 @@ class Scheduler:
                 await self._drop_chat(record.id, thread_id)
             return
         if late:
-            log.warning("schedule_fired_late", schedule_id=record.id, overdue_s=round(overdue_s))
-        told: str = late_goal(record.goal, due, now, zone) if late else record.goal
+            log.warning("schedule_fired_late", schedule_id=record.id, overdue_s=round(overdue_s), missed=missed)
+        told: str = caught_up_goal(record.goal, occurrence, now, zone, missed) if late else record.goal
         started: RunRecord | None = None
         try:
             # Read inside the try (item 785): a store that fails here keeps a one-time schedule due, as a run that did
@@ -816,6 +885,9 @@ class Scheduler:
                 await store.keep_schedule_due(record.id, due, now)
         run: RunRecord = started
         await self._track(record.id, run, self._level(record))
+        if missed:
+            # Once its run started: one that could not start is told as such, not as running late.
+            await self._tell_missed(record, missed_status(missed, occurrence, late, zone))
         try:
             await store.mark_schedule_running(record.id, run.id)
             await record_firing_started(store, record.id)
