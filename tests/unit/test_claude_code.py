@@ -29,6 +29,7 @@ from dotagent.claude_code.run import (
     write_mcp_config,
 )
 from dotagent.claude_code.stream import (
+    SEARCH_TOOL,
     BlockBegan,
     Delta,
     Init,
@@ -158,6 +159,15 @@ def test_the_prompt_says_who_the_model_is_its_tools_and_what_it_knows_of_the_own
     assert prompt.startswith("You are Dot,") and f"MCP server {DOOR}: notify, shell" in prompt
     assert "Dot's workspace, /w" in prompt and prompt.endswith("- (you said) My name is Ada.")
     assert "\n\n# Team\n- Ada\n\nWhat you know about the owner:" in prompt
+
+
+def test_the_prompt_tells_the_model_to_look_a_tool_up_before_it_calls_it() -> None:
+    """Item 1201: only the door's tools' names are in the prompt (item 1053), and runs on the plan called
+    ``browser_find`` and ``search_files`` with a ``query`` they had guessed, which neither takes, at 15 times the rate
+    of Dot's own loop. The prompt says that a tool's parameters come from its look-up, and how to look it up."""
+    prompt: str = system_prompt("Dot", DOOR, ["browser_find"], Path("/w"), "Friday", "", [])
+    assert f"{SEARCH_TOOL} (select:mcp__{DOOR}__<tool>, several at once" in prompt
+    assert "before your first call of it" in prompt and "never guess" in prompt
 
 
 def test_the_prompt_names_finish_only_to_a_run_that_has_it() -> None:
