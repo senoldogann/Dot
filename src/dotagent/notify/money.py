@@ -16,19 +16,15 @@ from dotagent.notify.owner import tell_owner
 RETELL_S: float = 86_400.0
 # Where the tell opens: the models page, where the model of the runs is chosen.
 MODELS_ROUTE: str = "#/settings/models"
-
-
-def money_title(provider: str) -> str:
-    """The title of the tell for ``provider``."""
-    return f"{provider} cannot answer: payment needed"
+# The title of every such tell: one fixed line, which the channels say in the owner's language
+# (:mod:`dotagent.channels.words`), the model and the provider's words in the text.
+MONEY_TITLE: str = "A model cannot answer: payment needed"
 
 
 def money_text(ref: ModelRef, pause: Pause, words: str) -> str:
-    """The text of the tell: which model, why, and the provider's own words, which say where to top up."""
-    return (
-        f"{ref.provider}:{ref.model} is paused ({pause.reason}); the runs and schedules on it fail until the account "
-        f"is topped up or another model is chosen. The provider said: {words}"
-    )
+    """The text of the tell: the model and why, short, then the provider's own words, which say where to top up and
+    come before a tell's limit cuts the text."""
+    return f"{ref.provider}:{ref.model} ({pause.reason}): {words}"
 
 
 def due(told: dict[str, float], provider: str, now: float) -> bool:
@@ -54,7 +50,7 @@ class MoneyTeller:
         before: float | None = self._told.get(ref.provider)
         self._told[ref.provider] = now
         try:
-            await tell_owner(self._bus, money_title(ref.provider), money_text(ref, pause, words), MODELS_ROUTE)
+            await tell_owner(self._bus, MONEY_TITLE, money_text(ref, pause, words), MODELS_ROUTE)
         except BaseException:
             if before is None:
                 self._told.pop(ref.provider, None)

@@ -282,7 +282,7 @@ async def test_a_model_whose_money_is_spent_is_told_once_while_it_stays_paused_a
     assert await router.complete(REF, REQUEST, no_sink, ORIGIN) == REPLY
     with pytest.raises(ProviderWindowError):
         await router.complete(REF, REQUEST, no_sink, ORIGIN)
-    assert router.paused(time.time())[REF.label].reason == "quota exhausted"
+    assert router.paused(time.time())[REF.label].reason == "usage window spent"
     assert len(told) == 3
 
 

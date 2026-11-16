@@ -338,7 +338,8 @@ objectives at the top of its **Work orders** part, read only.
 
 ## Telling you
 
-What Dot tells you on its own, the brief and the watchers, goes through one function, `tell_owner(bus, title, text,
+What Dot tells you on its own, the brief, the watchers and a model whose account ran out of money ([Models](models.md),
+item 1207), goes through one function, `tell_owner(bus, title, text,
 url)` in `dotagent/notify/owner.py`: a title, a line or two of text and the route of Dot's own pages that a tap opens
 (`#/runs/<id>`; an address of anything else is refused, so that nobody whose words are in a tell can send you
 elsewhere). It is an event of Dot itself, `owner_told`, live only like the other notices (see [The

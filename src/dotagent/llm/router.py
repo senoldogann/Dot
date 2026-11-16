@@ -87,8 +87,8 @@ MAX_PAUSE_S: float = 86_400.0
 
 # The reasons of a pause that only the owner can end, by paying or by changing the plan: the credits or the balance of
 # an account spent, a quota used up, a model the plan does not pay for (item 1207). A rate limit, a plan's usage window
-# (``ProviderWindowError``, which is a quota error too) and a refused key are not told: the first two pass on their
-# own, the third is told where the key is saved.
+# that is spent ("usage window spent") and a refused key are not among them: the first two pass on their own, the
+# third is told where the key is saved.
 MONEY_REASONS: frozenset[str] = frozenset({"out of credits", "quota exhausted", "not in the plan"})
 
 
@@ -100,6 +100,8 @@ def unavailable_reason(error: Exception) -> str | None:
     before such an error reaches its caller."""
     if isinstance(error, ProviderCreditError):
         return "out of credits"
+    if isinstance(error, ProviderWindowError):
+        return "usage window spent"
     if isinstance(error, ProviderQuotaError):
         return "not in the plan" if error.status == 402 else "quota exhausted"
     if isinstance(error, ProviderRateLimitError):
@@ -329,7 +331,7 @@ class ModelRouter:
             await self._record_failure(
                 _failed(ref, request, origin, time.monotonic() - started, _first(first), type(error).__name__)
             )
-            if begun is not None and begun.reason in MONEY_REASONS and not isinstance(error, ProviderWindowError):
+            if begun is not None and begun.reason in MONEY_REASONS:
                 await self._tell_money(ref, begun, error.message if isinstance(error, DotError) else str(error))
             raise
         self._pauses.pop(ref.label, None)

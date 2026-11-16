@@ -121,8 +121,8 @@ would be short; when that 402 names the longest answer the credits pay for (`can
 1,024 tokens, the connector asks once more with that as `max_tokens`, logs `openrouter_max_tokens_lowered`, and the
 model is not paused. A pause for money ("out of credits", "quota exhausted", "not in the plan") that begins, or
 replaces a pause for another reason, tells the owner (item 1207): a notice on their phone and desktop, titled
-"<provider> cannot answer: payment needed", with the provider's own words (which say where to top up) and a tap that opens the models page. A
-provider is told about at most once a day while its money stays spent, and once more after the daemon restarts; a rate
+"A model cannot answer: payment needed" (in the owner's language on iMessage), with the model, why, and the
+provider's own words (which say where to top up), and a tap that opens the models page. A provider is told about at most once a day while its money stays spent, and once more after the daemon restarts; a rate
 limit, a plan's usage window that passes on its own (Ollama's hourly or weekly limit, OpenCode Go's) or a refused
 key tells nothing. The fast model's work leaves a paused fast model out as well (item 240): a run's
 summary is written by the run's own model at once, and `web_extract` reads no source and says until when the fast model
