@@ -391,6 +391,28 @@ what moved; a schedule switched off is not started so, and the end of such a run
   reads first when it was due and when it starts. One whose run could not start stays due and is tried again a minute
   later, then after twice as long each time, an hour at the most. One whose firing a crash cut before its run was under
   way is due again at the time it fired once the scheduler starts, unless its run had been made (item 386).
+- A schedule's task is tried once more on its own (item 1206, `scheduler/recovery.py`) when Dot's restart or crash cut
+  it off, an error of the model service that may pass ended it (a broken connection, a 429 or 5xx, an answer out of
+  form, a Claude Code session that broke off or went silent), or it stopped without getting anywhere (the progress
+  watchdog, empty replies): 15 seconds after its end, or at the next start of Dot. One the Claude plan's usage limit
+  stopped starts again a minute after the plan's reset, when that is at most 12 hours away. The schedule says
+  `retrying at …` meanwhile. The try is a new task of the schedule, started as a firing is, with its own choices, in
+  the chat a firing goes in (one made for it is titled `… · retry`, which its **History** lists); its first message
+  says what it tries again and why, and its page shows a line that leads to that task. It starts from the beginning
+  rather than going on from the cut task's last step, which a half-done call would invite it to repeat.
+  A task is never tried again when it, or a helper it delegated, already sent something out or handed work on: a step
+  whose action the policy flagged as a message or mail, a post, an upload, a payment, a trade or a release (whether or
+  not it went through), a work order or a task handed to another agent, a call the cut left unfinished that may have
+  been one (or that cannot be told), or a helper's call without a result. A try is never tried again either, nor a
+  task the plan's limit stopped without saying when it resets or for longer than 12 hours. Each of those is told to
+  you (a notification whose tap opens the task, whatever the schedule's level of notices), and the schedule says
+  `not tried again: …`; so is a try that could not start, one that Dot was off for longer than `catch_up_s` past its
+  time, and one due while the emergency stop is engaged. A firing of the schedule (on time, late, by hand or by the
+  market) replaces a try still waiting, and a try waiting while a run of the schedule works, or for a schedule
+  switched off, deleted or whose agent is paused, is dropped. A try is claimed in the store before its run starts, so a
+  crash loses it rather than starting it twice. Its failure counts in the schedule's row of failures as any run's.
+  Your stop, the emergency stop, a run's limit of minutes or tokens, its own report of failure and a lasting error (a
+  key, credits) are not tried again. Your own chats are not either: only tasks of a schedule are.
 - The scheduler goes on past a failure: the schedules, the campaigns, the nightly reflection and the harness's step are
   each looked at on their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick
   tries again. Only 20 ticks in a row in which the part that fires schedules or the part that starts a campaign's

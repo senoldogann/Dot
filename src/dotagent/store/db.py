@@ -3841,6 +3841,31 @@ class Store:
             for row in rows
         ]
 
+    async def helper_calls_without_result(self, run_id: str) -> int:
+        """How many calls of the runs ``run_id`` delegated (its family but itself) started and have no result: a
+        ``tool_call`` event each, without the ``tool_result`` every call that ends gets (item 1206: a call a stop or a
+        crash cut while it ran)."""
+        row = await self._one(
+            _family_of("SELECT ?") + " SELECT COALESCE(SUM(open), 0) AS open FROM (SELECT"
+            " MAX(SUM(e.kind = 'tool_call') - SUM(e.kind = 'tool_result'), 0) AS open FROM events AS e"
+            " WHERE e.run_id IN (SELECT id FROM family) AND e.run_id != ? AND e.kind IN ('tool_call', 'tool_result')"
+            " GROUP BY e.run_id)",
+            (run_id, run_id),
+        )
+        return 0 if row is None else int(row["open"])
+
+    async def calls_without_result(self, run_id: str) -> list[str]:
+        """The tools of the calls of ``run_id`` itself that started and have no result, oldest first: a ``tool_call``
+        event without a later ``tool_result`` of the same call id in the run (item 1206). A run on the Claude plan or
+        OpenCode keeps its calls in these events alone, not in its chat's messages."""
+        rows = await self._all(
+            "SELECT json_extract(c.data, '$.tool') AS tool FROM events AS c WHERE c.run_id = ? AND c.kind = 'tool_call'"
+            " AND NOT EXISTS (SELECT 1 FROM events AS r WHERE r.run_id = c.run_id AND r.kind = 'tool_result'"
+            " AND r.id > c.id AND json_extract(r.data, '$.call_id') = json_extract(c.data, '$.call_id')) ORDER BY c.id",
+            (run_id,),
+        )
+        return [str(row["tool"] or "") for row in rows]
+
     async def run_sites(self, run_id: str) -> list[str]:
         """The sites a run's calls reached (the ``site`` of its ``tool_result`` events: page hosts and applications),
         the one it reached most often first (item 308)."""

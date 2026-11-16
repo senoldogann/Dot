@@ -335,9 +335,12 @@ trading off.
    of a schedule or a watcher of yours hands a reply on (item 926), never one of Dot's own initiative, whose messages
    ask you. Its words are the goal of the schedule, which a run of the chat may have written
    (`schedule_create`); the rule of lawful and harmless holds whatever it says, and a run that read outside content is
-   checked before it makes a schedule (item 525). Such a run resumed after a restart is taken as yours, there to
-   answer: its message waits for your yes. No rule of yours answers for you. A chat a schedule, a watcher, a notice, the
-   reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
+   checked before it makes a schedule (item 525). Such a run you resume after a restart is taken as yours, there to
+   answer: its message waits for your yes. The try a schedule starts on its own of a task a restart, a passing model
+   error or a stall ended (item 1206) is no resume: it is a new run of the schedule's own source, so the review model
+   judges its message as a firing's; it is never started for a task that already sent a message or mail, posted,
+   uploaded, paid, traded, released or handed work on, nor twice (see [Schedules](memory-and-schedules.md)). No rule
+   of yours answers for you. A chat a schedule, a watcher, a notice, the reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
    Schedules page runs in a chat of its own). A delegated run, an agent's too, is its parent's. Everything else
    (commands, MCP tools, files, the web, a release, a trade within its limits) runs in `yolo` without a question. In a
    chat Dot opened on its own initiative (item 850): a message, a post and a `release` there wait for your own yes in
