@@ -541,6 +541,12 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             await phone.locator(".composer textarea").last.tap()
             await phone.locator(".composer .composer-pill[data-pill='model']").tap()
             menu = phone.get_by_role("dialog", name="Chat settings")
+            # Escape right after Change leaves the choosing, and the sheet stays open.
+            await menu.get_by_role("button", name="Change").tap()
+            await expect(menu.locator(".model-choosing")).to_be_visible()
+            await phone.keyboard.press("Escape")
+            await expect(menu.locator(".model-choosing")).to_have_count(0)
+            await expect(menu).to_be_visible()
             await menu.get_by_role("button", name="Change").tap()
             # The default's provider is not this one now: its section opens first.
             await menu.locator("summary", has_text="Ollama").tap()

@@ -569,6 +569,29 @@ export function modelSections({ onPick, onMakeDefault }) {
   let making = null;
   // Paints the list as last built again, while it is on the page: what a default being made ended in, and the search.
   let paintBuilt = () => undefined;
+
+  // Escape while the list chooses the default leaves the choosing, wherever the focus is, and the sheet stays open, as
+  // on a Mac's menu: heard before the sheet's own Escape, and only while the list chooses.
+  function onEscape(event) {
+    // The sheet put away while the list chose: the choosing ends with it, and Escape is no longer the list's.
+    if (root === null || !root.isConnected) {
+      setChoosing(false);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setChoosing(false);
+      paintBuilt();
+    }
+  }
+  function setChoosing(on) {
+    choosingDefault = on;
+    if (on) {
+      document.addEventListener("keydown", onEscape, true);
+    } else {
+      document.removeEventListener("keydown", onEscape, true);
+    }
+  }
   // One field for the search, kept across the sheet's repaints, so that a repaint (a choice the daemon changed, the
   // models come) takes neither the focus nor the keyboard from it.
   const search = el("input", {
@@ -589,7 +612,7 @@ export function modelSections({ onPick, onMakeDefault }) {
     if (root === null || !root.isConnected) {
       query = "";
       folded = new Map();
-      choosingDefault = false;
+      setChoosing(false);
     }
     const list = el("div", { class: "model-sections", role: "listbox", "aria-label": t("choices.model") });
     search.value = query;
@@ -609,7 +632,7 @@ export function modelSections({ onPick, onMakeDefault }) {
         return;
       }
       if (ref === fallback) {
-        choosingDefault = false;
+        setChoosing(false);
         paint();
         return;
       }
@@ -618,7 +641,7 @@ export function modelSections({ onPick, onMakeDefault }) {
       Promise.resolve(onMakeDefault(ref))
         .then((taken) => {
           if (taken) {
-            choosingDefault = false;
+            setChoosing(false);
           }
         })
         .finally(() => {
@@ -674,7 +697,7 @@ export function modelSections({ onPick, onMakeDefault }) {
               class: "model-change",
               type: "button",
               onclick: () => {
-                choosingDefault = false;
+                setChoosing(false);
                 paint();
               },
             },
@@ -700,7 +723,7 @@ export function modelSections({ onPick, onMakeDefault }) {
                 type: "button",
                 title: t("choices.changeTitle"),
                 onclick: () => {
-                  choosingDefault = true;
+                  setChoosing(true);
                   paint();
                 },
               },
@@ -757,15 +780,6 @@ export function modelSections({ onPick, onMakeDefault }) {
     }
 
     // Escape while the list chooses the default leaves the choosing, and the sheet stays open, as on a Mac's menu.
-    function leaveOnEscape(event) {
-      if (event.key === "Escape" && choosingDefault) {
-        event.preventDefault();
-        choosingDefault = false;
-        paint();
-      }
-    }
-    list.addEventListener("keydown", leaveOnEscape);
-    search.onkeydown = leaveOnEscape;
     paint();
     root = list;
     paintBuilt = () => {
