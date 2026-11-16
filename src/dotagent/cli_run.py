@@ -18,14 +18,18 @@ from dotagent.cli_commands import (
     ResumeCommand,
     RunCommand,
 )
-from dotagent.cli_ui import TerminalUi, UiOptions, read_line
-from dotagent.config import load_user_config
+from dotagent.cli_handoff import DaemonLink, daemon_of_this_home, hand_run
+from dotagent.cli_ui import RuntimeDesk, TerminalUi, UiOptions, print_result, read_line
+from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import ConfigError, InvalidValueError
+from dotagent.core.logs import get_logger
 from dotagent.events import Subscription
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import RunMode, RunRecord
+
+log = get_logger(__name__)
 
 # How long a second Ctrl-C waits for the stop that the first one asked for to be recorded before the command quits.
 _QUIT_WAIT_S: float = 5.0
@@ -134,15 +138,6 @@ def _say_left_out_servers(runtime: Runtime) -> None:
         sys.stderr.write(f"MCP server {failure.server} is left out: {failure.error} (dotx mcp list shows more)\n")
 
 
-def _print_result(run: RunRecord) -> None:
-    sys.stdout.write(f"{run.result}\n")
-    sys.stdout.flush()
-    sys.stderr.write(
-        f"[{run.status}] {run.steps} steps, {run.input_tokens} tokens in / {run.output_tokens} out, "
-        f"run {run.id}, thread {run.thread_id}\n"
-    )
-
-
 async def _show_lessons(runtime: Runtime, manager: RunManager, ui: TerminalUi, run_id: str) -> None:
     """Wait until the lessons of a run that ended are drawn, then show what became of them. Ctrl-C drops the ones not
     drawn or saved yet, and the command still ends with the run's status."""
@@ -163,19 +158,35 @@ async def _show_lessons(runtime: Runtime, manager: RunManager, ui: TerminalUi, r
 
 
 async def cmd_run(command: RunCommand) -> int:
+    """Carry out the goal of ``command`` and print its answer; 0 when the run ended done. While a daemon of this Dot
+    home runs, the run is handed to it (:func:`dotagent.cli_handoff.hand_run`): it works in the daemon's Chrome beside
+    the chats' runs and is shown on the pages as theirs are. With none, as on a Mac without a daemon, the run works in
+    this process (:func:`run_here`)."""
     goal: str = await _read_goal(command.goal)
-    runtime: Runtime = await build_runtime(load_user_config())
+    config: AppConfig = load_user_config()
+    options: UiOptions = UiOptions(
+        interactive=sys.stdin.isatty() and not command.no_input,
+        stream_text=False,
+        show_thinking=command.thinking,
+        verbose=command.verbose,
+    )
+    link: DaemonLink | None = await daemon_of_this_home(config.server)
+    if link is not None:
+        log.info("run_path", path="daemon", port=link.port)
+        return await hand_run(link, config.server, command, goal, options)
+    log.info("run_path", path="in_process", port=config.server.port)
+    return await run_here(config, command, goal, options)
+
+
+async def run_here(config: AppConfig, command: RunCommand, goal: str, options: UiOptions) -> int:
+    """Carry out the goal of ``command`` in this process, its runtime and its run its own (no daemon of this home runs);
+    0 when the run ended done."""
+    runtime: Runtime = await build_runtime(config)
     try:
         _say_left_out_servers(runtime)
-        options: UiOptions = UiOptions(
-            interactive=sys.stdin.isatty() and not command.no_input,
-            stream_text=False,
-            show_thinking=command.thinking,
-            verbose=command.verbose,
-        )
         manager: RunManager = RunManager(runtime)
         manager.leave_queues()
-        ui: TerminalUi = TerminalUi(runtime, options)
+        ui: TerminalUi = TerminalUi(RuntimeDesk(runtime), runtime.config.server, options)
         run: RunRecord = (
             await follow_run(
                 runtime,
@@ -211,7 +222,7 @@ async def cmd_run(command: RunCommand) -> int:
             )
         )
         # The answer comes first: the lessons are drawn after the run's end.
-        _print_result(run)
+        print_result(run)
         ui.show_open_ends(ui.needs_from_user, await runtime.store.list_left_questions(run.id))
         if run.campaign_id is not None:
             sys.stderr.write(f"{render_first_session_end(await runtime.store.get_campaign(run.campaign_id))}\n")
@@ -234,9 +245,9 @@ async def cmd_resume(command: ResumeCommand) -> int:
         )
         manager: RunManager = RunManager(runtime)
         manager.leave_queues()
-        ui: TerminalUi = TerminalUi(runtime, options)
+        ui: TerminalUi = TerminalUi(RuntimeDesk(runtime), runtime.config.server, options)
         run: RunRecord = await follow_run(runtime, manager, ui, lambda: manager.resume(command.run_id))
-        _print_result(run)
+        print_result(run)
         ui.show_open_ends(ui.needs_from_user, await runtime.store.list_left_questions(run.id))
         await _show_lessons(runtime, manager, ui, run.id)
     finally:
@@ -253,7 +264,8 @@ async def cmd_chat(command: ChatCommand) -> int:
         manager: RunManager = RunManager(runtime)
         manager.leave_queues()
         ui: TerminalUi = TerminalUi(
-            runtime,
+            RuntimeDesk(runtime),
+            runtime.config.server,
             UiOptions(interactive=True, stream_text=True, show_thinking=command.thinking, verbose=command.verbose),
         )
         thread_id: str | None = command.thread

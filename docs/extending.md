@@ -591,7 +591,8 @@ whose connection broke is not repeated, as the tool may have done part of its wo
 tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, or two of its tools would share a
 name) is left out, and Dot starts without its tools: Settings › System, under **Details**,
-names it with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin, and `dotx doctor` warns of a
+names it with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin when they start their own
+servers (a `dotx run` handed to the daemon, item 1203, uses the daemon's, which Settings names), and `dotx doctor` warns of a
 missing command or secret. It is tried again when Dot starts again; `enabled = false` stops trying it. A tool's input
 schema is handed to the model flattened (item 671): a part that refers again to a definition its own path already went
 through (a tree whose nodes hold nodes, a filter of and, or and not), that nests deeper than twelve levels (a feature

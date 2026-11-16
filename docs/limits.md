@@ -63,7 +63,8 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   the run it resumes. After a crash the conversation shows every call of the step that was cut off as interrupted, also
   the ones that finished (a stop, the corner of the screen and an error outside a tool, a store that cannot write, keep
   the results of the ones that had ended, item 552); the first message of the resumed run
-  says which finished. A run of `dotx run` works in its own process: a daemon that starts while it works leaves it, and
+  says which finished. A run that `dotx run` works in its own process (no daemon of its home ran when it
+  started; with one, the daemon drives it, item 1203): a daemon that starts while it works leaves it, and
   the approvals it waits on, to that process, and marks it as cut off only once the process has ended (the daemon never
   resumes such a run on its own).
 - Undo: only `write_file`, `edit_file` and `write_notes` are in the journal, not shell commands, the browser or the

@@ -205,8 +205,9 @@ is left on the chat as above and the run goes on with what does not depend on th
 the card waits in the panel at the composer's place (item 973), and your answer comes to the run as your instruction at once (a step whose model
 is still answering is cut short and asked again with it, item 509), clearing no mark of untrusted content, as a waited
 answer does not ([Safety](safety.md#safety)), or, once it has ended, carries the work on as above, in a run that starts
-as untrusted as the run that asked ended. A run of a message sent with Plan first, and a run of a `dotx` command, which
-no other process can reach while it works, wait for every answer.
+as untrusted as the run that asked ended. A run of a message sent with Plan first, and a run of a `dotx` command that works in its own process, which
+no other process can reach while it works, wait for every answer; a `dotx run` handed to the daemon (item 1203) is the
+daemon's run and chooses as the daemon's do.
 
 **Sends kept for you** (item 922). A message, a post or a release whose question nobody answers in
 `approval_timeout_s` is not refused but kept as a card with its draft, in every chat and whatever `unanswered` says:
@@ -333,7 +334,7 @@ of 130 to 230 tool calls ran on, one for an hour until it was stopped by hand. G
 and keep an eye on the token count of a long one (`--verbose`, or the facts under More on the side panel's Task tab).
 
 **Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off, or a run of
-`dotx run` whose terminal was closed (or that got SIGTERM) or whose command died, and a run that is blocked or that
+`dotx run` in its own process (no daemon ran) whose terminal was closed (or that got SIGTERM) or whose command died, and a run that is blocked or that
 failed, can go on where it stopped: Continue
 on the run's page, `dotx resume RUN_ID` (in this terminal, like `dotx run`), or `POST /api/runs/{id}/resume`. The next
 message you send in that chat, after a blocked, failed or cut-off run, is handed the same note. A new run
@@ -396,8 +397,9 @@ was there before, or that was rewritten since, stays); a lesson left out says wh
 lessons wait on that card, in the conversation: Save to memory keeps one, Dismiss drops it (`POST
 /api/runs/{id}/lessons/{index}/save`, `/dismiss` and `/undo`). A lesson is what its last decision made it, and every
 decision waits for the one before it: a second save or dismissal of a lesson decided already is refused, save the Save
-anyway of one `auto` left out. `dotx run` and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait,
-and the exit status stays the run's. A saved lesson is a note of the agent like the others: a later run gets it when it
+anyway of one `auto` left out. `dotx run` and `dotx resume` show the lessons after the answer when the run worked in
+their own process; Ctrl-C skips the wait, and the exit status stays the run's. A `dotx run` handed to the daemon (item
+1203) does not wait for them: the daemon draws them, and the run's page shows them. A saved lesson is a note of the agent like the others: a later run gets it when it
 fits its goal, and the Memory page edits or forgets it; a lesson of an agent's run is that agent's own (see Agents), and
 the notes it is checked against are the ones that agent's runs are handed. The same text saved again is the same note,
 also one that rested, which is awake again. Delegated runs, chats, runs that failed or were stopped, and evals (which

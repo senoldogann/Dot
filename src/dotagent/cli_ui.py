@@ -8,7 +8,7 @@ import termios
 import threading
 import time
 from collections.abc import Sequence
-from typing import Literal, TextIO
+from typing import Literal, Protocol, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
@@ -24,13 +24,14 @@ from dotagent.agent.plan import StepStatus
 from dotagent.agent.progress import Rung
 from dotagent.agent.questions import QuestionOption, stored_options, takes_several, typed_answer
 from dotagent.agent.resume import CallEnd, CutOff
+from dotagent.config import ServerConfig
 from dotagent.core.errors import RunConflict
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.runtime import Runtime
 from dotagent.server import UI_SOURCE
-from dotagent.store.models import ApprovalRecord, EventRecord
+from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord
 
 _STDIN_POLL_S: float = 0.2
 _ARG_PREVIEW_CHARS: int = 140
@@ -309,6 +310,16 @@ async def read_line(prompt: str, fresh: bool = False) -> str | None:
         stop.set()
 
 
+def print_result(run: RunRecord) -> None:
+    """The answer of a run that ended on standard output, and its status, steps, tokens, id and thread on stderr."""
+    sys.stdout.write(f"{run.result}\n")
+    sys.stdout.flush()
+    sys.stderr.write(
+        f"[{run.status}] {run.steps} steps, {run.input_tokens} tokens in / {run.output_tokens} out, "
+        f"run {run.id}, thread {run.thread_id}\n"
+    )
+
+
 class PromptReply(FrozenModel):
     """What ended the prompt for a decision: the line typed at it (``None`` at the end of input), or the decision that
     came first from elsewhere (the pages of the daemon) or from the deadline."""
@@ -337,11 +348,47 @@ def first_line(text: str) -> str:
     return ""
 
 
-class TerminalUi:
-    """Writes run events to stderr and answers approval requests on the terminal."""
+class DecisionDesk(Protocol):
+    """Where the terminal's decisions on a run's approvals go, and where it learns of one made without it: the broker
+    of this process for a run it drives (:class:`RuntimeDesk`), the daemon's API for a run handed to the daemon
+    (``dotagent.cli_handoff``)."""
 
-    def __init__(self, runtime: Runtime, options: UiOptions) -> None:
+    async def settled(self, approval_id: str) -> None:
+        """Return once the approval ``approval_id`` was decided without the terminal (elsewhere, or by its deadline)."""
+        ...
+
+    async def record(self, approval_id: str) -> ApprovalRecord:
+        """The stored approval ``approval_id``."""
+        ...
+
+    async def resolve(self, approval_id: str, approve: bool, note: str) -> None:
+        """Store the terminal's decision, as :data:`CLI_DECIDER`; raises ``RunConflict`` when another came first."""
+        ...
+
+
+class RuntimeDesk:
+    """The decisions of the terminal on the runs of this process: its approval broker and its store."""
+
+    def __init__(self, runtime: Runtime) -> None:
         self._runtime: Runtime = runtime
+
+    async def settled(self, approval_id: str) -> None:
+        await self._runtime.approvals.settled(approval_id)
+
+    async def record(self, approval_id: str) -> ApprovalRecord:
+        return await self._runtime.store.get_approval(approval_id)
+
+    async def resolve(self, approval_id: str, approve: bool, note: str) -> None:
+        await self._runtime.approvals.resolve(approval_id, approve, CLI_DECIDER, note)
+
+
+class TerminalUi:
+    """Writes run events to stderr and answers approval requests on the terminal, through ``desk``; ``server`` is the
+    daemon's address, which the addresses of a run's pages name."""
+
+    def __init__(self, desk: DecisionDesk, server: ServerConfig, options: UiOptions) -> None:
+        self._desk: DecisionDesk = desk
+        self._server: ServerConfig = server
         self._options: UiOptions = options
         self._out: TextIO = sys.stderr
         self._color: bool = self._out.isatty()
@@ -454,8 +501,7 @@ class TerminalUi:
                 self._on_stall(StallPayload.model_validate(data))
             case "page_shown":
                 shown = PageShownPayload.model_validate(data)
-                server = self._runtime.config.server
-                address: str = page_address(server.host, server.port, shown.page_id)
+                address: str = page_address(self._server.host, self._server.port, shown.page_id)
                 self._line(self._paint(f"  ▣ page “{shown.title}”: {address}", "36"))
             case "compacted":
                 self._line(self._paint("  ⇲ older context summarised", "2"))
@@ -720,7 +766,7 @@ class TerminalUi:
         """The line typed at ``prompt`` for the approval ``approval_id``, unless the approval is decided first without
         it: on the pages of the daemon, whose decisions reach the runs of this command, or by the deadline."""
         reading: asyncio.Task[str | None] = asyncio.create_task(read_line(prompt, fresh=True))
-        settling: asyncio.Task[None] = asyncio.create_task(self._runtime.approvals.settled(approval_id))
+        settling: asyncio.Task[None] = asyncio.create_task(self._desk.settled(approval_id))
         try:
             done, _ = await asyncio.wait({reading, settling}, return_when=asyncio.FIRST_COMPLETED)
         finally:
@@ -732,7 +778,7 @@ class TerminalUi:
         # follows starts on a line of its own.
         self._open_line = line is None
         if settling in done:
-            return PromptReply(line=None, decided=await self._runtime.store.get_approval(approval_id))
+            return PromptReply(line=None, decided=await self._desk.record(approval_id))
         return PromptReply(line=line, decided=None)
 
     def _say_decided(self, decided: ApprovalRecord) -> None:
@@ -751,6 +797,6 @@ class TerminalUi:
         """Store the decision made at this terminal, unless one made elsewhere came first: the run goes on with that
         one, which is said instead."""
         try:
-            await self._runtime.approvals.resolve(request.approval_id, approve, CLI_DECIDER, note)
+            await self._desk.resolve(request.approval_id, approve, note)
         except RunConflict:
-            self._say_decided(await self._runtime.store.get_approval(request.approval_id))
+            self._say_decided(await self._desk.record(request.approval_id))

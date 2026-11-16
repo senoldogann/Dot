@@ -30,11 +30,25 @@ dotx chat
 ```
 
 `run` carries out one goal and prints the result; `chat` keeps a conversation going (`/new` starts a fresh one, `/exit`
-leaves). Ctrl-C stops the run that is going on; a second Ctrl-C quits as soon as that stop is recorded (five seconds at
-most). Closing the terminal, or SIGTERM, cuts the run off instead: its end is recorded, and it can be resumed like a run
-that a stop of the daemon cut off (`dotx resume RUN_ID`, or Continue on its page). A `dotx` command that dies (killed,
-or crashed) records nothing: the daemon closes its run within half a minute, as cut off by the command's death, and it
-can be resumed too.
+leaves).
+
+While the daemon of this Dot home runs, `run` hands its run to it (item 1203): the daemon starts the run, with the
+source `cli` that a run of the command has, in its own Chrome, a tab beside its chats' (Dot's Chrome profile is one
+process's at a time, so a run of the command's own process waited on the daemon's browser work, and theirs on it), and
+its screen is on the pages as any run's is, the phone's too. The command follows it over the daemon's API (the address
+of `[server]` and the token in the Dot home, once the daemon has proven that it holds it) and prints what it prints for
+a run of its own: the steps, the answer, what the run needs from you, the questions it left and, with `--standing`, the
+campaign's line. The lessons of the run are drawn by the daemon after its end: the run's page shows them. With no
+daemon of the home (it never started there, or nothing listens at its address), the run works in the command's own
+process, as on a Mac without one; a program or a daemon of another Dot home at the address is said, and sent nothing.
+`dotx resume` and `dotx chat` work in their own process whether or not a daemon runs.
+
+Ctrl-C stops the run that is going on; a second Ctrl-C quits (for a run of the command's own process, as soon as that
+stop is recorded, five seconds at most). For a run of the command's own process, closing the terminal, or SIGTERM, cuts
+the run off instead: its end is recorded, and it can be resumed like a run that a stop of the daemon cut off (`dotx
+resume RUN_ID`, or Continue on its page). A run handed to the daemon is stopped by them, as nothing follows it any more.
+A `dotx` command that dies (killed, or crashed) records nothing: the daemon closes its run within half a minute, as cut
+off by the command's death, and it can be resumed too; a run handed to the daemon goes on there, on its page.
 
 - `--mode research` makes the run read-only
 - `--model provider:model` picks the model for this run, for example `ollama:gpt-oss:20b-cloud`
@@ -50,7 +64,9 @@ can be resumed too.
   in, Dot's own or the one you have open, signed in as you are (default: `[browser] mode`) (`run` only)
 - `--thread ID` continues an earlier conversation; the line printed at the end of a run names its thread
 - `--no-input` never prompts: every approval that would wait for you is denied and questions go unanswered. The same
-  holds when standard input is not a terminal
+  holds when standard input is not a terminal, and for a run handed to the daemon: the command answers its cards as
+  the terminal (`cli`), so the caller is never kept waiting. A run of the daemon may also leave a question for you
+  and go on without it, as a chat's run does: it stays on the run's page
 - `--thinking` shows the model's reasoning stream, `--verbose` the tool output and the token use
 - a goal of `-` is read from standard input
 

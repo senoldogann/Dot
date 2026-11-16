@@ -18,7 +18,7 @@ from pydantic import TypeAdapter
 
 from dotagent.agent.manager import RunManager
 from dotagent.cli_run import follow_run
-from dotagent.cli_ui import TerminalUi, UiOptions
+from dotagent.cli_ui import RuntimeDesk, TerminalUi, UiOptions
 from dotagent.config import load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config
 from dotagent.evals.scripted import ScriptedProvider
@@ -66,7 +66,9 @@ async def main(goal: str, approvals: ApprovalMode, thread_id: str | None, turns:
         async with runtime.bus.subscribe(None) as subscription:
             saying: asyncio.Task[None] = asyncio.create_task(_say_steps(subscription))
             try:
-                finished: RunRecord = await follow_run(runtime, manager, TerminalUi(runtime, _OPTIONS), launch)
+                finished: RunRecord = await follow_run(
+                    runtime, manager, TerminalUi(RuntimeDesk(runtime), runtime.config.server, _OPTIONS), launch
+                )
             finally:
                 saying.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
