@@ -240,6 +240,13 @@ setTimeout(tick, 1500)</script>""",
     "/upload-one": """<!doctype html><title>One field</title>
 <button type="button">Attach CV</button><input type="file" hidden onchange="document.getElementById('one').textContent =
   event.target.files[0].name"><p>CV: <span id="one">none</span></p>""",
+    # Item 1199: an upload control the page's script draws anew (``draw(n)`` puts n alike buttons in its place), as a
+    # mail composer or a post composer redraws its toolbar; the button names its field, beside another.
+    "/upload-redrawn": """<!doctype html><title>Redrawn</title><div id="bar"></div>
+<input type="file" id="f" hidden onchange="document.getElementById('got').textContent = event.target.files[0].name">
+<input type="file" hidden><p>File: <span id="got">none</span></p>
+<script>function draw(count) { document.getElementById('bar').innerHTML =
+  '<button type="button" aria-controls="f">Attach file</button>'.repeat(count) } draw(1)</script>""",
     # A dialog opens 0.9 s after the first click (past the watch of its effect, item 739), one that says the order is
     # placed after the second (item 698).
     "/asks": """<!doctype html><title>Asks</title>
@@ -905,6 +912,26 @@ async def test_a_control_that_names_its_field_or_never_holds_still_or_opens_noth
     with pytest.raises(BrowserError, match="uploading the files failed"):
         await browser.upload("upload2", ref_of(view.body, 'button "Choose file"'), [str(cv)], True)
     assert "Layer: untouched" in (await browser.read_text("upload2", None, 0, 2000)).text
+
+
+async def test_an_upload_control_the_page_drew_anew_since_it_was_read_still_takes_the_files(
+    browser: BrowserSession, site: str, tmp_path: Path
+) -> None:
+    """Item 1199: a control the page drew anew between the read and the upload (a composer's toolbar redrawn while the
+    step waited for its yes) is the one control of the same role and name the page shows now, and takes the files; the
+    upload failed with "the ref is not in the latest snapshot". Two alike controls, or none, leave it failing."""
+    cv: Path = _file(tmp_path / "cv.pdf")
+    view: PageView = await browser.open_url("redrawn", f"{site}/upload-redrawn", True)
+    page = browser._threads["redrawn"].tabs[0].page
+    await page.evaluate("draw(1)")
+    after: PageView = await browser.upload("redrawn", ref_of(view.body, 'button "Attach file"'), [str(cv)], True)
+    assert "File: cv.pdf" in (await browser.read_text("redrawn", None, 0, 2000)).text
+    assert any("drew the control" in note for note in after.notes), after.notes
+    for count in (2, 0):
+        view = await browser.snapshot("redrawn", True)
+        await page.evaluate(f"draw({count})")
+        with pytest.raises(BrowserError, match="not in the latest snapshot"):
+            await browser.upload("redrawn", ref_of(view.body, 'button "Attach file"'), [str(cv)], True)
 
 
 async def test_a_dialog_that_opens_during_a_wait_ends_it_and_one_that_brings_the_text_is_the_text(
