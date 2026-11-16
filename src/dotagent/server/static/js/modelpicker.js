@@ -567,8 +567,23 @@ export function modelSections({ onPick, onMakeDefault }) {
   // Whether the list chooses the daemon's default, and the model being made the default (null while none is).
   let choosingDefault = false;
   let making = null;
-  // Paints the list as last built again, while it is on the page: what a default being made ended in.
+  // Paints the list as last built again, while it is on the page: what a default being made ended in, and the search.
   let paintBuilt = () => undefined;
+  // One field for the search, kept across the sheet's repaints, so that a repaint (a choice the daemon changed, the
+  // models come) takes neither the focus nor the keyboard from it.
+  const search = el("input", {
+    class: "sheet-search-field",
+    type: "search",
+    placeholder: t("choices.searchModels"),
+    "aria-label": t("choices.searchModels"),
+    autocomplete: "off",
+    enterkeyhint: "search",
+  });
+  const searchBox = el("label", { class: "sheet-search" }, icon("search"), search);
+  search.addEventListener("input", () => {
+    query = search.value;
+    paintBuilt();
+  });
 
   function build({ groups, chosen, fallback, blank }) {
     if (root === null || !root.isConnected) {
@@ -577,14 +592,6 @@ export function modelSections({ onPick, onMakeDefault }) {
       choosingDefault = false;
     }
     const list = el("div", { class: "model-sections", role: "listbox", "aria-label": t("choices.model") });
-    const search = el("input", {
-      class: "sheet-search-field",
-      type: "search",
-      placeholder: t("choices.searchModels"),
-      "aria-label": t("choices.searchModels"),
-      autocomplete: "off",
-      enterkeyhint: "search",
-    });
     search.value = query;
     const chosenProvider = chosen === "" ? (fallback === null ? "" : providerOf(fallback)) : providerOf(chosen);
 
@@ -749,10 +756,6 @@ export function modelSections({ onPick, onMakeDefault }) {
       list.replaceChildren(...children);
     }
 
-    search.addEventListener("input", () => {
-      query = search.value;
-      paint();
-    });
     paint();
     root = list;
     paintBuilt = () => {
@@ -760,7 +763,7 @@ export function modelSections({ onPick, onMakeDefault }) {
         paint();
       }
     };
-    return { list, search: el("label", { class: "sheet-search" }, icon("search"), search) };
+    return { list, search: searchBox };
   }
 
   return { build };

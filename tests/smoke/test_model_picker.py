@@ -346,9 +346,17 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
             await expect(phone_pill).to_contain_text("gpt-5.5-mini")
             await expect(sheet).to_be_visible()
             await expect(openai.get_by_role("option", name="gpt-5.5-mini")).to_have_attribute("aria-selected", "true")
-            # The search makes one list of what it finds, across the providers.
-            await sheet.locator("input.sheet-search-field").fill("mini")
+            # The search makes one list of what it finds, across the providers, and a repaint of the sheet (a choice
+            # the daemon changed) leaves the field its focus.
+            field: Locator = sheet.locator("input.sheet-search-field")
+            await field.fill("mini")
             await expect(sheet.locator(".model-sections [role=option]")).to_have_count(1)
+            await sheet.locator("summary", has_text="Approvals").tap()
+            await field.focus()
+            # A pick made without moving the focus, as a change the daemon tells the page repaints the sheet.
+            await sheet.locator(".pop-option[data-mode='ask']").evaluate("option => option.click()")
+            await expect(sheet.locator(".pop-option[data-mode='ask']")).to_have_attribute("aria-selected", "true")
+            await expect(field).to_be_focused()
             await sheet.get_by_role("button", name="Done").tap()
             await expect(sheet).to_be_hidden()
             await touch.close()

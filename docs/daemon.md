@@ -231,13 +231,15 @@ size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
 the bar is still one line. A phone's box shows its choices while it is used, not by the **+** menu: the words take
-their own line, and the **+**, the model (whose menu holds the reasoning, the approvals and the mode), the context
-meter, the microphone and the send stand on the line under them ([Phone](phone.md), items 1120 and 1121). On a phone the bar's buttons are 36 px and answer a
+their own line, and the **+**, the model (which opens the chat's settings, a sheet from the foot of the screen with the models, the
+reasoning, the mode, the approvals and How Dot works, item 1202), the context meter, the microphone and the send stand
+on the line under them ([Phone](phone.md), items 1120, 1121 and 1202). On a phone the bar's buttons are 36 px and answer a
 finger's 44 px around them (item
 787, as every icon button of the bars and the lists does), and the box's text is the size chosen for it, at
 least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item
-311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a pick or Escape
-or a click outside closes it. The model's menu (item 208) has a rail on its left, a star for the
+311). While Keep going is on, one line under the frame says so. On a wider window each pill opens its menu above it, and a pick or
+Escape or a click outside closes it; a phone's chat settings stay open after a pick, until Done, Close, Escape, a tap on
+the dim or a drag of the sheet's head down. The model's menu (item 208) has a rail on its left, a star for the
 favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the models
 of the view shown (item 395), as its placeholder and its label say, which keeps its words when the rail shows another
 view, has the keys as the menu opens and reads names, providers and "free"; and on each model a star

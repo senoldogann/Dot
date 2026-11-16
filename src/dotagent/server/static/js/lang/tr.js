@@ -276,7 +276,7 @@ export const TR = {
   "choices.makingDefault": "{model} varsayılan yapılıyor…",
   "choices.free": "Ücretsiz",
   "choices.freeMayTrain": "Ücretsiz, verilerinle eğitilebilir",
-  "choices.favouriteOf": "{name} favorilerde",
+  "choices.favouriteOf": "Favori: {name}",
   "choices.chatSettings": "Sohbet ayarları",
   "choices.searchModels": "Model bul",
   "choices.favourites": "Favoriler",

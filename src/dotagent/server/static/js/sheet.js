@@ -38,7 +38,11 @@ export function phoneSheet({ anchor, title, build }) {
     const scrolled = body.scrollTop;
     const parts = build();
     body.replaceChildren(...parts.body);
-    foot.replaceChildren(...parts.foot);
+    // The same foot is left in place: moved out and back, its field would lose the focus and the keyboard with it.
+    const same = parts.foot.length === foot.children.length && parts.foot.every((node, index) => foot.children[index] === node);
+    if (!same) {
+      foot.replaceChildren(...parts.foot);
+    }
     foot.hidden = parts.foot.length === 0;
     body.scrollTop = scrolled;
   }
