@@ -484,6 +484,15 @@ Both modes share what follows.
   Chrome application, so while it runs macOS takes it for yours: a click on Chrome in the Dock brings Dot's forward
   instead of opening yours. Once Dot's has closed, the Dock opens yours again; while a run works in its browser, the
   mode `attach` lets Dot work in your own Chrome instead.
+- Only one Chrome can hold a profile, and a `dotx` command (`dotx run`, `dotx chat`) works in a process of its own
+  beside the daemon, each with its own Chrome (item 1198). When one of them must start Dot's own Chrome and the other's
+  holds the profile, it asks that one to let go: a Chrome no work uses at that moment (no chat's step under way in it,
+  no run at work holding tabs in it, no page read in it for the web tools, no task taught in it) closes within about
+  two seconds, whatever its idle time and wherever its window is, and the asking one starts its own on the same
+  profile. A Chrome a run of the other process works in is kept; the start waits 20 seconds and then fails with *Dot's
+  browser is in use by a run of another Dot process*, to be tried again once that run no longer uses it. A Chrome
+  window no Dot process started (Sign in…, or one you opened on the profile) is never closed: the start fails at once
+  and asks for that window to be closed.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`, and the
   addresses a call of the web-research server's tools holds (`web_scrape`, `web_extract`, `web_map` and
   `web_crawl_start`, item 583: checked as `web_fetch`'s is, and a long one is flagged as it is, see

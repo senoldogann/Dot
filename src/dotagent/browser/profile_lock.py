@@ -111,3 +111,45 @@ def held_for_start(profile: Path) -> contextlib.AbstractContextManager[None]:
         "sign-ins are being imported into the Dot browser profile (dotx browser import-chrome); try again when the "
         "import has ended",
     )
+
+
+# The files by which a Dot process that must start Dot's own Chrome asks the Dot process whose Chrome holds the profile
+# to let go of it (item 1198): one per asking process, named by its pid, in the profile folder.
+_HANDOVER_PREFIX: str = "handover-"
+
+
+def ask_handover(profile: Path, pid: int) -> Path:
+    """Ask, for the process ``pid``, whichever Dot process holds ``profile`` to let go of its Chrome once no work of
+    its uses it (item 1198); the request is the returned file, which :func:`withdraw_handover` takes back."""
+    request: Path = profile / f"{_HANDOVER_PREFIX}{pid}"
+    try:
+        request.touch(mode=0o600)
+    except OSError as error:
+        raise BrowserError(
+            "the request for the browser profile could not be written", {"path": str(request), "error": str(error)}
+        ) from error
+    return request
+
+
+def withdraw_handover(request: Path) -> None:
+    """Take back a request of :func:`ask_handover`, answered or not."""
+    request.unlink(missing_ok=True)
+
+
+def handover_asked(profile: Path) -> bool:
+    """Whether a live process asks for ``profile`` (:func:`ask_handover`). A request left by a process that has ended
+    is deleted and asks nothing."""
+    asked: bool = False
+    for request in profile.glob(f"{_HANDOVER_PREFIX}*"):
+        owner: str = request.name.removeprefix(_HANDOVER_PREFIX)
+        if not owner.isdigit():
+            continue
+        try:
+            os.kill(int(owner), 0)
+        except ProcessLookupError:
+            request.unlink(missing_ok=True)
+            continue
+        except PermissionError:
+            pass
+        asked = True
+    return asked
