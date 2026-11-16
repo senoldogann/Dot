@@ -474,6 +474,12 @@ Both modes share what follows.
   clicked in its place. When no chooser opens and the page has exactly one file field, that field takes them, since no
   other control can be the one meant. A field beside the element, on a page with several, is not taken, as it may be
   another control's.
+  A control the page drew anew since the view that showed its ref (a mail or post composer redraws its toolbar, also
+  while the upload waits for its yes; the ref was then "not in the latest snapshot") is looked for in a new snapshot of
+  the whole page (item 1199): the one control of the same role and name, in the same frame, takes the files, and the
+  page's notes say which ref it was. Not when the page is at another address than that view's, when the view or the new
+  snapshot was of a part of the page only, and not when the page now shows no such control or several: then the upload
+  fails as before, saying to take a new snapshot.
 - With `idle_close_s` (seconds; 600 by default since item 1168, the time after which the chats' own tabs close; 0 keeps
   it open until the daemon stops; item 454), Dot's own Chrome (`own`) closes, the Playwright driver with it, once
   nothing used it for that long: no chat's step is under way in it, no run at work holds tabs in it, no page is being

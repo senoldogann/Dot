@@ -127,6 +127,7 @@ from dotagent.browser.snapshot import (
     link_lines,
     overlay_lines,
     prefer_diff,
+    redrawn_ref,
     render_diff,
     render_lines,
     squeeze_text,
@@ -165,6 +166,7 @@ from dotagent.core.errors import (
     ForbiddenUrlError,
     HandedOff,
     PolicyDenied,
+    RefGoneError,
     RunConflict,
     StepNotSent,
     TabSilentError,
@@ -4214,21 +4216,46 @@ class BrowserSession:
 
     async def upload(self, thread_id: str, ref: str, paths: Sequence[str], hide_secrets: bool) -> PageView:
         """Give ``paths`` to the file field of the upload control ``ref``, or to the file chooser a click on it opens
-        (:func:`upload_files`)."""
+        (:func:`upload_files`). A control the page drew anew since the view that showed ``ref`` (a composer redraws its
+        toolbar, also while the step waits for its yes) is the one alike control the page shows now
+        (:meth:`_redrawn`, item 1199)."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             await self._enforce_landing(tab)
+            given: str = ref
             tab.expect_chooser = True
             try:
-                await upload_files(tab.page, ref, list(paths), _ms(self._config.action_timeout_s))
+                try:
+                    await upload_files(tab.page, ref, list(paths), _ms(self._config.action_timeout_s))
+                except RefGoneError:
+                    again: str | None = await self._redrawn(tab, ref, hide_secrets)
+                    if again is None:
+                        raise
+                    await upload_files(tab.page, again, list(paths), _ms(self._config.action_timeout_s))
+                    given = again
+                    add_note(tab, f"the page drew the control {ref} anew since it was read: the files went to {again}")
             finally:
                 tab.expect_chooser = False
             unsettled: str | None = await self._settle_acted(tab)
             view: PageView = await _read_after(
                 self._changes_view(thread, tab, hide_secrets),
-                f"the upload went through: {len(paths)} file(s) given to {ref}",
+                f"the upload went through: {len(paths)} file(s) given to {given}",
             )
             return view if unsettled is None else view.model_copy(update={"notes": (*view.notes, unsettled)})
+
+    async def _redrawn(self, tab: Tab, ref: str, hide_secrets: bool) -> str | None:
+        """The ref the control ``ref`` of the tab's last view has on the page now (:func:`redrawn_ref`), from a new
+        snapshot of the whole page, which becomes the tab's lines. ``None`` while the page is at another address than
+        that view's, and when that view or the new snapshot was of a part of the page only: one alike control in a part
+        may be one of several on the page."""
+        if tab.rendered_partial or tab.page.url != tab.rendered_url:
+            return None
+        shown: tuple[SnapshotLine, ...] = tab.lines
+        capture: _Capture = await self._capture(tab, hide_secrets)
+        tab.lines = capture.lines
+        found: str | None = None if capture.partial else redrawn_ref(shown, capture.lines, ref)
+        _log.info("browser_ref_redrawn", ref=ref, found=found, url=tab.page.url)
+        return found
 
     # ------------------------------------------------------------------ reads without browser access
 

@@ -429,6 +429,33 @@ def link_lines(lines: Sequence[SnapshotLine], base_url: str, needle: str, limit:
     return tuple(hits)
 
 
+_FRAME_OF_REF: re.Pattern[str] = re.compile(r"^(f\d+)?e")
+
+
+def redrawn_ref(shown: Sequence[SnapshotLine], now: Sequence[SnapshotLine], ref: str) -> str | None:
+    """The ref the control ``ref`` of the view ``shown`` has in the snapshot ``now``, once the page drew it anew
+    (item 1199): ``ref`` itself while ``now`` holds it, else the ref of the one line of ``now`` of the same role and the
+    same name, in the same frame. ``None`` when ``shown`` has no such line or it has no name, and when ``now`` has no
+    alike line or several, which cannot be told apart."""
+    before: SnapshotLine | None = next((line for line in shown if line.ref == ref), None)
+    if before is None or not before.role or not before.name:
+        return None
+    if any(line.ref == ref for line in now):
+        return ref
+    frame: re.Match[str] | None = _FRAME_OF_REF.match(ref)
+    alike: list[str] = [
+        line.ref
+        for line in now
+        if line.ref is not None
+        and line.role == before.role
+        and line.name == before.name
+        and (match := _FRAME_OF_REF.match(line.ref)) is not None
+        and frame is not None
+        and match.group(1) == frame.group(1)
+    ]
+    return alike[0] if len(alike) == 1 else None
+
+
 def line_for_ref(lines: Sequence[SnapshotLine], ref: str) -> str | None:
     for line in lines:
         if line.ref == ref:

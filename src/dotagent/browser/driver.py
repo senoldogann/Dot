@@ -38,7 +38,7 @@ from dotagent.browser.types import (
     VaultFieldKind,
     Viewport,
 )
-from dotagent.core.errors import BrowserError, StepNotSent, TabSilentError
+from dotagent.core.errors import BrowserError, RefGoneError, StepNotSent, TabSilentError
 from dotagent.core.logs import get_logger
 from dotagent.core.outcomes import OutcomeCheck, judge_added, judge_chosen, judge_replaced, judge_ticked
 from dotagent.core.text import truncate_middle
@@ -1025,7 +1025,7 @@ async def live_locator(page: Page, ref: str, action: str) -> Locator:
             ) from error
         raise _failure(f"{action} failed", page, {"ref": ref}, error) from error
     if match_count == 0:
-        raise BrowserError(
+        raise RefGoneError(
             "the ref is not in the latest snapshot (the element changed or the page re-rendered); take a new snapshot",
             {"action": action, "ref": ref, "url": page.url},
         )

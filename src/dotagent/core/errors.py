@@ -191,6 +191,11 @@ class StepNotSent(BrowserError):
     there, an option the dropdown does not have. Doing it again, corrected, repeats nothing."""
 
 
+class RefGoneError(BrowserError):
+    """The ref a call named is not on the page now (item 1199): the element left it, or the page drew it anew, since
+    the snapshot that showed the ref."""
+
+
 class TabSilentError(BrowserError):
     """The page of a tab answered nothing at all within the navigation timeout (item 753): it is stuck, or Chrome is
     overloaded, so nothing can be read of it either; told apart from a page that answers and is still loading (item
