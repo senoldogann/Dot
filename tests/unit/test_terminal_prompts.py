@@ -10,15 +10,16 @@ import select
 import sys
 import threading
 from collections.abc import Iterator
-from typing import cast
 
 import pytest
 
 from dotagent import cli_ui
 from dotagent.cli_ui import ApprovalPayload, TerminalUi, UiOptions
-from dotagent.runtime import Runtime
+from dotagent.config import ServerConfig, load_default_config
+from dotagent.store.models import ApprovalRecord
 
 _ARRIVES_S: float = 5.0
+_SERVER: ServerConfig = load_default_config().server
 # How long a prompt for a decision is left to read what was typed ahead, which it must not take.
 _LEFT_S: float = 0.5
 
@@ -85,8 +86,8 @@ def test_standard_input_that_is_no_terminal_keeps_its_lines() -> None:
         os.close(writing)
 
 
-class _Approvals:
-    """The broker as the terminal meets it: nothing decides elsewhere, and each decision is written down."""
+class _Desk:
+    """The decisions as the terminal meets them: nothing decides elsewhere, and each decision is written down."""
 
     def __init__(self) -> None:
         self.decided: list[tuple[str, bool, str]] = []
@@ -94,13 +95,11 @@ class _Approvals:
     async def settled(self, approval_id: str) -> None:
         await asyncio.Event().wait()
 
-    async def resolve(self, approval_id: str, approve: bool, decided_by: str, note: str) -> None:
+    async def record(self, approval_id: str) -> ApprovalRecord:
+        raise AssertionError(f"nothing decides {approval_id} elsewhere")
+
+    async def resolve(self, approval_id: str, approve: bool, note: str) -> None:
         self.decided.append((approval_id, approve, note))
-
-
-class _Runtime:
-    def __init__(self) -> None:
-        self.approvals: _Approvals = _Approvals()
 
 
 @pytest.mark.parametrize(
@@ -117,15 +116,15 @@ async def test_a_hand_off_is_done_only_on_enter_or_a_yes(
         return answer
 
     monkeypatch.setattr(cli_ui, "read_line", typed_at_the_prompt)
-    runtime: _Runtime = _Runtime()
+    desk: _Desk = _Desk()
     ui: TerminalUi = TerminalUi(
-        cast(Runtime, runtime), UiOptions(interactive=True, stream_text=False, show_thinking=False, verbose=False)
+        desk, _SERVER, UiOptions(interactive=True, stream_text=False, show_thinking=False, verbose=False)
     )
     request: ApprovalPayload = ApprovalPayload(
         approval_id="apr_1", tool="browser_act", summary="Pay the invoice", severity="handoff", args={}
     )
     await ui._ask_approval(request)
-    (decision,) = runtime.approvals.decided
+    (decision,) = desk.decided
     assert decision[:2] == ("apr_1", done)
     assert ("completed" in decision[2]) is done
     assert "any other answer skips it" in asked[0]
@@ -144,13 +143,13 @@ async def test_a_card_that_asks_for_a_secret_is_never_answered_yes_in_the_termin
         return answer
 
     monkeypatch.setattr(cli_ui, "read_line", typed_at_the_prompt)
-    runtime: _Runtime = _Runtime()
+    desk: _Desk = _Desk()
     ui: TerminalUi = TerminalUi(
-        cast(Runtime, runtime), UiOptions(interactive=True, stream_text=False, show_thinking=False, verbose=False)
+        desk, _SERVER, UiOptions(interactive=True, stream_text=False, show_thinking=False, verbose=False)
     )
     request: ApprovalPayload = ApprovalPayload(
         approval_id="apr_2", tool="ask_secret", summary="Demo API token", severity="secret", args={}
     )
     await ui._ask_approval(request)
-    assert runtime.approvals.decided == [("apr_2", False, "")]
+    assert desk.decided == [("apr_2", False, "")]
     assert "Dot's page" in asked[0]

@@ -125,13 +125,14 @@ async def test_an_overdue_firing_says_the_daemon_was_off_or_the_mac_slept(login_
             runtime.store,
             runtime.config.scheduler,
             runtime.schedule_zone,
-            ScheduleRequest(name="Digest", goal=GOAL, cron="0 * * * *", at=None, mode="task", options=UNSET_OPTIONS),
+            ScheduleRequest(name="Digest", goal=GOAL, cron="0 9 * * *", at=None, mode="task", options=UNSET_OPTIONS),
             time.time(),
             None,
         )
         assert schedule.next_run_at is not None
-        grace: float = runtime.config.scheduler.misfire_grace_s
-        await scheduler.tick(schedule.next_run_at + grace + 600)
+        # Past the window in which a missed firing runs late (item 1204).
+        window: float = runtime.config.scheduler.catch_up_s
+        await scheduler.tick(schedule.next_run_at + window + 600)
         skipped: ScheduleRecord = await runtime.store.get_schedule(schedule.id)
         assert skipped.last_status is not None and skipped.last_status.endswith("(Dot was off or the Mac slept)")
         assert skipped.last_status.startswith("skipped: ") and "minutes overdue" in skipped.last_status

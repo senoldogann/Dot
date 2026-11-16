@@ -197,7 +197,8 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         """Start a run, or with ``standing`` a campaign whose opening session the returned run is. The message sent
         again with its ``key`` gets the run its first sending started (:func:`send_once`). With ``loop`` the goal is a
         loop of the run's chat too (item 400, :func:`make_loop`); what the scheduler would refuse of the loop
-        (:func:`plan_schedule`) starts nothing."""
+        (:func:`plan_schedule`) starts nothing. The run's source is the request's: the pages', or ``dotx run``'s for a
+        run it hands to the daemon."""
         if request.model is not None:
             parse_model_ref(request.model)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
@@ -221,7 +222,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     mode,
                     request.model,
                     request.thread_id,
-                    UI_SOURCE,
+                    request.source,
                     request.effort,
                     request.speed,
                     request.once,
@@ -237,7 +238,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.goal,
                     mode,
                     request.model,
-                    UI_SOURCE,
+                    request.source,
                     request.effort,
                     request.speed,
                     request.once,
@@ -254,7 +255,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     mode,
                     request.model,
                     request.thread_id,
-                    UI_SOURCE,
+                    request.source,
                     request.effort,
                     request.speed,
                     request.once,
@@ -269,7 +270,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     mode,
                     request.model,
                     request.thread_id,
-                    UI_SOURCE,
+                    request.source,
                     None,
                     request.effort,
                     request.speed,
@@ -577,26 +578,33 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def list_approvals(query: Annotated[ApprovalsQuery, Query()]) -> list[ApprovalRecord]:
         return await store.list_approvals(query.status, query.limit)
 
+    @router.get("/approvals/{approval_id}")
+    async def get_approval(approval_id: str) -> ApprovalRecord:
+        """One approval, as it is stored: how it was decided, which the terminal of a ``dotx run`` whose run the daemon
+        drives says when it was decided without it."""
+        return await store.get_approval(approval_id)
+
     @router.post("/approvals/{approval_id}/decision")
     async def decide_approval(approval_id: str, request: DecisionRequest) -> ApprovalRecord:
         """Decide an approval or answer a question; the answer to a question a run left carries the work on in its
         thread (see ``RunManager.decide``). A card that asks for a secret (item 857) is answered with its value through
-        its own route alone: here it may only be skipped, as a yes with no value would tell the run one was given."""
+        its own route alone: here it may only be skipped, as a yes with no value would tell the run one was given.
+        ``by`` is who decided: the pages, or the terminal of a ``dotx run`` that handed its run to the daemon."""
         if request.approve and (await store.get_approval(approval_id)).severity == SECRET_SEVERITY:
             raise InvalidValueError(
                 "a card that asks for a secret is answered with the secret, at /approvals/{id}/secret",
                 {"approval_id": approval_id},
             )
         if not (request.approve and request.remember):
-            return await ctx.manager.decide(approval_id, request.approve, UI_SOURCE, request.note)
+            return await ctx.manager.decide(approval_id, request.approve, request.by, request.note)
         record: ApprovalRecord = await store.get_approval(approval_id)
         found: tuple[str, str] | None = await _rememberable(record)
         if found is None:
             # A run that no longer works here (the daemon started again while its card stood): the yes is stored, for
             # this step alone.
-            return await ctx.manager.decide(approval_id, True, UI_SOURCE, request.note)
+            return await ctx.manager.decide(approval_id, True, request.by, request.note)
         chat, kind = found
-        decided: ApprovalRecord = await ctx.manager.decide(approval_id, True, UI_SOURCE, request.note)
+        decided: ApprovalRecord = await ctx.manager.decide(approval_id, True, request.by, request.note)
         # Kept once the yes is stored, so that no step goes on a yes that was not (the pre-push review of item 866).
         if decided.status == "approved":
             await store.add_chat_permit(chat, kind, approval_id)
