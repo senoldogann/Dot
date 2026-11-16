@@ -66,6 +66,11 @@ export function phoneSheet({ anchor, title, build }) {
     const moved = Math.max(0, event.touches[0].clientY - from);
     panel.style.transform = moved === 0 ? "" : `translateY(${moved}px)`;
   }, { passive: true });
+  // A drag the system takes over (an edge gesture, a banner) puts the sheet back where it was.
+  head.addEventListener("touchcancel", () => {
+    from = null;
+    panel.style.transform = "";
+  });
   head.addEventListener("touchend", (event) => {
     if (from === null) {
       return;

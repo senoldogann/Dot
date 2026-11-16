@@ -756,6 +756,16 @@ export function modelSections({ onPick, onMakeDefault }) {
       list.replaceChildren(...children);
     }
 
+    // Escape while the list chooses the default leaves the choosing, and the sheet stays open, as on a Mac's menu.
+    function leaveOnEscape(event) {
+      if (event.key === "Escape" && choosingDefault) {
+        event.preventDefault();
+        choosingDefault = false;
+        paint();
+      }
+    }
+    list.addEventListener("keydown", leaveOnEscape);
+    search.onkeydown = leaveOnEscape;
     paint();
     root = list;
     paintBuilt = () => {
