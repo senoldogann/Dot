@@ -1108,7 +1108,7 @@ them. **Themes** is one strip of cards that slides sideways (a mouse drags it, a
 arrow keys, Home and End move from card to card, and it opens on the theme in use), each with a light and a dark orb:
 the card takes its theme for both schemes, an orb for its own scheme only (a sun or a moon marks the picks), so light
 can wear one theme and dark another. Dot's two looks are **Neutral** (neutral grey and ink after OpenMausBot's Midnight and Daylight, a white page that
-is not cream in light and a phone's own darker greys on a phone in dark, item 1205; round and quiet; the default)
+is not cream in light and a phone's own darker greys on a phone in dark while Neutral is the theme of both schemes, item 1205; round and quiet; the default)
 and **Paper** (warm paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it
 is picked for; Dot's thirteen palettes are **Clean** (near-white, grey and a blue accent), **Rose** (blush whites and
 a raspberry accent), **Grove**, **Ocean**, **Ember**, **Iris**, **Midnight**, **Nord**, **Solarized**, **Sepia**,
@@ -1214,12 +1214,12 @@ it from Chrome's performance metrics and caps it). `#/controls` shows every shap
 Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what sits
 a breath apart; a unit test checks it); the sidebar is a tone darker than the page with no line between them, has no
 dividers between its groups, its labels are the lightest ink that reads, a chat's last activity sits at the right of its
-row in figures of one width ("5m", "3h", "2d") and its open row is a surface step rather than a tint; the top bar's
+row in figures of one width ("5m", "3h", "2d") and its open row is a flat tint of the ink (item 1205); the top bar's
 pills show a border only when they count something; a card's head is lighter than its body; a folded step of the
-timeline is one line whose duration shows on hover. Motion: three durations (120, 200 and 320 ms) and two easings for
-what changes, and the rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every
+timeline is one line whose duration shows on hover. Motion: three durations (120, 200 and 320 ms), the rise of a message
+sent (180 ms) and of a sheet (260 ms), and one easing for what changes (item 1205), and the rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every
 transition and animation to them. The face breathes slowly at rest and pulses while a run works; cards, rows, the slash
-menu and the toasts fade in; a state badge cross-fades. Under the system's reduced-motion setting every transform goes
+menu and the toasts fade in, and a menu of actions opens from 96 %; a state badge cross-fades. Under the system's reduced-motion setting every transform goes
 (the breath, the pulse, the spinners, the ring of a working run's dot, the drawer's slide) and the fades stay, so a
 state change is still seen. What repeats without end stands still while Dot's window is not the one in front or is out
 of sight, and moves again once it is (item 662: the page marks itself away, and every endless animation takes its play

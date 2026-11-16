@@ -165,7 +165,8 @@
 
 /* A phone in the neutral look (item 1205): the dark greys a phone's own system draws, a step lighter than a Mac's
    window, as OpenMausBot draws its Midnight on a phone; light stays as it is. Only the surfaces change, and the text
-   tiers read on these at 4.5:1 too (tests/unit/test_css_tokens.py). */
+   tiers read on these at 4.5:1 too (tests/unit/test_css_tokens.py). A pick of another theme for the other scheme
+   writes the looks' tokens on the page (theme.js), which keeps a Mac's greys. */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   :root:not([data-theme]),
   :root[data-theme="neutral"] {

@@ -3705,8 +3705,7 @@ dialog.modal.versions-dialog {
 
 /* One frame for the three composers (items 104 and 115): the box of one line that grows with its text, the attached
    files and the picks under it, then one bar: the "+" button (item 318) and the mode at the left; the agent, the model, the reasoning, the
-   approvals and the round send at the right. A hairline at rest, a stronger one under the pointer, the 10 % ring in
-   focus; the shadow is the dock's alone. */
+   approvals and the round send at the right. */
 /* The composer is a card on the larger corner with a soft shadow under it (item 121), drawn by a ring of half a pixel
    that grows stronger under the pointer and in focus, with no halo (item 1205); its corners close from 22 to 18 px
    once its text wraps, as OpenMausBot's do. */
@@ -5343,23 +5342,23 @@ dialog.modal.versions-dialog {
 }
 
 /* Two of your messages in a row, with nothing under the first but its foot, which a touch screen does not show (item
-   1064) while no reaction stands on it, are one run as iMessage draws it (item 1205): the corners where they meet
+   1064) while no reaction, yours or Dot's, stands on it, are one run as iMessage draws it (item 1205): the corners where they meet
    are joined. A pointer that can rest shows each message's time and buttons under it, which part them. */
 @media (hover: none) {
-  .user-message:not(:has(.reaction-chip)):has(> .bubble.user + .message-foot):has(
+  .user-message:not(:has(.reaction-chip, .dot-reaction)):has(> .bubble.user + .message-foot):has(
       + .user-message > .bubble.user:first-child
     )
     > .bubble.user {
     border-bottom-right-radius: var(--radius-joined);
   }
 
-  .user-message:not(:has(.reaction-chip)):has(> .bubble.user + .message-foot)
+  .user-message:not(:has(.reaction-chip, .dot-reaction)):has(> .bubble.user + .message-foot)
     + .user-message
     > .bubble.user:first-child {
     border-top-right-radius: var(--radius-joined);
   }
 
-  .user-message:not(:has(.reaction-chip)):has(> .bubble.user + .message-foot)
+  .user-message:not(:has(.reaction-chip, .dot-reaction)):has(> .bubble.user + .message-foot)
     + .user-message:has(> .bubble.user:first-child) {
     margin-top: var(--space-half);
   }
