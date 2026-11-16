@@ -301,7 +301,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   failed with that event too, so a page that showed it queued sees it end. A run that a crashed daemon left behind is
   marked as failed the next time Dot starts, as ended at its last event (the runs it delegated before it), and so is one
   that a `dotx` command left when it died, by the daemon within half a minute when it runs. Either can be resumed, and
-  so can a run that a shutdown of the daemon cut off. A queue held because the daemon crashed stays held while that
+  so can a run that a shutdown of the daemon cut off. A schedule's run that either cut off is not resumed on its own:
+  the scheduler starts it once more as a new run of the schedule, unless it sent something out (item 1206, see
+  [Schedules](memory-and-schedules.md)); that run's page shows a line saying it is a try, with the way to the run it
+  tries again. A queue held because the daemon crashed stays held while that
   resumed run works, and opens when the resumed run ends done; a queue held because a run failed stays held until you
   resume it. A resumed run keeps the ledger and the progress ladder of the run it goes on from when those were stored,
   and its note says so; when they were not, the note says they start again (see

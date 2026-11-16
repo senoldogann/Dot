@@ -28,6 +28,7 @@ from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.schedule import schedule_of
 from dotagent.harness.weekly import night as harness_night
 from dotagent.llm.types import Speed
+from dotagent.notify.owner import tell_owner
 from dotagent.plugins import scout_service
 from dotagent.plugins.scout import ScoutStopped
 from dotagent.plugins.scout_types import ScoutState
@@ -60,6 +61,25 @@ from dotagent.scheduler.failures import (
 from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
 from dotagent.scheduler.notices import BY_HAND_LEVEL, notify_level, said_nothing_new, tells
 from dotagent.scheduler.plans import schedule_zone
+from dotagent.scheduler.recovery import (
+    SCHEDULE_RETRY_EVENT,
+    EndFacts,
+    NoRetry,
+    PendingRetry,
+    Retry,
+    ScheduleRetries,
+    claim_stored,
+    decide,
+    drop_stored,
+    end_facts,
+    not_retried_status,
+    queue_stored,
+    retries_stored,
+    retry_goal,
+    retrying_status,
+    started_stored,
+    supersede_stored,
+)
 from dotagent.scheduler.timing import MissedFirings, format_local, newest_missed, next_firing
 from dotagent.store.db import Store
 from dotagent.store.models import (
@@ -224,7 +244,7 @@ class Scheduler:
         """Begin ticking in the background; what an earlier process left unfinished (a schedule starting or running a
         run, whose watch went with that process) is marked as interrupted and logged. A run that was under way counts
         as a failure in the schedule's row (item 1105): a schedule whose run brings the daemon down is switched off as
-        one whose runs fail is.
+        one whose runs fail is. That run is tried once more when it may be (item 1206, :meth:`_recover`).
 
         Returns the task of the loop, so the caller can notice when it ends.
         """
@@ -237,6 +257,7 @@ class Scheduler:
                     failed_in_row: int | None = await store.record_schedule_outcome(record.id, "interrupted")
                     if failed_in_row is not None:
                         await self._stop_if_failing(record.id, failed_in_row)
+                    await self._recover_cut(record)
                 else:
                     await store.set_schedule_status(record.id, "interrupted")
                 log.warning("schedule_interrupted", schedule_id=record.id, status=record.last_status)
@@ -322,7 +343,7 @@ class Scheduler:
         the market of items 770 and 772, the trend engine of item 818) is logged at each tick with the part's name
         and never raises (item 688)."""
         failures: list[Exception] = []
-        for part in (self._fire_due, self._start_due_sessions):
+        for part in (self._fire_due, self._retry_due, self._start_due_sessions):
             try:
                 await part(now)
             except Exception as exc:
@@ -808,6 +829,193 @@ class Scheduler:
         log.info("schedule_resumed_run_followed", schedule_id=record.id, run_id=newest[0].id)
         await self._track(record.id, newest[0], self._level(record))
 
+    async def _recover_cut(self, record: ScheduleRecord) -> None:
+        """The task of ``record`` that an earlier process left running, which its end cut (item 1206): the newest run
+        of the schedule's chat; it is tried once more when it may be (:meth:`_recover`)."""
+        if record.thread_id is None:
+            return
+        newest: list[RunRecord] = await self._runtime.store.list_runs(1, record.thread_id)
+        if newest:
+            await self._recover(record.id, newest[0])
+
+    async def _recover(self, schedule_id: str, run: RunRecord) -> None:
+        """Try the ended task ``run`` of ``schedule_id`` once more when its end calls for it (item 1206,
+        :func:`~dotagent.scheduler.recovery.decide`): the try is kept, due 15 s on or a minute after the Claude plan's
+        reset, and the schedule's status says when; a task that would be tried and is not is told to the owner. Only a
+        run of the schedule's own source is tried, never a delegated run nor one the owner resumed. A schedule deleted
+        meanwhile, or a repeating one switched off, tries nothing. What the store fails is logged, and the end
+        stands."""
+        if run.source != SCHEDULE_SOURCE or run.parent_run_id is not None:
+            return
+        store: Store = self._runtime.store
+        try:
+            now: float = time.time()
+            facts: EndFacts = await end_facts(self._runtime, run, schedule_id, now)
+            verdict: Retry | NoRetry | None = decide(facts, now)
+            if verdict is None:
+                return
+            record: ScheduleRecord = await store.get_schedule(schedule_id)
+            if isinstance(verdict, NoRetry):
+                await self._not_retried(record, run.id, verdict)
+                return
+            if record.cron is not None and not record.enabled:
+                log.info("schedule_retry_not_queued_off", schedule_id=schedule_id, run_id=run.id)
+                return
+            zone: ZoneInfo = await schedule_zone(record.options, self._zone)
+            await queue_stored(store, schedule_id, verdict.pending)
+            await store.set_schedule_status(schedule_id, retrying_status(verdict.pending, zone))
+            log.warning(
+                "schedule_retry_queued",
+                schedule_id=schedule_id,
+                run_id=run.id,
+                why=verdict.pending.why,
+                due_at=verdict.pending.due_at,
+            )
+        except NotFoundError:
+            log.info("schedule_retry_schedule_gone", schedule_id=schedule_id, run_id=run.id)
+        except DotError as exc:
+            log.error(
+                "schedule_retry_not_decided",
+                schedule_id=schedule_id,
+                run_id=run.id,
+                error=exc.message,
+                context=exc.context,
+            )
+
+    async def _not_retried(self, record: ScheduleRecord, run_id: str, refused: NoRetry) -> None:
+        """Tell the owner that the task ``run_id`` of ``record`` is not tried again and why, whatever the schedule's
+        level of notices (item 1206: the owner asked to be told), its tap opening that task; the schedule's status says
+        so unless it says the schedule was switched off."""
+        status: str = not_retried_status(refused)
+        log.warning("schedule_task_not_retried", schedule_id=record.id, run_id=run_id, why=refused.why)
+        if not record.last_status.startswith("switched off:"):
+            await self._runtime.store.set_schedule_status(record.id, status)
+        await tell_owner(
+            self._runtime.bus, "A schedule's task was not tried again", f"{record.name}: {status}", f"#/runs/{run_id}"
+        )
+
+    async def _retry_due(self, now: float) -> None:
+        """Start every try of a schedule's task that is due at ``now``, each on its own (:meth:`_retry_alone`)."""
+        retries: ScheduleRetries = await retries_stored(self._runtime.store)
+        for schedule_id, pending in retries.pending.items():
+            if pending.due_at <= now:
+                await self._retry_alone(schedule_id, pending, now)
+
+    async def _retry_alone(self, schedule_id: str, pending: PendingRetry, now: float) -> None:
+        """Start one try (:meth:`_retry`). One that cannot start is dropped, so that it is not started again at every
+        tick, and told to the owner as a task not tried again; the other tries and schedules go on."""
+        try:
+            await self._retry(schedule_id, pending, now)
+        except DotError as exc:
+            log.error("schedule_retry_failed", schedule_id=schedule_id, error=exc.message, context=exc.context)
+            await drop_stored(self._runtime.store, schedule_id, pending.from_run_id)
+            record: ScheduleRecord = await self._runtime.store.get_schedule(schedule_id)
+            refused: NoRetry = NoRetry(why=pending.why, reason=f"the try could not start: {exc.message}")
+            await self._not_retried(record, pending.from_run_id, refused)
+
+    async def _retry(self, schedule_id: str, pending: PendingRetry, now: float) -> None:
+        """Start the try ``pending`` of a task of ``schedule_id`` (item 1206) unless something drops it: the schedule
+        deleted or (a repeating one) switched off, its agent paused, or a run of it at work, which does the task; one
+        Dot was off for longer than ``catch_up_s`` past its time, or that comes while the emergency stop is engaged, is
+        dropped and told."""
+        store: Store = self._runtime.store
+        try:
+            record: ScheduleRecord = await store.get_schedule(schedule_id)
+        except NotFoundError:
+            log.info("schedule_retry_dropped_gone", schedule_id=schedule_id, run_id=pending.from_run_id)
+            await drop_stored(store, schedule_id, pending.from_run_id)
+            return
+        if record.cron is not None and not record.enabled:
+            log.info("schedule_retry_dropped_off", schedule_id=schedule_id, run_id=pending.from_run_id)
+            await drop_stored(store, schedule_id, pending.from_run_id)
+            return
+        refused: str | None = None
+        if now - pending.due_at > self._runtime.config.scheduler.catch_up_s:
+            refused = "Dot was off when it was due, for longer than a schedule waits to start late"
+        elif await _emergency_stop_engaged():
+            refused = "the emergency stop is engaged"
+        if refused is not None:
+            await drop_stored(store, schedule_id, pending.from_run_id)
+            await self._not_retried(record, pending.from_run_id, NoRetry(why=pending.why, reason=refused))
+            return
+        paused: AgentRecord | None = await self._paused_agent(record)
+        if paused is not None:
+            # A pause is the owner's: nobody is told, as for a firing it skips.
+            log.info("schedule_retry_dropped_paused", schedule_id=schedule_id, agent_id=paused.id)
+            await drop_stored(store, schedule_id, pending.from_run_id)
+            await store.set_schedule_status(schedule_id, f"not tried again: {paused.name} is paused")
+            return
+        await self._adopt_resumed(record)
+        if schedule_id in self._in_flight or schedule_id in self._starting:
+            log.info("schedule_retry_dropped_running", schedule_id=schedule_id, run_id=self._in_flight.get(schedule_id))
+            await drop_stored(store, schedule_id, pending.from_run_id)
+            return
+        self._starting.add(schedule_id)
+        try:
+            await self._start_retry(record, pending, now)
+        finally:
+            self._starting.discard(schedule_id)
+
+    async def _start_retry(self, record: ScheduleRecord, pending: PendingRetry, now: float) -> None:
+        """Start the run of the try ``pending`` as a firing starts its run: the schedule's own choices and source, the
+        chat a firing goes in (one made for it titled ``... · retry``), its first message saying what it tries again
+        and why. The try is claimed in the store before its run starts, so that a crash loses it rather than repeating
+        it, and its run is marked with a ``schedule_retry`` event, so that it is never tried itself."""
+        store: Store = self._runtime.store
+        zone: ZoneInfo = await schedule_zone(record.options, self._zone)
+        same_chat, digest = await self._history(record, zone)
+        record, digest, title = await self._briefed(
+            record, digest, now, zone, thread_title(f"{record.name} · {format_local(now, zone)}")
+        )
+        thread_id, made = await self._firing_chat(record, same_chat, f"{title} · retry")
+        if not await claim_stored(store, record.id, pending.from_run_id, thread_id, now):
+            # Claimed elsewhere, or superseded by a firing, since it was read due.
+            log.info("schedule_retry_claim_dropped", schedule_id=record.id, run_id=pending.from_run_id)
+            if made:
+                await self._drop_chat(record.id, thread_id)
+            return
+        started: RunRecord | None = None
+        try:
+            carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
+            opening: str = firing_opening(retry_goal(record.goal, pending, zone), digest)
+            started = await self._start(record, opening, thread_id, carried)
+        finally:
+            if started is None and made:
+                await self._drop_chat(record.id, thread_id)
+        run: RunRecord = started
+        # Followed first, so that a write that fails below leaves no run of the schedule unwatched; until the mark is
+        # written, the claim tells the try apart (:func:`~dotagent.scheduler.recovery.is_try_run`).
+        await self._track(record.id, run, self._level(record))
+        try:
+            await started_stored(store, record.id, pending.from_run_id, run.id)
+            await self._runtime.bus.emit(
+                run.id,
+                SCHEDULE_RETRY_EVENT,
+                {"from_run_id": pending.from_run_id, "why": pending.why, "ended_at": pending.ended_at},
+                True,
+            )
+            # Its chat is the schedule's last, as a run by hand's is (nothing of when it fires next changes): a crash
+            # while the try works finds it there as the run cut (:meth:`_recover_cut`), not the task it tried again.
+            await store.record_schedule_hand_run(record.id, now, thread_id, run.id)
+        except DotError as exc:
+            # The run started all the same; its watch writes how it ended.
+            log.error(
+                "schedule_status_not_written",
+                schedule_id=record.id,
+                run_id=run.id,
+                error=exc.message,
+                context=exc.context,
+            )
+        log.warning(
+            "schedule_retried",
+            schedule_id=record.id,
+            run_id=run.id,
+            from_run_id=pending.from_run_id,
+            why=pending.why,
+            thread_id=thread_id,
+            same_chat=not made,
+        )
+
     async def _paused_agent(self, record: ScheduleRecord) -> AgentRecord | None:
         """The agent ``record`` runs as when the owner paused it (item 465), else ``None``. An agent that cannot be read
         fails the firing: nothing starts for a pause that is not known."""
@@ -891,6 +1099,8 @@ class Scheduler:
         try:
             await store.mark_schedule_running(record.id, run.id)
             await record_firing_started(store, record.id)
+            # The firing's run does the task: a try of an earlier one waiting for the schedule is dropped (item 1206).
+            await supersede_stored(store, record.id)
         except DotError as exc:
             # The run started all the same; its watch writes how it ended.
             log.error(
@@ -977,6 +1187,8 @@ class Scheduler:
             )
             try:
                 await store.record_schedule_hand_run(record.id, now, thread_id, run.id)
+                # Its run does the task: a try waiting for the schedule is dropped (item 1206).
+                await supersede_stored(store, record.id)
             except DotError as exc:
                 # The run started all the same; its watch writes how it ended.
                 log.error(
@@ -1135,7 +1347,8 @@ class Scheduler:
     async def _watch(self, schedule_id: str, run_id: str, level: NotifyLevel, by_hand: bool = False) -> None:
         """Write the outcome of a run to its schedule once the run is over, with its row of failed runs (item 458); a
         repeating schedule whose runs failed so many times in a row is switched off, and the owner told once. The end
-        is told at ``level`` (item 461) even when the write or the switch-off failed."""
+        is told at ``level`` (item 461) even when the write or the switch-off failed. Then the task is tried once more
+        when its end calls for it (item 1206, :meth:`_recover`)."""
         try:
             finished: RunRecord = await self._manager.wait(run_id)
             failed_in_row: int | None = None
@@ -1154,6 +1367,7 @@ class Scheduler:
                     await self._stop_if_failing(schedule_id, failed_in_row)
             finally:
                 await self._tell_end(schedule_id, finished, level, failed_in_row, by_hand)
+            await self._recover(schedule_id, finished)
         finally:
             self._in_flight.pop(schedule_id, None)
 

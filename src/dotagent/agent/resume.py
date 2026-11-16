@@ -31,7 +31,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import ToolCall
-from dotagent.policy.types import READ_ONLY_KINDS, ActionInfo, ActionKind
+from dotagent.policy.types import READ_ONLY_KINDS, ActionInfo, ActionKind, Flag
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
@@ -104,14 +104,16 @@ _HANDOFF_TEXT: dict[HandOff, str] = {
 class InterruptedCall(FrozenModel):
     """A call of the step a run was in when it was cut off. ``arguments`` is the start of its arguments as JSON,
     ``kind`` its policy kind (``None`` when it cannot be told: an unknown tool, arguments its tool refuses, a check that
-    looks at the screen), ``end`` how it ended according to the run's events, and ``result`` the start of what it
-    returned (empty unless it finished)."""
+    looks at the screen), ``end`` how it ended according to the run's events, ``result`` the start of what it
+    returned (empty unless it finished), and ``flags`` those its action raises (none when its kind cannot be told),
+    which tell a call that may have sent something out (item 1206)."""
 
     tool: str
     arguments: str
     kind: ActionKind | None
     end: CallEnd
     result: str
+    flags: tuple[Flag, ...] = ()
 
 
 class Resumption(FrozenModel):
@@ -311,7 +313,7 @@ class _NoAnswers:
         raise PolicyDenied("a call that is only classified takes no instructions", {"chars": len(text)})
 
 
-async def _kind_of(call: ToolCall, context: ToolContext) -> ActionKind | None:
+async def _action_of(call: ToolCall, context: ToolContext) -> ActionInfo | None:
     tool: RegisteredTool | None = context.runtime.registry.tools.get(call.name)
     if tool is None or call.name in _SCREEN_CLASSIFIED:
         return None
@@ -320,7 +322,20 @@ async def _kind_of(call: ToolCall, context: ToolContext) -> ActionKind | None:
     except (DotError, OSError, ValueError) as exc:
         log.warning("resume_call_unclassified", run_id=context.run_id, tool=call.name, error=str(exc))
         return None
-    return prepared.action.kind
+    return prepared.action
+
+
+def _interrupted(
+    call: ToolCall, action: ActionInfo | None, started: Collection[str], results: Mapping[str, EventRecord]
+) -> InterruptedCall:
+    return InterruptedCall(
+        tool=call.name,
+        arguments=truncate_tail(dumps_compact(call.arguments), _ARGUMENTS_CHARS),
+        kind=None if action is None else action.kind,
+        end=_call_end(call.id, started, results),
+        result=_result_start(results.get(call.id)),
+        flags=() if action is None else action.flags,
+    )
 
 
 async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[InterruptedCall, ...]:
@@ -369,15 +384,4 @@ async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[Interrupt
         facts=new_facts,
         spawner=None,
     )
-    return tuple(
-        [
-            InterruptedCall(
-                tool=call.name,
-                arguments=truncate_tail(dumps_compact(call.arguments), _ARGUMENTS_CHARS),
-                kind=await _kind_of(call, context),
-                end=_call_end(call.id, started, results),
-                result=_result_start(results.get(call.id)),
-            )
-            for call in calls
-        ]
-    )
+    return tuple([_interrupted(call, await _action_of(call, context), started, results) for call in calls])

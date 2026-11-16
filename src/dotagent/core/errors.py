@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from typing import Literal
 
 from pydantic import JsonValue
 
@@ -297,6 +298,20 @@ class ClaudeCodeMissing(ClaudeCodeError):
     """The ``claude`` program a run on the owner's Claude plan needs (item 1013) is not installed, or not signed in."""
 
 
+class ClaudeCodeBroke(ClaudeCodeError):
+    """A run's Claude Code session broke off: it failed, ended or stopped reading before it answered, or went silent
+    (item 1206: a passing failure, which a schedule's task is tried again after)."""
+
+
+class ClaudePlanLimitError(ClaudeCodeError):
+    """The owner's Claude plan's usage limit stopped a run (item 1206). ``resets_at`` is when the plan's window resets,
+    in epoch seconds, ``None`` when the plan did not say; it is in the context too, which the run's end keeps."""
+
+    def __init__(self, message: str, resets_at: float | None, context: Mapping[str, JsonValue]) -> None:
+        super().__init__(message, {**context, "resets_at": resets_at})
+        self.resets_at: float | None = resets_at
+
+
 class PreviewError(DotError):
     """macOS's Quick Look could not draw a file for the panel beside a chat (item 268)."""
 
@@ -400,3 +415,26 @@ class VoiceError(DotError):
 
 class RepairError(DotError):
     """The repair of Dot's own problems (item 919) could not go on: Claude Code, git or GitHub's CLI failed."""
+
+
+# How a failure that ended a run fares with time (item 1206): ``passing`` may not happen again (a broken connection, a
+# provider's 429 or 5xx, a payload out of form, a Claude Code session that broke off), ``plan_limit`` passes at the
+# Claude plan's reset, and ``lasting`` needs a change (a key, credits, a setting, the task itself).
+type FailureKind = Literal["passing", "plan_limit", "lasting"]
+
+_PASSING_STATUS: int = 500
+
+
+def failure_kind(error: DotError) -> FailureKind:
+    """How ``error``, which ended a run, fares with time (:data:`FailureKind`)."""
+    if isinstance(error, ClaudePlanLimitError):
+        return "plan_limit"
+    if isinstance(error, ProviderTransportError | ProviderRunnerError | ProviderRateLimitError | ProviderProtocolError):
+        return "passing"
+    if isinstance(error, ClaudeCodeBroke):
+        return "passing"
+    if isinstance(error, ProviderAuthError | ProviderAccessError | ProviderQuotaError):
+        return "lasting"
+    if isinstance(error, ProviderHttpError) and error.status >= _PASSING_STATUS:
+        return "passing"
+    return "lasting"

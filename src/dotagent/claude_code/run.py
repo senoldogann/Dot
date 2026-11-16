@@ -119,7 +119,14 @@ from dotagent.claude_code.stream import (
     tool_prefix,
     user_line,
 )
-from dotagent.core.errors import ClaudeCodeError, FailSafeTriggered, RunCancelled, RunHoldLapsed
+from dotagent.core.errors import (
+    ClaudeCodeBroke,
+    ClaudeCodeError,
+    ClaudePlanLimitError,
+    FailSafeTriggered,
+    RunCancelled,
+    RunHoldLapsed,
+)
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import claude_code_dir
@@ -517,7 +524,7 @@ class _Follow:
             self.stdin.write(user_line(text, images).encode("utf-8"))
             await self.stdin.drain()
         except (BrokenPipeError, ConnectionResetError) as error:
-            raise ClaudeCodeError(
+            raise ClaudeCodeBroke(
                 "Claude Code stopped reading its input before the run ended",
                 {"run_id": self.agent.run.id, "error": str(error)},
             ) from error
@@ -531,11 +538,11 @@ class _Follow:
                 case _Stopped():
                     raise RunCancelled("the run was stopped", {"run_id": self.agent.run.id})
                 case _Ended():
-                    raise ClaudeCodeError(
+                    raise ClaudeCodeBroke(
                         "Claude Code ended before it answered", {"run_id": self.agent.run.id, "inited": self.inited}
                     )
                 case _Silent(seconds=seconds):
-                    raise ClaudeCodeError(
+                    raise ClaudeCodeBroke(
                         f"Claude Code said nothing for {round(seconds)} s while none of Dot's tools worked for it, so "
                         "Dot ended it",
                         {"run_id": self.agent.run.id, "silence_s": round(seconds, 1)},
@@ -570,8 +577,10 @@ class _Follow:
             case LimitSeen(window=window):
                 self.window = window
                 if window_refused(window):
-                    raise ClaudeCodeError(
-                        limit_message(window, limit_resets(window, "")),
+                    resets: float | None = limit_resets(window, "")
+                    raise ClaudePlanLimitError(
+                        limit_message(window, resets),
+                        resets,
                         {"run_id": self.agent.run.id, "window": window.model_dump(mode="json")},
                     )
             case Taken():
@@ -654,8 +663,9 @@ class _Follow:
         if event.is_error:
             context: JsonObject = {"run_id": self.agent.run.id, "subtype": event.subtype, "said": event.text[-2000:]}
             if limit_said(event.text) or (self.window is not None and window_refused(self.window)):
-                raise ClaudeCodeError(limit_message(self.window, limit_resets(self.window, event.text)), context)
-            raise ClaudeCodeError(f"Claude Code's session failed: {event.text or event.subtype}", context)
+                resets_at: float | None = limit_resets(self.window, event.text)
+                raise ClaudePlanLimitError(limit_message(self.window, resets_at), resets_at, context)
+            raise ClaudeCodeBroke(f"Claude Code's session failed: {event.text or event.subtype}", context)
         if not self.inited:
             raise ClaudeCodeError(
                 "Claude Code answered before it said what the model has, so Dot ended the run",

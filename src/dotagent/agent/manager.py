@@ -119,6 +119,7 @@ from dotagent.core.errors import (
     RunConflict,
     RunHoldLapsed,
     StoreError,
+    failure_kind,
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
@@ -3571,7 +3572,12 @@ class RunManager:
             status, result = "failed", exc.message
             log.warning("run_ended_before_it_started", run_id=run.id)
         except DotError as exc:
-            status, result, error = "failed", exc.message, {"message": exc.message, "context": exc.context}
+            # How the error fares with time goes with it: a schedule tries a task a passing one ended again (item 1206).
+            status, result, error = (
+                "failed",
+                exc.message,
+                {"message": exc.message, "context": exc.context, "kind": failure_kind(exc)},
+            )
             log.error("run failed", run_id=run.id, error=exc.message, context=exc.context)
         except Exception as exc:
             status, result = "failed", f"{PREFIX_INTERNAL_ERROR}{type(exc).__name__}: {exc}"
