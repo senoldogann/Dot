@@ -4578,8 +4578,9 @@ dialog.modal.versions-dialog {
   color: var(--warn);
 }
 
-/* A row of the Options menu: the caption on the left, its control on the right. */
-.composer-popover .composer-pick {
+/* A row of the Options menu, and of a phone's chat settings (item 1202): the caption on the left, its control on the
+   right. */
+:is(.composer-popover, .sheet) .composer-pick {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4589,12 +4590,12 @@ dialog.modal.versions-dialog {
   transition: background-color var(--motion-quick) var(--ease);
 }
 
-.composer-popover .composer-pick.switch-row {
+:is(.composer-popover, .sheet) .composer-pick.switch-row {
   cursor: pointer;
 }
 
 @media (hover: hover) {
-  .composer-popover .composer-pick.switch-row:hover {
+  :is(.composer-popover, .sheet) .composer-pick.switch-row:hover {
     background: var(--surface-2);
   }
 }
@@ -4618,13 +4619,13 @@ dialog.modal.versions-dialog {
 
 /* A group of a composer menu under a heading of its own, such as the speeds under the reasoning levels (item 223);
    a rule sets it apart from what is above it. */
-.composer-popover .pop-group {
+:is(.composer-popover, .sheet) .pop-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.composer-popover .pop-group:not(:first-child) {
+:is(.composer-popover, .sheet) .pop-group:not(:first-child) {
   margin-top: 4px;
   padding-top: 8px;
   border-top: 1px solid var(--border);

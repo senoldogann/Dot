@@ -9,6 +9,7 @@
 // whose models cannot play the role on the rail all the same, their view saying why.
 
 import { el, foldSearch, modelName } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
 import { providerLabel, providerMark, providerOf } from "./providers.js";
@@ -542,6 +543,224 @@ export function modelPicker({ onPick, onMakeDefault }) {
     paintRail();
     paintList();
     return [root];
+  }
+
+  return { build };
+}
+
+/**
+ * The models as a phone's chat settings show them (item 1202, after another assistant's thread settings): the blank
+ * row of the daemon's default first, with Change, then the favourites, then a section per provider that opens and
+ * folds, each row with a tick on the one chosen and a star; a search at the sheet's foot narrows them to one list,
+ * closest first. `build({ groups, chosen, fallback, blank })` takes what `modelPicker`'s does and returns
+ * `{ list, search }`: the element of the sections, painted again as the search changes, and the search's field for the
+ * foot. `onPick(ref)` runs when a row is picked ("" for the blank one). Change turns the list to choosing the daemon's
+ * default, as `modelPicker`'s does (item 209): a row picked then goes to `onMakeDefault(ref)`, which resolves to whether
+ * the daemon took it, and Cancel goes back. The sections opened or folded by hand and the search stay as they were
+ * while the sheet is open; a sheet opened anew starts with an empty search and the chosen model's provider open.
+ */
+export function modelSections({ onPick, onMakeDefault }) {
+  let query = "";
+  // The providers opened (true) or folded (false) by hand; the rest follow where the chosen model is.
+  let folded = new Map();
+  let root = null;
+  // Whether the list chooses the daemon's default, and the model being made the default (null while none is).
+  let choosingDefault = false;
+  let making = null;
+  // Paints the list as last built again, while it is on the page: what a default being made ended in.
+  let paintBuilt = () => undefined;
+
+  function build({ groups, chosen, fallback, blank }) {
+    if (root === null || !root.isConnected) {
+      query = "";
+      folded = new Map();
+      choosingDefault = false;
+    }
+    const list = el("div", { class: "model-sections", role: "listbox", "aria-label": t("choices.model") });
+    const search = el("input", {
+      class: "sheet-search-field",
+      type: "search",
+      placeholder: t("choices.searchModels"),
+      "aria-label": t("choices.searchModels"),
+      autocomplete: "off",
+      enterkeyhint: "search",
+    });
+    search.value = query;
+    const chosenProvider = chosen === "" ? (fallback === null ? "" : providerOf(fallback)) : providerOf(chosen);
+
+    // The model the tick is on: the chat's, or the daemon's default while the list chooses it.
+    function tickedRef() {
+      return choosingDefault ? fallback : chosen;
+    }
+
+    function pickRow(ref) {
+      if (!choosingDefault) {
+        onPick(ref);
+        return;
+      }
+      if (making !== null) {
+        return;
+      }
+      if (ref === fallback) {
+        choosingDefault = false;
+        paint();
+        return;
+      }
+      making = ref;
+      paint();
+      Promise.resolve(onMakeDefault(ref))
+        .then((taken) => {
+          if (taken) {
+            choosingDefault = false;
+          }
+        })
+        .finally(() => {
+          making = null;
+          paintBuilt();
+        });
+    }
+
+    function row({ info, provider }, mixed, favourites) {
+      const name = modelName(info.ref);
+      const free = info.free ? (info.learns ? "Free, may train on your data" : "Free") : "";
+      const hint = mixed ? [providerLabel(provider), free.toLowerCase()].filter((part) => part !== "").join(", ") : free;
+      const starred = favourites.includes(info.ref);
+      const star = el(
+        "button",
+        {
+          class: "model-star",
+          type: "button",
+          "aria-label": `Favourite ${name}`,
+          "aria-pressed": String(starred),
+          onclick: () => {
+            const now = readFavourites();
+            writeFavourites(now.includes(info.ref) ? now.filter((ref) => ref !== info.ref) : [...now, info.ref]);
+            paint();
+          },
+        },
+        icon("star"),
+      );
+      const option = el(
+        "button",
+        { class: "sheet-row model-sheet-option", type: "button", role: "option", title: info.ref, "aria-selected": String(info.ref === tickedRef()), onclick: () => pickRow(info.ref) },
+        el("span", { class: "sheet-row-text" }, el("span", null, name), hint === "" ? null : el("span", { class: "sheet-row-hint" }, hint)),
+        icon("check"),
+      );
+      return el("div", { class: "model-sheet-row" }, option, star);
+    }
+
+    function card(rows) {
+      return el("div", { class: "sheet-card" }, ...rows);
+    }
+
+    // The blank row, with Change once the default is known; while the list chooses the default, what it does (or the
+    // model being made the default) and Cancel instead.
+    function blankRow() {
+      if (choosingDefault) {
+        return el(
+          "div",
+          { class: "model-sheet-row model-choosing" },
+          el("span", { class: "sheet-row model-choosing-text", "aria-live": "polite" }, making === null ? "Choose the default model" : `Making ${modelName(making)} the default…`),
+          el(
+            "button",
+            {
+              class: "model-change",
+              type: "button",
+              onclick: () => {
+                choosingDefault = false;
+                paint();
+              },
+            },
+            "Cancel",
+          ),
+        );
+      }
+      return el(
+        "div",
+        { class: "model-sheet-row" },
+        el(
+          "button",
+          { class: "sheet-row model-sheet-option", type: "button", role: "option", "aria-selected": String(chosen === ""), onclick: () => onPick("") },
+          el("span", { class: "sheet-row-text" }, el("span", null, blank)),
+          icon("check"),
+        ),
+        fallback === null
+          ? null
+          : el(
+              "button",
+              {
+                class: "model-change",
+                type: "button",
+                title: "Choose the model new chats start on",
+                onclick: () => {
+                  choosingDefault = true;
+                  paint();
+                },
+              },
+              "Change",
+            ),
+      );
+    }
+
+    function section(provider, entries, favourites) {
+      const open = folded.get(provider) ?? provider === chosenProvider;
+      const count = () => el("span", { class: "sheet-section-count" }, String(entries.length));
+      const head = el("summary", { class: "sheet-section-head" }, providerMark(provider), el("span", { class: "sheet-section-title" }, providerLabel(provider)), open ? null : count(), icon("chevron"));
+      const details = el("details", { class: "sheet-section", open }, head, card(entries.map((entry) => row(entry, false, favourites))));
+      // A section folded shows how many models it holds, as the other assistant's does.
+      details.addEventListener("toggle", () => {
+        folded.set(provider, details.open);
+        head.querySelector(".sheet-section-count")?.remove();
+        if (!details.open) {
+          head.insertBefore(count(), head.lastElementChild);
+        }
+      });
+      return details;
+    }
+
+    function paint() {
+      const words = foldSearch(query)
+        .split(/\s+/)
+        .filter((word) => word !== "");
+      const favourites = readFavourites();
+      const entries = entriesOf(groups);
+      const children = [];
+      if (blank !== null && (words.length === 0 || choosingDefault)) {
+        children.push(card([blankRow()]));
+      }
+      if (words.length > 0) {
+        const found = foundEntries(entries, words, favourites);
+        children.push(
+          found.length === 0
+            ? el("p", { class: "sheet-note" }, t("choices.noModelFound", { query: query.trim() }))
+            : card(found.map((entry) => row(entry, true, favourites))),
+        );
+      } else {
+        const starred = entries.filter(({ info }) => favourites.includes(info.ref));
+        if (starred.length > 0) {
+          children.push(el("div", { class: "sheet-heading" }, t("choices.favourites")), card(starred.map((entry) => row(entry, true, favourites))));
+        }
+        for (const group of groups) {
+          if (group.models.length > 0) {
+            children.push(section(group.provider, viewEntries(groups, group.provider, favourites), favourites));
+          }
+        }
+      }
+      list.replaceChildren(...children);
+    }
+
+    search.addEventListener("input", () => {
+      query = search.value;
+      paint();
+    });
+    paint();
+    root = list;
+    paintBuilt = () => {
+      if (list.isConnected) {
+        paint();
+      }
+    };
+    return { list, search: el("label", { class: "sheet-search" }, icon("search"), search) };
   }
 
   return { build };

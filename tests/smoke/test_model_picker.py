@@ -37,7 +37,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "model-picker-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
-_SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
+# A phone's width has the chat settings' sheet instead of this menu (item 1202), read below on a touch screen.
+_SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"))
 _FAVOURITES_KEY: str = "dot.models.favourites"
 _MENU: str = ".composer .composer-popover[aria-label='Model']"
 # The rail of the menu: Favourites, then one mark for each provider that serves models.
@@ -319,8 +320,9 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
                 assert errors == []
                 await page.context.close()
 
-            # On a touch screen the search does not take the focus, so no keyboard springs up over the list, and the
-            # rows wear no keys.
+            # On a phone the pill opens the chat's settings (item 1202): a sheet with the models in a section per
+            # provider, the chosen one's open; its search does not take the focus, so no keyboard springs up over the
+            # list; a pick keeps the sheet open, and Done puts it away.
             host, port = "127.0.0.1", int(served.rpartition(":")[2])
             touch: BrowserContext = await browser.new_context(
                 viewport={"width": 390, "height": 860}, is_mobile=True, has_touch=True, reduced_motion="reduce"
@@ -330,14 +332,25 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
             await phone.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await phone.goto(ui_url(host, port, TOKEN))
             await phone.locator(".composer textarea").last.tap()
-            await phone.locator(".composer .composer-pill[data-pill='model']").tap()
-            menu = phone.locator(_MENU)
-            await expect(menu.locator(".model-picker")).to_have_count(1)
-            await expect(menu.locator("input.model-search-input")).not_to_be_focused()
-            await expect(menu.locator(".model-picker [role=option] kbd")).to_have_count(0)
-            await menu.get_by_role("button", name="OpenAI").tap()
-            assert await _rows(menu) == ["Default (scripted)", "gpt-5.5", "gpt-5.5-mini"]
-            await expect(menu.locator("input.model-search-input")).not_to_be_focused()
+            phone_pill: Locator = phone.locator(".composer .composer-pill[data-pill='model']")
+            await phone_pill.tap()
+            sheet: Locator = phone.get_by_role("dialog", name="Chat settings")
+            await expect(sheet).to_be_visible()
+            await expect(sheet.locator("input.sheet-search-field")).not_to_be_focused()
+            await expect(sheet.locator("details.sheet-section[open]")).to_have_count(1)
+            await sheet.locator("summary", has_text="OpenAI").tap()
+            openai: Locator = sheet.locator("details.sheet-section", has_text="OpenAI")
+            names: Locator = openai.locator("[role=option] .sheet-row-text > span:first-child")
+            assert await names.all_inner_texts() == ["gpt-5.5", "gpt-5.5-mini"]
+            await openai.get_by_role("option", name="gpt-5.5-mini").tap()
+            await expect(phone_pill).to_contain_text("gpt-5.5-mini")
+            await expect(sheet).to_be_visible()
+            await expect(openai.get_by_role("option", name="gpt-5.5-mini")).to_have_attribute("aria-selected", "true")
+            # The search makes one list of what it finds, across the providers.
+            await sheet.locator("input.sheet-search-field").fill("mini")
+            await expect(sheet.locator(".model-sections [role=option]")).to_have_count(1)
+            await sheet.get_by_role("button", name="Done").tap()
+            await expect(sheet).to_be_hidden()
             await touch.close()
 
             # Opened before the model list has come, the menu moves to its opening view once the list comes. (The
@@ -495,13 +508,16 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             assert errors == []
             await page.context.close()
 
-            # Dark, and on a phone: the bar and Change fit.
+            # Dark, and on a phone, whose chat settings (item 1202) have Change on the default's row: the bar fits.
             for width, scheme in ((1280, "dark"), (390, "light")):
                 shown, shown_errors = await _page(browser, served, width, scheme)
                 await shown.locator(".composer textarea").last.click()
                 await shown.locator(".composer .composer-pill[data-pill='model']").click()
-                await shown.locator(_MENU).get_by_role("button", name="Change").click()
-                await expect(shown.locator(_MENU).locator(".model-choosing")).to_be_visible()
+                held: Locator = (
+                    shown.get_by_role("dialog", name="Chat settings") if width < 720 else shown.locator(_MENU)
+                )
+                await held.get_by_role("button", name="Change").click()
+                await expect(held.locator(".model-choosing")).to_be_visible()
                 await shown.screenshot(path=str(tmp_path / f"choosing-{width}-{scheme}.png"), animations="disabled")
                 assert shown_errors == []
                 await shown.context.close()
@@ -516,10 +532,11 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             await phone.goto(ui_url(host, port, TOKEN))
             await phone.locator(".composer textarea").last.tap()
             await phone.locator(".composer .composer-pill[data-pill='model']").tap()
-            menu = phone.locator(_MENU)
+            menu = phone.get_by_role("dialog", name="Chat settings")
             await menu.get_by_role("button", name="Change").tap()
-            await menu.get_by_role("button", name="Ollama").tap()
-            await menu.locator(".model-picker [role=option]").filter(has_text="qwen3-coder").tap()
+            # The default's provider is not this one now: its section opens first.
+            await menu.locator("summary", has_text="Ollama").tap()
+            await menu.locator("[role=option]").filter(has_text="qwen3-coder").tap()
             await expect(phone.locator(".toast.ok")).to_contain_text("New chats start on qwen3-coder.")
             await expect(menu.get_by_role("option", name="Default (qwen3-coder)")).to_be_visible()
             assert await _main_model(served) == f"{_PROVIDER}:qwen3-coder"

@@ -826,81 +826,16 @@
     min-width: 0;
   }
 
+  /* The name gives way to the reasoning (item 1202): "deepseek-v4.1-flash L." cut the level the owner reads at a
+     glance, so the name takes the ellipsis and the small words after it stay whole. */
   .composer-pill[data-pill="model"] > .composer-pill-value {
-    flex: none;
+    flex: 0 1 auto;
   }
 
   .composer-pill[data-pill="model"] > .composer-pill-extra {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--muted);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* The model's menu holds the run's choices in tabs (items 1121 and 1122): a bar of tabs at its top, and under it the
-     tab shown, which scrolls on its own. It is the box's width and keeps one height whichever tab is shown, as much of
-     the room over the box as 560 px allows, and stands over the bar. */
-  .composer-popover:has(> .pop-tabs) {
-    width: calc(100% - 16px);
-    height: min(560px, var(--room, 480px));
-    max-height: none;
-    padding: 0;
-    overflow: hidden;
-    gap: 0;
-  }
-
-  .pop-tabs {
-    display: flex;
     flex: none;
-    gap: var(--space-1);
-    margin: var(--space-2);
-    padding: var(--space-half);
-    border-radius: var(--radius-pill);
-    background: var(--surface-2);
-  }
-
-  .pop-tab {
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 34px;
-    padding: 0 var(--space-2);
-    border: 0;
-    border-radius: var(--radius-pill);
-    background: none;
-    color: var(--text-2);
-    font: inherit;
-    font-size: var(--text-sm);
-    font-weight: var(--weight-label);
+    color: var(--muted);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-  }
-
-  .pop-tab[aria-selected="true"] {
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: var(--shadow-raised);
-  }
-
-  .pop-tab-panel {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 4px;
-    min-height: 0;
-    padding: 0 var(--space-2) var(--space-2);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  .pop-tab-panel > .model-picker {
-    flex: 1 1 auto;
-    height: auto;
-    min-height: 0;
-    margin: 0 calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
-    border-top: 1px solid var(--border);
   }
 
   .composer:has(> .composer-popover:not([hidden])) {
@@ -3091,3 +3026,284 @@ dialog.computer-full::backdrop {
   }
 }
 
+
+/* A phone's chat settings (item 1202, sheet.js): a sheet from the foot of the screen over a dim, its head Close, the
+   title and Done, the models in a section per provider and the Options in cards, and the search of the models kept
+   at its foot over the home indicator. */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sheet[hidden] {
+  display: none;
+}
+
+.sheet-dim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+}
+
+.sheet-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--safe-top) - var(--space-3));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg);
+  box-shadow: var(--shadow-modal);
+  outline: none;
+  transition: transform var(--motion-quick) var(--ease);
+}
+
+.sheet-grip {
+  flex: none;
+  width: 36px;
+  height: 5px;
+  margin: var(--space-2) auto 0;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+.sheet-head {
+  display: grid;
+  flex: none;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  touch-action: none;
+}
+
+.sheet-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-title);
+  text-align: center;
+}
+
+.sheet-round {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.sheet-round > .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.sheet-done {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 var(--space-4) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-foot {
+  flex: none;
+  padding: var(--space-2) var(--space-4) calc(var(--space-2) + var(--safe-bottom));
+  border-top: 1px solid var(--border);
+}
+
+.sheet-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.sheet-search-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  /* 16 px keeps iOS from zooming the page as the field takes the focus. */
+  font-size: max(16px, var(--text-md));
+  outline: none;
+}
+
+.sheet-heading {
+  margin: var(--space-5) var(--space-1) var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.sheet-card {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-2);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.sheet-card > * + * {
+  border-top: 1px solid var(--border);
+}
+
+.sheet-note {
+  margin: var(--space-4) var(--space-1);
+  color: var(--muted);
+}
+
+.sheet-section {
+  margin-top: var(--space-4);
+}
+
+.sheet-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-1);
+  color: var(--text-2);
+  list-style: none;
+  cursor: pointer;
+}
+
+.sheet-section-head::-webkit-details-marker {
+  display: none;
+}
+
+.sheet-section-title {
+  flex: 1 1 auto;
+}
+
+.sheet-section-count {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.sheet-section-head > .icon:last-child,
+.sheet-disclosure > summary > .icon:last-child {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  transform: rotate(90deg);
+  transition: transform var(--motion-quick) var(--ease);
+}
+
+.sheet-section[open] > .sheet-section-head > .icon:last-child,
+.sheet-disclosure[open] > summary > .icon:last-child {
+  transform: rotate(-90deg);
+}
+
+.sheet-disclosure > summary > .icon:last-child {
+  transform: none;
+}
+
+.sheet-disclosure[open] > summary > .icon:last-child {
+  transform: rotate(90deg);
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: start;
+  list-style: none;
+  cursor: pointer;
+}
+
+.sheet-row::-webkit-details-marker {
+  display: none;
+}
+
+.sheet-row-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sheet-row-text > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-row-hint,
+.sheet-row-value {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.model-sheet-row {
+  display: flex;
+  align-items: center;
+}
+
+.model-sheet-row > .sheet-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.model-sheet-option > .icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  visibility: hidden;
+}
+
+.model-sheet-option[aria-selected="true"] > .icon {
+  visibility: visible;
+}
+
+.model-sheet-row > .model-star {
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+
+.sheet-disclosure-body {
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.sheet-groups {
+  padding: var(--space-2);
+}
+
+.sheet-groups:empty {
+  display: none;
+}
+
+/* The row names what opens under it: the group's own heading would say it again. */
+.sheet-disclosure-body > .pop-group > .pop-heading {
+  display: none;
+}
+
+.sheet-groups > * + * {
+  border-top: 0;
+}

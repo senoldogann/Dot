@@ -269,9 +269,14 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                 pill: Locator = page.locator(f".dock .composer-pill[data-pill='{held}']")
                 await expect(pill).to_be_visible()
                 await pill.click()
+                # A phone's chat settings (item 1202) hold the reasoning in a row that opens in place.
+                menu: Locator = (
+                    page.get_by_role("dialog", name="Chat settings")
+                    if width < 720
+                    else page.locator(".composer-popover[aria-label='Reasoning']")
+                )
                 if width < 720:
-                    await page.get_by_role("tab", name="Reasoning", exact=True).click()
-                menu: Locator = page.locator(f".composer-popover[aria-label='{held.capitalize()}']")
+                    await menu.locator("summary", has_text="Reasoning").click()
                 speed: Locator = menu.get_by_role("listbox", name="Speed")
                 await expect(speed.get_by_role("option")).to_have_count(2)
                 fast: Locator = speed.get_by_role("option", name="Fast")

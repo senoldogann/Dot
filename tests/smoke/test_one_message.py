@@ -312,11 +312,15 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 pill: Locator = page.locator(f".composer-pill[data-pill='{held}']")
                 await expect(pill).to_contain_text("Medium")
                 await pill.click()
-                if width < 720:
-                    await page.get_by_role("tab", name="Reasoning", exact=True).click()
-                single: Locator = page.locator(f".composer-popover[aria-label='{held.capitalize()}']").get_by_role(
-                    "listbox", name="This message only"
+                # A phone's chat settings (item 1202) hold the reasoning in a row that opens in place.
+                menu: Locator = (
+                    page.get_by_role("dialog", name="Chat settings")
+                    if width < 720
+                    else page.locator(".composer-popover[aria-label='Reasoning']")
                 )
+                if width < 720:
+                    await menu.locator("summary", has_text="Reasoning").click()
+                single: Locator = menu.get_by_role("listbox", name="This message only")
                 await expect(single.get_by_role("option")).to_have_count(2)
                 thinking: Locator = single.get_by_role("option", name="Ultrathink")
                 await expect(thinking).to_contain_text("Max reasoning for this message only")
