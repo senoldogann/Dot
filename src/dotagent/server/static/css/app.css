@@ -126,23 +126,37 @@
   --radius-control: 10px;
   --radius: 16px;
   --radius-lg: 24px;
-  /* A message's bubble (item 1101): half the height of one line of it and a little more, so a bubble of one line is a
-     pill and a longer one a rounded box whose corners stay as round, as a messaging app's. */
-  --radius-bubble: 20px;
-  --radius-composer: 24px;
+  /* A message's bubble (item 1101; 18 px since item 1205, as OpenMausBot's): a bubble of one line is nearly a pill
+     and a longer one a rounded box whose corners stay as round, as a messaging app's; where two of yours follow each
+     other the corners that meet are joined (6 px), as iMessage draws a run of messages. */
+  --radius-bubble: 18px;
+  --radius-joined: 6px;
+  --pad-bubble: 7px 12px;
+  /* The composer (item 1205): 22 px while its text is one line, 18 once it wraps (data-multiline, composer.js). */
+  --radius-composer: 22px;
+  --radius-composer-wrapped: 18px;
+  /* A menu and its rows (item 1205): a menu on 12 px (22 on a phone), a row on 6, 30 px tall. */
+  --radius-menu: 12px;
+  --radius-row: 6px;
+  --menu-row: 30px;
   --radius-pill: 999px;
-  /* A box of the pages, a card or a settings' group (item 837): no frame, a soft shadow under its surface; the contrast
-     setting draws the frame again (themes.css). */
+  /* The stroke of an icon (item 1205): 1.75, and 1.5 in a menu, where the icons sit beside small words. */
+  --icon-stroke: 1.75;
+  /* A box of the pages, a card or a settings' group (item 837): no frame, and a ring of half a pixel round its surface
+     rather than a shadow under it (item 1205): only what floats over the page (a menu, a dialog, a sheet) casts a
+     shadow. The contrast setting draws the frame again (themes.css). */
   --box-border: transparent;
-  --box-shadow: var(--shadow-card);
+  --box-shadow: 0 0 0 0.5px var(--edge);
   /* A button's frame (item 837): none, as its fill says it is one; the contrast setting draws it (themes.css). Its
      fill is a tint of the ink over whatever it stands on, so that it is a step from every ground by itself (the
      pre-push reviews: a fill of the second surface vanished on the boxes, the notes and the sidebar of that ground). */
   --button-border: transparent;
   --button-fill: color-mix(in srgb, var(--text) 6%, transparent);
   --button-fill-hover: color-mix(in srgb, var(--text) 10%, transparent);
-  /* The composer's lift (item 121): a hairline of shadow and a soft one that falls below it. */
-  --shadow-composer: 0 1px 2px var(--shadow-ink), 0 12px 28px -18px var(--shadow-ink-deep);
+  /* The composer's lift (item 121): a ring of half a pixel (item 1205), a stronger one in focus, and a soft shadow
+     that falls below it, as it floats over the conversation. */
+  --shadow-composer: 0 0 0 0.5px var(--edge), 0 2px 8px -1px var(--shadow-ink), 0 1px 2px var(--shadow-ink);
+  --shadow-composer-focus: 0 0 0 0.5px var(--edge-strong), 0 2px 8px -1px var(--shadow-ink), 0 1px 2px var(--shadow-ink);
   /* The glass of what stands over the conversation at the foot (item 401): the composer and the bar over it, a
      translucent surface a hairline frames with the page blurred under it. */
   --glass-surface: color-mix(in srgb, var(--surface) 78%, transparent);
@@ -170,8 +184,12 @@
   --motion-slow: 320ms;
   /* The slide of the sidebar and the details panel, 0 to 400 ms in Settings › Appearance (item 127). */
   --motion-panel: var(--motion-base);
-  --ease: cubic-bezier(0.2, 0, 0, 1);
-  --ease-emphasis: cubic-bezier(0.3, 0, 0, 1);
+  /* One easing for what changes (item 1205, OpenMausBot's): quick out of its start, long and soft into its end. */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-emphasis: var(--ease);
+  /* A message you sent rises into its place; a menu opens from 96 %; a sheet rises 32 px (item 1205). */
+  --motion-message: 180ms;
+  --motion-sheet: 260ms;
   --motion-breath: 4s;
   --motion-pulse: 1.6s;
   --motion-blink: 1.4s;
@@ -238,6 +256,10 @@
     --leading-xl: calc(30px * var(--type-scale));
     --text-2xl: calc(26px * var(--type-scale));
     --leading-2xl: calc(34px * var(--type-scale));
+    /* A phone's corners are rounder, as iOS's (item 1205): a card on 18 px, a menu on 22, a sheet on 28. */
+    --radius: 18px;
+    --radius-lg: 28px;
+    --radius-menu: 22px;
   }
 }
 
@@ -319,7 +341,7 @@ textarea {
   fill: none;
   stroke: currentcolor;
   /* As thick on every icon, whatever the frame it is seen through (icons.js, item 849). */
-  stroke-width: calc(2 / var(--icon-scale, 1));
+  stroke-width: calc(var(--icon-stroke) / var(--icon-scale, 1));
   /* A frame drawn close around a shape leaves the stroke's own half-width past its edge: drawn, not cut. */
   overflow: visible;
   stroke-linecap: round;
@@ -3685,36 +3707,37 @@ dialog.modal.versions-dialog {
    files and the picks under it, then one bar: the "+" button (item 318) and the mode at the left; the agent, the model, the reasoning, the
    approvals and the round send at the right. A hairline at rest, a stronger one under the pointer, the 10 % ring in
    focus; the shadow is the dock's alone. */
-/* The composer is a card on the larger corner with a soft shadow under it (item 121). */
+/* The composer is a card on the larger corner with a soft shadow under it (item 121), drawn by a ring of half a pixel
+   that grows stronger under the pointer and in focus, with no halo (item 1205); its corners close from 22 to 18 px
+   once its text wraps, as OpenMausBot's do. */
 .composer {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-2);
-  border-color: var(--border);
+  border-color: transparent;
   border-radius: var(--radius-composer);
   background: var(--surface);
   box-shadow: var(--shadow-composer);
   transition:
     border-color var(--motion-quick) var(--ease),
+    border-radius var(--motion-slow) var(--ease),
     box-shadow var(--motion-quick) var(--ease),
     background-color var(--motion-quick) var(--ease);
 }
 
+.composer[data-multiline] {
+  border-radius: var(--radius-composer-wrapped);
+}
+
 .composer:focus-within {
-  border-color: var(--border-strong);
+  box-shadow: var(--shadow-composer-focus);
 }
 
 @media (hover: hover) {
   .composer:hover {
-    border-color: var(--border-strong);
+    box-shadow: var(--shadow-composer-focus);
   }
-}
-
-.composer:focus-within {
-  box-shadow:
-    var(--shadow-composer),
-    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 /* Files dragged over the frame tint it. */
@@ -3756,9 +3779,7 @@ dialog.modal.versions-dialog {
 }
 
 .composer[data-boost]:focus-within {
-  box-shadow:
-    var(--shadow-composer),
-    0 0 0 3px color-mix(in srgb, var(--boost-mid) 18%, transparent);
+  box-shadow: var(--shadow-composer);
 }
 
 /* The box starts one line high, its text on the left edge of the "+" button's icon. */
@@ -5295,10 +5316,53 @@ dialog.modal.versions-dialog {
   width: fit-content;
   max-width: 85%;
   margin-left: auto;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--pad-bubble);
   border-radius: var(--radius-bubble);
   background: var(--msg-me);
   color: var(--on-msg-me);
+  text-wrap: pretty;
+}
+
+/* A message you just sent rises into its place (item 1205, messages.js marks it), and stands still under reduced
+   motion. */
+.user-message.fresh {
+  animation: message-rise var(--motion-message) var(--ease) both;
+}
+
+@keyframes message-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-message.fresh {
+    animation: none;
+  }
+}
+
+/* Two of your messages in a row, with nothing under the first but its foot, which a touch screen does not show (item
+   1064) while no reaction stands on it, are one run as iMessage draws it (item 1205): the corners where they meet
+   are joined. A pointer that can rest shows each message's time and buttons under it, which part them. */
+@media (hover: none) {
+  .user-message:not(:has(.reaction-chip)):has(> .bubble.user + .message-foot):has(
+      + .user-message > .bubble.user:first-child
+    )
+    > .bubble.user {
+    border-bottom-right-radius: var(--radius-joined);
+  }
+
+  .user-message:not(:has(.reaction-chip)):has(> .bubble.user + .message-foot)
+    + .user-message
+    > .bubble.user:first-child {
+    border-top-right-radius: var(--radius-joined);
+  }
+
+  .user-message:not(:has(.reaction-chip)):has(> .bubble.user + .message-foot)
+    + .user-message:has(> .bubble.user:first-child) {
+    margin-top: var(--space-half);
+  }
 }
 
 /* What you wrote reads as markdown (item 206): its code and its tables' heads a tint of the bubble's own ink. */
@@ -5450,6 +5514,16 @@ dialog.modal.versions-dialog {
 .prose p,
 .prose blockquote {
   white-space: pre-wrap;
+}
+
+/* A paragraph's last line is not left with one word (item 1205), and bold in an answer is a step lighter than
+   the browser's 700: the answer's weight and two steps, 600 at the default. */
+.prose :is(p, li, blockquote) {
+  text-wrap: pretty;
+}
+
+.prose :is(strong, b) {
+  font-weight: var(--answer-title);
 }
 
 /* Headings in an answer are modest: one step up for h1, the prose size in the title weight for h2, the label weight
@@ -7500,7 +7574,7 @@ dialog.message-sheet {
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-modal);
-  animation: sheet-rise var(--motion-base) var(--ease-emphasis);
+  animation: sheet-rise var(--motion-sheet) var(--ease);
   touch-action: none;
 }
 
@@ -7512,9 +7586,17 @@ dialog.message-sheet::backdrop {
   background: var(--scrim);
 }
 
+/* A sheet rises 32 px into its place as it fades in (item 1205), rather than the whole height of the screen. */
 @keyframes sheet-rise {
   from {
-    transform: translateY(100%);
+    opacity: 0;
+    transform: translateY(32px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog.message-sheet {
+    animation: fade-in var(--motion-quick) var(--ease);
   }
 }
 
@@ -8519,6 +8601,8 @@ dialog.message-sheet::backdrop {
    drawer and under the toasts. Its items are as tall as the sidebar's rows in either density; the item with the focus
    of a key is the one tinted, as the one under the pointer is. */
 .menu {
+  --icon-stroke: 1.5;
+
   position: fixed;
   z-index: 50;
   display: flex;
@@ -8526,21 +8610,39 @@ dialog.message-sheet::backdrop {
   min-width: 180px;
   max-width: calc(100vw - 16px);
   padding: 4px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-menu);
+  border: 0;
   background: var(--surface);
-  box-shadow: var(--shadow-float);
-  animation: fade-in var(--motion-quick) var(--ease);
+  box-shadow:
+    0 0 0 0.5px var(--edge),
+    var(--shadow-float);
+  animation: pop-in var(--motion-base) var(--ease);
 }
 
+/* A menu opens from 96 % and a breath below its place (item 1205); under reduced motion it only fades in. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: fade-in var(--motion-quick) var(--ease);
+  }
+}
+
+/* A row of 30 px on a corner of 6 (item 1205); a phone's keeps the room of a finger. */
 .menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: var(--pad-side);
+  min-height: var(--menu-row);
+  padding: var(--space-1) var(--space-2);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-row);
   background: transparent;
   color: var(--text);
   font: inherit;

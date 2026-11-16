@@ -88,6 +88,15 @@ function editFromHereButton(editFromHere) {
   return button;
 }
 
+// How long after it was sent a message still rises into its place as it is drawn (item 1205): the one just sent
+// does, and a chat opened later draws its messages still.
+const JUST_SENT_S = 5;
+
+/** Whether a message sent at `sentAt` (seconds) is one just sent at `now` (seconds). */
+function justSent(sentAt, now) {
+  return now - sentAt < JUST_SENT_S;
+}
+
 /**
  * What the user wrote, as a bubble on the right, the pictures that came with it (`files`, as the timeline has them) as
  * small squares over it, its other files under it, and under them (item 205): when it was sent (`sentAt`), a copy of it
@@ -98,7 +107,7 @@ function editFromHereButton(editFromHere) {
 export function userMessage({ text, sentAt, files, editFromHere }) {
   return el(
     "div",
-    { class: "user-message" },
+    { class: justSent(sentAt, Date.now() / 1000) ? "user-message fresh" : "user-message" },
     sentPictures(files),
     el("div", { class: "bubble user" }, prose(text)),
     sentFiles(files),

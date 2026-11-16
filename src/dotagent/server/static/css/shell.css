@@ -289,13 +289,13 @@
   }
 }
 
-/* The row that is open is a surface step up from the sidebar, not a tint (item 74). */
+/* The row that is open is a flat tint of the ink with no shadow, its words a step bolder (item 1205, as
+   OpenMausBot's): a tint of the text, so that it is a step from the sidebar of every look. */
 .side-link[aria-current="page"],
 .side-run[aria-current="page"] {
-  background: var(--surface);
-  box-shadow: 0 1px 2px var(--shadow-ink);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
   color: var(--text);
-  font-weight: var(--weight-label);
+  font-weight: var(--weight-title);
 }
 
 .sidebar kbd {
@@ -512,12 +512,15 @@
   background: transparent;
 }
 
+/* A chat's name and its last line fade out over their last 28 px where they are cut (item 1205), rather than end
+   in an ellipsis; a line that fits ends before the fade. */
 .side-run-goal {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  -webkit-mask-image: linear-gradient(to right, var(--text) calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, var(--text) calc(100% - 28px), transparent);
 }
 
 /* A chat's last activity at the right of its row, in figures of one width (item 121). */
@@ -918,7 +921,7 @@
 }
 
 .side-run[aria-current="page"] .side-loop {
-  --loop-ring: var(--surface);
+  --loop-ring: color-mix(in srgb, var(--text) 8%, var(--sidebar));
 }
 
 /* While chats are chosen (item 635) the mark stays, cut out of a ticked row's ground as of the list's. */
@@ -967,7 +970,7 @@
 }
 
 .side-run[aria-current="page"] .side-campaign {
-  --campaign-ring: var(--surface);
+  --campaign-ring: color-mix(in srgb, var(--text) 8%, var(--sidebar));
 }
 
 .side-pick:has(.side-check:checked) .side-campaign {
@@ -992,7 +995,11 @@
   font-weight: var(--weight-label);
 }
 
-/* The chat's last line: its words, ellipsized, and the faces of what it delegated at their end (item 507). It is one
+.side-run[aria-current="page"] .side-chat-text .side-run-goal {
+  font-weight: var(--weight-title);
+}
+
+/* The chat's last line: its words, faded where they are cut, and the faces of what it delegated at their end (item 507). It is one
    line whatever it holds (item 510): words put in it bare, as a page of an earlier build put them, wrapped to as many
    lines as they took and made the row tall. */
 .side-chat-last {
@@ -1011,8 +1018,9 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  -webkit-mask-image: linear-gradient(to right, var(--text) calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, var(--text) calc(100% - 28px), transparent);
 }
 
 /* A row that waits for you (item 836) says so in its last line, in the warning's ink, and has the dot of a run that
@@ -1503,10 +1511,9 @@
   }
 }
 
-/* The open tab is a surface step up from the sidebar, as the open row of the chats is (item 74). */
+/* The open tab is a flat tint of the ink, as the open row of the chats is (item 1205). */
 .settings-nav-link[aria-current="page"] {
-  background: var(--surface);
-  box-shadow: 0 1px 2px var(--shadow-ink);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
   color: var(--text);
   font-weight: var(--weight-label);
 }

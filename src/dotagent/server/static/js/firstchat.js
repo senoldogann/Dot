@@ -74,7 +74,7 @@ export function buildFirstChat({ startLook, onSkipped }) {
   }
 
   function mine(text) {
-    flow.append(el("div", { class: "user-message" }, el("div", { class: "bubble user" }, text)));
+    flow.append(el("div", { class: "user-message fresh" }, el("div", { class: "bubble user" }, text)));
   }
 
   function noted(text) {
