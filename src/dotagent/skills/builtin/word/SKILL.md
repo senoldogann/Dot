@@ -45,7 +45,9 @@ EOF
 
 Terms of Word's dictionary (`sdef "/Applications/Microsoft Word.app"` prints all of it):
 
-- `open (POSIX file "/path/to/letter.docx")` opens a document; `active document` is the one in front.
+- `open (POSIX file "/path/to/letter.docx")` opens a document; `active document` is the one in front. `open` returns
+  nothing, whatever the dictionary says of its result: `set theDoc to open …` leaves `theDoc` undefined (error -2753).
+  Open the document, then `set theDoc to active document`.
 - `execute find (find object of text object of active document) find text "old" replace with "new" replace replace all`
   changes every match in the body and keeps its formatting; the headers and footers are not in the body.
 - `save as active document file name "/path/to/letter.pdf" file format format PDF` writes a PDF; `file format format
