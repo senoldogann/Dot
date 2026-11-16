@@ -282,7 +282,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   changed stay its own for the other chats' runs at work after it ends, until they read them again; and the browser's
   mode and its debugging port do not change while another chat's run is at work. The prompt tells each run to leave the
   other runs' apps and files to them and to stop, kill or quit no process or app it did not start. Only the runs of one
-  daemon know each other (`dotx run` in a terminal has its own), a path only the running line knows (`$(...)`,
+  daemon know each other (a `dotx` command that works in its own process has its own; `dotx run` hands its run to a running daemon, item
+  1203), a path only the running line knows (`$(...)`,
   `find -delete`, git) leaves no footprint, and a process killed by name (`pkill`) is kept to only by the prompt.
 - Runs, their events and their conversations are stored in a SQLite database (WAL mode; the daemon writes through one
   connection, one writer at a time, and waits out a lock held by another process with logged retries before it gives an
@@ -312,8 +313,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   [Reactions on Dot's messages](#reactions-on-dots-messages)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
   the sidebar, and you can steer it when you come back.
-- A run of a `dotx` command (`dotx run`, `dotx resume`, `dotx chat`) is on the pages too while the daemon runs: it works
-  in the sidebar, and its page follows it live, as it follows the daemon's own runs, though its text
+- `dotx run` hands its run to the daemon while one runs (item 1203, [The command line](command-line.md)): it is then the
+  daemon's own run, in its Chrome, its screen on the pages. A run of a `dotx` command's own process (`dotx resume`,
+  `dotx chat`, and `dotx run` with no daemon) is on the pages too while the daemon runs: it works in the sidebar, and its page follows it live, as it follows the daemon's own runs, though its text
   comes whole at each step rather than as it is written. Its Stop asks the command to stop it, which it does within a
   second. A question or an approval of it can be answered on the pages, which ends the prompt at its terminal; the first
   answer stands, wherever it was given. It takes no steering from the pages: a message sent there waits in the chat's

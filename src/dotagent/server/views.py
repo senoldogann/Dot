@@ -413,6 +413,10 @@ class StartRunRequest(FrozenModel):
     # How often the goal is asked again in the run's chat (LoopRequest.every); None for no loop. Not with standing.
     loop: str | None = Field(default=None, min_length=2, max_length=8)
     key: MessageKey | None = None
+    # Who sent it: Dot's pages and phones (``ui``), or ``dotx run``, which hands its run to the daemon (``cli``) and
+    # keeps the source a run of its own process has. The two weigh the same for the policy
+    # (``agent.progress.can_ask_user``); the plugin scout reads only the pages' goals as the owner's.
+    source: Literal["ui", "cli"] = "ui"
 
     @model_validator(mode="after")
     def _fits_standing(self) -> Self:
@@ -623,6 +627,10 @@ class DecisionRequest(FrozenModel):
     note: str = Field(default="", max_length=_TEXT_CHARS)
     # With a yes, "don't ask again in this chat" (item 866): the yes holds for the step's kind in its chat.
     remember: bool = False
+    # Who decided: the pages (``ui``), or the terminal of ``dotx run`` following a run it handed to the daemon (``cli``,
+    # ``agent.declined.CLI_DECIDER``), which a run of its own process records. Both are the owner's; a no from ``cli``
+    # carries no words of theirs to a card that asks for a secret (``tools.meta``).
+    by: Literal["ui", "cli"] = "ui"
 
 
 class RuleRequest(FrozenModel):

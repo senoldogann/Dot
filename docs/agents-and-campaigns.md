@@ -459,7 +459,8 @@ order the same way when its run had read such content. An order marked so keeps 
 try of it starts untrusted, whatever run sends it back (a clean run that returns or reassigns it included), its notes
 mark the run that reads them, and `review_work` and `work_orders` mark the run that calls them. Such an order's title is counted and not quoted by the brief and
 the look for work. A try starts as untrusted as the run that gave it, and answers the policy's questions as that run
-does. `dotx run` cannot hand out orders (its runs end with the process); the daemon can.
+does. A run of a `dotx` command's own process cannot hand out orders (its runs end with the process); the daemon can, a
+`dotx run` it was handed too (item 1203).
 
 The **Work orders** part of the Agents page lists them read only, under the active objectives: a badge with where the
 order stands, its title, its agent, tries, age, due time, the last note and a link to its newest task. `GET
@@ -559,8 +560,8 @@ the campaign's own check takes its place, so starting one with goal mode on is r
 (`run_max_minutes`, `run_max_tokens`) apply to each session. Sessions run only while the daemon runs; one the daemon cut
 off is not resumed as a run: the next session starts once the daemon is back (after `campaign_gap_minutes` when the
 daemon died while it worked, so that a session that brings it down does not run again and again), and its brief says the
-last one was cut off. A session whose `dotx` command died (the first one, from `dotx run --standing`) is closed by the
-daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. A session whose end could not
+last one was cut off. A session whose `dotx` command died (the first one, from `dotx run --standing` with no daemon
+running; with one, the daemon drives that session too, item 1203) is closed by the daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. A session whose end could not
 plan the next leaves the campaign planned again by the scheduler 10 minutes after it ended, `campaign_gap_minutes`
 later (item 1104). The threads of the sessions
 after the first are not in the chat list; the campaign's page links them. What you write in the campaign's conversation,

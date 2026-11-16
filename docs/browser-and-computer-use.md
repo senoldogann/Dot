@@ -490,8 +490,9 @@ Both modes share what follows.
   Chrome application, so while it runs macOS takes it for yours: a click on Chrome in the Dock brings Dot's forward
   instead of opening yours. Once Dot's has closed, the Dock opens yours again; while a run works in its browser, the
   mode `attach` lets Dot work in your own Chrome instead.
-- Only one Chrome can hold a profile, and a `dotx` command (`dotx run`, `dotx chat`) works in a process of its own
-  beside the daemon, each with its own Chrome (item 1198). When one of them must start Dot's own Chrome and the other's
+- Only one Chrome can hold a profile, and a `dotx` command (`dotx chat`, `dotx resume`, and `dotx run` with no daemon
+  of its home; with one, `dotx run` hands its run to the daemon, which works in its own Chrome, item 1203) works in a
+  process of its own beside the daemon, each with its own Chrome (item 1198). When one of them must start Dot's own Chrome and the other's
   holds the profile, it asks that one to let go: a Chrome no work uses at that moment (no chat's step under way in it,
   no run at work holding tabs in it, no page read in it for the web tools, no task taught in it) closes within about
   two seconds, whatever its idle time and wherever its window is, and the asking one starts its own on the same
