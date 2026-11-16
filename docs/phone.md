@@ -222,9 +222,14 @@ composer grows (items 374 and 401). At rest the composer is the "+", the words a
 words are touched or typed in, the words take their whole line and the line under them holds the "+", the model, the
 context meter, the microphone and the send, each 36 px, and a touch elsewhere puts that line away again. The model's
 pill stands for every choice of the run (item 1121): after the name it says the mode when one is named and the
-reasoning level in small words, not the approvals, which the owner read as a part of the model's name (item 1163), and its menu holds them in
-tabs under a bar at its top (item 1122): Model, Reasoning when the model offers a choice, Options (the approvals and
-How Dot works) and Mode, the menu keeping one height as the tabs change and opening on Model. The conversation scrolls up and down only
+reasoning level in small words, not the approvals, which the owner read as a part of the model's name (item 1163); a
+long name gives way to an ellipsis and the level stays whole. A tap on it opens the chat's settings (item 1202), a
+sheet from the foot of the screen with Close, the title and Done at its head: the default's row with Change, the
+favourites, then a section per provider that opens and folds (the chosen model's open, the others saying how many
+models they hold), each model with a tick and a star; under them the Options, Reasoning, Mode and Approvals as rows
+that say their value and open in place, and How Dot works with its switches; the search of the models stays at the
+sheet's foot. A pick keeps the sheet open; Done, Close, a tap on the dim above it or a drag of its head down puts it
+away. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
 tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A delegated run's row, under the helpers it belongs to, is one line tall at this width:
 its face, its goal, its state and time, and the way to its page, with the goal or the last line cut by an ellipsis

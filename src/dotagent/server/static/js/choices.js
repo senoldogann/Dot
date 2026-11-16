@@ -11,10 +11,11 @@ import { t } from "./i18n.js";
 import { allModels, levelLabel, offersChoice, ONE_MESSAGE, oneMessageChoices, SPEED_HINTS } from "./efforts.js";
 import { icon } from "./icons.js";
 import { PHONE } from "./layout.js";
-import { defaultRowText, modelPicker } from "./modelpicker.js";
+import { defaultRowText, modelPicker, modelSections } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
 import { providerMark, providerOf } from "./providers.js";
 import { approvalBadge, approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
+import { phoneSheet } from "./sheet.js";
 import { getSnapshot, loadModels, refresh } from "./state.js";
 import { attempt, toast, toastError } from "./ui.js";
 
@@ -115,7 +116,13 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   const optionsPill = composerPill({ id: "options", caption: t("choices.options"), value: "", icon: null });
   setTitle(optionsPill.element, optionsTitle);
   // The pill wears the mode's shorter name and its icon (item 398), its tooltip the whole name.
+  // The approval mode shown now (null before the daemon's is known), for its row in a phone's chat settings.
+  let approvalsShown = null;
+  // Paints a phone's chat settings again while they are open, once they exist: the Approvals row says the new mode.
+  let repaintSettings = () => undefined;
   const approvals = approvalsPicker((shown) => {
+    approvalsShown = shown;
+    repaintSettings();
     const badge = shown === null ? null : approvalBadge(shown);
     optionsPill.setValue(badge === null ? "" : badge.short, "");
     optionsPill.setIcon(icon(badge === null ? "lock" : badge.icon));
@@ -296,9 +303,15 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     if (onceFor(selectedInfo()) === null) {
       once = null;
     }
-    modelMenu.close();
+    // The sheet of a phone stays open after a pick; the menu over a Mac's box closes.
+    const sheet = PHONE.matches;
+    if (!sheet) {
+      modelMenu.close();
+    }
     paintModel();
-    modelPill.element.focus();
+    if (!sheet) {
+      modelPill.element.focus();
+    }
     onChange();
   }
 
@@ -401,78 +414,79 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
 
   // The model's menu (item 208): the favourites and the providers on a rail, a search, a star on each model.
   const picker = modelPicker({ onPick: pickModel, onMakeDefault: makeDefault });
-  const modelMenu = anchoredPopover({
-    anchor: modelPill.element,
-    frame: frame.element,
-    label: t("choices.model"),
-    build: () => {
-      const fallback = defaultRefOf(getSnapshot());
-      const models = picker.build({ groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) });
-      return PHONE.matches ? phoneMenu(models) : models;
-    },
-  });
+  function modelArgs() {
+    const fallback = defaultRefOf(getSnapshot());
+    return { groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) };
+  }
 
-  // On a phone the model's menu holds every choice of the run (item 1121, the owner's ask after another assistant's
-  // thread settings), a tab each under a bar of tabs at its top (item 1122, the owner's ask: one long list scrolled
-  // past the models): Model, Reasoning when the model offers a choice, Options (the approvals and how Dot works) and
-  // Mode. The menu keeps its height as the tabs change; their own pills stay on a Mac's wider box. The menu opens on
-  // Model, and a pick in a tab keeps that tab.
-  let phoneTab = "model";
-  // Before the press opens the menu, so that it opens on the models.
-  modelPill.element.addEventListener("pointerdown", () => {
-    phoneTab = "model";
-  });
+  // On a phone the model's pill opens the chat's settings instead (item 1202, the owner's ask after another
+  // assistant's thread settings; items 1121 and 1122 had them as tabs of a menu over the box): a sheet from the foot of
+  // the screen with the models in a section per provider, then the Options, Reasoning and Mode as rows that open in
+  // place, the approvals and how Dot works, and the search of the models at its foot. A pick keeps the sheet open, as
+  // the other assistant's does; Done or Close puts it away. The other pills stay on a Mac's wider box.
+  const sections = modelSections({ onPick: pickModel, onMakeDefault: makeDefault });
+  // The rows of the Options opened by hand, by id, kept while the sheet repaints after a pick.
+  const openRows = new Set();
 
-  function phoneTabs() {
+  function disclosure(id, label, value, rows) {
+    const details = el(
+      "details",
+      { class: "sheet-disclosure", open: openRows.has(id) },
+      el("summary", { class: "sheet-row" }, el("span", { class: "sheet-row-text" }, label), el("span", { class: "sheet-row-value" }, value), icon("chevron")),
+      el("div", { class: "sheet-disclosure-body" }, ...rows),
+    );
+    details.addEventListener("toggle", () => {
+      if (details.open) {
+        openRows.add(id);
+      } else {
+        openRows.delete(id);
+      }
+    });
+    return details;
+  }
+
+  function settingsParts() {
     const isChat = modeId === "chat";
     executionGroup.hidden = isChat;
     executionGroup.replaceChildren(el("div", { class: "pop-heading" }, t("choices.howDotWorks")), ...executionItems.flatMap((build) => build()), goalMode.element, frame.picks.planRow());
     const reasoning = reasoningRows();
-    return [
-      { id: "model", label: t("choices.model"), build: (models) => models },
-      ...(reasoning.length === 0 ? [] : [{ id: "reasoning", label: t("choices.reasoning"), build: () => reasoning }]),
-      { id: "options", label: t("choices.options"), build: () => [approvals.element, ...(isChat ? [] : [executionGroup]), ...more()] },
-      {
-        id: "mode",
-        label: t("choices.mode"),
-        build: () => [
-          el(
-            "div",
-            { role: "listbox", "aria-label": t("choices.mode") },
-            ...modes.map((option) => optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) })),
-          ),
-        ],
-      },
-    ];
+    const mode = modes.find((option) => option.id === modeId);
+    const modeRows = el(
+      "div",
+      { role: "listbox", "aria-label": t("choices.mode") },
+      ...modes.map((option) => optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) })),
+    );
+    const models = sections.build(modelArgs());
+    return {
+      body: [
+        models.list,
+        el("div", { class: "sheet-heading" }, t("choices.options")),
+        el(
+          "div",
+          { class: "sheet-card" },
+          ...(reasoning.length === 0 ? [] : [disclosure("reasoning", t("choices.reasoning"), reasoningShort, reasoning)]),
+          disclosure("mode", t("choices.mode"), mode === undefined ? "" : mode.label, [modeRows]),
+          disclosure("approvals", t("options.approvals"), approvalsShown === null ? "" : approvalLabel(approvalsShown), [approvals.element]),
+        ),
+        el("div", { class: "sheet-card sheet-groups" }, ...(isChat ? [] : [executionGroup]), ...more()),
+      ],
+      foot: [models.search],
+    };
   }
 
-  function phoneMenu(models) {
-    const tabs = phoneTabs();
-    const shown = tabs.find((tab) => tab.id === phoneTab) ?? tabs[0];
-    const bar = el(
-      "div",
-      { class: "pop-tabs", role: "tablist", "aria-label": t("choices.choices") },
-      ...tabs.map((tab) =>
-        el(
-          "button",
-          {
-            class: "pop-tab",
-            type: "button",
-            role: "tab",
-            "aria-selected": String(tab.id === shown.id),
-            // The models' tab gives the keys to its search, as the menu always did; another tab keeps them on itself.
-            "data-autofocus": tab.id === shown.id && tab.id !== "model" ? "" : null,
-            onclick: () => {
-              phoneTab = tab.id;
-              modelMenu.repaint();
-            },
-          },
-          tab.label,
-        ),
-      ),
-    );
-    return [bar, el("div", { class: "pop-tab-panel", role: "tabpanel", "aria-label": shown.label }, ...shown.build(models))];
+  function makeModelMenu() {
+    return PHONE.matches
+      ? phoneSheet({ anchor: modelPill.element, title: t("choices.chatSettings"), build: settingsParts })
+      : anchoredPopover({ anchor: modelPill.element, frame: frame.element, label: t("choices.model"), build: () => picker.build(modelArgs()) });
   }
+  let modelMenu = makeModelMenu();
+  repaintSettings = () => modelMenu.repaint();
+  // A window that crosses a phone's width takes the other menu.
+  function onLayout() {
+    modelMenu.dispose();
+    modelMenu = makeModelMenu();
+  }
+  PHONE.addEventListener("change", onLayout);
 
   paintPhonePill = () => {
     const option = modes.find((candidate) => candidate.id === modeId);
@@ -564,6 +578,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     },
     dispose: () => {
       unwatch();
+      PHONE.removeEventListener("change", onLayout);
       optionsMenu.dispose();
       modeMenu.dispose();
       modelMenu.dispose();

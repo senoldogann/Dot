@@ -206,7 +206,7 @@ async def _bar_and_composer(
     await sidebar.get_by_role("button", name="Hide sidebar").click()
 
     # The reasoning pill reads its level, chosen from its menu; the bar holds every button. A phone's box, once used,
-    # says the level after the model's name and holds the levels in the model's menu (items 1120 and 1121).
+    # says the level after the model's name and holds the levels in its chat settings (items 1120, 1121 and 1202).
     if width < 720:
         await box.click()
     held: str = "model" if width < 720 else "reasoning"
@@ -218,10 +218,13 @@ async def _bar_and_composer(
     await expect(level).to_be_visible()
     await expect(level).to_contain_text("Low")
     await page.locator(f'.composer-pill[data-pill="{held}"]').click()
+    # A phone's chat settings (item 1202) hold the levels in a row that opens in place, and stay open after a pick.
     if width < 720:
-        await page.get_by_role("tab", name="Reasoning", exact=True).click()
+        await page.get_by_role("dialog", name="Chat settings").locator("summary", has_text="Reasoning").click()
     await page.get_by_role("listbox", name="Reasoning", exact=True).get_by_role("option", name="High").click()
     await expect(level).to_contain_text("High")
+    if width < 720:
+        await page.get_by_role("dialog", name="Chat settings").get_by_role("button", name="Done").click()
     composer_bar: Locator = page.locator(".composer-bar")
     assert await composer_bar.evaluate("(row) => row.scrollWidth <= row.clientWidth + 1")
     for control in await composer_bar.locator("button:visible").all():
