@@ -148,7 +148,7 @@ def retry_why(ending: Ending, kind: FailureKind | None) -> RetryWhy | None:
         case "daemon_restarted" | "daemon_shutdown":
             return "cut_off"
         case "stalled" | "empty_replies":
-            return "stalled" if ending == "stalled" else "passing_error"
+            return "stalled"
         case "failed" if kind == "passing":
             return "passing_error"
         case "failed" if kind == "plan_limit":

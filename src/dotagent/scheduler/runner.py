@@ -983,15 +983,17 @@ class Scheduler:
             if started is None and made:
                 await self._drop_chat(record.id, thread_id)
         run: RunRecord = started
-        await started_stored(store, record.id, pending.from_run_id, run.id)
-        await self._runtime.bus.emit(
-            run.id,
-            SCHEDULE_RETRY_EVENT,
-            {"from_run_id": pending.from_run_id, "why": pending.why, "ended_at": pending.ended_at},
-            True,
-        )
+        # Followed first, so that a write that fails below leaves no run of the schedule unwatched; until the mark is
+        # written, the claim tells the try apart (:func:`~dotagent.scheduler.recovery.is_try_run`).
         await self._track(record.id, run, self._level(record))
         try:
+            await started_stored(store, record.id, pending.from_run_id, run.id)
+            await self._runtime.bus.emit(
+                run.id,
+                SCHEDULE_RETRY_EVENT,
+                {"from_run_id": pending.from_run_id, "why": pending.why, "ended_at": pending.ended_at},
+                True,
+            )
             # Its chat is the schedule's last, as a run by hand's is (nothing of when it fires next changes): a crash
             # while the try works finds it there as the run cut (:meth:`_recover_cut`), not the task it tried again.
             await store.record_schedule_hand_run(record.id, now, thread_id, run.id)
@@ -1056,8 +1058,6 @@ class Scheduler:
             if made:
                 await self._drop_chat(record.id, thread_id)
             return
-        # The firing does the task: a try of an earlier one waiting for the schedule is dropped (item 1206).
-        await supersede_stored(store, record.id)
         if late:
             log.warning("schedule_fired_late", schedule_id=record.id, overdue_s=round(overdue_s), missed=missed)
         told: str = caught_up_goal(record.goal, occurrence, now, zone, missed) if late else record.goal
@@ -1099,6 +1099,8 @@ class Scheduler:
         try:
             await store.mark_schedule_running(record.id, run.id)
             await record_firing_started(store, record.id)
+            # The firing's run does the task: a try of an earlier one waiting for the schedule is dropped (item 1206).
+            await supersede_stored(store, record.id)
         except DotError as exc:
             # The run started all the same; its watch writes how it ended.
             log.error(
@@ -1168,7 +1170,6 @@ class Scheduler:
             out_of_time: str = thread_title(f"{record.name} · {format_local(now, zone)} · {why}")
             record, digest, title = await self._briefed(record, digest, now, zone, out_of_time)
             thread_id, made = await self._firing_chat(record, same_chat, title)
-            await supersede_stored(store, record.id)
             goal: str = (
                 by_hand_goal(record.goal, now, zone) if signal is None else signal_goal(record.goal, now, zone, signal)
             )
@@ -1186,6 +1187,8 @@ class Scheduler:
             )
             try:
                 await store.record_schedule_hand_run(record.id, now, thread_id, run.id)
+                # Its run does the task: a try waiting for the schedule is dropped (item 1206).
+                await supersede_stored(store, record.id)
             except DotError as exc:
                 # The run started all the same; its watch writes how it ended.
                 log.error(
