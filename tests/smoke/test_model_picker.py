@@ -538,6 +538,11 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             await menu.locator("summary", has_text="Ollama").tap()
             await menu.locator("[role=option]").filter(has_text="qwen3-coder").tap()
             await expect(phone.locator(".toast.ok")).to_contain_text("New chats start on qwen3-coder.")
+            # The word stands over the sheet, which a pick keeps open: the toast's middle is the toast's own.
+            assert await phone.locator(".toast.ok").evaluate(
+                "toast => { const r = toast.getBoundingClientRect();"
+                " return toast.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }"
+            )
             await expect(menu.get_by_role("option", name="Default (qwen3-coder)")).to_be_visible()
             assert await _main_model(served) == f"{_PROVIDER}:qwen3-coder"
             await touch.close()

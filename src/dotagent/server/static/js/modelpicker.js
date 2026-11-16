@@ -622,7 +622,7 @@ export function modelSections({ onPick, onMakeDefault }) {
 
     function row({ info, provider }, mixed, favourites) {
       const name = modelName(info.ref);
-      const free = info.free ? (info.learns ? "Free, may train on your data" : "Free") : "";
+      const free = info.free ? (info.learns ? t("choices.freeMayTrain") : t("choices.free")) : "";
       const hint = mixed ? [providerLabel(provider), free.toLowerCase()].filter((part) => part !== "").join(", ") : free;
       const starred = favourites.includes(info.ref);
       const star = el(
@@ -630,7 +630,7 @@ export function modelSections({ onPick, onMakeDefault }) {
         {
           class: "model-star",
           type: "button",
-          "aria-label": `Favourite ${name}`,
+          "aria-label": t("choices.favouriteOf", { name }),
           "aria-pressed": String(starred),
           onclick: () => {
             const now = readFavourites();
@@ -660,7 +660,7 @@ export function modelSections({ onPick, onMakeDefault }) {
         return el(
           "div",
           { class: "model-sheet-row model-choosing" },
-          el("span", { class: "sheet-row model-choosing-text", "aria-live": "polite" }, making === null ? "Choose the default model" : `Making ${modelName(making)} the default…`),
+          el("span", { class: "sheet-row model-choosing-text", "aria-live": "polite" }, making === null ? t("choices.chooseDefault") : t("choices.makingDefault", { model: modelName(making) })),
           el(
             "button",
             {
@@ -671,7 +671,7 @@ export function modelSections({ onPick, onMakeDefault }) {
                 paint();
               },
             },
-            "Cancel",
+            t("dialog.cancel"),
           ),
         );
       }
@@ -691,13 +691,13 @@ export function modelSections({ onPick, onMakeDefault }) {
               {
                 class: "model-change",
                 type: "button",
-                title: "Choose the model new chats start on",
+                title: t("choices.changeTitle"),
                 onclick: () => {
                   choosingDefault = true;
                   paint();
                 },
               },
-              "Change",
+              t("choices.change"),
             ),
       );
     }

@@ -709,6 +709,8 @@ async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) ->
     await menu.locator(".pop-option[data-mode='yolo']").click()
     await expect(menu.locator(".pop-option[data-mode='yolo']")).to_have_attribute("aria-selected", "true")
     await expect(model).not_to_contain_text("Pay or send")
+    # The row says the mode chosen as it is chosen.
+    await expect(menu.locator("summary", has_text="Approvals")).to_contain_text("Ask only to pay or send")
     # A pick repaints the sheet: the row stays open, and the sheet stays within the screen.
     await menu.locator(".pop-option[data-mode='ask']").click()
     await expect(menu.locator(".pop-option[data-mode='ask']")).to_have_attribute("aria-selected", "true")

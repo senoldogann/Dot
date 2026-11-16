@@ -3030,10 +3030,11 @@ dialog.computer-full::backdrop {
 /* A phone's chat settings (item 1202, sheet.js): a sheet from the foot of the screen over a dim, its head Close, the
    title and Done, the models in a section per provider and the Options in cards, and the search of the models kept
    at its foot over the home indicator. */
+/* Under the toasts (z-index 60), as the menus are: a pick that failed, or Change's word, is read over the sheet. */
 .sheet {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 50;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;

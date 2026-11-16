@@ -118,8 +118,11 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   // The pill wears the mode's shorter name and its icon (item 398), its tooltip the whole name.
   // The approval mode shown now (null before the daemon's is known), for its row in a phone's chat settings.
   let approvalsShown = null;
+  // Paints a phone's chat settings again while they are open, once they exist: the Approvals row says the new mode.
+  let repaintSettings = () => undefined;
   const approvals = approvalsPicker((shown) => {
     approvalsShown = shown;
+    repaintSettings();
     const badge = shown === null ? null : approvalBadge(shown);
     optionsPill.setValue(badge === null ? "" : badge.short, "");
     optionsPill.setIcon(icon(badge === null ? "lock" : badge.icon));
@@ -477,6 +480,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
       : anchoredPopover({ anchor: modelPill.element, frame: frame.element, label: t("choices.model"), build: () => picker.build(modelArgs()) });
   }
   let modelMenu = makeModelMenu();
+  repaintSettings = () => modelMenu.repaint();
   // A window that crosses a phone's width takes the other menu.
   function onLayout() {
     modelMenu.dispose();
