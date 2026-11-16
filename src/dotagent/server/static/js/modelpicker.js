@@ -779,7 +779,6 @@ export function modelSections({ onPick, onMakeDefault }) {
       list.replaceChildren(...children);
     }
 
-    // Escape while the list chooses the default leaves the choosing, and the sheet stays open, as on a Mac's menu.
     paint();
     root = list;
     paintBuilt = () => {
