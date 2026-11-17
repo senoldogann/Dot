@@ -431,9 +431,9 @@ Both modes share what follows.
   makes it send by POST, and keeps it so as it is sent (item 775). A vault login's
   password is in the Mac's Keychain (service `dot-vault`), never in Dot's database, whose record of a login holds its
   site and username alone. It fills only on the login's own site; on another page the refusal sends the run to the
-  login's own site, and on another host of the same name (`account.apple.com` for a login of
-  `appstoreconnect.apple.com`, where Apple signs in) has it tell you, in one line, which site the login should name
-  (item 1208); never a password or a code in your own Chrome
+  login's own site to fill there, and when that site sends it back to a page the login does not name
+  (`account.apple.com`, where App Store Connect signs in), it does not fill and tells you so in one line; whether the
+  login should name that page too is yours to decide (item 1208); never a password or a code in your own Chrome
   (`attach`: that Chrome's requests are not held, so nothing would keep a value out of an address), and not in a chat in
   which a script (`browser_eval`) ran in a tab that is still open: there the fill first closes every tab of the chat and
   opens the page again in a new tab, with no history, and asks the run to fill again with that page's refs (item 697;
