@@ -268,3 +268,53 @@ def _owners_folder(folder: Path) -> None:
 def _replace_with_link(folder: Path, target: Path) -> None:
     folder.rmdir()
     folder.symlink_to(target)
+
+
+def _slides(folder: Path, seconds: tuple[float, ...]) -> Path:
+    """A video of still slides, each its own colour or pattern, shown for ``seconds`` each, as a talk's deck is."""
+    sources: tuple[str, ...] = ("color=c=navy", "testsrc2=rate=1", "color=c=white", "mandelbrot=rate=1")
+    folder.mkdir(parents=True, exist_ok=True)
+    listed: list[str] = ["ffconcat version 1.0"]
+    for index, (source, shown) in enumerate(zip(sources, seconds, strict=False)):
+        picture: Path = folder / f"slide{index}.png"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                f"{source}:size=640x360",
+                "-frames:v",
+                "1",
+                str(picture),
+            ],
+            check=True,
+        )
+        listed += [f"file {picture.name}", f"duration {shown}"]
+    listed.append(f"file {picture.name}")
+    deck: Path = folder / "deck.ffconcat"
+    deck.write_text("\n".join(listed) + "\n", encoding="utf-8")
+    video: Path = folder / "talk-slides.mp4"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "concat", "-i", str(deck), "-vf", "fps=10,format=yuv420p", str(video)],
+        check=True,
+    )
+    return video
+
+
+@needs_ffmpeg
+async def test_a_slide_shown_for_three_seconds_is_seen(runtime: Runtime) -> None:
+    # The deck is 80 s (ffconcat shows the last slide again for as long): spread evenly, four frames fall at 10, 30, 50
+    # and 70 s and miss the slide of 20-23 s; one in each scene sees it (item 1214).
+    ctx: ToolContext = await _context(runtime)
+    video: Path = await asyncio.to_thread(_slides, workspace_dir() / "slides", (20.0, 3.0, 17.0, 20.0))
+    result: ToolResult = await _watched(ctx, {"source": str(video), "frames": 4})
+    assert not result.is_error, result.text
+    assert "The part has 4 scenes" in result.text, result.text[:600]
+    found: re.Match[str] | None = re.search(r"in this order: (.*)\.", result.text)
+    assert found is not None
+    moments: list[str] = [part.split(") ")[1] for part in found.group(1).split(", ")]
+    assert moments == ["00:10", "00:21", "00:31", "01:00"], result.text[:600]

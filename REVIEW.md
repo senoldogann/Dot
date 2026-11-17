@@ -57,6 +57,8 @@ here points at a test that no longer exists.
   (item 1212): a name that is no language tag is dropped as yt-dlp's answer is read.
 - `tests/smoke/test_watch_video.py::test_what_a_site_says_when_a_look_fails_is_fenced_and_marks_the_run` — yt-dlp's
   error, which carries a site's words, reached the model unfenced and left the run trusted (item 1212).
+- `tests/unit/test_video_watch.py::test_the_line_says_how_the_frames_were_chosen` — the line that tells the model how
+  a look chose its frames was guessed from counts and said the wrong thing when quick cuts spread them (item 1214).
 
 ## Evidence and format
 
