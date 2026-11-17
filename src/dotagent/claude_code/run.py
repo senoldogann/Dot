@@ -91,7 +91,7 @@ from dotagent.agent.loop import (
     withheld_tools,
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
-from dotagent.agent.prompt import THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team_sections, turn_note
+from dotagent.agent.prompt import CHARACTER, THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team_sections, turn_note
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
@@ -233,7 +233,10 @@ _PROMPT: str = (
     "(you said) is the owner's own and outranks the others), the notes under their message, Dot's memory "
     "(memory_search, recall) and the files Dot and its agents wrote in the workspace (list_dir, read_file, "
     "search_files). "
-    "Before you say you do not know something about the owner or their work, look it up there.\n\n" + THOROUGH_AND_BOLD
+    "Before you say you do not know something about the owner or their work, look it up there.\n\n"
+    + THOROUGH_AND_BOLD
+    + "\n\n"
+    + CHARACTER
 )
 
 
