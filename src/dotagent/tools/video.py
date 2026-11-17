@@ -4,8 +4,9 @@ shows and a transcript of what is said in it, by the minute, for a model of any 
 A link is read with yt-dlp: its own captions when the uploader wrote some or the site recognised the speech (no
 download then, unless frames are asked for), else its video, downloaded. What is said in a file, or in a link with no
 captions, is written down by the Mac's own dictation model (:class:`dotagent.voice.helper.Transcriber`), a minute at a
-time: nothing leaves the Mac and no key is needed. Frames are taken by ffmpeg at the middle of equal slices of the part
-looked at.
+time: nothing leaves the Mac and no key is needed. Frames are taken by ffmpeg in every scene of the part looked at, the
+moments the picture changes found by :func:`dotagent.video.media.scene_cuts` and the frames placed by
+:func:`dotagent.video.watch.frame_plan` (item 1214).
 
 A file is read as ``read_file`` reads it: refused in a protected location. A link is an address as ``web_fetch``'s is
 (:func:`dotagent.tools.web.checked_address`), so ``[browser] allowed_hosts`` and ``blocked_hosts`` bind it and a long
@@ -49,13 +50,16 @@ from dotagent.video.media import Probe
 from dotagent.video.watch import (
     CaptionTrack,
     Cue,
+    FramePlan,
     Span,
     VideoInfo,
     caption_blocks,
     choose_track,
     clock,
-    frame_times,
+    frame_plan,
+    frame_plan_line,
     parse_vtt,
+    scenes_of,
     span_error,
     span_of,
     speech_pieces,
@@ -205,13 +209,23 @@ async def _dictated(
 
 
 @dataclass(frozen=True)
+class _Seen:
+    """What a look saw and heard of a file: how its frames were chosen and the frames (no plan when its picture was not
+    looked at), and what the Mac wrote down of its sound (``None`` when it was not asked)."""
+
+    plan: FramePlan | None
+    images: tuple[ImageData, ...]
+    cues: tuple[Cue, ...] | None
+
+
+@dataclass(frozen=True)
 class _Look:
-    """What one look found: the video's length, its part, the moments and the frames, the transcript, the line that
-    says where the transcript came from, and the video's title (the uploader's words)."""
+    """What one look found: the video's length, its part, how its frames were chosen and the frames, the transcript,
+    the line that says where the transcript came from, and the video's title (the uploader's words)."""
 
     duration: float
     span: Span
-    times: tuple[float, ...]
+    plan: FramePlan | None
     images: tuple[ImageData, ...]
     transcript: str
     heard_by: str
@@ -220,24 +234,27 @@ class _Look:
 
 async def _see_and_hear(
     ctx: ToolContext, sandbox: Sandbox, path: Path, probe: Probe, span: Span, frames: int, language: str | None
-) -> tuple[tuple[float, ...], tuple[ImageData, ...], tuple[Cue, ...] | None]:
-    """The frames of ``span`` and, when ``language`` is given, what the Mac writes down of its sound, at once."""
+) -> _Seen:
+    """The frames of ``span``, one or more in each of its scenes (item 1214), and, when ``language`` is given, what the
+    Mac writes down of its sound, at once."""
     env: dict[str, str] = ctx.runtime.shell_env
-    times: tuple[float, ...] = frame_times(span, frames) if frames > 0 and probe.has("video") else ()
     hearing: asyncio.Future[tuple[Cue, ...]] | None = (
         asyncio.ensure_future(_dictated(ctx.runtime.transcriber, sandbox, env, path, span, language))
         if language is not None and probe.has("audio")
         else None
     )
     try:
-        images: tuple[ImageData, ...] = await _frames(sandbox, env, path, times)
+        plan: FramePlan | None = None
+        if frames > 0 and probe.has("video"):
+            plan = frame_plan(span, frames, scenes_of(span, await media.scene_cuts(sandbox.search, env, path, span)))
+        images: tuple[ImageData, ...] = await _frames(sandbox, env, path, () if plan is None else plan.times)
     except BaseException:
         if hearing is not None:
             hearing.cancel()
             # Its stream is dropped and its ffmpeg killed before the call ends; its own error is not the one to tell.
             await asyncio.wait([hearing])
         raise
-    return times, images, (None if hearing is None else await hearing)
+    return _Seen(plan, images, None if hearing is None else await hearing)
 
 
 def _dictation_note(probe: Probe, cues: tuple[Cue, ...] | None, language: str | None) -> tuple[str, str]:
@@ -259,9 +276,9 @@ async def _watch_file(ctx: ToolContext, args: WatchVideoArgs, path: Path) -> _Lo
         )
     span: Span = _span(duration, args)
     language: str | None = _spoken(args.language, "") if probe.has("audio") else None
-    times, images, cues = await _see_and_hear(ctx, sandbox, path, probe, span, args.frames, language)
-    transcript, heard_by = _dictation_note(probe, cues, language)
-    return _Look(duration, span, times, images, transcript, heard_by, path.name)
+    seen: _Seen = await _see_and_hear(ctx, sandbox, path, probe, span, args.frames, language)
+    transcript, heard_by = _dictation_note(probe, seen.cues, language)
+    return _Look(duration, span, seen.plan, seen.images, transcript, heard_by, path.name)
 
 
 async def _watch_link(ctx: ToolContext, args: WatchVideoArgs, url: str) -> _Look:
@@ -287,16 +304,16 @@ async def _watch_link(ctx: ToolContext, args: WatchVideoArgs, url: str) -> _Look
             made: str = "the site's speech recognition" if track.automatic else "the uploader"
             heard_by = f"Transcript: the video's own captions ({track.language}, made by {made})."
         if args.frames == 0 and track is not None:
-            return _Look(info.duration, span, (), (), transcript, heard_by, title)
+            return _Look(info.duration, span, None, (), transcript, heard_by, title)
         written: str = ", ".join(info.subtitles)
         tracks: str = f"; the link has captions in {written}, which naming the language takes" if written else ""
         language: str | None = None if track is not None else _spoken(args.language or info.language, tracks)
         path: Path = await media.download(sandbox.commands, env, url, folder)
         probe: Probe = await media.probe(sandbox.search, env, path)
-        times, images, cues = await _see_and_hear(ctx, sandbox, path, probe, span, args.frames, language)
+        seen: _Seen = await _see_and_hear(ctx, sandbox, path, probe, span, args.frames, language)
     if track is None:
-        transcript, heard_by = _dictation_note(probe, cues, language)
-    return _Look(info.duration, span, times, images, transcript, heard_by, title)
+        transcript, heard_by = _dictation_note(probe, seen.cues, language)
+    return _Look(info.duration, span, seen.plan, seen.images, transcript, heard_by, title)
 
 
 def _render(look: _Look, where: str, output_chars: int) -> ToolResult:
@@ -307,9 +324,10 @@ def _render(look: _Look, where: str, output_chars: int) -> ToolResult:
     if look.span.cut:
         lines.append(f"One look covers at most an hour: call again with start={look.span.end:g} for what comes after.")
     lines.append(look.heard_by)
-    if look.times:
-        moments: str = ", ".join(f"{index}) {clock(at)}" for index, at in enumerate(look.times, start=1))
-        lines.append(f"{len(look.times)} frames follow as images, in this order: {moments}.")
+    if look.plan is not None and look.plan.times:
+        moments: str = ", ".join(f"{index}) {clock(at)}" for index, at in enumerate(look.plan.times, start=1))
+        lines.append(f"{len(look.plan.times)} frames follow as images, in this order: {moments}.")
+        lines.append(frame_plan_line(look.plan))
     else:
         lines.append("No frames were taken.")
     lines.append(

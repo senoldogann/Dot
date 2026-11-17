@@ -13,6 +13,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 import shutil
 import stat
 import tempfile
@@ -44,6 +45,10 @@ _RATE: str = "16000"
 _PROBE_TIMEOUT_S: float = 30.0
 _FRAME_TIMEOUT_S: float = 60.0
 _SOUND_TIMEOUT_S: float = 120.0
+# An hour of video looked at for its scenes: about 70 s on the Mac's decoder, measured on a 3:33 one (4.2 s).
+_SCENES_TIMEOUT_S: float = 300.0
+_SCENE_FPS: int = 4
+_SCENE_SCORE: str = "0.3"
 _INFO_TIMEOUT_S: float = 90.0
 _CAPTIONS_TIMEOUT_S: float = 90.0
 _DOWNLOAD_TIMEOUT_S: float = 900.0
@@ -210,6 +215,45 @@ def _remove(folder: Path) -> None:
         shutil.rmtree(folder)
     except OSError as error:
         log.warning("video_folder_kept", folder=str(folder), error=str(error))
+
+
+_SCENE_TIME: re.Pattern[bytes] = re.compile(rb"pts_time:([0-9.]+)")
+
+
+async def scene_cuts(sandbox: Sequence[str], env: dict[str, str], path: Path, span: Span) -> tuple[float, ...]:
+    """The moments in ``span`` of the video at ``path`` where its picture changes (a cut, a new slide), in seconds from
+    the video's start. The video is decoded by the Mac's own decoder where it can (``-hwaccel videotoolbox``: measured,
+    a 3:33 video took 0.8 s of the processor where the software decoder took 15), looked at four times a second and
+    small, and a change is a scene score of :data:`_SCENE_SCORE` or more (measured: every change of a slide deck
+    found, at its moment)."""
+    look: str = f"fps={_SCENE_FPS},scale=160:-2,select='gt(scene,{_SCENE_SCORE})',metadata=print:file=-"
+    argv: list[str] = [
+        program("ffmpeg"),
+        "-v",
+        "error",
+        "-nostdin",
+        "-protocol_whitelist",
+        "file,pipe",
+        "-format_whitelist",
+        _FORMATS,
+        "-hwaccel",
+        "videotoolbox",
+        "-ss",
+        f"{span.start:.3f}",
+        "-t",
+        f"{span.end - span.start:.3f}",
+        "-i",
+        str(path),
+        "-an",
+        "-vf",
+        look,
+        "-f",
+        "null",
+        "-",
+    ]
+    out: bytes = await _run(sandbox, argv, env, _SCENES_TIMEOUT_S)
+    # ffmpeg counts from the start it was given.
+    return tuple(span.start + float(found.group(1)) for found in _SCENE_TIME.finditer(out))
 
 
 @asynccontextmanager

@@ -20,9 +20,13 @@ Say "watch this and tell me what it says: https://www.youtube.com/watch?v=…", 
 
 - **The part looked at.** The whole video, or what `start` and `end` (seconds) name; at most an hour per call. A longer
   video is looked at an hour at a time, and the result says where to go on.
-- **Frames.** 16 by default, at most 40, at the middle of equal slices of the part, at most one a second, no larger
-  than 768 pixels. A closer look at a moment is a call with `start` and `end` around it: the same frames over a shorter
-  part. `frames = 0` gives the transcript alone.
+- **Frames.** 16 by default, at most 40, at most one a second, no larger than 768 pixels, taken so that every scene
+  of the part is seen (item 1214): Dot looks for the moments the picture changes (a cut, a new slide), takes one frame
+  in the middle of each scene and gives the frames left to the longest ones, so a slide shown for three seconds is
+  seen. With more scenes than frames (a music video's cuts), none, or scenes of a second or more that cover less than
+  half of the part (quick cuts), they are spread evenly; the result says which. Finding the scenes uses the Mac's own
+  video decoder and takes a few seconds for a few minutes of video. A closer look at a moment is a call with `start`
+  and `end` around it: the same frames over a shorter part. `frames = 0` gives the transcript alone.
 - **The transcript.** For a link, the video's own captions when it has some: the ones the uploader wrote in the
   language spoken, else the site's own recognition of the original sound (never a track the site translated). Then the
   video is not downloaded unless frames are asked for. Otherwise the Mac writes down the sound a minute at a time, in

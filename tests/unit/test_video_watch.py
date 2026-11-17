@@ -4,14 +4,18 @@ written down in, the caption track of a link and the lines of a caption file."""
 from dotagent.video.watch import (
     CaptionTrack,
     Cue,
+    FramePlan,
     Span,
     TrackFormat,
     VideoInfo,
     caption_blocks,
     choose_track,
     clock,
+    frame_plan,
+    frame_plan_line,
     frame_times,
     parse_vtt,
+    scenes_of,
     span_error,
     span_of,
     speech_pieces,
@@ -126,3 +130,74 @@ def test_a_track_name_that_is_no_language_tag_is_dropped_as_the_answer_is_read()
     assert list(info.subtitles) == ["pt-BR"]
     assert list(info.automatic_captions) == ["zh-Hans", "en-orig"]
     assert _taken(info, "en-US") == "en-orig"
+
+
+def test_every_scene_is_seen_and_the_longest_take_the_frames_left() -> None:
+    span: Span = Span(start=0.0, end=60.0, cut=False)
+    # A flash shorter than a second is no scene; the cuts outside the part are not its.
+    scenes: tuple[Span, ...] = scenes_of(span, (10.0, 10.4, 40.0, 75.0))
+    assert [(scene.start, scene.end) for scene in scenes] == [(0.0, 10.0), (10.4, 40.0), (40.0, 60.0)]
+    # A three-second slide is seen, which frames spread evenly over the minute would miss.
+    short: tuple[Span, ...] = scenes_of(span, (20.0, 23.0))
+    assert frame_plan(span, 3, short).times == (10.0, 21.5, 41.5)
+    assert not any(20.0 <= at < 23.0 for at in frame_times(span, 3))
+    # Frames left over go to the longest scenes, each split into equal slices.
+    assert frame_plan(span, 5, short).times == (5.0, 15.0, 21.5, 32.25, 50.75)
+
+
+def test_more_scenes_than_frames_or_none_spread_the_frames_evenly() -> None:
+    span: Span = Span(start=0.0, end=60.0, cut=False)
+    many: tuple[Span, ...] = scenes_of(span, tuple(float(at) for at in range(5, 60, 5)))
+    assert frame_plan(span, 4, many).times == frame_times(span, 4)
+    assert frame_plan(span, 4, ()).times == frame_times(span, 4)
+
+
+def test_frames_count_the_time_the_scenes_cover_and_quick_cuts_spread_them() -> None:
+    span: Span = Span(start=0.0, end=10.0, cut=False)
+    # A flash of half a second is dropped: 9.5 s of the 10 are covered, so at most nine frames, not ten.
+    covered: tuple[Span, ...] = scenes_of(span, (3.5, 4.0, 6.5))
+    assert len(frame_plan(span, 10, covered).times) == 9
+    # One scene of 1.5 s in a minute of flashes covers little of it: the frames are spread over the whole minute.
+    minute: Span = Span(start=0.0, end=60.0, cut=False)
+    flashes: tuple[float, ...] = (1.5, *(1.5 + 0.5 * step for step in range(1, 118)))
+    assert frame_plan(minute, 6, scenes_of(minute, flashes)).times == frame_times(minute, 6)
+
+
+def test_half_the_part_is_where_the_scenes_stop_choosing_the_frames() -> None:
+    minute: Span = Span(start=0.0, end=60.0, cut=False)
+    # Two scenes of 15.5 s, flashes between them (31 s of the 60), choose the frames; two of 14.5 s (29 s) leave them
+    # spread evenly.
+    over: FramePlan = frame_plan(minute, 4, scenes_of(minute, _flashes(15.5, 44.5)))
+    under: FramePlan = frame_plan(minute, 4, scenes_of(minute, _flashes(14.5, 45.5)))
+    assert (over.choice, over.scenes) == ("by_scene", 2)
+    assert (under.choice, under.scenes, under.times) == ("quick_cuts", 2, frame_times(minute, 4))
+
+
+def _flashes(start: float, end: float) -> tuple[float, ...]:
+    """Cuts every half second from ``start`` to ``end``: flashes, none of them a scene."""
+    return tuple(start + 0.5 * step for step in range(int((end - start) / 0.5) + 1))
+
+
+def test_the_line_says_how_the_frames_were_chosen() -> None:
+    times: tuple[float, ...] = (1.0, 2.0)
+    assert frame_plan_line(FramePlan(times=times, choice="by_scene", scenes=3, covered=1.0)).startswith(
+        "The part has 3 scenes"
+    )
+    assert frame_plan_line(FramePlan(times=times, choice="by_scene", scenes=1, covered=1.0)).startswith(
+        "The part is one scene"
+    )
+    # One scene of 35 s in a minute: the 42% of quick cuts that no frame sees is said.
+    partial: str = frame_plan_line(FramePlan(times=times, choice="by_scene", scenes=1, covered=35 / 60))
+    assert "The other 42% of the part changes too quickly to be a scene and has no frame." in partial
+    assert "more than the frames" in frame_plan_line(FramePlan(times=times, choice="too_many", scenes=40, covered=1.0))
+    assert "cover less than half" in frame_plan_line(FramePlan(times=times, choice="quick_cuts", scenes=2, covered=0.3))
+    one: str = frame_plan_line(FramePlan(times=times, choice="quick_cuts", scenes=1, covered=0.3))
+    assert one.startswith("The one scene of a second or more covers less than half")
+    assert frame_plan_line(FramePlan(times=times, choice="no_scene", scenes=0, covered=0.0)).startswith(
+        "No scene of a second"
+    )
+
+
+def test_one_scene_over_too_little_of_a_part_is_said_as_one() -> None:
+    line: str = frame_plan_line(FramePlan(times=(1.0,), choice="quick_cuts", scenes=1, covered=0.3))
+    assert line.startswith("The one scene of a second or more covers less than half of this part")

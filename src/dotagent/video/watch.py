@@ -3,12 +3,15 @@ frames are taken at, the pieces its sound is written down in, the caption track 
 track, and the text the model reads.
 
 No model takes a video: Claude takes pictures and text, and so does every model Dot runs (a model that cannot see has
-the pictures described by the vision model, :mod:`dotagent.agent.vision`). So a video is given as both: frames spread
-over the part looked at, each with its moment, and what is said, by the minute.
+the pictures described by the vision model, :mod:`dotagent.agent.vision`). So a video is given as both: frames of the
+part looked at, one or more in each of its scenes (:func:`frame_plan`, item 1214), each with its moment, and what is
+said, by the minute.
 """
 
 import re
 from collections.abc import Mapping, Sequence
+from itertools import pairwise
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -16,6 +19,8 @@ from dotagent.core.types import FrozenModel
 
 # The longest part one call writes down: a longer video is looked at a part at a time (start and end).
 MAX_SPAN_S: float = 3600.0
+# A scene shorter than this (a flash, a step of a fade) is no scene of its own (:func:`scenes_of`).
+MIN_SCENE_S: float = 1.0
 # The length of a piece of sound the Mac writes down at a time: its moment is the transcript's timestamp.
 SPEECH_PIECE_S: float = 60.0
 # A paragraph of captions starts at most this often, so a transcript reads in blocks and not a line per cue.
@@ -45,6 +50,23 @@ class Cue(FrozenModel):
 
     start: float
     text: str
+
+
+# Scenes that cover this share of a part or more cover all of it, as far as a line of the result says.
+_WHOLE: float = 0.95
+# How the frames of a look were chosen (:func:`frame_plan`): one or more in every scene, or spread evenly because the
+# part has more scenes than frames, none, or scenes over less than half of it.
+type FrameChoice = Literal["by_scene", "too_many", "no_scene", "quick_cuts"]
+
+
+class FramePlan(FrozenModel):
+    """The moments the frames are taken at, how they were chosen, how many scenes the part has and the share of the
+    part they cover (from 0 to 1; what is left is quick cuts, no scene)."""
+
+    times: tuple[float, ...]
+    choice: FrameChoice
+    scenes: int
+    covered: float
 
 
 class CaptionTrack(FrozenModel):
@@ -118,6 +140,78 @@ def frame_times(span: Span, count: int) -> tuple[float, ...]:
     length: float = span.end - span.start
     taken: int = min(count, max(1, int(length)))
     return tuple(span.start + length * (index + 0.5) / taken for index in range(taken))
+
+
+def scenes_of(span: Span, cuts: Sequence[float]) -> tuple[Span, ...]:
+    """The scenes of ``span``: the parts between the moments the picture changes (``cuts``, in seconds from the video's
+    start), each at least :data:`MIN_SCENE_S` long; a shorter one (a flash, a fade's step) is no scene."""
+    inside: list[float] = sorted(cut for cut in cuts if span.start < cut < span.end)
+    bounds: list[float] = [span.start, *inside, span.end]
+    return tuple(Span(start=start, end=end, cut=False) for start, end in pairwise(bounds) if end - start >= MIN_SCENE_S)
+
+
+def frame_plan(span: Span, count: int, scenes: Sequence[Span]) -> FramePlan:
+    """The moments of ``count`` frames over ``span`` that see every scene: one in the middle of each, and the rest given
+    to the longest scenes, each split again into equal slices. A slide that stays a second is seen as one that stays a
+    minute is, where frames spread evenly over the time would miss it. At most one a second of the time the scenes
+    cover (a flash dropped between them covers none). The frames are spread evenly (:func:`frame_times`) when there
+    are more scenes than frames (a music video's cuts), none, or scenes over less than half the part (quick cuts, which
+    say little of it); the plan says which."""
+    covered: float = sum(scene.end - scene.start for scene in scenes)
+    covered_share: float = covered / (span.end - span.start)
+    taken: int = min(count, max(1, int(covered)))
+    choice: FrameChoice
+    if not scenes:
+        choice = "no_scene"
+    elif len(scenes) > taken:
+        choice = "too_many"
+    elif covered < (span.end - span.start) / 2:
+        choice = "quick_cuts"
+    else:
+        choice = "by_scene"
+    if choice != "by_scene":
+        return FramePlan(times=frame_times(span, count), choice=choice, scenes=len(scenes), covered=covered_share)
+    shares: list[int] = [1] * len(scenes)
+    for _ in range(taken - len(scenes)):
+        widest: int = max(range(len(scenes)), key=lambda at: (scenes[at].end - scenes[at].start) / shares[at])
+        shares[widest] += 1
+    times: tuple[float, ...] = tuple(
+        scene.start + (scene.end - scene.start) * (index + 0.5) / share
+        for scene, share in zip(scenes, shares, strict=True)
+        for index in range(share)
+    )
+    return FramePlan(times=times, choice=choice, scenes=len(scenes), covered=covered_share)
+
+
+def frame_plan_line(plan: FramePlan) -> str:
+    """How the frames of ``plan`` were chosen, as the model reads it; frames chosen by scene say what of the part no
+    scene covers (quick cuts), which no frame sees."""
+    rest: str = (
+        ""
+        if plan.covered >= _WHOLE
+        else (
+            f" The other {round((1 - plan.covered) * 100)}% of the part changes too quickly to be a scene and has no "
+            "frame."
+        )
+    )
+    match plan.choice:
+        case "by_scene" if plan.scenes > 1:
+            return (
+                f"The part has {plan.scenes} scenes (the picture changes between them); each is seen in a frame.{rest}"
+            )
+        case "by_scene":
+            return f"The part is one scene (the picture does not change much): the frames are spread over it.{rest}"
+        case "too_many":
+            return f"The picture changes into {plan.scenes} scenes here, more than the frames: they are spread evenly."
+        case "quick_cuts":
+            found: str = (
+                "The one scene of a second or more covers"
+                if plan.scenes == 1
+                else (f"The {plan.scenes} scenes of a second or more cover")
+            )
+            return f"{found} less than half of this part (the picture changes quickly): the frames are spread evenly."
+        case "no_scene":
+            return "No scene of a second or more was found (the picture changes quickly): the frames are spread evenly."
 
 
 def speech_pieces(span: Span) -> tuple[Span, ...]:
