@@ -29,6 +29,9 @@ _log = get_logger("dotagent.browser.pages")
 
 _NOTE_LOG_CHARS: int = 300
 _MAX_NOTES: int = 30
+# How many of the tabs that closed under a thread it remembers, newest last (item 1209).
+_KEPT_CLOSED: int = 6
+_CLOSED_URL_CHARS: int = 200
 
 
 def _set_event() -> asyncio.Event:
@@ -100,6 +103,9 @@ class ThreadTabs:
     # open, since the script may have left a listener that copies what is typed, in its page, in a tab it opened, or
     # in a page Chrome brings back from its cache. Once the thread has no tab left, nothing it touched is left either.
     scripted: bool = False
+    # The tabs that closed without the run closing them, newest last, each as its address and what closed it (item
+    # 1209): a run that asks for a tab by a number it saw before is told what became of it.
+    closed: deque[str] = field(default_factory=lambda: deque(maxlen=_KEPT_CLOSED))
 
     def remove(self, tab: Tab) -> None:
         """Forget ``tab``; the active index keeps pointing at the same tab, or at its neighbour when it was active."""
@@ -110,6 +116,32 @@ class ThreadTabs:
         self.active = max(0, min(self.active, len(self.tabs) - 1))
         if not self.tabs:
             self.scripted = False
+
+
+def note_closed(thread: ThreadTabs, url: str, why: str) -> None:
+    """Remember that the tab at ``url`` of ``thread`` closed, and what closed it (item 1209)."""
+    thread.closed.append(f"{truncate_middle(url, _CLOSED_URL_CHARS)} ({why})")
+
+
+def missing_tab(index: int, thread: ThreadTabs) -> str:
+    """Why a run cannot have tab ``index`` of ``thread`` (item 1209): the tabs the thread has now, by number and
+    address (the page's title is left out, which a page writes as it likes), and the tabs that closed under it. A
+    run that saw a tab numbered in an earlier view, before Dot tidied the chat's tabs at the end of a run or the page
+    closed itself, otherwise had only the count to go on."""
+    listed: str = (
+        "no tab open"
+        if not thread.tabs
+        else "these tabs open: "
+        + "; ".join(
+            f"[{number}]{'*' if number - 1 == thread.active else ''} {truncate_middle(tab.page.url, _CLOSED_URL_CHARS)}"
+            for number, tab in enumerate(thread.tabs, start=1)
+        )
+    )
+    parts: list[str] = [f"there is no tab {index}: the chat has {listed}"]
+    if thread.closed:
+        parts.append(f"closed lately: {'; '.join(thread.closed)}")
+    parts.append("work in a tab listed here, or open a closed page again with browser_new_tab")
+    return ". ".join(parts)
 
 
 def add_note(tab: Tab, text: str) -> None:
