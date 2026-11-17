@@ -90,6 +90,8 @@ from dotagent.browser.pages import (
     add_note,
     attach_handlers,
     chrome_lists,
+    missing_tab,
+    note_closed,
     page_target_id,
     taken_in,
     target_id_of,
@@ -1784,7 +1786,9 @@ class BrowserSession:
             async with thread.lock:
                 if self._threads.get(thread_id) is not thread:
                     continue
-                closed: list[Tab] = await self._close_background(thread, idle_background_tabs(thread, cutoff))
+                closed: list[Tab] = await self._close_background(
+                    thread, idle_background_tabs(thread, cutoff), "Dot closed it once it stood unused in the background"
+                )
             if closed:
                 _log.info("browser_idle_background_tabs_closed", thread_id=thread_id, tabs=len(closed))
 
@@ -1807,19 +1811,23 @@ class BrowserSession:
             if self._threads.get(thread_id) is not thread or thread_id in self._kept():
                 return
             background: list[Tab] = [tab for index, tab in enumerate(thread.tabs) if index != thread.active]
-            closed: list[Tab] = await self._close_background(thread, background)
+            closed: list[Tab] = await self._close_background(
+                thread, background, "Dot closed it when the run that left it in the background ended"
+            )
         if closed:
             _log.info("browser_run_background_tabs_closed", thread_id=thread_id, tabs=len(closed))
 
-    async def _close_background(self, thread: ThreadTabs, tabs: Sequence[Tab]) -> list[Tab]:
-        """Close ``tabs`` of ``thread``, but not its current one nor the tab a task is being shown in, and note on the
-        current tab what closed; return the tabs closed."""
+    async def _close_background(self, thread: ThreadTabs, tabs: Sequence[Tab], why: str) -> list[Tab]:
+        """Close ``tabs`` of ``thread``, but not its current one nor the tab a task is being shown in, note on the
+        current tab what closed and keep it with ``why`` for a run that asks for one of them (item 1209); return the
+        tabs closed."""
         current: Tab | None = thread.tabs[thread.active] if thread.tabs else None
         teaching: object = None if self._teaching is None else self._teaching.page
         closing: list[Tab] = [tab for tab in tabs if tab is not current and tab.page is not teaching]
         for tab in closing:
             url: str = tab.page.url
             await self._close_tab_object(thread, tab)
+            note_closed(thread, url, why)
             if current is not None:
                 add_note(current, f"closed a tab no longer in use: {truncate_middle(url, _LAUNCH_ERROR_CHARS)}")
         return closing
@@ -1986,7 +1994,9 @@ class BrowserSession:
             self._teaching = None
         for thread in self._threads.values():
             if tab in thread.tabs:
+                # A tab Dot closes has left its thread by now: one still in it was closed by its page or in Chrome.
                 thread.remove(tab)
+                note_closed(thread, tab.page.url, "its page closed it, or it was closed in Chrome")
                 return
 
     def _take_initial_page(self) -> Page | None:
@@ -2033,7 +2043,9 @@ class BrowserSession:
             keep: Tab = thread.tabs[thread.active]
             victim: Tab = next(tab for tab in thread.tabs if tab is not keep)
             add_note(keep, f"closed the oldest background tab to stay within max_tabs={self._config.max_tabs}")
+            url: str = victim.page.url
             await self._close_tab_object(thread, victim)
+            note_closed(thread, url, f"Dot closed it to stay within max_tabs={self._config.max_tabs}")
 
     async def _close_tab_object(self, thread: ThreadTabs, tab: Tab) -> None:
         if tab in thread.tabs:
@@ -4188,7 +4200,7 @@ class BrowserSession:
 
     async def switch_tab(self, thread_id: str, index: int, hide_secrets: bool) -> PageView:
         async with self._locked(thread_id) as thread:
-            self._require_tab_index(thread, index)
+            self._require_tab_index(thread_id, thread, index)
             thread.active = index - 1
             tab: Tab = thread.tabs[thread.active]
             # The tab is made the window's visible one only when the window may be raised (item 97).
@@ -4205,14 +4217,18 @@ class BrowserSession:
                 for other in [tab for tab in thread.tabs if tab is not current]:
                     await self._close_tab_object(thread, other)
             else:
-                self._require_tab_index(thread, index)
+                self._require_tab_index(thread_id, thread, index)
                 await self._close_tab_object(thread, thread.tabs[index - 1])
             tab: Tab = await self._current_tab(thread)
             return await self._full_view(thread, tab, hide_secrets)
 
-    def _require_tab_index(self, thread: ThreadTabs, index: int) -> None:
-        if not 1 <= index <= len(thread.tabs):
-            raise BrowserError("there is no such tab", {"index": index, "open_tabs": len(thread.tabs)})
+    def _require_tab_index(self, thread_id: str, thread: ThreadTabs, index: int) -> None:
+        """Refuse a tab number the chat has no tab for, naming the tabs it has and those that closed (item 1209)."""
+        if 1 <= index <= len(thread.tabs):
+            return
+        error: BrowserError = BrowserError(missing_tab(index, thread), {"index": index, "open_tabs": len(thread.tabs)})
+        self.mask_held(thread_id, error)
+        raise error
 
     async def upload(self, thread_id: str, ref: str, paths: Sequence[str], hide_secrets: bool) -> PageView:
         """Give ``paths`` to the file field of the upload control ``ref``, or to the file chooser a click on it opens

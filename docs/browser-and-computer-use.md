@@ -456,7 +456,10 @@ Both modes share what follows.
   closes every tab of the chat but the current one. Only the chat's own tabs are closed: those of a chat at work at the
   same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a link or a page that
   opens a new tab) is the chat's, also when you opened it that way (a middle click in a tab of Dot's in your Chrome).
-  The current tab is told which closed. A tab whose page does not answer a script as simple as `1` within the navigation
+  The current tab is told which closed. A tab number the chat no longer has (`browser_switch_tab`, `browser_close_tab`
+  with a number seen before the tabs were tidied) fails naming the tabs the chat has now, by number and address, and
+  the last tabs that closed without the run closing them, with what closed each: Dot, when a run ended, once it
+  stood unused or to stay within `max_tabs`, or its page or Chrome (item 1209). A tab whose page does not answer a script as simple as `1` within the navigation
   timeout (`navigation_timeout_s`; a page stuck in a loop of its own, a Chrome too loaded to answer) fails saying so,
   and that it is to be closed and the page opened in a new tab (item 753): it was told as a document not yet parsed. A
   page busy for a while (a heavy app starting) has that whole time to answer. A page `browser_open` or `browser_new_tab`
