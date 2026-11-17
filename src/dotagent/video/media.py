@@ -6,18 +6,21 @@ run is.
 ffmpeg reads a file and nothing else: no address (``-protocol_whitelist file``), and no list that names other files
 (``-format_whitelist``, :data:`_FORMATS`: a concat list or a playlist named ``talk.mp4`` is refused). A frame comes
 back on ffmpeg's output and the sound in pieces, so neither is written to a file. What yt-dlp downloads goes to a
-folder of its own per address under the Mac's temporary folder (:func:`download_folder`), kept a few hours so that a
+folder of its own per address under the Mac's temporary folder (:func:`link_folder`), kept a few hours so that a
 second look at another part of the same video does not download it again, and removed after that by the next call.
 """
 
 import asyncio
 import base64
+import fcntl
 import hashlib
 import json
+import os
 import shutil
 import tempfile
 import time
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -54,7 +57,11 @@ _MAX_FILESIZE: str = "2G"
 # How long a downloaded video is kept for a second look.
 KEPT_S: float = 6 * 3600.0
 _FOLDER: str = "dot-video"
-_MEDIA_STEM: str = "media"
+# What yt-dlp writes a download as, and the name a finished one is given.
+_PART_STEM: str = "download"
+_VIDEO_STEM: str = "video"
+_LOCK: str = ".lock"
+_LOCK_POLL_S: float = 0.5
 _STDERR_CHARS: int = 800
 
 
@@ -205,18 +212,61 @@ async def sound(sandbox: Sequence[str], env: dict[str, str], path: Path, span: S
     return await _run(sandbox, argv, env, _SOUND_TIMEOUT_S)
 
 
-def download_folder(url: str, now: float) -> Path:
-    """The folder a link's video is downloaded to, made when it is not there; the folders of other links older than
-    :data:`KEPT_S` are removed first. Blocking."""
+def _held(lock: Path) -> int | None:
+    """The lock file ``lock`` opened and held alone, or ``None`` while another call holds it. Blocking, never waits."""
+    handle: int = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(handle)
+        return None
+    return handle
+
+
+def _sweep(root: Path, keep: str, now: float) -> None:
+    """Remove the folders of other links under ``root`` that no call used for :data:`KEPT_S` and none holds now; a
+    folder that cannot be removed is logged and left. Blocking."""
+    for old in root.iterdir():
+        if old.name == keep or not old.is_dir() or old.is_symlink() or now - old.stat().st_mtime <= KEPT_S:
+            continue
+        handle: int | None = _held(old / _LOCK)
+        if handle is None:
+            continue
+        try:
+            shutil.rmtree(old)
+        except OSError as error:
+            log.warning("video_folder_kept", folder=old.name, error=str(error))
+        finally:
+            os.close(handle)
+
+
+def _open_folder(url: str, now: float) -> Path:
+    """The folder of ``url``'s downloads, made when it is not there and marked used now; the old folders of other links
+    are swept first. Blocking."""
     root: Path = Path(tempfile.gettempdir()) / _FOLDER
     root.mkdir(mode=0o700, exist_ok=True)
     name: str = hashlib.sha256(url.encode("utf-8")).hexdigest()[:24]
-    for old in root.iterdir():
-        if old.name != name and old.is_dir() and not old.is_symlink() and now - old.stat().st_mtime > KEPT_S:
-            shutil.rmtree(old, ignore_errors=True)
+    _sweep(root, name, now)
     folder: Path = root / name
     folder.mkdir(mode=0o700, exist_ok=True)
+    os.utime(folder, (now, now))
     return folder
+
+
+@asynccontextmanager
+async def link_folder(url: str, now: float) -> AsyncIterator[Path]:
+    """The folder of ``url``'s downloads, held by this call alone while it lasts: a second look at the same link waits
+    for the first, and no sweep removes it meanwhile."""
+    folder: Path = await asyncio.to_thread(_open_folder, url, now)
+    while True:
+        handle: int | None = await asyncio.to_thread(_held, folder / _LOCK)
+        if handle is not None:
+            break
+        await asyncio.sleep(_LOCK_POLL_S)
+    try:
+        yield folder
+    finally:
+        os.close(handle)
 
 
 def _yt_dlp(url: str, words: Sequence[str]) -> list[str]:
@@ -233,13 +283,21 @@ async def link_info(sandbox: Sequence[str], env: dict[str, str], url: str) -> Vi
         raise ToolExecutionError("yt-dlp's answer about the link could not be read", {"url": url}) from error
 
 
+def _read_if_there(path: Path) -> str | None:
+    return path.read_text("utf-8", "replace") if path.is_file() else None
+
+
 async def captions(sandbox: Sequence[str], env: dict[str, str], url: str, track: CaptionTrack, folder: Path) -> str:
-    """The WebVTT text of the caption ``track`` of the video at ``url``, downloaded into ``folder``."""
-    kind: str = "--write-auto-subs" if track.automatic else "--write-subs"
+    """The WebVTT text of the caption ``track`` of the video at ``url``, downloaded into ``folder`` once: yt-dlp names
+    the file after the track's language, so a track of another language is another file."""
     stem: str = f"captions-{'auto' if track.automatic else 'own'}"
+    path: Path = folder / f"{stem}.{track.language}.vtt"
+    kept: str | None = await asyncio.to_thread(_read_if_there, path)
+    if kept is not None:
+        return kept
     words: list[str] = [
         "--skip-download",
-        kind,
+        "--write-auto-subs" if track.automatic else "--write-subs",
         "--sub-langs",
         track.language,
         "--sub-format",
@@ -248,27 +306,31 @@ async def captions(sandbox: Sequence[str], env: dict[str, str], url: str, track:
         str(folder / f"{stem}.%(ext)s"),
     ]
     await _run(sandbox, _yt_dlp(url, words), env, _CAPTIONS_TIMEOUT_S)
-    text: str | None = await asyncio.to_thread(_caption_text, folder, stem)
+    text: str | None = await asyncio.to_thread(_read_if_there, path)
     if text is None:
         raise ToolExecutionError("yt-dlp wrote no caption file", {"url": url, "track": track.language})
     return text
 
 
-def _caption_text(folder: Path, stem: str) -> str | None:
-    """The text of the caption file yt-dlp wrote in ``folder`` as ``stem``, or ``None`` when it wrote none."""
-    found: list[Path] = sorted(folder.glob(f"{stem}*.vtt"))
-    return found[0].read_text("utf-8", "replace") if found else None
-
-
-def _downloaded(folder: Path) -> Path | None:
-    done: list[Path] = [path for path in folder.glob(f"{_MEDIA_STEM}.*") if path.suffix not in (".part", ".ytdl")]
+def _finished(folder: Path) -> Path | None:
+    """The video a download finished earlier: only a file yt-dlp said it finished is given this name."""
+    done: list[Path] = sorted(folder.glob(f"{_VIDEO_STEM}.*"))
     return done[0] if done else None
 
 
+def _take(written: Path, folder: Path) -> Path:
+    """The file yt-dlp finished, named as a finished video of ``folder``. Blocking."""
+    if written.resolve().parent != folder.resolve() or not written.is_file():
+        raise ToolExecutionError("yt-dlp named a file it did not write", {"file": str(written)})
+    return written.rename(folder / f"{_VIDEO_STEM}{written.suffix}")
+
+
 async def download(sandbox: Sequence[str], env: dict[str, str], url: str, folder: Path) -> Path:
-    """The video at ``url`` as a file in ``folder``: the one downloaded earlier, or downloaded now (at most 480 lines
-    high, with its sound)."""
-    kept: Path | None = await asyncio.to_thread(_downloaded, folder)
+    """The video at ``url`` as a file in ``folder``, which the caller holds (:func:`link_folder`): the one finished
+    earlier, or downloaded now (at most 480 lines high, with its sound). What yt-dlp leaves of a download it did not
+    finish (the video and the sound before they are merged) never counts: only the file it names once it has merged
+    and moved it, after it ended well, becomes the video."""
+    kept: Path | None = await asyncio.to_thread(_finished, folder)
     if kept is not None:
         return kept
     started: float = time.monotonic()
@@ -281,14 +343,18 @@ async def download(sandbox: Sequence[str], env: dict[str, str], url: str, folder
         program("ffmpeg"),
         "--merge-output-format",
         "mp4",
+        "--no-simulate",
+        "--print",
+        "after_move:filepath",
         "-o",
-        str(folder / f"{_MEDIA_STEM}.%(ext)s"),
+        str(folder / f"{_PART_STEM}.%(ext)s"),
     ]
-    await _run(sandbox, _yt_dlp(url, words), env, _DOWNLOAD_TIMEOUT_S)
-    got: Path | None = await asyncio.to_thread(_downloaded, folder)
-    if got is None:
+    out: bytes = await _run(sandbox, _yt_dlp(url, words), env, _DOWNLOAD_TIMEOUT_S)
+    lines: list[str] = out.decode("utf-8", "replace").strip().splitlines()
+    if not lines:
         raise ToolExecutionError(
             f"yt-dlp downloaded nothing (a video over {_MAX_FILESIZE}B is not downloaded)", {"url": url}
         )
+    got: Path = await asyncio.to_thread(_take, Path(lines[-1]), folder)
     log.info("video_downloaded", took_s=round(time.monotonic() - started, 1))
     return got

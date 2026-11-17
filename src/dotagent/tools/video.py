@@ -115,13 +115,31 @@ def _spoken(language: str | None, tracks: str) -> str:
 
 
 async def _frames(sandbox: Sandbox, env: dict[str, str], path: Path, times: tuple[float, ...]) -> tuple[ImageData, ...]:
+    """The frames at ``times``, a few at once; the first that fails stops the others."""
     turns: asyncio.Semaphore = asyncio.Semaphore(media.FRAMES_AT_ONCE)
 
     async def one(at: float) -> ImageData:
         async with turns:
             return await media.frame(sandbox.search, env, path, at)
 
-    return tuple(await asyncio.gather(*(one(at) for at in times)))
+    tasks: list[asyncio.Task[ImageData]] = []
+    try:
+        async with asyncio.TaskGroup() as group:
+            tasks.extend(group.create_task(one(at)) for at in times)
+    except ExceptionGroup as failed:
+        # The first failure is the one to tell, as the error it is (the executor shows a DotError to the model).
+        raise failed.exceptions[0] from failed
+    return tuple(task.result() for task in tasks)
+
+
+def _heard_error(error: VoiceError, language: str) -> ToolExecutionError:
+    """What the Mac's dictation model could not do, in words for a run (its own are for the owner at the composer)."""
+    if error.context.get("code") == "unsupported-language":
+        return ToolExecutionError(
+            f"watch_video: this Mac cannot write down {language}; name the language spoken as another tag",
+            error.context,
+        )
+    return ToolExecutionError(f"watch_video: the Mac's dictation model failed: {error.message}", error.context)
 
 
 async def _written(transcriber: Transcriber, pcm: bytes, language: str) -> str:
@@ -129,16 +147,18 @@ async def _written(transcriber: Transcriber, pcm: bytes, language: str) -> str:
     try:
         name: str = await transcriber.open(language)
     except InvalidValueError as error:
-        raise ToolInputError(f"watch_video: {error.message}", error.context) from error
+        raise ToolInputError(
+            f"watch_video: {language!r} is not a language tag: write it as en-US", error.context
+        ) from error
     except VoiceError as error:
-        raise ToolExecutionError(f"watch_video: {error.message}", error.context) from error
+        raise _heard_error(error, language) from error
     try:
         for index, at in enumerate(range(0, len(pcm), MAX_PIECE_BYTES)):
             await transcriber.feed(name, index, pcm[at : at + MAX_PIECE_BYTES])
         return await transcriber.end(name)
     except VoiceError as error:
         await transcriber.drop(name)
-        raise ToolExecutionError(f"watch_video: {error.message}", error.context) from error
+        raise _heard_error(error, language) from error
     except BaseException:
         await transcriber.drop(name)
         raise
@@ -185,6 +205,8 @@ async def _see_and_hear(
     except BaseException:
         if hearing is not None:
             hearing.cancel()
+            # Its stream is dropped and its ffmpeg killed before the call ends; its own error is not the one to tell.
+            await asyncio.wait([hearing])
         raise
     return times, images, (None if hearing is None else await hearing)
 
@@ -226,23 +248,23 @@ async def _watch_link(ctx: ToolContext, args: WatchVideoArgs, url: str) -> _Look
         raise ToolExecutionError("watch_video: the link is a live stream or has no length to watch", {"url": url})
     span: Span = _span(info.duration, args)
     track: CaptionTrack | None = choose_track(info, args.language)
-    folder: Path = await asyncio.to_thread(media.download_folder, url, time.time())
     title: str = info.title if info.uploader is None else f"{info.title} — {info.uploader}"
-    transcript: str = ""
-    heard_by: str = ""
-    if track is not None:
-        vtt: str = await media.captions(sandbox.commands, env, url, track, folder)
-        transcript = transcript_text(caption_blocks(parse_vtt(vtt), span))
-        made: str = "the site's speech recognition" if track.automatic else "the uploader"
-        heard_by = f"Transcript: the video's own captions ({track.language}, made by {made})."
-    if args.frames == 0 and track is not None:
-        return _Look(info.duration, span, (), (), transcript, heard_by, title)
-    written: str = ", ".join(name for name in info.subtitles if name != "live_chat")
-    tracks: str = f"; the link has captions in {written}, which naming the language takes" if written else ""
-    language: str | None = None if track is not None else _spoken(args.language or info.language, tracks)
-    path: Path = await media.download(sandbox.commands, env, url, folder)
-    probe: Probe = await media.probe(sandbox.search, env, path)
-    times, images, cues = await _see_and_hear(ctx, sandbox, path, probe, span, args.frames, language)
+    async with media.link_folder(url, time.time()) as folder:
+        transcript: str = ""
+        heard_by: str = ""
+        if track is not None:
+            vtt: str = await media.captions(sandbox.commands, env, url, track, folder)
+            transcript = transcript_text(caption_blocks(parse_vtt(vtt), span))
+            made: str = "the site's speech recognition" if track.automatic else "the uploader"
+            heard_by = f"Transcript: the video's own captions ({track.language}, made by {made})."
+        if args.frames == 0 and track is not None:
+            return _Look(info.duration, span, (), (), transcript, heard_by, title)
+        written: str = ", ".join(name for name in info.subtitles if name != "live_chat")
+        tracks: str = f"; the link has captions in {written}, which naming the language takes" if written else ""
+        language: str | None = None if track is not None else _spoken(args.language or info.language, tracks)
+        path: Path = await media.download(sandbox.commands, env, url, folder)
+        probe: Probe = await media.probe(sandbox.search, env, path)
+        times, images, cues = await _see_and_hear(ctx, sandbox, path, probe, span, args.frames, language)
     if track is None:
         transcript, heard_by = _dictation_note(probe, cues, language)
     return _Look(info.duration, span, times, images, transcript, heard_by, title)

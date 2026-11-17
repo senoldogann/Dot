@@ -1,14 +1,18 @@
 """watch_video on a real video file (item 1212): ffmpeg makes the video, the tool runs as a run outside yolo runs it (in
 the sandbox), and the Mac's dictation model is a stand-in program of the test's own (as in tests/unit/test_voice_helper:
 no test builds Swift). It checks the frames and their moments, the transcript by the minute, the fence and the mark of
-untrusted content, the refusal of a protected file and of Dot's own server, and the call that names no language.
-The real dictation model writes down a video that `say` speaks in the test marked live."""
+untrusted content, the refusal of a protected file, of Dot's own server, of a host on the local network and of a list
+named as a video, and the call that names no language. The real dictation model and real links were tried by hand
+(roadmap/1212.md)."""
 
 import asyncio
 import base64
+import os
 import re
 import shutil
 import subprocess
+import tempfile
+import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -27,11 +31,11 @@ from dotagent.store.models import RunRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.context import ToolContext, run_sandbox
 from dotagent.tools.video import WATCH_VIDEO_TOOL
+from dotagent.video import media
 
-pytestmark = [
-    pytest.mark.asyncio(loop_scope="module"),
-    pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not on this Mac"),
-]
+pytestmark = pytest.mark.asyncio(loop_scope="module")
+# The checks that start ffmpeg need it; the refusals, which start nothing, run everywhere (the gate has no ffmpeg).
+needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not on this Mac")
 
 GOAL: str = "Watch the video."
 _HEARD: str = "the stand-in heard this"
@@ -147,6 +151,7 @@ def _video(path: Path, seconds: int, sound: bool) -> Path:
     return path
 
 
+@needs_ffmpeg
 async def test_a_file_is_seen_in_frames_and_heard_by_the_minute(runtime: Runtime) -> None:
     ctx: ToolContext = await _context(runtime)
     assert run_sandbox(ctx).search, "the test must run the programs in the sandbox"
@@ -173,6 +178,7 @@ async def test_a_file_is_seen_in_frames_and_heard_by_the_minute(runtime: Runtime
     assert quiet.images == () and "The video has no sound." in quiet.text
 
 
+@needs_ffmpeg
 async def test_a_file_with_sound_needs_the_language_spoken(runtime: Runtime) -> None:
     ctx: ToolContext = await _context(runtime)
     folder: Path = workspace_dir() / "videos"
@@ -196,13 +202,58 @@ async def test_a_protected_file_and_dots_own_server_are_refused(runtime: Runtime
     # A host on the local network is refused before yt-dlp is started, as web_fetch refuses it.
     with pytest.raises(PrivateHostRefused):
         await _watched(ctx, {"source": "http://192.168.1.10/talk.mp4", "frames": 0})
-    # A list that names another file, named as a video, is not followed.
+    link: PreparedCall = await runtime.registry.tools[WATCH_VIDEO_TOOL].prepare(
+        {"source": "https://www.youtube.com/watch?v=jNQXAC9IVRw"}, ctx
+    )
+    assert (link.action.kind, link.action.target) == ("network", "https://www.youtube.com/watch?v=jNQXAC9IVRw")
+
+
+@needs_ffmpeg
+async def test_a_list_named_as_a_video_is_not_followed(runtime: Runtime) -> None:
+    ctx: ToolContext = await _context(runtime)
     listed: Path = await asyncio.to_thread(_video, workspace_dir() / "videos" / "listed.mp4", 2, False)
     disguised: Path = workspace_dir() / "videos" / "list.mp4"
     await asyncio.to_thread(disguised.write_text, f"ffconcat version 1.0\nfile {listed.name}\n", "utf-8")
     with pytest.raises(ToolExecutionError, match="not on whitelist"):
         await _watched(ctx, {"source": str(disguised), "frames": 1})
-    link: PreparedCall = await runtime.registry.tools[WATCH_VIDEO_TOOL].prepare(
-        {"source": "https://www.youtube.com/watch?v=jNQXAC9IVRw"}, ctx
+
+
+def _age(root: Path, at: float) -> None:
+    for folder in root.iterdir():
+        os.utime(folder, (at, at))
+
+
+async def test_a_links_folder_is_held_by_one_look_and_swept_only_when_old_and_free(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    now: float = time.time()
+    first_in: asyncio.Event = asyncio.Event()
+    release: asyncio.Event = asyncio.Event()
+    order: list[str] = []
+
+    async def look(name: str) -> None:
+        async with media.link_folder("https://example.org/v", now):
+            order.append(f"{name} in")
+            first_in.set()
+            await release.wait()
+            order.append(f"{name} out")
+
+    first: asyncio.Task[None] = asyncio.create_task(look("first"))
+    await first_in.wait()
+    second: asyncio.Task[None] = asyncio.create_task(look("second"))
+    await asyncio.sleep(0.2)
+    # Held: an old folder of a link that a look holds is not swept, one that none holds is.
+    async with media.link_folder("https://example.org/other", now):
+        pass
+    old: float = now - media.KEPT_S - 60
+    root: Path = tmp_path / "dot-video"
+    await asyncio.to_thread(_age, root, old)
+    async with media.link_folder("https://example.org/third", now):
+        pass
+    release.set()
+    await asyncio.gather(first, second)
+    assert order == ["first in", "first out", "second in", "second out"]
+    assert len(await asyncio.to_thread(os.listdir, root)) == 2, (
+        "the held link's folder stays and the free old one is swept"
     )
-    assert (link.action.kind, link.action.target) == ("network", "https://www.youtube.com/watch?v=jNQXAC9IVRw")
