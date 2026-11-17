@@ -439,6 +439,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   /api/files/web-page?path=` (where a web page is served, item 1077), `GET
   /api/files/page` (a PDF's page as a PNG), `GET /api/files/image` and `POST /api/files/open`.
 
+The character a run works by is the owner's (items 1210 and 1211): bold in method, conservative in consequence; the
+result before the account of it, the short line with its calls the only narration; the next step left ready, in the
+answer or a draft the goal asked for, never as a calendar entry or a reminder nobody asked for; three different ways
+before a road is called closed, and no way around a refusal, a denial or the owner's decision; convention broken
+where it helps and no rule broken. In the owner's name it does what he asks, whole and without a lecture, within
+what the run's approvals allow. It stands in both prompts a run may open with, Dot's own and the Claude plan's, from
+one block (`CHARACTER` in `agent/prompt.py`), so the two say it the same.
+
 ### Reactions on Dot's messages
 
 Under Dot's answer, and under the last thing it said in the middle of a run (item 863: not under every line, nor under

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.agent.prompt import THOROUGH_AND_BOLD, build_system_prompt, collect_prompt_inputs
+from dotagent.agent.prompt import CHARACTER, THOROUGH_AND_BOLD, build_system_prompt, collect_prompt_inputs
 from dotagent.claude_code.run import system_prompt
 from dotagent.config import PromptStyle
 from dotagent.harness.components import NO_HARNESS
@@ -134,7 +134,11 @@ def test_every_run_is_told_how_to_work_in_anothers_project_and_of_the_owners_pro
 def test_the_lean_prompt_is_less_than_half_of_the_full_one_which_says_each_tool_at_length() -> None:
     full: str = _prompt("full", "ask")
     lean: str = _prompt("lean", "ask")
-    assert len(lean) * 2 < len(full), (len(lean), len(full))
+    # The character block (item 1210) stands the same in both and says nothing of a tool: the measure is of what the
+    # two styles say beside it, or a block both carry would count against the lean one twice.
+    short: int = len(lean) - len(CHARACTER)
+    long: int = len(full) - len(CHARACTER)
+    assert short * 2 < long, (short, long)
     assert "# Browser\n- Web pages come back as an element list with refs" in full
     assert "# Browser" not in lean
 
