@@ -49,7 +49,7 @@ from typing import Literal
 
 from dotagent.agent.attachments import MAX_ATTACHMENTS
 from dotagent.channels.handles import STATE_KEY, ImessageState, normalize_handle
-from dotagent.channels.inbox import ATTACHMENTS_DIR, Incoming, RowFile, Unread, read_file
+from dotagent.channels.inbox import ATTACHMENTS_DIR, MESSAGE_BYTES, Incoming, RowFile, Unread, read_file
 from dotagent.channels.intake import FILES_ONLY_NOTE, UNREAD_NOTE, Accept, Intake, Skip, Tell, Verdict
 from dotagent.channels.onetime import OneTimeCode, Redeemed, new_code, redeem, shown_code
 from dotagent.channels.pictures import Picture
@@ -553,8 +553,8 @@ def _files_of(db: Path, rowids: Sequence[int]) -> dict[int, tuple[RowFile, ...]]
 
 def _with_notes(text: str, files: tuple[Incoming, ...], unread: int) -> str:
     """The words a run is given for a message that brought files (item 806): the owner's, or the note that only files
-    came; and the note that not all of what came was read (a voice message, a video, a file not come down yet, a row
-    whose files are not known), when ``unread`` counts any."""
+    came; and the note that not all of what came was read (a file too large or of no kind Dot reads, one not come down
+    yet, a row whose files are not known), when ``unread`` counts any."""
     said: str = text or (FILES_ONLY_NOTE if files else "")
     return f"{said}\n\n{UNREAD_NOTE}".strip() if unread else said
 
@@ -907,8 +907,10 @@ class IMessageChannel:
         one). ``None`` when the message has nothing to run: no words, and no file that could be read, which the owner
         is told (that it is still coming, or what Dot reads)."""
         deadline: float = self._clock() + self._files_wait_s
+        read: list[Incoming | Unread] = []
         while True:
-            read: list[Incoming | Unread] = await asyncio.to_thread(self._read_files, row.files)
+            # What was read is kept from one look to the next: only a file still coming is read again (the review).
+            read = await asyncio.to_thread(self._read_files, row.files, read)
             if "coming" not in read or self._clock() >= deadline:
                 break
             # A stop the owner sent after this message is not held behind the wait (the review): the message goes on
@@ -936,9 +938,24 @@ class IMessageChannel:
             return False
         return any(row.text is not None and is_stop(row.text) for row in later)
 
-    def _read_files(self, files: Sequence[RowFile]) -> list[Incoming | Unread]:
+    def _read_files(self, files: Sequence[RowFile], kept: Sequence[Incoming | Unread]) -> list[Incoming | Unread]:
+        """The first files of a message, read in order while what they hold in all stays within
+        :data:`~dotagent.channels.inbox.MESSAGE_BYTES` (item 1213: ten videos are not held in memory at once); a file
+        past it is too large. A file ``kept`` from an earlier look as read is not read again. Blocking."""
         root: Path = self._db.parent / ATTACHMENTS_DIR
-        return [read_file(file, root, self._home) for file in files[:MAX_ATTACHMENTS]]
+        read: list[Incoming | Unread] = []
+        # What an earlier look kept counts first, so that the files read now fit beside it.
+        room: int = MESSAGE_BYTES - sum(len(item.data) for item in kept if isinstance(item, Incoming))
+        for at, file in enumerate(files[:MAX_ATTACHMENTS]):
+            earlier: Incoming | Unread | None = kept[at] if at < len(kept) else None
+            if isinstance(earlier, Incoming):
+                read.append(earlier)
+                continue
+            got: Incoming | Unread = read_file(file, root, self._home, room)
+            if isinstance(got, Incoming):
+                room -= len(got.data)
+            read.append(got)
+        return read
 
     def _copy_of(self, row: Row) -> int | None:
         """The row ``row`` is the copy of, or ``None``. With one Apple ID Messages may keep a message to oneself as two

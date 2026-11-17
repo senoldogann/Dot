@@ -256,8 +256,11 @@ handed them as a message of the web UI is ([Runs](runs.md)), what is in them fen
 the files you attach there are ([Safety](safety.md#safety)). A message of files and no words runs too: the run is told only files came and to do what you most
 likely want, asking when it is not clear. A file Messages is still bringing down from iCloud is waited for, 15
 seconds at most (a stop you send meanwhile ends the wait at once); one that has not come by then is said to be on its
-way, and you send it again. A voice message, a
-video, a sticker and a file of no kind Dot reads are not read: with words the words run, the run is told that part of
+way, and you send it again. **A video and a voice message** (item 1213), of at most 200 MB each and 300 MB with the
+other files of the message (a file past that is not read, as one too large), are kept as they came in
+the workspace's `attachments/`, and the run is told to watch them with `watch_video`, which sees the video in frames
+and writes down what is said with the Mac's own dictation model ([Watching videos](video.md)). A sticker and a file of
+no kind Dot reads are not read: with words the words run, the run is told that part of
 the message was not read and must not guess what it shows, and the answer's first line says so to you (*Dot did not
 read the picture or file that came with your message, so this answers your words only.*); with no words, Dot says
 what it reads. A message with one Apple ID that Messages keeps twice, sent and received, is run once, its files told
@@ -393,8 +396,7 @@ Mac](safety.md#what-leaves-this-mac).
 | *Last error* names a message that did not go | Messages did not take Dot's answer: Automation, or the address |
 
 Left for later: other messaging apps (the router posts what a channel receives and sends what a run ends with; a
-channel is the part that reads and sends), voice messages and videos (said not to be read, item 806), and answers to
-approvals on a channel (deliberately not).
+channel is the part that reads and sends) and answers to approvals on a channel (deliberately not).
 
 The REST routes of the tab (`/api/channels`) are in [the daemon's
 table](daemon.md#the-daemon-the-web-ui-and-the-service).

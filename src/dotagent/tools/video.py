@@ -302,7 +302,7 @@ async def _watch_link(ctx: ToolContext, args: WatchVideoArgs, url: str) -> _Look
 def _render(look: _Look, where: str, output_chars: int) -> ToolResult:
     """The look as the model reads it: Dot's lines, then the title and the transcript in a fence, then the frames."""
     lines: list[str] = [
-        f"Video {where}: {clock(look.duration)} long; this look covers {clock(look.span.start)}-{clock(look.span.end)}."
+        f"{where}: {clock(look.duration)} long; this look covers {clock(look.span.start)}-{clock(look.span.end)}."
     ]
     if look.span.cut:
         lines.append(f"One look covers at most an hour: call again with start={look.span.end:g} for what comes after.")

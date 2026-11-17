@@ -390,8 +390,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   XML part of more than 16 MB (a worksheet is read as a stream and has the first bound only), a part of 1 MB or more
   packed 200 times smaller than it unpacks to, or more than 10,000 parts. It is refused before anything is read, each
   part is unpacked in chunks up to the size it declares, and a part that declares less than it holds is damaged, so a
-  small file that unpacks to gigabytes cannot take the daemon's memory. Anything else is refused at
-  upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one named like a file
+  small file that unpacks to gigabytes cannot take the daemon's memory. A video or a sound (a voice memo) is kept as it
+  came, with no text read out of it, and the run is told to watch it with `watch_video` (item 1213, [Watching
+  videos](video.md)). Anything else is refused at upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one named like a file
   Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
 - A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269) and
   a file's path an answer names in code (under `~/` or `/Users/<you>/`; Dot names the files it made by their full

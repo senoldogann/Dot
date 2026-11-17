@@ -1683,24 +1683,43 @@ async def test_an_iphone_photo_is_drawn_as_png_and_the_words_with_it_are_the_com
     assert photo.data.startswith(b"\x89PNG") and Image.open(io.BytesIO(photo.data)).size == (40, 30)
 
 
-async def test_a_voice_message_is_not_read_and_the_owner_is_told_what_dot_reads(
+async def test_a_voice_message_alone_is_handed_to_the_run_to_be_written_down(
     store: Store, db: MessagesDb, runner: Osascript, clock: Clock
 ) -> None:
+    # A voice message runs as a file the run writes down with watch_video (item 1213); Messages names no type for it.
     channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
     _attached(db, "Audio Message.caf", b"caff" * 10, mime="", size=40)
     heard: Heard = Heard()
     await channel.poll(heard)
-    assert heard.texts == [] and runner.sent == [(PHONE, f"{MARKER}{ATTACHMENT}")]
+    assert heard.texts == [FILES_ONLY_NOTE] and runner.sent == []
+    assert heard.files == [(Incoming("Audio Message.caf", "audio/caf", b"caff" * 10),)]
 
 
-async def test_words_with_a_video_run_and_the_run_is_told_the_video_was_not_read(
+async def test_words_with_a_video_run_with_the_video_kept_for_the_run(
     store: Store, db: MessagesDb, runner: Osascript, clock: Clock
 ) -> None:
     channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
     _attached(db, "clip.mov", b"\x00" * 64, mime="video/quicktime", text="what happens here?")
     heard: Heard = Heard()
     await channel.poll(heard)
-    assert heard.texts == [f"what happens here?\n\n{UNREAD_NOTE}"] and heard.files == [()]
+    assert heard.texts == ["what happens here?"]
+    assert heard.files == [(Incoming("clip.mov", "video/quicktime", b"\x00" * 64),)]
+
+
+async def test_the_files_of_a_message_hold_at_most_their_budget_in_memory(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Ten videos of 200 MB are not read into memory at once (item 1213): a file past what the message may still hold is
+    # too large, and the run is told one was not read.
+    monkeypatch.setattr(imessage, "MESSAGE_BYTES", 100)
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    rowid, _ = _attached(db, "first.mov", b"\x01" * 64, mime="video/quicktime", text="both clips")
+    second: Path = _written(db.path.parent / ATTACHMENTS_DIR / "second.mov", b"\x02" * 64)
+    db.attach(rowid, str(second), "second.mov", "video/quicktime", size=64)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [f"both clips\n\n{UNREAD_NOTE}"]
+    assert heard.files == [(Incoming("first.mov", "video/quicktime", b"\x01" * 64),)]
 
 
 async def test_a_file_outside_the_folder_of_attachments_is_never_read(
