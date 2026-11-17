@@ -187,3 +187,44 @@ class SameOrigin:
 
     def __call__(self, address: str) -> bool:
         return SameOrigin.of(address) == self
+
+
+def _home(host: str, port: int | None) -> str:
+    """The address of a login's site: its host over https, with the port the website names; no path or query, which a
+    website may carry and need not be repeated."""
+    return f"https://{host}" if port is None else f"https://{host}:{port}"
+
+
+def _base(host: str) -> str:
+    """The last two labels of ``host`` (``apple.com`` of ``account.apple.com``); a host written as numbers is itself."""
+    if host.replace(".", "").isdigit() or ":" in host:
+        return host
+    return ".".join(host.split(".")[-2:])
+
+
+def elsewhere_advice(url: str, websites: tuple[str, ...], source_name: str) -> str:
+    """What a run does when a login of ``websites`` (kept in ``source_name``) was not filled on the page at ``url``
+    (item 1208). It goes to the login's own site, the one address the login is known for. A page on another host of the
+    same name (``account.apple.com`` for a login of ``appstoreconnect.apple.com``) is often where that site signs in:
+    the run does not fill there either, and tells the owner which site the login should name. What fills is
+    :func:`fills_on` alone; these words only send the run to a page where it may."""
+    sites: tuple[tuple[str, int | None], ...] = _sites(websites)
+    if not sites:
+        return f"The login names no website: tell the owner to add the site's address to it in {source_name}."
+    host, port = sites[0]
+    home: str = _home(host, port)
+    parts: SplitResult | None = _split(url)
+    page: str = "" if parts is None else _host_of(parts)
+    related: tuple[str, ...] = tuple(site for site, _ in sites if page and "." in page and _base(site) == _base(page))
+    if not related:
+        return (
+            f"Open the login's own site with browser_open {home} and call browser_fill_login on its sign-in page "
+            "there. If that site sends you to a page of another site to sign in, do not fill there: tell the owner."
+        )
+    base: str = _base(page)
+    return (
+        f"{page} is another host of {base}, where the site may sign in. Open the login's own site with browser_open "
+        f"{home} first and fill there if its sign-in form is on it. If it brings you back to {page}, do not fill: "
+        f"tell the owner, in one line, that the login's website should be {base} (or name {page} too) in "
+        f"{source_name}, and go on with what needs no sign-in."
+    )
