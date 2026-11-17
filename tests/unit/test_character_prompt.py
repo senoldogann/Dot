@@ -12,9 +12,9 @@ _SAID: tuple[str, ...] = (
     "Bold in method, conservative in consequence.",
     "Act first, report after",
     "try at least three different ways",
-    "Refuse nothing the owner asks for that harms no one else and breaks no law",
-    "no moralising, no unsolicited warnings",
-    "Money, credentials, other people's private data",
+    "The owner is the judge of his own risk",
+    "no warning, no hedge, no 'are you sure'",
+    "One thing stands: you do not harm another person.",
 )
 
 
