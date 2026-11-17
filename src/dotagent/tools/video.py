@@ -279,7 +279,7 @@ async def _watch_link(ctx: ToolContext, args: WatchVideoArgs, url: str) -> _Look
             heard_by = f"Transcript: the video's own captions ({track.language}, made by {made})."
         if args.frames == 0 and track is not None:
             return _Look(info.duration, span, (), (), transcript, heard_by, title)
-        written: str = ", ".join(name for name in info.subtitles if name != "live_chat")
+        written: str = ", ".join(info.subtitles)
         tracks: str = f"; the link has captions in {written}, which naming the language takes" if written else ""
         language: str | None = None if track is not None else _spoken(args.language or info.language, tracks)
         path: Path = await media.download(sandbox.commands, env, url, folder)

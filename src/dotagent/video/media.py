@@ -236,8 +236,9 @@ async def link_info(sandbox: Sequence[str], env: dict[str, str], url: str) -> Vi
         raise ToolExecutionError("yt-dlp's answer about the link could not be read", {"url": url}) from error
 
 
-def _read_if_there(path: Path) -> str | None:
-    return path.read_text("utf-8", "replace") if path.is_file() else None
+def _read_if_there(path: Path, folder: Path) -> str | None:
+    """The text of ``path``, a file of ``folder``, or ``None`` when yt-dlp wrote none there. Blocking."""
+    return _inside(path, folder).read_text("utf-8", "replace") if path.exists() else None
 
 
 async def captions(sandbox: Sequence[str], env: dict[str, str], url: str, track: CaptionTrack, folder: Path) -> str:
@@ -256,16 +257,16 @@ async def captions(sandbox: Sequence[str], env: dict[str, str], url: str, track:
         str(folder / f"{stem}.%(ext)s"),
     ]
     await _run(sandbox, _yt_dlp(url, words), env, _CAPTIONS_TIMEOUT_S)
-    text: str | None = await asyncio.to_thread(_read_if_there, path)
+    text: str | None = await asyncio.to_thread(_read_if_there, path, folder)
     if text is None:
         raise ToolExecutionError("yt-dlp wrote no caption file", {"url": url, "track": track.language})
     return text
 
 
-def _written(written: Path, folder: Path) -> Path:
-    """The file yt-dlp says it finished, which must be a file in ``folder``. Blocking."""
+def _inside(written: Path, folder: Path) -> Path:
+    """``written``, which must be a file in ``folder``. Blocking."""
     if written.resolve().parent != folder.resolve() or not written.is_file():
-        raise ToolExecutionError("yt-dlp named a file it did not write", {"file": str(written)})
+        raise ToolExecutionError("yt-dlp named a file outside the call's folder", {"file": str(written)})
     return written
 
 
@@ -294,6 +295,6 @@ async def download(sandbox: Sequence[str], env: dict[str, str], url: str, folder
         raise ToolExecutionError(
             f"yt-dlp downloaded nothing (a video over {_MAX_FILESIZE}B is not downloaded)", {"url": url}
         )
-    got: Path = await asyncio.to_thread(_written, Path(lines[-1]), folder)
+    got: Path = await asyncio.to_thread(_inside, Path(lines[-1]), folder)
     log.info("video_downloaded", took_s=round(time.monotonic() - started, 1))
     return got

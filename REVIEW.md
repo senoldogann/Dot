@@ -52,6 +52,9 @@ here points at a test that no longer exists.
 - `tests/smoke/test_watch_video.py::test_a_calls_download_folder_is_its_own_and_its_removal_follows_no_link` — the
   daemon removed old download folders under the temporary folder, where a run could leave a link to the owner's home
   (item 1212): a call's folder is its own now, and its removal follows no link.
+- `tests/unit/test_video_watch.py::test_a_track_name_that_is_no_language_tag_is_dropped_as_the_answer_is_read` — a
+  caption track's name came from the page (`<track srclang>`) and reached Dot's own line, an error and a file's path
+  (item 1212): a name that is no language tag is dropped as yt-dlp's answer is read.
 
 ## Evidence and format
 

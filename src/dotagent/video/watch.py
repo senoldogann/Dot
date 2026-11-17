@@ -10,7 +10,7 @@ over the part looked at, each with its moment, and what is said, by the minute.
 import re
 from collections.abc import Mapping, Sequence
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from dotagent.core.types import FrozenModel
 
@@ -20,12 +20,14 @@ MAX_SPAN_S: float = 3600.0
 SPEECH_PIECE_S: float = 60.0
 # A paragraph of captions starts at most this often, so a transcript reads in blocks and not a line per cue.
 CAPTION_BLOCK_S: float = 30.0
-# What a caption track of a live chat is called: comments, not what is said.
-_LIVE_CHAT: str = "live_chat"
 # A cue's timing line: ``00:01:02.345 --> 00:01:04.000 align:start``; hours may be left out.
 _TIMING: re.Pattern[str] = re.compile(r"^(?:(\d+):)?(\d{1,2}):(\d{2})[.,](\d{3})\s+-->")
 # The tags inside a YouTube cue: ``<00:00:01.234>`` word timings and ``<c>`` spans.
 _TAG: re.Pattern[str] = re.compile(r"<[^>]*>")
+# A caption track's name as a language tag (``en``, ``en-orig``, ``pt-BR``, ``zh-Hans``): the names come from the site
+# (yt-dlp's generic reader takes a page's ``<track srclang>``), and a name of another shape is dropped as the answer is
+# read, so no site text reaches Dot's own lines, an error or a file's name.
+TRACK_NAME: re.Pattern[str] = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8}){0,3}")
 _ENTITIES: Mapping[str, str] = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&nbsp;": " ", "&#39;": "'", "&quot;": '"'}
 
 
@@ -71,6 +73,11 @@ class VideoInfo(BaseModel):
     uploader: str | None = None
     subtitles: dict[str, list[TrackFormat]] = Field(default_factory=dict)
     automatic_captions: dict[str, list[TrackFormat]] = Field(default_factory=dict)
+
+    @field_validator("subtitles", "automatic_captions")
+    @classmethod
+    def _tags_only(cls, tracks: dict[str, list[TrackFormat]]) -> dict[str, list[TrackFormat]]:
+        return {name: formats for name, formats in tracks.items() if TRACK_NAME.fullmatch(name) is not None}
 
 
 def clock(seconds: float) -> str:
@@ -130,7 +137,7 @@ def choose_track(info: VideoInfo, spoken: str | None) -> CaptionTrack | None:
     ``spoken`` is the language the call names; the video's own when it names none. A track translated by the site is
     never taken: it is not what is said. ``None`` when there is none."""
     language: str | None = spoken if spoken is not None else info.language
-    written: list[str] = [name for name in info.subtitles if name != _LIVE_CHAT and info.subtitles[name]]
+    written: list[str] = [name for name, formats in info.subtitles.items() if formats]
     automatic: list[str] = [name for name in info.automatic_captions if info.automatic_captions[name]]
     if language is not None:
         wanted: str = _base(language)
