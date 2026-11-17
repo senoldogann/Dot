@@ -17,7 +17,6 @@ a page is.
 
 import asyncio
 import secrets
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
@@ -27,6 +26,7 @@ from pydantic import Field
 
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.core.errors import InvalidValueError, ToolExecutionError, ToolInputError, VoiceError
+from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.llm.types import ImageData
 from dotagent.policy.sandbox import Sandbox
@@ -56,6 +56,8 @@ from dotagent.voice.helper import LANGUAGE_TAG, Transcriber
 from dotagent.voice.wav import MAX_PIECE_BYTES
 from dotagent.web.client import checked_addresses
 
+log = get_logger(__name__)
+
 WATCH_VIDEO_TOOL: str = "watch_video"
 MAX_FRAMES: int = 40
 # A download of up to fifteen minutes, then an hour of sound written down a minute at a time (about 2.5 s each,
@@ -63,6 +65,9 @@ MAX_FRAMES: int = 40
 _TIMEOUT_S: float = 1800.0
 _HEADROOM_CHARS: int = 1500
 _NONCE_BYTES: int = 16
+# How long a look waits for the Mac's dictation model while two other streams hold it, and how often it asks again.
+_BUSY_WAIT_S: float = 300.0
+_BUSY_PAUSE_S: float = 2.0
 _LINK_SCHEMES: tuple[str, ...] = ("http://", "https://")
 
 
@@ -142,10 +147,25 @@ def _heard_error(error: VoiceError, language: str) -> ToolExecutionError:
     return ToolExecutionError(f"watch_video: the Mac's dictation model failed: {error.message}", error.context)
 
 
+async def _opened(transcriber: Transcriber, language: str) -> str:
+    """A stream of the Mac's dictation model. While two others hold it (the owner's microphone, another look), the
+    same open is tried again after a pause, for up to :data:`_BUSY_WAIT_S`; then the last refusal is raised."""
+    waited: float = 0.0
+    while True:
+        try:
+            return await transcriber.open(language)
+        except VoiceError as error:
+            if error.context.get("code") != "busy" or waited >= _BUSY_WAIT_S:
+                raise
+            log.warning("video_dictation_busy", waited_s=waited)
+            await asyncio.sleep(_BUSY_PAUSE_S)
+            waited += _BUSY_PAUSE_S
+
+
 async def _written(transcriber: Transcriber, pcm: bytes, language: str) -> str:
     """What the Mac's dictation model writes down of ``pcm``."""
     try:
-        name: str = await transcriber.open(language)
+        name: str = await _opened(transcriber, language)
     except InvalidValueError as error:
         raise ToolInputError(
             f"watch_video: {language!r} is not a language tag: write it as en-US", error.context
@@ -249,7 +269,7 @@ async def _watch_link(ctx: ToolContext, args: WatchVideoArgs, url: str) -> _Look
     span: Span = _span(info.duration, args)
     track: CaptionTrack | None = choose_track(info, args.language)
     title: str = info.title if info.uploader is None else f"{info.title} — {info.uploader}"
-    async with media.link_folder(url, time.time()) as folder:
+    async with media.download_folder() as folder:
         transcript: str = ""
         heard_by: str = ""
         if track is not None:

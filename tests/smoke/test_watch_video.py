@@ -12,7 +12,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -218,42 +217,27 @@ async def test_a_list_named_as_a_video_is_not_followed(runtime: Runtime) -> None
         await _watched(ctx, {"source": str(disguised), "frames": 1})
 
 
-def _age(root: Path, at: float) -> None:
-    for folder in root.iterdir():
-        os.utime(folder, (at, at))
-
-
-async def test_a_links_folder_is_held_by_one_look_and_swept_only_when_old_and_free(
+async def test_a_calls_download_folder_is_its_own_and_its_removal_follows_no_link(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
-    now: float = time.time()
-    first_in: asyncio.Event = asyncio.Event()
-    release: asyncio.Event = asyncio.Event()
-    order: list[str] = []
+    async with media.download_folder() as first, media.download_folder() as second:
+        assert first != second and first.parent == second.parent == tmp_path
+        assert (await asyncio.to_thread(os.stat, first)).st_mode & 0o777 == 0o700
+    assert not await asyncio.to_thread(first.exists)
+    # A run that put a link where a call's folder was has the link refused at the removal, never its target removed.
+    kept: Path = tmp_path / "home"
+    await asyncio.to_thread(_owners_folder, kept)
+    async with media.download_folder() as folder:
+        await asyncio.to_thread(_replace_with_link, folder, kept)
+    assert await asyncio.to_thread((kept / "note.txt").exists)
 
-    async def look(name: str) -> None:
-        async with media.link_folder("https://example.org/v", now):
-            order.append(f"{name} in")
-            first_in.set()
-            await release.wait()
-            order.append(f"{name} out")
 
-    first: asyncio.Task[None] = asyncio.create_task(look("first"))
-    await first_in.wait()
-    second: asyncio.Task[None] = asyncio.create_task(look("second"))
-    await asyncio.sleep(0.2)
-    # Held: an old folder of a link that a look holds is not swept, one that none holds is.
-    async with media.link_folder("https://example.org/other", now):
-        pass
-    old: float = now - media.KEPT_S - 60
-    root: Path = tmp_path / "dot-video"
-    await asyncio.to_thread(_age, root, old)
-    async with media.link_folder("https://example.org/third", now):
-        pass
-    release.set()
-    await asyncio.gather(first, second)
-    assert order == ["first in", "first out", "second in", "second out"]
-    assert len(await asyncio.to_thread(os.listdir, root)) == 2, (
-        "the held link's folder stays and the free old one is swept"
-    )
+def _owners_folder(folder: Path) -> None:
+    folder.mkdir()
+    (folder / "note.txt").write_text("kept", encoding="utf-8")
+
+
+def _replace_with_link(folder: Path, target: Path) -> None:
+    folder.rmdir()
+    folder.symlink_to(target)

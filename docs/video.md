@@ -29,9 +29,10 @@ Say "watch this and tell me what it says: https://www.youtube.com/watch?v=…", 
   the language the call names (`language = "tr-TR"`, `"en-US"`); for a link, the language the site gives when the call
   names none.
 
-A link's video is downloaded at most 480 lines high and 2 GB, into a folder of its own under the Mac's temporary folder,
-and kept six hours, so a second look at another part does not download it again. Frames and sound are never written
-to a file.
+A link's video is downloaded at most 480 lines high and 2 GB, into a folder of the call's own under the Mac's temporary
+folder, which is removed when the call ends: a second look at another part downloads it again (about 9 seconds for a
+three-minute video here). Frames and sound are never written to a file. While two other recordings hold the Mac's
+dictation model (your microphone, another look), a look waits for one to end, up to five minutes.
 
 ## Safety
 

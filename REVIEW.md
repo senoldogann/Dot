@@ -49,6 +49,9 @@ here points at a test that no longer exists.
 - `tests/smoke/test_chat_permits.py::test_a_permit_never_answers_money_nor_a_step_of_dots_own_initiative` — a
   "don't ask again in this chat" never answers money nor a step of Dot's initiative, and answers one of a run that read
   outside content, as the owner chose (item 866).
+- `tests/smoke/test_watch_video.py::test_a_calls_download_folder_is_its_own_and_its_removal_follows_no_link` — the
+  daemon removed old download folders under the temporary folder, where a run could leave a link to the owner's home
+  (item 1212): a call's folder is its own now, and its removal follows no link.
 
 ## Evidence and format
 
