@@ -326,9 +326,11 @@ def _render(look: _Look, where: str, output_chars: int) -> ToolResult:
 
 
 def _failed(where: str, error: DotError) -> ToolResult:
-    """A look that failed once it reached the video, as the model reads it: what yt-dlp or ffmpeg said, or what the
-    site answered, may be the site's words (an HTTP reason phrase, the site's own error), so it is fenced and the run is
-    marked untrusted, as a web_fetch that fails is (item 551). Dot's own refusal of the arguments is not this."""
+    """A look that failed, as the model reads it: what yt-dlp or ffmpeg said, or what the site answered, may be the
+    site's words (an HTTP reason phrase, the site's own error), so every failure of a running look is fenced and the
+    run is marked untrusted, as a web_fetch that read the site's error is (item 551). Dot's own refusals while a look
+    runs (a host on the local network, a program not installed) are fenced and mark the run too: one rule for every
+    failure, on the safe side. A refusal of the call's arguments (ToolInputError) is raised as it is."""
     said: str = fence_untrusted(where, error.message, secrets.token_hex(_NONCE_BYTES))
     return mark_untrusted(fail(f"watch_video could not watch {where}; what was said is inside the fence:\n{said}"))
 
