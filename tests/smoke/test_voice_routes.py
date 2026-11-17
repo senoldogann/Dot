@@ -12,6 +12,7 @@ import asyncio
 import base64
 import time
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,7 @@ from voice_stand_ins import StandIn, make_stand_in, pcm_of
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
+from dotagent.core.paths import voice_dir
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -29,6 +31,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.views import _PIECE_B64_CHARS
 from dotagent.voice import helper
+from dotagent.voice.helper import Transcriber
 from dotagent.voice.toolchain import NO_COMPILER
 from dotagent.voice.wav import RECORDING_RATE, TAIL_SECONDS
 
@@ -362,7 +365,8 @@ async def test_pages_that_load_while_a_slow_mac_is_asked_share_one_question_and_
     manager: RunManager = RunManager(runtime)
     port: int = 18626
     context: ServerContext = ServerContext(
-        runtime=runtime,
+        # The daemon's dictation model lives in its runtime (item 1212): this one's has not been asked yet.
+        runtime=replace(runtime, transcriber=Transcriber(voice_dir())),
         manager=manager,
         scheduler=None,
         token=TOKEN,

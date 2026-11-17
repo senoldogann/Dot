@@ -21,9 +21,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from dotagent.core.errors import DesktopError, DotError
+from dotagent.core.paths import voice_dir
 from dotagent.server.app import status_for
 from dotagent.server.routes_voice import voice_router
 from dotagent.voice.desktopapp import AUDIO_INPUT, DesktopApp, open_url, running_apps, settings_url
+from dotagent.voice.helper import Transcriber
 
 MICROPHONE_REASON: str = "Dot listens only while its microphone is on, to write what you say into the message box."
 SPEECH_REASON: str = "Dot turns what you say into text in the message box. macOS may send your voice to Apple."
@@ -403,7 +405,7 @@ def server(running: Running, settings: Settings) -> httpx.AsyncClient:
     and the address of this Mac, which the guard lets through."""
     app: FastAPI = FastAPI()
     reader: DesktopApp = DesktopApp(running=running, run=Codesign(entitlements=ENTITLED))
-    app.include_router(voice_router(reader, settings))
+    app.include_router(voice_router(Transcriber(voice_dir()), reader, settings))
 
     @app.exception_handler(DotError)
     async def dot_error(_request: Request, error: DotError) -> JSONResponse:
