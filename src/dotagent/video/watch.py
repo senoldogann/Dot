@@ -1,0 +1,211 @@
+"""What ``watch_video`` makes of a video, as pure functions (item 1212): the part of it a call looks at, the moments its
+frames are taken at, the pieces its sound is written down in, the caption track of a link it reads, the cues of that
+track, and the text the model reads.
+
+No model takes a video: Claude takes pictures and text, and so does every model Dot runs (a model that cannot see has
+the pictures described by the vision model, :mod:`dotagent.agent.vision`). So a video is given as both: frames spread
+over the part looked at, each with its moment, and what is said, by the minute.
+"""
+
+import re
+from collections.abc import Mapping, Sequence
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from dotagent.core.types import FrozenModel
+
+# The longest part one call writes down: a longer video is looked at a part at a time (start and end).
+MAX_SPAN_S: float = 3600.0
+# The length of a piece of sound the Mac writes down at a time: its moment is the transcript's timestamp.
+SPEECH_PIECE_S: float = 60.0
+# A paragraph of captions starts at most this often, so a transcript reads in blocks and not a line per cue.
+CAPTION_BLOCK_S: float = 30.0
+# What a caption track of a live chat is called: comments, not what is said.
+_LIVE_CHAT: str = "live_chat"
+# A cue's timing line: ``00:01:02.345 --> 00:01:04.000 align:start``; hours may be left out.
+_TIMING: re.Pattern[str] = re.compile(r"^(?:(\d+):)?(\d{1,2}):(\d{2})[.,](\d{3})\s+-->")
+# The tags inside a YouTube cue: ``<00:00:01.234>`` word timings and ``<c>`` spans.
+_TAG: re.Pattern[str] = re.compile(r"<[^>]*>")
+_ENTITIES: Mapping[str, str] = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&nbsp;": " ", "&#39;": "'", "&quot;": '"'}
+
+
+class Span(FrozenModel):
+    """The part of a video a call looks at, in seconds from its start; ``cut`` when the call asked for more than
+    :data:`MAX_SPAN_S` and the part ends sooner than asked."""
+
+    start: float
+    end: float
+    cut: bool
+
+
+class Cue(FrozenModel):
+    """A line said, and the moment it starts, in seconds from the video's start."""
+
+    start: float
+    text: str
+
+
+class CaptionTrack(FrozenModel):
+    """The caption track of a link that is read: its language as the site names it, and whether the site made it by
+    speech recognition (``automatic``) or the uploader wrote it."""
+
+    language: str
+    automatic: bool
+
+
+class TrackFormat(BaseModel):
+    """One format of a caption track as yt-dlp lists it; only that there is one matters."""
+
+    model_config = ConfigDict(extra="ignore")
+    ext: str
+
+
+class VideoInfo(BaseModel):
+    """What yt-dlp says of a link (``yt-dlp -J``): the fields read, nothing else. ``duration`` is ``None`` for a live
+    stream; ``language`` is the language the video is in, when the site says."""
+
+    model_config = ConfigDict(extra="ignore")
+    title: str = Field(max_length=2000)
+    duration: float | None = None
+    language: str | None = None
+    uploader: str | None = None
+    subtitles: dict[str, list[TrackFormat]] = Field(default_factory=dict)
+    automatic_captions: dict[str, list[TrackFormat]] = Field(default_factory=dict)
+
+
+def clock(seconds: float) -> str:
+    """``seconds`` as a timestamp: ``04:07``, or ``1:02:03`` past an hour."""
+    whole: int = max(0, int(seconds))
+    hours, rest = divmod(whole, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes:02d}:{secs:02d}"
+
+
+def span_of(duration: float, start: float, end: float | None) -> Span:
+    """The part looked at: from ``start`` to ``end`` (the video's end when ``None``), within the video, and no longer
+    than :data:`MAX_SPAN_S`. A start at or past the end is the caller's error: :func:`span_error` says so first."""
+    last: float = duration if end is None else min(end, duration)
+    if last - start > MAX_SPAN_S:
+        return Span(start=start, end=start + MAX_SPAN_S, cut=True)
+    return Span(start=start, end=last, cut=False)
+
+
+def span_error(duration: float, start: float, end: float | None) -> str | None:
+    """Why ``start`` and ``end`` name no part of a video of ``duration`` seconds, or ``None`` when they do."""
+    if start >= duration:
+        return f"start {clock(start)} is past the end of the video ({clock(duration)} long)"
+    if end is not None and end <= start:
+        return f"end {clock(end)} is not after start {clock(start)}"
+    return None
+
+
+def frame_times(span: Span, count: int) -> tuple[float, ...]:
+    """The moments of ``count`` frames over ``span``: the middle of each of ``count`` equal slices, so the first and
+    the last are not the black of a fade; at most one a second."""
+    length: float = span.end - span.start
+    taken: int = min(count, max(1, int(length)))
+    return tuple(span.start + length * (index + 0.5) / taken for index in range(taken))
+
+
+def speech_pieces(span: Span) -> tuple[Span, ...]:
+    """``span`` cut into pieces of :data:`SPEECH_PIECE_S` seconds, the last one shorter, for the Mac to write down one
+    at a time."""
+    pieces: list[Span] = []
+    at: float = span.start
+    while at < span.end:
+        until: float = min(at + SPEECH_PIECE_S, span.end)
+        pieces.append(Span(start=at, end=until, cut=False))
+        at = until
+    return tuple(pieces)
+
+
+def _base(language: str) -> str:
+    """``en`` of ``en-US``, ``en-orig`` or ``en``."""
+    return language.split("-", 1)[0].lower()
+
+
+def choose_track(info: VideoInfo, spoken: str | None) -> CaptionTrack | None:
+    """The caption track that says what is said in the video: one the uploader wrote in the language spoken, else the
+    site's own recognition of the original sound (YouTube's ``<lang>-orig``, or the track in the video's language).
+    ``spoken`` is the language the call names; the video's own when it names none. A track translated by the site is
+    never taken: it is not what is said. ``None`` when there is none."""
+    language: str | None = spoken if spoken is not None else info.language
+    written: list[str] = [name for name in info.subtitles if name != _LIVE_CHAT and info.subtitles[name]]
+    automatic: list[str] = [name for name in info.automatic_captions if info.automatic_captions[name]]
+    if language is not None:
+        wanted: str = _base(language)
+        for name in written:
+            if _base(name) == wanted:
+                return CaptionTrack(language=name, automatic=False)
+        if f"{wanted}-orig" in automatic:
+            return CaptionTrack(language=f"{wanted}-orig", automatic=True)
+        # Without an ``-orig`` track, the site's recognition is the track in the video's own language; a track in any
+        # other language is the site's translation.
+        own: str | None = info.language
+        if own is None or _base(own) != wanted:
+            return None
+        for name in (own, wanted):
+            if name in automatic:
+                return CaptionTrack(language=name, automatic=True)
+        return None
+    if len(written) == 1:
+        return CaptionTrack(language=written[0], automatic=False)
+    original: list[str] = [name for name in automatic if name.endswith("-orig")]
+    return CaptionTrack(language=original[0], automatic=True) if len(original) == 1 else None
+
+
+def _seconds(match: re.Match[str]) -> float:
+    hours: int = int(match.group(1) or 0)
+    return hours * 3600 + int(match.group(2)) * 60 + int(match.group(3)) + int(match.group(4)) / 1000
+
+
+def _plain(line: str) -> str:
+    text: str = _TAG.sub("", line)
+    for entity, character in _ENTITIES.items():
+        text = text.replace(entity, character)
+    return " ".join(text.split())
+
+
+def parse_vtt(text: str) -> tuple[Cue, ...]:
+    """The lines said in a WebVTT caption file, each once. YouTube's own recognition writes each line twice, in the cue
+    it is said in and again above the next line in the next cue: a line the same as the one just taken is not taken
+    again."""
+    cues: list[Cue] = []
+    last: str = ""
+    start: float | None = None
+    for raw in text.replace("\r\n", "\n").split("\n"):
+        timing: re.Match[str] | None = _TIMING.match(raw.strip())
+        if timing is not None:
+            start = _seconds(timing)
+            continue
+        if start is None:
+            continue
+        line: str = _plain(raw)
+        if not line:
+            # An empty line ends a cue; a line of a space (YouTube writes one above the first line of a cue) does not.
+            if raw == "":
+                start = None
+            continue
+        if line == last:
+            continue
+        cues.append(Cue(start=start, text=line))
+        last = line
+    return tuple(cues)
+
+
+def caption_blocks(cues: Sequence[Cue], span: Span) -> tuple[Cue, ...]:
+    """The cues inside ``span`` joined into paragraphs, a new one at most every :data:`CAPTION_BLOCK_S` seconds."""
+    blocks: list[Cue] = []
+    for cue in cues:
+        if not span.start <= cue.start < span.end:
+            continue
+        if blocks and cue.start - blocks[-1].start < CAPTION_BLOCK_S:
+            blocks[-1] = Cue(start=blocks[-1].start, text=f"{blocks[-1].text} {cue.text}")
+        else:
+            blocks.append(cue)
+    return tuple(blocks)
+
+
+def transcript_text(blocks: Sequence[Cue]) -> str:
+    """The transcript as the model reads it: one paragraph per block, after its timestamp."""
+    return "\n".join(f"[{clock(block.start)}] {block.text}" for block in blocks if block.text)

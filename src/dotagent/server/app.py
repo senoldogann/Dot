@@ -234,7 +234,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(accounts_router(ctx))
     app.include_router(vault_router(ctx))
     app.include_router(vault_items_router(ctx))
-    app.include_router(voice_router())
+    app.include_router(voice_router(ctx.runtime.transcriber))
 
     @app.exception_handler(DotError)
     async def dot_error(request: Request, exc: DotError) -> JSONResponse:

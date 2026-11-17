@@ -136,6 +136,7 @@ from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.todos import build_todo_tools
 from dotagent.tools.trading import build_trading_tools
+from dotagent.tools.video import build_video_tools
 from dotagent.tools.waits import build_wait_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.tools.work_orders import build_work_order_tools
@@ -145,6 +146,7 @@ from dotagent.trading.service import Trading, TradingSettings
 from dotagent.vault.items import VaultItems
 from dotagent.vault.onepassword import OnePassword
 from dotagent.vault.secretstore import LoginKeychain
+from dotagent.voice.helper import Transcriber
 from dotagent.web.client import WebClient
 from dotagent.web.keyed import keyed_engines
 from dotagent.web.ladder import SearchEngine
@@ -255,6 +257,8 @@ class Runtime:
     meetings: MeetingDesk
     # The owner's iPhone over WebDriverAgent (docs/phone-control.md); ``None`` while [phone] is off.
     phone: PhoneDesk | None
+    # The Mac's dictation model (item 626): what the owner says into a page, and what is said in a video (item 1212).
+    transcriber: Transcriber
 
     @property
     def search_key_present(self) -> bool:
@@ -298,6 +302,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         (build_skill_tool(), build_find_help_tool(), build_skill_save_tool()),
         build_contacts_tools(),
         build_meeting_tools(),
+        build_video_tools(),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),
         *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
@@ -665,6 +670,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             peers=peers,
             trading=_trading(config, store, schedule_zone),
             phone=_phone(config),
+            transcriber=Transcriber(voice_dir()),
             meetings=MeetingDesk(
                 store,
                 approvals,

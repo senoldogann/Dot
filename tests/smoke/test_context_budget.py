@@ -96,7 +96,8 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # consequence, the result before the account of it, the next step ready, three ways before a road is closed and none
 # around a refusal, and what he asks in his own name done within the run's approvals (27,620 measured here; the block
 # is 1,614 of the 8,405 of system).
-BUDGET_TOKENS: int = 27_800
+# Raised by 150 for `watch_video` (item 1212), whose definition is listed with its group (27,904 measured here).
+BUDGET_TOKENS: int = 27_950
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -122,7 +123,8 @@ SYSTEM_BUDGET_TOKENS: int = 8_600
 # Raised by 50 for `review_work`'s `brief` (item 1065) above (tools 18,516 measured).
 # Raised by 450 for the four meeting tools of item 1138 above (18,954 measured).
 # Raised by 200 for the two fields of a browser step and the words of its result of item 1145 above (19,195 measured).
-TOOLS_BUDGET_TOKENS: int = 19_200
+# Raised by 300 for `watch_video` of item 1212 above (19,472 measured).
+TOOLS_BUDGET_TOKENS: int = 19_500
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:
