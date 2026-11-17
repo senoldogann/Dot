@@ -44,6 +44,8 @@ dictation model (your microphone, another look), a look waits for one to end, up
   and sound files only (MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, MP3, WAV and the like) and reaches no address: a
   playlist or a concat list that names other files, whatever it is called, is refused.
 - A video is anyone's: the title and the transcript come inside a `<web_content>` fence, and a look marks the run
-  untrusted, as a page does ([Safety](safety.md)).
+  untrusted, as a page does ([Safety](safety.md)). So does a look that fails once it reached the video: what yt-dlp or
+  ffmpeg said may be the site's words (an HTTP error's reason), so it is fenced too. The names of a link's caption
+  tracks and its language, which the page writes, are taken only when they are language tags.
 
 A video sent to Dot in iMessage is not read yet: the channel still says it cannot read videos.

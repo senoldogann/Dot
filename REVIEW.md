@@ -55,6 +55,8 @@ here points at a test that no longer exists.
 - `tests/unit/test_video_watch.py::test_a_track_name_that_is_no_language_tag_is_dropped_as_the_answer_is_read` — a
   caption track's name came from the page (`<track srclang>`) and reached Dot's own line, an error and a file's path
   (item 1212): a name that is no language tag is dropped as yt-dlp's answer is read.
+- `tests/smoke/test_watch_video.py::test_what_a_site_says_when_a_look_fails_is_fenced_and_marks_the_run` — yt-dlp's
+  error, which carries a site's words, reached the model unfenced and left the run trusted (item 1212).
 
 ## Evidence and format
 

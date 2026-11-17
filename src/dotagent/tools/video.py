@@ -25,13 +25,22 @@ from urllib.parse import SplitResult, urlsplit
 from pydantic import Field
 
 from dotagent.browser.snapshot import fence_untrusted
-from dotagent.core.errors import InvalidValueError, ToolExecutionError, ToolInputError, VoiceError
+from dotagent.core.errors import DotError, InvalidValueError, ToolExecutionError, ToolInputError, VoiceError, WebError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.llm.types import ImageData
 from dotagent.policy.sandbox import Sandbox
 from dotagent.policy.types import ActionInfo
-from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, at_most, make_path_tool, mark_untrusted
+from dotagent.tools.base import (
+    ALL_MODES,
+    RegisteredTool,
+    ToolArgs,
+    ToolResult,
+    at_most,
+    fail,
+    make_path_tool,
+    mark_untrusted,
+)
 from dotagent.tools.context import ToolContext, run_sandbox
 from dotagent.tools.files import read_action, resolve_path
 from dotagent.tools.web import checked_address
@@ -316,13 +325,26 @@ def _render(look: _Look, where: str, output_chars: int) -> ToolResult:
     return mark_untrusted(ToolResult(text="\n".join([*lines, fenced]), images=look.images, is_error=False))
 
 
+def _failed(where: str, error: DotError) -> ToolResult:
+    """A look that failed once it reached the video, as the model reads it: what yt-dlp or ffmpeg said, or what the
+    site answered, may be the site's words (an HTTP reason phrase, the site's own error), so it is fenced and the run is
+    marked untrusted, as a web_fetch that fails is (item 551). Dot's own refusal of the arguments is not this."""
+    said: str = fence_untrusted(where, error.message, secrets.token_hex(_NONCE_BYTES))
+    return mark_untrusted(fail(f"watch_video could not watch {where}; what was said is inside the fence:\n{said}"))
+
+
 def _watch_tool() -> RegisteredTool:
     async def run(args: WatchVideoArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
-        if authorized.kind == "network":
-            return _render(await _watch_link(ctx, args, authorized.target), authorized.target, ctx.output_chars)
-        # The path as it was checked (item 681), not resolved again.
-        path: Path = Path(authorized.target)
-        return _render(await _watch_file(ctx, args, path), str(path), ctx.output_chars)
+        where: str = authorized.target
+        try:
+            if authorized.kind == "network":
+                return _render(await _watch_link(ctx, args, where), where, ctx.output_chars)
+            # The path as it was checked (item 681), not resolved again.
+            return _render(await _watch_file(ctx, args, Path(where)), where, ctx.output_chars)
+        except ToolInputError:
+            raise
+        except (ToolExecutionError, WebError) as error:
+            return _failed(where, error)
 
     return make_path_tool(
         name=WATCH_VIDEO_TOOL,

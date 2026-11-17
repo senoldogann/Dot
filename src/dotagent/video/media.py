@@ -12,7 +12,9 @@ folder of the call's own under the Mac's temporary folder (:func:`download_folde
 import asyncio
 import base64
 import json
+import os
 import shutil
+import stat
 import tempfile
 import time
 from collections.abc import AsyncIterator, Sequence
@@ -236,9 +238,19 @@ async def link_info(sandbox: Sequence[str], env: dict[str, str], url: str) -> Vi
         raise ToolExecutionError("yt-dlp's answer about the link could not be read", {"url": url}) from error
 
 
-def _read_if_there(path: Path, folder: Path) -> str | None:
-    """The text of ``path``, a file of ``folder``, or ``None`` when yt-dlp wrote none there. Blocking."""
-    return _inside(path, folder).read_text("utf-8", "replace") if path.exists() else None
+def _read_if_there(path: Path) -> str | None:
+    """The text of the regular file ``path``, opened without following a link (a run's command can write in the call's
+    folder), or ``None`` when yt-dlp wrote none there. Blocking."""
+    try:
+        handle: int = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise ToolExecutionError("the caption file could not be opened", {"file": path.name}) from error
+    with os.fdopen(handle, "rb") as opened:
+        if not stat.S_ISREG(os.fstat(opened.fileno()).st_mode):
+            raise ToolExecutionError("the caption file is not a file", {"file": path.name})
+        return opened.read().decode("utf-8", "replace")
 
 
 async def captions(sandbox: Sequence[str], env: dict[str, str], url: str, track: CaptionTrack, folder: Path) -> str:
@@ -257,7 +269,7 @@ async def captions(sandbox: Sequence[str], env: dict[str, str], url: str, track:
         str(folder / f"{stem}.%(ext)s"),
     ]
     await _run(sandbox, _yt_dlp(url, words), env, _CAPTIONS_TIMEOUT_S)
-    text: str | None = await asyncio.to_thread(_read_if_there, path, folder)
+    text: str | None = await asyncio.to_thread(_read_if_there, path)
     if text is None:
         raise ToolExecutionError("yt-dlp wrote no caption file", {"url": url, "track": track.language})
     return text

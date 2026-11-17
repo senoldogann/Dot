@@ -74,6 +74,12 @@ class VideoInfo(BaseModel):
     subtitles: dict[str, list[TrackFormat]] = Field(default_factory=dict)
     automatic_captions: dict[str, list[TrackFormat]] = Field(default_factory=dict)
 
+    @field_validator("language")
+    @classmethod
+    def _tag_or_none(cls, language: str | None) -> str | None:
+        """The video's language as the site says it, when it is a language tag; anything else is no language."""
+        return language if language is not None and TRACK_NAME.fullmatch(language) is not None else None
+
     @field_validator("subtitles", "automatic_captions")
     @classmethod
     def _tags_only(cls, tracks: dict[str, list[TrackFormat]]) -> dict[str, list[TrackFormat]]:
