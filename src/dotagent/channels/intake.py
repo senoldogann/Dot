@@ -27,8 +27,8 @@ ATTACHMENT: str = ENGLISH.attachment_only
 # at the end of the run's goal, so the two stay together through the chat's queue. The note is for the model, so it is
 # in English whatever the owner writes.
 UNREAD_NOTE: str = (
-    "(Dot's note: this message came with a picture or a file that Dot could not read (a voice message, a video, or a "
-    "file that had not come down yet). Only the rest reached you. Do not guess what it shows.)"
+    "(Dot's note: this message came with a file that Dot could not read (one too large, of a kind Dot does not read, "
+    "or one that had not come down yet). Only the rest reached you. Do not guess what it shows.)"
 )
 # What a run is told of a message that brought files and no words (item 806), in English, for the model.
 FILES_ONLY_NOTE: str = (

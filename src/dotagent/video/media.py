@@ -38,7 +38,7 @@ _FRAME_QUALITY: str = "4"  # ffmpeg's JPEG scale, 2 (best) to 31
 # The containers ffmpeg may open (its demuxers' names): videos and sounds, never a list that names other files or
 # addresses (concat, hls, image sequences), so a file reaches no further than itself. Measured: mp4, mov, m4a, webm,
 # mkv, avi, ts, wmv, flv, mp3 and wav open; an ffconcat list named talk.mp4 is refused.
-_FORMATS: str = "mov,matroska,avi,flv,mpegts,mpeg,ogg,wav,mp3,aac,flac,asf,aiff,caf"
+_FORMATS: str = "mov,matroska,avi,flv,mpegts,mpeg,ogg,wav,mp3,aac,flac,asf,aiff,caf,amr"
 # The sound the Mac's dictation model takes (dotagent.voice.wav): 16 kHz mono 16-bit samples.
 _RATE: str = "16000"
 _PROBE_TIMEOUT_S: float = 30.0

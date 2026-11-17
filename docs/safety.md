@@ -1330,9 +1330,10 @@ phone app, so that a channel's account, if taken, could not approve anything. Wh
 message on a channel starts no run (see Emergency stop, below). A message is read up to 4,000 characters
 and 30 a minute, and one that came more than 15 minutes before Dot read it is not run: Dot says so. The pictures, PDFs and
 documents a message brings are read (item 806), only from Messages' folder of attachments beside its database, as
-regular files reached with no link and of at most 20 MB, and handed to the run as the composer's uploads, fenced as
-data; a message of files and no words runs too. A voice message, a video or a sticker is not read: the words run, the
-run is told part of the message was not read, and the answer starts by saying so to you. A row that is not
+regular files reached with no link and of at most 20 MB (200 MB for a video or a voice message, which are kept as they
+came for `watch_video`, item 1213; 300 MB for all the files of a message, past which a file is not read), and handed to the run as the composer's uploads, fenced as data; a message of
+files and no words runs too. A sticker or a file of no kind Dot reads is not read: the words run, the run is told part
+of the message was not read, and the answer starts by saying so to you. A row that is not
 words (a sticker, an app's message, a payment: rich content, which Messages marks with a bundle of its own) is never
 run, and neither is a row that is only a link that Dot wrote, one into its own pages or one in a message it sent a
 minute before: Messages may split the link at the end of a message of Dot's into a row of its own, which has no mark and

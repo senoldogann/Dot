@@ -49,4 +49,6 @@ dictation model (your microphone, another look), a look waits for one to end, up
   on the local network, a program not installed). The names of a link's caption
   tracks and its language, which the page writes, are taken only when they are language tags.
 
-A video sent to Dot in iMessage is not read yet: the channel still says it cannot read videos.
+A video or a voice message you send Dot in iMessage (up to 200 MB), or attach in the composer (up to 20 MB, the
+composer's limit), is kept with the message and the run is told to watch it with `watch_video` (item 1213,
+[Channels](channels.md)); a voice message is written down as a sound.
