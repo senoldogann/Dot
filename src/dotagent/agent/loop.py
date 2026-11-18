@@ -2724,6 +2724,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else None
     )
     steps: int = 0
+    # The first model's answer when it declined the goal, kept for the ending when no standby took the run over.
+    declined_first: RunOutcome | None = None
     # Whether any step of the run called a tool other than finish: a run that ends failed before its first such step
     # has done no work, and a refusal there is the model's, not the goal's.
     worked: bool = False
@@ -3261,13 +3263,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 # on, not a goal that failed: a standby model takes the run over, as it does for a content filter's
                 # stop (item 789), so a refusal never stops the work the owner left running. The next standby takes it
                 # when that one declines too; only when none is left does the run end as the model said.
-                if (
-                    ended.status == "failed"
-                    and not worked
-                    and not ended.needs
-                    and routed is None
-                    and run.mode != "chat"
-                ):
+                if ended.status == "failed" and not worked and routed is None and run.mode != "chat":
+                    # A finish that says what it would need is still a decline: the answer is kept, and the run keeps
+                    # asking its standby models while one is left (item 1211).
+                    if declined_first is None:
+                        declined_first = ended
                     declined: _Declined = _Declined(f"the model declined the goal ({ref.label})", {"model": ref.label})
                     try:
                         declined_to: _Standby | None = await _to_standby(
@@ -3276,6 +3276,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     except ConfigError as error:
                         log.warning("declined_no_standby", run_id=agent.run.id, model=ref.label, problem=str(error))
                         declined_to = None
+                    if declined_to is None and declined_first is not None:
+                        # No model left took the goal: the run ends with what its first one said, needs included.
+                        ended = declined_first
                     if declined_to is not None:
                         history.append(
                             await _stored_note(
