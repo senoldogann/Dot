@@ -1,7 +1,7 @@
 """The desktop bank (item 1221): a live model drives the fixture app (``tests/fixtures/dot_fixture_app.py``) on a few
 tasks, each judged by what the application saw, and each attempt's score goes into a report of JSON lines. Desktop
 calls were 0.2 % of the owner's real runs, too few to measure the desktop by; this is where it is measured
-(``reports/agent-capabilities-2026-11-18.md``, CMP-P06: stage 1, three tasks, item 1221; stage 2, four harder ones).
+(``reports/agent-capabilities-2026-11-18.md``, CMP-P06: stage 1, three tasks, item 1221; stage 2, five harder ones).
 
 It moves the real pointer and keyboard, so it runs only with ``DOT_DESKTOP_BANK=1``, once macOS has granted the desktop
 permissions to the process, and each attempt starts only when nobody has touched the Mac for ten minutes (the owner's
@@ -52,6 +52,7 @@ IDLE_LEAST_S: float = 600.0
 RUN_MAX_TOKENS: int = int(os.environ.get("DOT_DESKTOP_BANK_MAX_TOKENS", "4000000"))
 RUN_MAX_MINUTES: float = 12.0
 TYPED_NAME: str = "Ayşe Çelik"
+EXPORT_NAME: str = "rapor-2026"
 # When the bank's last attempt ended (``time.time()``): its own pointer and keys count as the Mac's input, so after
 # it the Mac counts as left alone when no input came since that attempt ended.
 _LAST_END: list[float] = []
@@ -136,6 +137,14 @@ def _finder(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
     return status == "done" and bool(fronted) and bool(typed) and typed[-1][1] == "ok" and typed[-1][0] > fronted[0]
 
 
+def _dialog(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
+    """The name goes into the sheet's own field, and only Export takes it: one sheet, answered once, with the name."""
+    answered: list[tuple[str | None, str | None]] = [
+        (event.button, event.value) for event in seen if event.event == "dialog"
+    ]
+    return status == "done" and answered == [("Export", EXPORT_NAME)]
+
+
 TASKS: tuple[BankTask, ...] = (
     BankTask(
         "form",
@@ -176,6 +185,12 @@ TASKS: tuple[BankTask, ...] = (
         f"{_OPEN} Press the Bring Finder button once, then type ok into the Name field of the Dot Fixture window. Then "
         "call finish.",
         _finder,
+    ),
+    BankTask(
+        "export-dialog",
+        f"{_OPEN} Press the Export… button, name the export {EXPORT_NAME} in the dialog that opens and confirm it with "
+        "its Export button. Then call finish.",
+        _dialog,
     ),
 )
 

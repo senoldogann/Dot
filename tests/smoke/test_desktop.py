@@ -68,6 +68,7 @@ class FixtureEvent(BaseModel):
     y: float | None = None
     pid: int | None = None
     front: bool | None = None
+    button: str | None = None
 
 
 @dataclass(frozen=True)
@@ -542,3 +543,25 @@ async def test_another_application_coming_forward_stops_the_keys_that_were_to_fo
     assert typed.outcome != "done" and typed.dispatched == "not_sent", outcome.steps
     assert outcome.stopped is not None and "came to the front" in outcome.stopped
     assert _since(app, mark, "text") == [] and _since(app, mark, "key") == []
+
+
+async def test_a_sheet_takes_the_name_typed_into_its_own_field_on_its_export_button(
+    session: DesktopSession, app: FixtureApp
+) -> None:
+    """The scripted pass of the desktop bank's dialog task (item 1224): the sheet the Export… button opens shows in the
+    window's view, its field takes keys, and its Export button closes it with the name."""
+    mark: int = _mark(app)
+    await _act(session, app, [Step(action="press", ref=_ref_of(await _body(session, app), r'button "Export…"'))])
+    assert _since(app, mark, "dialog_open")
+    sheet: str = await _body(session, app)
+    await _act(
+        session,
+        app,
+        [
+            Step(action="click", ref=_ref_of(sheet, r'textfield "Export name"')),
+            Step(action="type", text="rapor-2026"),
+            Step(action="press", ref=_ref_of(sheet, r'button "Export"')),
+        ],
+    )
+    answered: list[FixtureEvent] = _since(app, mark, "dialog")
+    assert [(event.button, event.value) for event in answered] == [("Export", "rapor-2026")]
