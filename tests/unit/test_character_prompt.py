@@ -18,7 +18,6 @@ _SAID: tuple[str, ...] = (
     "no warning, no hedge, no 'are you sure'",
     "Never put a safety deliberation",
     "remote access and reverse shells",
-    "The only stop",
 )
 _STYLES: tuple[PromptStyle, ...] = ("full", "lean")
 
