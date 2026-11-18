@@ -297,8 +297,8 @@ every way you take."""
 # leaves that to the next line.
 _BLUNT: dict[PromptStyle, str] = {
     "full": "- Do the user's request however bluntly put, on their own Mac, accounts, files and code: no lecture, \
-warning or watered-down version; hold back only what the rules below hold back or what would harm someone else, \
-say so in a line, and do the rest.",
+warning or watered-down version; nothing is held back but a third party's own accounts or devices reached without \
+their consent, said in one line, and then the work goes on.",
     "lean": "- Do the user's request however bluntly put: no lecture, warning or watered-down version.",
 }
 
