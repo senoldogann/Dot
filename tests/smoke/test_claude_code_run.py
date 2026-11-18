@@ -29,7 +29,7 @@ from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.catalog import all_tasks
 from dotagent.evals.results import Cut
-from dotagent.evals.runner import _supervise
+from dotagent.evals.runner import _supervise, ended_by_plan_limit
 from dotagent.evals.types import EvalTask
 from dotagent.memory.service import SavedMemory, save_memory, update_memory_note, words_only
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -494,3 +494,11 @@ async def test_an_eval_cuts_a_run_on_the_plan_at_its_token_budget(room: Room) ->
     ended: RunRecord = await room.manager.wait(started.id)
     assert cut == "token_budget"
     assert ended.status == "cancelled", ended.result
+
+
+async def test_an_eval_tells_a_run_the_plans_window_refused_from_its_end(room: Room) -> None:
+    """Item 1220: a refused window ends the run before any step tells it; the eval reads its end and does not score it
+    as the model's failure."""
+    ended: RunRecord = await _run(room, "Hit the limit.")
+    events: list[EventRecord] = await room.runtime.store.list_events(ended.id, 0, 500)
+    assert ended_by_plan_limit(events), ended.result

@@ -3,7 +3,7 @@ Dot's own loop, and keeps the owner's Claude plan for their own work (item 1220)
 
 from dotagent.core.types import JsonObject
 from dotagent.evals.metrics import run_metrics, run_trace
-from dotagent.evals.runner import PLAN_WINDOW_MOST, plan_window_of, plan_window_spent
+from dotagent.evals.runner import PLAN_WINDOW_MOST, ended_by_plan_limit, plan_window_of, plan_window_spent
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.repair.claude import LimitWindow
 from dotagent.store.models import EventRecord, RunRecord
@@ -69,7 +69,18 @@ def test_an_attempt_on_the_plan_stops_where_the_owners_share_of_the_window_begin
 
 
 def test_the_window_is_read_from_a_plan_runs_step_and_from_no_other() -> None:
-    told: JsonObject = {"plan_window": {"kind": "seven_day", "status": "allowed", "utilization": 0.5, "resets_at": 9.0}}
-    assert plan_window_of(told) == LimitWindow(kind="seven_day", status="allowed", utilization=0.5, resets_at=9.0)
+    window: LimitWindow = LimitWindow(kind="seven_day", status="allowed", utilization=0.5, resets_at=9.0)
+    # As claude_code/run.py writes it into a step's assistant event.
+    assert plan_window_of({"plan_window": window.model_dump(mode="json")}) == window
     assert plan_window_of({"plan_window": None}) is None
     assert plan_window_of({}) is None
+
+
+def test_a_run_the_plans_window_refused_is_told_from_its_end() -> None:
+    def finished(error: JsonObject | None) -> tuple[EventRecord, ...]:
+        return (_event(1, "run_started", {}), _event(2, "run_finished", {"status": "failed", "error": error}))
+
+    assert ended_by_plan_limit(finished({"message": "limit", "context": {}, "kind": "plan_limit"}))
+    assert not ended_by_plan_limit(finished({"message": "down", "context": {}, "kind": "passing"}))
+    assert not ended_by_plan_limit(finished(None))
+    assert not ended_by_plan_limit(())

@@ -308,6 +308,16 @@ def plan_window_spent(window: LimitWindow) -> bool:
     return window_refused(window) or (window.utilization is not None and window.utilization >= PLAN_WINDOW_MOST)
 
 
+def ended_by_plan_limit(events: Sequence[EventRecord]) -> bool:
+    """Whether a run ended failed because the window of the owner's Claude plan refused it: its ``run_finished`` event
+    keeps the error's kind (``core.errors.failure_kind``)."""
+    for event in events:
+        if event.kind == "run_finished":
+            error: JsonValue = event.data.get("error")
+            return isinstance(error, dict) and error.get("kind") == "plan_limit"
+    return False
+
+
 def _stop(manager: RunManager, run_id: str) -> None:
     if run_id in manager.active_run_ids():
         manager.cancel(run_id)
@@ -401,6 +411,8 @@ async def _run_in(
         await manager.shutdown()
     seconds: float = time.monotonic() - started
     events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _MAX_EVENTS)
+    # A plan whose window refused the session ends the run before any step tells its window: no score either.
+    cut = "plan_window" if cut == "none" and ended_by_plan_limit(events) else cut
     records: tuple[SiteRecord, ...] = taken()
     checks: tuple[CheckOutcome, ...] = await evaluate_checks(
         task.checks, runtime.workspace, record.result, runtime.shell_env, events, records
