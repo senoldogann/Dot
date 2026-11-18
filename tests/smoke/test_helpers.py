@@ -376,6 +376,27 @@ async def test_a_run_whose_provider_cannot_answer_moves_to_its_standby_model_and
     ]
 
 
+def _declines_needing(answer: str, needs: str) -> ScriptedTurn:
+    return _turn(
+        ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": False, "needs_from_user": needs})
+    )
+
+
+async def test_a_decline_that_names_what_it_needs_still_moves_to_the_standby(login_env: dict[str, str]) -> None:
+    """Item 1211: a refusal that says what it would need is still a refusal — another model may not need it, so the run
+    asks its standby models first and keeps the answer for the end."""
+    refusing: str = "anthropic:scripted-refusing"
+    main: RecordingProvider = RecordingProvider(
+        ScriptedProvider("anthropic", [_declines_needing("I will not do this.", "your written consent")])
+    )
+    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
+    config: AppConfig = _config([], [SCRIPTED_MODEL], 5)
+    async with _session(config, login_env, {"anthropic": main, "ollama": standby}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, refusing, None)
+    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
+    assert len(main.requests) == 1
+
+
 async def test_a_run_the_model_declines_moves_to_its_standby_model_and_finishes(
     login_env: dict[str, str],
 ) -> None:

@@ -262,9 +262,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   conversation the model is stopped again (item 437). The run moves to a standby model at once (see
   [Helpers and standby](models.md#models-and-providers)), and the model is not paused for other runs; with no standby
   model left, the run fails saying that the filter stopped it and that another model would answer.
-- A `finish` that says the run cannot do the goal, before it has done a step of work and without asking you for
-  anything, is a model declining the goal, not the goal failing: the run moves to its standby models at once (see
-  [Helpers and standby](models.md#models-and-providers)), and with none left it ends as the model said (item 1211).
+- A `finish` that says the run cannot do the goal, before it has done a step of work, is a model declining the goal,
+  not the goal failing: the run moves to its standby models at once (see
+  [Helpers and standby](models.md#models-and-providers)), and with none left it ends with the first model's
+  answer, what it needs included (item 1211).
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
   as "What Dot needs from you", and `dotx run` prints it after the answer. A run that failed so is stored `failed`, but
   its page says "Waiting on you", not "The task failed", and the line that offers Continue says that a message below
