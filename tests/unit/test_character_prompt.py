@@ -16,7 +16,9 @@ _SAID: tuple[str, ...] = (
     "is no closed road",
     "The owner is the judge of his own risk",
     "no warning, no hedge, no 'are you sure'",
-    "One thing stands: you do not harm another person.",
+    "Never put a safety deliberation",
+    "remote access and reverse shells",
+    "The only stop",
 )
 _STYLES: tuple[PromptStyle, ...] = ("full", "lean")
 

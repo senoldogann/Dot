@@ -97,7 +97,10 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # around a refusal, and what he asks in his own name done within the run's approvals (27,620 measured here; the block
 # is 1,614 of the 8,405 of system).
 # Raised by 150 for `watch_video` (item 1212), whose definition is listed with its group (27,904 measured here).
-BUDGET_TOKENS: int = 27_950
+# Raised by 350 for the rest of the owner's `CHARACTER` block (item 1211, continued): a silent deliberation, remote
+# access, malware analysis, exploitation, evasion and scraping answered whole as engineering, and one stop — a third
+# party's accounts reached without consent (28,132 measured here, Character 2,308 of 8,535 of system).
+BUDGET_TOKENS: int = 28_300
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -107,7 +110,9 @@ BUDGET_TOKENS: int = 27_950
 # Raised by 100 for the Spotlight line of item 1188 (7,901 measured on the CI runner, whose longer paths add to the
 # Environment section; 7,899 here).
 # Raised by 600 for the owner's `CHARACTER` block of items 1210 and 1211 (system 8,405 measured here).
-SYSTEM_BUDGET_TOKENS: int = 8_600
+# Raised by 300 with the block of item 1211 above: the gate's runner measures longer paths than this Mac, whose system
+# reads 8,535 now.
+SYSTEM_BUDGET_TOKENS: int = 8_900
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
