@@ -435,6 +435,8 @@ TURKISH: Words = Words(
         "A fix of Dot's own is ready": "Bir düzeltmem hazır",
         "A fix of Dot's own needs you": "Bir düzeltmem sana bakıyor",
         "A model cannot answer: payment needed": "Bir model cevap veremiyor: ödeme gerekiyor",
+        "The plugin scout cannot read GitHub: renew the token": "Eklenti taraması GitHub'ı okuyamıyor: token'ı yenile",
+        "The plugin scout's night failed": "Eklenti taramasının gecesi başarısız oldu",
     },
     not_sent="{names} gönderilemedi. Nedeni günlükte yazıyor.",
     rest_in_dot="\n\n… Cevabın devamı Dot'ta: ",

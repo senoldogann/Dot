@@ -71,7 +71,12 @@ same asks as anything else the run does ([Safety](safety.md)).
 `[scheduler] timezone`; `"off"` stops it), Dot looks for plugins worth having and for updates of those it installed,
 checks each, and keeps what passes for you. **Nothing is installed by itself**: each proposal waits for your Install (or
 Update) or Skip. **Look now** starts a look at once. The line under the title says when Dot last looked and what it
-found; what its review refused is folded under the cards with the review's reason.
+found; what its review refused is folded under the cards with the review's reason. A night that saw nothing it went for
+is told to you the same morning (item 1215): when GitHub refuses the saved token (401, expired or revoked) the night
+ends at its first request, says "GitHub refused the token" and tells you to renew it in Customize › Connectors; when
+its looks failed and GitHub answered none of its requests, it tells you so with the night's line; a night GitHub
+answered is not told, though a lead of it failed (a repository renamed or gone fails every night). The
+tell's title is in your language; its text, like that of Dot's other tells, is still English.
 
 **Where it looks**, by how far Dot trusts the source before reading a line: Anthropic's own marketplaces
 (`anthropics/claude-plugins-official`, `anthropics/skills`, `anthropics/knowledge-work-plugins`; their catalogue,
