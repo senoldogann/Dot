@@ -494,7 +494,10 @@ and `desktop_act` calls, the share that carried one step (a round trip spent on 
 batches of [Browser use](browser-and-computer-use.md#browser-use) and [Computer use](browser-and-computer-use.md#computer-use) exist to avoid it), the share that failed and
 the median call; a **step model call by step number** line gives the median seconds of a step's model call for the
 steps 1 to 5, 6 to 10, 11 to 20, 21 to 40 and from 41 on of their runs, which shows how much a run slows down as its
-context grows. The Time table ends with the share of the input tokens the provider served from its cache. A **Sites**
+context grows. The Time table ends with the share of the input tokens the provider served from its cache, the
+fresh input (read at full price) and the input weighed as it is billed, `weighted*`: fresh tokens plus cached ones at
+0.1 of a fresh one, an assumption until bills are read (item 1218). Raw input overstated a DeepSeek bill about six
+times; judge a change of the context, which may break the cache, by the weighted column. A **Sites**
 table follows, per site (the host of the page for a browser act, the application for a desktop one, both recorded in
 the `tool_result` event with the steps of the batch): acts, the share with one step, the share that failed, the
 median call, and the finished runs that acted there with the share of them that ended done (item 308). **By day**
