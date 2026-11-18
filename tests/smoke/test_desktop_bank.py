@@ -52,6 +52,9 @@ IDLE_LEAST_S: float = 600.0
 RUN_MAX_TOKENS: int = int(os.environ.get("DOT_DESKTOP_BANK_MAX_TOKENS", "4000000"))
 RUN_MAX_MINUTES: float = 12.0
 TYPED_NAME: str = "Ayşe Çelik"
+# When the bank's last attempt ended (``time.time()``): its own pointer and keys count as the Mac's input, so after
+# it the Mac counts as left alone when no input came since that attempt ended.
+_LAST_END: list[float] = []
 # The model's provider refused an attempt before its first step (a spent quota, a refused key): the attempts after it
 # would be refused too, and are not played (ARC-02: cancel at the first quota error).
 _REFUSED: list[str] = []
@@ -110,6 +113,13 @@ TASKS: tuple[BankTask, ...] = (
 )
 
 
+def left_alone(idle: float, since_last_attempt: float | None) -> bool:
+    """Whether nobody is at the Mac: no input for ten minutes, or none since the bank's own last attempt ended (whose
+    input was the bank's; a move of the owner's during a run stops it, as ever)."""
+    # A second of slack: the attempt's last event and its end are not the same instant.
+    return idle >= IDLE_LEAST_S or (since_last_attempt is not None and idle >= since_last_attempt - 1.0)
+
+
 def _report() -> Path:
     named: str | None = os.environ.get("DOT_DESKTOP_BANK_REPORT")
     return Path(named).expanduser() if named else Path(os.environ.get("TMPDIR", "/tmp")) / "desktop-bank.jsonl"
@@ -156,7 +166,7 @@ def test_a_model_drives_the_fixture_app(
     if _REFUSED:
         pytest.skip(f"the model's provider refused an earlier attempt: {_REFUSED[0][:200]}")
     idle: float = mac_idle_seconds()
-    if idle < IDLE_LEAST_S:
+    if not left_alone(idle, time.time() - _LAST_END[-1] if _LAST_END else None):
         pytest.skip(f"someone used the Mac {idle:.0f} s ago; an attempt starts after {IDLE_LEAST_S:.0f} s")
     home: Path = _home(tmp_path)
     monkeypatch.setenv("DOT_HOME", str(home))
@@ -164,6 +174,7 @@ def test_a_model_drives_the_fixture_app(
     monkeypatch.setenv("DOT_CHROME_DIR", str(tmp_path / "chrome"))
     with fixture_app(tmp_path / "events.jsonl") as app:
         finished, seconds, window = asyncio.run(_attempt(home, app, task))
+        _LAST_END.append(time.time())
         exit_code: int | None = app.process.poll()
         seen: list[FixtureEvent] = events(app.log)
     started: bool = finished.steps > 0 or finished.input_tokens > 0
