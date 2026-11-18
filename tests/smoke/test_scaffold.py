@@ -28,7 +28,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import FileSeed, ScriptedCall, ScriptedTurn
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
-from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, Usage
+from dotagent.llm.types import ChatRequest, DeltaSink, Message, ModelInfo, ModelReply, Usage
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.secrets import resolve_secret
 from dotagent.store.models import EventRecord, RunRecord
@@ -303,8 +303,19 @@ def _reading(pages: int) -> list[ScriptedTurn]:
 
 
 def _pages(played: Played) -> list[str]:
-    """Each page of the log as the model got it: the newest message of the step after the read."""
-    return [step.messages[-1].content for step in played.steps if step.messages[-1].role == "tool"]
+    """Each page of the log as the model got it: the newest tool result of the step after the read, which a note
+    handed again after a compaction (items 404 and 1219) may follow."""
+    return [page for page in map(_page, played.steps) if page is not None]
+
+
+def _page(step: ChatRequest) -> str | None:
+    """The newest tool result of a step's request when only system notes follow it, as after a compaction (items 404
+    and 1219); none for a step whose newest message is anything else."""
+    newest: int = max((i for i, message in enumerate(step.messages) if message.role == "tool"), default=-1)
+    after: Sequence[Message] = step.messages[newest + 1 :]
+    if newest < 0 or not all(message.content.startswith("[system note]") for message in after):
+        return None
+    return step.messages[newest].content
 
 
 def _said(request: ChatRequest) -> str:

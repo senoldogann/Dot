@@ -27,6 +27,7 @@ from dotagent.events import Subscription
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.server import CLI_SOURCE
 from dotagent.store.models import RunMode, RunRecord
 
 log = get_logger(__name__)
@@ -63,7 +64,7 @@ async def execute_run(
         manager,
         ui,
         lambda: manager.start(
-            goal, mode, model, thread_id, "cli", None, effort, "standard", None, approvals, goal_mode, ()
+            goal, mode, model, thread_id, CLI_SOURCE, None, effort, "standard", None, approvals, goal_mode, ()
         ),
     )
 
@@ -197,7 +198,7 @@ async def run_here(config: AppConfig, command: RunCommand, goal: str, options: U
                     command.mode,
                     command.model,
                     command.thread,
-                    "cli",
+                    CLI_SOURCE,
                     command.effort,
                     "standard",
                     None,

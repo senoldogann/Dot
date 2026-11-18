@@ -11,11 +11,13 @@ from typing import Literal
 from dotagent.channels.types import TITLES
 from dotagent.config import PromptStyle
 from dotagent.core.types import FrozenModel
+from dotagent.evals import EVAL_SOURCE
 from dotagent.harness.components import GivenText
 from dotagent.mcp.types import McpPurpose
 from dotagent.policy.types import ApprovalMode, Preset
 from dotagent.proactive import UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.server import CLI_SOURCE, UI_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
@@ -594,6 +596,17 @@ _ON_A_PHONE: str = (
     "or nested lists; quotes, parentheses, arrows and file paths only where they are needed."
 )
 
+_WATCHED: str = "This run was started by the user's own message."
+_BY_DOT: str = "This run was started by Dot ({source}), not by a new message of the user's."
+# The sources of a run that a message of the owner's starts in the app or with dotx run, and of an eval's task, whose
+# goal stands for one; a phone's channel has its own line.
+_OWNER_SOURCES: frozenset[str] = frozenset({UI_SOURCE, CLI_SOURCE, EVAL_SOURCE})
+
+_STARTED_LEAD: str = (
+    "[system note] How this run was started; it holds for this run, in place of what earlier runs of this chat were "
+    "told about theirs:"
+)
+
 _DELEGATED: str = (
     "This run was started by another run (its parent) for one self-contained part of the parent's work, and the "
     "parent is waiting for your final answer. You cannot ask the user questions: decide, and put everything the "
@@ -757,28 +770,46 @@ def _environment(inputs: PromptInputs) -> str:
     # Only a run that can delegate is told to split: a delegated run cannot delegate again.
     if inputs.split and DELEGATE_TOOL in inputs.tool_names:
         lines.append(f"- {_SPLIT_TEXT}")
-    if inputs.source in UNWATCHED_SOURCES:
-        lines.append(f"- {_UNATTENDED_LEAVING if inputs.questions == 'leave' else _UNATTENDED}")
-    if inputs.source == SCHEDULE_SOURCE:
-        lines.append(f"- {_NOTHING_NEW}")
-    if inputs.source in (SCHEDULE_SOURCE, WATCHER_SOURCE) and PASS_REPLY_TOOL in inputs.tool_names:
-        lines.append(f"- {_HAND_REPLIES}")
-    if inputs.source == DELEGATE_SOURCE:
-        lines.append(f"- {_DELEGATED}")
-    channel: str | None = next((title for name, title in TITLES.items() if name == inputs.source), None)
-    if channel is not None:
-        lines.append(f"- {_ON_A_PHONE.format(channel=channel)}")
-    # A delegated run has no ask_user, so it has no questions to leave.
-    if inputs.questions == "leave" and ASK_USER_TOOL in inputs.tool_names:
-        lines.append(f"- {_LEFT_QUESTIONS}")
-    # Where the user can answer while the run works, the run chooses for each question whether to wait (item 508).
-    if inputs.questions == "choose" and ASK_USER_TOOL in inputs.tool_names:
-        lines.append(f"- {_QUESTIONS_GO_ON}")
     if inputs.phone:
         lines.append(f"- {_PHONE}")
     if inputs.devtools is not None and not _SCRIPT_TOOLS.isdisjoint(inputs.tool_names):
         lines.append(f"- {_DEVTOOLS.format(address=inputs.devtools)}")
     return "\n".join(lines)
+
+
+def _started_lines(inputs: PromptInputs) -> list[str]:
+    """What the way this run was started asks of it: who watches, who answers, where its answer goes."""
+    lines: list[str] = []
+    if inputs.source in UNWATCHED_SOURCES:
+        lines.append(_UNATTENDED_LEAVING if inputs.questions == "leave" else _UNATTENDED)
+    if inputs.source == SCHEDULE_SOURCE:
+        lines.append(_NOTHING_NEW)
+    if inputs.source in (SCHEDULE_SOURCE, WATCHER_SOURCE) and PASS_REPLY_TOOL in inputs.tool_names:
+        lines.append(_HAND_REPLIES)
+    if inputs.source == DELEGATE_SOURCE:
+        lines.append(_DELEGATED)
+    channel: str | None = next((title for name, title in TITLES.items() if name == inputs.source), None)
+    if channel is not None:
+        lines.append(_ON_A_PHONE.format(channel=channel))
+    if not lines:
+        # Only a message of the owner's is said to be one: a run Dot started (a notice, a resumed run, a teammate's)
+        # is told so, and neither stands under the lead as the owner's word.
+        lines.append(_WATCHED if inputs.source in _OWNER_SOURCES else _BY_DOT.format(source=inputs.source))
+    # A delegated run has no ask_user, so it has no questions to leave.
+    if inputs.questions == "leave" and ASK_USER_TOOL in inputs.tool_names:
+        lines.append(_LEFT_QUESTIONS)
+    # Where the user can answer while the run works, the run chooses for each question whether to wait (item 508).
+    if inputs.questions == "choose" and ASK_USER_TOOL in inputs.tool_names:
+        lines.append(_QUESTIONS_GO_ON)
+    return lines
+
+
+def started_note(inputs: PromptInputs) -> str:
+    """How this run was started and what that asks of it, stored under its goal with the turn note (item 1219), not
+    in the system prompt: a chat whose runs come from the app, a schedule or a phone changed its system prompt from one
+    run to the next, and the provider read the whole prompt again at full price (5 of 26 cold first steps within an
+    hour on 2026-11-17). Each run's note says it replaces the earlier runs' notes, which stay in the history."""
+    return "\n".join([_STARTED_LEAD, *(f"- {line}" for line in _started_lines(inputs))])
 
 
 def _left_out_line(left_out: int) -> str:
