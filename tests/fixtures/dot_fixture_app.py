@@ -28,6 +28,7 @@ from AppKit import (
     NSMenuItem,
     NSRectFill,
     NSRunningApplication,
+    NSScrollerStyleOverlay,
     NSScrollView,
     NSSecureTextField,
     NSString,
@@ -356,6 +357,9 @@ def build_window(delegate: FixtureDelegate) -> NSWindow:
     scroll = LoggingScrollView.alloc().initWithFrame_(NSMakeRect(20, 20, 600, 240))
     scroll.setHasVerticalScroller_(True)
     scroll.setHasHorizontalScroller_(True)
+    # The scroll bars lie over the grid whatever the Mac's setting, so the grid shows 600 by 240 points of itself on any
+    # Mac (the desktop bank's scroll task is judged by that size).
+    scroll.setScrollerStyle_(NSScrollerStyleOverlay)
     scroll.setAccessibilityLabel_("Grid scroller")
     grid = GridView.alloc().initWithFrame_(NSMakeRect(0, 0, _GRID_WIDTH, _GRID_HEIGHT))
     scroll.setDocumentView_(grid)

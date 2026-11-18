@@ -106,9 +106,9 @@ def _menu(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
 
 
 # Where the grid's visible part may start for the cell r17 c9 to be in view: its label is drawn from (906, 1706) in the
-# grid, about 40 by 15 points, and the scroller shows 600 by 240 of it (its scroll bars lie over the grid). In view is
-# its top-left corner and ten points of its height and twenty of its width: GPT-5.5 stopped at (880, 1480), where the
-# label shows whole; a range drawn for 585 by 225 failed it.
+# grid, about 40 by 15 points, and the scroller shows 600 by 240 of it (the fixture lays its scroll bars over the
+# grid). In view is its top-left corner and ten points of its height and twenty of its width: GPT-5.5 stopped at
+# (880, 1480), where the label shows whole; a range drawn for 585 by 225 failed it.
 _IN_VIEW_X: tuple[float, float] = (326.0, 906.0)
 _IN_VIEW_Y: tuple[float, float] = (1476.0, 1706.0)
 
