@@ -471,7 +471,7 @@ owner's own runs call too seldom to measure it by: a live model drives the fixtu
 that takes digits alone and must be reported as it is, a button whose result shows a moment later), each judged by what
 the app saw, and each attempt's line (passed, status, steps, tokens, seconds) is added to the report that
 `DOT_DESKTOP_BANK_REPORT` names. It runs only with `DOT_DESKTOP_BANK=1`, and each attempt starts only when nobody has
-touched the Mac for ten minutes; an attempt is cut at 4,000,000 tokens (`DOT_DESKTOP_BANK_MAX_TOKENS`) and 12
+touched the Mac for ten minutes, or since the bank's own last attempt ended; an attempt is cut at 4,000,000 tokens (`DOT_DESKTOP_BANK_MAX_TOKENS`) and 12
 minutes. A model that fails a task is a line of the report, not a failed test; an attempt its provider refused before
 its first step (a spent quota) is a line marked not started, and the attempts after it are skipped. `DOT_DESKTOP_BANK_MODEL` picks the model (`ollama:gpt-oss:120b-cloud` by
 default), `DOT_DESKTOP_BANK_K` the attempts of each task.
