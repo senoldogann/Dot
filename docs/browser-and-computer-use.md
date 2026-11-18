@@ -735,8 +735,13 @@ every mode but `yolo` (item 433).
   not name the program, and never replaces the error it belongs to. An AppleScript that times out says which
   application it names shows a window on screen, with its title, that may wait for an answer (Microsoft Word's own
   "Grant File Access" sheet for a file outside its sandbox is one), the Automation approval dialog staying one
-  possibility. A screen capture that comes back empty is asked for once more, and a second empty answer says how long
-  it took and whether Screen Recording is granted.
+  possibility. An AppleScript that fails is read by the error number osascript ends its message with, which macOS
+  writes the same in every language (item 1216): the failure says what the number means and the move that helps
+  next (-1743: the owner allows Dot under Privacy & Security › Automation, and the model is told not to send the
+  script again until then; -600: start the application first; -1728: the object named does not exist; -1708: read
+  the dictionary; and the others of `OSASCRIPT_ERRORS`), with macOS's own words kept beside it. A screen capture that
+  comes back empty is asked for once more, and a second empty answer says how long it took and whether Screen
+  Recording is granted.
 - A step the owner was asked about is read again before it goes (item 555): when the application, the kind of window,
   the control, its name or the default button is no longer what the question was about (a page put a "Buy now" where
   the "Send" was while they decided), the step is not done and the run is told to look again. While a batch waits for
