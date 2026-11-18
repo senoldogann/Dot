@@ -67,11 +67,16 @@ def _batch_steps(event: EventRecord) -> int:
 
 
 def model_calls(events: Sequence[EventRecord]) -> list[EventRecord]:
-    """The model calls of a run: its ``model_call`` events, or, on a program that runs the whole goal itself (the
-    Claude plan, OpenCode) and records none, the ``assistant`` event of each of its steps, which carries the step's
-    tokens and seconds too (item 1220: such a run was measured with no cache, no context and no model time)."""
+    """The model calls of a run, in order: its ``model_call`` events, and, on a program that runs the whole goal
+    itself (the Claude plan, OpenCode), whose steps are no ``model_call`` of Dot's, the ``assistant`` event of each of
+    its steps, which carries the step's tokens and seconds too (item 1220: such a run was measured with no cache, no
+    context and no model time). Such a run's side calls of Dot's (a page read with ``web_extract``, a look at a
+    picture) are ``model_call`` events and count beside its steps."""
     calls: list[EventRecord] = [event for event in events if event.kind == CALL_EVENT]
-    return calls if calls else [event for event in events if event.kind == ASSISTANT_EVENT]
+    if any(event.data.get("purpose") == "step" for event in calls):
+        return calls
+    steps: list[EventRecord] = [event for event in events if event.kind == ASSISTANT_EVENT]
+    return sorted([*calls, *steps], key=lambda event: event.id)
 
 
 def _cached_tokens(events: Sequence[EventRecord]) -> int:

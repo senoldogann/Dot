@@ -29,6 +29,8 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/unit/test_eval_plan_runs.py::test_a_plan_run_that_had_dot_read_a_page_counts_its_steps_and_that_read` — a
+  plan run with one side call of Dot's was measured from that call alone, its steps dropped (item 1220).
 - `tests/smoke/test_work_status.py::test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answered` — the
   line of the work kept saying "Waiting for you" after the owner's yes, while the step's command ran (item 1148).
 - `tests/unit/test_browser_readback_calls.py::test_a_page_that_never_answers_ends_the_readback_at_the_steps_time` — a

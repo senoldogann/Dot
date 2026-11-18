@@ -57,6 +57,21 @@ def test_a_run_of_dots_loop_is_measured_from_its_model_calls_alone() -> None:
     assert (metrics.model_calls, metrics.cached_tokens, metrics.model_seconds) == (1, 600, 1.0)
 
 
+def test_a_plan_run_that_had_dot_read_a_page_counts_its_steps_and_that_read() -> None:
+    """The pre-push review of item 1220: a plan run's web_extract records a model call under its run id, and the steps
+    were dropped for it."""
+    extract: JsonObject = {"purpose": "extract", "input_tokens": 3000, "output_tokens": 50, "cached_tokens": 0}
+    events: tuple[EventRecord, ...] = (
+        _step(1, 40_000, 30_000, 4.0),
+        _event(2, CALL_EVENT, {**extract, "seconds": 0.5, "error": None}),
+        _step(3, 50_000, 45_000, 6.5),
+    )
+    metrics = run_metrics(_RUN, events)
+    assert (metrics.model_calls, metrics.cached_tokens, metrics.peak_input_tokens) == (3, 75_000, 50_000)
+    assert metrics.model_seconds == 11.0
+    assert [step.name for step in run_trace(events)] == ["step", "extract", "step"]
+
+
 def _window(status: str, utilization: float | None) -> LimitWindow:
     return LimitWindow(kind="five_hour", status=status, utilization=utilization, resets_at=None)
 
