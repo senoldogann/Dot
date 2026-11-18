@@ -43,7 +43,7 @@ to 1147):
 | Kind                 | Asks                                         | Where                                                                                              | Calls a model |
 | -------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------- |
 | deterministic checks | does the harness do what it says             | `tests/unit`, the smoke tests on local fixtures with a scripted model, `dotx eval check`           | no            |
-| model evaluations    | does a model pass the tasks, and at what cost | `dotx eval run`, `dotx eval speed`, in the isolated configuration [below](#measuring-the-agent)     | yes           |
+| model evaluations    | does a model pass the tasks, and at what cost | `dotx eval run`, `dotx eval speed`, in the isolated configuration [below](#measuring-the-agent); the desktop bank | yes           |
 | product acceptance   | does the whole product do it on this Mac     | the `live` tests of a run end to end (`test_agent_browser.py`, `test_agent_desktop.py`)            | yes           |
 
 A scripted pass says nothing about a model: it shows that the tools, the checks and the fixtures hold together. What a
@@ -465,6 +465,16 @@ the workflow that runs is the tagged commit's own, which such a token can write 
 yours to set, close that: yourself as the required reviewer of the environment `pypi` (Settings › Environments › pypi),
 so that every publish waits for your click, and a ruleset that lets only you create tags `v*` (Settings › Rules ›
 Rulesets). Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`, then `dotx setup`.
+
+The desktop bank (`tests/smoke/test_desktop_bank.py`, item 1221) is the model evaluation of the desktop, which the
+owner's own runs call too seldom to measure it by: a live model drives the fixture app on three tasks (a form, a field
+that takes digits alone and must be reported as it is, a button whose result shows a moment later), each judged by what
+the app saw, and each attempt's line (passed, status, steps, tokens, seconds) is added to the report that
+`DOT_DESKTOP_BANK_REPORT` names. It runs only with `DOT_DESKTOP_BANK=1`, and each attempt starts only when nobody has
+touched the Mac for ten minutes; an attempt is cut at 4,000,000 tokens (`DOT_DESKTOP_BANK_MAX_TOKENS`) and 12
+minutes. A model that fails a task is a line of the report, not a failed test; an attempt its provider refused before
+its first step (a spent quota) is a line marked not started, and the attempts after it are skipped. `DOT_DESKTOP_BANK_MODEL` picks the model (`ollama:gpt-oss:120b-cloud` by
+default), `DOT_DESKTOP_BANK_K` the attempts of each task.
 
 ## Measuring the agent
 
