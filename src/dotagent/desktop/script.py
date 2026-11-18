@@ -3,6 +3,7 @@ killed."""
 
 import asyncio
 import contextlib
+import re
 from collections.abc import Mapping
 from typing import Literal
 
@@ -21,6 +22,42 @@ _WINDOWS_NAMED: int = 3
 _TITLE_CHARS: int = 80
 
 _log = get_logger("dotagent.desktop.script")
+
+# What an osascript error number means and the move that helps next (item 1216). macOS writes the message in the
+# owner's language ("Ayrıcalık ihlali") but the number in brackets is the same everywhere, so it is what is read: in the
+# old store 27.5 % of apple_script calls failed with raw, localized messages the model could not act on.
+_ERROR_NUMBER: re.Pattern[str] = re.compile(r"\((-?\d{1,6})\)\s*$")
+OSASCRIPT_ERRORS: Mapping[int, str] = {
+    -128: "the user cancelled a dialog the script showed",
+    -600: "the application is not running: start it first (`tell application ... to activate`, or `open -a`)",
+    -609: "the connection to the application broke: it quit or crashed while the script ran; start it and try again",
+    -1700: "a value could not be made into the type the script asked for: coerce it, or read the raw value first",
+    -1708: "the application does not understand that command: read its dictionary (`sdef` with its path) for the "
+    "right one",
+    -1712: "the application did not answer in time: it may be busy or showing a dialog; give timeout_s or wait",
+    -1719: "an element index is out of range, or assistive access is not allowed for System Events UI scripting",
+    -1728: "the object the script named does not exist (a window, document, row or element); read what exists first",
+    -1743: "macOS did not allow Apple events to that application: the owner must allow Dot under System Settings › "
+    "Privacy & Security › Automation; do not retry until then",
+    -2700: "the script raised an error of its own; its message says why",
+    -2741: "the script does not compile: fix its syntax",
+    -2753: "the script used a variable before setting it",
+    -10004: "a privilege violation: the application refused the command (sandboxed apps refuse some)",
+    -10810: "macOS could not launch the application",
+    -25211: "assistive access is not allowed: the owner must allow Dot under System Settings › Privacy & Security › "
+    "Accessibility",
+}
+
+
+def osascript_error(stderr: str) -> tuple[int, str] | None:
+    """The error number at the end of osascript's message and what it means, or None for a number not known or a
+    message without one."""
+    found: re.Match[str] | None = _ERROR_NUMBER.search(stderr.strip())
+    if found is None:
+        return None
+    number: int = int(found.group(1))
+    meaning: str | None = OSASCRIPT_ERRORS.get(number)
+    return None if meaning is None else (number, meaning)
 
 
 def _window_note(shown: tuple[tuple[str, str], ...]) -> str:
@@ -100,12 +137,14 @@ async def run_osascript(
             with contextlib.suppress(ProcessLookupError):
                 process.kill()
     if process.returncode != 0:
+        said: str = stderr.decode("utf-8", "replace").strip()
+        known: tuple[int, str] | None = osascript_error(said)
         raise DesktopError(
-            "osascript failed",
+            "osascript failed" if known is None else f"osascript failed with error {known[0]}: {known[1]}",
             {
                 "language": language,
                 "code": process.returncode or 0,
-                "stderr": stderr.decode("utf-8", "replace").strip(),
+                "stderr": said,
                 "script": truncate_middle(script, _SCRIPT_CONTEXT_CHARS),
             },
         )
