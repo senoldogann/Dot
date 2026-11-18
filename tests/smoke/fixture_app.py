@@ -32,6 +32,7 @@ class FixtureEvent(BaseModel):
     on: bool | None = None
     pid: int | None = None
     item: str | None = None
+    button: str | None = None
     front: bool | None = None
     x: float | None = None
     y: float | None = None

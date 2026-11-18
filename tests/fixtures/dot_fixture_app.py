@@ -14,6 +14,8 @@ from pathlib import Path
 
 import objc
 from AppKit import (
+    NSAlert,
+    NSAlertFirstButtonReturn,
     NSApplication,
     NSApplicationActivationPolicyRegular,
     NSBackingStoreBuffered,
@@ -243,6 +245,26 @@ class FixtureDelegate(NSObject):
             front = active is not None and str(active.bundleIdentifier()) == _FINDER
         log_event("front_other", front=front)
 
+    def exportPressed_(self, sender: object) -> None:
+        """A sheet that asks for a name, with Export and Cancel: what the run typed counts only once Export takes it."""
+        alert = NSAlert.alloc().init()
+        alert.setMessageText_("Export")
+        alert.setInformativeText_("Name the export.")
+        alert.addButtonWithTitle_("Export")
+        alert.addButtonWithTitle_("Cancel")
+        field = NSTextField.alloc().initWithFrame_(NSMakeRect(0, 0, 220, 24))
+        field.setPlaceholderString_("Export name")
+        field.setAccessibilityLabel_("Export name")
+        alert.setAccessoryView_(field)
+        alert.window().setInitialFirstResponder_(field)
+        log_event("dialog_open")
+
+        def answered(code: int) -> None:
+            chosen: str = "Export" if code == NSAlertFirstButtonReturn else "Cancel"
+            log_event("dialog", button=chosen, value=str(field.stringValue()))
+
+        alert.beginSheetModalForWindow_completionHandler_(sender.window(), answered)
+
     def scrolled_(self, notification: object) -> None:
         origin = notification.object().bounds().origin
         log_event("scrolled", x=round(float(origin.x), 1), y=round(float(origin.y), 1))
@@ -347,6 +369,13 @@ def build_window(delegate: FixtureDelegate) -> NSWindow:
     finder.setTarget_(delegate)
     finder.setAction_("finderPressed:")
     content.addSubview_(finder)
+
+    export = NSButton.alloc().initWithFrame_(NSMakeRect(480, 440, 140, 30))
+    export.setTitle_("Export…")
+    export.setBezelStyle_(NSBezelStyleRounded)
+    export.setTarget_(delegate)
+    export.setAction_("exportPressed:")
+    content.addSubview_(export)
 
     pad = PadView.alloc().initWithFrame_(NSMakeRect(20, 280, 300, 100))
     pad.setAccessibilityElement_(True)

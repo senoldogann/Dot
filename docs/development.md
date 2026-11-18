@@ -467,10 +467,10 @@ so that every publish waits for your click, and a ruleset that lets only you cre
 Rulesets). Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`, then `dotx setup`.
 
 The desktop bank (`tests/smoke/test_desktop_bank.py`, item 1221) is the model evaluation of the desktop, which the
-owner's own runs call too seldom to measure it by: a live model drives the fixture app on seven tasks (a form, a field
+owner's own runs call too seldom to measure it by: a live model drives the fixture app on eight tasks (a form, a field
 that takes digits alone and must be reported as it is, a button whose result shows a moment later, a choice in a
-context menu, one in the menu bar, a cell far down a scrolled grid, and a button that brings Finder forward before the
-typing), each judged by what the app saw, and each attempt's line (passed, status, steps, tokens, seconds) is added to the report that
+context menu, one in the menu bar, a cell far down a scrolled grid, a button that brings Finder forward before the
+typing, and a name given in a sheet), each judged by what the app saw, and each attempt's line (passed, status, steps, tokens, seconds) is added to the report that
 `DOT_DESKTOP_BANK_REPORT` names, which it needs. It runs only with `DOT_DESKTOP_BANK=1`, and each attempt starts only when nobody has
 touched the Mac for ten minutes, or since the bank's own last attempt ended; an attempt is cut at 4,000,000 tokens (`DOT_DESKTOP_BANK_MAX_TOKENS`; give it 1500000 on
 your Claude plan) and 12 minutes. A model that fails a task is a line of the report, not a failed test; an attempt its provider refused before
