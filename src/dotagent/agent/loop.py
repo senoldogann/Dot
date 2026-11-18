@@ -2166,6 +2166,31 @@ async def _held_by_the_owner(agent: AgentRun, held_since: float) -> None:
     raise RunHoldLapsed(hold_lapsed_text(minutes), {"run_id": agent.run.id, "held_s": round(held_s, 1)})
 
 
+_LEAST_TOOLS: int = 12
+
+
+def _fit_tools(
+    system: Message, specs: tuple[ToolSpec, ...], scaffold: Scaffold
+) -> tuple[tuple[ToolSpec, ...], tuple[str, ...]]:
+    """The tools the run can hold: when its system prompt and every schema overfill the model's window, tools are left
+    out — the owner's own servers' first (``mcp__``), the largest first — so a model with a small window runs with the
+    tools it can carry instead of not running at all (item 1211). The last few stay: a run with no tools cannot work
+    either. Answers the tools kept and the names left out."""
+    kept: list[ToolSpec] = list(specs)
+    fixed: int = estimate_tokens([system], tuple(kept))
+    if fixed <= scaffold.context_tokens:
+        return specs, ()
+    order: list[ToolSpec] = sorted(specs, key=lambda spec: (not spec.name.startswith("mcp__"), -len(str(spec))))
+    for spec in order:
+        if fixed <= scaffold.context_tokens or len(kept) <= _LEAST_TOOLS:
+            break
+        kept.remove(spec)
+        fixed = estimate_tokens([system], tuple(kept))
+    stay: set[str] = {spec.name for spec in kept}
+    names: tuple[str, ...] = tuple(spec.name for spec in specs if spec.name not in stay)
+    return tuple(kept), names
+
+
 def _cannot_answer(error: Exception) -> str | None:
     """Why the run's model cannot answer this run: what pauses it for every run (:func:`unavailable_reason`), or its
     service's content filter, which stops this conversation alone. ``None`` for any other error."""
@@ -2562,6 +2587,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     await runtime.bus.emit(run.id, "scaffold", scaffold_event(scaffold, config), True)
     # Every tool of the run counts, also the ones of groups that are off: a group the run turns on later must fit too.
+    specs, left_out = _fit_tools(system, specs, scaffold)
+    if left_out:
+        log.warning("tools_left_out", run_id=run.id, model=ref.label, count=len(left_out), tools=left_out[:20])
     require_room(scaffold, estimate_tokens([system], specs))
     candidates: tuple[_Candidate, ...] = await _routing(agent, ref, bool(specs), estimate_tokens([system], specs))
     history: list[Message] = repair_history(
