@@ -2,9 +2,10 @@
 
 It opens one window with a button, a checkbox, a text field, a secure field, a scroll view and a pad that reacts to the
 mouse. Every event it receives is appended to a JSON-lines log, so a test can compare what a tool did with what the
-application actually saw. Four controls are there for what a step's outcome is checked against: a field that takes
-digits alone and puts anything else back, a button that does nothing, a button whose result shows a moment later, and a
-button that brings Finder to the front. Usage: ``python dot_fixture_app.py <log path>``.
+application actually saw. Five controls are there for what a step's outcome is checked against: a field that takes
+digits alone and puts anything else back, a button that does nothing, a button whose result shows a moment later, a
+button that brings Finder to the front, and a button that opens a sheet asking for a name, whose field is logged once,
+when the sheet closes, with the button that closed it. Usage: ``python dot_fixture_app.py <log path>``.
 """
 
 import json
@@ -257,13 +258,13 @@ class FixtureDelegate(NSObject):
         field.setAccessibilityLabel_("Export name")
         alert.setAccessoryView_(field)
         alert.window().setInitialFirstResponder_(field)
-        log_event("dialog_open")
 
         def answered(code: int) -> None:
             chosen: str = "Export" if code == NSAlertFirstButtonReturn else "Cancel"
             log_event("dialog", button=chosen, value=str(field.stringValue()))
 
         alert.beginSheetModalForWindow_completionHandler_(sender.window(), answered)
+        log_event("dialog_open")
 
     def scrolled_(self, notification: object) -> None:
         origin = notification.object().bounds().origin
