@@ -2856,8 +2856,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         if ledger.compactions > compactions_before:
             present: str = "\n".join(message.content for message in history if message.role == "user")
             recalled_text: str = await recalled_now(present)
+            # This run's own note, looked for from its goal on: an earlier run's note may have the same words.
+            this_run: str = "\n".join(
+                message.content for message in _since_goal(history, goal) if message.role == "user"
+            )
             again: str = "\n\n".join(
-                part for part in ("" if started_text in present else started_text, recalled_text) if part != ""
+                part for part in ("" if started_text in this_run else started_text, recalled_text) if part != ""
             )
             if again != "":
                 history.append(await _stored_note(agent, again))

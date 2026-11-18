@@ -5,12 +5,15 @@ hour on 2026-11-17."""
 from pathlib import Path
 
 from dotagent.agent.prompt import PromptInputs, build_system_prompt, collect_prompt_inputs, started_note, with_phone
+from dotagent.agent.resume import RESUME_SOURCE
 from dotagent.harness.components import NO_HARNESS
+from dotagent.proactive import NOTICE_SOURCE
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
 from dotagent.tools.replies import PASS_REPLY_TOOL
+from dotagent.tools.team import TEAM_SOURCE
 
 
 def _inputs() -> PromptInputs:
@@ -50,3 +53,13 @@ def test_the_system_prompt_is_the_same_whoever_started_the_run() -> None:
     assert all(note.startswith("[system note] How this run was started") for note in notes)
     assert "started by the user's own message" in notes[0]
     assert "nobody is watching" in notes[1] and "the user's own message" not in notes[1]
+
+
+def test_only_a_message_of_the_users_is_said_to_have_started_the_run() -> None:
+    """A run Dot started (a notice, a resumed run) is not told the user's message started it: under the lead, that
+    would stand in place of a schedule's "nobody is watching" said earlier in the chat."""
+    for source in (RESUME_SOURCE, NOTICE_SOURCE, "background", TEAM_SOURCE):
+        note: str = started_note(_from(source, "wait"))
+        assert "the user's own message" not in note
+        assert f"started by Dot ({source})" in note
+    assert "the user's own message" in started_note(_from("cli", "wait"))
