@@ -238,7 +238,8 @@ answer keeps its words, Ollama's too.
   without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes), and
   from one run of a chat to the next: the system prompt is the same bytes from one message of a chat to the next (it
   names the day and the time zone; the time of day, the notes recalled for the message and the skills that fit it go in
-  a note under the message, item 404), so the cache holds the instructions and the history up to the message. A
+  a note under the message, item 404, and so does how the run was started, by the owner, a schedule, a watcher, a
+  phone's message or another run, with what that asks of it, item 1219), so the cache holds the instructions and the history up to the message. A
   question Dot asks once (the review model's, a summary, a recap, a consult) is not cached (item 1010): writing the
   cache costs a quarter more than reading the prompt, and nothing would read it back. A request may use the model's
   whole output limit. The thinking of earlier steps is sent back; a block whose earlier context has

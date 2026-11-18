@@ -138,6 +138,7 @@ from dotagent.agent.prompt import (
     handed_note_ids,
     notes_missing,
     recalled_again,
+    started_note,
     turn_note,
     with_phone,
 )
@@ -2489,65 +2490,64 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # What each MCP server's group is for, from what the hub learned when it connected (item 659): nothing is asked of a
     # server now. ``[agent] mcp_purposes = false`` leaves the lines as they were, the evals' other arm.
     purposes: dict[str, McpPurpose] = runtime.mcp.purposes(held_at_start) if config.mcp_purposes else {}
+    prompt_inputs: PromptInputs = _with_phone_state(
+        runtime,
+        [spec.name for spec in specs],
+        collect_prompt_inputs(
+            run.mode,
+            run.source,
+            runtime.config.policy.preset,
+            run.approvals,
+            questions,
+            run.goal_mode,
+            splits_work(run.once),
+            runtime.workspace,
+            (),
+            0,
+            tools_in_order(specs, thread.title),
+            listing.skills,
+            listing.left,
+            None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
+            helpers,
+            None
+            if agent_record is None
+            else AgentBrief(
+                name=agent_record.name,
+                role=agent_record.role,
+                instructions=agent_record.instructions,
+                made_by_dot=agent_record.made_by is not None,
+                team=team_name(agent_record.name),
+                refuses=agent_record.refuses,
+                folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
+            ),
+            [
+                AgentBrief(
+                    name=member.name,
+                    role=member.role,
+                    instructions="",
+                    made_by_dot=member.made_by is not None,
+                    team=team_name(member.name),
+                )
+                for member in team
+            ],
+            (
+                *owner_name_lines(names.owner, names.mac_name),
+                *(called_lines(names.name) if agent_record is None else ()),
+                # The accounts are named only to a run that has one of the tools that take them (an agent's may
+                # have none, or only some).
+                *(account_lines(signed_in) if tools_in([spec.name for spec in specs], ACCOUNTS_GROUP) else ()),
+                *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
+            ),
+            devtools_address(browser.config),
+            config.prompt,
+            harness_text,
+            lead,
+            skills_left_names=listing.left_names,
+            group_purposes=purposes,
+        ),
+    )
     system: Message = system_message(
-        build_system_prompt(
-            _with_phone_state(
-                runtime,
-                [spec.name for spec in specs],
-                collect_prompt_inputs(
-                    run.mode,
-                    run.source,
-                    runtime.config.policy.preset,
-                    run.approvals,
-                    questions,
-                    run.goal_mode,
-                    splits_work(run.once),
-                    runtime.workspace,
-                    (),
-                    0,
-                    tools_in_order(specs, thread.title),
-                    listing.skills,
-                    listing.left,
-                    None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
-                    helpers,
-                    None
-                    if agent_record is None
-                    else AgentBrief(
-                        name=agent_record.name,
-                        role=agent_record.role,
-                        instructions=agent_record.instructions,
-                        made_by_dot=agent_record.made_by is not None,
-                        team=team_name(agent_record.name),
-                        refuses=agent_record.refuses,
-                        folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
-                    ),
-                    [
-                        AgentBrief(
-                            name=member.name,
-                            role=member.role,
-                            instructions="",
-                            made_by_dot=member.made_by is not None,
-                            team=team_name(member.name),
-                        )
-                        for member in team
-                    ],
-                    (
-                        *owner_name_lines(names.owner, names.mac_name),
-                        *(called_lines(names.name) if agent_record is None else ()),
-                        # The accounts are named only to a run that has one of the tools that take them (an agent's may
-                        # have none, or only some).
-                        *(account_lines(signed_in) if tools_in([spec.name for spec in specs], ACCOUNTS_GROUP) else ()),
-                        *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
-                    ),
-                    devtools_address(browser.config),
-                    config.prompt,
-                    harness_text,
-                    lead,
-                    skills_left_names=listing.left_names,
-                    group_purposes=purposes,
-                ),
-            )
-        )
+        build_system_prompt(prompt_inputs)
         # The owner's free mode (item 922), as it stands when the run starts: the gate reads it at every step.
         + (_FREE_MODE_LINE if runtime.approvals.free else "")
     )
@@ -2617,10 +2617,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             [render_note(record) for record in kept], recalled.tainted_left_out, extra_skills, gone, present
         )
 
+    # How the run was started goes under its goal, not into the system prompt (item 1219), and comes again after a
+    # compaction that folded it away.
+    started_text: str = started_note(prompt_inputs)
     history.append(
         await _stored_note(
             agent,
-            turn_note(datetime.now().astimezone(), fresh_notes, recalled.tainted_left_out, extra_skills, forgotten),
+            f"{started_text}\n\n"
+            + turn_note(datetime.now().astimezone(), fresh_notes, recalled.tainted_left_out, extra_skills, forgotten),
         )
     )
     facts: RunFacts = new_facts()
@@ -2852,8 +2856,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         if ledger.compactions > compactions_before:
             present: str = "\n".join(message.content for message in history if message.role == "user")
             recalled_text: str = await recalled_now(present)
-            if recalled_text != "":
-                history.append(await _stored_note(agent, recalled_text))
+            again: str = "\n\n".join(
+                part for part in ("" if started_text in present else started_text, recalled_text) if part != ""
+            )
+            if again != "":
+                history.append(await _stored_note(agent, again))
         routed: _Candidate | None = (
             None
             if route_skip or not candidates

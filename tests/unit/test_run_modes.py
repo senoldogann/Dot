@@ -16,6 +16,7 @@ import pytest
 from dotagent.agent.compact import drop_old_images
 from dotagent.agent.loop import AgentRun, RunOutcome, SendBack, _acts, _after_verdict, _follow_ups, _since_goal
 from dotagent.agent.prompt import (
+    PromptInputs,
     build_system_prompt,
     clock_note,
     collect_prompt_inputs,
@@ -24,6 +25,7 @@ from dotagent.agent.prompt import (
     notes_missing,
     recalled_again,
     recalled_note,
+    started_note,
     turn_note,
 )
 from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT
@@ -357,31 +359,31 @@ def test_yolo_changes_the_approvals_line_and_what_a_secret_field_takes() -> None
 
 
 def _asking(source: str, questions: AskMode, tool_names: list[str]) -> str:
-    return build_system_prompt(
-        collect_prompt_inputs(
-            "task",
-            source,
-            "aggressive",
-            "ask",
-            questions,
-            False,
-            False,
-            Path("/tmp/work"),
-            [],
-            0,
-            tool_names,
-            [],
-            0,
-            None,
-            [],
-            None,
-            (),
-            (),
-            None,
-            "full",
-            NO_HARNESS,
-        )
+    inputs: PromptInputs = collect_prompt_inputs(
+        "task",
+        source,
+        "aggressive",
+        "ask",
+        questions,
+        False,
+        False,
+        Path("/tmp/work"),
+        [],
+        0,
+        tool_names,
+        [],
+        0,
+        None,
+        [],
+        None,
+        (),
+        (),
+        None,
+        "full",
+        NO_HARNESS,
     )
+    # How the run was started is stored under its goal, not in the system prompt (item 1219).
+    return f"{build_system_prompt(inputs)}\n\n{started_note(inputs)}"
 
 
 @pytest.mark.parametrize(

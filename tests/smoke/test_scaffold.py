@@ -303,8 +303,14 @@ def _reading(pages: int) -> list[ScriptedTurn]:
 
 
 def _pages(played: Played) -> list[str]:
-    """Each page of the log as the model got it: the newest message of the step after the read."""
-    return [step.messages[-1].content for step in played.steps if step.messages[-1].role == "tool"]
+    """Each page of the log as the model got it: the newest tool result of the step after the read, which a note
+    handed again after a compaction (items 404 and 1219) may follow."""
+    pages: list[str] = []
+    for step in played.steps:
+        tools: list[str] = [message.content for message in step.messages if message.role == "tool"]
+        if tools and tools[-1] not in pages:
+            pages.append(tools[-1])
+    return pages
 
 
 def _said(request: ChatRequest) -> str:
