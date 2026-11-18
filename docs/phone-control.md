@@ -4,7 +4,8 @@ With `[phone] enabled = true` Dot keeps a link to your iPhone. The phone runs We
 (`[phone] runner_bundle`), whose server on port 8100 Dot reaches at the first of `[phone] wda_urls` that answers (for
 example the Tailscale address, then the home network's). A run has one tool for it, `phone_status` in the group `phone`:
 a fresh look at whether the phone answers and whether it is locked, with the address that answered. The prompt names the
-phone and its state at the keeper's last look to a run that has the tool.
+phone to a run that has the tool, never its state: a sentence that changed each time the phone locked made the provider
+read the whole prompt again at full price (item 1217), so a run asks `phone_status` when it needs to know.
 
 Dot neither reads the phone's screen nor acts on it yet. The tools that read the screen and tap, type and open apps come
 once every rule the Mac's desktop keeps holds on the phone too: a password manager's screen never read, Dot's own app

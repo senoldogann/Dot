@@ -265,7 +265,6 @@ from dotagent.memory.service import (
 )
 from dotagent.oauth.providers import PROVIDERS
 from dotagent.oauth.tokens import Account
-from dotagent.phone.keeper import state_word
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -1530,10 +1529,10 @@ async def browser_of(runtime: Runtime, run: RunRecord) -> BrowserSession:
 
 
 def _with_phone_state(runtime: Runtime, tool_names: Sequence[str], inputs: PromptInputs) -> PromptInputs:
-    """``inputs`` with the iPhone's state when the run has its tool (and the phone is on), else as they are."""
+    """``inputs`` naming the iPhone when the run has its tool (and the phone is on), else as they are."""
     if runtime.phone is None or not tools_in(tool_names, "phone"):
         return inputs
-    return with_phone(inputs, state_word(runtime.phone.state))
+    return with_phone(inputs)
 
 
 async def _agent_folder(workspace: Path, agent_id: str) -> Path:

@@ -27,8 +27,10 @@ answered it (a message taken after the turn's last step began waits for a turn o
 failed when the session fails, when the plan's window is used up (with when it resets: nothing moves the run to another
 model), when the program says nothing for ``[providers.claude_code] silence_s`` while none of Dot's tools works for it,
 when its last reply was cut short, and when it goes on past the run's limits (``run_max_minutes``, ``run_max_tokens``),
-which it is told of once. A run here has none of the rest of what Dot's own runs bring (the memory recalled at the
-start, the checks of a finish, the lessons and playbooks)."""
+which it is told of once. A run here is handed the notes recalled at the start under its message, as Dot's own loop
+hands them (item 1055), but none of the rest of what Dot's own runs bring: the checks of a finish, the lessons drawn at
+its end, the playbooks offered, the skills listed by goal, Dot's masking and compaction (the research of 2026-11-18,
+item 1217)."""
 
 import asyncio
 import base64
