@@ -205,6 +205,10 @@ def _finish(answer: str) -> ScriptedTurn:
     return _turn(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": True}))
 
 
+def _declines(answer: str) -> ScriptedTurn:
+    return _turn(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": False}))
+
+
 def _says(text: str) -> ScriptedTurn:
     return ScriptedTurn(text=text, calls=())
 
@@ -370,6 +374,29 @@ async def test_a_run_whose_provider_cannot_answer_moves_to_its_standby_model_and
         (SPENT_MAIN, "ProviderQuotaError"),
         (SCRIPTED_MODEL, None),
     ]
+
+
+async def test_a_run_the_model_declines_moves_to_its_standby_model_and_finishes(
+    login_env: dict[str, str],
+) -> None:
+    """Item 1211: a model that says it cannot, before it has done a step of work, is not the goal failing — the
+    standby model takes the run over, so a refusal never stops the work the owner left running."""
+    refusing: str = "anthropic:scripted-refusing"
+    main: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [_declines("I will not do this.")]))
+    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
+    config: AppConfig = _config([], [SCRIPTED_MODEL], 5)
+    async with _session(config, login_env, {"anthropic": main, "ollama": standby}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, refusing, None)
+    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
+    assert played.data(MODEL_SWITCHED_EVENT) == (
+        {
+            "from": refusing,
+            "to": SCRIPTED_MODEL,
+            "reason": "it declined the goal before doing any of it",
+            "step": 1,
+        },
+    )
+    assert len(main.requests) == 1
 
 
 async def test_a_standby_model_chosen_while_the_daemon_runs_takes_the_next_run_over(login_env: dict[str, str]) -> None:
