@@ -10,6 +10,7 @@ from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
+import httpx
 import pytest
 
 from dotagent.core.errors import GalleryError, ProviderTransportError
@@ -21,11 +22,12 @@ from dotagent.plugins import scout_sources
 from dotagent.plugins.gallery import GalleryEntry, files_hash, install, unpack
 from dotagent.plugins.scout import ScoutDeps, ScoutStopped, run_night, skill_folders, skill_texts
 from dotagent.plugins.scout_review import REVIEW_TOOL
-from dotagent.plugins.scout_sources import API, RAW, GitHub, OutOfRequests
+from dotagent.plugins.scout_sources import API, RAW, GitHub, OutOfRequests, TokenRefused
 from dotagent.plugins.scout_types import (
     MAX_SETTLED,
     Candidate,
     ScoutState,
+    blind_reason,
     bounded,
     candidate_entry,
     looked_key,
@@ -158,6 +160,7 @@ class _GitHub(GitHub):
         self.requests += 1
         if url not in self.answers:
             raise GalleryError("GitHub answered 404", {"url": url})
+        self.answered += 1
         return self.answers[url]
 
 
@@ -798,3 +801,80 @@ async def test_a_whole_repositorys_plugin_declined_and_pushed_out_by_the_bounds_
     assert "skills" not in _by_id(kept) and kept.declined == ("maker/skills:skills/rollback",)
     state: ScoutState = await run_night(_deps(tmp_path, _GitHub(_answers())), kept)
     assert not [candidate for candidate in state.candidates if candidate.state == "proposed"]
+
+
+async def test_a_refused_token_ends_the_night_at_once_and_marks_it_blind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1215: six nights failed lead by lead on GitHub's 401 (201 failures) and nobody was told. With several
+    sources (the pre-push review: the sources' loop went on to the end of its list), the first refusal ends it."""
+    monkeypatch.setattr(
+        "dotagent.plugins.scout.MARKETPLACES",
+        ((OFFICIAL, "a", "Anthropic's official marketplace"), ("other/market", "b", "Another marketplace")),
+    )
+    monkeypatch.setattr("dotagent.plugins.scout.SEARCH_TOPICS", ("claude-skills", "agent-skills"))
+
+    class _Refused(_GitHub):
+        async def get_json(self, url: str) -> object:
+            self.requests += 1
+            self.token_refused = True
+            raise TokenRefused("GitHub refused the token (401): it is expired or revoked", {"url": url})
+
+    github: _Refused = _Refused(_answers())
+    state: ScoutState = await run_night(_deps(tmp_path, github), ScoutState())
+    assert github.requests == 1
+    assert state.last_summary.endswith(", GitHub refused the token")
+    assert state.blind == "token" and state.candidates == ()
+
+
+async def test_a_night_github_answered_nothing_is_blind_and_one_lead_failing_is_not(tmp_path: Path) -> None:
+    """The second pre-push review: a lead that fails in a night GitHub answered (a repository renamed or gone fails
+    every night) must not tell the owner each morning that the night failed."""
+    blind: ScoutState = await run_night(_deps(tmp_path / "a", _GitHub({})), ScoutState())
+    answers: dict[str, object] = _answers()
+    del answers[f"{API}/repos/partner/skills"]
+    one_failed: ScoutState = await run_night(_deps(tmp_path / "b", _GitHub(answers)), ScoutState())
+    assert blind.blind == "failed"
+    assert ", 1 failed" in one_failed.last_summary and one_failed.blind == ""
+
+
+def test_blind_reason_says_why_a_night_saw_nothing() -> None:
+    assert blind_reason(True, 3, 0) == "token"
+    assert blind_reason(False, 0, 4) == "failed"
+    assert blind_reason(False, 1, 4) == ""
+    assert blind_reason(False, 0, 0) == ""
+
+
+async def test_github_marks_a_refused_token_and_a_401_without_one_is_an_ordinary_failure() -> None:
+    def answer(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"message": "Bad credentials"})
+
+    with_token: GitHub = GitHub("expired", httpx.AsyncClient(transport=httpx.MockTransport(answer)))
+    with pytest.raises(TokenRefused):
+        await with_token.get_json(f"{API}/repos/a/b")
+    assert with_token.token_refused
+    without: GitHub = GitHub(None, httpx.AsyncClient(transport=httpx.MockTransport(answer)))
+    with pytest.raises(GalleryError) as raised:
+        await without.get_json(f"{API}/repos/a/b")
+    assert not isinstance(raised.value, TokenRefused) and not without.token_refused
+
+
+def test_a_blind_night_is_told_the_next_morning_in_the_owners_words() -> None:
+    from dotagent.channels.words import WORDS
+    from dotagent.plugins.scout_service import BLIND_TITLE, TOKEN_REFUSED_TITLE, blind_tell
+
+    assert blind_tell(ScoutState(blind="")) is None
+    token: tuple[str, str] | None = blind_tell(ScoutState(blind="token"))
+    assert token is not None and token[0] == TOKEN_REFUSED_TITLE and "Connectors" in token[1]
+    failed: tuple[str, str] | None = blind_tell(ScoutState(blind="failed", last_summary="0 proposed, 7 failed"))
+    assert failed == (BLIND_TITLE, "0 proposed, 7 failed")
+    for title in (TOKEN_REFUSED_TITLE, BLIND_TITLE):
+        assert WORDS["tr"].title(title) != title
+
+
+async def test_a_night_whose_sources_all_failed_is_blind(tmp_path: Path) -> None:
+    """The pre-push review: a source that failed did not count, so a night with no source answering was not blind."""
+    answers: dict[str, object] = _answers()
+    del answers[f"{API}/repos/{OFFICIAL}/commits/HEAD"]
+    state: ScoutState = await run_night(_deps(tmp_path, _GitHub(answers)), ScoutState())
+    assert state.blind == "failed" and ", 1 failed" in state.last_summary

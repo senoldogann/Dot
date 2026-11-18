@@ -66,6 +66,7 @@ from dotagent.plugins.scout_sources import (
     Lead,
     OutOfRequests,
     RepoFacts,
+    TokenRefused,
     maker_lead,
     marketplace_leads,
     plugin_id,
@@ -79,6 +80,7 @@ from dotagent.plugins.scout_types import (
     Review,
     ScoutState,
     Tier,
+    blind_reason,
     bounded,
     declined_key,
     looked_key,
@@ -141,6 +143,7 @@ class _Night:
     failed: int = 0
     out_of_time: bool = False
     out_of_requests: bool = False
+    token_refused: bool = False
 
 
 def skill_folders(archive: Path, path: str) -> tuple[str, ...]:
@@ -277,7 +280,9 @@ class _Scout:
             self._night.out_of_time = True
         if self._deps.github.exhausted:
             self._night.out_of_requests = True
-        return self._night.out_of_time or self._night.out_of_requests
+        if self._deps.github.token_refused:
+            self._night.token_refused = True
+        return self._night.out_of_time or self._night.out_of_requests or self._night.token_refused
 
     async def _leads(self) -> list[Lead]:
         github: GitHub = self._deps.github
@@ -288,13 +293,19 @@ class _Scout:
                 leads.extend(
                     marketplace_leads(await github.marketplace(repository, commit), repository, commit, tier, label)
                 )
+            except TokenRefused:
+                raise
             except (GalleryError, ValueError) as error:
+                self._night.failed += 1
                 log.warning("scout_source_failed", source=repository, error=_said(error))
         leads.extend(maker_lead(repository) for repository in MAKERS)
         for topic in SEARCH_TOPICS:
             try:
                 leads.extend(search_leads(await github.search(topic), topic))
+            except TokenRefused:
+                raise
             except (GalleryError, ValueError) as error:
+                self._night.failed += 1
                 log.warning("scout_source_failed", source=f"topic {topic}", error=_said(error))
         return unique(leads)
 
@@ -635,11 +646,19 @@ class _Scout:
                 except OutOfRequests:
                     self._night.out_of_requests = True
                     break
+                except TokenRefused:
+                    self._night.token_refused = True
+                    break
                 except (DotError, OSError, ValueError) as error:
                     self._night.failed += 1
                     log.warning("scout_update_failed", plugin=name, error=_said(error))
             if not self._out_of_time():
-                for lead in self._chosen(await self._leads()):
+                try:
+                    leads: list[Lead] = await self._leads()
+                except TokenRefused:
+                    self._night.token_refused = True
+                    return self._settled()
+                for lead in self._chosen(leads):
                     if self._out_of_time():
                         break
                     try:
@@ -648,6 +667,9 @@ class _Scout:
                         raise
                     except OutOfRequests:
                         self._night.out_of_requests = True
+                        break
+                    except TokenRefused:
+                        self._night.token_refused = True
                         break
                     # ValueError: a model of what a source said that does not hold (pydantic's ValidationError), which
                     # ends that plugin, never the night.
@@ -672,6 +694,7 @@ class _Scout:
             f"{proposed} proposed, {len(night.found) - proposed} refused by the review, {night.refused} refused by the "
             f"rules, {night.unusable} unusable, {night.failed} failed{', out of time' if night.out_of_time else ''}"
             f"{", out of GitHub's requests" if night.out_of_requests else ''}"
+            f"{', GitHub refused the token' if night.token_refused else ''}"
         )
         log.info("scout_night", summary=summary, github_requests=self._deps.github.requests)
         taken: set[str] = set(night.seen)
@@ -686,6 +709,7 @@ class _Scout:
                 ),
                 last_run=self._deps.now,
                 last_summary=summary,
+                blind=blind_reason(night.token_refused, self._deps.github.answered, night.failed),
             )
         )
 

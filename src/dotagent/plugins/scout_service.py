@@ -126,5 +126,23 @@ async def night(runtime: "Runtime", now: float) -> ScoutState:
         return final
 
 
+# The tells of a blind night (item 1215): one fixed title each, which the channels say in the owner's language.
+TOKEN_REFUSED_TITLE: str = "The plugin scout cannot read GitHub: renew the token"
+BLIND_TITLE: str = "The plugin scout's night failed"
+PLUGINS_ROUTE: str = "#/customize/plugins"
+
+
+def blind_tell(state: ScoutState) -> tuple[str, str] | None:
+    """The title and text to tell the owner the morning after a blind night, or None after one that worked."""
+    if state.blind == "token":
+        return (
+            TOKEN_REFUSED_TITLE,
+            "GitHub answered 401 to the saved token, so the scout read nothing. Renew it in Customize › Connectors.",
+        )
+    if state.blind == "failed":
+        return BLIND_TITLE, state.last_summary
+    return None
+
+
 def today_of(runtime: "Runtime") -> date:
     return datetime.now(runtime.schedule_zone).date()

@@ -585,6 +585,9 @@ class Scheduler:
             log.exception("scout_crashed")
         else:
             log.info("scout_fired", summary=state.last_summary)
+            tell: tuple[str, str] | None = scout_service.blind_tell(state)
+            if tell is not None:
+                await tell_owner(self._runtime.bus, tell[0], tell[1], scout_service.PLUGINS_ROUTE)
 
     async def _step(self, now: float) -> None:
         """Task body of the night of the harness, and the one place its errors end: its outcome is logged and kept in
