@@ -365,7 +365,9 @@ every request longer; `tool_surface = "grouped"` keeps a server's tools out of a
 on. A run of more than 128 tools starts grouped whatever the setting, as some providers refuse more in one request
 ([runs](runs.md)). The groups a grouped run has on (those its chat used before, the servers picked for its message, and
 those it turns on) may still bring a request past what its provider takes, and the request then fails with the
-provider's error, so cut a big server down here. **Choose actions**, on the row of a server added here that runs, opens
+provider's error, so cut a big server down here. A model whose window is smaller than the system prompt and every tool
+definition drops tools until they fit — the servers' tools first, the largest first — and the run goes on with what it
+can carry (item 1211, [runs](runs.md)). **Choose actions**, on the row of a server added here that runs, opens
 the list of every tool it offers with what each says it does, all of them ticked until you choose, and **All actions**
 ticks or unticks them at once. **Save** connects the server with the ticked ones and keeps the choice with it, so a
 restart offers the same ones; with every one ticked it keeps no list, and the tools the server adds later are offered
