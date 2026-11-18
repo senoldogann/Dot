@@ -98,8 +98,8 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # is 1,614 of the 8,405 of system).
 # Raised by 150 for `watch_video` (item 1212), whose definition is listed with its group (27,904 measured here).
 # Raised by 350 for the rest of the owner's `CHARACTER` block (item 1211, continued): a silent deliberation, remote
-# access, malware analysis, exploitation, evasion and scraping answered whole as engineering, and one stop — a third
-# party's accounts reached without consent (28,132 measured here, Character 2,308 of 8,535 of system).
+# access, malware analysis, exploitation, evasion and scraping answered whole as engineering. Its last stop went with
+# it (28,062 measured here, Character 2,176 of 8,465 of system).
 BUDGET_TOKENS: int = 28_300
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
