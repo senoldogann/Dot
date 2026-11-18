@@ -29,6 +29,9 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_context_budget.py::test_a_tool_the_run_let_go_is_not_named_and_not_callable` — the fit ran after
+  the groups, the registry and the prompt were built, so a run named tools it had let go, and a dropped tool stayed
+  callable (item 1211).
 - `tests/unit/test_eval_plan_runs.py::test_a_plan_run_that_had_dot_read_a_page_counts_its_steps_and_that_read` — a
   plan run with one side call of Dot's was measured from that call alone, its steps dropped (item 1220).
 - `tests/smoke/test_work_status.py::test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answered` — the

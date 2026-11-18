@@ -162,6 +162,57 @@ async def _first_parts(config: AppConfig) -> ContextParts:
     return ContextParts.model_validate_json(json.dumps(told[0].data))
 
 
+def _with_context_size(config: AppConfig, size: int) -> AppConfig:
+    """The same configuration, with this test's model given a chosen context size of ``size`` tokens
+    (``[models.context]``), which is what a run's budget is cut to when the provider's window is larger."""
+    models = config.models.model_copy(update={"context": {**config.models.context, SCRIPTED_MODEL: size}})
+    return config.model_copy(update={"models": models})
+
+
+async def test_a_tool_the_run_let_go_is_not_named_and_not_callable() -> None:
+    """Item 1211: a run whose budget cannot hold every tool drops some, and its groups, registry and prompt are built
+    again for what stays — so no section of the prompt opens for a tool it let go, and calling that tool answers
+    unknown.
+    A fit that runs after the prompt is built (or a registry built from the tools before the fit) turns this red."""
+    config: AppConfig = _with_context_size(eval_config(load_default_config()), 12_000)
+    asked: ScriptedTurn = ScriptedTurn(
+        text="", calls=(ScriptedCall(tool="show_page", arguments={"title": "x", "html": "<b>x</b>"}),)
+    )
+    parts: ContextParts
+    answers: list[str]
+    with scratch_home() as home, eval_environment(home, {}):
+        runtime: Runtime = await open_runtime(config, await read_login_env(10.0, ()))
+        manager: RunManager = RunManager(runtime)
+        try:
+            await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [asked, _FINISH]))
+            run: RunRecord = await manager.start(
+                "Write a short note about the weather in notes.txt.",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                "ui",
+                None,
+                None,
+                "standard",
+                None,
+                "yolo",
+                False,
+                (),
+            )
+            async with asyncio.timeout(30.0):
+                await manager.wait(run.id)
+            told: list[EventRecord] = await runtime.store.events_of_kind(run.id, CONTEXT_PARTS_EVENT, 5)
+            messages = await runtime.store.load_messages(run.thread_id, False)
+        finally:
+            await manager.shutdown()
+            await close_runtime(runtime)
+    parts = ContextParts.model_validate_json(json.dumps(told[0].data))
+    answers = [message.content for message in messages if message.role == "tool"]
+    assert parts.tools_offered < 82, "the budget left every tool in: this test measures a run that let some go"
+    assert "Pages in the conversation" not in parts.system, sorted(parts.system)
+    assert any("Unknown tool 'show_page'" in answer for answer in answers), answers[-3:]
+
+
 async def test_a_fresh_homes_first_step_stays_within_its_budget() -> None:
     parts: ContextParts = await _first_parts(eval_config(load_default_config()))
     system: int = round(sum(parts.system.values()) / 3.2)

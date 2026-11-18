@@ -1,11 +1,12 @@
 """A run whose model has a small window leaves tools out instead of not running (item 1211): the owner's own servers'
-tools go first, the largest first, and the last few always stay. No model service is used.
+tools go first, the largest first, and finish, use_tools and ask_user always stay. No model service is used.
 """
 
 from dotagent.agent.compact import estimate_tokens
-from dotagent.agent.loop import _LEAST_TOOLS, _fit_tools
+from dotagent.agent.loop import _fit_tools
 from dotagent.agent.scaffold import Scaffold
 from dotagent.llm.types import ToolSpec, system_message
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL
 
 
 def _scaffold(context_tokens: int) -> Scaffold:
@@ -43,9 +44,10 @@ def test_a_window_with_room_leaves_nothing_out() -> None:
     assert (kept, left_out) == (specs, ())
 
 
-def test_the_last_few_tools_stay_even_when_they_alone_overfill_the_window() -> None:
+def test_the_tools_a_run_cannot_work_without_stay_even_when_they_alone_overfill_the_window() -> None:
     system = system_message("s" * 4000)
-    specs: tuple[ToolSpec, ...] = tuple(_spec(f"mcp__server__tool_{index}", 3000) for index in range(30))
+    must: tuple[ToolSpec, ...] = tuple(_spec(name, 3000) for name in (FINISH_TOOL, USE_TOOLS_TOOL, ASK_USER_TOOL))
+    specs: tuple[ToolSpec, ...] = must + tuple(_spec(f"mcp__server__tool_{index}", 3000) for index in range(30))
     kept, left_out = _fit_tools(system, specs, _scaffold(100))
-    assert len(kept) == _LEAST_TOOLS, len(kept)
-    assert len(left_out) == 30 - _LEAST_TOOLS
+    assert {spec.name for spec in kept} == {FINISH_TOOL, USE_TOOLS_TOOL, ASK_USER_TOOL}, kept
+    assert len(left_out) == 30

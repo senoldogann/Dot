@@ -1133,7 +1133,7 @@ def _run_tools(registry: ToolRegistry, mode: RunMode, specs: Sequence[ToolSpec])
     """The tools a run can call: the ones it offers, and the ones of other modes, whose calls are answered as not
     available in the run's mode. A tool of the run's mode that the run leaves out (use_tools when its tools are not
     grouped, delegate, ask_user and consult in a delegated run, skill when no skill is installed, consult without a
-    helper) is answered as unknown."""
+    helper, and the tools a small window had to leave out of the prompt, item 1211) is answered as unknown."""
     offered: frozenset[str] = frozenset(spec.name for spec in specs)
     return ToolRegistry(
         tools={name: tool for name, tool in registry.tools.items() if name in offered or mode not in tool.modes}
@@ -2166,7 +2166,8 @@ async def _held_by_the_owner(agent: AgentRun, held_since: float) -> None:
     raise RunHoldLapsed(hold_lapsed_text(minutes), {"run_id": agent.run.id, "held_s": round(held_s, 1)})
 
 
-_LEAST_TOOLS: int = 12
+# The tools a run cannot work without: one ends it, one turns a group on, one asks its owner (item 1211).
+_KEEP_TOOLS: frozenset[str] = frozenset({FINISH_TOOL, USE_TOOLS_TOOL, ASK_USER_TOOL})
 
 
 def _fit_tools(
@@ -2174,16 +2175,22 @@ def _fit_tools(
 ) -> tuple[tuple[ToolSpec, ...], tuple[str, ...]]:
     """The tools the run can hold: when its system prompt and every schema overfill the model's window, tools are left
     out — the owner's own servers' first (``mcp__``), the largest first — so a model with a small window runs with the
-    tools it can carry instead of not running at all (item 1211). The last few stay: a run with no tools cannot work
-    either. Answers the tools kept and the names left out."""
+    tools it can carry instead of not running at all (item 1211). The three a run cannot work without stay
+    (:data:`_KEEP_TOOLS`):
+    one ends the run, one turns a group on, one asks its owner. The measure is the prompt as it stands for every
+    tool, so a run may carry one fewer than it could; leaving a tool out costs a call, naming one it cannot call
+    costs the step.
+    Answers the tools kept and the names left out."""
     kept: list[ToolSpec] = list(specs)
     fixed: int = estimate_tokens([system], tuple(kept))
-    if fixed <= scaffold.context_tokens:
+    if fixed < scaffold.context_tokens:
         return specs, ()
     order: list[ToolSpec] = sorted(specs, key=lambda spec: (not spec.name.startswith("mcp__"), -len(str(spec))))
     for spec in order:
-        if fixed <= scaffold.context_tokens or len(kept) <= _LEAST_TOOLS:
+        if fixed < scaffold.context_tokens:
             break
+        if spec.name in _KEEP_TOOLS:
+            continue
         kept.remove(spec)
         fixed = estimate_tokens([system], tuple(kept))
     stay: set[str] = {spec.name for spec in kept}
@@ -2524,62 +2531,68 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # What each MCP server's group is for, from what the hub learned when it connected (item 659): nothing is asked of a
     # server now. ``[agent] mcp_purposes = false`` leaves the lines as they were, the evals' other arm.
     purposes: dict[str, McpPurpose] = runtime.mcp.purposes(held_at_start) if config.mcp_purposes else {}
-    prompt_inputs: PromptInputs = _with_phone_state(
-        runtime,
-        [spec.name for spec in specs],
-        collect_prompt_inputs(
-            run.mode,
-            run.source,
-            runtime.config.policy.preset,
-            run.approvals,
-            questions,
-            run.goal_mode,
-            splits_work(run.once),
-            runtime.workspace,
-            (),
-            0,
-            tools_in_order(specs, thread.title),
-            listing.skills,
-            listing.left,
-            None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
-            helpers,
-            None
-            if agent_record is None
-            else AgentBrief(
-                name=agent_record.name,
-                role=agent_record.role,
-                instructions=agent_record.instructions,
-                made_by_dot=agent_record.made_by is not None,
-                team=team_name(agent_record.name),
-                refuses=agent_record.refuses,
-                folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
+
+    async def _inputs_for(tools: tuple[ToolSpec, ...]) -> PromptInputs:
+        """What the prompt is built from, for ``tools``: it is asked again when a small window left tools out, so
+        that the prompt names only the tools the run has (item 1211)."""
+        return _with_phone_state(
+            runtime,
+            [spec.name for spec in tools],
+            collect_prompt_inputs(
+                run.mode,
+                run.source,
+                runtime.config.policy.preset,
+                run.approvals,
+                questions,
+                run.goal_mode,
+                splits_work(run.once),
+                runtime.workspace,
+                (),
+                0,
+                tools_in_order(tools, thread.title),
+                listing.skills,
+                listing.left,
+                None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
+                helpers,
+                None
+                if agent_record is None
+                else AgentBrief(
+                    name=agent_record.name,
+                    role=agent_record.role,
+                    instructions=agent_record.instructions,
+                    made_by_dot=agent_record.made_by is not None,
+                    team=team_name(agent_record.name),
+                    refuses=agent_record.refuses,
+                    folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
+                ),
+                [
+                    AgentBrief(
+                        name=member.name,
+                        role=member.role,
+                        instructions="",
+                        made_by_dot=member.made_by is not None,
+                        team=team_name(member.name),
+                    )
+                    for member in team
+                ],
+                (
+                    *owner_name_lines(names.owner, names.mac_name),
+                    *(called_lines(names.name) if agent_record is None else ()),
+                    # The accounts are named only to a run that has one of the tools that take them (an agent's may
+                    # have none, or only some).
+                    *(account_lines(signed_in) if tools_in([spec.name for spec in tools], ACCOUNTS_GROUP) else ()),
+                    *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
+                ),
+                devtools_address(browser.config),
+                config.prompt,
+                harness_text,
+                lead,
+                skills_left_names=listing.left_names,
+                group_purposes=purposes,
             ),
-            [
-                AgentBrief(
-                    name=member.name,
-                    role=member.role,
-                    instructions="",
-                    made_by_dot=member.made_by is not None,
-                    team=team_name(member.name),
-                )
-                for member in team
-            ],
-            (
-                *owner_name_lines(names.owner, names.mac_name),
-                *(called_lines(names.name) if agent_record is None else ()),
-                # The accounts are named only to a run that has one of the tools that take them (an agent's may
-                # have none, or only some).
-                *(account_lines(signed_in) if tools_in([spec.name for spec in specs], ACCOUNTS_GROUP) else ()),
-                *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
-            ),
-            devtools_address(browser.config),
-            config.prompt,
-            harness_text,
-            lead,
-            skills_left_names=listing.left_names,
-            group_purposes=purposes,
-        ),
-    )
+        )
+
+    prompt_inputs: PromptInputs = await _inputs_for(specs)
     system: Message = system_message(
         build_system_prompt(prompt_inputs)
         # The owner's free mode (item 922), as it stands when the run starts: the gate reads it at every step.
@@ -2587,9 +2600,23 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     await runtime.bus.emit(run.id, "scaffold", scaffold_event(scaffold, config), True)
     # Every tool of the run counts, also the ones of groups that are off: a group the run turns on later must fit too.
+    # A window too small for every tool carries the tools it can hold (item 1211): the owner's own servers' go first,
+    # the largest first, and the groups, the registry and the prompt are built again for what stays, so that the run
+    # names only the tools it has and nothing it dropped can be called.
     specs, left_out = _fit_tools(system, specs, scaffold)
     if left_out:
         log.warning("tools_left_out", run_id=run.id, model=ref.label, count=len(left_out), tools=left_out[:20])
+        groups = (CORE_GROUP, *groups_of([spec.name for spec in specs]))
+        grouped = surface == "grouped" and len(groups) > 1
+        if not grouped:
+            specs = tuple(spec for spec in specs if spec.name != USE_TOOLS_TOOL)
+        callable_tools = _run_tools(runtime.registry, run.mode, specs)
+        may_message = any(spec.name == MESSAGE_AGENT_TOOL for spec in specs)
+        # The prompt, and what the run's opening note is built from, name only the tools that stayed.
+        prompt_inputs = await _inputs_for(specs)
+        system = system_message(
+            build_system_prompt(prompt_inputs) + (_FREE_MODE_LINE if runtime.approvals.free else "")
+        )
     require_room(scaffold, estimate_tokens([system], specs))
     candidates: tuple[_Candidate, ...] = await _routing(agent, ref, bool(specs), estimate_tokens([system], specs))
     history: list[Message] = repair_history(
