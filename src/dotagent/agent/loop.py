@@ -486,6 +486,13 @@ _CUT_SHORT: frozenset[FinishReason] = frozenset({"length", "other"})
 _FILTERED: frozenset[str] = frozenset({"content_filter"})
 _FILTERED_REASON: str = "its content filter stopped the reply"
 _EMPTY_REASON: str = "it answered with nothing, again and again"
+_DECLINED_REASON: str = "it declined the goal before doing any of it"
+
+
+class _Declined(ProviderError):
+    """The run's model ended it saying it cannot, before a step of work was done: like a content filter, it does not
+    answer this goal, and a standby model takes the run over (item 1211, the owner's word: a refusal must not stop the
+    work he left running)."""
 
 
 class _EmptyReplies(ProviderError):
@@ -2162,6 +2169,8 @@ async def _held_by_the_owner(agent: AgentRun, held_since: float) -> None:
 def _cannot_answer(error: Exception) -> str | None:
     """Why the run's model cannot answer this run: what pauses it for every run (:func:`unavailable_reason`), or its
     service's content filter, which stops this conversation alone. ``None`` for any other error."""
+    if isinstance(error, _Declined):
+        return _DECLINED_REASON
     if isinstance(error, ProviderFilterError):
         return _FILTERED_REASON
     if isinstance(error, _EmptyReplies):
@@ -2660,6 +2669,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else None
     )
     steps: int = 0
+    # Whether any step of the run called a tool other than finish: a run that ends failed before its first such step
+    # has done no work, and a refusal there is the model's, not the goal's.
+    worked: bool = False
     # The plan the run was last handed as a note, and at which step (item 825).
     plan_told: str | None = None
     plan_told_at: int = 0
@@ -3104,6 +3116,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             # A step that calls anything but finish goes on with the work: the replies told to finish were steps
             # announced, not the answer, and stay.
             if any(call.name != FINISH_TOOL for call in reply.tool_calls):
+                worked = True
                 noted_replies = []
             # Only text replies in a row end a task run; a step that acts starts the count again.
             if _acts(reply.tool_calls, questions):
@@ -3189,6 +3202,47 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     history.append(await _stored_note(agent, arrival))
             if finished is not None:
                 ended = _finish_result(finished)
+                # A run that says it cannot before it has done a step of work is a model that will not take this goal
+                # on, not a goal that failed: a standby model takes the run over, as it does for a content filter's
+                # stop (item 789), so a refusal never stops the work the owner left running. The next standby takes it
+                # when that one declines too; only when none is left does the run end as the model said.
+                if (
+                    ended.status == "failed"
+                    and not worked
+                    and not ended.needs
+                    and routed is None
+                    and run.mode != "chat"
+                ):
+                    declined: _Declined = _Declined(f"the model declined the goal ({ref.label})", {"model": ref.label})
+                    try:
+                        declined_to: _Standby | None = await _to_standby(
+                            agent, ref, declined, left, bool(specs), estimate_tokens([system], specs), steps
+                        )
+                    except ConfigError as error:
+                        log.warning("declined_no_standby", run_id=agent.run.id, model=ref.label, problem=str(error))
+                        declined_to = None
+                    if declined_to is not None:
+                        history.append(
+                            await _stored_note(
+                                declined_to.agent,
+                                _SWITCH_NOTE.format(to=declined_to.ref.label, old=ref.label, reason=declined_to.reason),
+                            )
+                        )
+                        agent, run, ref, info, scaffold = (
+                            declined_to.agent,
+                            declined_to.agent.run,
+                            declined_to.ref,
+                            declined_to.info,
+                            declined_to.scaffold,
+                        )
+                        left = left | {ref.label}
+                        candidates = still_routable(candidates, left)
+                        context = replace(context, output_chars=scaffold.tool_output_chars)
+                        if not info.vision:
+                            history = drop_old_images(history, 0)
+                        nudges = 0
+                        ratio = 1.0
+                        continue
                 unread = _failed_before_finish(outcomes, finished)
                 # The finish takes the replies told to finish before it; one sent back is a new start for them.
                 restating = tuple(noted_replies)

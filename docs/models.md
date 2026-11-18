@@ -92,7 +92,10 @@ account's privacy settings leave no provider of, item 361), its provider has no 
 stops the reply (item 437; that pauses the model for no other run), or the run's own model answers with nothing as
 often as a run is nudged to answer (item 789; that pauses it for no other run either): the run goes on from the same step, with the tools
 that step had, on the first standby model that can take it over, the model is told, and the timeline shows the switch,
-which the model chip follows. The run's reasoning level becomes the nearest one the new model offers. A run takes each
+which the model chip follows. A run whose own model ends it with a `finish` that says it cannot (a step routed to another model does not count), before it has
+done a step of work and without asking you for anything, goes to these models the same way: a refusal is not the
+goal failing, and the work you left running carries on on one that will take it (item 1211). The run's reasoning
+level becomes the nearest one the new model offers. A run takes each
 model once at most, in the order of the list, and never goes back to one it left. A standby model that cannot call tools
 while the run offers them, whose window cannot hold the instructions and the tools, or whose details cannot be read is
 passed over, and so is one of OpenCode's agent or the Claude plan named in `config.toml`, as a helper model is too: each
