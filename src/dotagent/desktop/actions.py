@@ -65,8 +65,17 @@ _FOCUS_SETTLE_S: float = 0.05
 # application after the step returns.
 _READ_BACK_WAIT_S: float = 1.0
 _READ_BACK_POLL_S: float = 0.05
+# A value set through accessibility reaches the field without a key: the field shows it, but the application's own
+# handlers of what is typed (a check, a filter, a form's model) may never see it, and reading the field back reads only
+# what was written (the desktop bank's digits field, item 1222). Uncertain, never verified.
 _VALUE_KEPT: OutcomeCheck = OutcomeCheck(
-    condition="the field holds the value set", status="verified", evidence="read back after the step", reason=""
+    condition="the application took the value set",
+    status="uncertain",
+    evidence="the field shows it, read back after the step",
+    reason=(
+        "set through accessibility, no key reached the application, whose own checks and saves may not see it: where "
+        "it must take the value as input (a form it checks or saves), click the field and type it"
+    ),
 )
 _LABEL_CLIP: int = 50
 _SCROLL_UNITS: dict[str, tuple[int, int]] = {"down": (0, -1), "up": (0, 1), "right": (-1, 0), "left": (1, 0)}

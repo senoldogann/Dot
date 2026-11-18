@@ -683,7 +683,9 @@ every mode but `yolo` (item 433).
   without announcing anything in between shows in the next view.
 - A step's line says whether it was sent and what Dot checked of it, as a browser step's does (item 1146): done says
   that it was sent, and verified, uncertain or not checked stands beside it. What `set_value` set is read back as
-  before, and now says so: verified, or the step fails as sent and not kept. What `type` and `paste` put in is read
+  before: uncertain when the field shows it, since a value set through accessibility reaches no key handler and the
+  application's own checks and saves may not see it (the step says to click the field and type where the application
+  must take it, item 1222), or the step fails as sent and not kept. What `type` and `paste` put in is read
   back from the field the step names, or from the one that has the keyboard, for up to a second, since keys reach an
   application after the step returns: verified once the text is in the field one more time than before (as typed, or
   with the same letters and digits), otherwise uncertain and never contradicted. A secure field is never read; a field
