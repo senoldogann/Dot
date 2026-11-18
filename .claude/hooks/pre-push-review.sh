@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Git pre-push hook: Claude Code reviews the commits about to be pushed, following REVIEW.md, on the claude.ai
-# subscription the local `claude` command is signed in with. An Important finding stops the push.
+# Git pre-push hook: Dot's own model reviews the commits about to be pushed, following REVIEW.md, in research mode
+# (read-only). An Important finding stops the push. The review ran on Claude Code until item 1211: that model answered
+# `[cyber]` to a diff it declined to read, and stopped a push it never judged.
 #
 # Install once: ln -sf ../../.claude/hooks/pre-push-review.sh .git/hooks/pre-push
 # Skip once:    git push --no-verify
@@ -29,8 +30,8 @@ mkdir -p "$review_dir"
 cd "$repo_root"
 
 if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-  echo "claude-review: ANTHROPIC_API_KEY is set, so the review would be billed to the API, not the subscription." >&2
-  echo "claude-review: unset it, or push with --no-verify." >&2
+  echo "claude-review: ANTHROPIC_API_KEY is set and nothing here needs it any more; unset it to keep the environment" >&2
+  echo "claude-review: honest, or push with --no-verify." >&2
   exit 1
 fi
 
@@ -95,18 +96,27 @@ starts with the finding count. Read the surrounding code before reporting a find
 your answer with one last line that is exactly \`VERDICT: BLOCK\` if there is at least one Important finding or you \
 could not review the change, otherwise exactly \`VERDICT: PASS\`."
 
-  # The model is named because the user's default routes each turn to the cheapest model that can do it. Its stdin is
-  # /dev/null (item 1020): `claude -p` reads a piped stdin into the prompt, and the hook's stdin is git's list of refs,
-  # so it would swallow the refs after this one and push them unreviewed.
-  if ! claude -p "$prompt" \
-    --model claude-opus-5-5 \
-    --permission-mode dontAsk \
-    --allowedTools "Read" "Grep" "Glob" \
-    --no-session-persistence \
-    </dev/null >"$review_file"; then
-    echo "claude-review: the claude command failed; its output is in $review_file" >&2
-    exit 1
+  # Dot's own model is named rather than left to the configured main model: the review is the one step that must not
+  # drift. Research mode is what makes it read-only. Its stdin is /dev/null (item 1020): the hook's stdin is git's list
+  # of refs, and nothing may swallow the refs after this one. A reviewer that cannot start does not hold the push: CI
+  # is the gate that still does.
+  dotx=${DOTX:-$(command -v dotx || echo "$HOME/Desktop/Dot/.venv/bin/dotx")}
+  thread_file="$review_dir/thread"
+  review() {
+    local extra=()
+    [[ -s "$thread_file" ]] && extra=(--thread "$(cat "$thread_file")")
+    "$dotx" run --mode research --model opencode_go:deepseek-v4.1-flash --effort high --no-input \
+      "${extra[@]}" "$prompt" </dev/null
+  }
+  if ! review >"$review_file" 2>&1; then
+    # A thread that no longer exists is no reason to skip the review: run it in a chat of its own.
+    rm -f "$thread_file"
+    if ! review >"$review_file" 2>&1; then
+      echo "claude-review: the dotx review could not run; its output is in $review_file. The push goes on." >&2
+      continue
+    fi
   fi
+  grep -oE 'thread thr_[a-z0-9_]+' "$review_file" | tail -n 1 | awk '{print $2}' >"$thread_file" || true
 
   cat "$review_file"
   verdict=$(grep -E '^VERDICT: (PASS|BLOCK)$' "$review_file" | tail -n 1 || true)
