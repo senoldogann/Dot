@@ -29,12 +29,6 @@ review_dir="$(git rev-parse --path-format=absolute --git-common-dir)/claude-revi
 mkdir -p "$review_dir"
 cd "$repo_root"
 
-if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-  echo "claude-review: ANTHROPIC_API_KEY is set and nothing here needs it any more; unset it to keep the environment" >&2
-  echo "claude-review: honest, or push with --no-verify." >&2
-  exit 1
-fi
-
 while read -r local_ref local_sha remote_ref remote_sha; do
   # A deleted branch has nothing to review.
   [[ "$local_sha" == "$zero_sha" ]] && continue
@@ -97,11 +91,12 @@ your answer with one last line that is exactly \`VERDICT: BLOCK\` if there is at
 could not review the change, otherwise exactly \`VERDICT: PASS\`."
 
   # Dot's own model is named rather than left to the configured main model: the review is the one step that must not
-  # drift. Research mode is what makes it read-only. Its stdin is /dev/null (item 1020): the hook's stdin is git's list
-  # of refs, and nothing may swallow the refs after this one. A reviewer that cannot start does not hold the push: CI
-  # is the gate that still does.
+  # drift. Research mode refuses every step that would change the repository or run a command's side effect, so the
+  # review reads the code and cannot edit it; it may still read the web and keep a note. Its stdin is /dev/null (item
+  # 1020): the hook's stdin is git's list of refs, and nothing may swallow the refs after this one.
   dotx=${DOTX:-$(command -v dotx || echo "$HOME/Desktop/Dot/.venv/bin/dotx")}
-  thread_file="$review_dir/thread"
+  branch=$(git symbolic-ref --short -q HEAD 2>/dev/null || echo detached)
+  thread_file="$review_dir/thread-${branch//\//-}"
   review() {
     local args=(run --mode research --model opencode_go:deepseek-v4.1-flash --effort high --no-input)
     if [[ -s "$thread_file" ]]; then
@@ -109,13 +104,13 @@ could not review the change, otherwise exactly \`VERDICT: PASS\`."
     fi
     "$dotx" "${args[@]}" "$prompt" </dev/null
   }
-  if ! review >"$review_file" 2>&1; then
-    # A thread that no longer exists is no reason to skip the review: run it in a chat of its own.
+  # The status of a run says whether it finished, not what it found: a BLOCK ends a run that exited cleanly, so the
+  # verdict line decides. A thread that no longer exists is no reason to skip the review: it gets one more try in a
+  # chat of its own.
+  review >"$review_file" 2>&1 || true
+  if ! grep -qE '^VERDICT: (PASS|BLOCK)$' "$review_file"; then
     rm -f "$thread_file"
-    if ! review >"$review_file" 2>&1; then
-      echo "claude-review: the dotx review could not run; its output is in $review_file. The push goes on." >&2
-      continue
-    fi
+    review >"$review_file" 2>&1 || true
   fi
   grep -oE 'thread thr_[a-z0-9_]+' "$review_file" | tail -n 1 | awk '{print $2}' >"$thread_file" || true
 
