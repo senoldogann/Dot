@@ -111,7 +111,7 @@ BUDGET_TOKENS: int = 28_300
 # Environment section; 7,899 here).
 # Raised by 600 for the owner's `CHARACTER` block of items 1210 and 1211 (system 8,405 measured here).
 # Raised by 300 with the block of item 1211 above: the gate's runner measures longer paths than this Mac, whose system
-# reads 8,535 now.
+# reads 8,465 now.
 SYSTEM_BUDGET_TOKENS: int = 8_900
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
