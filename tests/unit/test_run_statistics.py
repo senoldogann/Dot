@@ -271,6 +271,9 @@ def test_the_time_of_a_model_comes_from_the_calls_its_timed_runs_recorded(databa
     assert first.cached_tokens == 150
     # 150 cached of the 600 input tokens of the six calls that answered (the cut step served none).
     assert first.cached_share == pytest.approx(0.25)
+    # Item 1218: 450 of them fresh, and weighed as billed, 450 + 0.1 * 150 = 465.
+    assert first.fresh_tokens == 450
+    assert first.weighted_tokens == pytest.approx(465.0)
     second: TimeStats = _by_model(stats)["ollama:b"].time
     assert (second.timed_runs, second.step_seconds_median, second.step_seconds_p90) == (1, 7.0, 7.0)
 
@@ -407,8 +410,24 @@ def test_the_statistics_are_rendered_per_model_in_plain_words(database: Path) ->
     assert "by step number: 1-5 1.5 s (1), 6-10 4.0 s (1), 11-20 9.0 s / 12.0 k tokens (1)" in text
     assert "acts: none counted" in text
     time_row: str = next(line for line in lines if line.strip().startswith("ollama:a ") and "of 2" in line)
-    assert time_row.split() == ["ollama:a", "1", "of", "2", "320.5", "2.5", "10.0", "4.0", "4.5", "150", "25", "%"]
+    assert time_row.split() == [
+        "ollama:a",
+        "1",
+        "of",
+        "2",
+        "320.5",
+        "2.5",
+        "10.0",
+        "4.0",
+        "4.5",
+        "150",
+        "25",
+        "%",
+        "450",
+        "465",
+    ]
     assert "1 runs recorded no model calls" in text
+    assert "* weighted: fresh input plus cached input at 0.1 of a fresh token" in text
     tool_row: str = next(line for line in lines if line.strip().startswith("browser_act"))
     assert tool_row.split() == ["browser_act", "5", "1", "14.0", "2.0", "1.5"]
     site_row: str = next(line for line in lines if line.strip().startswith("x.com"))
