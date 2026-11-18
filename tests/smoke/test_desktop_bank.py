@@ -1,7 +1,7 @@
 """The desktop bank (item 1221): a live model drives the fixture app (``tests/fixtures/dot_fixture_app.py``) on a few
 tasks, each judged by what the application saw, and each attempt's score goes into a report of JSON lines. Desktop
 calls were 0.2 % of the owner's real runs, too few to measure the desktop by; this is where it is measured
-(``reports/agent-capabilities-2026-11-18.md``, CMP-P06, stage 1: three tasks).
+(``reports/agent-capabilities-2026-11-18.md``, CMP-P06: stage 1, three tasks, item 1221; stage 2, four harder ones).
 
 It moves the real pointer and keyboard, so it runs only with ``DOT_DESKTOP_BANK=1``, once macOS has granted the desktop
 permissions to the process, and each attempt starts only when nobody has touched the Mac for ten minutes (the owner's
@@ -47,7 +47,7 @@ MODEL: str = os.environ.get("DOT_DESKTOP_BANK_MODEL", "ollama:gpt-oss:120b-cloud
 REPEATS: int = int(os.environ.get("DOT_DESKTOP_BANK_K", "1"))
 # Nobody has touched the Mac for this long when an attempt starts (D2).
 IDLE_LEAST_S: float = 600.0
-# One attempt's ceiling: three attempts stay within the calibration's 12M tokens and 40 minutes (D1, D2). On the
+# One attempt's ceiling: three attempts stay within a calibration's 12M tokens and 40 minutes (D1, D2). On the
 # owner's Claude plan, whose week D1 caps at 5M, give DOT_DESKTOP_BANK_MAX_TOKENS=1500000: nothing lowers it by itself.
 RUN_MAX_TOKENS: int = int(os.environ.get("DOT_DESKTOP_BANK_MAX_TOKENS", "4000000"))
 RUN_MAX_MINUTES: float = 12.0
@@ -94,6 +94,48 @@ def _slow(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
     return status == "done" and presses == 2 and "Saved 2" in answer
 
 
+def _context(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
+    """The pad's menu shows only on a right click (or a control click): Beta picked there, and nothing else."""
+    picks: list[str | None] = [event.item for event in seen if event.event == "context_pick"]
+    return status == "done" and picks == ["Beta"]
+
+
+def _menu(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
+    """Ping is in the menu bar's Actions menu, not in the window: chosen once."""
+    return status == "done" and sum(1 for event in seen if event.event == "menu") == 1
+
+
+# Where the grid's visible part may start for the cell r17 c9 to be in view: its label is drawn from (906, 1706) in the
+# grid, about 40 by 15 points, and the scroller shows 600 by 240 of it (its scroll bars lie over the grid). In view is
+# its top-left corner and ten points of its height and twenty of its width: GPT-5.5 stopped at (880, 1480), where the
+# label shows whole; a range drawn for 585 by 225 failed it.
+_IN_VIEW_X: tuple[float, float] = (326.0, 906.0)
+_IN_VIEW_Y: tuple[float, float] = (1476.0, 1706.0)
+
+
+def _scroll(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
+    """The cell is far down and to the right of the grid: the run ends with it in view."""
+    origins: list[tuple[float | None, float | None]] = [
+        (event.x, event.y) for event in seen if event.event == "scrolled"
+    ]
+    if status != "done" or not origins:
+        return False
+    x, y = origins[-1]
+    return (
+        x is not None and y is not None and _IN_VIEW_X[0] <= x <= _IN_VIEW_X[1] and _IN_VIEW_Y[0] <= y <= _IN_VIEW_Y[1]
+    )
+
+
+def _finder(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
+    """The button brings Finder to the front: the run must bring the fixture back before its typing reaches the field
+    (typed into Finder, the keys select files there and never reach it)."""
+    fronted: list[int] = [at for at, event in enumerate(seen) if event.event == "front_other" and event.front]
+    typed: list[tuple[int, str | None]] = [
+        (at, event.value) for at, event in enumerate(seen) if event.event == "text" and event.field == "name"
+    ]
+    return status == "done" and bool(fronted) and bool(typed) and typed[-1][1] == "ok" and typed[-1][0] > fronted[0]
+
+
 TASKS: tuple[BankTask, ...] = (
     BankTask(
         "form",
@@ -112,6 +154,28 @@ TASKS: tuple[BankTask, ...] = (
         f"{_OPEN} Press the Slow save button exactly twice. Then call finish and tell me what the label next to it "
         "says once both saves are done.",
         _slow,
+    ),
+    BankTask(
+        "context-menu",
+        f"{_OPEN} Open the context menu of the light blue Pad area and choose Beta in it. Then call finish.",
+        _context,
+    ),
+    BankTask(
+        "menu-bar",
+        f"{_OPEN} Choose Ping from the application's Actions menu in the menu bar, exactly once. Then call finish.",
+        _menu,
+    ),
+    BankTask(
+        "scroll-to-cell",
+        f"{_OPEN} The grid at the bottom of the window holds cells labelled r<row> c<column>. Scroll it until the cell "
+        "r17 c9 is in view, then call finish.",
+        _scroll,
+    ),
+    BankTask(
+        "finder-trap",
+        f"{_OPEN} Press the Bring Finder button once, then type ok into the Name field of the Dot Fixture window. Then "
+        "call finish.",
+        _finder,
     ),
 )
 

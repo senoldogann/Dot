@@ -31,6 +31,10 @@ class FixtureEvent(BaseModel):
     count: int | None = None
     on: bool | None = None
     pid: int | None = None
+    item: str | None = None
+    front: bool | None = None
+    x: float | None = None
+    y: float | None = None
 
 
 @dataclass(frozen=True)
