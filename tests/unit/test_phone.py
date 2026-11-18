@@ -8,7 +8,7 @@ import pytest
 from dotagent.config import PhoneConfig, load_default_config
 from dotagent.core.errors import PhoneError
 from dotagent.phone.devicectl import device_available, launch_argv
-from dotagent.phone.keeper import next_state, notice_for, state_line, state_word
+from dotagent.phone.keeper import next_state, notice_for, state_line
 from dotagent.phone.types import PhoneProbe
 from dotagent.server.routes_iphone import iphone_view
 
@@ -50,7 +50,6 @@ def test_the_owner_is_told_once_until_the_phone_is_up_and_never_of_a_lock() -> N
     unclear_again = next_state(up, PhoneProbe(url="http://x", locked=None), 800.0)
     told_again = notice_for(unclear_again, 0.0)
     assert told_again is not None and "cannot tell" in told_again[0]
-    assert state_word(None) == "not checked yet" and state_word(state) == "reachable but locked"
 
 
 def test_devicectl_listing_says_whether_the_phone_is_available() -> None:

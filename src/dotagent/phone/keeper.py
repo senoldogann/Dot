@@ -60,11 +60,6 @@ def notice_for(state: PhoneState, notify_after_s: float) -> tuple[str, str] | No
     return _NOTICES[state.kind]
 
 
-def state_word(state: PhoneState | None) -> str:
-    """The state as a few words that stay the same while it does (the prompt is kept for a provider's cache)."""
-    return "not checked yet" if state is None else _WORDS[state.kind]
-
-
 def state_line(state: PhoneState | None, now: float) -> str:
     """The state as one sentence, for the prompt and the tools."""
     if state is None:
