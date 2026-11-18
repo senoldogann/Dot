@@ -163,4 +163,4 @@ def test_a_value_the_field_kept_is_uncertain_since_the_application_may_not_have_
         _env(tmp_path), Step(action="set_value", ref="a3", text="new value"), inspection
     )
     assert [check.status for check in effect.checks] == ["uncertain"]
-    assert "type" in effect.checks[0].reason
+    assert "click the field and type it" in effect.checks[0].reason
