@@ -32,7 +32,7 @@ from dotagent.evals.runner import plan_window_of, plan_window_spent
 from dotagent.repair.claude import LimitWindow
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.endings import PREFIX_INTERNAL_ERROR
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import EventRecord, RunRecord, RunStatus
 
 pytestmark = [
     pytest.mark.live,
@@ -63,32 +63,35 @@ _OPEN: str = "Open the Mac application with the process id {pid} (its window is 
 
 @dataclass(frozen=True)
 class BankTask:
-    """A task of the bank: its goal, given the fixture's process id, and whether what the app saw and what the run
-    answered pass it."""
+    """A task of the bank: its goal, given the fixture's process id, and whether what the app saw, what the run answered
+    and how it ended pass it."""
 
     id: str
     goal: str
-    passed: Callable[[list[FixtureEvent], str], bool]
+    passed: Callable[[list[FixtureEvent], str, RunStatus], bool]
 
 
-def _form(seen: list[FixtureEvent], answer: str) -> bool:
+def _form(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
     typed: list[str | None] = [event.value for event in seen if event.event == "text" and event.field == "name"]
     ticks: list[bool | None] = [event.on for event in seen if event.event == "checkbox"]
     presses: list[int | None] = [event.count for event in seen if event.event == "button"]
-    return bool(typed) and typed[-1] == TYPED_NAME and presses == [1, 2] and bool(ticks) and ticks[-1] is True
+    done: bool = status == "done"
+    return done and bool(typed) and typed[-1] == TYPED_NAME and presses == [1, 2] and bool(ticks) and ticks[-1] is True
 
 
-def _digits(seen: list[FixtureEvent], answer: str) -> bool:
+def _digits(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
     """The field takes digits alone: the run passes when the field holds the digits and it says what the field holds,
-    not the number it was asked to type."""
+    not the number it was asked to type, whether it ends done or failed (the number asked for cannot be typed there:
+    Sonnet 5.5 ended failed with the right words in the first calibration)."""
     kept: list[str | None] = [event.value for event in seen if event.event == "text" and event.field == "digits"]
-    return bool(kept) and kept[-1] == "4721" and "4721" in answer and "A-4721 is in" not in answer
+    ended: bool = status in ("done", "failed")
+    return ended and bool(kept) and kept[-1] == "4721" and "4721" in answer and "A-4721 is in" not in answer
 
 
-def _slow(seen: list[FixtureEvent], answer: str) -> bool:
+def _slow(seen: list[FixtureEvent], answer: str, status: RunStatus) -> bool:
     """Each save shows a moment after the press: two presses and the label read once both showed."""
     presses: int = sum(1 for event in seen if event.event == "slow_press")
-    return presses == 2 and "Saved 2" in answer
+    return status == "done" and presses == 2 and "Saved 2" in answer
 
 
 TASKS: tuple[BankTask, ...] = (
@@ -189,7 +192,7 @@ def test_a_model_drives_the_fixture_app(
         "model": MODEL,
         # An attempt the provider refused says nothing of the model.
         "started": started,
-        "passed": finished.status == "done" and task.passed(seen, finished.result),
+        "passed": task.passed(seen, finished.result, finished.status),
         "status": finished.status,
         "steps": finished.steps,
         "input_tokens": finished.input_tokens,
