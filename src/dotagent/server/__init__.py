@@ -2,3 +2,5 @@
 
 # The ``source`` of the threads and runs that the UI starts.
 UI_SOURCE: str = "ui"
+# The ``source`` of the runs that ``dotx run`` starts.
+CLI_SOURCE: str = "cli"

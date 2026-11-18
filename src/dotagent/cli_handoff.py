@@ -29,6 +29,7 @@ from dotagent.core.errors import ConfigError, RunConflict, ServiceError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import token_path
 from dotagent.core.types import FrozenModel
+from dotagent.server import CLI_SOURCE
 from dotagent.server.guard import read_token
 from dotagent.server.links import base_url, health_url
 from dotagent.server.views import CampaignDetail, DecisionRequest, RunDetail, StartRunRequest
@@ -94,7 +95,7 @@ def handed_request(command: RunCommand, goal: str) -> StartRunRequest:
             goal_mode=command.goal_mode,
             standing=command.standing,
             browser=command.browser if command.standing else None,
-            source="cli",
+            source=CLI_SOURCE,
         )
     except ValidationError as exc:
         raise ConfigError(

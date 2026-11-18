@@ -6,9 +6,11 @@ from pathlib import Path
 
 from dotagent.agent.prompt import PromptInputs, build_system_prompt, collect_prompt_inputs, started_note, with_phone
 from dotagent.agent.resume import RESUME_SOURCE
+from dotagent.evals import EVAL_SOURCE
 from dotagent.harness.components import NO_HARNESS
 from dotagent.proactive import NOTICE_SOURCE
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.server import CLI_SOURCE, UI_SOURCE
 from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
@@ -62,4 +64,5 @@ def test_only_a_message_of_the_users_is_said_to_have_started_the_run() -> None:
         note: str = started_note(_from(source, "wait"))
         assert "the user's own message" not in note
         assert f"started by Dot ({source})" in note
-    assert "the user's own message" in started_note(_from("cli", "wait"))
+    for source in (UI_SOURCE, CLI_SOURCE, EVAL_SOURCE):
+        assert "the user's own message" in started_note(_from(source, "wait"))
