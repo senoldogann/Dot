@@ -7,19 +7,14 @@ Accessibility, input events and screen recording to the process that runs pytest
 """
 
 import asyncio
-import json
 import os
-import subprocess
-import sys
-import time
 from collections.abc import AsyncIterator, Iterator
-from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 import pytest
 import pytest_asyncio
-from pydantic import BaseModel, ConfigDict
+from fixture_app import FixtureApp, FixtureEvent, events, fixture_app
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -42,10 +37,8 @@ OLLAMA_ROOT: str = "http://localhost:11434"
 MODEL: str = "gpt-oss:20b-cloud"
 MODEL_REF: str = f"ollama:{MODEL}"
 RUN_TIMEOUT_S: float = 300.0
-READY_TIMEOUT_S: float = 15.0
 TYPED_NAME: str = "Ayşe Çelik"
 PRESSES: int = 2
-_FIXTURE: Path = Path(__file__).resolve().parents[1] / "fixtures" / "dot_fixture_app.py"
 
 
 def model_is_listed() -> bool:
@@ -59,56 +52,13 @@ def model_is_listed() -> bool:
 requires_model = pytest.mark.skipif(not model_is_listed(), reason=f"needs the local Ollama server with {MODEL}")
 
 
-class FixtureEvent(BaseModel):
-    """One line of the fixture's event log; only the fields the checks read."""
-
-    model_config = ConfigDict(extra="ignore")
-
-    event: str
-    field: str | None = None
-    value: str | None = None
-    count: int | None = None
-    on: bool | None = None
-    pid: int | None = None
-
-
-@dataclass(frozen=True)
-class FixtureApp:
-    pid: int
-    log: Path
-    process: subprocess.Popen[bytes]
-
-
-def _events(log: Path) -> list[FixtureEvent]:
-    # The app may be in the middle of writing its last line; only lines that end in a newline are complete.
-    complete: list[str] = log.read_text(encoding="utf-8").split("\n")[:-1]
-    return [FixtureEvent.model_validate(json.loads(line)) for line in complete if line.strip()]
-
-
-def _wait_until_ready(process: subprocess.Popen[bytes], log: Path) -> int:
-    deadline: float = time.monotonic() + READY_TIMEOUT_S
-    while time.monotonic() < deadline:
-        assert process.poll() is None, f"the fixture app exited with code {process.returncode}"
-        if log.exists():
-            for event in _events(log):
-                if event.event == "ready" and event.pid is not None:
-                    return event.pid
-        time.sleep(0.1)
-    raise AssertionError("the fixture app did not become ready")
-
-
 @pytest.fixture(scope="module")
 def app(tmp_path_factory: pytest.TempPathFactory) -> Iterator[FixtureApp]:
     permissions: Permissions = check_permissions()
     if not (permissions.accessibility and permissions.post_event and permissions.screen_recording):
         pytest.skip(f"macOS has not granted the desktop permissions to this process: {permissions}")
-    log: Path = tmp_path_factory.mktemp("fixture") / "events.jsonl"
-    process: subprocess.Popen[bytes] = subprocess.Popen([sys.executable, str(_FIXTURE), str(log)])
-    try:
-        yield FixtureApp(pid=_wait_until_ready(process, log), log=log, process=process)
-    finally:
-        process.terminate()
-        process.wait(timeout=10)
+    with fixture_app(tmp_path_factory.mktemp("fixture") / "events.jsonl") as started:
+        yield started
 
 
 @pytest.fixture(scope="module")
@@ -151,7 +101,7 @@ async def test_the_agent_types_presses_and_ticks_in_a_mac_application(runtime: R
     exit_code: int | None = app.process.poll()
     assert exit_code is None, f"the fixture app exited with code {exit_code} during the run: {finished.result}"
     assert finished.status == "done", finished.result
-    seen: list[FixtureEvent] = _events(app.log)
+    seen: list[FixtureEvent] = events(app.log)
     typed: list[str | None] = [event.value for event in seen if event.event == "text" and event.field == "name"]
     assert typed
     assert typed[-1] == TYPED_NAME, typed
