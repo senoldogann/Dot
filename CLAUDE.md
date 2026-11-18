@@ -52,10 +52,10 @@ npm run check
 ## Review
 
 [REVIEW.md](REVIEW.md) says what the code review looks for here. `.claude/hooks/pre-push-review.sh` runs that review
-before every push, on the `claude` command's subscription; its header says how to install and skip it. That hook is the
-one review a change gets: `/code-review` or a review subagent is not run on top of it. A finding is fixed or answered
-and pushed again, and the hook reads only the new commits. `/security-review` runs only when a change touches a path
-REVIEW.md lists under "Always needs a human".
+before every push, on Dot's own model (`opencode_go:deepseek-v4.1-flash`), in research mode, so it reads the code and
+cannot change it; its header says how to install and skip it. That hook is the one review a change gets: `/code-review`
+or a review subagent is not run on top of it. A finding is fixed or answered and pushed again, and the hook reads only
+the new commits. `/security-review` runs only when a change touches a path REVIEW.md lists under "Always needs a human".
 
 ## Keeping a change short (item 540)
 
