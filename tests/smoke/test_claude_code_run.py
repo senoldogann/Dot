@@ -26,6 +26,11 @@ from dotagent.config import load_config
 from dotagent.core.errors import FailSafeTriggered, InvalidValueError
 from dotagent.core.paths import claude_code_dir
 from dotagent.core.types import JsonObject
+from dotagent.evals import EVAL_SOURCE
+from dotagent.evals.catalog import all_tasks
+from dotagent.evals.results import Cut
+from dotagent.evals.runner import _supervise
+from dotagent.evals.types import EvalTask
 from dotagent.memory.service import SavedMemory, save_memory, update_memory_note, words_only
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler.notices import said_nothing_new
@@ -474,3 +479,18 @@ async def test_a_run_on_the_plan_is_handed_what_dot_remembers_of_its_goal(room: 
     assert third.status == "done", third.result
     changed: str = await asyncio.to_thread((room.record / "first.json").read_text, encoding="utf-8")
     assert "Finnish level is B2" in changed
+
+
+async def test_an_eval_cuts_a_run_on_the_plan_at_its_token_budget(room: Room) -> None:
+    """Item 1220: a run on the plan records its tokens with each step's assistant event and no model call; the eval's
+    watch read the spending only at a model call, so a plan run was never cut at its budget."""
+    task: EvalTask = all_tasks()[0].model_copy(update={"token_budget": 50, "time_limit_s": 60.0})
+    async with room.runtime.bus.subscribe(None) as subscription:
+        started: RunRecord = await room.manager.start(
+            "Write a note in the workspace.", "task", MODEL, None, EVAL_SOURCE, None, None, "standard", None, "auto",
+            False, (),
+        )  # fmt: skip
+        cut: Cut = await _supervise(room.runtime, room.manager, subscription, started.id, task)
+    ended: RunRecord = await room.manager.wait(started.id)
+    assert cut == "token_budget"
+    assert ended.status == "cancelled", ended.result

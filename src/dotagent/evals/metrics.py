@@ -26,15 +26,18 @@ def _has_broken_arguments(event: EventRecord) -> bool:
     return isinstance(arguments, dict) and invalid_arguments_text(arguments) is not None
 
 
-def _seconds(events: Sequence[EventRecord], kind: str) -> float:
-    """The seconds the events of ``kind`` took in all."""
+# The event of a step's reply, which every way of running a goal records (agent/loop.py, claude_code/run.py,
+# opencode/run.py).
+ASSISTANT_EVENT: str = "assistant"
+
+
+def _seconds(events: Sequence[EventRecord]) -> float:
+    """The seconds ``events`` took in all."""
     total: float = 0.0
     for event in events:
-        if event.kind != kind:
-            continue
         seconds: JsonValue = event.data.get("seconds")
         if not isinstance(seconds, int | float):
-            raise EvalError("an event lacks the seconds the harness counts", {"kind": kind, "event_id": event.id})
+            raise EvalError("an event lacks the seconds the harness counts", {"kind": event.kind, "event_id": event.id})
         total += seconds
     return total
 
@@ -63,12 +66,18 @@ def _batch_steps(event: EventRecord) -> int:
     return steps if isinstance(steps, int) else 0
 
 
+def model_calls(events: Sequence[EventRecord]) -> list[EventRecord]:
+    """The model calls of a run: its ``model_call`` events, or, on a program that runs the whole goal itself (the
+    Claude plan, OpenCode) and records none, the ``assistant`` event of each of its steps, which carries the step's
+    tokens and seconds too (item 1220: such a run was measured with no cache, no context and no model time)."""
+    calls: list[EventRecord] = [event for event in events if event.kind == CALL_EVENT]
+    return calls if calls else [event for event in events if event.kind == ASSISTANT_EVENT]
+
+
 def _cached_tokens(events: Sequence[EventRecord]) -> int:
     """The input tokens the provider served from its cache, over the model calls of the run."""
     total: int = 0
-    for event in events:
-        if event.kind != CALL_EVENT:
-            continue
+    for event in model_calls(events):
         cached: JsonValue = event.data.get("cached_tokens")
         if not isinstance(cached, int):
             raise EvalError("a model call lacks the cached tokens the harness counts", {"event_id": event.id})
@@ -113,11 +122,7 @@ def _first_token_mean(events: Sequence[EventRecord]) -> float | None:
 def _peak_input(events: Sequence[EventRecord]) -> int:
     """The most input tokens one of the run's model calls was sent: the largest context it had (item 1037)."""
     return max(
-        (
-            int(tokens)
-            for event in events
-            if event.kind == CALL_EVENT and isinstance(tokens := event.data.get("input_tokens"), int)
-        ),
+        (int(tokens) for event in model_calls(events) if isinstance(tokens := event.data.get("input_tokens"), int)),
         default=0,
     )
 
@@ -164,15 +169,17 @@ def run_trace(events: Sequence[EventRecord]) -> tuple[TraceStep, ...]:
     their steps. At most :data:`_TRACE_MOST` moments, the first ones."""
     actions: dict[str, str] = {}
     moments: list[TraceStep] = []
+    calls: set[int] = {event.id for event in model_calls(events)}
     for event in events:
         data = event.data
         if event.kind == "tool_call" and data.get("tool") in ACT_TOOLS:
             actions[str(data.get("call_id", ""))] = _actions_of(data.get("args"))
-        elif event.kind == CALL_EVENT:
+        elif event.id in calls:
             moments.append(
                 TraceStep(
                     kind="model",
-                    name=str(data.get("purpose", "")),
+                    # A step of a program that runs the goal itself records no purpose: it is a step (item 1220).
+                    name=str(data.get("purpose", "step")),
                     seconds=_seconds_of(data.get("seconds")),
                     ok=_answered(data),
                     input_tokens=_int_of(data.get("input_tokens")),
@@ -221,8 +228,8 @@ def run_metrics(
         stalls=sum(1 for event in events if event.kind == "stall"),
         compactions=sum(1 for event in events if event.kind == "compacted"),
         unanswered_questions=sum(1 for event in events if event.kind in _UNANSWERED_KINDS),
-        model_seconds=round(_seconds(events, CALL_EVENT), 3),
-        tool_seconds=round(_seconds(events, "tool_result"), 3),
+        model_seconds=round(_seconds(model_calls(events)), 3),
+        tool_seconds=round(_seconds(results), 3),
         acts=len(acts),
         single_acts=sum(1 for event in acts if _batch_steps(event) == 1),
         cached_tokens=_cached_tokens(events),
@@ -234,7 +241,7 @@ def run_metrics(
         help_calls=sum(1 for event in events if event.kind == "tool_call" and event.data.get("tool") == FIND_HELP_TOOL),
         plan_changes=sum(1 for event in events if event.kind == PLAN_EVENT),
         approvals_asked=sum(1 for event in events if event.kind == "approval_requested"),
-        model_calls=sum(1 for event in events if event.kind == CALL_EVENT),
+        model_calls=len(model_calls(events)),
         first_token_seconds=_first_token_mean(events),
         peak_input_tokens=_peak_input(events),
         browser_calls=sum(1 for event in results if str(event.data.get("tool", "")).startswith("browser_")),

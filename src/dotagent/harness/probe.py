@@ -102,7 +102,8 @@ def tasks_of(ask: ProbeAsk) -> tuple[EvalTask, ...]:
 
 class ProbeReport(FrozenModel):
     """What a probe came to: a scorecard per attempt, the tokens and seconds it took in all, and why it stopped short
-    of its tasks when it did (``cut_short``: ``minutes`` or ``tokens``)."""
+    of its tasks when it did (``cut_short``: ``minutes``, ``tokens`` or ``plan_window``, the owner's Claude plan
+    window used as far as an eval may take it)."""
 
     label: str
     tasks: tuple[str, ...]
@@ -166,8 +167,12 @@ async def probe(
             except StopAsyncIteration:
                 break
             card: Scorecard = card_of(outcome)
-            cards.append(card)
             tokens += card.input_tokens + card.output_tokens
+            if outcome.cut == "plan_window":
+                # The owner's Claude plan is kept for their own work (item 1220): the attempt is not a score.
+                cut_short = "plan_window"
+                break
+            cards.append(card)
     finally:
         await attempts.aclose()
     report: ProbeReport = ProbeReport(

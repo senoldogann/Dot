@@ -31,6 +31,7 @@ from dotagent.evals.drafts import draft_from_run, save_draft
 from dotagent.evals.reports import load_report, save_report
 from dotagent.evals.results import EvalReport, EvalSettings, TaskOutcome
 from dotagent.evals.runner import (
+    PLAN_WINDOW_MOST,
     do_nothing_passes,
     eval_config,
     lookup_secrets,
@@ -180,6 +181,12 @@ def configured_for(config: AppConfig, command: EvalRunCommand) -> AppConfig:
     return effort.model_copy(update={"agent": effort.agent.model_copy(update={"mcp_purposes": False})})
 
 
+_PLAN_WINDOW_STOP: str = (
+    "Stopped at {task}: the window of your Claude plan is {most}% used or refuses calls, and the rest is kept for your "
+    "own work. That attempt is not counted; run the eval again once the window resets.\n"
+)
+
+
 async def play_and_save(command: EvalRunCommand) -> tuple[EvalReport, Path]:
     """Play the tasks of ``command`` against its model, telling each attempt as it ends, and save the report, after
     each attempt as at the end."""
@@ -219,6 +226,11 @@ async def play_and_save(command: EvalRunCommand) -> tuple[EvalReport, Path]:
     started_at: float = time.time()
     outcomes: list[TaskOutcome] = []
     async for outcome in play(run_config, login_env, secrets, model, tasks, command.repeat, NO_HARNESS, False):
+        if outcome.cut == "plan_window":
+            # The owner's plan is kept for their own work (item 1220): the attempt says nothing of the model, so it
+            # is left out of the report, and no other attempt starts in the same window.
+            sys.stdout.write(_PLAN_WINDOW_STOP.format(task=outcome.task_id, most=round(PLAN_WINDOW_MOST * 100)))
+            break
         outcomes.append(outcome)
         sys.stdout.write(_progress_line(outcome) + "\n")
         await asyncio.to_thread(save_report, evals_dir(), _report_of(run_config, model, started_at, outcomes))
