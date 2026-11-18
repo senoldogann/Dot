@@ -47,8 +47,8 @@ MODEL: str = os.environ.get("DOT_DESKTOP_BANK_MODEL", "ollama:gpt-oss:120b-cloud
 REPEATS: int = int(os.environ.get("DOT_DESKTOP_BANK_K", "1"))
 # Nobody has touched the Mac for this long when an attempt starts (D2).
 IDLE_LEAST_S: float = 600.0
-# One attempt's ceiling: three attempts stay within the calibration's 12M tokens and 40 minutes (D1, D2); on the
-# owner's Claude plan, whose week D1 caps at 5M, 1,500,000.
+# One attempt's ceiling: three attempts stay within the calibration's 12M tokens and 40 minutes (D1, D2). On the
+# owner's Claude plan, whose week D1 caps at 5M, give DOT_DESKTOP_BANK_MAX_TOKENS=1500000: nothing lowers it by itself.
 RUN_MAX_TOKENS: int = int(os.environ.get("DOT_DESKTOP_BANK_MAX_TOKENS", "4000000"))
 RUN_MAX_MINUTES: float = 12.0
 TYPED_NAME: str = "Ayşe Çelik"
@@ -125,7 +125,9 @@ def left_alone(idle: float, since_last_attempt: float | None) -> bool:
 
 def _report() -> Path:
     named: str | None = os.environ.get("DOT_DESKTOP_BANK_REPORT")
-    return Path(named).expanduser() if named else Path(os.environ.get("TMPDIR", "/tmp")) / "desktop-bank.jsonl"
+    if not named:
+        raise AssertionError("DOT_DESKTOP_BANK_REPORT names no file for the bank's report")
+    return Path(named).expanduser()
 
 
 def _home(root: Path) -> Path:
@@ -166,6 +168,7 @@ def test_a_model_drives_the_fixture_app(
     permissions: Permissions = check_permissions()
     if not (permissions.accessibility and permissions.post_event and permissions.screen_recording):
         pytest.skip(f"macOS has not granted the desktop permissions to this process: {permissions}")
+    report: Path = _report()
     if _REFUSED:
         pytest.skip(f"the model's provider refused an earlier attempt: {_REFUSED[0][:200]}")
     idle: float = mac_idle_seconds()
@@ -176,8 +179,11 @@ def test_a_model_drives_the_fixture_app(
     monkeypatch.setenv("DOT_LOG_DIR", str(tmp_path / "logs"))
     monkeypatch.setenv("DOT_CHROME_DIR", str(tmp_path / "chrome"))
     with fixture_app(tmp_path / "events.jsonl") as app:
-        finished, seconds, window = asyncio.run(_attempt(home, app, task))
-        _LAST_END.append(time.time())
+        try:
+            finished, seconds, window = asyncio.run(_attempt(home, app, task))
+        finally:
+            # Also when the attempt broke off: its pointer and keys were the bank's, not the owner's.
+            _LAST_END.append(time.time())
         exit_code: int | None = app.process.poll()
         seen: list[FixtureEvent] = events(app.log)
     started: bool = finished.steps > 0 or finished.input_tokens > 0
@@ -201,7 +207,7 @@ def test_a_model_drives_the_fixture_app(
         "at": round(time.time()),
         "result": finished.result[-400:],
     }
-    with _report().open("a", encoding="utf-8") as report:
-        report.write(json.dumps(line, ensure_ascii=False) + "\n")
+    with report.open("a", encoding="utf-8") as lines:
+        lines.write(json.dumps(line, ensure_ascii=False) + "\n")
     assert exit_code is None, f"the fixture app exited with code {exit_code} during the run: {finished.result}"
     assert not finished.result.startswith(PREFIX_INTERNAL_ERROR), finished.result
