@@ -103,10 +103,11 @@ could not review the change, otherwise exactly \`VERDICT: PASS\`."
   dotx=${DOTX:-$(command -v dotx || echo "$HOME/Desktop/Dot/.venv/bin/dotx")}
   thread_file="$review_dir/thread"
   review() {
-    local extra=()
-    [[ -s "$thread_file" ]] && extra=(--thread "$(cat "$thread_file")")
-    "$dotx" run --mode research --model opencode_go:deepseek-v4.1-flash --effort high --no-input \
-      "${extra[@]}" "$prompt" </dev/null
+    local args=(run --mode research --model opencode_go:deepseek-v4.1-flash --effort high --no-input)
+    if [[ -s "$thread_file" ]]; then
+      args+=(--thread "$(cat "$thread_file")")
+    fi
+    "$dotx" "${args[@]}" "$prompt" </dev/null
   }
   if ! review >"$review_file" 2>&1; then
     # A thread that no longer exists is no reason to skip the review: run it in a chat of its own.
