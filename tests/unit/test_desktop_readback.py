@@ -144,3 +144,23 @@ def test_a_value_a_field_did_not_keep_fails_the_step_by_its_length_and_not_its_t
     assert refused.value.message.startswith("a3 did not keep the value: it holds 11 characters where 9 were set.")
     # A value typed into a plain field may be a password: the step's report never carries what a field holds.
     assert _OLD_VALUE not in str(refused.value)
+
+
+def test_a_value_the_field_kept_is_uncertain_since_the_application_may_not_have_taken_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Item 1222: reading the field back reads only what accessibility wrote, not what the application took (the
+    desktop bank's digits field showed a value its own filter never saw)."""
+    monkeypatch.setattr(actions, "_element_for", lambda env, raw: (3, "element"))
+    monkeypatch.setattr(actions, "_aim_at", lambda env, number, element: None)
+    monkeypatch.setattr(ax, "set_attribute", lambda element, attribute, value, pid: None)
+    monkeypatch.setattr(ax, "read_text", lambda element, pid: ("Name", "new value", len("new value")))
+    inspection: Inspection = Inspection(
+        target='textfield "Name" a3 in Notes',
+        context=StepContext(role="other", app="Notes", element=None, secure=False, line=None),
+    )
+    effect: actions.Effect = actions._set_value(
+        _env(tmp_path), Step(action="set_value", ref="a3", text="new value"), inspection
+    )
+    assert [check.status for check in effect.checks] == ["uncertain"]
+    assert "type" in effect.checks[0].reason
