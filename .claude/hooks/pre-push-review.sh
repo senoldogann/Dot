@@ -76,15 +76,16 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       "the approach (the structural fix, or two smaller changes) rather than closing the next spelling." >&2
   fi
 
-  echo "claude-review: reviewing $base..$local_sha ($local_ref -> $remote_ref) with Claude Code"
+  echo "claude-review: reviewing $base..$local_sha ($local_ref -> $remote_ref) on opencode_go:deepseek-v4.1-flash"
   review_file="$review_dir/$local_sha.md"
   diff_file="$review_dir/$local_sha.diff"
   {
     git log --format='commit %h%n%n%B' "$base..$local_sha"
     git diff "$base..$local_sha"
   } >"$diff_file"
-  prompt="Review the change in $diff_file (its commit messages, then the diff of $base..$local_sha) in this \
-repository; the working tree may differ, so trust the diff for what changed. Follow REVIEW.md exactly: what failure \
+  prompt="Review the change in $diff_file (its commit messages, then the diff of $base..$local_sha) in the repository \
+at $repo_root; its working tree may differ, so trust the diff for what changed, and read every file by its path under \
+$repo_root, since the run's own workspace is elsewhere. Follow $repo_root/REVIEW.md exactly: what failure \
 looks like here, file-and-line evidence, the Important / Nit / Pre-existing tags, at most 3 nits, and a summary that \
 starts with the finding count. Read the surrounding code before reporting a finding. Review only; change nothing. End \
 your answer with one last line that is exactly \`VERDICT: BLOCK\` if there is at least one Important finding or you \
@@ -95,7 +96,9 @@ could not review the change, otherwise exactly \`VERDICT: PASS\`."
   # review reads the code and cannot edit it; it may still read the web and keep a note. Its stdin is /dev/null (item
   # 1020): the hook's stdin is git's list of refs, and nothing may swallow the refs after this one.
   dotx=${DOTX:-$(command -v dotx || echo "$HOME/Desktop/Dot/.venv/bin/dotx")}
-  branch=$(git symbolic-ref --short -q HEAD 2>/dev/null || echo detached)
+  # The chat the review is kept in belongs to the branch being pushed, not to the one checked out: `git push origin
+  # other`, `git push --all` and the repair flow push a branch that is not HEAD.
+  branch=${local_ref#refs/heads/}
   thread_file="$review_dir/thread-${branch//\//-}"
   review() {
     local args=(run --mode research --model opencode_go:deepseek-v4.1-flash --effort high --no-input)
@@ -112,7 +115,9 @@ could not review the change, otherwise exactly \`VERDICT: PASS\`."
     rm -f "$thread_file"
     review >"$review_file" 2>&1 || true
   fi
-  grep -oE 'thread thr_[a-z0-9_]+' "$review_file" | tail -n 1 | awk '{print $2}' >"$thread_file" || true
+  if thread=$(grep -oE 'thread thr_[a-z0-9_]+' "$review_file" | tail -n 1); then
+    printf '%s\n' "${thread#thread }" >"$thread_file"
+  fi
 
   cat "$review_file"
   verdict=$(grep -E '^VERDICT: (PASS|BLOCK)$' "$review_file" | tail -n 1 || true)
@@ -125,7 +130,9 @@ could not review the change, otherwise exactly \`VERDICT: PASS\`."
       exit 1
       ;;
     *)
-      echo "claude-review: the review gave no VERDICT line; read $review_file" >&2
+      echo "claude-review: the reviewer did not start or gave no VERDICT line; its last lines follow, and the whole" \
+        "output is in $review_file" >&2
+      tail -n 5 "$review_file" >&2 || true
       exit 1
       ;;
   esac

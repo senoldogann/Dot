@@ -63,7 +63,8 @@ def _run_hook_on(
     answer_file: Path = tmp_path / "answer"
     answer_file.write_text(answer + "\n", encoding="utf-8")
     stand_in.write_text(
-        f'#!/bin/sh\ncat > /dev/null\necho asked >> "{asked}"\ncat "{answer_file}"\n',
+        f'#!/bin/sh\ncat > /dev/null\necho asked >> "{asked}"\ncat "{answer_file}"\n'
+        'echo "run run_test, thread thr_test"\n',
         encoding="utf-8",
     )
     stand_in.chmod(0o755)
