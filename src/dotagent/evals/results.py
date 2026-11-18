@@ -7,8 +7,9 @@ from dotagent.core.types import FrozenModel
 from dotagent.evals.types import TaskCategory
 from dotagent.store.models import RunStatus
 
-# Why the harness cut a run short: it took longer than the task allows, or it used more tokens than the task allows.
-type Cut = Literal["none", "time_limit", "token_budget"]
+# Why the harness cut a run short: it took longer than the task allows, it used more tokens than the task allows, or
+# the owner's Claude plan window it runs on came near its end (item 1220: an eval does not spend the owner's own work).
+type Cut = Literal["none", "time_limit", "token_budget", "plan_window"]
 
 
 class CheckOutcome(FrozenModel):

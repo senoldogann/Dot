@@ -98,11 +98,19 @@ def _not_started(report: ProbeReport) -> list[Scorecard]:
     return [card for card in report.cards if not card.started]
 
 
+# Where a probe stopped short, by its ``cut_short`` (``harness/probe.py``).
+_STOPPED_AT: dict[str, str] = {
+    "tokens": "its tokens budget",
+    "minutes": "its minutes budget",
+    "plan_window": "the share of the Claude plan's window kept for the owner (item 1220)",
+}
+
+
 def _cut_short(base: ProbeReport, candidate: ProbeReport, unplayed: int, tasks: int) -> str:
     """Why a verdict cannot be told: ``unplayed`` of ``tasks`` were not played as many times as asked under both texts,
     the probe that stopped short, with the budget it stopped at, and the attempts whose runs never started."""
     stopped: list[str] = [
-        f"the {name}'s probe stopped at its {report.cut_short} budget"
+        f"the {name}'s probe stopped at {_STOPPED_AT[report.cut_short]}"
         for name, report in (("base", base), ("candidate", candidate))
         if report.cut_short is not None
     ]

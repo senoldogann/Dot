@@ -17,15 +17,18 @@ from collections.abc import AsyncGenerator, Callable, Iterator, Mapping, Sequenc
 from contextlib import contextmanager
 from pathlib import Path
 
+from pydantic import JsonValue
+
 from dotagent.agent.manager import RunManager, goal_mode_asked
 from dotagent.config import AgentConfig, AppConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import EvalError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import skills_dir
 from dotagent.core.text import truncate_middle
+from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.checks import evaluate_checks, workspace_path
-from dotagent.evals.metrics import run_metrics, run_trace, took_easy_way
+from dotagent.evals.metrics import ASSISTANT_EVENT, run_metrics, run_trace, took_easy_way
 from dotagent.evals.results import CheckOutcome, Cut, RunMetrics, TaskOutcome, TraceStep
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.site import serve_recording_site, with_site
@@ -37,6 +40,7 @@ from dotagent.harness.tasks import OWN_PREFIX
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatProvider
+from dotagent.repair.claude import LimitWindow, window_refused
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.secrets import resolve_secret
 from dotagent.skills.types import SKILL_FILE
@@ -287,6 +291,33 @@ async def _decline(runtime: Runtime, event: EventRecord) -> None:
     await runtime.approvals.resolve(approval_id, False, _DECIDER, _DENIAL_NOTE)
 
 
+# How much of a window of the owner's Claude plan an eval leaves for the owner's own work (item 1220): an attempt on
+# the plan is cut once the window it runs in is used this far, or refuses calls.
+PLAN_WINDOW_MOST: float = 0.70
+
+
+def plan_window_of(data: JsonObject) -> LimitWindow | None:
+    """The plan's window an ``assistant`` event of a run on the Claude plan says it ran in, ``None`` when it says
+    none (any other model, or no window told yet)."""
+    window: JsonValue = data.get("plan_window")
+    return None if window is None else LimitWindow.model_validate(window)
+
+
+def plan_window_spent(window: LimitWindow) -> bool:
+    """Whether the plan's ``window`` is used as far as an eval may take it, or refuses calls."""
+    return window_refused(window) or (window.utilization is not None and window.utilization >= PLAN_WINDOW_MOST)
+
+
+def ended_by_plan_limit(events: Sequence[EventRecord]) -> bool:
+    """Whether a run ended failed because the window of the owner's Claude plan refused it: its ``run_finished`` event
+    keeps the error's kind (``core.errors.failure_kind``)."""
+    for event in events:
+        if event.kind == "run_finished":
+            error: JsonValue = event.data.get("error")
+            return isinstance(error, dict) and error.get("kind") == "plan_limit"
+    return False
+
+
 def _stop(manager: RunManager, run_id: str) -> None:
     if run_id in manager.active_run_ids():
         manager.cancel(run_id)
@@ -316,11 +347,18 @@ async def _supervise(
                 ended: bool = event.kind == "run_finished" and event.run_id == run_id
                 missed: bool = subscription.dropped != dropped
                 dropped = subscription.dropped
-                if event.kind == CALL_EVENT or missed:
+                # A program that runs the whole goal itself (the Claude plan, OpenCode) records a step's tokens with
+                # its assistant event, and no model call (item 1220).
+                if event.kind in (CALL_EVENT, ASSISTANT_EVENT) or missed:
                     spent, stored_end = await _stored_spending(runtime, run_id)
                     ended = ended or stored_end
                     if spent > task.token_budget and cut == "none":
                         cut = "token_budget"
+                        _stop(manager, run_id)
+                if event.kind == ASSISTANT_EVENT and event.run_id == run_id and cut == "none":
+                    window: LimitWindow | None = plan_window_of(event.data)
+                    if window is not None and plan_window_spent(window):
+                        cut = "plan_window"
                         _stop(manager, run_id)
                 if event.kind == "approval_requested":
                     await _decline(runtime, event)
@@ -373,6 +411,8 @@ async def _run_in(
         await manager.shutdown()
     seconds: float = time.monotonic() - started
     events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _MAX_EVENTS)
+    # A plan whose window refused the session ends the run before any step tells its window: no score either.
+    cut = "plan_window" if cut == "none" and ended_by_plan_limit(events) else cut
     records: tuple[SiteRecord, ...] = taken()
     checks: tuple[CheckOutcome, ...] = await evaluate_checks(
         task.checks, runtime.workspace, record.result, runtime.shell_env, events, records
