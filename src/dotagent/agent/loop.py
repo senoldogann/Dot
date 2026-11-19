@@ -206,6 +206,7 @@ from dotagent.core.errors import (
     InvalidValueError,
     MissingSecretError,
     NotFoundError,
+    ProviderCreditError,
     ProviderError,
     ProviderFilterError,
     ProviderQuotaError,
@@ -482,22 +483,8 @@ _EMPTY_NOTE: str = "[system note] Your last reply was empty. Continue with the t
 _CUT_SHORT: frozenset[FinishReason] = frozenset({"length", "other"})
 # The ends, in the service's own words, of a reply its content filter stopped (OpenCode Go's DeepSeek gave
 # 'content_filter' with no output on a 340k-token chat, 2026-10-20): asked again with the same conversation, the model
-# is stopped again, so the run moves to a standby model at once (:func:`_cannot_answer`) instead of being nudged.
+# is stopped again, so the run ends at once saying so instead of being nudged.
 _FILTERED: frozenset[str] = frozenset({"content_filter"})
-_FILTERED_REASON: str = "its content filter stopped the reply"
-_EMPTY_REASON: str = "it answered with nothing, again and again"
-_DECLINED_REASON: str = "it declined the goal before doing any of it"
-
-
-class _Declined(ProviderError):
-    """The run's model ended it saying it cannot, before a step of work was done: like a content filter, it does not
-    answer this goal, and a standby model takes the run over (item 1211, the owner's word: a refusal must not stop the
-    work he left running)."""
-
-
-class _EmptyReplies(ProviderError):
-    """The run's model answered with nothing as many times as a run is nudged (item 789): like a content filter, it does
-    not answer this conversation, and a standby model takes the run over."""
 
 
 _CUT_SHORT_NOTE: str = (
@@ -2199,15 +2186,15 @@ def _fit_tools(
 
 
 def _cannot_answer(error: Exception) -> str | None:
-    """Why the run's model cannot answer this run: what pauses it for every run (:func:`unavailable_reason`), or its
-    service's content filter, which stops this conversation alone. ``None`` for any other error."""
-    if isinstance(error, _Declined):
-        return _DECLINED_REASON
-    if isinstance(error, ProviderFilterError):
-        return _FILTERED_REASON
-    if isinstance(error, _EmptyReplies):
-        return _EMPTY_REASON
-    return unavailable_reason(error)
+    """Why the run moves to a standby model: its provider's credits, usage window, quota or rate are spent, the one
+    reason a run changes its model (the owner's word, 2026-11-19, item 1225). A refusal, a content filter's stop, empty
+    replies, a refused or missing key and a model its plan lacks move it nowhere: the run ends saying why, and a run
+    that needs the owner asks them first. ``None`` for those, and for any other error."""
+    if isinstance(error, ProviderCreditError | ProviderWindowError | ProviderRateLimitError):
+        return unavailable_reason(error)
+    if isinstance(error, ProviderQuotaError) and error.status != 402:
+        return unavailable_reason(error)
+    return None
 
 
 def filtered_stop(reply: ModelReply, model: str) -> ProviderFilterError | None:
@@ -2216,8 +2203,7 @@ def filtered_stop(reply: ModelReply, model: str) -> ProviderFilterError | None:
         return None
     return ProviderFilterError(
         f"the model's service stopped its reply with its content filter ('{reply.raw_finish}'), and asked again with "
-        "this conversation it stops it again: choose another model, or name a standby model "
-        "([models] standby) that the run moves to",
+        "this conversation it stops it again: choose another model for this chat",
         {"model": model, "input_tokens": reply.usage.input_tokens, "output_tokens": reply.usage.output_tokens},
     )
 
@@ -2231,8 +2217,8 @@ async def _to_standby(
     fixed_tokens: int,
     step: int,
 ) -> _Standby | None:
-    """Move the run to the first standby model that can take it over, now that ``ref`` could not answer (``error``,
-    which paused it in the router, or its content filter's stop, which paused nothing: :func:`_cannot_answer`). The
+    """Move the run to the first standby model that can take it over, now that ``ref`` could not answer because its
+    credits, usage window, quota or rate are spent (``error``, :func:`_cannot_answer`). The
     models the run has worked on (``left``) are not taken again, so a run goes through its standby models once at most.
     The run's reasoning level follows the move: the level of the new model that is nearest to it.
 
@@ -2724,11 +2710,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else None
     )
     steps: int = 0
-    # The first model's answer when it declined the goal, kept for the ending when no standby took the run over.
-    declined_first: RunOutcome | None = None
-    # Whether any step of the run called a tool other than finish: a run that ends failed before its first such step
-    # has done no work, and a refusal there is the model's, not the goal's.
-    worked: bool = False
     # The plan the run was last handed as a note, and at which step (item 825).
     plan_told: str | None = None
     plan_told_at: int = 0
@@ -2994,8 +2975,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 continue
             reply: ModelReply = heard
             await sink.flush()
-            # A reply the service's content filter stopped is handled as a model that cannot answer this run: a
-            # routed step goes back to the run's own model, the run's own model hands over to a standby one.
+            # A reply the service's content filter stopped: a routed step goes back to the run's own model; on the
+            # run's own model the run ends saying so.
             filtered: ProviderFilterError | None = filtered_stop(reply, step_ref.label)
             if filtered is not None:
                 log.warning("reply_filtered", run_id=run.id, step=steps, model=step_ref.label, finish=reply.raw_finish)
@@ -3173,7 +3154,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             # A step that calls anything but finish goes on with the work: the replies told to finish were steps
             # announced, not the answer, and stay.
             if any(call.name != FINISH_TOOL for call in reply.tool_calls):
-                worked = True
                 noted_replies = []
             # Only text replies in a row end a task run; a step that acts starts the count again.
             if _acts(reply.tool_calls, questions):
@@ -3259,48 +3239,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     history.append(await _stored_note(agent, arrival))
             if finished is not None:
                 ended = _finish_result(finished)
-                # A run that says it cannot before it has done a step of work is a model that will not take this goal
-                # on, not a goal that failed: a standby model takes the run over, as it does for a content filter's
-                # stop (item 789), so a refusal never stops the work the owner left running. The next standby takes it
-                # when that one declines too; only when none is left does the run end as the model said.
-                if ended.status == "failed" and not worked and routed is None and run.mode != "chat":
-                    # A finish that says what it would need is still a decline: the answer is kept, and the run keeps
-                    # asking its standby models while one is left (item 1211).
-                    if declined_first is None:
-                        declined_first = ended
-                    declined: _Declined = _Declined(f"the model declined the goal ({ref.label})", {"model": ref.label})
-                    try:
-                        declined_to: _Standby | None = await _to_standby(
-                            agent, ref, declined, left, bool(specs), estimate_tokens([system], specs), steps
-                        )
-                    except ConfigError as error:
-                        log.warning("declined_no_standby", run_id=agent.run.id, model=ref.label, problem=str(error))
-                        declined_to = None
-                    if declined_to is None and declined_first is not None:
-                        # No model left took the goal: the run ends with what its first one said, needs included.
-                        ended = declined_first
-                    if declined_to is not None:
-                        history.append(
-                            await _stored_note(
-                                declined_to.agent,
-                                _SWITCH_NOTE.format(to=declined_to.ref.label, old=ref.label, reason=declined_to.reason),
-                            )
-                        )
-                        agent, run, ref, info, scaffold = (
-                            declined_to.agent,
-                            declined_to.agent.run,
-                            declined_to.ref,
-                            declined_to.info,
-                            declined_to.scaffold,
-                        )
-                        left = left | {ref.label}
-                        candidates = still_routable(candidates, left)
-                        context = replace(context, output_chars=scaffold.tool_output_chars)
-                        if not info.vision:
-                            history = drop_old_images(history, 0)
-                        nudges = 0
-                        ratio = 1.0
-                        continue
                 unread = _failed_before_finish(outcomes, finished)
                 # The finish takes the replies told to finish before it; one sent back is a new start for them.
                 restating = tuple(noted_replies)
@@ -3395,34 +3333,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             elif answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text, needs="")
             elif nudges >= config.finish_nudges:
-                # Empty again and again on the run's own model: a standby model takes the run over where one is left
-                # (item 789), as for a content filter; else, and on a step routed to another model, the run ends.
-                empty: _EmptyReplies = _EmptyReplies("the model returned empty replies", {"model": ref.label})
-                moved: _Standby | None = (
-                    None
-                    if answered or routed is not None
-                    else await _to_standby(
-                        agent, ref, empty, left, bool(specs), estimate_tokens([system], specs), steps
-                    )
+                # Empty again and again: the run ends, on no other model (item 1225).
+                return _run_end(
+                    agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
                 )
-                if moved is None:
-                    return _run_end(
-                        agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
-                    )
-                history.append(
-                    await _stored_note(
-                        moved.agent, _SWITCH_NOTE.format(to=moved.ref.label, old=ref.label, reason=moved.reason)
-                    )
-                )
-                agent, run, ref, info, scaffold = moved.agent, moved.agent.run, moved.ref, moved.info, moved.scaffold
-                left = left | {ref.label}
-                candidates = still_routable(candidates, left)
-                context = replace(context, output_chars=scaffold.tool_output_chars)
-                if not info.vision:
-                    history = drop_old_images(history, 0)
-                nudges = 0
-                ratio = 1.0
-                continue
             else:
                 nudges += 1
                 if answered:
