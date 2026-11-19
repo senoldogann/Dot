@@ -122,11 +122,13 @@ async def login_env() -> dict[str, str]:
 
 
 def _config() -> AppConfig:
-    """An eval configuration with ``auto`` lessons and the scripted model as the review model too."""
+    """An eval configuration with ``auto`` lessons, the night's reflection at its time of day (an eval leaves it off,
+    item 1227) and the scripted model as the review model too."""
     config: AppConfig = eval_config(load_default_config())
+    night: str = load_default_config().agent.reflection_time
     return config.model_copy(
         update={
-            "agent": config.agent.model_copy(update={"lessons": "auto"}),
+            "agent": config.agent.model_copy(update={"lessons": "auto", "reflection_time": night}),
             "models": config.models.model_copy(update={"review": SCRIPTED_MODEL}),
         }
     )

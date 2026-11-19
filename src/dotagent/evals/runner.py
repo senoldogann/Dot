@@ -20,6 +20,7 @@ from pathlib import Path
 from pydantic import JsonValue
 
 from dotagent.agent.manager import RunManager, goal_mode_asked
+from dotagent.agent.reflection_record import REFLECTION_OFF
 from dotagent.config import AgentConfig, AppConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import EvalError
 from dotagent.core.logs import get_logger
@@ -93,8 +94,14 @@ def eval_config(config: AppConfig) -> AppConfig:
                     # turn every reference on: eval check plays the script, and a task that does not opt in has no
                     # verdict in that script.
                     "goal_mode": False,
+                    # The night's reflection fires on any tick past its time of day and asks the review model, which
+                    # a scripted provider of the same service answers with a reply a test meant for its run: tests in
+                    # the small hours failed so (item 1227). A test of the night opts back in.
+                    "reflection_time": REFLECTION_OFF,
                 }
             ),
+            # The plugin scout's night is read by the review model too, on the same tick.
+            "scout": config.scout.model_copy(update={"time": REFLECTION_OFF}),
             "mcp": [],
             "builtin_mcp": config.builtin_mcp.model_copy(update={"web_research": False}),
             "skills": SkillsConfig(dirs=[], elsewhere=False),
