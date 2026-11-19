@@ -358,7 +358,8 @@ yours and is never touched; a file with no block gets it at its end. The tool gr
 `pipeline_begin`, `pipeline_end` and `pipeline_outcome`.
 
 - **An action is written down before it goes out.** `pipeline_begin` writes it begun; `pipeline_end` says what came of
-  it with what showed it: sent (seen in Sent, in the channel's history), failed (seen not to have gone) or uncertain
+  it with what showed it (and, for one recorded after the fact, `at`, when its evidence says it went out; never later
+  than now, item 1231): sent (seen in Sent, in the channel's history), failed (seen not to have gone) or uncertain
   (could not tell). A run that breaks off between the two leaves it begun, and the next run finds it first.
 - **Nothing is begun twice.** An action begun or uncertain cannot be begun again until a run looked and ended it; one
   sent is never begun again under its name (a further mail is an action of its own, `reminder-1`); only one that failed

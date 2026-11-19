@@ -23,6 +23,7 @@ from dotagent.pipeline.ledger import (
     pending,
     summary,
     upsert_client,
+    when_of,
     written,
 )
 
@@ -234,3 +235,17 @@ def test_an_action_of_a_client_the_owner_took_out_still_ends() -> None:
     ledger: Ledger = begin(_one_client(), "ornek-leipomo", "first-mail", "", "2026-11-19 10:00")
     gone: Ledger = Ledger(clients=(), actions=ledger.actions, outcomes=(), outside=False)
     assert end(gone, "ornek-leipomo/first-mail", "sent", "In Sent", "2026-11-19 10:01").actions[0].state == "sent"
+
+
+def test_an_action_recorded_after_the_fact_is_dated_by_its_evidence_and_its_answers_count() -> None:
+    """Item 1231: a mail sent on 29 October and recorded on 19 November was dated the 19th, and the reply of 3 November
+    was counted as no answer to it."""
+    recorded: datetime = datetime(2026, 11, 19, 9, 20)
+    ledger: Ledger = begin(_one_client(), "ornek-leipomo", "first-mail", "v1", minute(recorded))
+    when: str = when_of("2026-10-29 03:24", recorded)
+    ledger = end(ledger, "ornek-leipomo/first-mail", "sent", "client-pipeline.md: Gönderildi 29.10.2026 03:24", when)
+    ledger, _ = note_outcome(ledger, "ornek-leipomo", "reply", "2026-11-03 09:12", "Mail")
+    assert (ledger.actions[0].at, compare(ledger)[0].answered) == ("2026-10-29 03:24", 1)
+    assert when_of(None, recorded) == "2026-11-19 09:20"
+    with pytest.raises(LedgerRefusal, match="after now"):
+        when_of("2026-11-20", recorded)
