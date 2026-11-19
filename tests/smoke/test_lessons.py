@@ -338,6 +338,26 @@ async def test_auto_leaves_a_lesson_alone_that_the_owner_dismissed_while_it_save
         assert await home.runtime.store.count_memories() == 1
 
 
+async def test_auto_leaves_out_a_lesson_past_the_days_cap_and_still_offers_save_anyway(
+    login_env: dict[str, str],
+) -> None:
+    # Item 1247: with [agent] lessons_per_day at 1, the second lesson the second look keeps is left out with the reason.
+    base: AppConfig = _config("auto")
+    config: AppConfig = base.model_copy(update={"agent": base.agent.model_copy(update={"lessons_per_day": 1})})
+    async with _home(config, login_env, [*_stumbles(NOTES, ()), _lessons(LESSON, OTHER), _vet(None, None)]) as home:
+        run: RunRecord = await _run(home)
+        lessons: RunLessons | None = await run_lessons(home.runtime.store, run.id)
+        assert lessons is not None
+        assert [(lesson.state, lesson.reason) for lesson in lessons.lessons] == [
+            ("saved", None),
+            ("dismissed", "1 lesson was saved in the last 24 hours, the most a day keeps is 1"),
+        ]
+        assert await home.runtime.store.count_memories() == 1
+        # The owner's Save anyway is not held to the cap.
+        await home.manager.save_lesson(run.id, 1)
+        assert await home.runtime.store.count_memories() == 2
+
+
 async def test_auto_saves_the_lessons_of_a_run_and_drops_a_lesson_a_saved_note_already_says(
     login_env: dict[str, str],
 ) -> None:

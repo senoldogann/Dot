@@ -437,6 +437,12 @@ lessons = "auto"
 # the same by hand.
 reflection_time = "03:30"
 lesson_rest_days = 60
+# A lesson that no run was handed at all rests sooner, after lesson_unused_rest_days (item 1247: of the owner's 834
+# lessons of 2026-10-28 to 11-19, every one a later run was handed, 346, was handed first within 20 days, 90% within
+# 14). lessons_per_day is the most lessons "auto" saves in 24 hours; past it a lesson is left out with that reason and
+# its run's page still offers Save anyway (the same days made 3 to 97 a day, 38 on average; 7 of 23 days passed 40).
+lesson_unused_rest_days = 21
+lessons_per_day = 40
 # After a task run of its own that ended done (its answer checked, or its goal found achieved) with at least
 # skill_min_steps acting steps, the review model distils how it got there into a learned skill: a folder
 # learned-<kind>/SKILL.md under <home>/playbooks with the kind of work, the steps, the parameters and the evidence,
