@@ -62,7 +62,8 @@ WORK_ORDER_MOVES: dict[WorkOrderStatus, frozenset[WorkOrderStatus]] = {
     "assigned": frozenset({"working", "in_review", "cancelled", "escalated"}),
     "working": frozenset({"in_review", "cancelled", "escalated"}),
     "in_review": frozenset({"accepted", "returned", "assigned", "escalated", "cancelled"}),
-    "returned": frozenset({"working", "assigned", "cancelled", "escalated"}),
+    # Back to review when the attempt it was sent back for never started (item 1237).
+    "returned": frozenset({"working", "in_review", "assigned", "cancelled", "escalated"}),
     "escalated": frozenset({"cancelled"}),
     "accepted": frozenset(),
     "cancelled": frozenset(),
