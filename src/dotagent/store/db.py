@@ -86,6 +86,7 @@ from dotagent.store.models import (
     ObjectiveNote,
     ObjectiveRecord,
     ObjectiveStatus,
+    ObjectiveWorkflow,
     PushSubscription,
     QueuedMessage,
     ReactionName,
@@ -203,7 +204,8 @@ CREATE INDEX IF NOT EXISTS work_orders_status ON work_orders(status, created_at)
 CREATE INDEX IF NOT EXISTS work_orders_objective ON work_orders(objective_id);
 CREATE TABLE IF NOT EXISTS objectives (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, why TEXT NOT NULL, measure TEXT NOT NULL, status TEXT NOT NULL,
-    notes TEXT NOT NULL, tainted INTEGER NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL
+    notes TEXT NOT NULL, tainted INTEGER NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL,
+    workflow TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS objectives_status ON objectives(status, created_at);
 CREATE TABLE IF NOT EXISTS drafts (
@@ -1017,6 +1019,7 @@ def _objective(row: aiosqlite.Row) -> ObjectiveRecord:
         tainted=bool(row["tainted"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        workflow=ObjectiveWorkflow.model_validate_json(row["workflow"]),
     )
 
 
@@ -1425,6 +1428,8 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
+    # How a continuing piece of work is done (item 1227; an ``ObjectiveWorkflow`` as JSON): an older objective has none.
+    await _add_columns(connection, "objectives", (("workflow", "TEXT NOT NULL DEFAULT '{}'"),))
     await _add_columns(connection, "queued_messages", _ADDED_QUEUE_COLUMNS)
     await _add_columns(connection, "harness_experiences", _ADDED_HARNESS_EXPERIENCE_COLUMNS)
     await _add_columns(connection, "harness_probes", _ADDED_HARNESS_PROBE_COLUMNS)
@@ -4640,7 +4645,9 @@ class Store:
     # ----- objectives (item 908) ------------------------------------------------------------
 
     @_writing
-    async def add_objective(self, title: str, why: str, measure: str, tainted: bool) -> ObjectiveRecord:
+    async def add_objective(
+        self, title: str, why: str, measure: str, workflow: ObjectiveWorkflow, tainted: bool
+    ) -> ObjectiveRecord:
         """Put an objective on the list, active, with no progress yet."""
         now: float = time.time()
         record: ObjectiveRecord = ObjectiveRecord(
@@ -4653,11 +4660,12 @@ class Store:
             tainted=tainted,
             created_at=now,
             updated_at=now,
+            workflow=workflow,
         )
         await self._db.execute(
-            "INSERT INTO objectives(id, title, why, measure, status, notes, tainted, created_at, updated_at)"
-            " VALUES(?, ?, ?, ?, 'active', '[]', ?, ?, ?)",
-            (record.id, title, why, measure, int(tainted), now, now),
+            "INSERT INTO objectives(id, title, why, measure, status, notes, tainted, created_at, updated_at, workflow)"
+            " VALUES(?, ?, ?, ?, 'active', '[]', ?, ?, ?, ?)",
+            (record.id, title, why, measure, int(tainted), now, now, workflow.model_dump_json()),
         )
         await self._db.commit()
         return record
@@ -4679,11 +4687,15 @@ class Store:
 
     @_writing
     async def update_objective(
-        self, objective_id: str, status: ObjectiveStatus | None, note: ObjectiveNote | None
+        self,
+        objective_id: str,
+        status: ObjectiveStatus | None,
+        note: ObjectiveNote | None,
+        workflow: ObjectiveWorkflow | None,
     ) -> ObjectiveRecord:
-        """Change where an objective stands, and add a dated line of progress: the notes only grow. A move
-        :data:`OBJECTIVE_MOVES` does not allow is refused. The write matches the status just read, so a move made
-        meanwhile is not overwritten."""
+        """Change where an objective stands, add a dated line of progress (the notes only grow), and replace how it
+        is done (``workflow``, item 1227; ``None`` keeps it). A move :data:`OBJECTIVE_MOVES` does not allow is refused.
+        The write matches the status just read, so a move made meanwhile is not overwritten."""
         current: ObjectiveRecord = await self.get_objective(objective_id)
         wanted: ObjectiveStatus = current.status if status is None else status
         if wanted != current.status and wanted not in OBJECTIVE_MOVES[current.status]:
@@ -4692,11 +4704,13 @@ class Store:
                 {"objective_id": objective_id, "from": current.status, "to": wanted},
             )
         notes: tuple[ObjectiveNote, ...] = current.notes if note is None else (*current.notes, note)
+        kept: ObjectiveWorkflow = current.workflow if workflow is None else workflow
         cursor = await self._db.execute(
-            "UPDATE objectives SET status = ?, notes = ?, updated_at = ? WHERE id = ? AND status = ?",
+            "UPDATE objectives SET status = ?, notes = ?, workflow = ?, updated_at = ? WHERE id = ? AND status = ?",
             (
                 wanted,
                 _OBJECTIVE_NOTES.dump_json(notes).decode(),
+                kept.model_dump_json(),
                 time.time(),
                 objective_id,
                 current.status,

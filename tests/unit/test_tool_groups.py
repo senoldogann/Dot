@@ -92,6 +92,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "browser",
         "memory_admin",
         "todos",
+        "pipeline",
         "drafts",
         "accounts",
         "schedule",
@@ -112,6 +113,8 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
     assert groups_of([spec.name for spec in specs_for_mode(REGISTRY, "research")]) == (
         "browser",
         "todos",
+        # A research run reads a pipeline's ledger; it keeps none (item 1227).
+        "pipeline",
         "accounts",
         "schedule",
         "office",
@@ -181,6 +184,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "memory_admin",
         "office",
         "pages",
+        "pipeline",
         "recon",
         "replies",
         "skills",
@@ -249,6 +253,9 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "- memory_admin: correcting or forgetting saved notes (memory_update, memory_forget)",
         "- todos: your own list of work to do for the owner later, on your own while the Mac is idle, and their "
         "objectives (todo_add, todo_drop, objective_add, objective_update, objectives)",
+        "- pipeline: the ledger of a continuing piece of work (clients, leads) in its record file: each one's status "
+        "and next step, every mail or message begun before it goes out and ended with what showed it, and what came "
+        "of them (pipeline_view, pipeline_client, pipeline_begin, pipeline_end, pipeline_outcome)",
         "- drafts: an email or a message you write for the owner, who sends it from the conversation (draft_message)",
         "- accounts: the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only "
         "(mail_search, mail_read, calendar_events)",

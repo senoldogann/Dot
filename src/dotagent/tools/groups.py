@@ -42,6 +42,8 @@ _PREFIX_GROUPS: tuple[tuple[str, str], ...] = (
     ("meeting_", "meetings"),
     # The owner's iPhone over WebDriverAgent, while [phone] is on.
     ("phone_", "phone"),
+    # The ledger of a continuing piece of work in its record file (item 1227).
+    ("pipeline_", "pipeline"),
 )
 _GROUP_OF_TOOL: dict[str, str] = {
     "apple_script": "desktop",
@@ -104,6 +106,10 @@ _PURPOSES: dict[str, str] = {
     "skills": "saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way",
     "video": "watching a video file or a video link: frames of what it shows and a transcript of what is said",
     "recon": "a site or host you own: addresses, TLS, headers, technology, open ports, and a form's payload check",
+    "pipeline": (
+        "the ledger of a continuing piece of work (clients, leads) in its record file: each one's status and next "
+        "step, every mail or message begun before it goes out and ended with what showed it, and what came of them"
+    ),
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
 LISTED_TOOLS: int = 16

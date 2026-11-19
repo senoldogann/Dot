@@ -555,6 +555,21 @@ class ObjectiveNote(FrozenModel):
     tainted: bool
 
 
+class ObjectiveWorkflow(FrozenModel):
+    """How a continuing piece of work is done (item 1227), beside what it is and how it is measured: where its facts
+    come from (``sources``), the rules its decisions follow (``rules``), what shows a step of it done (``evidence``),
+    what is handled otherwise or brought to the owner (``exceptions``), the step that comes next (``next_step``), and
+    the workspace file that is the one record of its items (``record``, a path under the workspace, kept with the
+    pipeline tools). Each is empty when not said; an objective of before it has them all empty."""
+
+    sources: str = ""
+    rules: str = ""
+    evidence: str = ""
+    exceptions: str = ""
+    next_step: str = ""
+    record: str = ""
+
+
 class ObjectiveRecord(FrozenModel):
     """Something the owner wants Dot to move forward over time (item 908): what (``title``), why it matters
     (``why``) and how progress is judged (``measure``). ``notes`` only grow. ``tainted`` says the run that wrote it
@@ -570,6 +585,7 @@ class ObjectiveRecord(FrozenModel):
     tainted: bool
     created_at: float
     updated_at: float
+    workflow: ObjectiveWorkflow
 
 
 class DraftRecord(FrozenModel):

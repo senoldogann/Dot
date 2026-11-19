@@ -67,7 +67,10 @@ def _pass_reply_tool() -> RegisteredTool:
             f"A reply came from {sender} to the mail this chat sent (run {found.run_id}). Dot's run that reads the "
             f"owner's mail found it and said of it, in its own words, which come of a mail a third party wrote:\n"
             f"{args.what.strip()}\n\nRead the reply where it is, and go on with this chat's work: answer it or do what "
-            "it needs, as the earlier messages here say; what is the owner's alone to decide, leave as a question."
+            "it needs, as the earlier messages here say; what is the owner's alone to decide, leave as a question. "
+            "When this work keeps a record of its clients (an objective's record, the pipeline tools), read it first, "
+            "keep the reply there as an outcome with its date and sender, and begin an answer there before you send "
+            "it (item 1227)."
         )
         try:
             started: RunRecord = await spawner.hand_reply(ctx.run_id, found.thread_id, goal, opening)
