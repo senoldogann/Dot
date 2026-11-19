@@ -1575,6 +1575,35 @@ _OCCUPIED_SQL: str = ", ".join(f"'{status}'" for status in sorted(OCCUPIED_STATU
 _RUN_WORKS_SQL: str = f"EXISTS (SELECT 1 FROM runs WHERE runs.id = ? AND runs.status IN ({_WORKING_SQL}))"
 
 
+def _thread_summaries_sql(where: str, order: str) -> str:
+    """The query of the chats' summaries (``Store.list_thread_summaries``), with ``where`` after its joins (its own
+    marks after the seven of the query) and ``order`` after its ORDER BY."""
+    return (
+        "WITH ranked AS ("
+        " SELECT thread_id, id, status, mode, created_at, finished_at,"
+        "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place,"
+        "  COUNT(*) OVER (PARTITION BY thread_id) AS run_count"
+        " FROM runs WHERE parent_run_id IS NULL AND rewound_at IS NULL"
+        " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns))"
+        " AND (? IS NULL OR thread_id IN (SELECT id FROM threads WHERE team_id = ?)))"
+        " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
+        "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
+        "  r.created_at AS latest_created_at,"
+        "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread,"
+        "  COALESCE(latest.agent_id, latest.campaign_id, team.id) AS actor_id,"
+        "  team.id AS team_id, team.name AS team_name, team.agents AS team_agents,"
+        "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result,"
+        f"  (SELECT s.cron FROM schedules AS s WHERE {_CHAT_LOOP}"
+        "   ORDER BY s.next_run_at IS NULL, s.next_run_at LIMIT 1) AS loop_cron,"
+        f"  (SELECT MIN(s.next_run_at) FROM schedules AS s WHERE {_CHAT_LOOP}) AS loop_next_at,"
+        "  (SELECT c.id FROM campaigns AS c WHERE c.thread_id = t.id ORDER BY c.created_at DESC LIMIT 1)"
+        "   AS campaign_id"
+        " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
+        " JOIN runs AS latest ON latest.id = r.id LEFT JOIN teams AS team ON team.id = t.team_id"
+        f"{where} ORDER BY {order}"
+    )
+
+
 class Store:
     """Connector to the SQLite database."""
 
@@ -2322,28 +2351,7 @@ class Store:
         schedules that make none of their own going on in their chat when ``same_chat`` (``[scheduler] same_chat``),
         and the team it is with (item 610); with ``team_id``, only the chats with that team are listed."""
         rows: list[aiosqlite.Row] = await self._all(
-            "WITH ranked AS ("
-            " SELECT thread_id, id, status, mode, created_at, finished_at,"
-            "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place,"
-            "  COUNT(*) OVER (PARTITION BY thread_id) AS run_count"
-            " FROM runs WHERE parent_run_id IS NULL AND rewound_at IS NULL"
-            " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns))"
-            " AND (? IS NULL OR thread_id IN (SELECT id FROM threads WHERE team_id = ?)))"
-            " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
-            "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
-            "  r.created_at AS latest_created_at,"
-            "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread,"
-            "  COALESCE(latest.agent_id, latest.campaign_id, team.id) AS actor_id,"
-            "  team.id AS team_id, team.name AS team_name, team.agents AS team_agents,"
-            "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result,"
-            f"  (SELECT s.cron FROM schedules AS s WHERE {_CHAT_LOOP}"
-            "   ORDER BY s.next_run_at IS NULL, s.next_run_at LIMIT 1) AS loop_cron,"
-            f"  (SELECT MIN(s.next_run_at) FROM schedules AS s WHERE {_CHAT_LOOP}) AS loop_next_at,"
-            "  (SELECT c.id FROM campaigns AS c WHERE c.thread_id = t.id ORDER BY c.created_at DESC LIMIT 1)"
-            "   AS campaign_id"
-            " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
-            " JOIN runs AS latest ON latest.id = r.id LEFT JOIN teams AS team ON team.id = t.team_id"
-            " ORDER BY t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?",
+            _thread_summaries_sql("", "t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?"),
             (
                 team_id,
                 team_id,
@@ -2355,6 +2363,41 @@ class Store:
             ),
         )
         return [_summary(row) for row in rows]
+
+    async def agent_home_chats(
+        self, sources: Sequence[str], same_chat: bool = False, agent_id: str | None = None
+    ) -> dict[str, ThreadSummary]:
+        """Each agent's home chat (item 1233), by its id: the chat of the latest activity among those whose latest run
+        is the agent's, that a source of ``sources`` started (the owner's: not a schedule's, a watcher's or the
+        agents' work among themselves) and that is with no team and is no campaign's, however many chats are newer;
+        with ``agent_id``, that agent's alone. A chat is as ``list_thread_summaries`` makes it."""
+        named: tuple[str, ...] = tuple(sources)
+        if not named:
+            return {}
+        marks: str = ", ".join("?" for _ in named)
+        rows: list[aiosqlite.Row] = await self._all(
+            _thread_summaries_sql(
+                f" WHERE latest.agent_id IS NOT NULL AND (? IS NULL OR latest.agent_id = ?) AND t.source IN ({marks})"
+                " AND t.team_id IS NULL AND latest.campaign_id IS NULL"
+                " AND NOT EXISTS (SELECT 1 FROM campaigns AS home_c WHERE home_c.thread_id = t.id)",
+                "updated_at DESC",
+            ),
+            (
+                None,
+                None,
+                _LAST_MESSAGE_READ_CHARS,
+                _LAST_MESSAGE_READ_CHARS,
+                int(same_chat),
+                int(same_chat),
+                agent_id,
+                agent_id,
+                *named,
+            ),
+        )
+        homes: dict[str, ThreadSummary] = {}
+        for row in rows:
+            homes.setdefault(row["actor_id"], _summary(row))
+        return homes
 
     async def delete_threads(self, thread_ids: Sequence[str]) -> list[str]:
         """Delete chats with everything they hold, in one transaction: their messages (with what was kept aside of their

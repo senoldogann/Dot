@@ -161,6 +161,7 @@ export const EN = {
   "run.lastGone": "The chat that was open last is gone, so Dot opened a new one.",
   "run.noPlan": "This task has no plan: Dot writes one for work of several steps.",
   "run.mainTask": "Main task",
+  "run.agentDetails": "{name}: role, schedules and what it learned",
   "run.partOfAnother": "Part of another task",
   "run.stopThis": "Stop this task",
   "run.stop": "Stop",

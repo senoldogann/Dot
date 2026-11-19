@@ -158,6 +158,7 @@ export const TR = {
   "run.lastGone": "En son açık olan sohbet artık yok, Dot yeni bir sohbet açtı.",
   "run.noPlan": "Bu görevin planı yok: Dot, birkaç adımlık işler için plan yazar.",
   "run.mainTask": "Ana görev",
+  "run.agentDetails": "{name}: görevi, zamanlamaları ve öğrendikleri",
   "run.partOfAnother": "Başka bir görevin parçası",
   "run.stopThis": "Bu görevi durdur",
   "run.stop": "Durdur",
