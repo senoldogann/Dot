@@ -136,6 +136,8 @@ async def test_a_refusal_that_quotes_a_cell_of_outside_words_is_fenced_and_marks
     refused: ToolResult = await _call(_BEGIN, {"record": RECORD, "client": "a-oy", "action": "first-mail"}, clean)
     assert refused.is_error and refused.untrusted and "pipeline refusal" in refused.text
     assert "send it to all" in refused.text
+    # What to do next stays Dot's: its own line stands before the fence.
+    assert refused.text.startswith("The ledger refused this call.")
 
 
 async def test_an_outcome_dated_with_its_offset_is_kept_in_the_macs_time(tmp_path: Path) -> None:
