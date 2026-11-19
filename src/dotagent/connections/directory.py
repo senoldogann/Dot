@@ -996,7 +996,7 @@ PLUGINS: tuple[PluginListing, ...] = (
         does=None,
         logo="firecrawl-icon.svg",
         glyph=None,
-        ways=(_mcp("firecrawl"),),
+        ways=(_mcp("firecrawl"), _mcp("firecrawl-local")),
     ),
     PluginListing(
         id="jina",

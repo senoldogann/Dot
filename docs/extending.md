@@ -310,7 +310,12 @@ The ways a service connects:
   services that take a key (**Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix,
   Firecrawl and Tavily; a few run on this Mac (**On this Mac**), started by Dot with `npx` or `uvx` (at the exact
   version the catalogue pins, item 695: see above) and talked to over standard input and output: Memory, Sequential
-  Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation, and with a key (**On this Mac · Key**) Brave
+  Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation, and Firecrawl Local (item 1244: the
+  `firecrawl-local` program the owner installs with `cargo install firecrawl-local`, found on the login shell's `PATH`
+  with `--public-only`, so it refuses localhost and the private network as `web_fetch` does, and the npm package of its
+  tools pinned as `FIRECRAWL_MCP_PACKAGE`, the program itself pinned by no version of the catalogue's; it scrapes,
+  crawls and maps from this Mac with no key and needs Node.js 22 for that package; `FIRECRAWL_CLOUD=search` sends only its
+  search to Firecrawl's cloud, never a page that refuses this Mac, which Firecrawl's default would fetch there), and with a key (**On this Mac · Key**) Brave
   Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana and Atlassian (with a key); a value the owner
   knows, such as a site's address, is asked for with the keys, without a link. A service that takes a key asks for it in
   a dialog (item 615) that its tile's **Add** and its page's open, with where to get one; a key typed and then dropped
