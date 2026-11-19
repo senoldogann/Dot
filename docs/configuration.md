@@ -79,7 +79,8 @@ how many messages they are and their size, and the screenshots they name stay wi
 moment while it compacts, so run it when no run is active.
 
 Deleting a chat (or a campaign with its chats) removes its screenshot files after the delete has committed, asking
-the database about each file's name instead of reading every message and event, and hands the freed pages back in parts,
+the database about each file's name instead of reading every message and event (and, under the write lock, reads only
+the chat's texts that hold a screenshot's file extension, item 1248), and hands the freed pages back in parts,
 so the other writers go on between them (item 686). A file that cannot be removed is logged and left for `dotx prune`.
 A screenshot file that something outside Dot removed is left out of its message as the chat's history is read back, the
 message saying "(a screenshot that is no longer on disk)", and logged as `screenshot_missing`: the chat goes on (item

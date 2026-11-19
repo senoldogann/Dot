@@ -476,6 +476,12 @@ def _write_image(directory: Path, image: ImageData) -> str:
 _IMAGE_NAME: re.Pattern[str] = re.compile(rf"\b[0-9a-f]{{24}}\.(?:{'|'.join([*_EXTENSIONS.values(), 'bin'])})\b")
 
 
+def _names_an_image(column: str) -> str:
+    """What the stored text in ``column`` must hold to name a screenshot file (:data:`_IMAGE_NAME`), as SQL: a text that
+    does not is passed over in the database rather than read into Python. ``instr`` is a plain search."""
+    return " OR ".join(f"instr({column}, '.{extension}') > 0" for extension in [*_EXTENSIONS.values(), "bin"])
+
+
 def image_names_in(texts: Iterable[str]) -> set[str]:
     """The screenshot file names that the stored messages or events in ``texts`` name."""
     return {name for text in texts for name in _IMAGE_NAME.findall(text)}
@@ -2540,10 +2546,15 @@ class Store:
         """The screenshot files named by what ``delete_threads`` is about to delete: the events of the doomed runs, the
         messages of the named threads and of the threads of delegated runs, and what the named threads kept aside."""
         threads: tuple[str, ...] = named + delegated
+        # Only the texts that may name one are read (the owner's ask of 2026-11-19): reading every event and message of
+        # the chats into Python took 9.5 of the 13 seconds ten chats took to delete, under the write lock.
         rows: list[aiosqlite.Row] = await self._all(
             f"{doomed} SELECT data AS text FROM events WHERE run_id IN (SELECT id FROM doomed)"
+            f" AND ({_names_an_image('data')})"
             f" UNION ALL SELECT body FROM messages WHERE thread_id IN ({','.join('?' * len(threads))})"
-            f" UNION ALL SELECT body FROM message_archive WHERE thread_id IN ({','.join('?' * len(named))})",
+            f" AND ({_names_an_image('body')})"
+            f" UNION ALL SELECT body FROM message_archive WHERE thread_id IN ({','.join('?' * len(named))})"
+            f" AND ({_names_an_image('body')})",
             named + threads + named,
         )
         return await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])

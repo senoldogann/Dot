@@ -97,7 +97,8 @@ at the foot (Dot's work, a channel's) fold on a click of their label, and the fo
 sidebar's head holds the button that folds it away, at its left, and the **+** of a new chat. **Select** turns the list
 into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
-and approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to
+and approval of theirs; they leave the list at the yes, while the daemon deletes them, and come back with why if the
+delete fails (item 1248). A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to
 end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a
 drawer. On a touch screen of a phone's width it has no X (item 888): a chat you choose closes it, and so does a swipe
 to the left; a narrow window of the Mac keeps its button. On a phone the list is the home (item 991, the owner's

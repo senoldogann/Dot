@@ -1349,10 +1349,31 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (!confirmed) {
       return;
     }
+    // The chats leave the list at the yes (the owner's ask of 2026-11-19: many chats took seconds to delete and the
+    // page showed nothing meanwhile); a delete that fails brings them back with why.
+    const leaving = new Set(ids);
+    for (const id of ids) {
+      deleting.add(id);
+    }
+    chats = chats.filter((chat) => !leaving.has(chat.id));
+    if (selecting) {
+      leaveSelectMode();
+    } else {
+      paintLists();
+    }
+    if (routeThreadId !== null && leaving.has(routeThreadId)) {
+      location.hash = homeHref;
+    }
     let outcome;
     try {
       outcome = await request("DELETE", "/threads", { ids });
     } catch (error) {
+      for (const id of ids) {
+        deleting.delete(id);
+      }
+      if (!disposed) {
+        await load();
+      }
       if (error instanceof ApiError && error.status === 409) {
         toast("error", BUSY_MESSAGE);
         return;
@@ -1362,17 +1383,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (disposed) {
       return;
     }
-    const gone = new Set(outcome.deleted);
-    toast("ok", tCount(gone.size, "sidebar.deletedOne", "sidebar.deletedMany"));
-    chats = chats.filter((chat) => !gone.has(chat.id));
-    if (selecting) {
-      leaveSelectMode();
-    } else {
-      paintLists();
+    for (const id of ids) {
+      deleting.delete(id);
     }
-    if (routeThreadId !== null && gone.has(routeThreadId)) {
-      location.hash = homeHref;
-    }
+    toast("ok", tCount(outcome.deleted.length, "sidebar.deletedOne", "sidebar.deletedMany"));
     await load();
   }
 
@@ -1410,6 +1424,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     resolveThread(routeRunId);
   }
 
+  // The chats whose delete was asked and has not answered yet (deleteChats).
+  const deleting = new Set();
   // The newest load answers for what is shown: an older answer that comes after it is dropped, not painted over it.
   let activityTicket = 0;
   let chatsTicket = 0;
@@ -1441,7 +1457,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       if (disposed || mine !== chatsTicket) {
         return;
       }
-      chats = all;
+      // A chat being deleted stays out of the list while its delete is under way, whatever a reload in between reads.
+      chats = all.filter((chat) => !deleting.has(chat.id));
       failure = null;
       const known = new Set(all.map((chat) => chat.id));
       for (const id of [...selected]) {
