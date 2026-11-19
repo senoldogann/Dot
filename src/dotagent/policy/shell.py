@@ -201,7 +201,8 @@ _WRAPPERS: frozenset[str] = frozenset(
 # (``script -q log rm``).
 _WRAPPER_SKIPS: dict[str, int] = {"timeout": 1, "gtimeout": 1, "script": 1}
 # The precommand modifiers that run a builtin of the shell itself, so ``builtin cd ~`` moves the line as ``cd ~`` does.
-_BUILTIN_MODIFIERS: frozenset[str] = frozenset({"builtin", "command", "noglob", "nocorrect"})
+# zsh's ``-`` is one too: ``- rm x`` runs ``rm`` with a ``-`` in front of the name it is given (K1-04).
+_BUILTIN_MODIFIERS: frozenset[str] = frozenset({"builtin", "command", "noglob", "nocorrect", "-"})
 # Tools that run the command their operands name, after a word of their own (``uv run pytest``, ``bundle exec rake``)
 # or at once (``npx``, ``bunx``). Their options that take a value are many and not all known here, so an operand right
 # after an option may begin the command (:func:`_runner_starts`), and each such reading is judged.
@@ -282,13 +283,17 @@ _WRAPPER_VALUES: dict[str, frozenset[str]] = {
     "su": frozenset({"-c", "-s", "-g", "-G", "--command", "--shell", "--group", "--supp-group"}),
     "pkexec": frozenset({"--user"}),
 }
-_SHELLS: frozenset[str] = frozenset({"bash", "sh", "zsh", "dash", "ksh", "fish"})
+# The C shells, which ship with macOS: their lines are not the Bourne shells' lines the guard reads (K1-04).
+_C_SHELLS: frozenset[str] = frozenset({"csh", "tcsh"})
+_SHELLS: frozenset[str] = frozenset({"bash", "sh", "zsh", "dash", "ksh", "fish", *_C_SHELLS})
 # A shell's own standard input, named as the file it reads commands from (``source /dev/stdin``).
 _STDIN_FILES: frozenset[str] = frozenset({"/dev/stdin", "/dev/fd/0"})
 _SHELL_VALUES: frozenset[str] = frozenset({"-o", "+o", "-O", "+O", "--rcfile", "--init-file"})
 _INTERPRETERS: frozenset[str] = frozenset(
     {"python", "python3", "node", "ruby", "perl", "php", "swift", "deno", "bun", "lua", "rscript", "julia"}
 )
+# The programs a version in their name does not hide (:func:`_unversioned`).
+_VERSIONED: frozenset[str] = _SHELLS | _INTERPRETERS
 _INLINE_CODE: frozenset[str] = frozenset({"-c", "-e", "-E", "--eval", "-p"})
 # node's long spellings of its inline code, as the word before the code or with "=code" attached.
 _LONG_INLINE_CODE: tuple[str, ...] = ("--eval", "--print")
@@ -681,6 +686,7 @@ _SAFE_COMMANDS: frozenset[str] = frozenset(
         "cd",
         "pushd",
         "popd",
+        "chdir",
         "dirs",
         "read",
         "export",
@@ -1127,11 +1133,16 @@ def _command_starts(text: str, start: int, index: int, patterns: Set[int]) -> bo
 def _closing_paren(text: str, start: int) -> int:
     """The index of the ``)`` that closes a ``(`` opened just before ``start``, past quotes, nested parentheses and the
     patterns of a ``case`` (in ``$(case x in x) rm ;; esac)`` the first ``)`` ends a pattern, and the substitution
-    goes on to its ``esac``); the end of ``text`` when it never closes."""
+    goes on to its ``esac``); the end of ``text`` when it never closes. The shell reads the body as commands, so a
+    comment runs to its line's end, a here-document's body to its delimiter line and a ``$'...'`` string past its
+    escaped quotes, and a ``)`` in any of them ends nothing (K1-02: ``$(true # )'`` went on, and the quote that the
+    guard took to open after it hid the commands of the next lines)."""
     depth: int = 1
     # The depth each ``case`` not yet ended by its ``esac`` stands at: a ``)`` there ends one of its patterns.
     cases: list[int] = []
     patterns: set[int] = set()
+    # The here-documents whose bodies start after the next newline: each delimiter and whether tabs are stripped.
+    documents: list[tuple[str, bool]] = []
     quote: str | None = None
     index: int = start
     while index < len(text):
@@ -1142,8 +1153,27 @@ def _closing_paren(text: str, start: int) -> int:
             index += 1
         elif quote == '"':
             quote = None if char == '"' else quote
+        elif text.startswith("$'", index):
+            index += 2
+            while index < len(text) and text[index] != "'":
+                index += 2 if text[index] == "\\" else 1
         elif char in ("'", '"'):
             quote = char
+        elif char == "#" and (index == start or text[index - 1] in _WORD_BREAKS):
+            newline: int = text.find("\n", index)
+            index = len(text) if newline == -1 else newline
+            continue
+        elif (operator := _heredoc(text, index)) is not None:
+            end, delimiter, strip, _ = operator
+            documents.append((delimiter, strip))
+            index = end
+            continue
+        elif char == "\n" and documents:
+            index += 1
+            for delimiter, strip in documents:
+                index = _document(text, index, delimiter, strip)[1]
+            documents = []
+            continue
         elif char == "(":
             depth += 1
         elif char == ")" and cases and cases[-1] == depth:
@@ -1263,6 +1293,26 @@ def _last_word(out: list[str]) -> str:
     return text[max(text.rfind(char) for char in _WORD_BREAKS) + 1 :]
 
 
+def _open_variable(out: list[str]) -> int | None:
+    """Where the ``$`` of a variable named without braces stands when :func:`_read`'s text ends with it (``$K``), so
+    that a quote or an escape after it can end the name: the shell reads ``$K'sh'`` as ``K``'s value and ``sh``, and
+    once the quotes are gone the words would say ``$Ksh`` (item 1250). None when the text does not end so."""
+    index: int = len(out) - 1
+    while index >= 0 and len(out[index]) == 1 and (out[index].isalnum() or out[index] == "_"):
+        index -= 1
+    named: bool = index < len(out) - 1 and not out[index + 1].isdigit()
+    return index if index >= 0 and out[index] == "$" and named else None
+
+
+def _end_variable(out: list[str]) -> None:
+    """Brace the variable :func:`_read`'s text ends with (``$K`` becomes ``${K}``), before a quote or an escape that
+    the shell reads as the end of its name."""
+    at: int | None = _open_variable(out)
+    if at is not None:
+        out[at] = "${"
+        out.append("}")
+
+
 def _read(command: str) -> _Reading:
     """``command`` read the way the shell reads it before it splits it into words (item 116).
 
@@ -1298,6 +1348,7 @@ def _read(command: str) -> _Reading:
             elif escaped != "" and escaped in _OPERATOR_CHARS:
                 out.append(escaped.translate(_HIDE_OPERATORS))
             else:
+                _end_variable(out)
                 out.append(command[index : index + 2])
             index += 2
         elif (
@@ -1323,6 +1374,8 @@ def _read(command: str) -> _Reading:
             unclosed = unclosed or end == len(command)
             index = end + 1
         elif quote == '"':
+            if char == '"':
+                _end_variable(out)
             out.append(char if char == '"' else char.translate(_HIDE_OPERATORS))
             quote = None if char == '"' else quote
             index += 1
@@ -1333,6 +1386,7 @@ def _read(command: str) -> _Reading:
             out.append(shlex.quote(_ANSI_C.sub(_ansi_escape, command[index + 2 : end])).translate(_HIDE_OPERATORS))
             index = end + 1
         elif char in ("'", '"'):
+            _end_variable(out)
             out.append(char)
             quote = char
             index += 1
@@ -1565,7 +1619,16 @@ def _program(word: str) -> str:
     """The name of the program ``word`` runs, as this Mac reads it: the last part of the word, in lower case. The
     default volume does not tell letter cases apart, so ``RM``, ``Rm`` and ``/bin/RM`` run ``rm`` and ``SUDO`` runs
     ``sudo``; a name is judged by its letters alone (item 538)."""
-    return Path(word).name.casefold()
+    return _unversioned(Path(word).name.casefold())
+
+
+def _unversioned(name: str) -> str:
+    """``name`` without the version a shell or an interpreter may carry in it (K1-04: ``perl5.34`` ships with macOS and
+    runs ``perl``, ``python3.13`` runs ``python3``); any other name as it is (``md5`` is no ``md``)."""
+    base: str = name
+    while base and base not in _VERSIONED and base[-1] in "0123456789.":
+        base = base[:-1]
+    return base if base in _VERSIONED else name
 
 
 # Item 788: a system tool's line is a read only when what it asks for is one of the reads below; any other verb or
@@ -1760,6 +1823,21 @@ def _unbraced(values: list[str]) -> list[str] | None:
     return done
 
 
+def _brace_words(word: str) -> list[str]:
+    """The words the shell makes of ``word``'s braces, in its order (``{rm,-rf,x}`` is ``rm``, ``-rf`` and ``x``;
+    ``a{b,c}d`` is ``abd`` and ``acd``); past :data:`_MOST_VALUES` of them, ``word`` stands for one only the running
+    line knows. :func:`_unbraced` gives the same values as alternatives of one word, in no order."""
+    match: re.Match[str] | None = _BRACES.search(word)
+    if match is None:
+        return [word]
+    words: list[str] = []
+    for choice in match.group(1).split(","):
+        words.extend(_brace_words(f"{word[: match.start()]}{choice}{word[match.end() :]}"))
+        if len(words) > _MOST_VALUES:
+            return [_SUBSTITUTED]
+    return words
+
+
 def _spellings(raw: str, scope: ShellScope) -> tuple[list[str] | None, bool]:
     """:func:`_expansions` and whether it gave up for want of room: more spellings (variables, braces) than
     :data:`_MOST_VALUES`, as against a part only the running line knows. A part only the running line knows (a variable
@@ -1784,8 +1862,19 @@ def _spellings(raw: str, scope: ShellScope) -> tuple[list[str] | None, bool]:
         return None, True
     if unknown:
         return None, False
-    expanded: list[str] = [os.path.expanduser(value) for value in spelled]
+    expanded: list[str] = [tilded for value in spelled for tilded in _tilde(value, scope)]
     return (None if any("$" in value for value in expanded) else expanded), False
+
+
+def _tilde(value: str, scope: ShellScope) -> list[str]:
+    """``value`` with a leading ``~`` (alone or before ``/``) put as the shell puts it: the ``HOME`` the line set, each
+    value it may hold, else the daemon's (item 1250: ``HOME+=/.ssh; cat ~/id_rsa`` reads ``~/.ssh/id_rsa``); a value
+    only the running line knows keeps its ``$`` stand-in, so the word is one the guard cannot spell. ``~user`` is that
+    account's home."""
+    held: tuple[str, ...] | None = scope.variables.get("HOME")
+    if held is None or not (value == "~" or value.startswith("~/")):
+        return [os.path.expanduser(value)]
+    return [home + value[1:] for home in held]
 
 
 def _expansions(raw: str, scope: ShellScope) -> list[str] | None:
@@ -1894,6 +1983,62 @@ def _places(raw: str, scope: ShellScope) -> list[Path]:
     return [_located(value, cwd, scope) for value in values for cwd in scope.cwds]
 
 
+# The builtins that move the line to the folder they are given: zsh's ``chdir`` is its ``cd``.
+_CHANGES_FOLDER: frozenset[str] = frozenset({"cd", "chdir", "pushd"})
+# ``CDPATH`` and the array zsh ties to it: ``cdpath=(~)`` sets both.
+_CDPATH_NAMES: tuple[str, ...] = ("CDPATH", "cdpath")
+
+
+def _cd_places(operands: list[str], scope: ShellScope) -> list[Path]:
+    """The directories a ``cd`` or ``pushd`` given ``operands`` may move the line to (K1-03). No operand, or ``-``,
+    goes home or back, which the home folder stands for. zsh's ``cd OLD NEW`` puts ``NEW`` in place of the first
+    ``OLD`` in the current folder's path. A name that does not start with ``/``, ``./`` or ``../`` is also looked up
+    under each folder ``CDPATH`` (or zsh's ``cdpath`` array) names, the daemon's or the line's; a folder only the
+    running line knows (``cdpath=(~)``, whose values the guard does not keep) is the home folder, with the name under
+    it. More operands, or a part only the running line knows, may go anywhere the home folder stands for. The home
+    folder is the line's ``HOME`` when it sets one (item 1250)."""
+    homes: list[Path] = _home_places(scope)
+    if len(operands) == 2:
+        olds: list[str] | None = _expansions(operands[0], scope)
+        news: list[str] | None = _expansions(operands[1], scope)
+        if olds is None or news is None:
+            return homes
+        return [
+            Path(str(cwd).replace(old, new, 1))
+            for cwd in scope.cwds
+            for old in olds
+            for new in news
+            if old and old in str(cwd)
+        ]
+    if len(operands) != 1 or operands[0] == "-":
+        return homes
+    places: list[Path] = _places(operands[0], scope)
+    if operands[0].startswith(("/", "./", "../", "~")) or operands[0] in (".", ".."):
+        return places
+    searched: list[str] = [value for name in _CDPATH_NAMES for value in _held(name, scope) or ()]
+    if not searched:
+        return places
+    names: list[str] | None = _expansions(operands[0], scope)
+    if names is None:
+        return [*places, *homes]
+    folders: list[Path] = [
+        expand_path(folder, home) if "$" not in folder else home
+        for value in searched
+        for folder in value.split(":")
+        if folder
+        for home in homes
+    ]
+    return [*places, *(expand_path(name, folder) for folder in folders for name in names)]
+
+
+def _home_places(scope: ShellScope) -> list[Path]:
+    """The home folders ``~`` and a bare ``cd`` may stand for: the values the line gave ``HOME``, else the daemon's;
+    one only the running line knows is the daemon's home."""
+    held: tuple[str, ...] = scope.variables.get("HOME", ())
+    known: list[Path] = [Path(value) for value in held if "$" not in value and value.startswith("/")]
+    return known if known and len(known) == len(held) else [*known, Path.home()]
+
+
 def _with_places(scope: ShellScope, places: list[Path]) -> ShellScope:
     """``scope`` in the directories ``places``; past ``_MOST_PLACES`` of them, the home folder stands for the rest."""
     cwds: tuple[Path, ...] = tuple(dict.fromkeys(places))
@@ -1924,12 +2069,34 @@ def _assigned(scope: ShellScope, name: str, raws: list[str]) -> ShellScope:
     return replace(scope, variables={**scope.variables, name: held if len(held) <= _MOST_VALUES else (_SUBSTITUTED,)})
 
 
+def _appended(scope: ShellScope, name: str, raw: str) -> ShellScope:
+    """``scope`` after ``name+=raw``, which zsh and bash read as the old value with ``raw`` added at its end (K1-01:
+    ``K=~/.s; K+=sh`` holds ``~/.ssh``, not ``~/.s`` or ``sh``): every value ``name`` may hold joined with every value
+    of ``raw``, the old values kept too. A variable nothing set holds what the daemon's environment gives it, else a
+    part only the running line knows."""
+    before: tuple[str, ...] = _held(name, scope) or (_SUBSTITUTED,)
+    added: list[str] = _expansions(raw, scope) or [_SUBSTITUTED]
+    joined: list[str] = [old + new for old in before for new in added]
+    held: tuple[str, ...] = tuple(dict.fromkeys([*scope.variables.get(name, ()), *joined]))
+    return replace(scope, variables={**scope.variables, name: held if len(held) <= _MOST_VALUES else (_SUBSTITUTED,)})
+
+
 def _assign_words(scope: ShellScope, words: list[str]) -> ShellScope:
+    """``scope`` after the assignments ``words``: a plain one adds a value, an append (``+=``) joins one to the values
+    held, and one to an element of an array (``arr[1]=x``) leaves the whole variable to the running line."""
     current: ShellScope = scope
     for word in words:
         assignment: re.Match[str] | None = _ENV_ASSIGNMENT.fullmatch(word)
-        if assignment is not None:
-            current = _assigned(current, assignment.group(1), [assignment.group(2)])
+        if assignment is None:
+            continue
+        name: str = assignment.group(1)
+        operator: str = word[len(name) : assignment.start(2)]
+        if operator.startswith("["):
+            current = _assigned(current, name, [_SUBSTITUTED])
+        elif operator == "+=":
+            current = _appended(current, name, assignment.group(2))
+        else:
+            current = _assigned(current, name, [assignment.group(2)])
     return current
 
 
@@ -2029,10 +2196,8 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
     command: str = _program(rest[0]) if rest else ""
     if command == "eval":
         return _line_scope(" ".join(rest[1:]), assigned)
-    if command in ("cd", "pushd"):
-        operands: list[str] = _positional(rest[1:])
-        wanted: bool = len(operands) == 1 and operands[0] != "-"
-        return _with_places(assigned, [*assigned.cwds, *(_places(operands[0], assigned) if wanted else [Path.home()])])
+    if command in _CHANGES_FOLDER:
+        return _with_places(assigned, [*assigned.cwds, *_cd_places(_positional(rest[1:]), assigned)])
     if command == "ln":
         return _linked(assigned, rest[1:])
     run, where = _run_by_wrappers(rest, assigned)
@@ -2221,7 +2386,7 @@ def _assess_redirects(targets: list[str], scope: ShellScope) -> list[Finding]:
 # The commands that move the line to another folder: a climb (``..``) beside a part only the running line knows is no
 # step toward a protected location in ``cd "$(dirname "$f")/.."``, which reads nothing. Where the line lands is still
 # read: the beginning and the end of the path a move names are judged as any other word's.
-_MOVES: frozenset[str] = frozenset({"cd", "pushd", "popd"})
+_MOVES: frozenset[str] = frozenset({"cd", "chdir", "pushd", "popd"})
 
 
 def _protected_words(words: list[str], scope: ShellScope, *, climbs: bool = True) -> list[Finding]:
@@ -3873,6 +4038,10 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
 
 def _assess_command_body(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
     """Judge one command, its reserved words, assignments and wrappers already looked through."""
+    if command in _C_SHELLS:
+        return [_unknown(f"runs {command}, a C shell whose lines the guard does not read")]
+    if command == "alias":
+        return _assess_alias(args, scope)
     if command in _SHELLS:
         return _assess_shell_call(command, args, scope, given)
     if command == "eval":
@@ -3968,7 +4137,42 @@ def _assess_command_body(command: str, args: list[str], scope: ShellScope, given
         return [_finding("low", (), f"runs {command}"), *_writes_to(command, _unpacked_into(command, args), scope)]
     if command in _SAFE_COMMANDS:
         return [_finding("safe", (), command)]
-    return [_finding("low", (), f"runs {command}")]
+    return [_finding("low", (), f"runs {command}"), *_given_lines(args, scope)]
+
+
+# The options with which a program is given a command line or code to run (``tcsh -c``, ``npx -c``, ``npm exec
+# --call``, ``docker exec c sh -c``), read as a line when the program is not one the guard knows (K1-04).
+_LINE_OPTIONS: frozenset[str] = frozenset({"-c", "-e", "--command", "--call", "--eval", "--exec", "--execute"})
+# What makes a value a command line rather than one word (``gcc -c main.c``, ``ffmpeg -c copy``): a blank, an operator
+# or a substitution.
+_LINE_CHARS: str = " \t\n;&|`<>"
+
+
+def _given_lines(args: list[str], scope: ShellScope) -> list[Finding]:
+    """What a program the guard does not know runs when it is given a command line with one of :data:`_LINE_OPTIONS`
+    (separate or as ``--command=...``): each such value that is a line is judged as one, as ``docs/safety.md`` says a
+    wrapper's string is; a value of one word is no line and is passed over."""
+    lines: list[str] = []
+    for index, word in enumerate(args):
+        name, glued, value = word.partition("=")
+        if word in _LINE_OPTIONS and index + 1 < len(args):
+            lines.append(args[index + 1])
+        elif glued and name.startswith("--") and name in _LINE_OPTIONS:
+            lines.append(value)
+    return [
+        found
+        for line in lines
+        if any(char in line for char in _LINE_CHARS) or "$(" in line
+        for found in _assess_all(line, scope)
+    ]
+
+
+def _assess_alias(args: list[str], scope: ShellScope) -> list[Finding]:
+    """``alias`` (and ``alias -g``, whose name stands for its value anywhere in a later line) keeps each ``name=value``
+    it is given as a line that runs when the name does, in a later line or through ``eval``; each is judged now, as
+    ``trap``'s line is (K1-06). Without a value it only prints."""
+    lines: list[str] = [word.partition("=")[2] for word in _positional(args) if "=" in word]
+    return [_finding("safe", (), "alias"), *(found for line in lines for found in _assess_all(line, scope))]
 
 
 def _assess_privileged(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
@@ -4041,6 +4245,21 @@ def _assess_wrapped(command: str, args: list[str], scope: ShellScope, given: _In
     return _assess_simple(rest, scope, given)
 
 
+# zsh's tables (of its zsh/parameter module) whose elements are aliases and function bodies: setting one defines it.
+_CODE_ARRAYS: frozenset[str] = frozenset(
+    {
+        "aliases",
+        "galiases",
+        "saliases",
+        "functions",
+        "dis_aliases",
+        "dis_galiases",
+        "dis_saliases",
+        "dis_functions",
+    }
+)
+
+
 def _assignment_findings(word: str, scope: ShellScope) -> list[Finding]:
     """What the assignment ``word`` (``NAME=value``) sets up for the programs it reaches: a command line one of them
     runs, judged now, or code one of them loads, which cannot be read; an empty value loads nothing."""
@@ -4048,6 +4267,12 @@ def _assignment_findings(word: str, scope: ShellScope) -> list[Finding]:
     if assignment is None:
         return []
     name, value = assignment.group(1), assignment.group(2)
+    if name in _CODE_ARRAYS:
+        # An element of zsh's alias and function tables is a line that runs when its name does (item 1250:
+        # ``aliases[x]='rm -rf ~/x'; eval x``); a whole table given at once holds values the guard does not keep.
+        if _SUBSTITUTED in value:
+            return [_unknown(f"sets zsh's {name} table to values only the running line knows")]
+        return _assess_all(value, scope)
     if name in _COMMAND_VARIABLES:
         return _assess_all(value, scope)
     if name in _LOADING_VARIABLES and value:
@@ -4100,7 +4325,8 @@ def _assess_runner(command: str, args: list[str], scope: ShellScope, given: _Inp
         rest = args[at + 1 :]
     starts: list[int] = _runner_starts(rest, _RUNNER_OPERANDS.get(command, 0))
     readings: list[Finding] = [found for index in starts for found in _assess_simple(rest[index:], scope, given)]
-    return [_finding("low", (), f"runs {command}"), *readings]
+    # ``npx -c 'line'``, ``npm exec --call 'line'`` and ``pnpm exec -c`` run their line in a shell (K1-04).
+    return [_finding("low", (), f"runs {command}"), *readings, *_given_lines(rest, scope)]
 
 
 def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
@@ -4116,6 +4342,14 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
     if len(head) > 1 and head.startswith("="):
         # zsh puts the path of the command in place of ``=rm``.
         return _assess_simple([head[1:], *plain[1:]], scope, given)
+    if head == "-":
+        # zsh's precommand modifier: ``- rm x`` runs ``rm x`` (K1-04).
+        return _assess_simple(plain[1:], scope, given)
+    braced: list[str] = _brace_words(head)
+    if len(braced) > 1:
+        # The shell makes several words of braces in the command's place, the first the command and the rest its first
+        # arguments (K1-05: ``{rm,-rf,~/x}`` runs ``rm -rf ~/x``), where a word elsewhere is read as its alternatives.
+        return _assess_simple([*braced, *plain[1:]], scope, given)
     names: list[str] | None = _expansions(head, scope)
     if names is None:
         return [_unknown("runs a command whose name is only known when the line runs")]
