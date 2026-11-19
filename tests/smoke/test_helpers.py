@@ -205,10 +205,6 @@ def _finish(answer: str) -> ScriptedTurn:
     return _turn(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": True}))
 
 
-def _declines(answer: str) -> ScriptedTurn:
-    return _turn(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": False}))
-
-
 def _says(text: str) -> ScriptedTurn:
     return ScriptedTurn(text=text, calls=())
 
@@ -376,50 +372,6 @@ async def test_a_run_whose_provider_cannot_answer_moves_to_its_standby_model_and
     ]
 
 
-def _declines_needing(answer: str, needs: str) -> ScriptedTurn:
-    return _turn(
-        ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": False, "needs_from_user": needs})
-    )
-
-
-async def test_a_decline_that_names_what_it_needs_still_moves_to_the_standby(login_env: dict[str, str]) -> None:
-    """Item 1211: a refusal that says what it would need is still a refusal — another model may not need it, so the run
-    asks its standby models first and keeps the answer for the end."""
-    refusing: str = "anthropic:scripted-refusing"
-    main: RecordingProvider = RecordingProvider(
-        ScriptedProvider("anthropic", [_declines_needing("I will not do this.", "your written consent")])
-    )
-    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
-    config: AppConfig = _config([], [SCRIPTED_MODEL], 5)
-    async with _session(config, login_env, {"anthropic": main, "ollama": standby}) as (runtime, runs):
-        played: Played = await _play(runtime, runs, refusing, None)
-    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
-    assert len(main.requests) == 1
-
-
-async def test_a_run_the_model_declines_moves_to_its_standby_model_and_finishes(
-    login_env: dict[str, str],
-) -> None:
-    """Item 1211: a model that says it cannot, before it has done a step of work, is not the goal failing — the
-    standby model takes the run over, so a refusal never stops the work the owner left running."""
-    refusing: str = "anthropic:scripted-refusing"
-    main: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [_declines("I will not do this.")]))
-    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
-    config: AppConfig = _config([], [SCRIPTED_MODEL], 5)
-    async with _session(config, login_env, {"anthropic": main, "ollama": standby}) as (runtime, runs):
-        played: Played = await _play(runtime, runs, refusing, None)
-    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
-    assert played.data(MODEL_SWITCHED_EVENT) == (
-        {
-            "from": refusing,
-            "to": SCRIPTED_MODEL,
-            "reason": "it declined the goal before doing any of it",
-            "step": 1,
-        },
-    )
-    assert len(main.requests) == 1
-
-
 async def test_a_standby_model_chosen_while_the_daemon_runs_takes_the_next_run_over(login_env: dict[str, str]) -> None:
     """Item 478: Settings › Models chooses the standby models while the daemon runs, and the next run whose model cannot
     answer moves to the one chosen, with no restart, though the config the runtime was built with names none."""
@@ -508,9 +460,9 @@ async def test_without_a_standby_model_the_run_fails_with_the_error_of_its_model
     assert played.record.model == SPENT_MAIN
 
 
-async def test_a_reply_its_content_filter_stops_moves_the_run_to_its_standby_model(login_env: dict[str, str]) -> None:
-    """Asked again with the same conversation the filter stops the model again, so the run is not nudged: it moves to
-    its standby model at the first stop."""
+async def test_a_reply_its_content_filter_stops_ends_the_run_on_its_own_model(login_env: dict[str, str]) -> None:
+    """A run changes its model only when its credits or limits are spent (item 1225): a filter's stop ends it saying
+    so, a standby model named or not, and the same conversation is not sent again."""
     filtering: FilteringProvider = FilteringProvider(ScriptedProvider("anthropic", []), 0)
     standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
     async with _session(_config([], [SCRIPTED_MODEL], 5), login_env, {"anthropic": filtering, "ollama": standby}) as (
@@ -518,18 +470,17 @@ async def test_a_reply_its_content_filter_stops_moves_the_run_to_its_standby_mod
         runs,
     ):
         played: Played = await _play(runtime, runs, SPENT_MAIN, None)
-    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
-    assert played.data(MODEL_SWITCHED_EVENT) == (
-        {"from": SPENT_MAIN, "to": SCRIPTED_MODEL, "reason": "its content filter stopped the reply", "step": 1},
-    )
-    assert len(filtering.requests) == 1
+    assert (played.record.status, played.record.model) == ("failed", SPENT_MAIN), played.record
+    assert "content filter" in played.record.result
+    assert played.data(MODEL_SWITCHED_EVENT) == ()
+    assert (len(filtering.requests), standby.requests) == (1, [])
 
 
-async def test_a_model_that_answers_with_nothing_again_and_again_hands_the_run_to_its_standby_model(
+async def test_a_model_that_answers_with_nothing_again_and_again_ends_the_run_on_its_own_model(
     login_env: dict[str, str],
 ) -> None:
-    """Item 789: a model that answers with nothing as many times as a run is nudged ended the run ("The model returned
-    empty replies"), a standby model named or not; the standby model takes it over, as for a content filter."""
+    """Item 789: a model that answers with nothing as many times as a run is nudged ends the run ("The model returned
+    empty replies"), a standby model named or not (item 1225)."""
     empty: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [_says("")] * 5))
     standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
     async with _session(_config([], [SCRIPTED_MODEL], 5), login_env, {"anthropic": empty, "ollama": standby}) as (
@@ -537,10 +488,30 @@ async def test_a_model_that_answers_with_nothing_again_and_again_hands_the_run_t
         runs,
     ):
         played: Played = await _play(runtime, runs, SPENT_MAIN, None)
-    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
-    assert [switch["reason"] for switch in played.data(MODEL_SWITCHED_EVENT)] == [
-        "it answered with nothing, again and again"
-    ]
+    assert (played.record.status, played.record.model) == ("failed", SPENT_MAIN), played.record
+    assert played.data(MODEL_SWITCHED_EVENT) == ()
+    assert standby.requests == []
+
+
+async def test_a_model_that_declines_the_goal_ends_the_run_with_its_answer_on_its_own_model(
+    login_env: dict[str, str],
+) -> None:
+    """A refusal is the model's answer, not a spent credit: the run ends with it, and no standby model is asked (item
+    1225, the owner's word of 2026-11-19, which undoes items 980 and 983's move)."""
+    declined: ScriptedTurn = _turn(
+        ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "I cannot do this.", "success": False})
+    )
+    declining: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [declined]))
+    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
+    async with _session(_config([], [SCRIPTED_MODEL], 5), login_env, {"anthropic": declining, "ollama": standby}) as (
+        runtime,
+        runs,
+    ):
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert (played.record.status, played.record.model) == ("failed", SPENT_MAIN), played.record
+    assert "I cannot do this." in played.record.result
+    assert played.data(MODEL_SWITCHED_EVENT) == ()
+    assert standby.requests == []
 
 
 async def test_a_reply_its_content_filter_stops_ends_the_run_saying_so_when_no_standby_model_is_left(

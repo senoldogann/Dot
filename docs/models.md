@@ -86,17 +86,12 @@ and the end of a long one) and the newest screenshot, which only a helper that c
 `[agent] consult_max_per_run` questions (5); `0` offers no `consult`. A delegated run asks none (its parent does), and
 the run's own model is never its helper.
 
-`standby` lists the models a run moves to when its own model answers with a quota, rate-limit or key error (HTTP 401),
-refuses access to it (HTTP 403: a model, a region or a plan the key may not use; or OpenRouter's 404 for a model the
-account's privacy settings leave no provider of, item 361), its provider has no key, its service's content filter
-stops the reply (item 437; that pauses the model for no other run), or the run's own model answers with nothing as
-often as a run is nudged to answer (item 789; that pauses it for no other run either): the run goes on from the same step, with the tools
+`standby` lists the models a run moves to when its own model's credits, usage window, quota or rate are spent, and
+then only (item 1225, the owner's word of 2026-11-19): a refusal, a content filter's stop, replies with nothing, a
+refused key or access and a missing key end the run on its own model, saying why, and a run that needs you asks you
+first. On a spent credit or limit the run goes on from the same step, with the tools
 that step had, on the first standby model that can take it over, the model is told, and the timeline shows the switch,
-which the model chip follows. A run whose own model ends it with a `finish` that says it cannot (a step routed to another model does not count), before it has
-done a step of work, goes to these models the same way: a refusal is not the goal failing, and the work you left
-running carries on on one that will take it (item 1211). A refusal that names what it would need counts too — another
-model may not need it — and when no standby is left the run ends with the first model's answer, what it needs included. The run's reasoning
-level becomes the nearest one the new model offers. A run takes each
+which the model chip follows. The run's reasoning level becomes the nearest one the new model offers. A run takes each
 model once at most, in the order of the list, and never goes back to one it left. A standby model that cannot call tools
 while the run offers them, whose window cannot hold the instructions and the tools, or whose details cannot be read is
 passed over, and so is one of OpenCode's agent or the Claude plan named in `config.toml`, as a helper model is too: each
@@ -162,9 +157,9 @@ for a server it cannot connect to checks every 5 s and asks the same step again 
 and is rewritten when the connection is back ("The connection to openrouter.ai is back after 4m 10s; Dot asks … again").
 A local server that is not running (Ollama on `localhost:11434`) is waited for the same way. OpenCode's agent, a server
 of Dot's own, is not checked. A stop ends the wait at once. A model still out of reach when the wait is over fails the run,
-and the result names the wait and the error. A refused request ends the run at once; a key or access error, spent
-credits (OpenRouter's, Anthropic's prepaid balance, OpenCode's `CreditsError`), a model the plan does not include or a
-missing key moves it to a standby model or ends it at once.
+and the result names the wait and the error. A refused request ends the run at once; spent credits (OpenRouter's,
+Anthropic's prepaid balance, OpenCode's `CreditsError`) move it to a standby model or end it at once; a key or access
+error, a model the plan does not include or a missing key ends it at once.
 
 **A spent quota** (item 713). When the run's model cannot answer for a while that comes back by itself and no standby
 model can take the run over, the run waits instead of failing: a rate limit, or a subscription's usage window (OpenCode
@@ -222,7 +217,7 @@ answer keeps its words, Ollama's too.
   model whose providers keep what they are sent is under Zero Data Retention, is answered 404; Dot reads that as a
   refused access: the error names what excluded the providers and where to change it
   (https://openrouter.ai/settings/privacy), or to choose another model. As after a 403, a run whose own model it is
-  moves to its standby model, and the model is paused (item 361).
+  ends saying so, and the model is paused (item 361).
 - **OpenCode Go**: Dot knows the route of the models in its catalog, and of a new Claude, Qwen, MiniMax, Grok, GPT or
   Muse model by the start of its name; any other new model goes to Chat Completions. `route_overrides = { "<model-id>" =
   "chat" }` in `[providers.opencode_go]` adds or corrects one (`chat`, `responses` or `messages`). The Messages route
