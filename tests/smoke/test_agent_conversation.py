@@ -161,7 +161,7 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
             assert fresh != thread
             await expect(face).to_have_attribute("href", f"#/runs/{third}")
 
-            # The conversation deleted from the sidebar, the page and the face go on in the chat left, not in one that is gone.
+            # The conversation deleted from the sidebar, the page and the face go on in the chat left, not a gone one.
             await page.goto(page.url.split("#", 1)[0] + f"#/agents/{agent_id}")
             await expect(page.get_by_role("link", name="Open your chat with Scout")).to_have_attribute(
                 "href", f"#/runs/{third}"
