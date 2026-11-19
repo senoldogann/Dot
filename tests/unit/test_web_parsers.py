@@ -2,9 +2,12 @@
 
 import time
 
+import pytest
+
 from dotagent.browser.snapshot import link_lines, parse_snapshot
+from dotagent.core.errors import WebError
 from dotagent.web.search import parse_duckduckgo
-from dotagent.web.text import html_to_text
+from dotagent.web.text import decode_body, html_to_text
 
 _BASE: str = "https://docs.test/guide/"
 _ARTICLE: str = """<!doctype html><html lang="en"><head><title>  Guide
@@ -133,3 +136,13 @@ def test_the_links_of_a_page_of_many_are_listed_in_a_moment() -> None:
         "e1  outer -> https://docs.test/out",
         "e2  inner -> https://docs.test/in",
     )
+
+
+def test_a_character_set_that_cannot_read_the_page_is_a_web_error() -> None:
+    """Item 1238: ``idna`` takes no ``replace``, and its ``UnicodeError`` was no ``WebError``, so a page that declared
+    it ended the whole crawl it was read in instead of being left out with its reason."""
+    with pytest.raises(WebError, match="cannot read it"):
+        decode_body(b"<p>caf\xc3\xa9</p>", "idna")
+    with pytest.raises(WebError, match="not known"):
+        decode_body(b"<p>x</p>", "no-such-charset")
+    assert decode_body(b"caf\xe9", "latin-1") == "café"

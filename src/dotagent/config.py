@@ -1308,6 +1308,11 @@ def _read_toml(path: Path) -> JsonObject:
             parsed: JsonObject = tomllib.load(handle)
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError("config file is not valid TOML", {"path": str(path), "error": str(exc)}) from exc
+    except UnicodeDecodeError as exc:
+        # Not text at all: the daemon and ``dotx`` said a traceback and nothing of the file (item 1238).
+        raise ConfigError(
+            "config file is not UTF-8 text", {"path": str(path), "byte": exc.start, "error": exc.reason}
+        ) from exc
     return parsed
 
 

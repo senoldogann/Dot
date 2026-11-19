@@ -153,6 +153,10 @@ def decode_body(body: bytes, header_charset: str | None) -> str:
         return body.decode(label, errors="replace")
     except LookupError as exc:
         raise WebError("the document declares a character set that is not known", {"charset": label}) from exc
+    except UnicodeError as exc:
+        # A codec that takes no ``replace`` (``idna``): its error was no ``WebError``, so a page's own label ended the
+        # whole crawl it was read in (the code review of 2026-11-19, item 1238).
+        raise WebError("the document declares a character set that cannot read it", {"charset": label}) from exc
 
 
 def _bom_charset(body: bytes) -> str | None:
