@@ -1027,18 +1027,20 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_words_o
                 await page.mouse.click(4, 240)
                 await expect(composer).to_have_attribute("data-quiet", "")
                 continue
-            # As one line (item 833), on a phone too: the microphone stands right of the words, alone until words are
-            # typed, and the send then comes right of it. All three are read in one frame.
+            # On a desk the words have a line of their own (item 1249): the microphone stands under them at the right,
+            # alone until words are typed, and the send then comes right of it, on its line. All three are read in
+            # one frame.
             await expect(composer).to_have_attribute("data-quiet", "")
             await expect(send).to_be_hidden()
             await words.fill("a word")
             await expect(send).to_be_visible()
             box, sent, field = await _rects(composer, ".mic-button", ".btn.send", ".composer-field")
             assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
-            assert box["x"] >= field["x"] + field["width"] - 1, f"{place} {width}: it is not right of the words"
+            assert box["y"] >= field["y"] + field["height"] - 1, f"{place} {width}: it is not under the words"
+            assert box["x"] > field["x"] + field["width"] / 2, f"{place} {width}: it is not at the right"
             assert box["x"] + box["width"] <= sent["x"] + 1, f"{place} {width}: it is not left of the send"
-            assert abs((box["y"] + box["height"] / 2) - (field["y"] + field["height"] / 2)) < 8, (
-                f"{place} {width}: it is not on the line of the words"
+            assert abs((box["y"] + box["height"] / 2) - (sent["y"] + sent["height"] / 2)) < 2, (
+                f"{place} {width}: it is not on the send's line"
             )
             await words.fill("")
             # With the run's choices shown, the box takes a line of its own. On a desk the microphone stands left of
@@ -1065,5 +1067,5 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_words_o
             # The choices away again, for the next place and the tests after this one.
             await composer.get_by_role("button", name="Model and options").click()
             await expect(composer).to_have_attribute("data-quiet", "")
-            await _fits(page, f"{width} {place} as one line")
+            await _fits(page, f"{width} {place} at rest")
         await page.context.close()

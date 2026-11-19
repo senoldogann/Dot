@@ -2,7 +2,8 @@
 letters filter it, the arrows move, Enter picks without sending (a skill as a chip, item 318), Escape closes;
 Shift+Enter breaks a line. The bar's pills open the Model and the Options menus, and the "+" goal mode; a draft
 survives a navigation; a photo in the box shows the picture itself, its name its tooltip, in one row beside the other
-files; the bar keeps one line from the desk to the phone. Wide and on a phone."""
+files; on a desk the words have a line of their own and the controls the line under it (item 1249). Wide and on a
+phone."""
 
 import asyncio
 import re
@@ -726,13 +727,13 @@ async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) ->
     await page.close()
 
 
-async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
+async def test_the_words_have_their_own_line_and_the_runs_choices_wait_behind_the_plus(
     runtime: Runtime, client: httpx.AsyncClient
 ) -> None:
-    """Item 833: the box as one line, the "+", the words and the microphone, as a messaging app's; the run's choices
-    wait behind their own "Model and options" button beside the "+", which shows and hides them and is kept; the
-    least-asking mode stays in sight while
-    they are away; the microphone stands alone until words are typed, and the send then comes beside it."""
+    """Item 833: the box with the run's choices behind their own "Model and options" button beside the "+", which
+    shows and hides them and is kept; the least-asking mode stays in sight while they are away; the microphone stands
+    alone until words are typed, and the send then comes beside it. Item 1249: on a Mac the words have a line of their
+    own, and the "+", the microphone and the send the line under them, however many lines the words take."""
     host: str = client.base_url.host
     port: int | None = client.base_url.port
     assert port is not None
@@ -745,16 +746,15 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
                 composer: Locator = page.locator(".composer").last
                 await expect(composer).to_have_attribute("data-quiet", "")
                 await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_hidden()
-                # One line: the "+" and the words share it.
+                # The words on a line of their own, the "+" under them, read in one frame.
                 plus: Locator = composer.locator(".plus-button")
                 field: Locator = composer.locator(".composer-field")
                 await expect(field).to_be_visible()
-                # Both read in one frame: the home's box still settling between two reads put them apart.
-                centres: list[float] = await composer.evaluate(
-                    "box => ['.plus-button', '.composer-field'].map((part) => {"
-                    " const rect = box.querySelector(part).getBoundingClientRect(); return rect.y + rect.height / 2; })"
+                edges: list[float] = await composer.evaluate(
+                    "box => [box.querySelector('.plus-button').getBoundingClientRect().top,"
+                    " box.querySelector('.composer-field').getBoundingClientRect().bottom]"
                 )
-                assert abs(centres[0] - centres[1]) <= 8, centres
+                assert edges[0] >= edges[1] - 2, edges
                 # The microphone alone until words are typed, then the send beside it: more can still be dictated.
                 mic: Locator = composer.locator(".mic-button")
                 send: Locator = composer.locator(".btn.send")
@@ -763,13 +763,15 @@ async def test_the_box_is_one_line_with_the_runs_choices_behind_the_plus(
                 await composer.locator("textarea").fill("Plan the garden")
                 await expect(send).to_be_visible()
                 await expect(mic).to_be_visible()
-                # A box that grows keeps the "+", the microphone and the send at its last line, read in one frame.
+                # A box that grows keeps the "+", the microphone and the send on one line under the words.
                 await composer.locator("textarea").fill("Plan the garden\nwhat to sow\nwhat to plant\nwhat to dig")
-                bottoms: list[float] = await composer.evaluate(
-                    "box => ['.plus-button', '.mic-button', '.btn.send', '.composer-field'].map((part) => {"
-                    " const rect = box.querySelector(part).getBoundingClientRect(); return rect.bottom; })"
+                tops: list[float] = await composer.evaluate(
+                    "box => ['.plus-button', '.mic-button', '.btn.send'].map((part) =>"
+                    " box.querySelector(part).getBoundingClientRect().top + box.querySelector(part).offsetHeight / 2)"
+                    ".concat([box.querySelector('.composer-field').getBoundingClientRect().bottom])"
                 )
-                assert all(abs(bottom - bottoms[-1]) <= 4 for bottom in bottoms[:-1]), bottoms
+                assert all(abs(top - tops[0]) <= 4 for top in tops[:3]), tops
+                assert tops[0] > tops[3], tops
                 await composer.locator("textarea").fill("")
                 # The "+" adds to the message alone; the button beside it shows the choices, and the choice is kept.
                 await plus.click()

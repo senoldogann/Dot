@@ -96,9 +96,15 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
 
   // The box at its own height of one row is shorter than its text once the text wraps: the frame then closes its
   // corners (item 1205, app.css `.composer[data-multiline]`).
+  // A phone's box gives wrapped words a line of their own (run.css), where they may fit on one line again: whether
+  // they wrap is measured in the one-line box, so the box does not jump between the two layouts as keys are typed or
+  // deleted, and its height once it is decided.
   function autosize() {
+    const composer = textarea.closest(".composer");
+    composer?.removeAttribute("data-multiline");
     textarea.style.height = "auto";
-    textarea.closest(".composer")?.toggleAttribute("data-multiline", textarea.scrollHeight > textarea.clientHeight + 1);
+    composer?.toggleAttribute("data-multiline", textarea.scrollHeight > textarea.clientHeight + 1);
+    textarea.style.height = "auto";
     textarea.style.height = `${Math.min(textarea.scrollHeight, maxPx)}px`;
     mirror.paint();
   }

@@ -809,6 +809,32 @@
   .composer[data-quiet] .composer-bar:not(.recording) {
     display: flex;
     flex-wrap: nowrap;
+    align-items: flex-end;
+  }
+
+  /* Until the words wrap (the owner's ask of 2026-11-19): then they take the whole line and the "+" and the send the
+     line under them, at the edges, rather than leaving the words a few to a line between them. */
+  .composer[data-quiet]:not([data-multiline]) {
+    border-radius: var(--radius-composer);
+  }
+
+  .composer[data-quiet]:not([data-multiline]) .composer-bar > .composer-field {
+    flex: 1 1 0;
+    order: 0;
+  }
+
+  .composer[data-quiet][data-multiline] .composer-bar:not(.recording) {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .composer[data-quiet][data-multiline] .composer-bar > .composer-field {
+    flex: 1 0 100%;
+    order: -1;
+  }
+
+  .composer[data-quiet][data-multiline] .composer-bar > .send {
+    margin-inline-start: auto;
   }
 
   .composer[data-quiet] .composer-bar > .composer-options {

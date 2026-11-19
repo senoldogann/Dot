@@ -196,11 +196,15 @@ about; two rows a section (a run without the runs it delegated), then **Show N m
 in place (item 364), and the page scrolls to what does not fit. A section folds on a click of
 its title, which counts its rows, and the folds are kept in that browser. The line and the strip follow the lifecycle
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
-and `due`. The composer is one frame on a 22 px corner, 18 once its words wrap, drawn by a ring of half a pixel that grows
-stronger in focus (no halo) with a soft shadow under it, as a messaging app's box (items 833 and 1205):
-one line of the **+**, the words ("Message Miro", the name you call Dot by; "Follow up" in the box of a run; the box's
-tooltip says that @ opens the apps and / the skills and commands) and the microphone at the right, with the files
-attached and the picks above it; as the words take more lines, the buttons stay at the last. A file uploads as it
+and `due`. The composer is one frame on an 18 px corner (22 px while it is one line: a phone's box at rest, or a box with the
+run's choices out whose words fit one line), drawn by a ring of half a pixel that grows stronger in focus (no halo)
+with a soft shadow under it (items 833 and 1205): the words on a line of their own, across the box ("Message Miro",
+the name you call Dot by; "Follow up" in the box of a run; the box's tooltip says that @ opens the apps and / the
+skills and commands), and under them the **+** and the choices at the left, the microphone and the send at the right,
+with the files attached and the picks above it (item 1249: a long message wrapped a few words a line between the **+**
+and the send). On a phone the box is one line of the **+**, the words and the send, on a 22 px corner, until the words
+wrap; then they take the whole line, and the **+** and the send go under them, until the text is shorter than where it
+first wrapped. A file uploads as it
 is attached; a picture past a megabyte and 2048 pixels on its longer side goes as a JPEG of 2048 (its clear parts
 white), as a model reads it at about that size (one the browser cannot read fails on its chip, with the browser's
 words); a send pressed while files upload says to wait, once however often it is pressed, as the same toast is never
