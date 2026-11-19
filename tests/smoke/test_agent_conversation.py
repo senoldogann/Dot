@@ -1,6 +1,6 @@
 """An agent is one conversation (item 1233, the owner's word of 2026-11-19 after Grok Bot): its face in the sidebar
 opens its chat, its page's box goes on in that chat rather than starting a new one each time, New chat in its page's
-"…" starts the next message afresh. A real server on a
+"…" starts the next message afresh, and its name in the chat's bar opens its page (item 1234). A real server on a
 scripted model, in Chrome."""
 
 import asyncio
@@ -132,6 +132,11 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
             await expect(face).to_have_attribute("href", f"#/agents/{agent_id}")
             first: str = await _sent_from_page(manager, page, "Find two sources on the matter")
             thread: str = (await client.get(f"/api/runs/{first}")).json()["run"]["thread_id"]
+
+            # The chat's bar names the agent, a link to its page.
+            name: Locator = page.locator(".stage-title a.stage-name-link")
+            await expect(name).to_have_text("Scout")
+            await expect(name).to_have_attribute("href", f"#/agents/{agent_id}")
 
             # Its face now opens that chat, and is marked while it is open.
             await expect(face).to_have_attribute("href", f"#/runs/{first}")
