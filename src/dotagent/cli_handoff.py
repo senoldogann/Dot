@@ -28,6 +28,7 @@ from dotagent.config import ServerConfig
 from dotagent.core.errors import ConfigError, RunConflict, ServiceError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import token_path
+from dotagent.core.text import stream_lines
 from dotagent.core.types import FrozenModel
 from dotagent.server import CLI_SOURCE
 from dotagent.server.guard import read_token
@@ -176,7 +177,7 @@ class DaemonApi:
                         {"path": path, "status": response.status_code, "body": _clip(response.text)},
                     )
                 data: list[str] = []
-                async for line in response.aiter_lines():
+                async for line in stream_lines(response.aiter_text()):
                     if line.startswith(_DATA):
                         data.append(line.removeprefix(_DATA).removeprefix(" "))
                     elif line == "" and data:

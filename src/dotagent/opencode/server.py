@@ -45,6 +45,7 @@ from dotagent.core.errors import JsonParseError, OpenCodeError, OpenCodeMissing,
 from dotagent.core.jsonutil import parse_json_object, parse_json_value
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import log_dir, opencode_command, opencode_dir
+from dotagent.core.text import stream_lines
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort
 from dotagent.llm.wire import get_int, get_obj, get_str
@@ -734,7 +735,7 @@ async def _events(response: httpx.Response) -> AsyncIterator[JsonObject]:
     """The events of OpenCode's stream. Whatever ends it early is an ``OpenCodeError``, a line that is not a JSON object
     too (item 351: that one ended the reader of the stream without a word, and the run waited for it for good)."""
     try:
-        async for line in response.aiter_lines():
+        async for line in stream_lines(response.aiter_text()):
             if line.startswith("data:"):
                 data: str = line.removeprefix("data:").strip()
                 try:
