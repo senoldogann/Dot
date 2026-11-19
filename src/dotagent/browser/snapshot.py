@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 from urllib.parse import urljoin
 
 from dotagent.browser.types import Dropdown, DropdownOption
-from dotagent.core.text import unclosing
+from dotagent.core.text import unclosing, without_trailing_blanks
 
 _INDENT: re.Pattern[str] = re.compile(r"^( *)- ")
 _BOX: re.Pattern[str] = re.compile(r" \[box=(-?[\d.]+),(-?[\d.]+),([\d.]+),([\d.]+)\]")
@@ -38,7 +38,6 @@ _SHAPE: re.Pattern[str] = re.compile(
 )
 _NAMED: re.Pattern[str] = re.compile(r'^\s*- (?!generic\b)([A-Za-z][\w-]*) "((?:[^"\\]|\\.)*)"')
 _BLANK_RUNS: re.Pattern[str] = re.compile(r"\n{3,}")
-_TRAILING_SPACE: re.Pattern[str] = re.compile(r"[ \t]+\n")
 _INVISIBLE_CHARS: re.Pattern[str] = re.compile("[" + chr(0x200B) + chr(0x00AD) + "]")  # zero-width space, soft hyphen
 _WORD: re.Pattern[str] = re.compile(r"\w{3,}")
 _MAX_LINE_CHARS: int = 400
@@ -642,7 +641,7 @@ def fence_untrusted(url: str, body: str, nonce: str) -> str:
 
 def squeeze_text(text: str) -> str:
     """Page text without trailing blanks and with at most one empty line in a row."""
-    return _BLANK_RUNS.sub("\n\n", _TRAILING_SPACE.sub("\n", text.replace("\r\n", "\n"))).strip()
+    return _BLANK_RUNS.sub("\n\n", without_trailing_blanks(text.replace("\r\n", "\n"))).strip()
 
 
 def controls_near(lines: Sequence[SnapshotLine], ref: str) -> tuple[str, ...]:

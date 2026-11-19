@@ -28,7 +28,8 @@ CAPTION_BLOCK_S: float = 30.0
 # A cue's timing line: ``00:01:02.345 --> 00:01:04.000 align:start``; hours may be left out.
 _TIMING: re.Pattern[str] = re.compile(r"^(?:(\d+):)?(\d{1,2}):(\d{2})[.,](\d{3})\s+-->")
 # The tags inside a YouTube cue: ``<00:00:01.234>`` word timings and ``<c>`` spans.
-_TAG: re.Pattern[str] = re.compile(r"<[^>]*>")
+# A tag holds no ``<``: an unclosed one is read up to the next, not to the end of the line (item 1242).
+_TAG: re.Pattern[str] = re.compile(r"<[^<>]*>")
 # A caption track's name as a language tag (``en``, ``en-orig``, ``pt-BR``, ``zh-Hans``): the names come from the site
 # (yt-dlp's generic reader takes a page's ``<track srclang>``), and a name of another shape is dropped as the answer is
 # read, so no site text reaches Dot's own lines, an error or a file's name.

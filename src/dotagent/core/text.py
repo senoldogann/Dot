@@ -470,3 +470,11 @@ def has_verification(report: str) -> bool:
     rest: str = found.group(1) + report[found.end() :]
     section: str = re.split(r"(?m)^[ \t]*#{1,4}[ \t]", rest, maxsplit=1)[0]
     return len("".join(section.split()).strip("*_:-")) >= _VERIFIED_CHARS
+
+
+def without_trailing_blanks(text: str) -> str:
+    """``text`` with the spaces and tabs at the end of each line taken off, in time that grows with its length: the
+    pattern ``[ \t]+\n`` this replaces went back over a long run of blanks that no line break ends from each of its
+    places, so a page of 40,000 tabs took 3 s and one of a megabyte half an hour, with the daemon held all that while
+    (the code review of 2026-11-19, item 1242)."""
+    return "\n".join(line.rstrip(" \t") for line in text.split("\n"))
