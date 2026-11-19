@@ -67,7 +67,15 @@ _ANSWERS: frozenset[str] = frozenset({"reply", "meeting", "proposal", "won", "de
 
 
 class LedgerRefusal(Exception):
-    """What a ledger change may not do, and what to do instead; the file is left as it was."""
+    """What a ledger change may not do, and what to do instead; the file is left as it was. ``quoted`` is the part that
+    quotes the record (a client's name, an action's evidence), which a reply's run may have written; ``advice`` is
+    Dot's own words, which quote nothing of it, so that a run handed the record's words fenced still reads what to do
+    (the third pre-push review of item 1227)."""
+
+    def __init__(self, quoted: str, advice: str) -> None:
+        super().__init__(f"{quoted} {advice}".strip())
+        self.quoted: str = quoted
+        self.advice: str = advice
 
 
 class LedgerFormatError(Exception):
@@ -158,7 +166,7 @@ def moment(text: str) -> datetime:
         read: datetime = datetime.fromisoformat(text.strip())
     except ValueError as error:
         raise LedgerRefusal(
-            f"'{text}' is no date: write it as 2026-11-19 or 2026-11-19 10:02, as the source shows it"
+            "", f"'{text}' is no date: write it as 2026-11-19 or 2026-11-19 10:02, as the source shows it"
         ) from error
     return read if read.tzinfo is None else read.astimezone().replace(tzinfo=None)
 
@@ -315,13 +323,15 @@ def _client(ledger: Ledger, client_id: str) -> Client:
     found: Client | None = next((each for each in ledger.clients if each.id == client_id), None)
     if found is None:
         known: str = ", ".join(each.id for each in ledger.clients[:20]) or "none yet"
-        raise LedgerRefusal(f"no client has the id '{client_id}' in this record (known: {known}); add it first")
+        raise LedgerRefusal(
+            f"no client has the id '{client_id}' in this record (known: {known}).", "Add it first with pipeline_client."
+        )
     return found
 
 
 def _status(status: str) -> str:
     if status not in CLIENT_STATUSES:
-        raise LedgerRefusal(f"'{status}' is no client status: one of {', '.join(CLIENT_STATUSES)}")
+        raise LedgerRefusal("", f"'{status}' is no client status: one of {', '.join(CLIENT_STATUSES)}")
     return status
 
 
@@ -329,7 +339,7 @@ def upsert_client(ledger: Ledger, client_id: str, change: ClientChange) -> Ledge
     """``ledger`` with the client ``client_id`` added (a name is needed then) or changed as ``change`` says."""
     if not _ID.match(client_id):
         raise LedgerRefusal(
-            f"'{client_id}' is no client id: lower-case letters, digits and hyphens, as kuivaksen-leipomo"
+            "", f"'{client_id}' is no client id: lower-case letters, digits and hyphens, as kuivaksen-leipomo"
         )
     if change.status is not None:
         _status(change.status)
@@ -338,7 +348,7 @@ def upsert_client(ledger: Ledger, client_id: str, change: ClientChange) -> Ledge
     present: Client | None = next((each for each in ledger.clients if each.id == client_id), None)
     if present is None:
         if not change.name:
-            raise LedgerRefusal(f"a new client needs its name: '{client_id}' is not in this record yet")
+            raise LedgerRefusal("", f"a new client needs its name: '{client_id}' is not in this record yet")
         added: Client = Client(
             id=client_id,
             name=change.name,
@@ -380,23 +390,26 @@ def begin(ledger: Ledger, client_id: str, action: str, variant: str, now: str) -
     client: Client = _client(ledger, client_id)
     if client.status in _HELD:
         raise LedgerRefusal(
-            f"{client.name} is {client.status}: nothing is sent to them. Change the client's status only on the "
-            "owner's word."
+            f"{client.name} is {client.status}.",
+            "Nothing is sent to a client held back (do-not-contact, paused); its status changes only on the owner's "
+            "word.",
         )
     if not _ID.match(action):
-        raise LedgerRefusal(f"'{action}' is no action name: lower-case letters, digits and hyphens, as first-mail")
+        raise LedgerRefusal("", f"'{action}' is no action name: lower-case letters, digits and hyphens, as first-mail")
     key: str = action_key(client_id, action)
     present: Action | None = next((each for each in ledger.actions if each.key == key), None)
     if present is not None and present.state == "sent":
         raise LedgerRefusal(
-            f"{key} was sent at {present.at} ({present.evidence}): it is not sent again. A further one is an action "
-            "of its own name (reminder-1), begun when the rules call for it."
+            f"{key} was sent at {present.at} ({present.evidence}).",
+            "It is not sent again: a further one is an action of its own name (reminder-1), begun when the rules call "
+            "for it.",
         )
     if present is not None and present.state in _UNSETTLED:
         raise LedgerRefusal(
-            f"{key} was {present.state} at {present.at} and nobody has seen what came of it. Look first (the Sent "
-            "folder, the channel's history, the recipient's reply), then end it with pipeline_end: sent with what "
-            "showed it, failed with what showed it did not go, or uncertain. Only an action that failed is tried again."
+            f"{key} was {present.state} at {present.at}.",
+            "Nobody has seen what came of it. Look first (the Sent folder, the channel's history, the recipient's "
+            "reply), then end it with pipeline_end: sent with what showed it, failed with what showed it did not go, "
+            "or uncertain. Only an action that failed is tried again.",
         )
     started: Action = Action(
         key=key,
@@ -422,13 +435,14 @@ def end(ledger: Ledger, key: str, result: ActionResult, evidence: str, now: str)
     looked at again."""
     present: Action | None = next((each for each in ledger.actions if each.key == key), None)
     if present is None:
-        raise LedgerRefusal(f"no action has the key '{key}': begin it with pipeline_begin before it goes out")
+        raise LedgerRefusal("", f"no action has the key '{key}': begin it with pipeline_begin before it goes out")
     if present.state not in _UNSETTLED:
-        raise LedgerRefusal(f"{key} ended {present.state} at {present.at} already ({present.evidence})")
+        raise LedgerRefusal(f"{key} ended {present.state} at {present.at} already ({present.evidence}).", "")
     if not evidence.strip():
         raise LedgerRefusal(
+            "",
             "say what showed it: the mail in Sent and its time, the error the service gave, or, for uncertain, what "
-            "was seen and what was not"
+            "was seen and what was not",
         )
     ended: Action = replace(present, state=result, at=now, evidence=evidence.strip())
     actions: tuple[Action, ...] = tuple(ended if each.key == key else each for each in ledger.actions)
@@ -452,9 +466,11 @@ def note_outcome(ledger: Ledger, client_id: str, kind: str, at: str, source: str
     seen (``source``). The same outcome at the same moment is kept once (``False`` then: it was there)."""
     _client(ledger, client_id)
     if kind not in OUTCOME_KINDS:
-        raise LedgerRefusal(f"'{kind}' is no outcome: one of {', '.join(OUTCOME_KINDS)}")
+        raise LedgerRefusal("", f"'{kind}' is no outcome: one of {', '.join(OUTCOME_KINDS)}")
     if not source.strip():
-        raise LedgerRefusal("say where it was seen (the mail and its time, the call, the page): no outcome is guessed")
+        raise LedgerRefusal(
+            "", "say where it was seen (the mail and its time, the call, the page): no outcome is guessed"
+        )
     when: str = at.strip() if _dated_only(at) else minute(moment(at))
     moment(when)
     if any(each.client == client_id and each.kind == kind and each.at == when for each in ledger.outcomes):
@@ -514,7 +530,7 @@ def summary(ledger: Ledger, client_id: str | None) -> str:
         ledger.clients if client_id is None else tuple(c for c in ledger.clients if c.id == client_id)
     )
     if client_id is not None and not shown:
-        raise LedgerRefusal(f"no client has the id '{client_id}' in this record")
+        raise LedgerRefusal("", f"no client has the id '{client_id}' in this record")
     lines.append(f"Clients ({len(shown)}):" if shown else "No clients in this record yet.")
     for c in shown:
         done: str = f"last {c.last_action} at {c.last_at}" if c.last_action else "nothing sent yet"

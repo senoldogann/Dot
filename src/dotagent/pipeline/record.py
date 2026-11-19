@@ -28,12 +28,13 @@ _LOCK_FLAGS: int = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW
 
 
 class RecordRefusal(Exception):
-    """A change the ledger refused (:class:`LedgerRefusal`), with whether its block holds outside words: the refusal
-    may quote a cell (a client's name, an action's evidence), which a reply's run may have written."""
+    """A change the ledger refused (:class:`LedgerRefusal`: what it quotes of the record and Dot's own advice), with
+    whether its block holds outside words, which a reply's run may have written."""
 
-    def __init__(self, message: str, outside: bool) -> None:
-        super().__init__(message)
-        self.message: str = message
+    def __init__(self, quoted: str, advice: str, outside: bool) -> None:
+        super().__init__(f"{quoted} {advice}".strip())
+        self.quoted: str = quoted
+        self.advice: str = advice
         self.outside: bool = outside
 
 
@@ -128,7 +129,7 @@ def change[T](record: Path, journal: JournalTarget, outside: bool, apply: Callab
             try:
                 after, said = apply(before)
             except LedgerRefusal as refusal:
-                raise RecordRefusal(str(refusal), before.outside) from refusal
+                raise RecordRefusal(refusal.quoted, refusal.advice, before.outside) from refusal
             if after != before:
                 kept: Ledger = replace(after, outside=after.outside or outside)
                 atomic_write(record, written(text, kept), journal)

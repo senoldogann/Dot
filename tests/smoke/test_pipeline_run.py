@@ -97,6 +97,6 @@ async def test_a_run_begins_a_mail_once_and_the_next_one_is_refused_the_same_sen
         for event in await runtime.store.list_events(second.id, 0, 200)
         if event.kind == "tool_result"
     ]
-    assert any("nobody has seen what came of it" in result for result in results), results
+    assert any("Nobody has seen what came of it" in result for result in results), results
     assert await asyncio.to_thread(path.read_text, encoding="utf-8") == text
     assert await asyncio.to_thread(path.with_name(f".{path.name}.dot-lock").exists)
