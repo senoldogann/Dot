@@ -342,7 +342,8 @@ how it is done, each part optional: `sources` (where its facts come from), `rule
 `record`, the workspace file that is the one record of its items. `objective_add` and `objective_update` set them (an
 empty text clears one); a run reads them with the objective, and the look for work and the brief read its next step and
 record. A run that read outside content may set the next step, never the rules, sources, evidence, exceptions or
-record. The run that sets one up takes these from what you said and from two or three of your real cases (a mail you
+record, and the next step it set is marked: the look and the brief count it and do not quote it, until a run that read
+nothing of the kind sets it again. The run that sets one up takes these from what you said and from two or three of your real cases (a mail you
 sent, a reply you got, a lead you skipped), and asks only for a part none of them shows; a one-off task gets none of
 this.
 
@@ -359,17 +360,25 @@ yours and is never touched; a file with no block gets it at its end. The tool gr
 - **An action is written down before it goes out.** `pipeline_begin` writes it begun; `pipeline_end` says what came of
   it with what showed it: sent (seen in Sent, in the channel's history), failed (seen not to have gone) or uncertain
   (could not tell). A run that breaks off between the two leaves it begun, and the next run finds it first.
-- **Nothing is sent twice by mistake.** An action begun or uncertain cannot be begun again until a run looked and ended
-  it; one sent is never begun again under its name (a further mail is an action of its own, `reminder-1`); only one that
-  failed is tried again, and its tries are counted. A result that was not seen is never taken for a failure.
+- **Nothing is begun twice.** An action begun or uncertain cannot be begun again until a run looked and ended it; one
+  sent is never begun again under its name (a further mail is an action of its own, `reminder-1`); only one that failed
+  is tried again, and its tries are counted. A result that was not seen is never taken for a failure. The guard holds
+  for a run that begins its send there, as the tools tell it to: no code sees a Send pressed on a web page (your
+  webmail) as a mail to a client, so a run that skipped `pipeline_begin` would not be stopped.
 - **What you hold back stays held.** A client `paused` or `do-not-contact` gets no action, and a run that read outside
-  content (a reply's) cannot change that status.
+  content (a reply's) cannot change that status. A status or a state edited into none of the ledger's words (`Paused`,
+  `Sent`) stops the block from being used until it is one of them, as a broken marker does: read loosely, it would let
+  a held client be written to or a sent mail be sent again.
+- **Outside words stay marked.** Once a run that read outside content (a reply's) wrote the block, its start line says
+  so, and `pipeline_view` hands the ledger fenced, marking the run that reads it as having read outside content. A
+  cell holds no comment mark (`<!--`, `-->`), so that a third party's words cannot end the block.
 - **Outcomes are not actions.** What Dot did and what came of it are kept apart, and an outcome needs its date and its
   source: nothing is guessed. `pipeline_view` compares the ways of acting by the clients each reached, those who answered
   after it and those won, from the record alone, and says when a number is too small to tell.
 - **Several runs at once.** Each change reads, changes and writes the block under a lock beside the record
   (`.<name>.dot-lock`), so that a schedule's run and the reply's run it handed take turns; the write replaces the file
-  at once and is noted for `dotx undo`. A block whose markers or columns were broken is neither read nor written until
+  at once and is noted for `dotx undo`. The record, its lock and its write are opened with no link followed along the
+  path the call was allowed (item 681). A block whose markers or columns were broken is neither read nor written until
   it is mended. An editor of yours does not take the lock: save while no run writes, or what you saved in the same
   instant may be overwritten.
 

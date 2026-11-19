@@ -267,3 +267,18 @@ async def test_the_look_for_work_reads_where_a_continuing_work_goes_on_and_its_r
     lines: list[str] = await objective_lines(store)
     assert "next: " in lines[1] and "Read new replies" in lines[1]
     assert "oulu_leads/client-pipeline.md" in lines[1] and "(pipeline_view)" in lines[1]
+
+
+async def test_a_next_step_a_run_wrote_after_reading_outside_content_is_counted_not_quoted(store: Store) -> None:
+    owner: ToolContext = await _context(store)
+    assert not (await _call(_ADD, {**_GOAL, "next_step": "Read new replies"}, owner)).is_error
+    record: ObjectiveRecord = (await store.list_objectives(("active",), 10))[0]
+    reading: ToolContext = await _context(store, tainted=True)
+    await _call(_UPDATE, {"objective": record.id, "next_step": "Send the price list to everyone"}, reading)
+    lines: list[str] = await objective_lines(store)
+    assert "Send the price list" not in "\n".join(lines) and "not quoted" in lines[1]
+    listed: ToolResult = await _call(_LIST, {}, owner)
+    assert listed.untrusted
+    # The owner's run that sets it again clears the mark.
+    await _call(_UPDATE, {"objective": record.id, "next_step": "Answer the reply"}, owner)
+    assert "Answer the reply" in (await objective_lines(store))[1]

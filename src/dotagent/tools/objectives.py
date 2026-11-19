@@ -91,15 +91,25 @@ _WORKFLOW_LABELS: tuple[tuple[str, str], ...] = (
 )
 
 
-def workflow_of(current: ObjectiveWorkflow, args: WorkflowArgs, held: tuple[str, ...]) -> ObjectiveWorkflow | None:
-    """``current`` with the parts ``args`` sets (an empty string clears one), secrets taken out; ``None`` when
-    ``args`` sets none."""
-    given: dict[str, str] = {
+def workflow_of(
+    current: ObjectiveWorkflow, args: WorkflowArgs, held: tuple[str, ...], tainted: bool
+) -> ObjectiveWorkflow | None:
+    """``current`` with the parts ``args`` sets (an empty string clears one), secrets taken out, and the next step
+    marked as written after outside content when ``tainted`` set it; ``None`` when ``args`` sets none."""
+    given: dict[str, str | bool] = {
         name: redact_known(" ".join(value.split()), held)
         for name, _ in _WORKFLOW_LABELS
         if (value := getattr(args, name)) is not None
     }
+    if args.next_step is not None:
+        given["next_step_tainted"] = tainted and bool(args.next_step.strip())
     return None if not given else current.model_copy(update=given)
+
+
+def workflow_tainted(record: ObjectiveRecord) -> bool:
+    """Whether any word of the objective came of content third parties can author: itself, a line of progress, or its
+    next step."""
+    return record.tainted or any(note.tainted for note in record.notes) or record.workflow.next_step_tainted
 
 
 def objective_text(record: ObjectiveRecord, shown: int = NOTES_SHOWN) -> str:
@@ -159,7 +169,7 @@ def _add_tool() -> RegisteredTool:
             redact_known(" ".join(args.title.split()), held),
             redact_known(args.why.strip(), held),
             redact_known(args.measure.strip(), held),
-            workflow_of(ObjectiveWorkflow(), args, held) or ObjectiveWorkflow(),
+            workflow_of(ObjectiveWorkflow(), args, held, ctx.ever_tainted()) or ObjectiveWorkflow(),
             ctx.ever_tainted(),
         )
         return ok(f"Objective {added.id} is written down: {added.title}. The initiative and the brief follow it.")
@@ -229,7 +239,7 @@ def _update_tool() -> RegisteredTool:
             else None
         )
         updated: ObjectiveRecord = await store.update_objective(
-            found.id, args.status, note, workflow_of(found.workflow, args, held)
+            found.id, args.status, note, workflow_of(found.workflow, args, held, ctx.ever_tainted())
         )
         return ok(f"Objective {updated.id} is {updated.status}; {len(updated.notes)} lines of progress are kept.")
 
@@ -258,7 +268,7 @@ def _list_tool() -> RegisteredTool:
         await _own(ctx)
         records: list[ObjectiveRecord] = await ctx.runtime.store.list_objectives((args.status,), _LISTED)
         text: str = "\n".join(objective_text(record) for record in records) or f"No {args.status} objectives."
-        if not any(record.tainted or any(note.tainted for note in record.notes) for record in records):
+        if not any(workflow_tainted(record) for record in records):
             return ok(text)
         # Written by a run that read outside content: not the owner's words, so fenced and the reader marked.
         return mark_untrusted(ok(fenced("objectives", text, secrets.token_hex(_NONCE_BYTES))))

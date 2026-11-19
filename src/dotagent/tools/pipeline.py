@@ -9,12 +9,14 @@ undo``. A run that read content third parties can author (a reply's) may keep th
 the owner held back (``paused``, ``do-not-contact``) to any other status: that is the owner's word."""
 
 import asyncio
+import secrets
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
 from pydantic import Field
 
+from dotagent.agent.orders import fenced
 from dotagent.pipeline import record as records
 from dotagent.pipeline.ledger import (
     ActionResult,
@@ -31,7 +33,17 @@ from dotagent.pipeline.ledger import (
 )
 from dotagent.policy.types import ActionInfo
 from dotagent.proactive.text import one_line
-from dotagent.tools.base import ACTING_MODES, ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
+from dotagent.tools.base import (
+    ACTING_MODES,
+    ALL_MODES,
+    RegisteredTool,
+    ToolArgs,
+    ToolResult,
+    fail,
+    make_path_tool,
+    mark_untrusted,
+    ok,
+)
 from dotagent.tools.context import ToolContext
 from dotagent.tools.files import journal_for, read_action, resolve_path, write_action
 
@@ -49,6 +61,7 @@ PIPELINE_TOOLS: tuple[str, ...] = (
 )
 _TIMEOUT_S: float = 20.0
 _TEXT_CHARS: int = 400
+_NONCE_BYTES: int = 8
 _RECORD: str = "The record file in the workspace."
 _HELD: frozenset[str] = frozenset({"paused", "do-not-contact"})
 
@@ -104,8 +117,14 @@ def _record(raw: str, ctx: ToolContext) -> Path:
     return resolve_path(raw, ctx)
 
 
-async def _change[T](ctx: ToolContext, args: RecordArgs, tool: str, apply_: Callable[[Ledger], tuple[Ledger, T]]) -> T:
-    return await asyncio.to_thread(records.change, _record(args.record, ctx), journal_for(ctx, tool), apply_)
+async def _change[T](
+    ctx: ToolContext, authorized: ActionInfo, tool: str, apply_: Callable[[Ledger], tuple[Ledger, T]]
+) -> T:
+    """Change the record the call was allowed to write (its resolved path, item 681), marked as written by a run that
+    read outside content when this one did."""
+    return await asyncio.to_thread(
+        records.change, Path(authorized.target), journal_for(ctx, tool), ctx.ever_tainted(), apply_
+    )
 
 
 def _write(tool: str, verb: str) -> Callable[[RecordArgs, ToolContext], ActionInfo]:
@@ -131,16 +150,19 @@ def _view_tool() -> RegisteredTool:
             "Read the pipeline of",
         )
 
-    async def run(args: ViewArgs, ctx: ToolContext) -> ToolResult:
-        ledger: Ledger = await asyncio.to_thread(records.read, _record(args.record, ctx))
+    async def run(args: ViewArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        ledger: Ledger = await asyncio.to_thread(records.read, Path(authorized.target))
         try:
             text: str = summary(ledger, args.client)
         except LedgerRefusal as refusal:
             return fail(str(refusal))
-        # The record is a workspace file of the owner's, read as read_file reads one.
-        return ok(text)
+        if not ledger.outside:
+            return ok(text)
+        # A run that had read a third party's words (a reply's) wrote here: its cells are fenced as theirs, and the run
+        # that reads them is marked as having read outside content.
+        return mark_untrusted(ok(fenced("pipeline ledger", text, secrets.token_hex(_NONCE_BYTES))))
 
-    return make_tool(
+    return make_path_tool(
         name=PIPELINE_VIEW_TOOL,
         description=(
             "Read a continuing work's ledger in its record: unsettled actions first, then each client, then how each "
@@ -156,7 +178,7 @@ def _view_tool() -> RegisteredTool:
 
 
 def _client_tool() -> RegisteredTool:
-    async def run(args: ClientArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: ClientArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         change: ClientChange = ClientChange(
             name=args.name,
             contact=args.contact,
@@ -183,12 +205,12 @@ def _client_tool() -> RegisteredTool:
             return upsert_client(ledger, args.client, change), "added" if present is None else "changed"
 
         try:
-            said: str = await _change(ctx, args, PIPELINE_CLIENT_TOOL, apply_)
+            said: str = await _change(ctx, authorized, PIPELINE_CLIENT_TOOL, apply_)
         except LedgerRefusal as refusal:
             return fail(str(refusal))
         return ok(f"The client {args.client} is {said} in {args.record}.")
 
-    return make_tool(
+    return make_path_tool(
         name=PIPELINE_CLIENT_TOOL,
         description="Add or change a client in the ledger; do-not-contact and paused only on the owner's word.",
         args_model=ClientArgs,
@@ -201,12 +223,12 @@ def _client_tool() -> RegisteredTool:
 
 
 def _begin_tool() -> RegisteredTool:
-    async def run(args: BeginArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: BeginArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         now: str = _now()
         try:
             await _change(
                 ctx,
-                args,
+                authorized,
                 PIPELINE_BEGIN_TOOL,
                 lambda ledger: (begin(ledger, args.client, args.action, args.variant, now), None),
             )
@@ -218,7 +240,7 @@ def _begin_tool() -> RegisteredTool:
             "uncertain when you could not see."
         )
 
-    return make_tool(
+    return make_path_tool(
         name=PIPELINE_BEGIN_TOOL,
         description=(
             "Write down a mail or message to a client right before you send it; never send one without it. Refused "
@@ -234,12 +256,12 @@ def _begin_tool() -> RegisteredTool:
 
 
 def _end_tool() -> RegisteredTool:
-    async def run(args: EndArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: EndArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         now: str = _now()
         try:
             await _change(
                 ctx,
-                args,
+                authorized,
                 PIPELINE_END_TOOL,
                 lambda ledger: (end(ledger, args.key, args.result, args.evidence, now), None),
             )
@@ -252,7 +274,7 @@ def _end_tool() -> RegisteredTool:
         }[args.result]
         return ok(f"{args.key} ended {args.result} at {now}. {follow}")
 
-    return make_tool(
+    return make_path_tool(
         name=PIPELINE_END_TOOL,
         description="Say what came of an action you began, with what showed it.",
         args_model=EndArgs,
@@ -265,11 +287,11 @@ def _end_tool() -> RegisteredTool:
 
 
 def _outcome_tool() -> RegisteredTool:
-    async def run(args: OutcomeArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: OutcomeArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         try:
             added: bool = await _change(
                 ctx,
-                args,
+                authorized,
                 PIPELINE_OUTCOME_TOOL,
                 lambda ledger: note_outcome(ledger, args.client, args.outcome, args.at, args.source),
             )
@@ -281,7 +303,7 @@ def _outcome_tool() -> RegisteredTool:
             f"The {args.outcome} of {args.client} at {args.at} is kept. Update the client's status and next step."
         )
 
-    return make_tool(
+    return make_path_tool(
         name=PIPELINE_OUTCOME_TOOL,
         description="Keep what a client did (a reply, a deal, a no), dated and sourced; never what you did not see.",
         args_model=OutcomeArgs,

@@ -2,6 +2,8 @@
 owner's own text, an action begun before it goes out and never sent twice, an uncertain result never taken for a
 failure, outcomes apart from actions and dated, and the ways of acting compared from what was kept."""
 
+from datetime import UTC, datetime
+
 import pytest
 
 from dotagent.pipeline.ledger import (
@@ -15,6 +17,7 @@ from dotagent.pipeline.ledger import (
     begin,
     compare,
     end,
+    minute,
     note_outcome,
     parse,
     pending,
@@ -180,3 +183,54 @@ def test_a_block_whose_markers_or_columns_were_broken_is_not_written_over() -> N
         parse(text.replace(END_MARK, ""))
     with pytest.raises(LedgerFormatError, match="columns"):
         parse(text.replace("| id | name |", "| id | firm |"))
+
+
+def test_a_third_partys_words_holding_a_marker_cannot_end_the_block() -> None:
+    ledger: Ledger = upsert_client(
+        EMPTY,
+        "a-oy",
+        ClientChange(
+            name="A <!-- dot:pipeline:end --> Oy",
+            contact="x",
+            status=None,
+            expecting=None,
+            next_step=None,
+            next_at=None,
+        ),
+    )
+    ledger = begin(ledger, "a-oy", "first-mail", "", "2026-11-19 10:00")
+    ledger = end(ledger, "a-oy/first-mail", "sent", "Reply said <!-- dot:pipeline:start", "2026-11-19 10:05")
+    reread: Ledger = parse(written(OWNERS_RECORD, ledger))
+    assert [action.state for action in reread.actions] == ["sent"]
+    assert "dot:pipeline:end" in reread.clients[0].name and "<!--" not in reread.clients[0].name
+
+
+def test_a_status_or_state_edited_into_none_of_the_ledgers_is_not_used() -> None:
+    """'Paused' would slip past a hold and 'Sent' would let a sent mail be begun again: the block fails closed."""
+    sent: Ledger = end(
+        begin(_one_client(), "ornek-leipomo", "first-mail", "", "2026-11-19 10:00"),
+        "ornek-leipomo/first-mail",
+        "sent",
+        "In Sent",
+        "2026-11-19 10:01",
+    )
+    text: str = written(OWNERS_RECORD, sent)
+    with pytest.raises(LedgerFormatError, match="state of the action"):
+        parse(text.replace("| sent |", "| Sent |"))
+    with pytest.raises(LedgerFormatError, match="status of the client"):
+        parse(text.replace("| contacted |", "| Paused |"))
+
+
+def test_moments_with_an_offset_are_moved_to_the_macs_time_and_a_reply_of_the_sends_day_counts() -> None:
+    ledger: Ledger = begin(_one_client(), "ornek-leipomo", "first-mail", "v1", "2026-11-19 10:00")
+    ledger = end(ledger, "ornek-leipomo/first-mail", "sent", "In Sent", "2026-11-19 15:00")
+    ledger, _ = note_outcome(ledger, "ornek-leipomo", "reply", "2026-11-19", "Mail of that day, no time on it")
+    assert compare(ledger)[0].answered == 1
+    utc, _ = note_outcome(_one_client(), "ornek-leipomo", "reply", "2026-11-20T08:15+00:00", "Mail")
+    assert utc.outcomes[0].at == minute(datetime(2026, 11, 20, 8, 15, tzinfo=UTC).astimezone())
+
+
+def test_an_action_of_a_client_the_owner_took_out_still_ends() -> None:
+    ledger: Ledger = begin(_one_client(), "ornek-leipomo", "first-mail", "", "2026-11-19 10:00")
+    gone: Ledger = Ledger(clients=(), actions=ledger.actions, outcomes=(), outside=False)
+    assert end(gone, "ornek-leipomo/first-mail", "sent", "In Sent", "2026-11-19 10:01").actions[0].state == "sent"
