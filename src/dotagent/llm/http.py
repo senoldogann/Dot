@@ -16,7 +16,7 @@ from dotagent.core.errors import (
     ProviderRunnerError,
     ProviderTransportError,
 )
-from dotagent.core.text import redact_secrets, strip_blobs
+from dotagent.core.text import redact_secrets, stream_lines, strip_blobs
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.provider_errors import StatusClassifier, parse_retry_after, parse_wire_error
 
@@ -95,7 +95,7 @@ def transport_error_types() -> tuple[type[Exception], ...]:
 
 async def iter_ndjson(response: httpx.Response, context: JsonObject) -> AsyncIterator[JsonObject]:
     """Yield one JSON object per non-empty line of a newline-delimited JSON stream."""
-    async for line in response.aiter_lines():
+    async for line in stream_lines(response.aiter_text()):
         stripped: str = line.strip()
         if stripped == "":
             continue
@@ -112,8 +112,7 @@ async def iter_sse(response: httpx.Response) -> AsyncGenerator[SseEvent]:
     """Yield Server-Sent Events (``event:`` + ``data:`` blocks separated by blank lines)."""
     event_name: str | None = None
     data_lines: list[str] = []
-    async for raw in response.aiter_lines():
-        line: str = raw.rstrip("\r")
+    async for line in stream_lines(response.aiter_text()):
         if line == "":
             if data_lines:
                 yield SseEvent(event=event_name, data="\n".join(data_lines))
