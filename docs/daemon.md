@@ -75,7 +75,9 @@ Above the list: a search over the titles (⌘K or `/`) and, while you have no ag
 said New chat). Under the search your agents stand as faces (item
 835), as a messaging app's people: the three that worked last, each its face over its name on one line, to its
 conversation (item 1233: its home chat, where a message to it goes on; its page while it has none), the one whose page
-or conversation is open marked, and **All**, the page of every agent and team, in
+or conversation is open marked, a face whose agent's newest run works wearing its working look and one whose
+conversation is unread the dot of an unread chat (item 1235, as Grok Bot's column of faces marks a bot that wrote; not
+while that chat is open), and **All**, the page of every agent and team, in
 four columns the sidebar holds whole (item 855: the row scrolled sideways and cut a face at its edge); an agent made,
 changed or deleted on a page shows there at once, and one a run made once that run ends. In the foot, **Connect apps**
 ([Connect apps](extending.md#connect-apps), items 492 and 545), which opens

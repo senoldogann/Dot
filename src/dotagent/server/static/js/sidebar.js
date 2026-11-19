@@ -661,11 +661,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     for (const { record, home } of mine) {
       homes.set(record.id, home ?? null);
     }
-    const drawn = JSON.stringify(mine.map(({ record }) => [record.id, record.name, record.role, record.look]));
+    // A face works while the agent's newest run does, and has the dot of an unread chat while its conversation is
+    // unread (item 1235), as a messaging app marks who wrote: Grok Bot's column of faces does.
+    const working = (summary) => summary.latest !== null && WORKING.has(summary.latest.status);
+    const unread = (summary) => summary.home?.unread === true;
+    const drawn = JSON.stringify(mine.map((summary) => [summary.record.id, summary.record.name, summary.record.role, summary.record.look, working(summary), unread(summary)]));
     if (drawn !== facesDrawn) {
       facesDrawn = drawn;
       faceLinks.clear();
-      for (const { record } of mine) {
+      for (const summary of mine) {
+        const { record } = summary;
         faceLinks.set(
           record.id,
           el(
@@ -677,8 +682,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
               "aria-label": record.name,
               onclick: onNavigate,
             },
-            actorFace(record.id, "idle", record.look),
+            actorFace(record.id, working(summary) ? "working" : "idle", record.look),
             el("span", { class: "side-agent-name", "aria-hidden": "true" }, record.name),
+            unread(summary) ? el("span", { class: "side-unread side-agent-unread" }) : null,
           ),
         );
       }
@@ -710,7 +716,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     for (const [id, link] of faceLinks) {
       const home = homes.get(id) ?? null;
       link.setAttribute("href", home === null ? `#/agents/${id}` : `#/runs/${home.latest_run_id}`);
-      mark(link, (routeTab === "agents" && id === open) || (routeTab === "runs" && home !== null && home.id === routeThreadId));
+      const reading = routeTab === "runs" && home !== null && home.id === routeThreadId;
+      mark(link, (routeTab === "agents" && id === open) || reading);
+      // The dot of its unread conversation (item 1235), but not while that chat is on the page, being read.
+      const dot = link.querySelector(".side-agent-unread");
+      if (dot instanceof HTMLElement) {
+        dot.hidden = reading;
+      }
+      const name = link.querySelector(".side-agent-name")?.textContent ?? "";
+      link.setAttribute("aria-label", dot !== null && !reading ? `${name} (${t("side.unread")})` : name);
     }
     mark(allAgents, routeTab === "agents" && (open === null || !faceLinks.has(open)));
   }
@@ -768,6 +782,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
     chats = chats.map((chat) => (chat.id === open.id ? { ...chat, unread: false } : chat));
     paintLists();
+    // The face whose conversation it is loses its dot too (item 1235).
+    for (const [id, home] of homes) {
+      const link = faceLinks.get(id);
+      if (home?.id === open.id && link !== undefined) {
+        homes.set(id, { ...home, unread: false });
+        link.querySelector(".side-agent-unread")?.remove();
+      }
+    }
+    markFaces();
     api.patch(`/threads/${open.id}`, { seen: true }).catch((error) => console.warn("the open chat could not be marked seen", error));
   }
 
