@@ -437,12 +437,18 @@ def _clause(text: str) -> str:
         if char in "'\"`" and _closes(text, index):
             quote = char
             continue
-        if char == ";":
+        if char in ";`":
             return text[:index].strip()
         for stop in (" — ", ", then ", " and then "):
             if text.startswith(stop, index):
                 return text[:index].strip()
-    return text.strip().strip("`").strip()
+    command: str = text.strip()
+    # A quote with no partner before it is the tail of one the line opened: an entry that starts inside a quoted
+    # command cannot close it, so it is dropped rather than shown half-open.
+    for mark in ("'", '"', "`"):
+        if command.count(mark) % 2 == 1 and command.endswith(mark):
+            command = command[:-1].rstrip()
+    return command
 
 
 def commands_the_owner_never_gave(summary: str, ledger: RunLedger, plan: PlanPayload) -> tuple[str, ...]:

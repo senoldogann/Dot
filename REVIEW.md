@@ -64,6 +64,8 @@ here points at a test that no longer exists.
   mid-word opened a quote that never closed, so the entry carried the rest of the sentence (item 1219).
 - `tests/unit/test_compaction_taint.py::test_the_compaction_event_carries_the_mark_so_a_resumed_run_starts_untrusted` — the
   mark lived only in the gate, so a run cut off after a compaction and resumed started untainted (item 1219).
+- `tests/unit/test_continuity.py::test_a_command_the_summary_opened_inside_a_quote_stops_at_its_backtick` — a command
+  a summary wrapped in backticks swallowed the prose after it (item 1219, found on a live compaction).
 - `tests/unit/test_continuity.py::test_a_quote_straight_after_a_word_still_holds_its_semicolon` — a quote that opens
   straight after a word was taken for prose, so the command was cut at its own ``;`` (item 1219).
 - `tests/unit/test_compaction_taint.py::test_a_compaction_puts_the_steps_after_it_under_the_check` — a run that went on
