@@ -44,3 +44,31 @@ def test_a_daemon_that_refuses_its_configuration_names_the_setting_in_the_log(tm
     assert [(event["command"], event["level"]) for event in failed] == [("daemon", "error")]
     failure: DaemonFailure | None = daemon_failure_in(logs / "dotx.log")
     assert failure is not None and _NAMED in failure.error
+
+
+def test_a_phones_file_it_cannot_read_keeps_the_daemon_from_starting_anything(tmp_path: Path) -> None:
+    """Item 1239: ``phones.json`` was read only as the server was built, after the daemon had resumed runs, opened
+    iMessage and started the scheduler, which the error then cut off again, and launchd started it all once more. It is
+    read first now: the daemon ends before it makes its database, its running mark or a listening address."""
+    home: Path = tmp_path / "home"
+    logs: Path = tmp_path / "logs"
+    home.mkdir()
+    (home / "phones.json").write_text("{not json", encoding="utf-8")
+    env: dict[str, str] = {
+        **os.environ,
+        "DOT_HOME": str(home),
+        "DOT_LOG_DIR": str(logs),
+        "DOT_CHROME_DIR": str(tmp_path / "chrome"),
+    }
+    started: subprocess.CompletedProcess[str] = subprocess.run(
+        [sys.executable, "-m", "dotagent", "daemon"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=_TIME_LIMIT_S,
+        check=False,
+    )
+    assert started.returncode == 2, started.stderr
+    assert "phones.json" in started.stderr
+    assert not (home / "dot.sqlite3").exists()
+    assert not (home / "daemon.running").exists()
