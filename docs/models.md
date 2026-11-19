@@ -182,6 +182,8 @@ answer keeps its words, Ollama's too.
 | OpenCode Go | `opencode_go:<model>`      | each model is served on exactly one of Chat Completions, Responses and Messages | `OPENCODE_API_KEY`                                             |
 | Anthropic   | `anthropic:<model>`        | Messages API                                                                    | `ANTHROPIC_API_KEY`                                            |
 | OpenRouter  | `openrouter:<lab>/<model>` | Chat Completions, the models of many labs                                       | `OPENROUTER_API_KEY`                                           |
+| Antigravity | `antigravity:<model>`      | Cloud Code Assist, the models of a Google Antigravity plan                      | none; the Google login Antigravity holds                   |
+| Google      | `google:<model>`           | Chat Completions, the Gemini API's OpenAI-compatible route of a Google AI Studio key | `GOOGLE_API_KEY` (aistudio.google.com; free tier)         |
 | OpenCode    | `opencode:<model>`         | OpenCode's own agent, in the `opencode serve` Dot starts (Zen's free models)    | none; the `opencode` program                                   |
 
 - **Ollama**: `[providers.ollama] base_url` is `http://localhost:11434` by default. Cloud models go through the local
@@ -189,6 +191,21 @@ answer keeps its words, Ollama's too.
   talking to ollama.com directly.
 - **OpenAI**: on the Responses wire Dot sends the whole conversation on every call (`store: false`) and carries the
   encrypted reasoning items from step to step, so no state lives on the server.
+- **Google**: a key from [Google AI Studio](https://aistudio.google.com/api-keys) serves the Gemini and Gemma models over
+  `https://generativelanguage.googleapis.com/v1beta/openai`; `dotx auth set GOOGLE_API_KEY` stores it. The key's
+  project is on the free tier until billing is set up, and each model keeps its own daily request limit there (Gemini 3.x
+  Flash 20 a day, Flash Lite 500, Gemma 14.4K); a prompt on the free tier may be used to improve Google's products.
+  `dotx models google` lists the ids the key can reach.
+- **Antigravity**: the models of a Google Antigravity plan, straight over Cloud Code Assist, with no proxy and no key.
+  `[providers.antigravity] credentials_file` names the Google login the Antigravity client on this Mac already holds
+  (the Antigravity driver a desktop client installs writes `acp_token.json`; a `*` glob is allowed and the newest
+  match wins), `project`
+  the Cloud Code project that login belongs to, and `user_agent` the client Google gates the route on: a retired
+  version answers with a text asking for an update, so keep it equal to the installed Antigravity's
+  (`antigravity/hub/<version> ...`). `dotx models antigravity` lists what the account is served: the Gemini 3.x Flash
+  models (`gemini-3.8-flash-high|medium|low`, `gemini-3-flash`, `gemini-3.5-flash-lite`), Claude Sonnet and Opus 4.6 and
+  GPT-OSS 120B. They read images and call tools. The login lives as long as the one Antigravity signed in with; when it
+  is revoked, sign in to Antigravity again on this Mac.
 - **OpenRouter** (item 349): one key and one balance for the models of many labs,
   `openrouter:anthropic/claude-sonnet-5.5` or `openrouter:openai/gpt-5.6-luna` for example. What each model can do comes
   from OpenRouter's own list of its models, read when a model is first asked about and kept for `[providers.openrouter]
@@ -373,7 +390,8 @@ answer keeps its words, Ollama's too.
   this to no one else. That is a judgment, not an exception Anthropic documents: the plans' limits assume ordinary
   individual use, and an always-on agent may be held to more, so use it as you would use Claude Code yourself.
 
-`dotx models [ollama|openai|opencode_go|anthropic|openrouter|opencode|claude_code]` lists what a provider offers, including the
+`dotx models [ollama|openai|opencode_go|anthropic|openrouter|google|antigravity|opencode|claude_code]` lists what a provider
+offers, including the
 reasoning levels of each model, and ends with 1 when no provider answered (the one named, when one is). An Ollama server
 on this Mac is asked for its list once, so one that is not running is reported at once, here, in the model menu and by
 `dotx doctor`, not after the retries a network needs (item 212). `dotx models profile [provider:model]` shows how
@@ -443,16 +461,17 @@ changing the file take turns); `dotx auth status` shows which keys are present. 
 is a template for the file. An OpenAI key is created on platform.openai.com under API keys (`OPENAI_API_KEY`); the
 OpenCode Go key (`OPENCODE_API_KEY`) is the one the OpenCode Console at opencode.ai/auth shows once you have subscribed
 to Go; an Anthropic key (`ANTHROPIC_API_KEY`) is created in the Claude Console at platform.claude.com/settings/keys; an
-OpenRouter key (`OPENROUTER_API_KEY`) at openrouter.ai/settings/keys. The
+OpenRouter key (`OPENROUTER_API_KEY`) at openrouter.ai/settings/keys, a Gemini key (`GOOGLE_API_KEY`) at
+aistudio.google.com/api-keys — free within the tier's daily limits, which each model has its own of. The
 Ollama models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key added
 later when a run first uses that provider, without a restart.
 
 Settings › AI services in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows where
 the key in use comes from (the daemon's environment, Dot's `.env` file or the Keychain) and, for a key of 16 characters
 or more, its last four characters; a key never comes back from the daemon whole. **Check** asks the provider whether it
-takes the key in use: the model listing of OpenAI and Anthropic, the subscription of OpenCode Go and the key's own page
-at OpenRouter (what it has spent and may spend) cost nothing, the Ollama key is tried with one search of its hosted web
-search. **Add key** or **Replace key** asks for the key in a dialog (item 615), saves it in `<home>/.env` and then runs
+takes the key in use: the model listing of OpenAI, Anthropic and Google, the subscription of OpenCode Go and the key's
+own page at OpenRouter (what it has spent and may spend) cost nothing, the Ollama key is tried with one search of its
+hosted web search. **Add key** or **Replace key** asks for the key in a dialog (item 615), saves it in `<home>/.env` and then runs
 **Check**; the key is hidden until you show it, a key with a space inside is refused there, and one typed and dropped
 is gone when the dialog opens again; **Remove** takes away the
 key saved there (a key from the environment or the Keychain is left alone). The page warns when the daemon was started

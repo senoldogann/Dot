@@ -83,14 +83,19 @@ def _assistant_message(message: Message, options: ChatOptions, origin: str) -> J
     if options.replay_details and message.raw and message.raw_origin == origin:
         entry["reasoning_details"] = list(message.raw)
     if message.tool_calls:
-        entry["tool_calls"] = [
-            {
+        calls: list[JsonValue] = []
+        for call in message.tool_calls:
+            wire_call: JsonObject = {
                 "id": call.id,
                 "type": "function",
                 "function": {"name": call.name, "arguments": arguments_for_wire(call.arguments)},
             }
-            for call in message.tool_calls
-        ]
+            if call.extra and call.extra_origin == origin:
+                # Back to the model that sent it, and only to it: Gemini wants the call's thought signature with the
+                # call, and another lab's model would be handed a field it never wrote.
+                wire_call["extra_content"] = dict(call.extra)
+            calls.append(wire_call)
+        entry["tool_calls"] = calls
     return entry
 
 
@@ -164,6 +169,8 @@ class PartialCall(FrozenModel):
     id: str
     name: str
     arguments: str
+    # What the server sent beside the call and asks back with it (Gemini's ``extra_content``).
+    extra: JsonObject | None = None
 
 
 class ChatState(FrozenModel):
@@ -267,12 +274,18 @@ def _fold_call(calls: tuple[PartialCall, ...], entry: JsonObject) -> tuple[Parti
     call_id: str = get_str(entry, "id")
     name: str = get_str(function, "name")
     piece: str = _arguments_piece(function)
+    # A server that wants state back with its call sends it whole, beside the function.
+    extra: JsonObject | None = get_obj(entry, "extra_content") or None
     position: int | None = _slot_for(calls, index, call_id)
     if position is None:
-        return (*calls, PartialCall(index=index, id=call_id, name=name, arguments=piece))
+        return (*calls, PartialCall(index=index, id=call_id, name=name, arguments=piece, extra=extra))
     current: PartialCall = calls[position]
     updated: PartialCall = PartialCall(
-        index=index, id=current.id or call_id, name=current.name or name, arguments=current.arguments + piece
+        index=index,
+        id=current.id or call_id,
+        name=current.name or name,
+        arguments=current.arguments + piece,
+        extra=extra or current.extra,
     )
     return (*calls[:position], updated, *calls[position + 1 :])
 
@@ -348,7 +361,9 @@ def _tool_calls_of(slots: tuple[PartialCall, ...]) -> tuple[ToolCall, ...]:
             )
         identifier: str = slot.id if slot.id and slot.id not in used else new_id("call")
         used.add(identifier)
-        calls.append(ToolCall(id=identifier, name=slot.name, arguments=parse_tool_arguments(slot.arguments)))
+        calls.append(
+            ToolCall(id=identifier, name=slot.name, arguments=parse_tool_arguments(slot.arguments), extra=slot.extra)
+        )
     return tuple(calls)
 
 

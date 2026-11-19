@@ -34,6 +34,17 @@ here points at a test that no longer exists.
   callable (item 1211).
 - `tests/unit/test_eval_plan_runs.py::test_a_plan_run_that_had_dot_read_a_page_counts_its_steps_and_that_read` — a
   plan run with one side call of Dot's was measured from that call alone, its steps dropped (item 1220).
+- `tests/unit/test_tool_call_origin.py::test_another_models_turn_is_not_handed_a_signature_it_never_wrote` — a tool
+  call's replay state went back to whatever model the conversation was sent to, not only the one that wrote it
+  (item 1228).
+- `tests/unit/test_antigravity_request.py::test_a_revoked_login_says_to_sign_in_again` — a token endpoint answering 400
+  (a revoked login) was read as a protocol error, and nothing else noticed the login was gone (item 1228).
+- `tests/unit/test_antigravity_request.py::test_the_answers_to_two_calls_of_one_turn_are_one_content` — the answers to
+  two tool calls of one turn went to Gemini as two contents, so a call was left unanswered (item 1228).
+- `tests/unit/test_antigravity_request.py::test_a_token_endpoint_having_a_bad_moment_is_asked_again` — a 5xx from the
+  token endpoint was reported as a refused login (item 1228).
+- `tests/unit/test_doctor_rows.py::test_a_models_row_is_named_for_its_own_provider` — Google's models row in the checks
+  was called "openai api" (item 1228).
 - `tests/smoke/test_work_status.py::test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answered` — the
   line of the work kept saying "Waiting for you" after the owner's yes, while the step's command ran (item 1148).
 - `tests/unit/test_browser_readback_calls.py::test_a_page_that_never_answers_ends_the_readback_at_the_steps_time` — a

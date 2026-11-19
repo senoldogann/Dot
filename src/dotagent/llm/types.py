@@ -40,9 +40,11 @@ INVALID_ARGUMENTS_KEY: str = "__invalid_arguments__"
 KNOWN_PROVIDERS: tuple[str, ...] = (
     "ollama",
     "openai",
+    "google",
     "opencode_go",
     "anthropic",
     "openrouter",
+    "antigravity",
     "opencode",
     "claude_code",
 )
@@ -84,9 +86,14 @@ class ImageData(FrozenModel):
 
 
 class ToolCall(FrozenModel):
+    """``extra`` is state the server sent beside the call and asks back with it (Gemini's ``extra_content``, which
+    carries the call's thought signature); it goes back unchanged, and only to the model that sent it."""
+
     id: str
     name: str
     arguments: JsonObject
+    extra: JsonObject | None = None
+    extra_origin: str | None = None
 
 
 class Message(FrozenModel):

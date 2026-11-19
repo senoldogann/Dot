@@ -10,6 +10,7 @@ import subprocess
 import time
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from glob import glob
 from pathlib import Path
 
 import httpx
@@ -24,6 +25,7 @@ from dotagent.browser.login import CHROME_APP
 from dotagent.browser.profile_lock import profile_holder_pid, started_by_dot
 from dotagent.browser.profiles import profile_dir
 from dotagent.config import (
+    AntigravityConfig,
     AppConfig,
     JudgeConfig,
     LessonsMode,
@@ -161,9 +163,9 @@ async def _check_model(
     router: ModelRouter, role: str, reference: str, served: Mapping[str, Served], down: Mapping[str, str]
 ) -> CheckResult:
     """A configured model, which its provider must serve to its key: Ollama and Anthropic answer for the model itself,
-    OpenAI, OpenCode Go and OpenRouter through the list of the models they serve (``served``, by provider). When that
-    list could not be read, the model is a warning, and is not asked about (OpenRouter's connector would read the same
-    list again): the provider's own row fails for it. So is a model of a provider whose server could not be reached
+    OpenAI, OpenCode Go, OpenRouter and Google through the list of the models they serve (``served``, by provider). When
+    that list could not be read, the model is a warning, and is not asked about (OpenRouter's connector would read the
+    same list again): the provider's own row fails for it. So is a model of a provider whose server could not be reached
     (``down``: what its row says, by provider), which is not asked, as the call would only wait out its retries (item
     212)."""
     try:
@@ -312,12 +314,29 @@ def _search_row(
     return _result("web search", True, False, f"{ladder} (auto: {keys})")
 
 
-def _openai_api_row(served: Served, required: bool) -> CheckResult:
+def _openai_api_row(served: Served, required: bool, name: str = "openai api") -> CheckResult:
     """With a key present, the list of the models the key can use (:func:`_served`): it proves the key, the project and
     the network path."""
     if served.problem:
-        return _result("openai api", False, required, served.problem)
-    return _result("openai api", True, required, f"{len(served.names)} chat models are available to this key")
+        return _result(name, False, required, served.problem)
+    return _result(name, True, required, f"{len(served.names)} chat models are available to this key")
+
+
+def _antigravity_login_row(config: AntigravityConfig, required: bool) -> CheckResult:
+    """The login the Antigravity route lives on: the file the Antigravity client writes on this Mac. It says whether
+    the file is there, which is what a run would find out the hard way; whether the login still works is the provider's
+    to say, and a call says so in its own words."""
+    pattern: str = str(Path(config.credentials_file).expanduser())
+    found: bool = bool(glob(pattern)) if any(char in pattern for char in "*?[") else Path(pattern).is_file()
+    if found:
+        return _result("antigravity login", True, required, f"the login is at {config.credentials_file}")
+    return _result(
+        "antigravity login",
+        False,
+        required,
+        "no Antigravity login on this Mac: sign in to Antigravity once, or set "
+        "[providers.antigravity] credentials_file",
+    )
 
 
 async def _check_opencode_go_api(router: ModelRouter, required: bool) -> CheckResult:
@@ -414,8 +433,8 @@ def _judge_row(config: JudgeConfig, present: bool) -> CheckResult:
 
 async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
     """Ask ``provider`` whether it takes the key in use now, through connectors made for this check alone. The calls
-    for OpenAI, OpenCode Go, Anthropic and OpenRouter cost nothing; Ollama's key is for its hosted web search, so it is
-    checked with one search, and TypeSafe's, the typed judge's, with one small judgment."""
+    for OpenAI, OpenCode Go, Anthropic, OpenRouter and Google cost nothing; Ollama's key is for its hosted web search,
+    so it is checked with one search, and TypeSafe's, the typed judge's, with one small judgment."""
     if provider == "ollama":
         return await _check_ollama_search(config)
     if provider == "typesafe":
@@ -431,6 +450,8 @@ async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
                 return await _check_anthropic_api(router, True)
             case "openrouter":
                 return await _check_openrouter_api(router, True)
+            case "google":
+                return _openai_api_row(await _served(router, "google"), True, "google api")
             case _:
                 raise ConfigError("no key check exists for this provider", {"provider": provider})
     finally:
@@ -881,6 +902,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
     go_present: bool = await asyncio.to_thread(_has_secret, config.providers.opencode_go.api_key_env)
     anthropic_present: bool = await asyncio.to_thread(_has_secret, config.providers.anthropic.api_key_env)
     openrouter_present: bool = await asyncio.to_thread(_has_secret, config.providers.openrouter.api_key_env)
+    google_present: bool = await asyncio.to_thread(_has_secret, config.providers.google.api_key_env)
     ollama_present: bool = await asyncio.to_thread(_has_secret, config.providers.ollama.api_key_env)
     server: ServerCheck = await _check_ollama_server(config, "ollama" in used)
     down: dict[str, str] = {} if server.reached else {"ollama": server.row.detail}
@@ -890,6 +912,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         _check_key("opencode go", config.providers.opencode_go.api_key_env, go_present, "opencode_go" in used),
         _check_key("anthropic", config.providers.anthropic.api_key_env, anthropic_present, "anthropic" in used),
         _check_key("openrouter", config.providers.openrouter.api_key_env, openrouter_present, "openrouter" in used),
+        _check_key("google", config.providers.google.api_key_env, google_present, "google" in used),
         _search_row(
             config,
             ollama_present,
@@ -899,14 +922,16 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         ),
     ]
     try:
-        # The connectors of OpenAI, OpenCode Go and OpenRouter know a model by its name alone until it is called, so the
-        # list of the models each serves is read once, and each configured model of theirs is checked against it.
+        # The connectors of OpenAI, OpenCode Go, OpenRouter and Google know a model by its name alone until it is
+        # called, so the list of the models each serves is read once, and each configured model of theirs is checked
+        # against it.
         served: dict[str, Served] = {
             provider: await _served(router, provider)
             for provider, present in (
                 ("openai", openai_present),
                 ("opencode_go", go_present),
                 ("openrouter", openrouter_present),
+                ("google", google_present),
             )
             if present
         }
@@ -918,6 +943,9 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
             results.append(await _check_anthropic_api(router, "anthropic" in used))
         if openrouter_present:
             results.append(await _check_openrouter_api(router, "openrouter" in used))
+        if google_present:
+            results.append(_openai_api_row(served["google"], "google" in used, "google api"))
+        results.append(_antigravity_login_row(config.providers.antigravity, "antigravity" in used))
         results.append(await _check_memory(router, config, down))
         for role, reference in configured:
             results.append(await _check_model(router, role, reference, served, down))

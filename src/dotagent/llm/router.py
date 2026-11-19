@@ -21,9 +21,11 @@ from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.llm import reach
 from dotagent.llm.anthropic import FAST_MODE_MODELS, AnthropicProvider
+from dotagent.llm.antigravity import AntigravityProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, ClaudeCodeProvider
 from dotagent.llm.claude_code import FAST_MODELS as CLAUDE_FAST_MODELS
+from dotagent.llm.google import GoogleProvider
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode import OpenCodeProvider
@@ -237,6 +239,12 @@ class ModelRouter:
                 many = self._config.providers.openrouter
                 many_key: str = await asyncio.to_thread(require_secret, many.api_key_env, "the openrouter provider")
                 return OpenRouterProvider(many, many_key)
+            case "google":
+                gemini = self._config.providers.google
+                gemini_key: str = await asyncio.to_thread(require_secret, gemini.api_key_env, "the google provider")
+                return GoogleProvider(gemini, gemini_key)
+            case "antigravity":
+                return AntigravityProvider(self._config.providers.antigravity)
             case "opencode":
                 return OpenCodeProvider(OpenCodeServer(self._config.providers.opencode, self._login_env), ToolBridge())
             case "claude_code":
@@ -399,6 +407,8 @@ class ModelRouter:
                 return providers.anthropic.base_url
             case "openrouter":
                 return providers.openrouter.base_url
+            case "google":
+                return providers.google.base_url
             case _:
                 return None
 

@@ -39,6 +39,12 @@ const PROVIDERS = {
     site: "openrouter.ai",
     needed: true,
   },
+  google: {
+    use: "The Gemini models of a Google AI Studio key, free within their daily limits.",
+    page: "https://aistudio.google.com/api-keys",
+    site: "aistudio.google.com",
+    needed: true,
+  },
   ollama: {
     use: "Optional: the online web search, and ollama.com without the Ollama app. The models the app runs need no key.",
     page: "https://ollama.com/settings/keys",

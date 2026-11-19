@@ -33,5 +33,12 @@
     "needs": "an OpenRouter API key (the models of many labs)",
     "key": true,
     "models": ["anthropic/claude-sonnet-5.5", "openai/gpt-5.6-luna"]
+  },
+  {
+    "provider": "google",
+    "label": "Google",
+    "needs": "a Google AI Studio API key (the Gemini models, free within their daily limits)",
+    "key": true,
+    "models": ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
   }
 ]

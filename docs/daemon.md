@@ -1569,8 +1569,8 @@ the agent itself. On a Mac that has no Dot, the shell installs one first (**Inst
      before it is moved).
   2. **The models**: what `dotx setup` offers, less OpenCode's own agent (the list is `providers.json`, which a test
      keeps equal to `CHOICES` of `cli_setup.py`): Ollama, when it answers on 127.0.0.1:11434 (its models are listed; a
-     cloud model needs `ollama signin` once), or an API key of OpenAI, Anthropic, OpenRouter or OpenCode Go, in a
-     password field.
+     cloud model needs `ollama signin` once), or an API key of OpenAI, Anthropic, OpenRouter, Google (the Gemini models,
+     free within their daily limits) or OpenCode Go, in a password field.
   3. **Install**, one button, four steps. `uv --no-config tool install --constraints <constraints.txt in the app's
      Resources> --python 3.13 dotagent-macos==<the app's version>`, with the `uv` the app carries (the constraints file
      pins every dependency of the package to the version of the `uv.lock` the release was built and tested with, so a
