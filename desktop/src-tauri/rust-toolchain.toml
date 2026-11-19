@@ -4,7 +4,7 @@
 # which the desktop checks pass or stop. The release builds the app for both kinds of Mac (desktop/release.sh), so the
 # standard library of each comes with this version.
 [toolchain]
-channel = "1.99.1"
+channel = "1.100.0"
 components = ["rustfmt", "clippy"]
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
 profile = "minimal"
