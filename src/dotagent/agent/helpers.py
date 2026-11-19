@@ -8,6 +8,8 @@ paused the model after an error that says it cannot answer for a while (:func:`d
 import asyncio
 import time
 from collections.abc import Collection, Mapping, Sequence
+from glob import glob
+from pathlib import Path
 
 from dotagent.config import ProvidersConfig
 from dotagent.core.errors import ConfigError
@@ -63,9 +65,12 @@ def roster_for(models: Sequence[str], keyed: Collection[str], paused: Mapping[st
 
 
 def _key_name(providers: ProvidersConfig, provider: str) -> str | None:
-    """The API key that ``provider`` cannot answer without; ``None`` for Ollama, whose local server needs none."""
+    """The API key that ``provider`` cannot answer without; ``None`` for Ollama, whose local server needs none, and for
+    Antigravity, whose login ``_has_key`` looks for itself."""
     match provider:
         case "ollama":
+            return None
+        case "antigravity":
             return None
         case "openai":
             return providers.openai.api_key_env
@@ -75,11 +80,18 @@ def _key_name(providers: ProvidersConfig, provider: str) -> str | None:
             return providers.anthropic.api_key_env
         case "openrouter":
             return providers.openrouter.api_key_env
+        case "google":
+            return providers.google.api_key_env
         case _:
             raise ConfigError("unknown provider", {"provider": provider})
 
 
 def _has_key(providers: ProvidersConfig, provider: str) -> bool:
+    if provider == "antigravity":
+        # No key: the login the Antigravity client keeps on this Mac is what the route answers with, and a roster that
+        # switched to a model of a missing login would die on its first call.
+        pattern: str = str(Path(providers.antigravity.credentials_file).expanduser())
+        return bool(glob(pattern)) if any(char in pattern for char in "*?[") else Path(pattern).is_file()
     key: str | None = _key_name(providers, provider)
     return key is None or secret_state(key).source is not None
 

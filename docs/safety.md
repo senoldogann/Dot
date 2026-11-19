@@ -18,8 +18,10 @@ run needs, sent where the configuration points:
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
   playbooks and the nightly reflection (which shows `review` the notes it considers merging or putting aside, and the
   learned skills it considers merging) to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
-  OpenCode Go, Anthropic and OpenRouter get it only when a role, a helper or a standby model names one of their models;
-  OpenRouter passes each call on to the lab whose model it is. OpenCode Zen's free models (`opencode:`) get the whole
+  OpenCode Go, Anthropic, OpenRouter, Google (a key from AI Studio) and a Google Antigravity account get it only when a
+  role, a helper or a standby model names one of their models; OpenRouter passes each call on to the lab whose model it
+  is, and Google's free tier may use what it is sent to improve its products. OpenCode Zen's free models (`opencode:`) get
+  the whole
   conversation of a run that runs on one, through OpenCode's own agent, and the providers of some of them may use what
   they get to improve their models (see [Models and providers](models.md#models-and-providers)).
 - **To Anthropic, through your Claude plan: the whole conversation of a run on `claude_code:` (item 1013), and each

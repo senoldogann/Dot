@@ -10,9 +10,10 @@ Ollama it asks the Ollama of this Mac for `bge-m3`, and where there is none it w
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
 permissions the desktop tools need, the Office applications and the OneDrive folders of the skills that come with Dot
 (none is opened), the commands and secrets of the configured MCP servers (none is started), Ollama, the keys of OpenAI,
-OpenCode Go, Anthropic and OpenRouter (OpenRouter's row says what its key has spent), the embedding model and the
-configured models, each of which its provider must serve to the key (Ollama and Anthropic answer for the model itself,
-OpenAI, OpenCode Go and OpenRouter through the list of the models they serve), and says how to fix what is missing.
+OpenCode Go, Anthropic, OpenRouter and Google (OpenRouter's row says what its key has spent), the login of a Google
+Antigravity account, the embedding model and the configured models, each of which its provider must serve to the key
+(Ollama and Anthropic answer for the model itself, OpenAI, OpenCode Go, OpenRouter and Google through the list of the
+models they serve), and says how to fix what is missing.
 It warns, without failing, when the review model is also the main model,
 when an MCP server's command or secret is missing (Dot starts without that server's tools), when a single tool of a
 connected server was left out because its schema cannot be used (item 1001: `dotx doctor` starts no server, so it asks

@@ -203,6 +203,35 @@ class ClaudeCodeConfig(FrozenModel):
     silence_s: float = Field(gt=0, allow_inf_nan=False)
 
 
+class AntigravityConfig(FrozenModel):
+    """The models of a Google Antigravity account over Cloud Code Assist (``llm/antigravity.py``): no key, but the
+    Google login a client on this Mac keeps, which ``credentials_file`` names (a home directory ``~`` and a ``*`` glob
+    allowed), the Cloud Code ``project`` that login belongs to, and the ``user_agent`` Google gates the route on (the
+    installed Antigravity's client name and version)."""
+
+    base_url: ServiceAddress
+    credentials_file: str
+    project: str
+    user_agent: str
+    connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    attempts: int = Field(ge=1)
+    max_concurrent: int = Field(ge=1)
+
+
+class GoogleConfig(FrozenModel):
+    """The Gemini models of a Google AI Studio key, over the Gemini API's OpenAI-compatible route
+    (``https://generativelanguage.googleapis.com/v1beta/openai``). ``api_key_env`` holds the key from
+    aistudio.google.com; a model is free while the key's project stays inside its free tier (docs/models.md)."""
+
+    base_url: ServiceAddress
+    api_key_env: str
+    connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    attempts: int = Field(ge=1)
+    max_concurrent: int = Field(ge=1)
+
+
 class AnthropicConfig(FrozenModel):
     base_url: ServiceAddress
     api_key_env: str
@@ -253,6 +282,8 @@ class ProvidersConfig(FrozenModel):
     opencode_go: OpenCodeGoConfig
     anthropic: AnthropicConfig
     openrouter: OpenRouterConfig
+    antigravity: AntigravityConfig
+    google: GoogleConfig
     opencode: OpenCodeConfig
     claude_code: ClaudeCodeConfig
 
@@ -1389,6 +1420,7 @@ def providers_by_key(config: AppConfig) -> dict[str, str]:
         providers.anthropic.api_key_env: "anthropic",
         providers.opencode_go.api_key_env: "opencode_go",
         providers.openrouter.api_key_env: "openrouter",
+        providers.google.api_key_env: "google",
         providers.ollama.api_key_env: "ollama",
         config.judge.api_key_env: JUDGE_SERVICE,
     }
