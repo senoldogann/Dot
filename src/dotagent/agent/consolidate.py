@@ -119,10 +119,13 @@ def merge_groups(
             fresh: list[int] = [one, other]
             groups.append(fresh)
             member[one] = member[other] = fresh
-        elif alone not in member and len(joined) < MOST_GROUP_NOTES:
-            if all((min(alone, place), max(alone, place)) in close for place in joined):
-                joined.append(alone)
-                member[alone] = joined
+        elif (
+            alone not in member
+            and len(joined) < MOST_GROUP_NOTES
+            and all((min(alone, place), max(alone, place)) in close for place in joined)
+        ):
+            joined.append(alone)
+            member[alone] = joined
     made: list[MergeGroup] = [
         MergeGroup(
             notes=tuple(pool[place] for place in places),
