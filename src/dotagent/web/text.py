@@ -10,6 +10,7 @@ from typing import Literal
 from urllib.parse import urljoin, urlsplit
 
 from dotagent.core.errors import WebError
+from dotagent.core.text import without_trailing_blanks
 from dotagent.core.types import FrozenModel
 
 type DocumentKind = Literal["html", "pdf", "text", "binary"]
@@ -112,7 +113,6 @@ _MAX_DESCRIPTION_CHARS: int = 400
 _MIN_MAIN_CHARS: int = 500
 _MIN_MAIN_SHARE: float = 0.2
 _SPACES: re.Pattern[str] = re.compile(r"\s+")
-_TRAILING_SPACES: re.Pattern[str] = re.compile(r"[ \t]+\n")
 _BLANK_RUNS: re.Pattern[str] = re.compile(r"\n{3,}")
 _HIDDEN_STYLE: re.Pattern[str] = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.IGNORECASE)
 # Soft hyphens, zero-width spaces and joiners, direction marks and byte-order marks: invisible, and used by pages to
@@ -258,7 +258,7 @@ def _render(tokens: Sequence[_Token]) -> str:
                         last_words = len(parts) - 1
                     newlines, last, at_marker = 0, value[-1], False
     joined: str = "".join(parts)
-    return _BLANK_RUNS.sub("\n\n", _TRAILING_SPACES.sub("\n", joined)).strip()
+    return _BLANK_RUNS.sub("\n\n", without_trailing_blanks(joined)).strip()
 
 
 class _Reader(HTMLParser):

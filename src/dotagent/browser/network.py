@@ -30,10 +30,11 @@ HIDDEN: str = "[hidden]"
 # The prefixes some sites put before their JSON so that no other site's script can read it (Google's ``)]}'``).
 _GUARDS: tuple[str, ...] = (")]}'", "for(;;);", "while(1);")
 # A secret's name and its value in text that is no JSON (a form's ``access_token=…``, a line of key and value): the
-# value is hidden in every mode but yolo, as a JSON key's is (the code review of item 714).
+# value is hidden in every mode but yolo, as a JSON key's is (the code review of item 714). A name is taken whole
+# from its start, so that a long run of letters is read once, not again from each of its letters (item 1242).
 _TEXT_SECRET: re.Pattern[str] = re.compile(
-    r"""(["']?)([\w.-]*(?:token|secret|passw|session|cookie|csrf|xsrf|authori[sz]ation|api[_-]?key|private[_-]?key"""
-    r"""|signature|credential)[\w.-]*)\1(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s&,;"']+)""",
+    r"""(["']?)(?<![\w.-])(?=[\w.-]*?(?:token|secret|passw|session|cookie|csrf|xsrf|authori[sz]ation|api[_-]?key"""
+    r"""|private[_-]?key|signature|credential))([\w.-]++)\1(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s&,;"']+)""",
     re.IGNORECASE,
 )
 _KB: float = 1024.0

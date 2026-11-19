@@ -219,8 +219,12 @@ def summary_part(text: str) -> str:
 def _heading(section: str) -> re.Pattern[str]:
     """Where ``section`` opens: its name at the start of a line, after marks of Markdown or a number, before a colon,
     a dash, a bracket or the line's end (``GOAL:``, ``## Done``, ``**STATE** -``, ``1. NEXT``), or its name in capitals
-    and a colon anywhere (``GOAL: x. DONE: y``)."""
-    return re.compile(rf"^\W*(?:\d+[.)]\s*)?\W*(?i:{section})\W*?(?:[:\-–—(]|$)|\b{section}\s*:", re.MULTILINE)
+    and a colon anywhere (``GOAL: x. DONE: y``). The marks before the name stay on its line and are read once: two
+    runs of any non-word character side by side, which also went over line breaks, took a time that grew with the
+    cube of a run of blank lines, 1,000 of them five seconds (the pre-push review of item 1242)."""
+    return re.compile(
+        rf"^[^\w\n]*(?:\d+[.)][^\w\n]*)?(?i:{section})[^\w\n]*?(?:[:\-–—(]|$)|\b{section}\s*:", re.MULTILINE
+    )
 
 
 _HEADINGS: tuple[tuple[str, re.Pattern[str]], ...] = tuple((section, _heading(section)) for section in SUMMARY_SECTIONS)
