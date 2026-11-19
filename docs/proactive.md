@@ -370,7 +370,8 @@ yours and is never touched; a file with no block gets it at its end. The tool gr
   `Sent`) stops the block from being used until it is one of them, as a broken marker does: read loosely, it would let
   a held client be written to or a sent mail be sent again.
 - **Outside words stay marked.** Once a run that read outside content (a reply's) wrote the block, its start line says
-  so, and `pipeline_view` hands the ledger fenced, marking the run that reads it as having read outside content. A
+  so, and `pipeline_view` hands the ledger fenced, marking the run that reads it as having read outside content; so does
+  a refusal of a tool that quotes a cell of it (a client's name, an action's evidence). A
   cell holds no comment mark (`<!--`, `-->`), so that a third party's words cannot end the block.
 - **Outcomes are not actions.** What Dot did and what came of it are kept apart, and an outcome needs its date and its
   source: nothing is guessed. `pipeline_view` compares the ways of acting by the clients each reached, those who answered
