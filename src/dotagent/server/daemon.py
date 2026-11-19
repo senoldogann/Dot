@@ -272,6 +272,9 @@ async def run_daemon(config: AppConfig) -> int:
     host: str = config.server.host
     require_loopback(host)
     token: str = await asyncio.to_thread(read_or_create_token, token_path())
+    # Read before anything starts (item 1239): a file that cannot be read keeps the daemon from starting, as
+    # docs/phone.md says, not after it resumed runs, opened iMessage and started the scheduler, all cut off again.
+    phones: PairedPhones = await asyncio.to_thread(PairedPhones.load, phones_path())
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     stop: asyncio.Event = asyncio.Event()
     restart_wanted: bool = False
@@ -413,7 +416,7 @@ async def run_daemon(config: AppConfig) -> int:
                 restart=restart,
                 channels=channels,
                 reactions=reactions,
-                phones=await asyncio.to_thread(PairedPhones.load, phones_path()),
+                phones=phones,
                 notifications=phone,
             )
             server: DotServer = DotServer(serving_config(create_app(context)), stopping)
