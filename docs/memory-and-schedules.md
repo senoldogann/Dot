@@ -316,6 +316,11 @@ reply to the finder's own chat, stay with the finder; while a run works in that 
 a schedule or a watcher of yours hands a reply on, refused by the code for any other run: what the reply's run sends
 in your chat is judged as that chat's, so a run of Dot's own initiative, whose messages ask you in every mode (item
 850), keeps its replies.
+The reply's run is told, when the work keeps a record of its clients ([Continuing work](proactive.md#objectives)), to
+read it first, keep the reply there as a dated outcome with its sender, and begin an answer there before it sends it, so
+that a reply handed twice, or a run that broke off, sends nothing twice (item 1227). There is no watcher of the inbox:
+your mail (webmail.zone.fi) is read by that schedule, every two hours, so a reply starts its work within two hours of
+being read, not the moment it arrives.
 
 The **Morning brief** (item 570) is a schedule too, set on a card under your schedules (its **Settings** open in a
 dialog, item 615) and labelled **Brief** in the list: a read-only run (`research`) at the time you set whose goal Dot

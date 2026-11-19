@@ -9,7 +9,7 @@ from dotagent.agent.plan import PlanItem, with_step_status
 from dotagent.core.errors import InvalidValueError, RunConflict, ToolInputError
 from dotagent.store.db import Store
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
-from dotagent.store.models import RunRecord, ThreadRecord
+from dotagent.store.models import ObjectiveWorkflow, RunRecord, ThreadRecord
 
 
 def test_a_run_ends_through_ending_and_does_not_return_to_working() -> None:
@@ -148,12 +148,12 @@ async def test_a_crash_hold_opens_for_a_resumed_run_and_an_owner_hold_does_not(t
 async def test_the_store_refuses_an_objective_move_the_table_does_not_have(tmp_path: Path) -> None:
     store: Store = await _open(tmp_path)
     try:
-        made = await store.add_objective("Ship it", "because", "it is live", False)
-        done = await store.update_objective(made.id, "done", None)
+        made = await store.add_objective("Ship it", "because", "it is live", ObjectiveWorkflow(), False)
+        done = await store.update_objective(made.id, "done", None, None)
         assert done.status == "done"
-        dropped = await store.update_objective(done.id, "dropped", None)
+        dropped = await store.update_objective(done.id, "dropped", None, None)
         assert dropped.status == "dropped"
-        assert (await store.update_objective(dropped.id, "active", None)).status == "active"
+        assert (await store.update_objective(dropped.id, "active", None, None)).status == "active"
     finally:
         await store.close()
 

@@ -122,6 +122,7 @@ from dotagent.tools.objectives import build_objective_tools
 from dotagent.tools.office import build_office_tools
 from dotagent.tools.pages import build_page_tools
 from dotagent.tools.phone import build_phone_tools
+from dotagent.tools.pipeline import build_pipeline_tools
 from dotagent.tools.posts import build_post_tools
 from dotagent.tools.recall import build_recall_tools
 from dotagent.tools.recon import build_recon_tool
@@ -285,6 +286,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_memory_tools(),
         build_todo_tools(),
         build_objective_tools(),
+        build_pipeline_tools(),
         (build_draft_tool(),),
         build_mail_calendar_tools(),
         build_schedule_tools(),
