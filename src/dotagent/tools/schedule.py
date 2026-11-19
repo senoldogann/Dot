@@ -144,13 +144,18 @@ def tool_timing(cron: str | None, at: str | None, ctx: ToolContext) -> Timing:
     return plan_timing(cron, at, ctx.runtime.schedule_zone, ctx.runtime.config.scheduler.min_interval_s, time.time())
 
 
+def create_action(name: str, when: str, mode: str, goal: str) -> ActionInfo:
+    """The step of making the schedule ``name``: its summary holds the whole goal, on the card and for the review, which
+    reads it whole (item 1251): every firing runs all of it, not what fits the card (the review of 2026-11-01)."""
+    summary: str = f'Schedule "{name}" ({when}, {mode}): {" ".join(goal.split())}'
+    return _action("schedule_create", "", "medium").model_copy(update={"summary": summary})
+
+
 def _create_tool() -> RegisteredTool:
     def classify(args: CreateArgs, ctx: ToolContext) -> ActionInfo:
         when: str = describe_timing(tool_timing(args.cron, args.at, ctx), ctx.runtime.schedule_zone)
         mode: str = "this chat's mode" if args.mode is None else args.mode
-        # The whole goal on the card: every firing runs all of it, not what fits the card (the review of 2026-11-01).
-        summary: str = f'Schedule "{args.name}" ({when}, {mode}): {" ".join(args.goal.split())}'
-        return _action("schedule_create", "", "medium").model_copy(update={"summary": summary})
+        return create_action(args.name, when, mode, args.goal)
 
     async def run(args: CreateArgs, ctx: ToolContext) -> ToolResult:
         zone: ZoneInfo = ctx.runtime.schedule_zone

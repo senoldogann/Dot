@@ -86,12 +86,22 @@ def classify_mcp_call(tool: McpTool, arguments: JsonObject) -> ActionInfo:
     (item 429): a hint is the server's word, and a server may be wrong or hostile. Other tools that declare themselves
     read-only only look. Any other tool may change things and may reach out to the world, unless the server says it
     does not: servers that declare nothing get the careful treatment."""
-    shown: str = _clip(redact_secrets(dumps_compact(arguments)), _ARGUMENT_CHARS)
+    written: str = redact_secrets(dumps_compact(arguments))
+    shown: str = _clip(written, _ARGUMENT_CHARS)
     summary: str = f"{tool.server}: {tool.remote_name}({shown})"
+    # The summary shows the arguments' start alone; the owner's rules, the review and the card read them whole (the
+    # code review of 2026-11-19, K3-02: a message's harmless start was approved, and all of it was sent).
+    body: str = written if len(written) > _ARGUMENT_CHARS else ""
     sends: bool = sends_messages(tool.remote_name)
     if tool.hints.read_only is True and not sends:
         return ActionInfo(
-            tool=tool.exposed_name, kind="mcp_read", risk="low", summary=summary, target=tool.server, flags=()
+            tool=tool.exposed_name,
+            kind="mcp_read",
+            risk="low",
+            summary=summary,
+            target=tool.server,
+            flags=(),
+            body=body,
         )
     flags: list[Flag] = []
     if tool.hints.destructive is not False and tool.hints.read_only is not True:
@@ -101,7 +111,13 @@ def classify_mcp_call(tool: McpTool, arguments: JsonObject) -> ActionInfo:
     if sends:
         flags.append("message_send")
     return ActionInfo(
-        tool=tool.exposed_name, kind="mcp", risk="medium", summary=summary, target=tool.server, flags=tuple(flags)
+        tool=tool.exposed_name,
+        kind="mcp",
+        risk="medium",
+        summary=summary,
+        target=tool.server,
+        flags=tuple(flags),
+        body=body,
     )
 
 

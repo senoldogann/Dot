@@ -111,6 +111,15 @@ here points at a test that no longer exists.
   `Paused` slipped past a hold and a state of `Sent` let a sent mail be begun again (item 1227).
 - `tests/smoke/test_pipeline_record.py::test_a_lock_file_that_is_a_link_is_refused_and_nothing_is_written` — the pipeline
   tools followed links on the path the call was allowed (item 681's guard, item 1227).
+- `tests/unit/test_shell_guard_zsh.py::test_what_zsh_runs_of_a_line_the_guard_reads_too` — the shell guard read six
+  ways of zsh's (`+=`, a comment in `$(...)`, `cd OLD NEW` and `cdpath`, a C shell, braces in the command's place, an
+  alias) as safe while zsh read `~/.ssh` or deleted in the home folder (K1-01 to K1-06, item 1250).
+- `tests/smoke/test_taint_check.py::test_a_step_too_long_for_the_review_model_to_read_is_refused_with_how_to_go_on` — a
+  step past what the review model reads ran unread in a tainted yolo run (K3-01, item 1251).
+- `tests/unit/test_review_target.py::test_a_schedules_whole_goal_is_read_not_its_middle_cut` — the review read a
+  schedule's goal cut in the middle, and an MCP call's arguments cut at 300 characters (K3-02, item 1251).
+- `tests/unit/test_pixel_click.py::test_a_part_of_a_button_presses_the_button` — a click at a pixel was judged by no
+  element, so a payment button held back by its ref was pressed by its pixel (B2-01, item 1252).
 
 ## Evidence and format
 
