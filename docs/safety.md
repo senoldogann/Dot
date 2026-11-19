@@ -1393,12 +1393,20 @@ event and approval.
 
 > **The shell guardrail is best-effort; the sandbox holds only Dot's own files and what would act outside it.** Dot
 > reads a shell command before it runs it and judges what it would touch: it reads the line as the shell does (quotes,
-> comments, here-documents, the commands substituted into it, a `case` inside one, a `cd` however it is spelt, a
-> variable, a link it makes, a wrapper such as `bash -c`, `env`, `xargs`, `xcrun` or `uv run`, a `trap`, the settings
-> and variables that make git or another program run a command line), compares paths, and the names of commands, without
-> case (`RM -rf`, `SUDO` and `CURL … | SH` run the commands of the lower-case names on this Mac's file system, item
-> 538), and treats what it cannot read (a command named by a substitution or a pattern, `eval` of one, a setting of git
-> it does not know, a line it cannot parse) as a destructive step outside the workspace, which every preset asks about.
+> comments, here-documents, the commands substituted into it and a comment or a here-document inside one, a `case`
+> inside one, a `cd` however it is spelt, zsh's `chdir`, `cd OLD NEW`, `CDPATH` and `cdpath` included, a variable and
+> what `+=` adds to it or a quote right after its name ends it with, a `~` as the `HOME` the line set, a link it makes,
+> an element of zsh's `aliases` or `functions` table, judged as the line it is, braces in the command's place, which make several words of it, a wrapper such as `bash -c`,
+> `env`, `xargs`, `xcrun`, `uv run` or `npx -c`, zsh's `-` before a command, a `trap` and an `alias`, whose line is
+> judged where it is defined, the settings and variables that make git or another program run a command line, and the
+> line a program it does not know is given with `-c`, `-e` or `--command`, item 1250), compares paths, and the names of
+> commands, without case and without the version a shell or an interpreter carries in its name (`RM -rf`, `SUDO` and
+> `CURL … | SH` run the commands of the lower-case names on this Mac's file system, item 538; `perl5.34` is `perl`), and
+> treats what it cannot read (a command named by a substitution or a pattern, `eval` of one, a setting of git it does
+> not know, a line it cannot parse, a C shell's line, `csh` and `tcsh`) as a destructive step outside the workspace,
+> which every preset asks about. How it reads is checked against zsh itself: a test runs the lines that fooled it
+> before in a real zsh whose only programs are recorders, and every recorded delete outside the workspace or read of a
+> protected file must be a line a preset asks about (item 1250).
 > A script the line downloads and then runs (`curl -o`, `wget -O` or `git clone`, then a shell, `source`, its path or an
 > interpreter such as `python3`, also after a `cp`, an `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh |
 > bash`) is judged as piping the download into a shell; a file named after an at sign (`curl --data-binary @file`) as
