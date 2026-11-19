@@ -516,17 +516,33 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     // comes when the run takes it before its next step).
     /** @type {Map<string, string[]>} */
     const pending = new Map();
-    /** Whether a message to the agent goes on in the chat of `latest`: one of the owner's, not a helper's or a schedule's. */
-    function continues(latest) {
-      return latest !== null && latest !== undefined && latest.parent_run_id === null && latest.thread_id !== "" && !AUTOMATIC.has(latest.source ?? "");
+    /**
+     * The chat a message to the agent goes on in, as its latest run: the agent's conversation (item 1233), its home chat
+     * as the daemon names it (`home`), the one its page's box and its face in the sidebar go on in, whatever ran since
+     * (a schedule's, a lead's work order); `null` before the owner had one with it. Dot's, which has no home, is the
+     * chat of its latest run when the owner started it.
+     */
+    function conversationOf(summary) {
+      const home = summary?.home ?? null;
+      if (home !== null) {
+        return {
+          id: home.latest_run_id,
+          status: home.latest_status,
+          thread_id: home.id,
+          goal: home.last_role === "user" ? home.last_message : home.title,
+        };
+      }
+      const latest = summary?.latest ?? null;
+      const owners = latest !== null && summary.record.id === DOT_ID && latest.parent_run_id === null && latest.thread_id !== "" && !AUTOMATIC.has(latest.source ?? "");
+      return owners ? latest : null;
     }
     function followOf(id) {
       return () => {
-        const latest = actors.get(id)?.summary.latest ?? null;
-        if (freshChat.has(id) || !continues(latest)) return { threadId: null, working: null };
+        const chat = conversationOf(actors.get(id)?.summary);
+        if (freshChat.has(id) || chat === null) return { threadId: null, working: null };
         // Waiting for the owner (blocked) is at work too: the message reaches that run, as in its chat (the review).
-        const working = WORKING_STATES.has(latest.status);
-        return { threadId: latest.thread_id, working: working ? latest.id : null };
+        const working = WORKING_STATES.has(chat.status);
+        return { threadId: chat.thread_id, working: working ? chat.id : null };
       };
     }
     async function readChat(threadId, key) {
@@ -576,17 +592,18 @@ export function mountOffice(holder, { composerFor, openAgent }) {
      * run that is no chat of the owner's (a schedule's, a watcher's, Dot's own, a helper's) shows a note and its live
      * part all the same. The log that is in the panel is changed where it differs and given back, so that its scroll,
      * its selection and the nodes already drawn stay; a new one is made for another agent or another chat. */
-    function chatView(id, latest, live) {
+    function chatView(id, chat, live) {
       let thread = "";
       /** @type {(HTMLElement | null)[]} */
       let nodes;
       if (freshChat.has(id)) {
         nodes = [noteNode("Your next message starts a new chat.")];
-      } else if (!continues(latest)) {
-        // No chat of the owner's with it yet, or its newest is a schedule's or a helper's: an empty chat, ready for the
-        // first message (item 901), with what that run does now under it.
+      } else if (chat === null) {
+        // No chat of the owner's with it yet: an empty chat, ready for the first message (item 901), with what its run
+        // does now under it.
         nodes = [noteNode("No chat yet. Write to start one.")];
       } else {
+        const latest = chat;
         thread = latest.thread_id;
         const key = `${latest.id}|${latest.status}`;
         const kept = chats.get(latest.thread_id);
@@ -658,10 +675,11 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         return;
       }
       const { record, latest } = actor.summary;
+      const conversation = freshChat.has(record.id) ? null : conversationOf(actor.summary);
       const mode = modeOf(latest, waitingRuns());
       // What it does, in a word: the goal of a chat of the owner's is its first message below, not said again (item
       // 905); a run that is no such chat (a schedule's, Dot's own, a helper's), or one a new chat leaves out, says it.
-      const inChat = continues(latest) && !freshChat.has(record.id);
+      const inChat = conversation !== null && latest !== null && latest.id === conversation.id;
       const doing = el(
         "p",
         { class: "office-panel-doing", dataset: { mode }, title: mode === "free" ? "" : (latest?.goal ?? "") },
@@ -670,12 +688,12 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       // Its steps and words live while it works or waits, at the foot of its chat, whoever started the run; a free
       // agent's panel is its chat alone (item 901, the owner's word: "the chat screens should be clean").
       const live = mode === "free" || latest === null ? null : feedView(feeds.feed(latest.id), mode);
-      const chat = chatView(record.id, latest, live);
+      const chat = chatView(record.id, conversationOf(actor.summary), live);
       const links = el(
         "div",
         { class: "office-panel-links" },
-        latest !== null ? el("a", { class: "btn ghost sm", href: `#/runs/${latest.id}` }, "Open its chat") : null,
-        continues(latest) && !freshChat.has(record.id)
+        conversation !== null || latest !== null ? el("a", { class: "btn ghost sm", href: `#/runs/${(conversation ?? latest).id}` }, "Open its chat") : null,
+        conversation !== null
           ? el(
               "button",
               {
@@ -704,7 +722,9 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       const box = composerFor(
         record,
         (run) => {
-          actor.summary = { ...actor.summary, latest: run };
+          // The chat it went on in, or the one it began, is the conversation until the agents are read again.
+          const home = { id: run.thread_id, latest_run_id: run.id, latest_status: run.status, title: run.goal, last_message: run.goal, last_role: "user" };
+          actor.summary = { ...actor.summary, latest: run, ...(record.id === DOT_ID ? {} : { home }) };
           freshChat.delete(record.id);
           toast("ok", `${record.name} is on it.`);
           readSoon();

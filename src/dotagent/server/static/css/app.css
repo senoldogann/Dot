@@ -5111,6 +5111,20 @@ dialog.modal.versions-dialog {
   white-space: nowrap;
 }
 
+/* An agent's name in its chat's bar opens its page (item 1234): it reads as the name, not as a link. */
+a.stage-name-link {
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-xs);
+}
+
+@media (hover: hover) {
+  a.stage-name-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
 /* A page's tools in the bar, before the daemon's pills. */
 .stage-tools {
   display: flex;

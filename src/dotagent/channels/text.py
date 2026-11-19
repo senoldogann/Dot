@@ -32,9 +32,11 @@ _CELL_BREAK: re.Pattern[str] = re.compile(r"(?<!\\)\|")
 # An inline code span keeps what is in it as it is; every other mark is read around it.
 _CODE_SPAN: re.Pattern[str] = re.compile(r"(?P<ticks>`+)(?!`)(?P<code>.+?)(?<!`)(?P=ticks)(?!`)")
 # A link keeps its address in brackets after its words, as the page it points to would be lost else; so does an image
-# (a picture of the Mac's own that goes with the answer never reaches here: see pictures.py).
+# (a picture of the Mac's own that goes with the answer never reaches here: see pictures.py). Its words may hold
+# pairs of brackets (``[see [1] and [2]](…)``) and no unpaired one, so that a run of unclosed ``[`` is read once
+# (item 1242).
 _LINK: re.Pattern[str] = re.compile(
-    r"!?\[(?P<words>[^\]\n]*)\]\((?P<address>(?:[^()\s]|\([^()\s]*\))+)(?:[ \t]+\"[^\"\n]*\")?\)"
+    r"!?\[(?P<words>(?:[^\[\]\n]|\[[^\[\]\n]*\])*)\]\((?P<address>(?:[^()\s]|\([^()\s]*\))+)(?:[ \t]+\"[^\"\n]*\")?\)"
 )
 _AUTOLINK: re.Pattern[str] = re.compile(r"<(https?://[^>\s]+)>")
 _LINE_BREAK: re.Pattern[str] = re.compile(r"<br\s*/?>", re.IGNORECASE)

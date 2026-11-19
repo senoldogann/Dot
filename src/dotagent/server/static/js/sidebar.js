@@ -622,7 +622,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   const schedulesLink = el("a", { class: "icon-btn side-page", href: "#/schedules", title: t("sidebar.schedules"), "aria-label": t("sidebar.schedules"), onclick: onNavigate }, icon("calendar"));
   // The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name, to its
-  // page, where a message to it starts; the three that worked last (item 855: the row scrolled and cut a face), and its
+  // conversation (item 1233), where a message to it goes on, else to its page; the three that worked last (item 855: the row scrolled and cut a face), and its
   // last tile, All, is the page of every agent and team, which the Agents row is while the owner has no agent of their
   // own. A list that did not load leaves the row as it was.
   const facesNav = el("nav", { class: "side-agent-faces", "aria-label": t("sidebar.yourAgents"), hidden: true });
@@ -633,6 +633,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el("span", { class: "side-agent-name", "aria-hidden": "true" }, t("sidebar.all")),
   );
   const faceLinks = new Map();
+  // Each face's agent's home chat (item 1233), as the agents were last read: the chat its face opens.
+  const homes = new Map();
   let facesTicket = 0;
   // What the tiles show, as last drawn: the same agents read again leave them standing, so that the focus or the
   // pointer on one stays (the pre-push review).
@@ -655,11 +657,20 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       .filter(({ record }) => record.id !== DOT_ID)
       .sort((one, other) => worked(other) - worked(one))
       .slice(0, SIDE_FACES);
-    const drawn = JSON.stringify(mine.map(({ record }) => [record.id, record.name, record.role, record.look]));
+    homes.clear();
+    for (const { record, home } of mine) {
+      homes.set(record.id, home ?? null);
+    }
+    // A face works while the agent's newest run does, and has the dot of an unread chat while its conversation is
+    // unread (item 1235), as a messaging app marks who wrote: Grok Bot's column of faces does.
+    const working = (summary) => summary.latest !== null && WORKING.has(summary.latest.status);
+    const unread = (summary) => summary.home?.unread === true;
+    const drawn = JSON.stringify(mine.map((summary) => [summary.record.id, summary.record.name, summary.record.role, summary.record.look, working(summary), unread(summary)]));
     if (drawn !== facesDrawn) {
       facesDrawn = drawn;
       faceLinks.clear();
-      for (const { record } of mine) {
+      for (const summary of mine) {
+        const { record } = summary;
         faceLinks.set(
           record.id,
           el(
@@ -671,8 +682,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
               "aria-label": record.name,
               onclick: onNavigate,
             },
-            actorFace(record.id, "idle", record.look),
+            actorFace(record.id, working(summary) ? "working" : "idle", record.look),
             el("span", { class: "side-agent-name", "aria-hidden": "true" }, record.name),
+            unread(summary) ? el("span", { class: "side-unread side-agent-unread" }) : null,
           ),
         );
       }
@@ -696,10 +708,23 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
   }
   // The face of the agent whose page is open is marked as a row of the list is, and All on the page of every agent.
+  // An agent's face opens its conversation (item 1233): its home chat, which the daemon names however many chats are
+  // newer, else its page, whose box starts the first chat with it. The face is marked on its page and in its home chat,
+  // as a messaging app marks whom you are talking to.
   function markFaces() {
     const open = /^#\/agents\/([A-Za-z0-9_-]+)$/.exec(location.hash)?.[1] ?? null;
     for (const [id, link] of faceLinks) {
-      mark(link, routeTab === "agents" && id === open);
+      const home = homes.get(id) ?? null;
+      link.setAttribute("href", home === null ? `#/agents/${id}` : `#/runs/${home.latest_run_id}`);
+      const reading = routeTab === "runs" && home !== null && home.id === routeThreadId;
+      mark(link, (routeTab === "agents" && id === open) || reading);
+      // The dot of its unread conversation (item 1235), but not while that chat is on the page, being read.
+      const dot = link.querySelector(".side-agent-unread");
+      if (dot instanceof HTMLElement) {
+        dot.hidden = reading;
+      }
+      const name = link.querySelector(".side-agent-name")?.textContent ?? "";
+      link.setAttribute("aria-label", dot !== null && !reading ? `${name} (${t("side.unread")})` : name);
     }
     mark(allAgents, routeTab === "agents" && (open === null || !faceLinks.has(open)));
   }
@@ -733,6 +758,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     for (const [id, node] of rowNodes) {
       mark(node, id === routeThreadId);
     }
+    markFaces();
     const active = rowNodes.get(routeThreadId);
     if (active !== undefined && routeThreadId !== revealedThreadId) {
       revealedThreadId = routeThreadId;
@@ -756,6 +782,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
     chats = chats.map((chat) => (chat.id === open.id ? { ...chat, unread: false } : chat));
     paintLists();
+    // The face whose conversation it is loses its dot too (item 1235).
+    for (const [id, home] of homes) {
+      const link = faceLinks.get(id);
+      if (home?.id === open.id && link !== undefined) {
+        homes.set(id, { ...home, unread: false });
+        link.querySelector(".side-agent-unread")?.remove();
+      }
+    }
+    markFaces();
     api.patch(`/threads/${open.id}`, { seen: true }).catch((error) => console.warn("the open chat could not be marked seen", error));
   }
 
@@ -1441,7 +1476,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (RELOAD_KINDS.has(event.kind)) {
       reloadSoon();
     }
-    if (event.kind === "run_finished") {
+    // A run that starts may begin an agent's conversation (item 1233), and one that ends moves its face.
+    if (event.kind === "run_started" || event.kind === "run_finished") {
       reloadFacesSoon();
     }
   });
