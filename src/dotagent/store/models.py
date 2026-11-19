@@ -568,6 +568,8 @@ class ObjectiveWorkflow(FrozenModel):
     exceptions: str = ""
     next_step: str = ""
     record: str = ""
+    # The next step was written by a run that had read content third parties can author: not quoted as the owner's.
+    next_step_tainted: bool = False
 
 
 class ObjectiveRecord(FrozenModel):

@@ -23,8 +23,11 @@ START_MARK: str = "<!-- dot:pipeline:start"
 END_MARK: str = "<!-- dot:pipeline:end -->"
 _START_LINE: str = (
     "<!-- dot:pipeline:start — Dot keeps the three tables below with its pipeline tools; a cell may be edited, the "
-    "columns stay -->"
+    "columns stay{outside} -->"
 )
+# Said in the start line once a run that had read content third parties can author (a reply's) wrote the block: its
+# cells may hold a third party's words from then on, and a run that reads them is marked so.
+OUTSIDE_WORD: str = "; outside content was written here"
 _CLIENTS: str = "Clients"
 _ACTIONS: str = "Actions"
 _OUTCOMES: str = "Outcomes"
@@ -54,6 +57,7 @@ type ActionResult = Literal["sent", "failed", "uncertain"]
 type OutcomeKind = Literal["reply", "meeting", "proposal", "won", "lost", "declined", "bounced", "unsubscribed"]
 CLIENT_STATUSES: tuple[str, ...] = get_args(ClientStatus.__value__)
 OUTCOME_KINDS: tuple[str, ...] = get_args(OutcomeKind.__value__)
+ACTION_STATES: tuple[str, ...] = get_args(ActionState.__value__)
 # The states in which nobody may try an action again before a run looked at what became of it.
 _UNSETTLED: frozenset[str] = frozenset({"begun", "uncertain"})
 # The statuses of a client no action is begun for: the owner said not to, or paused them.
@@ -108,9 +112,12 @@ class Outcome:
 
 @dataclass(frozen=True)
 class Ledger:
+    """``outside`` says that a run that had read content third parties can author wrote it."""
+
     clients: tuple[Client, ...]
     actions: tuple[Action, ...]
     outcomes: tuple[Outcome, ...]
+    outside: bool
 
 
 @dataclass(frozen=True)
@@ -136,7 +143,7 @@ class VariantResult:
     won: int
 
 
-EMPTY: Ledger = Ledger(clients=(), actions=(), outcomes=())
+EMPTY: Ledger = Ledger(clients=(), actions=(), outcomes=(), outside=False)
 
 
 def minute(at: datetime) -> str:
@@ -145,17 +152,26 @@ def minute(at: datetime) -> str:
 
 
 def moment(text: str) -> datetime:
-    """A date (``2026-11-19``) or a moment (``2026-11-19 10:02``, ``2026-11-19T10:02``) the ledger reads."""
+    """A date (``2026-11-19``) or a moment (``2026-11-19 10:02``, ``2026-11-19T10:02``, ``…T08:15Z``) the ledger reads,
+    in the Mac's time: a moment with an offset is moved to it."""
     try:
-        return datetime.fromisoformat(text.strip())
+        read: datetime = datetime.fromisoformat(text.strip())
     except ValueError as error:
         raise LedgerRefusal(
             f"'{text}' is no date: write it as 2026-11-19 or 2026-11-19 10:02, as the source shows it"
         ) from error
+    return read if read.tzinfo is None else read.astimezone().replace(tzinfo=None)
+
+
+def _dated_only(text: str) -> bool:
+    return len(text.strip()) == len("2026-11-19")
 
 
 def _cell(text: str) -> str:
-    return " ".join(text.split()).replace("|", "\\|")
+    """A cell's text on one line, its pipes escaped and no comment mark in it: a third party's words that held one (a
+    reply's) would end the block, and every later read of it would fail."""
+    flat: str = " ".join(text.split()).replace("<!--", "<! --").replace("-->", "-- >")
+    return flat.replace("|", "\\|")
 
 
 def _uncell(text: str) -> str:
@@ -221,21 +237,36 @@ def parse(text: str) -> Ledger:
     bounds: tuple[int, int] | None = _bounds(text)
     if bounds is None:
         return EMPTY
-    sections: dict[str, list[str]] = _sections(text[bounds[0] : bounds[1]])
+    block: str = text[bounds[0] : bounds[1]]
+    sections: dict[str, list[str]] = _sections(block)
     clients: tuple[Client, ...] = tuple(
         Client(*cells) for cells in _table(sections.get(_CLIENTS, []), _CLIENT_COLUMNS, _CLIENTS)
     )
+    for kept in clients:
+        # A status edited by hand that is none of the ledger's would slip past a hold: the block is not used then.
+        if kept.status not in CLIENT_STATUSES:
+            raise LedgerFormatError(
+                f"the status of the client {kept.id} is '{kept.status}', none of {', '.join(CLIENT_STATUSES)}: "
+                "write one of them before Dot uses the record"
+            )
     actions: list[Action] = []
     for key, client, action, variant, state, tries, at, evidence in _table(
         sections.get(_ACTIONS, []), _ACTION_COLUMNS, _ACTIONS
     ):
         if not tries.isdigit():
             raise LedgerFormatError(f"the tries of the action {key} are '{tries}', not a number")
+        if state not in ACTION_STATES:
+            # 'Sent' or 'sent?' read as no state would let a sent mail be begun again.
+            raise LedgerFormatError(
+                f"the state of the action {key} is '{state}', none of {', '.join(ACTION_STATES)}: write one of them "
+                "before Dot uses the record"
+            )
         actions.append(Action(key, client, action, variant, state, int(tries), at, evidence))
     outcomes: tuple[Outcome, ...] = tuple(
         Outcome(*cells) for cells in _table(sections.get(_OUTCOMES, []), _OUTCOME_COLUMNS, _OUTCOMES)
     )
-    return Ledger(clients=clients, actions=tuple(actions), outcomes=outcomes)
+    first_line: str = block.split("\n", 1)[0]
+    return Ledger(clients=clients, actions=tuple(actions), outcomes=outcomes, outside=OUTSIDE_WORD in first_line)
 
 
 def _render_table(name: str, columns: tuple[str, ...], rows: list[tuple[str, ...]]) -> str:
@@ -261,7 +292,7 @@ def render(ledger: Ledger) -> str:
     outcomes: list[tuple[str, ...]] = [(o.client, o.kind, o.at, o.source) for o in ledger.outcomes]
     return "\n\n".join(
         (
-            _START_LINE,
+            _START_LINE.format(outside=OUTSIDE_WORD if ledger.outside else ""),
             _render_table(_CLIENTS, _CLIENT_COLUMNS, clients),
             _render_table(_ACTIONS, _ACTION_COLUMNS, actions),
             _render_table(_OUTCOMES, _OUTCOME_COLUMNS, outcomes),
@@ -401,9 +432,11 @@ def end(ledger: Ledger, key: str, result: ActionResult, evidence: str, now: str)
         )
     ended: Action = replace(present, state=result, at=now, evidence=evidence.strip())
     actions: tuple[Action, ...] = tuple(ended if each.key == key else each for each in ledger.actions)
-    if result != "sent":
+    found: Client | None = next((each for each in ledger.clients if each.id == present.client), None)
+    if result != "sent" or found is None:
+        # A client whose row the owner took away still has its action ended, so that the key is not held for good.
         return replace(ledger, actions=actions)
-    client: Client = _client(ledger, present.client)
+    client: Client = found
     moved: Client = replace(
         client,
         last_action=present.action,
@@ -422,7 +455,7 @@ def note_outcome(ledger: Ledger, client_id: str, kind: str, at: str, source: str
         raise LedgerRefusal(f"'{kind}' is no outcome: one of {', '.join(OUTCOME_KINDS)}")
     if not source.strip():
         raise LedgerRefusal("say where it was seen (the mail and its time, the call, the page): no outcome is guessed")
-    when: str = minute(moment(at)) if " " in at.strip() or "T" in at else at.strip()
+    when: str = at.strip() if _dated_only(at) else minute(moment(at))
     moment(when)
     if any(each.client == client_id and each.kind == kind and each.at == when for each in ledger.outcomes):
         return ledger, False
@@ -453,11 +486,18 @@ def compare(ledger: Ledger) -> tuple[VariantResult, ...]:
         answered: int = sum(
             1
             for client, sent_at in reached.items()
-            if any(o.client == client and o.kind in _ANSWERS and moment(o.at) >= sent_at for o in ledger.outcomes)
+            if any(o.client == client and o.kind in _ANSWERS and _after(o.at, sent_at) for o in ledger.outcomes)
         )
         won: int = sum(1 for client in reached if any(o.client == client and o.kind == "won" for o in ledger.outcomes))
         results.append(VariantResult(variant=name, reached=len(reached), answered=answered, won=won))
     return tuple(results)
+
+
+def _after(at: str, sent_at: datetime) -> bool:
+    """Whether an outcome dated ``at`` came at or after a send at ``sent_at``: one dated by its day alone counts from
+    that day, so a reply of the same day is not taken for one before the send."""
+    when: datetime = moment(at)
+    return when.date() >= sent_at.date() if _dated_only(at) else when >= sent_at
 
 
 def summary(ledger: Ledger, client_id: str | None) -> str:
