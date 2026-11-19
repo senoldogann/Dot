@@ -1925,6 +1925,7 @@ class Store:
             raise NotFoundError("harness step not found", {"step_id": step_id})
         return await self.get_harness_step(step_id)
 
+    @_writing
     async def close_unfinished_harness_steps(self) -> int:
         """Steps still ``running`` when the daemon starts (their process went before :meth:`finish_harness_step`)
         become failed. Idempotent: a second start finds none running. Returns how many closed."""
@@ -6769,16 +6770,25 @@ class Store:
         """Change a campaign only while its status is one of ``statuses`` (item 1046): whether it changed. A campaign
         that is not there is an error; one whose status moved meanwhile (the owner stopped it, a session achieved it) is
         left as it is."""
+        if await self._campaign_rows_in(campaign_id, assignments, params, statuses) > 0:
+            return True
+        await self.get_campaign(campaign_id)
+        return False
+
+    @_writing
+    async def _campaign_rows_in(
+        self, campaign_id: str, assignments: str, params: Sequence[object], statuses: Sequence[CampaignStatus]
+    ) -> int:
+        """The write of :meth:`_update_campaign_in`, under the write lock as every write is: its commit, made beside
+        another writer's unit, ended that unit half way (the code review of 2026-11-19, item 1236). How many rows it
+        changed."""
         marks: str = ", ".join("?" * len(statuses))
         cursor: aiosqlite.Cursor = await self._db.execute(
             f"UPDATE campaigns SET {assignments}, updated_at = ? WHERE id = ? AND status IN ({marks})",
             (*params, time.time(), campaign_id, *statuses),
         )
         await self._db.commit()
-        if cursor.rowcount > 0:
-            return True
-        await self.get_campaign(campaign_id)
-        return False
+        return cursor.rowcount
 
     async def plan_campaign_sessions(self, campaign_id: str, cron: str, next_session_at: float) -> bool:
         """Give an active campaign's sessions the rhythm ``cron``, with the next one at ``next_session_at``; whether
@@ -6818,6 +6828,16 @@ class Store:
                 campaign_id, "status = 'achieved', evidence = ?, next_session_at = NULL", (evidence,)
             )
             return True
+        if await self._achieve_active_campaign(campaign_id, evidence):
+            return True
+        # A campaign that is not there is an error, as for the other guarded updates (the pre-push review of 1236).
+        await self.get_campaign(campaign_id)
+        return False
+
+    @_writing
+    async def _achieve_active_campaign(self, campaign_id: str, evidence: str) -> bool:
+        """The write of :meth:`achieve_campaign` for a campaign that must still be active, under the write lock
+        (item 1236)."""
         cursor: aiosqlite.Cursor = await self._db.execute(
             "UPDATE campaigns SET status = 'achieved', evidence = ?, next_session_at = NULL, updated_at = ?"
             " WHERE id = ? AND status = 'active'",
