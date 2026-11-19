@@ -465,6 +465,86 @@ def redrawn_ref(shown: Sequence[SnapshotLine], now: Sequence[SnapshotLine], ref:
     return alike[0] if len(alike) == 1 else None
 
 
+def _page_origins(lines: Sequence[SnapshotLine]) -> list[tuple[float, float] | None]:
+    """Where each line's frame starts in the page's viewport: (0, 0) for the top frame, an iframe's own place plus its
+    frame's start for the lines inside it; ``None`` when an iframe holding the line has no box."""
+    parents: list[int | None] = _parents(lines)
+    owners: list[int | None] = _frame_owners(lines, parents)
+    origins: list[tuple[float, float] | None] = []
+    for index in range(len(lines)):
+        owner: int | None = owners[index]
+        if owner is None:
+            origins.append((0.0, 0.0))
+            continue
+        outer: tuple[float, float] | None = origins[owner]
+        owner_box: Box | None = lines[owner].box
+        origins.append(None if outer is None or owner_box is None else (outer[0] + owner_box.x, outer[1] + owner_box.y))
+    return origins
+
+
+# The roles a click on a part of them presses (a button's icon, a link's text): a pixel is judged by the nearest of them
+# above the element under it (item 1252).
+_PRESSED_BY_PARTS: frozenset[str] = frozenset(
+    {
+        "button",
+        "link",
+        "menuitem",
+        "menuitemcheckbox",
+        "menuitemradio",
+        "checkbox",
+        "radio",
+        "switch",
+        "tab",
+        "option",
+        "combobox",
+        "textbox",
+        "searchbox",
+        "slider",
+    }
+)
+
+
+def refs_at_point(lines: Sequence[SnapshotLine], x: float, y: float) -> tuple[str, ...]:
+    """The refs of the elements a click at the viewport pixel (``x``, ``y``) may land on, as the snapshot drew the page
+    (the code review of 2026-11-19, B2-01; a click at a pixel is judged by them, as a click on a ref is): of the boxes
+    holding the point, in an iframe too (its boxes count from where the frame stands), each that holds no other of
+    them, put in the place of the nearest control above it (a button's icon presses the button), the smallest first.
+    The snapshot does not say which of two boxes that overlap is on top, so both are named. Empty when no box holds the
+    point (a canvas)."""
+    parents: list[int | None] = _parents(lines)
+    holding: list[int] = []
+    for index, (line, origin) in enumerate(zip(lines, _page_origins(lines), strict=True)):
+        box: Box | None = line.box
+        if line.ref is None or box is None or origin is None or box.width <= 0 or box.height <= 0:
+            continue
+        left: float = origin[0] + box.x
+        top: float = origin[1] + box.y
+        if left <= x < left + box.width and top <= y < top + box.height:
+            holding.append(index)
+    above: set[int] = set()
+    for index in holding:
+        parent: int | None = parents[index]
+        while parent is not None:
+            above.add(parent)
+            parent = parents[parent]
+    found: dict[str, float] = {}
+    for index in holding:
+        if index in above:
+            continue
+        chosen: int = index
+        parent = index
+        while parent is not None:
+            if lines[parent].role in _PRESSED_BY_PARTS and lines[parent].ref is not None:
+                chosen = parent
+                break
+            parent = parents[parent]
+        chosen_box: Box | None = lines[chosen].box
+        ref: str | None = lines[chosen].ref
+        if ref is not None and chosen_box is not None and ref not in found:
+            found[ref] = chosen_box.width * chosen_box.height
+    return tuple(sorted(found, key=lambda ref: found[ref]))
+
+
 def line_for_ref(lines: Sequence[SnapshotLine], ref: str) -> str | None:
     for line in lines:
         if line.ref == ref:

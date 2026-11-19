@@ -312,7 +312,13 @@ Both modes share what follows.
   `type` and `insert` need a text that is not empty. A drop onto a password, card or one-time-code field is refused
   like typing into it, and a drag that fails releases the mouse button. `click_at` presses a viewport pixel from
   `browser_screenshot`; `drag_at` presses at one pixel and lets go at another, for a canvas, a slider or a cross-origin
-  widget such as a captcha, where no ref reaches inside the frame. See [Captcha](captcha.md).
+  widget such as a captcha, where no ref reaches inside the frame. See [Captcha](captcha.md). Either is judged by the
+  elements the last snapshot drew under its pixel, as a click on their refs is (item 1252): of the boxes there, in a
+  frame too, each that holds no other, put in the place of the control above it (a button's icon presses the button),
+  and all of them where boxes overlap, since the snapshot does not say which is on top; so a payment button is a payment
+  by its pixel as by its ref. Where the snapshot drew nothing (a canvas), the step is judged by its pixel alone, as
+  before. A step at a pixel goes first in its batch (several in a row are fine): after a step that may move the page it
+  is sent back, to be taken from a new screenshot.
 - In a rich editor (a contenteditable area such as X's composer) `fill`, `type` and `insert` give the editor the focus
   when it does not have it and wait until it has settled, check the field that has the focus for a secret, write, and
   fail when the editor's text did not change, instead of reporting done; a `fill` that leaves the editor holding its

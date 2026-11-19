@@ -407,7 +407,7 @@ def assess_step(
             reasons = list(dict.fromkeys(reasons + naming_reasons(element) + pressed))
     elif step.action in _CLICKING_ACTIONS or step.action in ("check", "uncheck"):
         reasons = naming_reasons(element)
-    elif step.action == "drag":
+    elif step.action in ("drag", "drag_at"):
         # What is dragged is named for what it is, not for what the drag does: a control dragged is judged as a click.
         dragged: list[str] = clicking_reasons(element, _CONTROL_ROLES)
         reasons = list(dict.fromkeys(dragged + naming_reasons(target) + typing_reasons(target, None)))
