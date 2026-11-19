@@ -132,7 +132,8 @@
   --radius-bubble: 18px;
   --radius-joined: 6px;
   --pad-bubble: 7px 12px;
-  /* The composer (item 1205): 22 px while its text is one line, 18 once it wraps (data-multiline, composer.js). */
+  /* The composer (item 1205): 22 px while it is one line, 18 once it has two: its words wrap (data-multiline,
+     composer.js), or it is a desk's box at rest, whose controls have a line under the words (item 1249). */
   --radius-composer: 22px;
   --radius-composer-wrapped: 18px;
   /* A menu and its rows (item 1205): a menu on 12 px (22 on a phone), a row on 6, 30 px tall. */
@@ -3947,13 +3948,20 @@ dialog.modal.versions-dialog {
    nothing): in that mode the run asks nothing, which the box must say. The size of the chat shows once it is near
    full. A phone's box rests quieter still (item 1120, run.css): the "+", the words and the send, its choices, YOLO
    among them, on the model's pill once the words are touched. */
-.composer[data-quiet] .composer-bar > .composer-field {
-  flex: 1 1 0;
-  order: 0;
-}
-
 .composer[data-quiet] .composer-options {
   flex: none;
+}
+
+/* The words have the box's whole width on a line of their own, and the controls the line under them (the owner's ask of
+   2026-11-19: a long message wrapped between the "+" and the send, a few words a line): the "+" and the choices at the
+   left, the microphone and the send at the right. The corners are those of a box of two lines from the start. */
+.composer[data-quiet] {
+  border-radius: var(--radius-composer-wrapped);
+}
+
+.composer[data-quiet] .composer-bar > .mic-button,
+.composer[data-quiet] .composer-bar:not(.has-mic) > .send {
+  margin-inline-start: auto;
 }
 
 /* What is out of sight leaves no gap: the choices but YOLO's pill, and their line when YOLO is not chosen. */
@@ -3963,10 +3971,6 @@ dialog.modal.versions-dialog {
   display: none;
 }
 
-/* A box that grows keeps the "+", the microphone and the send at its last line, as a messaging app's does. */
-.composer[data-quiet] .composer-bar {
-  align-items: flex-end;
-}
 
 /* With a microphone, the send waits for words or a file, and the microphone stands alone at the end until then. The
    microphone stays once there are words, so that more can be dictated after them (items 574 and 605). A Stop stays in
