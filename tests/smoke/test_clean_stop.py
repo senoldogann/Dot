@@ -193,9 +193,16 @@ async def test_a_call_cut_after_another_of_its_step_ended_is_said_to_have_starte
 
 
 def _reflecting_config() -> AppConfig:
-    """An eval configuration with the scripted model as the review model too, which describes the owner at night."""
+    """An eval configuration with the night's reflection at its time of day (an eval leaves it off, item 1227) and the
+    scripted model as the review model too, which describes the owner at night."""
     config: AppConfig = eval_config(load_default_config())
-    return config.model_copy(update={"models": config.models.model_copy(update={"review": SCRIPTED_MODEL})})
+    night: str = load_default_config().agent.reflection_time
+    return config.model_copy(
+        update={
+            "agent": config.agent.model_copy(update={"reflection_time": night}),
+            "models": config.models.model_copy(update={"review": SCRIPTED_MODEL}),
+        }
+    )
 
 
 async def test_a_stop_of_the_daemon_does_not_wait_for_a_reflection_under_way(login_env: dict[str, str]) -> None:

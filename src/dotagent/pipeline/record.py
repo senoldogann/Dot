@@ -24,7 +24,9 @@ from dotagent.undo.journal import JournalTarget
 # How long a change waits for another one's lock before it gives up, and how often it looks.
 LOCK_WAIT_S: float = 10.0
 _LOCK_POLL_S: float = 0.05
-_LOCK_FLAGS: int = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW
+_LOCK_OPEN: int = os.O_RDWR | os.O_NOFOLLOW
+_LOCK_MAKE: int = os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+_LOCK_OPEN_TRIES: int = 20
 
 
 class RecordRefusal(Exception):
@@ -90,16 +92,32 @@ def read(record: Path) -> Ledger:
         os.close(folder)
 
 
+def _lock_file(folder: int, record: Path) -> int:
+    """The record's lock file, opened, or made when it is not there: opened first, made with ``O_EXCL`` when missing, so
+    that runs making it at once each end with the one file (macOS answered ENOENT to some of twelve threads that
+    opened it with ``O_CREAT`` together)."""
+    name: str = lock_path(record).name
+    for _ in range(_LOCK_OPEN_TRIES):
+        try:
+            return os.open(name, _LOCK_OPEN, dir_fd=folder)
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            if error.errno == errno.ELOOP:
+                raise ToolExecutionError(
+                    "the record's lock file is a link: take it away", {"record": str(record)}
+                ) from error
+            raise
+        try:
+            return os.open(name, _LOCK_MAKE, 0o600, dir_fd=folder)
+        except FileExistsError:
+            continue
+    raise ToolExecutionError("the record's lock file could not be opened or made", {"record": str(record)})
+
+
 def _locked(folder: int, record: Path) -> int:
     """The record's lock, taken: a descriptor to close to let it go."""
-    try:
-        descriptor: int = os.open(lock_path(record).name, _LOCK_FLAGS, 0o600, dir_fd=folder)
-    except OSError as error:
-        if error.errno == errno.ELOOP:
-            raise ToolExecutionError(
-                "the record's lock file is a link: take it away", {"record": str(record)}
-            ) from error
-        raise
+    descriptor: int = _lock_file(folder, record)
     deadline: float = time.monotonic() + LOCK_WAIT_S
     while True:
         try:
