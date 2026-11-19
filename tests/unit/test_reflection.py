@@ -305,11 +305,16 @@ def test_a_lesson_rests_after_sixty_days_without_a_run_being_handed_it() -> None
     stale: MemoryRecord = _note("stale", "z" * 30, now - 90 * DAY_S, now - 61 * DAY_S, ("lesson",))
     never: MemoryRecord = _note("never", "w" * 30, now - 61 * DAY_S, None, ("lesson",))
     resting: MemoryRecord = _note("resting", "v" * 30, now - 90 * DAY_S, None, ("lesson", "rest"))
-    assert to_retire([fresh, used, stale, never, resting], now, 60, set()) == [stale, never]
+    assert to_retire([fresh, used, stale, never, resting], now, 60, 90, set()) == [stale, never]
     # A lesson the owner saved never rests for its age, and one learnt again rests from then on (audit defects 4, 5).
-    assert to_retire([stale, never], now, 60, {"never"}) == [stale]
+    assert to_retire([stale, never], now, 60, 90, {"never"}) == [stale]
     again: MemoryRecord = stale.model_copy(update={"updated_at": now - 5 * DAY_S})
-    assert to_retire([again], now, 60, set()) == []
+    assert to_retire([again], now, 60, 90, set()) == []
+    # Item 1247: a lesson no run was ever handed rests after the shorter unused_days; one handed once keeps rest_days.
+    unhanded: MemoryRecord = _note("unhanded", "u" * 30, now - 22 * DAY_S, None, ("lesson",))
+    handed: MemoryRecord = _note("handed", "h" * 30, now - 22 * DAY_S, now - 21 * DAY_S, ("lesson",))
+    assert to_retire([unhanded, handed, fresh], now, 60, 21, set()) == [unhanded]
+    assert to_retire([unhanded], now, 60, 21, {"unhanded"}) == []
 
 
 def test_the_summary_counts_the_skill_merges_it_proposed_in_the_singular_and_the_plural() -> None:
@@ -375,6 +380,7 @@ def test_the_journal_names_the_days_it_tells() -> None:
 def test_the_reflection_time_is_a_time_of_day_or_off() -> None:
     config: AppConfig = load_default_config()
     assert (config.agent.reflection_time, config.agent.lesson_rest_days) == ("03:30", 60)
+    assert (config.agent.lesson_unused_rest_days, config.agent.lessons_per_day) == (21, 40)
     assert config.agent.model_copy(update={"reflection_time": "off"}).reflection_time == "off"
     for bad in ("3:30", "24:00", "night", ""):
         with pytest.raises(ValidationError, match="time of day"):

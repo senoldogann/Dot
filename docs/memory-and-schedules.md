@@ -109,6 +109,13 @@ dotx memory reindex      # embed every note again, for example after changing [m
   page's count of uses and the Task tab say which were handed. A clean run, a run whose mark your message cleared, and
   a run on the Claude plan or OpenCode (whose program keeps a call's result in a session a later run resumes) are
   handed none of them; `memory_search` still finds them all.
+- Lessons are kept from piling up (item 1247). A run's lessons are not saved when a note already says them or the
+  harness's habits do; `auto` saves at most `[agent] lessons_per_day` (40) in 24 hours, and the night rests a lesson
+  that no run was ever handed after `[agent] lesson_unused_rest_days` (21), sooner than one that helped
+  (`lesson_rest_days`, 60). Resting is not forgetting: a resting lesson is listed, can be woken, and is only ever
+  proposed to be forgotten. Measured on the owner's 834 lessons of 2026-10-28 to 11-19: 346 were handed to a later
+  run, all of them first within 20 days of being written (90% within 14); only 11 merges were made in those nights,
+  so `merges_per_night` (20) was never the limit and stays.
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
@@ -152,7 +159,7 @@ dotx memory reindex      # embed every note again, for example after changing [m
   merged tags, is no change: the note keeps its date, so an old fact retagged at night does not pass for newer than its
   correction.
 - Three tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
-  days, which searches skip (the list and the page still show it; take the tag off to wake it), and
+  days, or twenty-one when no run was ever handed it (`lesson_unused_rest_days`, item 1247), which searches skip (the list and the page still show it; take the tag off to wake it), and
   `keep-separate` on the notes whose merge you took back, which no night merges again (take it off to let them). A
   run that saves or rewrites a note cannot give it `rest` or `keep-separate`, however spelled, and keeps the ones
   the note has (item 796). A run that saves the words of your own note or of a pinned one again, with a time to hold,

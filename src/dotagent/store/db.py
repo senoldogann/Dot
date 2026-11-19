@@ -5818,6 +5818,26 @@ class Store:
         row = await self._one("SELECT COUNT(*) AS n FROM memories", ())
         return 0 if row is None else int(row["n"])
 
+    async def count_auto_lessons_since(self, since: float) -> int:
+        """How many lessons ``auto`` saved as new notes at ``since`` or later (item 1247): its ``lesson_saved`` events,
+        not the owner's Save anyway nor a lesson that was a note already."""
+        row = await self._one(
+            "SELECT COUNT(*) AS n FROM events WHERE kind = 'lesson_saved' AND ts >= ?"
+            " AND json_extract(data, '$.by') = 'auto' AND json_extract(data, '$.created') = 1",
+            (since,),
+        )
+        return 0 if row is None else int(row["n"])
+
+    async def awake_memories_with_tag(self, tag: str, rest_tag: str) -> list[MemoryRecord]:
+        """Every memory carrying ``tag`` and not ``rest_tag``, the oldest change first (item 1247: the night's
+        retirement reads them all, not only the most recently changed)."""
+        rows = await self._all(
+            "SELECT * FROM memories WHERE instr(',' || tags || ',', ?) > 0 AND instr(',' || tags || ',', ?) = 0"
+            " ORDER BY updated_at",
+            (f",{tag},", f",{rest_tag},"),
+        )
+        return [_memory(row) for row in rows]
+
     async def search_memories_terms(
         self, terms: Sequence[str], limit: int, among: AwakeNotes | None = None
     ) -> list[str]:

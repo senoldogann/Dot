@@ -12,6 +12,7 @@ from dotagent.agent.lessons import (
     RunLessons,
     _says_it,
     contains_secret,
+    day_full,
     kept_lessons,
     lesson_problem,
     lessons_of,
@@ -230,6 +231,13 @@ def test_a_lesson_never_repeats_the_one_that_says_the_opposite() -> None:
     hit: MemoryHit = MemoryHit(record=_note("Use --force when git push is refused."), similarity=0.99)
     assert not _says_it("Do not use --force when git push is refused.", hit, 0.9)
     assert _says_it("Use --force whenever git push is refused.", hit, 0.9)
+
+
+def test_a_day_keeps_at_most_its_cap_of_lessons() -> None:
+    # Item 1247: past [agent] lessons_per_day in 24 hours, auto leaves a lesson out and says why.
+    assert day_full(39, 40) is None
+    assert day_full(40, 40) == "40 lessons were saved in the last 24 hours, the most a day keeps is 40"
+    assert day_full(1, 1) == "1 lesson was saved in the last 24 hours, the most a day keeps is 1"
 
 
 def test_kept_lessons_drop_what_is_not_a_lesson_and_every_repeat() -> None:
