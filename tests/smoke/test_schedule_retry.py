@@ -72,9 +72,12 @@ async def login_env() -> dict[str, str]:
 
 
 def _config() -> AppConfig:
-    """The eval configuration, with a model out of reach not waited for: its error ends the run at once."""
+    """The eval configuration, with a model out of reach not waited for: its error ends the run at once. The nightly
+    reflection is off: a tick past its time of day fired it, and it took the scripted reply a retry was to get, so the
+    tests failed when they ran in the small hours (2026-11-19, 03:29 and on the gate)."""
     config: AppConfig = eval_config(load_default_config())
-    return config.model_copy(update={"agent": config.agent.model_copy(update={"model_wait_s": 0.0})})
+    agent = config.agent.model_copy(update={"model_wait_s": 0.0, "reflection_time": "off"})
+    return config.model_copy(update={"agent": agent})
 
 
 @asynccontextmanager
