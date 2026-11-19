@@ -150,3 +150,23 @@ async def test_an_outcome_dated_with_its_offset_is_kept_in_the_macs_time(tmp_pat
         ctx,
     )
     assert not kept.is_error, kept.text
+
+
+async def test_a_mail_recorded_after_the_fact_ends_at_the_time_its_evidence_gives(tmp_path: Path) -> None:
+    ctx: ToolContext = _context(tmp_path, False)
+    await _call(_CLIENT, {"record": RECORD, "client": "a-oy", "name": "A Oy"}, ctx)
+    await _call(_BEGIN, {"record": RECORD, "client": "a-oy", "action": "first-mail"}, ctx)
+    ended: ToolResult = await _call(
+        _END,
+        {
+            "record": RECORD,
+            "key": "a-oy/first-mail",
+            "result": "sent",
+            "evidence": "Gönderildi 29.10.2026 03:24",
+            "at": "2026-10-29 03:24",
+        },
+        ctx,
+    )
+    assert not ended.is_error and "at 2026-10-29 03:24" in ended.text, ended.text
+    view: ToolResult = await _call(_VIEW, {"record": RECORD, "client": "a-oy"}, ctx)
+    assert "first-mail sent at 2026-10-29 03:24" in view.text
