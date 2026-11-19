@@ -31,6 +31,7 @@ from dotagent.pipeline.ledger import (
     summary,
     upsert_client,
 )
+from dotagent.pipeline.record import RecordRefusal
 from dotagent.policy.types import ActionInfo
 from dotagent.proactive.text import one_line
 from dotagent.tools.base import (
@@ -85,7 +86,7 @@ class ClientArgs(RecordArgs):
     )
     expecting: str | None = Field(default=None, max_length=_TEXT_CHARS)
     next_step: str | None = Field(default=None, max_length=_TEXT_CHARS)
-    next_at: str | None = Field(default=None, max_length=20, description="2026-11-21 or 2026-11-21 09:00")
+    next_at: str | None = Field(default=None, max_length=32, description="2026-11-21 or 2026-11-21 09:00")
 
 
 class BeginArgs(RecordArgs):
@@ -105,8 +106,16 @@ class OutcomeArgs(RecordArgs):
     outcome: str = Field(
         min_length=1, max_length=20, description="reply meeting proposal won lost declined bounced unsubscribed"
     )
-    at: str = Field(min_length=10, max_length=20, description="As the source dates it.")
+    at: str = Field(min_length=10, max_length=32, description="As the source dates it.")
     source: str = Field(min_length=3, max_length=_TEXT_CHARS, description="Where you saw it.")
+
+
+def _refused(refusal: RecordRefusal) -> ToolResult:
+    """A refusal as the run reads it: fenced and marking the run when the block holds outside words, which it may
+    quote."""
+    if not refusal.outside:
+        return fail(refusal.message)
+    return mark_untrusted(fail(fenced("pipeline refusal", refusal.message, secrets.token_hex(_NONCE_BYTES))))
 
 
 def _now() -> str:
@@ -206,8 +215,8 @@ def _client_tool() -> RegisteredTool:
 
         try:
             said: str = await _change(ctx, authorized, PIPELINE_CLIENT_TOOL, apply_)
-        except LedgerRefusal as refusal:
-            return fail(str(refusal))
+        except RecordRefusal as refusal:
+            return _refused(refusal)
         return ok(f"The client {args.client} is {said} in {args.record}.")
 
     return make_path_tool(
@@ -232,8 +241,8 @@ def _begin_tool() -> RegisteredTool:
                 PIPELINE_BEGIN_TOOL,
                 lambda ledger: (begin(ledger, args.client, args.action, args.variant, now), None),
             )
-        except LedgerRefusal as refusal:
-            return fail(str(refusal))
+        except RecordRefusal as refusal:
+            return _refused(refusal)
         key: str = action_key(args.client, args.action)
         return ok(
             f"{key} is begun at {now}. Send it now, then end it with pipeline_end: sent or failed with what showed it, "
@@ -265,8 +274,8 @@ def _end_tool() -> RegisteredTool:
                 PIPELINE_END_TOOL,
                 lambda ledger: (end(ledger, args.key, args.result, args.evidence, now), None),
             )
-        except LedgerRefusal as refusal:
-            return fail(str(refusal))
+        except RecordRefusal as refusal:
+            return _refused(refusal)
         follow: str = {
             "sent": "Set what answer you expect and the next step with pipeline_client.",
             "failed": "It may be begun again once what failed is mended.",
@@ -295,8 +304,8 @@ def _outcome_tool() -> RegisteredTool:
                 PIPELINE_OUTCOME_TOOL,
                 lambda ledger: note_outcome(ledger, args.client, args.outcome, args.at, args.source),
             )
-        except LedgerRefusal as refusal:
-            return fail(str(refusal))
+        except RecordRefusal as refusal:
+            return _refused(refusal)
         if not added:
             return ok(f"That {args.outcome} of {args.client} at {args.at} is kept already.")
         return ok(

@@ -64,6 +64,18 @@ here points at a test that no longer exists.
   error, which carries a site's words, reached the model unfenced and left the run trusted (item 1212).
 - `tests/unit/test_video_watch.py::test_the_line_says_how_the_frames_were_chosen` — the line that tells the model how
   a look chose its frames was guessed from counts and said the wrong thing when quick cuts spread them (item 1214).
+- `tests/smoke/test_pipeline_tools.py::test_a_ledger_a_run_that_read_outside_content_wrote_is_fenced_and_marks_its_reader` — ledger cells
+  a reply's run wrote reached clean runs unmarked (item 1227).
+- `tests/smoke/test_pipeline_tools.py::test_a_refusal_that_quotes_a_cell_of_outside_words_is_fenced_and_marks_its_reader` — the same
+  cells came back unmarked inside a refusal that quoted them (item 1227).
+- `tests/unit/test_objectives.py::test_a_next_step_a_run_wrote_after_reading_outside_content_is_counted_not_quoted` — a
+  next step a reply's run set reached the look and the brief as the owner's plan (item 1227).
+- `tests/unit/test_pipeline_ledger.py::test_a_third_partys_words_holding_a_marker_cannot_end_the_block` — a cell holding
+  the block's end marker broke every later read of the ledger, and the send guard with it (item 1227).
+- `tests/unit/test_pipeline_ledger.py::test_a_status_or_state_edited_into_none_of_the_ledgers_is_not_used` — a status of
+  `Paused` slipped past a hold and a state of `Sent` let a sent mail be begun again (item 1227).
+- `tests/smoke/test_pipeline_record.py::test_a_lock_file_that_is_a_link_is_refused_and_nothing_is_written` — the pipeline
+  tools followed links on the path the call was allowed (item 681's guard, item 1227).
 
 ## Evidence and format
 

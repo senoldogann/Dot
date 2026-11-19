@@ -12,7 +12,6 @@ from dotagent.pipeline import record
 from dotagent.pipeline.ledger import (
     ClientChange,
     Ledger,
-    LedgerRefusal,
     begin,
     end,
     parse,
@@ -83,7 +82,7 @@ def test_two_runs_beginning_the_same_send_at_once_begin_it_once(tmp_path: Path) 
                 lambda ledger: (begin(ledger, "a-oy", "first-mail", "", "2026-11-19 10:00"), None),
             )
             outcomes.append("begun")
-        except LedgerRefusal:
+        except record.RecordRefusal:
             outcomes.append("refused")
 
     threads: list[threading.Thread] = [threading.Thread(target=try_begin) for _ in range(2)]
@@ -110,7 +109,7 @@ def test_a_refused_change_leaves_the_file_as_it_was(tmp_path: Path) -> None:
     def resend(ledger: Ledger) -> tuple[Ledger, None]:
         return begin(ledger, "a-oy", "first-mail", "", "2026-11-19 11:00"), None
 
-    with pytest.raises(LedgerRefusal):
+    with pytest.raises(record.RecordRefusal):
         record.change(path, _journal(tmp_path), False, resend)
     assert path.read_bytes() == before
 
