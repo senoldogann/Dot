@@ -127,6 +127,7 @@ export const TR = {
   "dialog.keepEditing": "Düzenlemeye devam et",
   "sheet.readAloud": "Yanıtı sesli oku",
   "sheet.stopReading": "Okumayı durdur",
+  "sheet.copy": "Metni kopyala",
   "sheet.selectText": "Metni seç",
   "sheet.actions": "Mesaj işlemleri",
   "sheet.react": "Bu mesaja tepki ver",

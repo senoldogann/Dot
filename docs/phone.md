@@ -14,7 +14,9 @@ dictation Safari does not hear says so, names what the Mac lacks, and Reload bri
 A message shows no buttons under it on the phone (item 1064), only the reactions that stand on it: hold a message (about
 half a second) and a sheet rises from the foot of the screen, with when it was sent and how long its work took, the
 seven reactions of Dot's messages, a thumb's size each, and what the message can do, a row each: copy it, select its
-text (a hold no longer selects it), read it aloud, show its steps, edit from here (your own), open its task. A press
+text (a hold no longer selects it; the words selected so take the phone's own Copy menu), read it aloud, show its
+steps, edit from here (your own), open its task. Every message can be copied there: what Dot said between steps, and
+your message while its run works, whose controls are kept back, have Copy the text (item 1226). A press
 outside the sheet, a swipe down or Escape closes it. A reaction does on the phone what it does elsewhere: a 👎 on a run
 at work reaches it, a ✋ holds it until you write, a 📌 keeps the message as a note (item 586; see
 [Reactions](runs.md#reactions-on-dots-messages)).

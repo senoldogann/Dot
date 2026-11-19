@@ -7554,7 +7554,10 @@ summary:has(> .chev)::-webkit-details-marker {
     -webkit-touch-callout: default;
   }
 
+  /* Selected from the sheet, the words take the phone's own menu (Copy, Look Up), which a hold of them otherwise keeps
+     off: without it the selection could not be copied (item 1226). */
   :is(.user-message, .answer, .bubble.say, .turn-say).selecting :is(.bubble.user, .answer, .bubble.say, .turn-say, .prose) {
+    -webkit-touch-callout: default;
     -webkit-user-select: text;
     user-select: text;
   }
