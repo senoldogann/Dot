@@ -414,8 +414,9 @@ trading off.
    summary (a shell command's starts with `Run: ` and names the folder it runs in when the call names one, item 483,
    so an expression can fit that folder too), a line break and its target (the command, the path, the address), and
    for a page's script (`browser_eval`), whose summary shows its start and whose target is the page, a line break and
-   the whole script, which the review model of `auto` reads whole too, or hands to you past 12,000 characters, the
-   card of the approval showing it whole under Script (item 985);
+   the whole script, which the review model of `auto` reads whole too (in parts past 12,000 characters, item 1251), the
+   card of the approval showing it whole under Script (item 985), and for an MCP call whose summary shows the start of
+   its arguments, a line break and the whole of them, secrets masked (item 1251), so a rule may fit text deep in them;
    one that takes longer than 0.25 s to match is stopped and the action refused, as for a rule that cannot be read, so
    that a pattern that backtracks for long cannot hold the daemon (item 387). A rule
    reads as a sentence in Settings › Rules, "When Dot wants to run a command that mentions “git push”, it asks you
@@ -671,8 +672,9 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   of your secrets, a deletion outside the workspace), the review model (`[models] review`) judges it against your own
   instructions, as it does in `auto`, with the run marked untrusted. A step it refuses is refused: the run is told why
   and goes on with the rest, and the record names the review model. Any other answer, `escalate` too, lets the step run
-  as yolo runs it. A follow or a like is left to the pace of its site. A review model that cannot answer fails the step
-  with its error. `[policy] yolo_taint_check = false` turns the check off.
+  as yolo runs it, but for a step too long for the review model to read whole even in parts (more than eight overlapping
+  parts, about 82,000 characters), which is refused with how to go on: split it (item 1251; before, it ran unread). A
+  follow or a like is left to the pace of its site. A review model that cannot answer fails the step with its error. `[policy] yolo_taint_check = false` turns the check off.
 - *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, but free mode (item
   1097, your choice), a run marked untrusted has
   a step refused whose words would send a secret Dot holds out of the Mac: a key read in this process (saved with `dotx
