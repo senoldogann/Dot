@@ -4,6 +4,7 @@ opens its chat, its page's box goes on in that chat rather than starting a new o
 scripted model, in Chrome."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -128,7 +129,7 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
         try:
             # With no chat yet, its face opens its page, whose box starts the first chat.
             page: Page = await _opened(browser, client, f"/agents/{agent_id}")
-            face: Locator = page.locator(f".side-agent-faces a[aria-label='{_AGENT['name']}']")
+            face: Locator = page.locator(f".side-agent-faces a.side-agent-face[title^='{_AGENT['name']}:']")
             await expect(face).to_have_attribute("href", f"#/agents/{agent_id}")
             first: str = await _sent_from_page(manager, page, "Find two sources on the matter")
             thread: str = (await client.get(f"/api/runs/{first}")).json()["run"]["thread_id"]
@@ -177,6 +178,19 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
                 "href", f"#/runs/{second}"
             )
             await expect(face).to_have_attribute("href", f"#/runs/{second}")
+
+            # Its conversation's run that ends while you are elsewhere puts the dot of an unread chat on its face
+            # (item 1235); opening the chat takes it off.
+            more = await client.post("/api/runs", json={"goal": "One more", "agent_id": agent_id, "thread_id": thread})
+            assert more.status_code == 201, more.text
+            await _settled(manager, more.json()["id"])
+            await expect(face.locator(".side-agent-unread")).to_be_visible()
+            await expect(face).to_have_attribute("aria-label", "Scout (unread)")
+            await expect(face).to_have_attribute("href", f"#/runs/{more.json()['id']}")
+            await face.click()
+            await expect(page).to_have_url(re.compile(f"#/runs/{more.json()['id']}$"))
+            await expect(face.locator(".side-agent-unread")).to_be_hidden()
+            await expect(face).to_have_attribute("aria-label", "Scout")
             await page.close()
         finally:
             await browser.close()
