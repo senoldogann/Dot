@@ -653,45 +653,56 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     // As many as the sidebar holds whole beside All (item 855: the row scrolled, and a face cut at its edge looked
     // broken): the agents that worked last first.
     const worked = (summary) => summary.latest?.created_at ?? summary.record.created_at;
-    const mine = found
-      .filter(({ record }) => record.id !== DOT_ID)
-      .sort((one, other) => worked(other) - worked(one))
-      .slice(0, SIDE_FACES);
+    // Dot is one conversation as its agents are (item 1245): its face leads the column, to its home chat, and takes
+    // one of the places the agents had.
+    const agentsOwn = found.filter(({ record }) => record.id !== DOT_ID);
+    const mine = [
+      ...(dot === undefined ? [] : [dot]),
+      ...agentsOwn.sort((one, other) => worked(other) - worked(one)).slice(0, SIDE_FACES - 1),
+    ];
     homes.clear();
     for (const { record, home } of mine) {
       homes.set(record.id, home ?? null);
     }
+    // Dot's large face on a phone opens its conversation too (item 1245), else the home, whose box starts it.
+    const dotHome = dot?.home ?? null;
+    dotHero.setAttribute("href", dotHome === null ? homeHref : `#/runs/${dotHome.latest_run_id}`);
     // A face works while the agent's newest run does, and has the dot of an unread chat while its conversation is
     // unread (item 1235), as a messaging app marks who wrote: Grok Bot's column of faces does.
     const working = (summary) => summary.latest !== null && WORKING.has(summary.latest.status);
     const unread = (summary) => summary.home?.unread === true;
-    const drawn = JSON.stringify(mine.map((summary) => [summary.record.id, summary.record.name, summary.record.role, summary.record.look, working(summary), unread(summary)]));
+    const drawn = JSON.stringify([dotName(), ...mine.map((summary) => [summary.record.id, summary.record.name, summary.record.role, summary.record.look, working(summary), unread(summary)])]);
     if (drawn !== facesDrawn) {
       facesDrawn = drawn;
       faceLinks.clear();
       for (const summary of mine) {
         const { record } = summary;
+        const isDot = record.id === DOT_ID;
+        const name = isDot ? dotName() : record.name;
         faceLinks.set(
           record.id,
           el(
             "a",
             {
-              class: "side-agent-face",
-              href: `#/agents/${record.id}`,
-              title: record.role === "" ? record.name : `${record.name}: ${record.role}`,
-              "aria-label": record.name,
+              class: isDot ? "side-agent-face side-dot-face" : "side-agent-face",
+              href: isDot ? homeHref : `#/agents/${record.id}`,
+              title: record.role === "" || isDot ? name : `${name}: ${record.role}`,
+              "aria-label": name,
               onclick: onNavigate,
             },
             actorFace(record.id, working(summary) ? "working" : "idle", record.look),
-            el("span", { class: "side-agent-name", "aria-hidden": "true" }, record.name),
+            el("span", { class: "side-agent-name", "aria-hidden": "true" }, name),
             unread(summary) ? el("span", { class: "side-unread side-agent-unread" }) : null,
           ),
         );
       }
       facesNav.replaceChildren(...faceLinks.values(), allAgents);
     }
+    // Dot's face alone is a phone's large one (item 991): the column there holds the agents, and stands hidden without.
+    facesNav.dataset.agents = String(agentsOwn.length);
     facesNav.hidden = mine.length === 0;
-    agentsLink.hidden = mine.length > 0;
+    agentsLink.hidden = agentsOwn.length > 0;
+    allAgents.hidden = agentsOwn.length === 0;
     markFaces();
   }
   async function loadFaces() {
@@ -715,9 +726,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const open = /^#\/agents\/([A-Za-z0-9_-]+)$/.exec(location.hash)?.[1] ?? null;
     for (const [id, link] of faceLinks) {
       const home = homes.get(id) ?? null;
-      link.setAttribute("href", home === null ? `#/agents/${id}` : `#/runs/${home.latest_run_id}`);
+      const page = id === DOT_ID ? homeHref : `#/agents/${id}`;
+      link.setAttribute("href", home === null ? page : `#/runs/${home.latest_run_id}`);
       const reading = routeTab === "runs" && home !== null && home.id === routeThreadId;
-      mark(link, (routeTab === "agents" && id === open) || reading);
+      const onHome = id === DOT_ID && routeTab === "runs" && routeRunId === null && routeThreadId === null;
+      mark(link, (routeTab === "agents" && id === open) || reading || onHome);
       // The dot of its unread conversation (item 1235), but not while that chat is on the page, being read.
       const dot = link.querySelector(".side-agent-unread");
       if (dot instanceof HTMLElement) {
@@ -1562,24 +1575,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   loadFaces();
 
   // On a phone the sidebar is the list of chats over the whole screen (item 294), the phone's home (item 991): your
-  // initials and a new chat at its head, the apps and the search at its foot, under the thumb. The search moves between
-  // the head of the list and the foot as the width changes; there is one box. A new chat is a "+" (item 834), as a
-  // messaging app's, at the right of the head, where the "New chat" row under the search was.
+  // initials at its head, the apps and the search at its foot, under the thumb. The search moves between the head of the
+  // list and the foot as the width changes; there is one box. No "+" starts a new chat (item 1245, after item 834's):
+  // Dot is one conversation, which its face opens, as each agent's face opens its own.
   const searchBox = el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K"));
-  const compose = el(
-    "a",
-    {
-      class: "icon-btn side-compose",
-      href: homeHref,
-      title: t("sidebar.newChatKeys"),
-      "aria-label": t("sidebar.newChat"),
-      onclick: () => {
-        requestCompose();
-        onNavigate();
-      },
-    },
-    icon("plus"),
-  );
   const body = el(
     "div",
     { class: "side-body" },
@@ -1642,8 +1641,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   paintConnected();
   const foot = el("div", { class: "side-foot" }, connectButton, settingsLink);
   // On a phone the list is the home (item 991, the owner's ask of 2026-11-05 for a plain home): your initials at the top
-  // left lead to the settings, the "+" at the right starts a chat, Dot's own face stands large over the faces of the
-  // other agents, and the foot holds the apps and the search.
+  // left lead to the settings, Dot's own face stands large over the faces of the other agents, to its conversation (item
+  // 1245), and the foot holds the apps and the search.
   const ownerInitials = el("span", { class: "side-owner-initials", "aria-hidden": "true" });
   const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: t("sidebar.settings"), "aria-label": t("sidebar.settings"), onclick: onNavigate }, ownerInitials);
   function paintOwner() {
@@ -1663,8 +1662,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const heroName = el("span", { class: "side-dot-name" }, dotName());
   const dotHero = el(
     "a",
-    // A chat with Dot starts from its face, as every other way to Dot leads to New chat (views/agents.js): Dot has no
-    // agent page of its own.
+    // Dot's face opens its conversation (item 1245, `markFaces`), or the home before there is one: Dot has no agent
+    // page of its own.
     {
       class: "side-dot-hero",
       href: homeHref,
@@ -1687,7 +1686,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
     connectButton.firstElementChild.replaceWith(icon(PHONE.matches ? "appsGrid" : "plug"));
-    sideHead.append(compose);
     if (PHONE.matches) {
       close.after(ownerLink);
       connectButton.after(searchBox);

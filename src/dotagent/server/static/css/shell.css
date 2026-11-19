@@ -1248,10 +1248,6 @@
     text-decoration: none;
   }
 
-  .side-head > .side-compose {
-    margin-left: 4px;
-  }
-
   /* Dot's own face, large, its name under it, over the faces of the other agents. */
   .side-dot-hero {
     display: flex;
@@ -1294,8 +1290,7 @@
   }
 
   .side-foot > .side-link,
-  .side-foot > .side-connect,
-  .side-compose {
+  .side-foot > .side-connect {
     display: grid;
     place-items: center;
     flex: none;
@@ -1370,6 +1365,12 @@
 
   .side-agent-faces > .side-agent-face {
     width: 72px;
+  }
+
+  /* Dot's face is the large one over the column (item 1245), which holds the agents alone, and none without them. */
+  .side-agent-faces > .side-dot-face,
+  .side-agent-faces[data-agents="0"] {
+    display: none;
   }
 }
 

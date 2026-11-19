@@ -4,7 +4,7 @@
 // for you, and its card stays in its own chat (item 434).
 
 import { actorFace, DOT_ID } from "../actors.js";
-import { api, sharedGet } from "../api.js";
+import { AGENTS_CHANGED_EVENT, api, sharedGet } from "../api.js";
 import { assistant, loadAssistant, onAssistant } from "../assistant.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, optionRow, runChoices } from "../choices.js";
@@ -30,6 +30,8 @@ import { onCompose } from "../shortcuts.js";
 import { setStageGlass } from "../stage.js";
 import { getSnapshot, loadModels, onChange } from "../state.js";
 import { attempt, toast } from "../ui.js";
+import { WORKING_STATES } from "../runstates.js";
+import { sendToWork } from "../sendwork.js";
 
 const MAX_GOAL_PX = 320;
 
@@ -102,6 +104,20 @@ const HOME_KEPT = {
  * (item 833); what the at sign and the slash open is the box's tooltip. */
 function placeholderFor(name) {
   return `Message ${name}`;
+}
+
+/**
+ * Where a message from the home goes (item 1245): Dot is one conversation, as each agent is (item 1233), so a message
+ * to Dot or to the agent picked goes on in its home chat as the daemon names it (`home` of `GET /api/agents`), and
+ * reaches the run at work there; a new chat only when the owner asked for one (`fresh`), when Keep going or a loop
+ * starts work of its own, or before the owner had a chat with it.
+ */
+function whereTo(summaries, actorId, fresh) {
+  const home = fresh ? null : (summaries.find((summary) => summary.record.id === actorId)?.home ?? null);
+  if (home === null) {
+    return { threadId: null, working: null };
+  }
+  return { threadId: home.id, working: WORKING_STATES.has(home.latest_status) ? home.latest_run_id : null };
 }
 
 /** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
@@ -180,6 +196,7 @@ function buildComposer(ctx, listener) {
     agentPill.setIcon(chosen === null ? actorFace(DOT_ID, "idle", null) : actorFace(chosen.id, "idle", chosen.look));
     standing.setAvailable(chosen === null && actsOnGoal(choices.value().mode));
     agentMenu.repaint();
+    paintConversation();
   }
   function pickAgent(id) {
     agentId = id;
@@ -213,9 +230,55 @@ function buildComposer(ctx, listener) {
       ),
     ],
   });
-  sharedGet("/agents")
-    .then((summaries) => {
-      agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
+  // The conversation under the box (item 1245): the way back into the home chat of the one the box writes to, and New
+  // chat, which makes the next message start a chat of its own.
+  let summaries = [];
+  let fresh = false;
+  const conversationLabel = el("span");
+  const conversation = el("a", { class: "btn ghost sm agent-conversation", hidden: true }, icon("message"), conversationLabel);
+  const freshButton = el(
+    "button",
+    {
+      class: "btn ghost sm",
+      type: "button",
+      hidden: true,
+      title: "The next message starts a chat of its own; the conversation stays as it is",
+      onclick: () => {
+        fresh = true;
+        paintConversation();
+        toast("ok", "Your next message starts a new chat.");
+        goal.focus();
+      },
+    },
+    icon("plus"),
+    "New chat",
+  );
+  const conversationRow = el("div", { class: "row home-conversation" }, conversation, freshButton);
+  function paintConversation() {
+    const actorId = agentId === "" ? DOT_ID : agentId;
+    const summary = summaries.find((candidate) => candidate.record.id === actorId) ?? null;
+    const home = summary?.home ?? null;
+    conversation.hidden = home === null || fresh;
+    freshButton.hidden = home === null || fresh;
+    if (home !== null) {
+      conversation.setAttribute("href", `#/runs/${home.latest_run_id}`);
+      conversation.title = home.title;
+      conversationLabel.textContent = `Open your chat with ${summary.record.id === DOT_ID ? called : summary.record.name}`;
+    }
+  }
+  function readAgents() {
+    return sharedGet("/agents").then((found) => {
+      summaries = found;
+      paintConversation();
+      // Read: whether New chat shows is known.
+      conversationRow.dataset.state = "read";
+      return found;
+    });
+  }
+  window.addEventListener(AGENTS_CHANGED_EVENT, readAgents);
+  readAgents()
+    .then((found) => {
+      agents = found.map((summary) => summary.record).filter((record) => record.id !== "dot");
       listed = true;
       agentPill.element.hidden = agents.length === 0;
       // The agent the new chat had, while it is still one of them; its choices then keep the one shown.
@@ -230,6 +293,8 @@ function buildComposer(ctx, listener) {
       console.warn("the agents could not be listed", error);
     });
 
+  // The message whose sending failed and where it went (item 1245), so that sent again it goes there with its key.
+  let unsent = null;
   // True from the moment a run is being started until the answer is in: Enter does not look at the disabled button, so
   // a second press must be refused here, or one goal would start two runs.
   let starting = false;
@@ -265,6 +330,23 @@ function buildComposer(ctx, listener) {
       await attempt(async () => {
         // A kept reasoning level is checked against the model's own, so the models are known first.
         await choices.ready();
+        // The conversation as the daemon names it now (item 1245): its run may have ended, or the chat gone, since the
+        // home was drawn. Keep going and a loop start work of their own, in a chat of their own.
+        // A message sent again after an answer that was lost goes where its first sending went, with its key (item 189).
+        const where =
+          unsent !== null && unsent.text === text
+            ? unsent.where
+            : loop !== null || standing.value()
+              ? { threadId: null, working: null }
+              : whereTo(await api.get("/agents"), agentId === "" ? DOT_ID : agentId, fresh);
+        unsent = { text, where };
+        const owner = { agent_id: agentId === "" ? null : agentId };
+        const opening = { ...ctx, steered: (runId) => ctx.navigate(`/runs/${runId}`), queued: (runId) => ctx.navigate(`/runs/${runId}`) };
+        if (await sendToWork({ where, text, choices, frame, owner, keys, ctx: opening })) {
+          unsent = null;
+          removePref(HOME_CHOICES_KEY);
+          return;
+        }
         const chosen = choices.value();
         const body = {
           goal: loop === null ? text : loop.message,
@@ -276,9 +358,9 @@ function buildComposer(ctx, listener) {
           approvals: sentApprovals ?? chosen.approvals,
           goal_mode: standing.value() ? null : chosen.goal_mode,
           standing: standing.value(),
-          thread_id: null,
+          thread_id: where.threadId,
           attachments: attachments.ids(),
-          agent_id: agentId === "" ? null : agentId,
+          ...owner,
           loop: loop === null ? null : loop.every,
           ...frame.picks.body(),
         };
@@ -287,6 +369,7 @@ function buildComposer(ctx, listener) {
         choices.sent();
         frame.picks.sent();
         frame.clear();
+        unsent = null;
         removePref(HOME_CHOICES_KEY);
         ctx.navigate(`/runs/${created.id}`);
       });
@@ -301,7 +384,7 @@ function buildComposer(ctx, listener) {
   const stopStatus = onChange(choices.sync);
   return {
     // Keep going's line sits under the frame, not in it.
-    element: el("div", { class: "composer-stack" }, frame.element, standing.note),
+    element: el("div", { class: "composer-stack" }, frame.element, standing.note, conversationRow),
     focus: () => goal.focus(),
     // Send `text` as the owner would, with the choices of the box but the approval mode `approvals` (the first
     // conversation's look, item 420, which starts in the mode its promises were said in).
@@ -317,8 +400,10 @@ function buildComposer(ctx, listener) {
     rename: (name) => {
       called = name;
       rephrase();
+      paintConversation();
     },
     dispose: () => {
+      window.removeEventListener(AGENTS_CHANGED_EVENT, readAgents);
       PHONE.removeEventListener("change", rephrase);
       stopStatus();
       choices.dispose();

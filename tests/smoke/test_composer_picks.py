@@ -25,6 +25,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from composer_choices import show_choices
+from home_afresh import start_afresh
 from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -590,6 +591,7 @@ async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_wit
                     await _fits(page, chips, composer)
                     await page.screenshot(path=str(tmp_path / f"chips-{width}-{scheme}.png"), animations="disabled")
                     # The picks go with the message and stand under it; the composer they left holds none.
+                    await start_afresh(page)
                     await goal.fill(GOAL)
                     await goal.press("Enter")
                     await page.wait_for_url(re.compile(r"#/runs/[^/]+$"))

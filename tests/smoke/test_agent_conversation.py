@@ -1,6 +1,7 @@
 """An agent is one conversation (item 1233, the owner's word of 2026-11-19 after Grok Bot): its face in the sidebar
 opens its chat, its page's box goes on in that chat rather than starting a new one each time, New chat in its page's
-"…" starts the next message afresh, and its name in the chat's bar opens its page (item 1234). A real server on a
+"…" starts the next message afresh, and its name in the chat's bar opens its page (item 1234). Dot is one
+conversation too (item 1245): the home's box goes on in Dot's chat, and no "+" starts a new one. A real server on a
 scripted model, in Chrome."""
 
 import asyncio
@@ -59,7 +60,7 @@ async def served(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[tupl
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [_FINISH] * 8))
+    await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [_FINISH] * 12))
     manager: RunManager = RunManager(runtime)
     stopping: asyncio.Event = asyncio.Event()
     listener = bind_listener("127.0.0.1", 0)
@@ -191,6 +192,55 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
             await expect(page).to_have_url(re.compile(f"#/runs/{more.json()['id']}$"))
             await expect(face.locator(".side-agent-unread")).to_be_hidden()
             await expect(face).to_have_attribute("aria-label", "Scout")
+            await page.close()
+        finally:
+            await browser.close()
+
+
+async def _sent_from_home(manager: RunManager, page: Page, words: str) -> str:
+    """Send `words` from the home's box; the id of the run it started, once it ended."""
+    box: Locator = page.get_by_role("textbox", name="Goal")
+    await box.fill(words)
+    await box.press("Enter")
+    await page.wait_for_url("**/#/runs/*")
+    run_id: str = page.url.rsplit("/", 1)[1]
+    await _settled(manager, run_id)
+    return run_id
+
+
+async def test_dot_is_one_conversation(served: tuple[RunManager, httpx.AsyncClient]) -> None:
+    manager, client = served
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await _opened(browser, client, "/runs")
+            home: str = page.url.split("#", 1)[0] + "#/runs"
+            # No "+" starts a new chat; Dot's face leads the column, to the home before there is a chat with Dot.
+            await expect(page.locator("#sidebar").get_by_role("link", name="New chat")).to_have_count(0)
+            face: Locator = page.locator(".side-agent-faces a.side-dot-face")
+            await expect(face).to_have_attribute("href", "#/runs")
+            await expect(page.get_by_role("link", name="Open your chat with Dot")).to_be_hidden()
+            first: str = await _sent_from_home(manager, page, "Plan my week")
+            thread: str = (await client.get(f"/api/runs/{first}")).json()["run"]["thread_id"]
+            await expect(face).to_have_attribute("href", f"#/runs/{first}")
+            await expect(face).to_have_attribute("aria-current", "page")
+
+            # The home's next message goes on in that chat, rather than starting a new one.
+            await page.goto(home)
+            await expect(page.get_by_role("link", name="Open your chat with Dot")).to_have_attribute(
+                "href", f"#/runs/{first}"
+            )
+            second: str = await _sent_from_home(manager, page, "And add the gym on Friday")
+            assert second != first
+            assert (await client.get(f"/api/runs/{second}")).json()["run"]["thread_id"] == thread
+
+            # New chat under the box starts the next message afresh, and the face follows the newest chat.
+            await page.goto(home)
+            await page.get_by_role("button", name="New chat").click()
+            await expect(page.get_by_role("link", name="Open your chat with Dot")).to_be_hidden()
+            third: str = await _sent_from_home(manager, page, "Something else entirely")
+            assert (await client.get(f"/api/runs/{third}")).json()["run"]["thread_id"] != thread
+            await expect(face).to_have_attribute("href", f"#/runs/{third}")
             await page.close()
         finally:
             await browser.close()
