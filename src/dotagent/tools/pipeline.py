@@ -110,21 +110,16 @@ class OutcomeArgs(RecordArgs):
     source: str = Field(min_length=3, max_length=_TEXT_CHARS, description="Where you saw it.")
 
 
-# Dot's own words beside a fenced refusal (the third pre-push review of item 1227): what to do next is not the third
-# party's, only the cells the refusal quotes are.
-_REFUSED_LEAD: str = (
-    "The ledger refused this call. What it says to do next (look at the earlier try and end it, or leave the client "
-    "to the owner) is Dot's own; only the names and evidence it quotes may be a third party's words:"
-)
-
-
 def _refused(refusal: RecordRefusal) -> ToolResult:
-    """A refusal as the run reads it: when the block holds outside words, which it may quote, it is fenced and marks
-    the run, with Dot's own line before it saying that its advice is Dot's."""
-    if not refusal.outside:
-        return fail(refusal.message)
-    fence: str = fenced("pipeline refusal", refusal.message, secrets.token_hex(_NONCE_BYTES))
-    return mark_untrusted(fail(f"{_REFUSED_LEAD}\n{fence}"))
+    """A refusal as the run reads it. When the block holds outside words, the part that quotes it is fenced and marks
+    the run, while Dot's own advice stands outside the fence, so that a run that reads fenced words as data still reads
+    what to do (the third pre-push review of item 1227)."""
+    if not refusal.outside or not refusal.quoted:
+        return fail(str(refusal))
+    fence: str = fenced("pipeline refusal", refusal.quoted, secrets.token_hex(_NONCE_BYTES))
+    lead: str = "The ledger refused this call. What the record says, which may be a third party's words:"
+    advice: str = f"\nWhat to do (Dot's own words): {refusal.advice}" if refusal.advice else ""
+    return mark_untrusted(fail(f"{lead}\n{fence}{advice}"))
 
 
 def _now() -> str:
@@ -217,8 +212,8 @@ def _client_tool() -> RegisteredTool:
                 and args.status != present.status
             ):
                 raise LedgerRefusal(
-                    f"{present.name} is {present.status} on the owner's word: a run that read outside content does "
-                    "not change that"
+                    f"{present.name} is {present.status}.",
+                    "That is the owner's word: a run that read outside content does not change it.",
                 )
             return upsert_client(ledger, args.client, change), "added" if present is None else "changed"
 

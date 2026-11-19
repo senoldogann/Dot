@@ -85,12 +85,12 @@ def test_an_action_is_never_begun_twice_while_its_result_is_unseen_and_never_sen
     # The run broke off here: the next one reads the file again and finds the action begun, not missing.
     reread: Ledger = parse(written(OWNERS_RECORD, ledger))
     assert [action.key for action in pending(reread)] == ["ornek-leipomo/first-mail"]
-    with pytest.raises(LedgerRefusal, match="nobody has seen what came of it"):
+    with pytest.raises(LedgerRefusal, match="Nobody has seen what came of it"):
         begin(reread, "ornek-leipomo", "first-mail", "", "2026-11-19 11:00")
     sent: Ledger = end(reread, "ornek-leipomo/first-mail", "sent", "In Sent at 10:01", "2026-11-19 11:05")
     assert pending(sent) == ()
     assert (sent.clients[0].last_action, sent.clients[0].status) == ("first-mail", "contacted")
-    with pytest.raises(LedgerRefusal, match="it is not sent again"):
+    with pytest.raises(LedgerRefusal, match="It is not sent again"):
         begin(sent, "ornek-leipomo", "first-mail", "", "2026-11-20 09:00")
     # A further mail is an action of its own name.
     assert begin(sent, "ornek-leipomo", "reminder-1", "", "2026-11-26 09:00").actions[-1].state == "begun"
