@@ -135,10 +135,20 @@ def _make_line(raw: str, depth: int) -> SnapshotLine:
     )
 
 
+def fed_lines(text: str) -> list[str]:
+    """The lines of ``text`` as a line feed ends them, and nothing else: ``str.splitlines`` also ends a line at U+0085,
+    U+2028, U+2029 and some control characters, which a page can put in an element's name (item 1241)."""
+    return text.removesuffix("\n").split("\n") if text else []
+
+
 def parse_snapshot(snapshot: str) -> tuple[SnapshotLine, ...]:
-    """Split a snapshot into lines with their depth, ref, box and shape; lines that are not list items are dropped."""
+    """Split a snapshot into lines with their depth, ref, box and shape; lines that are not list items are dropped.
+    Playwright ends a line with a line feed and writes an element's name as it is, so a name may hold U+0085, U+2028 or
+    another character ``str.splitlines`` also breaks at: a page that put one in a name forged a line of its own, with a
+    control's ref, ahead of the control's real line (the code review of 2026-11-19, item 1241): only a line feed
+    ends one here (:func:`fed_lines`)."""
     lines: list[SnapshotLine] = []
-    for raw in snapshot.splitlines():
+    for raw in fed_lines(snapshot):
         indent: re.Match[str] | None = _INDENT.match(raw)
         if indent is not None:
             lines.append(_make_line(raw, len(indent.group(1)) // 2))
@@ -309,10 +319,10 @@ def count_refs(lines: Sequence[SnapshotLine]) -> int:
 
 def diff_views(previous: str, current: str) -> ViewDiff:
     """Line-level multiset diff of two rendered views. Refs stay stable while an element's role and name do not."""
-    before: Counter[str] = Counter(line.strip() for line in previous.splitlines())
+    before: Counter[str] = Counter(line.strip() for line in fed_lines(previous))
     budget: Counter[str] = Counter(before)
     added: list[str] = []
-    current_lines: list[str] = current.splitlines()
+    current_lines: list[str] = fed_lines(current)
     for line in current_lines:
         key: str = line.strip()
         if budget[key] > 0:
@@ -353,7 +363,7 @@ def fit_to_budget(text: str, max_chars: int) -> tuple[str, int]:
     """Cut ``text`` at a line boundary so it fits ``max_chars``; returns the text and how many lines were dropped."""
     if len(text) <= max_chars:
         return text, 0
-    lines: list[str] = text.splitlines()
+    lines: list[str] = fed_lines(text)
     used: int = 0
     kept: list[str] = []
     for line in lines:
