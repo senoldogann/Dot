@@ -130,6 +130,7 @@ export const EN = {
   "dialog.keepEditing": "Keep editing",
   "sheet.readAloud": "Read the answer aloud",
   "sheet.stopReading": "Stop reading",
+  "sheet.copy": "Copy the text",
   "sheet.selectText": "Select text",
   "sheet.actions": "Message actions",
   "sheet.react": "React to this message",

@@ -8,10 +8,11 @@
  * Its states are explicit: the hold (`idle`, then `pressing` from a touch until it is held, moved or let go) and the
  * sheet, open or not, one at a time.
  */
-import { el } from "./dom.js";
+import { copyText, el } from "./dom.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { REACTIONS, reactionsOf } from "./reactions.js";
+import { toast } from "./ui.js";
 
 // How long a touch rests on a message before it is a hold, and how far it may move meanwhile.
 const HOLD_MS = 450;
@@ -112,7 +113,23 @@ function openMessageSheet(container) {
       });
     }),
   ];
-  if (container.querySelector(BODY) !== null) {
+  const body = container.querySelector(BODY);
+  // A message whose foot lends no control (what Dot said between steps, or your message while its run works) is still
+  // copied from here: the selection a hold would make is kept off a touch screen (app.css), so this is the way to copy
+  // it (item 1226).
+  if (body !== null && actions.length === 0) {
+    rows.push(
+      row(icon("copy"), t("sheet.copy"), () => {
+        // The copy starts inside this press, so that it is still the owner's gesture.
+        copyText(body.innerText.trim()).then(
+          () => toast("ok", t("code.copied")),
+          (error) => toast("error", `Could not copy: ${error.message}`),
+        );
+        close();
+      }),
+    );
+  }
+  if (body !== null) {
     rows.splice(
       Math.min(1, rows.length),
       0,
@@ -123,12 +140,14 @@ function openMessageSheet(container) {
     );
   }
   const handle = el("div", { class: "sheet-handle", "aria-hidden": "true" });
-  dialog.append(
+  // Only the parts there are: append() writes a null as the word "null" (item 1226).
+  const parts = [
     handle,
     facts.length === 0 ? null : el("div", { class: "sheet-facts" }, facts.join(" · ")),
     reactionRow,
     rows.length === 0 ? null : el("div", { class: "sheet-actions" }, ...rows),
-  );
+  ];
+  dialog.append(...parts.filter((part) => part !== null));
   // A press on the backdrop, outside the sheet's box, closes it.
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) {
