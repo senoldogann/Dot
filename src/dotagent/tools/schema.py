@@ -23,6 +23,18 @@ _SCHEMA_KEYS_WITH_MAP: frozenset[str] = frozenset({"properties", "$defs"})
 _SCHEMA_KEYS_WITH_LIST: frozenset[str] = frozenset({"anyOf", "oneOf", "allOf", "prefixItems"})
 _SCHEMA_KEYS_WITH_NODE: frozenset[str] = frozenset({"items", "additionalProperties", "not"})
 _DROPPED_KEYS: frozenset[str] = frozenset({"title", "$defs", "definitions", "$schema"})
+# What a keyword of a JSON Schema dialect, or of a model that dropped its bound into the field's own metadata, is
+# spelled as in the schema every provider reads: an exclusive bound as an inclusive one (the tool checks the bound
+# itself), so that no provider meets a keyword it has never heard of.
+_BOUNDS: dict[str, str] = {
+    "gt": "minimum",
+    "ge": "minimum",
+    "exclusiveMinimum": "minimum",
+    "lt": "maximum",
+    "le": "maximum",
+    "exclusiveMaximum": "maximum",
+}
+
 _SCALARS: frozenset[str] = frozenset({"string", "number", "integer", "boolean"})
 # What a cut part says of itself, after its own description.
 _CUT_NOTE: str = "Its parts nest deeper than shown here: give it as the service's docs say."
@@ -118,7 +130,12 @@ def _transform(node: JsonValue, walk: _Walk, depth: int, path: frozenset[str]) -
             continue
         if key == "default" and value is None:
             continue
-        if key in _SCHEMA_KEYS_WITH_MAP and isinstance(value, dict):
+        if key in _BOUNDS:
+            # Draft-4's boolean form ("exclusiveMinimum": true beside "minimum") says nothing the inclusive bound
+            # beside it does not; a number is the bound itself.
+            if not isinstance(value, bool):
+                out[_BOUNDS[key]] = value
+        elif key in _SCHEMA_KEYS_WITH_MAP and isinstance(value, dict):
             out[key] = {name: _transform(child, walk, depth + 1, path) for name, child in value.items()}
         elif key in _SCHEMA_KEYS_WITH_LIST and isinstance(value, list):
             out[key] = [_transform(child, walk, depth + 1, path) for child in value]

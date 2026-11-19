@@ -65,8 +65,9 @@ backup_keep_hourly = 24
 backup_keep_days = 14
 
 [models]
-# "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic, openrouter and opencode (Zen's free
-# models, which run as OpenCode's own agent: [providers.opencode]).
+# "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic, openrouter, google (the Gemini models of a
+# key from Google AI Studio, free within their daily limits), antigravity (the models of a Google Antigravity plan, over
+# the account's own login) and opencode (Zen's free models, which run as OpenCode's own agent: [providers.opencode]).
 # A run uses the model it was started with (main unless one is chosen) for every step, until it moves to a standby
 # model (below); the roles below are only used for what their comments say.
 main = "ollama:minimax-m2.7:cloud"
@@ -116,6 +117,33 @@ api_key_env = "OPENAI_API_KEY"
 organization_env = "OPENAI_ORG_ID"
 project_env = "OPENAI_PROJECT_ID"
 wire = "responses"
+connect_timeout_s = 10.0
+read_timeout_s = 600.0
+attempts = 6
+max_concurrent = 4
+
+[providers.google]
+# The Gemini models of a Google AI Studio key (aistudio.google.com), over the Gemini API's OpenAI-compatible route:
+# "google:gemini-3.1-flash-lite" for example. A model is free while the key's project stays inside the free tier's
+# limits (docs/models.md). api_key_env holds the AI Studio key; `dotx models google` lists what it can use.
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+api_key_env = "GOOGLE_API_KEY"
+connect_timeout_s = 10.0
+read_timeout_s = 600.0
+attempts = 6
+max_concurrent = 4
+
+[providers.antigravity]
+# The models of a Google Antigravity plan (Gemini 3.x Flash, and the Claude and GPT-OSS models it offers beside them),
+# straight over Cloud Code Assist: the Google login Antigravity on this Mac already holds, no proxy and no key.
+# credentials_file is that login (the Antigravity driver a desktop client installs writes it; "~" and a "*" glob are
+# allowed), project the
+# Cloud Code project it belongs to, and user_agent the client Google gates the route on: a retired version answers with
+# a text asking for an update, so keep it equal to the installed Antigravity's (antigravity/hub/<version> ...).
+base_url = "https://daily-cloudcode-pa.googleapis.com"
+credentials_file = "~/.t3/userdata/providers/antigravity/*/antigravity-acp/acp_token.json"
+project = "aicode-consumers"
+user_agent = "antigravity/hub/2.24.0 (aidev_client; os_type=darwin; arch=arm64; cl=7180000000000000000)"
 connect_timeout_s = 10.0
 read_timeout_s = 600.0
 attempts = 6
@@ -1056,8 +1084,14 @@ timezone = ""
 tick_s = 15.0
 # A cron expression may not fire more often than this.
 min_interval_s = 300
-# A schedule that is overdue by more than this (the daemon was off, the Mac asleep) skips that firing and waits for the next.
+# A firing that starts at most this late is on time: it runs as at its time. Several firings of a repeating schedule
+# missed within it collapse into the newest, unsaid.
 misfire_grace_s = 3600
+# A repeating schedule that the daemon being off or the Mac asleep kept from firing runs its newest missed firing late
+# when that is at most this many seconds past its time (12 hours), saying so to its run; the older ones are told as
+# missed, in one notice, and do not run. Several such late starts are 15 seconds apart. Later than this, the firing is
+# skipped and the schedule waits for its next time; 0 never runs one late. A one-time schedule always fires late.
+catch_up_s = 43200
 # Schedules that are switched on.
 max_schedules = 50
 # A firing's run starts with the dated final answers of the schedule's last runs in front of its goal, so it builds
@@ -1263,3 +1297,18 @@ settle_s = 1.5
 notes_minutes = 3.0
 keep_days = 7
 headless = true
+
+[phone]
+# The owner's iPhone over WebDriverAgent (docs/phone-control.md, item 1196): off until the runner app is on the phone.
+# wda_urls are the addresses of its server (port 8100), tried in order; udid is the phone's id for `xcrun devicectl
+# list devices`, with which the daemon relaunches runner_bundle, the runner app, when the server stops answering and
+# the phone is in reach of this Mac. Every check_every_s seconds the daemon looks; a phone out of reach for
+# notify_after_s seconds is told to the owner once until it is up again (a locked one is not told: locking it is how the
+# owner uses it). request_timeout_s bounds one request to the phone.
+enabled = false
+wda_urls = []
+udid = ""
+runner_bundle = "dev.dotagent.wda.xctrunner"
+check_every_s = 30.0
+notify_after_s = 300.0
+request_timeout_s = 20.0

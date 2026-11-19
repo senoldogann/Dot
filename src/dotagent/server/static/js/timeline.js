@@ -261,6 +261,13 @@ const CUT_OFFS = {
   failed: { after: t("timeline.resumedAfterFailed"), how: t("timeline.cutFailedHow") },
   continued: { after: t("timeline.resumedAfterContinued"), how: t("timeline.cutContinuedHow") },
 };
+// Why a schedule's task was tried once more (scheduler/recovery.py `RetryWhy`).
+const RETRY_WHYS = {
+  cut_off: t("timeline.retriedCutOff"),
+  passing_error: t("timeline.retriedPassing"),
+  stalled: t("timeline.retriedStalled"),
+  plan_limit: t("timeline.retriedPlanLimit"),
+};
 
 /** One call of the step a resumed run was in, as "what it did: how it ended". */
 function callEnd(call) {
@@ -1539,6 +1546,27 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         el("p", null, `${cutOff.how} ${data.automatic ? t("timeline.resumedOnItsOwn") : t("timeline.resumedByHand")}`),
         calls,
         el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, t("timeline.openContinued")),
+      );
+      place(scope, el("details", { class: "restart" }, head, body), record.ts);
+    },
+
+    // A schedule's task tried once more on its own (item 1206, scheduler/recovery.py): a line that says so; opened, why
+    // the task before it ended and the way to that task.
+    schedule_retry(scope, record) {
+      const data = record.data;
+      const why = RETRY_WHYS[data.why] ?? String(data.why);
+      const head = el(
+        "summary",
+        { class: "tool-head" },
+        el("span", { class: "tool-state restart-mark" }, icon("refresh")),
+        el("span", { class: "restart-label" }, t("timeline.retried")),
+        el("span", { class: "chev" }, icon("chevron")),
+      );
+      const body = el(
+        "div",
+        { class: "tool-body restart-body" },
+        el("p", null, `${why} ${t("timeline.retriedOnce")}`),
+        el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, t("timeline.openRetried")),
       );
       place(scope, el("details", { class: "restart" }, head, body), record.ts);
     },

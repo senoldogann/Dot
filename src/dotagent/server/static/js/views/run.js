@@ -273,7 +273,12 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const crumbSep = parentId === null ? null : el("span", { class: "stage-sep", "aria-hidden": "true" }, "/");
   // Whose chat it is, named in the bar: the agent, the team (item 610) or Dot.
   const chatWith = agent !== null ? agent.name : team !== null ? team.name : dotName();
-  const stageName = el("span", { class: "stage-name" }, parentId !== null ? clip(run.goal, CRUMB_CHARS) : chatWith);
+  // An agent's name opens its page (item 1234), where its role, schedules and what it learned are, as a messaging
+  // app's name over a chat opens the chat's details.
+  const stageName =
+    parentId === null && agent !== null
+      ? el("a", { class: "stage-name stage-name-link", href: `#/agents/${agent.id}`, title: t("run.agentDetails", { name: agent.name }) }, chatWith)
+      : el("span", { class: "stage-name" }, parentId !== null ? clip(run.goal, CRUMB_CHARS) : chatWith);
   const footTime = el("span", null);
   const footParent = el("span", null, t("run.partOfAnother"));
   const footStop = el(

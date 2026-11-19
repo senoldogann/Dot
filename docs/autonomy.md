@@ -85,9 +85,11 @@ preset's and your `ask` rules', money and credentials', a message or a post in y
 refusal of a read of your secrets or of data sent out (items 429 and 433). **What no mode waives** (item 429): a
 `research` run changes nothing but its notes file and memory — a refusal is not a question, so yolo does not waive it
 either — and a run that read outside content has a step refused whose words would send a secret Dot holds out of the Mac
-(item 525), in every mode but free mode, which you switch (item 1097: it records the step, the secret masked). A yolo run that read such content also has the review model's refusal of a step it checks (`[policy]
-yolo_taint_check`, on by default). (A rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand
-off, and a yolo run waives the last two with every other question.) The modes that ask keep their guard: in
+(item 525), in every mode but free mode, which you switch (item 1097: it records the step, the secret masked). A yolo
+run that read such content also puts the steps it lists to the review model first (`[policy] yolo_taint_check`, on by
+default) — and so does the run that goes on from a compaction, whose note is written out of what tools returned, while
+what that run saves since is not marked as learned from outside content (item 1219). (A rule of yours cannot refuse:
+its behaviours are allow, preapproved, ask and hand off, and a yolo run waives the last two with every other question.) The modes that ask keep their guard: in
 `supervised`, `ask` and `auto` money and credentials are still yours (Dot stops and asks you to do that step yourself;
 the review model is never asked about them, and a payment under its pre-approved caps asks you, or the review model in
 `auto`), and a message sent for you or a post in your name still waits for your yes (the review model answers it in
@@ -170,9 +172,10 @@ or method instead of repeating the call that failed; and it says that something 
 later, only after trying it, naming each way it tried and what it returned. A chat, whose reply ends its turn, is told
 not to end it announcing a next step it could take now, as a task or research run is told to keep acting. Your
 request is the job however bluntly it is put (item 1102): on your own Mac, accounts, files and code it is done without a
-lecture, a warning or a watered-down version, and only what the trust and safety rules hold back, or what would harm
-someone else, is held back, in one line, the rest done. No way goes around a refusal, a denial or a decision that is
-yours.
+lecture, a warning or a watered-down version, and the character keeps no rule of its own about what Dot will not do
+(item 1211's last stop went on 2026-11-18). The rules of trust and safety below still hold back what they name —
+credentials and secret stores, another run's work — and each of them protects you. No way goes around a refusal, a
+denial or a decision that is yours.
 
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the
@@ -205,8 +208,9 @@ is left on the chat as above and the run goes on with what does not depend on th
 the card waits in the panel at the composer's place (item 973), and your answer comes to the run as your instruction at once (a step whose model
 is still answering is cut short and asked again with it, item 509), clearing no mark of untrusted content, as a waited
 answer does not ([Safety](safety.md#safety)), or, once it has ended, carries the work on as above, in a run that starts
-as untrusted as the run that asked ended. A run of a message sent with Plan first, and a run of a `dotx` command, which
-no other process can reach while it works, wait for every answer.
+as untrusted as the run that asked ended. A run of a message sent with Plan first, and a run of a `dotx` command that works in its own process, which
+no other process can reach while it works, wait for every answer; a `dotx run` handed to the daemon (item 1203) is the
+daemon's run and chooses as the daemon's do.
 
 **Sends kept for you** (item 922). A message, a post or a release whose question nobody answers in
 `approval_timeout_s` is not refused but kept as a card with its draft, in every chat and whatever `unanswered` says:
@@ -333,7 +337,7 @@ of 130 to 230 tool calls ran on, one for an hour until it was stopped by hand. G
 and keep an eye on the token count of a long one (`--verbose`, or the facts under More on the side panel's Task tab).
 
 **Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off, or a run of
-`dotx run` whose terminal was closed (or that got SIGTERM) or whose command died, and a run that is blocked or that
+`dotx run` in its own process (no daemon ran) whose terminal was closed (or that got SIGTERM) or whose command died, and a run that is blocked or that
 failed, can go on where it stopped: Continue
 on the run's page, `dotx resume RUN_ID` (in this terminal, like `dotx run`), or `POST /api/runs/{id}/resume`. The next
 message you send in that chat, after a blocked, failed or cut-off run, is handed the same note. A new run
@@ -396,8 +400,9 @@ was there before, or that was rewritten since, stays); a lesson left out says wh
 lessons wait on that card, in the conversation: Save to memory keeps one, Dismiss drops it (`POST
 /api/runs/{id}/lessons/{index}/save`, `/dismiss` and `/undo`). A lesson is what its last decision made it, and every
 decision waits for the one before it: a second save or dismissal of a lesson decided already is refused, save the Save
-anyway of one `auto` left out. `dotx run` and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait,
-and the exit status stays the run's. A saved lesson is a note of the agent like the others: a later run gets it when it
+anyway of one `auto` left out. `dotx run` and `dotx resume` show the lessons after the answer when the run worked in
+their own process; Ctrl-C skips the wait, and the exit status stays the run's. A `dotx run` handed to the daemon (item
+1203) does not wait for them: the daemon draws them, and the run's page shows them. A saved lesson is a note of the agent like the others: a later run gets it when it
 fits its goal, and the Memory page edits or forgets it; a lesson of an agent's run is that agent's own (see Agents), and
 the notes it is checked against are the ones that agent's runs are handed. The same text saved again is the same note,
 also one that rested, which is awake again. Delegated runs, chats, runs that failed or were stopped, and evals (which

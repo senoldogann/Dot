@@ -121,6 +121,21 @@ class ScoutState(FrozenModel):
     declined: tuple[str, ...] = ()
     last_run: float | None = None
     last_summary: str = ""
+    # Why the last night saw nothing it went for (item 1215): "token" when GitHub refused the owner's token, "failed"
+    # when looks failed and GitHub answered none of its requests; "" for a night that worked. The scheduler tells the
+    # owner the same morning.
+    blind: Literal["", "token", "failed"] = ""
+
+
+def blind_reason(token_refused: bool, answered: int, failed: int) -> Literal["", "token", "failed"]:
+    """Why a night was blind: GitHub refused the token, or looks failed and GitHub answered none of its requests. A
+    night GitHub answered is not blind, though a lead of it failed (a repository renamed or gone fails every night)
+    and though it found nothing new (the second pre-push review)."""
+    if token_refused:
+        return "token"
+    if failed > 0 and answered == 0:
+        return "failed"
+    return ""
 
 
 def declined_key(repository: str, path: str) -> str:
@@ -203,6 +218,7 @@ def merged(before: ScoutState, after: ScoutState, now: ScoutState) -> ScoutState
             declined=(*now.declined, *(key for key in after.declined if key not in refused)),
             last_run=after.last_run,
             last_summary=after.last_summary,
+            blind=after.blind,
         )
     )
 

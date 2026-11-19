@@ -9,7 +9,7 @@
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
 import { isTrader, TRADING_DESK } from "../agentpanel.js";
-import { api } from "../api.js";
+import { AGENTS_CHANGED_EVENT, api } from "../api.js";
 import { BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
@@ -1200,11 +1200,17 @@ function agentKept(record) {
   };
 }
 
-/** The composer of an agent's page: a message for the agent, sent with Enter, with the new chat's mode, model and
- * reasoning and Options pills; the model starts at the agent's own, the mode at Auto, and /auto, /task, /chat and
- * /research name one as on the home (item 513). */
-function agentComposer(record, ctx) {
-  return startComposer({ name: record.name, bounds: record, owner: { agent_id: record.id }, ctx });
+/** The composer of an agent's page: a message for the agent, sent with Enter, with the mode, model and reasoning and
+ * Options pills; the model starts at the agent's own, the mode at Auto, and /auto, /task, /chat and /research name one
+ * as on the home (item 513). The message goes on in the agent's conversation (item 1233, `follow`), and its chat
+ * opens: the run it started, or the run at work it reached. */
+function agentComposer(record, ctx, follow) {
+  const opening = {
+    ...ctx,
+    steered: (runId) => ctx.navigate(`/runs/${runId}`),
+    queued: (runId) => ctx.navigate(`/runs/${runId}`),
+  };
+  return startComposer({ name: record.name, bounds: record, owner: { agent_id: record.id }, ctx: opening, follow });
 }
 
 /**
@@ -1591,6 +1597,28 @@ function mountPage(root, ctx, agentId) {
   let face = null;
   let shownDetail = null;
   let folds = readFolds(FOLDS_KEY);
+  // The agent's conversation (item 1233): its home chat as the daemon last named it, which the box goes on in, unless
+  // New chat in the "…" chose to start the next message afresh.
+  let homeChat = null;
+  let freshChat = false;
+  // The way back into that conversation, under the box while there is one to go on in.
+  const conversationLabel = el("span");
+  const conversation = el("a", { class: "btn ghost sm agent-conversation", hidden: true }, icon("message"), conversationLabel);
+  function paintConversation(record) {
+    conversation.hidden = homeChat === null || freshChat;
+    if (homeChat !== null) {
+      conversation.setAttribute("href", `#/runs/${homeChat.latest_run_id}`);
+      conversation.title = clip(homeChat.title, GOAL_CHARS);
+    }
+    setText(conversationLabel, `Open your chat with ${record.name}`);
+  }
+  function follow() {
+    if (freshChat || homeChat === null) {
+      return { threadId: null, working: null };
+    }
+    // Waiting for the owner (blocked) is at work too: the message reaches that run, as in its chat (item 898).
+    return { threadId: homeChat.id, working: WORKING.has(homeChat.latest_status) ? homeChat.latest_run_id : null };
+  }
   // The agent's page is laid out as the home is (item 124): its face, name and role over the composer in the middle,
   // and under them its chats, what it learned and its messages as the home's Today strip, each only when it has rows.
   const top = el("div", { class: "home-start agent-top" });
@@ -1626,6 +1654,17 @@ function mountPage(root, ctx, agentId) {
         back: button,
         button,
         items: [
+          {
+            label: "New chat",
+            icon: "plus",
+            title: `The next message starts a chat of its own; ${record.name}'s conversation stays as it is`,
+            run: () => {
+              freshChat = true;
+              paintConversation(record);
+              toast("ok", `Your next message to ${record.name} starts a new chat.`);
+              composer?.focus();
+            },
+          },
           { label: "Edit", icon: "pencil", run: () => edit(record) },
           { label: "Export", icon: "download", title: "Save the agent as a file, to import into another Dot", run: () => attempt(() => exportAgent(record)) },
           record.paused_at === null
@@ -1659,10 +1698,11 @@ function mountPage(root, ctx, agentId) {
       composer.dispose();
     }
     closeForm();
-    composer = agentComposer(record, ctx);
+    composer = agentComposer(record, ctx, follow);
     face?.dispose();
     face = liveFace(record.id, "idle", record.look, FACE_PX);
-    top.replaceChildren(who(record, face.element), composer.element);
+    paintConversation(record);
+    top.replaceChildren(who(record, face.element), composer.element, conversation);
     stageOf(record);
   }
 
@@ -1830,6 +1870,9 @@ function mountPage(root, ctx, agentId) {
 
   /** Draw a read: the top built again when it is due, and the lists. */
   function paint(detail) {
+    // The conversation as the daemon names it now (item 1233): a chat deleted or begun since is followed.
+    homeChat = detail.home ?? null;
+    paintConversation(detail.record);
     if (greetDue) {
       greetDue = false;
       greet(detail.record);
@@ -1865,11 +1908,15 @@ function mountPage(root, ctx, agentId) {
     }
   });
   const stopBack = onStreamBack(() => attempt(refresh));
+  // Chats deleted elsewhere on the page may take the conversation with them (item 1233): the box then starts one.
+  const onAgentsChanged = () => attempt(refresh);
+  window.addEventListener(AGENTS_CHANGED_EVENT, onAgentsChanged);
   attempt(reload);
   return () => {
     disposed = true;
     stopLifecycle();
     stopBack();
+    window.removeEventListener(AGENTS_CHANGED_EVENT, onAgentsChanged);
     if (composer !== null) {
       composer.dispose();
     }

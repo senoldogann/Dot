@@ -21,7 +21,6 @@ from fastapi import APIRouter, Request
 
 from dotagent.core.errors import InvalidValueError, SignInError
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import voice_dir
 from dotagent.server.routes_accounts import on_this_mac
 from dotagent.server.views import (
     TranscriptView,
@@ -37,11 +36,12 @@ from dotagent.voice.helper import Ability, Transcriber
 log = get_logger(__name__)
 
 
-def voice_router(desktop_app: DesktopApp | None = None, opener: Opener = open_url) -> APIRouter:
-    """The voice routes. ``desktop_app`` reads the Dot.app that runs and ``opener`` shows System Settings; a test gives
-    its own of each."""
+def voice_router(
+    transcriber: Transcriber, desktop_app: DesktopApp | None = None, opener: Opener = open_url
+) -> APIRouter:
+    """The voice routes. ``transcriber`` is the runtime's, which ``watch_video`` writes down with too (item 1212);
+    ``desktop_app`` reads the Dot.app that runs and ``opener`` shows System Settings; a test gives its own of each."""
     router: APIRouter = APIRouter(prefix="/api")
-    transcriber: Transcriber = Transcriber(voice_dir())
     app: DesktopApp = DesktopApp() if desktop_app is None else desktop_app
 
     @router.get("/voice")

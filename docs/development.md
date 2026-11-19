@@ -43,7 +43,7 @@ to 1147):
 | Kind                 | Asks                                         | Where                                                                                              | Calls a model |
 | -------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------- |
 | deterministic checks | does the harness do what it says             | `tests/unit`, the smoke tests on local fixtures with a scripted model, `dotx eval check`           | no            |
-| model evaluations    | does a model pass the tasks, and at what cost | `dotx eval run`, `dotx eval speed`, in the isolated configuration [below](#measuring-the-agent)     | yes           |
+| model evaluations    | does a model pass the tasks, and at what cost | `dotx eval run`, `dotx eval speed`, in the isolated configuration [below](#measuring-the-agent); the desktop bank | yes           |
 | product acceptance   | does the whole product do it on this Mac     | the `live` tests of a run end to end (`test_agent_browser.py`, `test_agent_desktop.py`)            | yes           |
 
 A scripted pass says nothing about a model: it shows that the tools, the checks and the fixtures hold together. What a
@@ -248,7 +248,7 @@ continuing that work.
 src/dotagent/
   cli*.py     the command line: the parser and the command models (light), one module per command family loaded by name
   agent/      run loop, run manager, approvals, context trimming, vision relay
-  llm/        providers (Ollama, OpenAI, OpenCode Go, Anthropic, OpenRouter) and their wire codecs
+  llm/        providers (Ollama, OpenAI, OpenCode Go, Anthropic, OpenRouter, Google, Antigravity) and their wire codecs
   policy/     action descriptions, shell analysis, the decision engine
   tools/      the tools the model can call
   browser/    Playwright session, snapshots, safety
@@ -466,6 +466,17 @@ yours to set, close that: yourself as the required reviewer of the environment `
 so that every publish waits for your click, and a ruleset that lets only you create tags `v*` (Settings › Rules ›
 Rulesets). Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`, then `dotx setup`.
 
+The desktop bank (`tests/smoke/test_desktop_bank.py`, item 1221) is the model evaluation of the desktop, which the
+owner's own runs call too seldom to measure it by: a live model drives the fixture app on eight tasks (a form, a field
+that takes digits alone and must be reported as it is, a button whose result shows a moment later, a choice in a
+context menu, one in the menu bar, a cell far down a scrolled grid, a button that brings Finder forward before the
+typing, and a name given in a sheet), each judged by what the app saw, and each attempt's line (passed, status, steps, tokens, seconds) is added to the report that
+`DOT_DESKTOP_BANK_REPORT` names, which it needs. It runs only with `DOT_DESKTOP_BANK=1`, and each attempt starts only when nobody has
+touched the Mac for ten minutes, or since the bank's own last attempt ended; an attempt is cut at 4,000,000 tokens (`DOT_DESKTOP_BANK_MAX_TOKENS`; give it 1500000 on
+your Claude plan) and 12 minutes. A model that fails a task is a line of the report, not a failed test; an attempt its provider refused before
+its first step (a spent quota) is a line marked not started, and the attempts after it are skipped. `DOT_DESKTOP_BANK_MODEL` picks the model (`ollama:gpt-oss:120b-cloud` by
+default), `DOT_DESKTOP_BANK_K` the attempts of each task.
+
 ## Measuring the agent
 
 How well Dot finishes work is measured, not guessed, in two ways.
@@ -494,7 +505,10 @@ and `desktop_act` calls, the share that carried one step (a round trip spent on 
 batches of [Browser use](browser-and-computer-use.md#browser-use) and [Computer use](browser-and-computer-use.md#computer-use) exist to avoid it), the share that failed and
 the median call; a **step model call by step number** line gives the median seconds of a step's model call for the
 steps 1 to 5, 6 to 10, 11 to 20, 21 to 40 and from 41 on of their runs, which shows how much a run slows down as its
-context grows. The Time table ends with the share of the input tokens the provider served from its cache. A **Sites**
+context grows. The Time table ends with the share of the input tokens the provider served from its cache, the
+fresh input (read at full price) and the input weighed as it is billed, `weighted*`: fresh tokens plus cached ones at
+0.1 of a fresh one, an assumption until bills are read (item 1218). Raw input overstated a DeepSeek bill about six
+times; judge a change of the context, which may break the cache, by the weighted column. A **Sites**
 table follows, per site (the host of the page for a browser act, the application for a desktop one, both recorded in
 the `tool_result` event with the steps of the batch): acts, the share with one step, the share that failed, the
 median call, and the finished runs that acted there with the share of them that ended done (item 308). **By day**
@@ -559,8 +573,8 @@ it.
 | `dotx eval list`                                         | The tasks, with their kind, mode and number of checks.                                                                                                                                                             |
 | `dotx eval check`                                        | Needs no model and costs nothing. Replays the reference solution of every task through the real loop, tools and policy, and proves that a run that touches nothing and says "done" fails every task and that the reference of a task with an easy way takes it. Run it after changing a tool, the policy or the loop. |
 | `dotx eval from-run RUN [--out PATH]`                    | Writes a draft task from a saved run: its goal, ending, steps and the tool names that failed. It leaves tool arguments out, so the draft can be read before it is shared, and it does not play anything; turn it into a task in `src/dotagent/evals/catalog.py`. The default is `<home>/evals/drafts/<run>.md`. |
-| `dotx eval run [--model REF] [--task ID]... [--repeat N] [--effort LEVEL] [--no-mcp-purposes]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens (180 s or 250000 for a choice task), and the notice before it starts states the ceiling. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. `--no-mcp-purposes` plays them with `[agent] mcp_purposes` false (below). |
-| `dotx eval speed [--model REF] [--repeat N] [--effort LEVEL] [--report FILE]...` | Plays the speed set (items 1037 and 1040): five browser tasks on a local site, with no network and no account (a sign-up over three pages, a search and the result it opens, a stock list of 120 rows, a daily check over three pages, a job application in a dialog of three steps), `--repeat` times each (3 by default), and prints per task and over them all the share passed, the wall seconds, the model calls, the share of `browser_act`/`desktop_act` calls that carried one step, the mean time to the first token of the steps' calls and the largest context a call was sent. `--effort` plays every attempt at that level of thinking, the report keeping it (item 1041). `--report` prints a saved report's table instead, and two of them side by side, a baseline and a later run, with how much the seconds and the calls changed. A change to how fast Dot uses the browser is measured with it, the same model and set before and after: `uv run dotx eval speed --repeat 3`. |
+| `dotx eval run [--model REF] [--task ID]... [--repeat N] [--effort LEVEL] [--no-mcp-purposes]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens (180 s or 250000 for a choice task), and the notice before it starts states the ceiling. A model on your Claude plan (`claude_code:...`) or on OpenCode is counted from each step it records, as Dot's own loop is from its model calls (item 1220), and on your Claude plan an attempt is also cut, and the eval stops without counting it, once the plan's window it runs in is 70 % used or refuses calls, also when it refused the run before its first step: the rest is kept for your own work. A harness probe stops the same way. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. `--no-mcp-purposes` plays them with `[agent] mcp_purposes` false (below). |
+| `dotx eval speed [--model REF] [--repeat N] [--effort LEVEL] [--report FILE]...` | Plays the speed set (items 1037 and 1040): five browser tasks on a local site, with no network and no account (a sign-up over three pages, a search and the result it opens, a stock list of 120 rows, a daily check over three pages, a job application in a dialog of three steps), `--repeat` times each (3 by default), and prints per task and over them all the share passed, the wall seconds, the model calls, the share of `browser_act`/`desktop_act` calls that carried one step, the mean time to the first token of the steps' calls and the largest context a call was sent. `--effort` plays every attempt at that level of thinking, the report keeping it (item 1041). `--report` prints a saved report's table instead, and two of them side by side, a baseline and a later run, with how much the seconds and the calls changed. It stops at your Claude plan's window as `dotx eval run` does. A change to how fast Dot uses the browser is measured with it, the same model and set before and after: `uv run dotx eval speed --repeat 3`. |
 | `dotx eval tools [--model REF] [--case ID]... [--repeat N]` | Asks a model the moments of tool use Dot's runs got wrong (item 736), one call each: each case's goal is started as a run of the scripted model, whose first request (the system prompt and the tools' schemas, as Dot makes them) is asked of the model with the steps before the moment, and the first call that does work is judged (the tool, its arguments, the calls it must not make). The request is captured in `yolo`, so that no case waits on an approval. It spends the tokens of that model, about 20,000 a call; its key comes from the environment and the home's `.env` alone, and the Keychain is not asked while the cases play: a key in neither is missing, and the command says so before the first case. The cases are in `evals/tool_cases.py`, each saying which failure it comes from. |
 | `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims, unproven steps, the share of the easy ways taken); without a file, every run saved under `<home>/evals/`. |
 

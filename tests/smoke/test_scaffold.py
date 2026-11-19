@@ -28,7 +28,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import FileSeed, ScriptedCall, ScriptedTurn
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
-from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, Usage
+from dotagent.llm.types import ChatRequest, DeltaSink, Message, ModelInfo, ModelReply, Usage
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.secrets import resolve_secret
 from dotagent.store.models import EventRecord, RunRecord
@@ -60,9 +60,10 @@ _BROKEN_FAST: str = "broken"
 # `nothing_new` on `finish` and `refuses` on `create_agent` (items 880 and 875) and the shell's pointer to wait_until
 # and its group's line (item 887), 33 000 for the office's `agents_now` and `read_agent_chat` (item 890), 35 000 for the
 # work orders and the objectives (items 907 and 908), 36 000 for the line that has a run do a request however bluntly it
-# is put (item 1102; the gate's runner, whose paths are longer, was 14 tokens over); the window is rounded up so that
-# the summary still has room.
-_SMALL_WINDOW: int = 36_000
+# is put (item 1102; the gate's runner, whose paths are longer, was 14 tokens over), 37 000 for the line that has a run
+# find a file by name with Spotlight (item 1188, 56 tokens over), 38 000 for `watch_video` and its group's line (item
+# 1212, 23 tokens over); the window is rounded up so that the summary still has room.
+_SMALL_WINDOW: int = 38_000
 # Every section the continuity check asks for, and no identifier the run's history does not hold.
 _SUMMARY: str = (
     "GOAL: find why the backup failed.\nDONE: read the log page by page.\nSTATE: no failure found so far.\n"
@@ -214,6 +215,17 @@ class ForgetfulFastProvider(WindowedProvider):
         return await super().complete(request, sink)
 
 
+class RunawayFastProvider(WindowedProvider):
+    """The scripted model next to a fast model that runs on to the cap of a summary until told it was cut off (item
+    1191), as glm-5.3-flash did on the owner's Mac, 35,060 tokens in 400 s."""
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        reply: ModelReply = await super().complete(request, sink)
+        if request.session_key.endswith(_SUMMARY_KEY) and "was cut off" not in _said(request):
+            return reply.model_copy(update={"text": _SUMMARY[:40], "finish": "length", "raw_finish": "length"})
+        return reply
+
+
 class StubbornFastProvider(WindowedProvider):
     """The scripted model next to a fast model that leaves PROBLEMS out of every summary, asked for it or not."""
 
@@ -291,8 +303,19 @@ def _reading(pages: int) -> list[ScriptedTurn]:
 
 
 def _pages(played: Played) -> list[str]:
-    """Each page of the log as the model got it: the newest message of the step after the read."""
-    return [step.messages[-1].content for step in played.steps if step.messages[-1].role == "tool"]
+    """Each page of the log as the model got it: the newest tool result of the step after the read, which a note
+    handed again after a compaction (items 404 and 1219) may follow."""
+    return [page for page in map(_page, played.steps) if page is not None]
+
+
+def _page(step: ChatRequest) -> str | None:
+    """The newest tool result of a step's request when only system notes follow it, as after a compaction (items 404
+    and 1219); none for a step whose newest message is anything else."""
+    newest: int = max((i for i, message in enumerate(step.messages) if message.role == "tool"), default=-1)
+    after: Sequence[Message] = step.messages[newest + 1 :]
+    if newest < 0 or not all(message.content.startswith("[system note]") for message in after):
+        return None
+    return step.messages[newest].content
 
 
 def _said(request: ChatRequest) -> str:
@@ -349,12 +372,13 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     # until the work orders and the objectives joined (items 907 and 908), and 41 000 until `recall` joined the core
     # tools and a plan's step could carry a brief (items 924 and 927), and 42 000 until every run was told to do a
     # request however bluntly it is put (item 1102), and 43 000 until a browser step could name what it expects and
-    # every run was told that done is not verified (item 1145).
+    # every run was told that done is not verified (item 1145), and 45 000 until `watch_video` joined (item 1212), and
+    # 47 000 until the pipeline tools and the parts of an objective's work joined (item 1227).
     turns: list[ScriptedTurn] = _reading(40)
-    small: Played = await _play(_config({}, 6), login_env, 44_000, turns)
+    small: Played = await _play(_config({}, 6), login_env, 47_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(44_000, None, 33_000, 33_000, 4125, True),)
+    assert small.scaffolds == (_scaffold(47_000, None, 35_250, 35_250, 4406, True),)
     assert roomy.scaffolds == (_scaffold(None, None, 96_000, 81_600, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
@@ -365,7 +389,7 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for page in [*small_pages, *roomy_pages]:
         assert "chars omitted" not in page
         assert page.endswith("to continue]")
-    assert max(len(page) for page in small_pages) <= 3980 < min(len(page) for page in roomy_pages)
+    assert max(len(page) for page in small_pages) <= 4261 < min(len(page) for page in roomy_pages)
 
     # The small budget is kept by compacting with summaries of the fast model; the large one is never reached.
     assert len(small.compactions) > 1
@@ -377,8 +401,8 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for compaction in small.compactions:
         before, after = compaction["tokens_before"], compaction["tokens_after"]
         assert isinstance(before, int) and isinstance(after, int), compaction
-        assert after < before and after <= 33_000, compaction
-    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 33_000
+        assert after < before and after <= 35_250, compaction
+    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 35_250
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
     # history again at the very next step.
     gaps: list[int] = [
@@ -477,6 +501,29 @@ async def test_a_summary_that_lacks_a_section_is_asked_for_again_with_the_sectio
     assert len(played.summaries) == 2 * len(played.compactions)
     second: str = _said(played.summaries[1])
     assert "lacked the sections PROBLEMS" in second and "DECISIONS: read on to the end." in second
+
+
+async def test_a_summary_cut_off_at_its_cap_is_asked_for_again_whole_and_shorter(login_env: dict[str, str]) -> None:
+    """Item 1191: every summary is asked for with a cap on what its writer writes, and one cut off there is asked for
+    once more, whole and under its word limit, so that a writer that runs on holds its run for the cap at most."""
+    with capture_logs() as logs:
+        played: Played = await _play_with(
+            _config({}, 6), login_env, RunawayFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), _SMALL_WINDOW)
+        )
+    assert played.record.status == "done"
+    assert played.compactions
+    for compaction in played.compactions:
+        assert (compaction["method"], compaction["attempts"]) == ("model", 2)
+        problem: JsonValue = compaction["problem"]
+        assert isinstance(problem, str) and problem.startswith("the summary ran past its limit of "), problem
+    caps: set[int | None] = {request.max_output_tokens for request in played.summaries}
+    assert len(caps) == 1 and None not in caps, caps
+    second: str = _said(played.summaries[1])
+    assert "was cut off. Write it again, whole" in second
+    # The try after a cut-off reply is asked without reasoning, as the first is: a writer that thought the cap away
+    # would think more with some allowed (the pre-push review).
+    assert [request.effort for request in played.summaries[:2]] == ["off", "off"]
+    assert [entry["attempt"] for entry in logs if entry["event"] == "summary_cut"][:1] == [1]
 
 
 async def test_a_summary_that_still_lacks_a_section_keeps_its_heading_empty_and_says_so(

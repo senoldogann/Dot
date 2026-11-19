@@ -11,6 +11,7 @@ import stat
 import time
 from collections.abc import Iterator
 from contextlib import AsyncExitStack
+from functools import partial
 from pathlib import Path
 
 import uvicorn
@@ -27,11 +28,13 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import db_path, dot_home, phones_path, pid_path, running_mark_path, token_path
 from dotagent.desktop.flight import FlightOverlay
 from dotagent.desktop.show_dot import dot_shower
-from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
+from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, EventBus, Subscription
 from dotagent.notify.apns import ApnsSender, HttpTransport, apns_set, read_key
 from dotagent.notify.apns_watch import APNS_KINDS, ApnsWatch, watch_apns
 from dotagent.notify.health import NotifyHealth
+from dotagent.notify.owner import tell_owner
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
+from dotagent.phone.keeper import keep_phone
 from dotagent.proactive.watching import watch_loop
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler.runner import Scheduler
@@ -189,6 +192,18 @@ def _log_push_end(health: NotifyHealth, channel: str, pusher: asyncio.Task[None]
     log.error("push_watch_ended", channel=channel, error=repr(pusher.exception()))
 
 
+async def _tell_phone_owner(bus: EventBus, title: str, text: str) -> None:
+    """Tell the owner the iPhone needs them; a tap opens Settings › Phone, which shows the link's state."""
+    await tell_owner(bus, title, text, "#/settings/phone")
+
+
+def _log_phone_end(task: asyncio.Task[None]) -> None:
+    """A keeper of the phone that stops before the daemon does is logged: the phone is not kept up after it."""
+    if task.cancelled() or task.exception() is None:
+        return
+    log.error("phone_keeper_ended", error=repr(task.exception()))
+
+
 def _log_watch_end(watcher: asyncio.Task[None]) -> None:
     """A watch of dead dotx commands that stops before the daemon does is logged: their runs stay active until the
     daemon starts again."""
@@ -257,6 +272,9 @@ async def run_daemon(config: AppConfig) -> int:
     host: str = config.server.host
     require_loopback(host)
     token: str = await asyncio.to_thread(read_or_create_token, token_path())
+    # Read before anything starts (item 1239): a file that cannot be read keeps the daemon from starting, as
+    # docs/phone.md says, not after it resumed runs, opened iMessage and started the scheduler, all cut off again.
+    phones: PairedPhones = await asyncio.to_thread(PairedPhones.load, phones_path())
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     stop: asyncio.Event = asyncio.Event()
     restart_wanted: bool = False
@@ -339,6 +357,21 @@ async def run_daemon(config: AppConfig) -> int:
             watcher: asyncio.Task[None] = asyncio.create_task(manager.watch_commands(), name="dead-commands")
             watcher.add_done_callback(_log_watch_end)
             cleanup.push_async_callback(_cancelled, watcher)
+            # The iPhone's runner app is kept up, and the owner told once when the phone needs them
+            # (docs/phone-control.md).
+            if runtime.phone is not None:
+                phone_task: asyncio.Task[None] = asyncio.create_task(
+                    keep_phone(
+                        runtime.phone,
+                        partial(_tell_phone_owner, runtime.bus),
+                        config.phone.check_every_s,
+                        config.phone.notify_after_s,
+                        stopping,
+                    ),
+                    name="phone-keeper",
+                )
+                phone_task.add_done_callback(_log_phone_end)
+                cleanup.push_async_callback(_cancelled, phone_task)
             # The runs of dotx commands work on the pages as this daemon's own do, and their chats' queues move here.
             relay: asyncio.Task[None] = asyncio.create_task(manager.relay_elsewhere(), name="relay")
             relay.add_done_callback(_log_relay_end)
@@ -383,7 +416,7 @@ async def run_daemon(config: AppConfig) -> int:
                 restart=restart,
                 channels=channels,
                 reactions=reactions,
-                phones=await asyncio.to_thread(PairedPhones.load, phones_path()),
+                phones=phones,
                 notifications=phone,
             )
             server: DotServer = DotServer(serving_config(create_app(context)), stopping)

@@ -973,8 +973,14 @@ async def test_the_claim_of_a_process_that_died_holds_its_chats_queue(login_env:
         run: RunRecord = await _start(manager)
         message: QueuedMessage = await _queue(manager, run, SUMMARY, "yolo")
         await runtime.store.hold_queue(run.thread_id)
+        # The run's task goes on after its end is recorded, which wakes the waiters: it closes the run's tabs, gives
+        # the front of the Mac back and then moves the chat's queue. It is waited for whole before the queue is let
+        # go, or its move of the queue claims the message first and starts it (item 1193: main's gate, 2026-11-15).
+        task: asyncio.Task[None] = manager._handles[run.id].task
         await model.release()
         await _ended(manager, run.id)
+        async with asyncio.timeout(WAIT_S):
+            await task
         await runtime.store.release_queue(run.thread_id)
         # The owner of a process that is gone: no file of it is left.
         assert await runtime.store.claim_queued(run.thread_id, token_hex(16)) == message

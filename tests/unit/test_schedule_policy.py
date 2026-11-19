@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
+from dotagent.agent.prompt import PromptInputs, build_system_prompt, collect_prompt_inputs, started_note
 from dotagent.harness.components import NO_HARNESS
 from dotagent.policy.engine import decide
 from dotagent.policy.types import ActionInfo, ActionKind, Decision, Flag, Preset, Risk, Verdict
@@ -46,31 +46,31 @@ def test_schedules_follow_the_policy_layers(
 
 
 def _prompt(source: str) -> str:
-    return build_system_prompt(
-        collect_prompt_inputs(
-            "task",
-            source,
-            "aggressive",
-            "ask",
-            "wait",
-            False,
-            False,
-            Path("/tmp/work"),
-            [],
-            0,
-            [],
-            [],
-            0,
-            None,
-            [],
-            None,
-            (),
-            (),
-            None,
-            "full",
-            NO_HARNESS,
-        )
+    inputs: PromptInputs = collect_prompt_inputs(
+        "task",
+        source,
+        "aggressive",
+        "ask",
+        "wait",
+        False,
+        False,
+        Path("/tmp/work"),
+        [],
+        0,
+        [],
+        [],
+        0,
+        None,
+        [],
+        None,
+        (),
+        (),
+        None,
+        "full",
+        NO_HARNESS,
     )
+    # How the run was started is stored under its goal, not in the system prompt (item 1219).
+    return f"{build_system_prompt(inputs)}\n\n{started_note(inputs)}"
 
 
 def test_a_scheduled_run_is_told_that_nobody_is_watching() -> None:

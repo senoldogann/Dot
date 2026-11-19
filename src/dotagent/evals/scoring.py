@@ -87,6 +87,8 @@ def failure_reason(outcome: TaskOutcome) -> str:
         return "cut short: it ran over the time limit"
     if outcome.cut == "token_budget":
         return "cut short: it used more tokens than the task allows"
+    if outcome.cut == "plan_window":
+        return "cut short: the Claude plan's window came near its end, which is kept for the owner's own work"
     failed: list[CheckOutcome] = [check for check in outcome.checks if not check.passed]
     if failed:
         more: str = f" (and {len(failed) - 1} more checks)" if len(failed) > 1 else ""

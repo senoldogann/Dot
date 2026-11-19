@@ -89,14 +89,33 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # less on the model): `expect_text` and `expect_url` on a step of `browser_act`, the words of its result (done is
 # sent, verified is seen, uncertain is not sent again unseen) and one line of the prompt's Browser, each cut to a
 # line after a first wording took 580 (27,069 measured here, on item 1143's words; system 7,847, tools 19,195).
-BUDGET_TOKENS: int = 27_100
+# Raised by 100 for the line that has a run find a file by name with Spotlight (item 1188: `find` and `grep -r` over the
+# home folder took 46 to 100 s a call in the owner's week to 2026-11-15, where `mdfind` answers in 0.4 s; 27,106
+# measured).
+# Raised by 600 for the owner's `CHARACTER` block (items 1210 and 1211): bold in method and conservative in
+# consequence, the result before the account of it, the next step ready, three ways before a road is closed and none
+# around a refusal, and what he asks in his own name done within the run's approvals (27,620 measured here; the block
+# is 1,614 of the 8,405 of system).
+# Raised by 150 for `watch_video` (item 1212), whose definition is listed with its group (27,904 measured here).
+# Raised by 350 for the rest of the owner's `CHARACTER` block (item 1211, continued): a silent deliberation, remote
+# access, malware analysis, exploitation, evasion and scraping answered whole as engineering. Its last stop went with
+# it (28,062 measured here, Character 2,176 of 8,465 of system).
+# Raised by 1,450 for continuing work (item 1227, the owner's ask of 2026-11-19): the five `pipeline_*` tools that keep
+# a client ledger in its record file (a mail begun before it goes out, never sent twice, outcomes apart) and the six
+# parts of how an objective's work is done, each cut to a line after a first wording took 1,800 (29,443 measured here).
+BUDGET_TOKENS: int = 29_750
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
 # Raised by 200 for the lead's paragraph on work orders (item 907).
 # Raised by 100 for the rule of item 1023 above.
 # Raised by 200 for the line of item 1102 above (system 7,838 measured here).
-SYSTEM_BUDGET_TOKENS: int = 7_900
+# Raised by 100 for the Spotlight line of item 1188 (7,901 measured on the CI runner, whose longer paths add to the
+# Environment section; 7,899 here).
+# Raised by 600 for the owner's `CHARACTER` block of items 1210 and 1211 (system 8,405 measured here).
+# Raised by 300 with the block of item 1211 above: the gate's runner measures longer paths than this Mac, whose system
+# reads 8,465 now.
+SYSTEM_BUDGET_TOKENS: int = 8_900
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
@@ -112,7 +131,9 @@ SYSTEM_BUDGET_TOKENS: int = 7_900
 # Raised by 50 for `review_work`'s `brief` (item 1065) above (tools 18,516 measured).
 # Raised by 450 for the four meeting tools of item 1138 above (18,954 measured).
 # Raised by 200 for the two fields of a browser step and the words of its result of item 1145 above (19,195 measured).
-TOOLS_BUDGET_TOKENS: int = 19_200
+# Raised by 300 for `watch_video` of item 1212 above (19,472 measured).
+# Raised by 1,350 for the pipeline tools and the parts of an objective's work of item 1227 above (20,808 measured).
+TOOLS_BUDGET_TOKENS: int = 20_850
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:
@@ -143,6 +164,57 @@ async def _first_parts(config: AppConfig) -> ContextParts:
             await close_runtime(runtime)
     assert len(told) == 1, "the first step's parts are recorded once a run"
     return ContextParts.model_validate_json(json.dumps(told[0].data))
+
+
+def _with_context_size(config: AppConfig, size: int) -> AppConfig:
+    """The same configuration, with this test's model given a chosen context size of ``size`` tokens
+    (``[models.context]``), which is what a run's budget is cut to when the provider's window is larger."""
+    models = config.models.model_copy(update={"context": {**config.models.context, SCRIPTED_MODEL: size}})
+    return config.model_copy(update={"models": models})
+
+
+async def test_a_tool_the_run_let_go_is_not_named_and_not_callable() -> None:
+    """Item 1211: a run whose budget cannot hold every tool drops some, and its groups, registry and prompt are built
+    again for what stays — so no section of the prompt opens for a tool it let go, and calling that tool answers
+    unknown.
+    A fit that runs after the prompt is built (or a registry built from the tools before the fit) turns this red."""
+    config: AppConfig = _with_context_size(eval_config(load_default_config()), 12_000)
+    asked: ScriptedTurn = ScriptedTurn(
+        text="", calls=(ScriptedCall(tool="show_page", arguments={"title": "x", "html": "<b>x</b>"}),)
+    )
+    parts: ContextParts
+    answers: list[str]
+    with scratch_home() as home, eval_environment(home, {}):
+        runtime: Runtime = await open_runtime(config, await read_login_env(10.0, ()))
+        manager: RunManager = RunManager(runtime)
+        try:
+            await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [asked, _FINISH]))
+            run: RunRecord = await manager.start(
+                "Write a short note about the weather in notes.txt.",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                "ui",
+                None,
+                None,
+                "standard",
+                None,
+                "yolo",
+                False,
+                (),
+            )
+            async with asyncio.timeout(30.0):
+                await manager.wait(run.id)
+            told: list[EventRecord] = await runtime.store.events_of_kind(run.id, CONTEXT_PARTS_EVENT, 5)
+            messages = await runtime.store.load_messages(run.thread_id, False)
+        finally:
+            await manager.shutdown()
+            await close_runtime(runtime)
+    parts = ContextParts.model_validate_json(json.dumps(told[0].data))
+    answers = [message.content for message in messages if message.role == "tool"]
+    assert parts.tools_offered < 82, "the budget left every tool in: this test measures a run that let some go"
+    assert "Pages in the conversation" not in parts.system, sorted(parts.system)
+    assert any("Unknown tool 'show_page'" in answer for answer in answers), answers[-3:]
 
 
 async def test_a_fresh_homes_first_step_stays_within_its_budget() -> None:

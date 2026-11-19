@@ -51,8 +51,20 @@ async def objective_lines(store: Store) -> list[str]:
             lines.append("- one that came of content third parties wrote, not quoted here")
             continue
         newest: str = f"; newest progress: {quoted(objective.notes[-1].text, _NOTE_CHARS)}" if objective.notes else ""
+        # Where its work stands and goes on from (item 1227): its next step and the record its items are kept in.
+        flow = objective.workflow
+        # A next step a run wrote after reading outside content is counted, not quoted, as a line of progress is.
+        nxt: str = (
+            ""
+            if not flow.next_step
+            else "; next: one written after reading outside content, not quoted here"
+            if flow.next_step_tainted
+            else f"; next: {quoted(flow.next_step, _NOTE_CHARS)}"
+        )
+        kept: str = f"; record: {quoted(flow.record, _NOTE_CHARS)} (pipeline_view)" if flow.record else ""
         lines.append(
-            f"- {quoted(objective.title, _TITLE_CHARS)}; judged by: {quoted(objective.measure, _MEASURE_CHARS)}{newest}"
+            f"- {quoted(objective.title, _TITLE_CHARS)}; judged by: {quoted(objective.measure, _MEASURE_CHARS)}"
+            f"{newest}{nxt}{kept}"
         )
         serving: list[WorkOrderRecord] = [order for order in orders if order.objective_id == objective.id]
         unquoted: int = sum(1 for order in serving if order.tainted)

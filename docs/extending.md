@@ -71,7 +71,12 @@ same asks as anything else the run does ([Safety](safety.md)).
 `[scheduler] timezone`; `"off"` stops it), Dot looks for plugins worth having and for updates of those it installed,
 checks each, and keeps what passes for you. **Nothing is installed by itself**: each proposal waits for your Install (or
 Update) or Skip. **Look now** starts a look at once. The line under the title says when Dot last looked and what it
-found; what its review refused is folded under the cards with the review's reason.
+found; what its review refused is folded under the cards with the review's reason. A night that saw nothing it went for
+is told to you the same morning (item 1215): when GitHub refuses the saved token (401, expired or revoked) the night
+ends at its first request, says "GitHub refused the token" and tells you to renew it in Customize › Connectors; when
+its looks failed and GitHub answered none of its requests, it tells you so with the night's line; a night GitHub
+answered is not told, though a lead of it failed (a repository renamed or gone fails every night). The
+tell's title is in your language; its text, like that of Dot's other tells, is still English.
 
 **Where it looks**, by how far Dot trusts the source before reading a line: Anthropic's own marketplaces
 (`anthropics/claude-plugins-official`, `anthropics/skills`, `anthropics/knowledge-work-plugins`; their catalogue,
@@ -360,7 +365,9 @@ every request longer; `tool_surface = "grouped"` keeps a server's tools out of a
 on. A run of more than 128 tools starts grouped whatever the setting, as some providers refuse more in one request
 ([runs](runs.md)). The groups a grouped run has on (those its chat used before, the servers picked for its message, and
 those it turns on) may still bring a request past what its provider takes, and the request then fails with the
-provider's error, so cut a big server down here. **Choose actions**, on the row of a server added here that runs, opens
+provider's error, so cut a big server down here. A model whose window is smaller than the system prompt and every tool
+definition drops tools until they fit — the servers' tools first, the largest first — and the run goes on with what it
+can carry (item 1211, [runs](runs.md)). **Choose actions**, on the row of a server added here that runs, opens
 the list of every tool it offers with what each says it does, all of them ticked until you choose, and **All actions**
 ticks or unticks them at once. **Save** connects the server with the ticked ones and keeps the choice with it, so a
 restart offers the same ones; with every one ticked it keeps no list, and the tools the server adds later are offered
@@ -591,7 +598,8 @@ whose connection broke is not repeated, as the tool may have done part of its wo
 tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, or two of its tools would share a
 name) is left out, and Dot starts without its tools: Settings › System, under **Details**,
-names it with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin, and `dotx doctor` warns of a
+names it with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin when they start their own
+servers (a `dotx run` handed to the daemon, item 1203, uses the daemon's, which Settings names), and `dotx doctor` warns of a
 missing command or secret. It is tried again when Dot starts again; `enabled = false` stops trying it. A tool's input
 schema is handed to the model flattened (item 671): a part that refers again to a definition its own path already went
 through (a tree whose nodes hold nodes, a filter of and, or and not), that nests deeper than twelve levels (a feature

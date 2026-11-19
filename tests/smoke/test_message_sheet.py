@@ -172,7 +172,10 @@ async def test_holding_a_message_opens_its_sheet_and_a_touch_screen_shows_no_but
             await page.evaluate("document.querySelector('.run-thread').classList.add('run-working')")
             await page.evaluate(HOLD, [".user-message .bubble.user", HOLD_MS])
             await expect(sheet).to_be_visible()
-            assert await sheet.locator(".sheet-action").all_inner_texts() == ["Select text"]
+            # It is still copied from the sheet (item 1226: a sheet with no Copy left no way to copy it on a phone), and
+            # a sheet without its facts draws no "null" where they would be.
+            assert await sheet.locator(".sheet-action").all_inner_texts() == ["Copy the text", "Select text"]
+            assert "null" not in await sheet.inner_text()
             await page.keyboard.press("Escape")
             await expect(sheet).to_have_count(0)
             await page.evaluate("document.querySelector('.run-thread').classList.remove('run-working')")

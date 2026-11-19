@@ -187,3 +187,39 @@ class SameOrigin:
 
     def __call__(self, address: str) -> bool:
         return SameOrigin.of(address) == self
+
+
+def _home(host: str, port: int | None) -> str:
+    """The address of a login's site: its host with the port the website names, over https, or over http on this Mac
+    itself (where a login of http fills); no path or query, which a website may carry and need not be repeated."""
+    scheme: str = "http" if host in _LOOPBACK_HOSTS else "https"
+    return f"{scheme}://{host}" if port is None else f"{scheme}://{host}:{port}"
+
+
+def elsewhere_advice(url: str, websites: tuple[str, ...], source_name: str) -> str:
+    """What a run does when a login of ``websites`` (kept in ``source_name``) was not filled on the page at ``url``
+    (item 1208): it goes to the login's own site, the one address the login is known for, and fills there. A site that
+    signs in on another host (App Store Connect on ``account.apple.com``) brings it back to such a page: it does not
+    fill there and tells the owner the host it was sent to, which the login does not name. Whether a login should name
+    that host too is the owner's: no list of the suffixes names are sold under is read here, so two hosts that end
+    alike (``co.uk``, ``github.io``) say nothing of one owner, and a page that names itself a sign-in is what a phishing
+    page does too. What fills is :func:`fills_on` alone; these words only send the run to a page where it may."""
+    sites: tuple[tuple[str, int | None], ...] = _sites(websites)
+    if not sites:
+        return f"The login names no website: tell the owner to add the site's address to it in {source_name}."
+    host, port = sites[0]
+    home: str = _home(host, port)
+    parts: SplitResult | None = _split(url)
+    page: str = "" if parts is None else _host_of(parts)
+    if page and any(page == site for site, _ in sites):
+        return (
+            f"This page is on the login's own host but not over https or not on its port: open {home} with "
+            "browser_open and fill there."
+        )
+    sent: str = f" to {page}" if page else ""
+    return (
+        f"Open the login's own site with browser_open {home} and call browser_fill_login on its sign-in page there. "
+        f"If that site sends you back{sent} or to another site to sign in, do not fill there: tell the owner, in one "
+        f"line, that the site signs in on that page, which the login in {source_name} does not name, and go on with "
+        "what needs no sign-in."
+    )

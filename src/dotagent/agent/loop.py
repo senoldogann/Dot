@@ -29,8 +29,10 @@ from dotagent.agent.compact import (
     render_recent_steps,
     render_transcript,
     repair_history,
+    shown_key,
     shrink_old_tool_results,
     split_for_summary,
+    with_shown,
 )
 from dotagent.agent.context_parts import CONTEXT_PARTS_EVENT, parts_of
 from dotagent.agent.continuity import (
@@ -128,6 +130,7 @@ from dotagent.agent.progress import (
 )
 from dotagent.agent.prompt import (
     AgentBrief,
+    PromptInputs,
     TeamBrief,
     build_system_prompt,
     collect_prompt_inputs,
@@ -135,7 +138,9 @@ from dotagent.agent.prompt import (
     handed_note_ids,
     notes_missing,
     recalled_again,
+    started_note,
     turn_note,
+    with_phone,
 )
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.restating import restates
@@ -201,6 +206,7 @@ from dotagent.core.errors import (
     InvalidValueError,
     MissingSecretError,
     NotFoundError,
+    ProviderCreditError,
     ProviderError,
     ProviderFilterError,
     ProviderQuotaError,
@@ -434,6 +440,10 @@ _COMPACTION_ROOM: float = 0.15
 _WORDS_PER_TOKEN: float = 0.75
 # A summary longer than its limit by more than this factor is asked for again.
 _SUMMARY_SLACK: float = 1.5
+# The tokens a summary's writer may spend thinking besides the words it may write (item 1191): a writer asked with no
+# reasoning may still think (glm-5.3-flash on OpenCode Go wrote 2,600 to 4,500 tokens a summary in the owner's week to
+# 2026-11-15), and the longest summary seen that passed, 6,434 tokens, fits with the words.
+_SUMMARY_THINKING_TOKENS: int = 4000
 _SUMMARY_PROMPT: str = (
     "You compress the history of an autonomous agent so that the same agent can continue the same run without "
     "starting over. Write a dense, factual summary with exactly these sections: GOAL (the task and the user's "
@@ -459,6 +469,10 @@ _SUMMARY_SHORTER_PROMPT: str = (
     "finished work to one line per step and keep every identifier. "
 )
 _SUMMARY_DRAFT_HEADING: str = "\n\n## Your earlier summary, which lacked the sections {sections}\n"
+_SUMMARY_CUT_PROMPT: str = (
+    "Your summary ran past {tokens} tokens and was cut off. Write it again, whole, under {max_words} words: shorten "
+    "finished work to one line per step and keep every identifier. "
+)
 _NO_TOOL_NOTE: str = (
     "[system note] You replied without calling a tool. If the goal is achieved or impossible, call finish with your "
     "complete final answer. Otherwise continue by calling the tools you need."
@@ -469,15 +483,8 @@ _EMPTY_NOTE: str = "[system note] Your last reply was empty. Continue with the t
 _CUT_SHORT: frozenset[FinishReason] = frozenset({"length", "other"})
 # The ends, in the service's own words, of a reply its content filter stopped (OpenCode Go's DeepSeek gave
 # 'content_filter' with no output on a 340k-token chat, 2026-10-20): asked again with the same conversation, the model
-# is stopped again, so the run moves to a standby model at once (:func:`_cannot_answer`) instead of being nudged.
+# is stopped again, so the run ends at once saying so instead of being nudged.
 _FILTERED: frozenset[str] = frozenset({"content_filter"})
-_FILTERED_REASON: str = "its content filter stopped the reply"
-_EMPTY_REASON: str = "it answered with nothing, again and again"
-
-
-class _EmptyReplies(ProviderError):
-    """The run's model answered with nothing as many times as a run is nudged (item 789): like a content filter, it does
-    not answer this conversation, and a standby model takes the run over."""
 
 
 _CUT_SHORT_NOTE: str = (
@@ -638,6 +645,13 @@ async def _current_plan(agent: AgentRun) -> PlanPayload:
     return EMPTY_PLAN if latest is None else plan_from_event(latest)
 
 
+def summary_output_cap(max_words: int) -> int:
+    """The most tokens the writer of a summary of at most ``max_words`` words may write (item 1191): the words of a
+    summary at the edge of its slack and room for thinking. Without it a writer that ran on held its run for minutes:
+    35,060 tokens in 400 s on the owner's Mac on 2026-11-15."""
+    return round(max_words * _SUMMARY_SLACK / _WORDS_PER_TOKEN) + _SUMMARY_THINKING_TOKENS
+
+
 async def _model_summary(
     agent: AgentRun, ref: ModelRef, transcript: str, context_tokens: int, window: int | None
 ) -> tuple[str | None, int, str | None]:
@@ -645,27 +659,32 @@ async def _model_summary(
     attempts made, last problem)``.
 
     An empty reply is asked again (the first try without reasoning, later ones with a little, since some models spend
-    their whole answer on thinking). A summary far over its word limit is asked again with the limit and the overrun
-    in front of the prompt; one that lacks a section is asked again once, with the missing sections named and the
-    first reply carried along as a draft. The attempts stay within ``_SUMMARY_ATTEMPTS``; a second reply that still
+    their whole answer on thinking). The writer may write :func:`summary_output_cap` tokens at most: a reply cut there
+    is asked again once, whole and shorter. A summary far over its word limit is asked again with the limit and the
+    overrun in front of the prompt; one that lacks a section is asked again once, with the missing sections named and
+    the first reply carried along as a draft. The attempts stay within ``_SUMMARY_ATTEMPTS``; a second reply that still
     lacks a section is returned as it is, for the check to say so. A provider error or a timeout ends the attempts at
     once, as the provider already retried what can be retried.
     """
     max_words: int = min(_SUMMARY_MAX_WORDS, round(context_tokens * _SUMMARY_SHARE * _WORDS_PER_TOKEN))
+    cap: int = summary_output_cap(max_words)
     base: str = _SUMMARY_PROMPT.format(max_words=max_words)
     prompt: str = base
     history: str = transcript
     problem: str | None = None
     asked_shorter: bool = False
     asked_sections: bool = False
+    # Whether the last reply ran on to the cap: the try after it is asked without reasoning again, as the first is,
+    # since a writer that spent the cap thinking would think more with a little reasoning allowed (item 1191).
+    cut_last: bool = False
     for attempt in range(1, _SUMMARY_ATTEMPTS + 1):
         request: ChatRequest = ChatRequest(
             model=ref.model,
             messages=(system_message(prompt), user_message(history, ())),
             tools=(),
             temperature=0.2,
-            max_output_tokens=None,
-            effort="off" if attempt == 1 else "low",
+            max_output_tokens=cap,
+            effort="off" if attempt == 1 or cut_last else "low",
             speed="standard",
             session_key=f"{agent.run.thread_id}:summary",
             cache_mark=None,
@@ -683,6 +702,26 @@ async def _model_summary(
             return None, attempt, problem
         text: str = reply.text.strip()
         words: int = len(text.split())
+        cut_last = reply.finish == "length"
+        if cut_last:
+            # A writer that ran on to the cap left a summary cut short: it is asked once to write it whole and shorter,
+            # and the run waits for the cap at most, never for a writer that does not stop (item 1191).
+            problem = f"the summary ran past its limit of {cap} tokens and was cut off"
+            # A writer that spent the cap thinking leaves no words: its thinking's length says so, as for an empty
+            # reply.
+            log.warning(
+                "summary_cut",
+                run_id=agent.run.id,
+                model=ref.label,
+                attempt=attempt,
+                cap=cap,
+                words=words,
+                thinking_chars=len(reply.thinking),
+            )
+            if not asked_shorter:
+                asked_shorter = True
+                prompt = _SUMMARY_CUT_PROMPT.format(tokens=cap, max_words=max_words) + base
+            continue
         if words > max_words * _SUMMARY_SLACK:
             problem = f"the summary had {words} words, over the limit of {max_words}"
             log.warning("summary_too_long", run_id=agent.run.id, model=ref.label, attempt=attempt, words=words)
@@ -726,9 +765,9 @@ async def _compact(
 ) -> Compaction:
     """Fold ``head`` into a continuity note written by the fast model (``[models] fast``), the side work of a run that
     its own, slower model need not do; the run's own model writes it when the fast one gives no usable summary (a
-    provider error, a timeout, no text, a summary far too long, a window that cannot be read) and, without asking the
-    fast one, while the router has paused it (item 240). The compaction event names the fast model's problem, so that a
-    fast model that never answers is seen, not hidden.
+    provider error, a timeout, no text, a summary far too long or cut off at its cap at every try, a window that cannot
+    be read) and, without asking the fast one, while the router has paused it (item 240). The compaction event names
+    the fast model's problem, so that a fast model that never answers is seen, not hidden.
 
     The ledger and the plan are pinned into the note in about ``part_chars`` characters; the model's summary is checked
     against ``head``, and a section it still lacks after it was asked for again goes into the note as an empty heading,
@@ -817,6 +856,9 @@ def _compaction_event(
     before and after the compaction, which the conversation shows (item 312)."""
     check: ContinuityCheck | None = compaction.check
     return {
+        # The run that goes on from it is marked untrusted (item 1219), and the mark is stored with the compaction so
+        # that a run cut off right here, resumed or carried into the next, starts marked as this one ended.
+        "tainted": True,
         "summarised_messages": summarised,
         "compaction": ledger.compactions,
         "tokens_before": tokens_before,
@@ -880,6 +922,10 @@ async def _fit_context(
             ledger = with_compaction(ledger)
             part_chars: int = round(plain * _SUMMARY_SHARE * CHARS_PER_TOKEN)
             compaction: Compaction = await _compact(agent, head, ledger, context_tokens, part_chars, scaffold.window)
+            # The note is written by a model out of what tools returned: from here on a yolo run puts the steps that
+            # reach outside the Mac, read a secret, install, change Dot's own files or fill a login to the review model
+            # first, as it does after a page read (item 1219).
+            agent.gate.rewrite_from_outside()
             before: int = estimated
             current = [compaction.note, *tail]
             estimated = round(estimate_tokens([system, *current], specs) * ratio)
@@ -1081,7 +1127,7 @@ def _run_tools(registry: ToolRegistry, mode: RunMode, specs: Sequence[ToolSpec])
     """The tools a run can call: the ones it offers, and the ones of other modes, whose calls are answered as not
     available in the run's mode. A tool of the run's mode that the run leaves out (use_tools when its tools are not
     grouped, delegate, ask_user and consult in a delegated run, skill when no skill is installed, consult without a
-    helper) is answered as unknown."""
+    helper, and the tools a small window had to leave out of the prompt, item 1211) is answered as unknown."""
     offered: frozenset[str] = frozenset(spec.name for spec in specs)
     return ToolRegistry(
         tools={name: tool for name, tool in registry.tools.items() if name in offered or mode not in tool.modes}
@@ -1336,13 +1382,14 @@ async def _read_same_goal_skills(
     context: ToolContext,
     offered: Sequence[Skill],
     can_see: bool,
-) -> None:
+) -> dict[tuple[str, str], str]:
     """Read, before the run's first step, the learned skills made from a run whose goal was word for word this run's
     (item 1118, :func:`same_goal_playbooks`): the model was told to read a matching skill first and did not (3 of 42
     such runs did, 2026-11-10). The read is a call of the ``skill`` tool as any, so the timeline shows it, the read is
     dated, the run's end counts its use and a skill made from content third parties can author taints the run. Its
     call and result go into ``history`` and the thread. Only a run of its own of a mode that acts, not resumed, with
-    the ``skill`` tool; a skill whose instructions the history already carries is not read again."""
+    the ``skill`` tool; a skill whose instructions the history already carries is not read again. Returns the lessons
+    its calls were handed to be shown next to their results (item 1192), by :func:`shown_key`."""
     runtime: Runtime = agent.runtime
     run: RunRecord = agent.run
     root: Path | None = playbook_root(runtime.config)
@@ -1353,7 +1400,7 @@ async def _read_same_goal_skills(
         or agent.opening.resumed is not None
         or SKILL_TOOL not in registry.tools
     ):
-        return
+        return {}
     entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
     goals: dict[str, str] = await runtime.store.goals_of([r for r in evidence_runs(entries) if r != run.id])
     names: tuple[str, ...] = tuple(
@@ -1362,7 +1409,7 @@ async def _read_same_goal_skills(
         if not _carries_skill(history, name)
     )
     if not names:
-        return
+        return {}
     calls: tuple[ToolCall, ...] = tuple(
         ToolCall(id=f"call_skill_{index}_{run.id}", name=SKILL_TOOL, arguments={"name": name})
         for index, name in enumerate(names)
@@ -1375,6 +1422,9 @@ async def _read_same_goal_skills(
     results: list[Message] = await _tool_messages(agent, outcomes, can_see)
     history.extend(results)
     await runtime.store.append_messages(run.thread_id, results)
+    return {
+        shown_key(message): outcome.shown for outcome, message in zip(outcomes, results, strict=True) if outcome.shown
+    }
 
 
 async def _stored_note(agent: AgentRun, text: str) -> Message:
@@ -1478,6 +1528,13 @@ async def browser_of(runtime: Runtime, run: RunRecord) -> BrowserSession:
         return runtime.browser
     campaign: CampaignRecord = await runtime.store.get_campaign(campaign_id)
     return runtime.browsers.session_for(campaign.browser)
+
+
+def _with_phone_state(runtime: Runtime, tool_names: Sequence[str], inputs: PromptInputs) -> PromptInputs:
+    """``inputs`` naming the iPhone when the run has its tool (and the phone is on), else as they are."""
+    if runtime.phone is None or not tools_in(tool_names, "phone"):
+        return inputs
+    return with_phone(inputs)
 
 
 async def _agent_folder(workspace: Path, agent_id: str) -> Path:
@@ -2103,14 +2160,48 @@ async def _held_by_the_owner(agent: AgentRun, held_since: float) -> None:
     raise RunHoldLapsed(hold_lapsed_text(minutes), {"run_id": agent.run.id, "held_s": round(held_s, 1)})
 
 
+# The tools a run cannot work without: one ends it, one turns a group on, one asks its owner (item 1211).
+_KEEP_TOOLS: frozenset[str] = frozenset({FINISH_TOOL, USE_TOOLS_TOOL, ASK_USER_TOOL})
+
+
+def _fit_tools(
+    system: Message, specs: tuple[ToolSpec, ...], scaffold: Scaffold
+) -> tuple[tuple[ToolSpec, ...], tuple[str, ...]]:
+    """The tools the run can hold: when its system prompt and every schema overfill the model's window, tools are left
+    out — the owner's own servers' first (``mcp__``), the largest first — so a model with a small window runs with the
+    tools it can carry instead of not running at all (item 1211). The three a run cannot work without stay
+    (:data:`_KEEP_TOOLS`):
+    one ends the run, one turns a group on, one asks its owner. The measure is the prompt as it stands for every
+    tool, so a run may carry one fewer than it could; leaving a tool out costs a call, naming one it cannot call
+    costs the step.
+    Answers the tools kept and the names left out."""
+    kept: list[ToolSpec] = list(specs)
+    fixed: int = estimate_tokens([system], tuple(kept))
+    if fixed < scaffold.context_tokens:
+        return specs, ()
+    order: list[ToolSpec] = sorted(specs, key=lambda spec: (not spec.name.startswith("mcp__"), -len(str(spec))))
+    for spec in order:
+        if fixed < scaffold.context_tokens:
+            break
+        if spec.name in _KEEP_TOOLS:
+            continue
+        kept.remove(spec)
+        fixed = estimate_tokens([system], tuple(kept))
+    stay: set[str] = {spec.name for spec in kept}
+    names: tuple[str, ...] = tuple(spec.name for spec in specs if spec.name not in stay)
+    return tuple(kept), names
+
+
 def _cannot_answer(error: Exception) -> str | None:
-    """Why the run's model cannot answer this run: what pauses it for every run (:func:`unavailable_reason`), or its
-    service's content filter, which stops this conversation alone. ``None`` for any other error."""
-    if isinstance(error, ProviderFilterError):
-        return _FILTERED_REASON
-    if isinstance(error, _EmptyReplies):
-        return _EMPTY_REASON
-    return unavailable_reason(error)
+    """Why the run moves to a standby model: its provider's credits, usage window, quota or rate are spent, the one
+    reason a run changes its model (the owner's word, 2026-11-19, item 1225). A refusal, a content filter's stop, empty
+    replies, a refused or missing key and a model its plan lacks move it nowhere: the run ends saying why, and a run
+    that needs the owner asks them first. ``None`` for those, and for any other error."""
+    if isinstance(error, ProviderCreditError | ProviderWindowError | ProviderRateLimitError):
+        return unavailable_reason(error)
+    if isinstance(error, ProviderQuotaError) and error.status != 402:
+        return unavailable_reason(error)
+    return None
 
 
 def filtered_stop(reply: ModelReply, model: str) -> ProviderFilterError | None:
@@ -2119,8 +2210,7 @@ def filtered_stop(reply: ModelReply, model: str) -> ProviderFilterError | None:
         return None
     return ProviderFilterError(
         f"the model's service stopped its reply with its content filter ('{reply.raw_finish}'), and asked again with "
-        "this conversation it stops it again: choose another model, or name a standby model "
-        "([models] standby) that the run moves to",
+        "this conversation it stops it again: choose another model for this chat",
         {"model": model, "input_tokens": reply.usage.input_tokens, "output_tokens": reply.usage.output_tokens},
     )
 
@@ -2134,8 +2224,8 @@ async def _to_standby(
     fixed_tokens: int,
     step: int,
 ) -> _Standby | None:
-    """Move the run to the first standby model that can take it over, now that ``ref`` could not answer (``error``,
-    which paused it in the router, or its content filter's stop, which paused nothing: :func:`_cannot_answer`). The
+    """Move the run to the first standby model that can take it over, now that ``ref`` could not answer because its
+    credits, usage window, quota or rate are spent (``error``, :func:`_cannot_answer`). The
     models the run has worked on (``left``) are not taken again, so a run goes through its standby models once at most.
     The run's reasoning level follows the move: the level of the new model that is nearest to it.
 
@@ -2434,8 +2524,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # What each MCP server's group is for, from what the hub learned when it connected (item 659): nothing is asked of a
     # server now. ``[agent] mcp_purposes = false`` leaves the lines as they were, the evals' other arm.
     purposes: dict[str, McpPurpose] = runtime.mcp.purposes(held_at_start) if config.mcp_purposes else {}
-    system: Message = system_message(
-        build_system_prompt(
+
+    async def _inputs_for(tools: tuple[ToolSpec, ...]) -> PromptInputs:
+        """What the prompt is built from, for ``tools``: it is asked again when a small window left tools out, so
+        that the prompt names only the tools the run has (item 1211)."""
+        return _with_phone_state(
+            runtime,
+            [spec.name for spec in tools],
             collect_prompt_inputs(
                 run.mode,
                 run.source,
@@ -2447,7 +2542,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 runtime.workspace,
                 (),
                 0,
-                tools_in_order(specs, thread.title),
+                tools_in_order(tools, thread.title),
                 listing.skills,
                 listing.left,
                 None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
@@ -2478,7 +2573,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     *(called_lines(names.name) if agent_record is None else ()),
                     # The accounts are named only to a run that has one of the tools that take them (an agent's may
                     # have none, or only some).
-                    *(account_lines(signed_in) if tools_in([spec.name for spec in specs], ACCOUNTS_GROUP) else ()),
+                    *(account_lines(signed_in) if tools_in([spec.name for spec in tools], ACCOUNTS_GROUP) else ()),
                     *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
                 ),
                 devtools_address(browser.config),
@@ -2487,13 +2582,34 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 lead,
                 skills_left_names=listing.left_names,
                 group_purposes=purposes,
-            )
+            ),
         )
+
+    prompt_inputs: PromptInputs = await _inputs_for(specs)
+    system: Message = system_message(
+        build_system_prompt(prompt_inputs)
         # The owner's free mode (item 922), as it stands when the run starts: the gate reads it at every step.
         + (_FREE_MODE_LINE if runtime.approvals.free else "")
     )
     await runtime.bus.emit(run.id, "scaffold", scaffold_event(scaffold, config), True)
     # Every tool of the run counts, also the ones of groups that are off: a group the run turns on later must fit too.
+    # A window too small for every tool carries the tools it can hold (item 1211): the owner's own servers' go first,
+    # the largest first, and the groups, the registry and the prompt are built again for what stays, so that the run
+    # names only the tools it has and nothing it dropped can be called.
+    specs, left_out = _fit_tools(system, specs, scaffold)
+    if left_out:
+        log.warning("tools_left_out", run_id=run.id, model=ref.label, count=len(left_out), tools=left_out[:20])
+        groups = (CORE_GROUP, *groups_of([spec.name for spec in specs]))
+        grouped = surface == "grouped" and len(groups) > 1
+        if not grouped:
+            specs = tuple(spec for spec in specs if spec.name != USE_TOOLS_TOOL)
+        callable_tools = _run_tools(runtime.registry, run.mode, specs)
+        may_message = any(spec.name == MESSAGE_AGENT_TOOL for spec in specs)
+        # The prompt, and what the run's opening note is built from, name only the tools that stayed.
+        prompt_inputs = await _inputs_for(specs)
+        system = system_message(
+            build_system_prompt(prompt_inputs) + (_FREE_MODE_LINE if runtime.approvals.free else "")
+        )
     require_room(scaffold, estimate_tokens([system], specs))
     candidates: tuple[_Candidate, ...] = await _routing(agent, ref, bool(specs), estimate_tokens([system], specs))
     history: list[Message] = repair_history(
@@ -2558,10 +2674,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             [render_note(record) for record in kept], recalled.tainted_left_out, extra_skills, gone, present
         )
 
+    # How the run was started goes under its goal, not into the system prompt (item 1219), and comes again after a
+    # compaction that folded it away.
+    started_text: str = started_note(prompt_inputs)
     history.append(
         await _stored_note(
             agent,
-            turn_note(datetime.now().astimezone(), fresh_notes, recalled.tainted_left_out, extra_skills, forgotten),
+            f"{started_text}\n\n"
+            + turn_note(datetime.now().astimezone(), fresh_notes, recalled.tainted_left_out, extra_skills, forgotten),
         )
     )
     facts: RunFacts = new_facts()
@@ -2586,6 +2706,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         tainted=lambda: agent.gate.tainted,
         ever_tainted=lambda: agent.gate.ever_tainted,
         run_tools=frozenset(spec.name for spec in specs),
+        # Shown next to their call's result in this run's requests (``shown_lessons``), stored nowhere (item 1192).
+        shows_outside_lessons=True,
     )
     checker: GoalChecker | None = (
         goal_checker_for(
@@ -2598,6 +2720,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # The plan the run was last handed as a note, and at which step (item 825).
     plan_told: str | None = None
     plan_told_at: int = 0
+    # The lessons saved while reading outside content that this run was handed, by the result they came with
+    # (:func:`shown_key`, item 1192): its requests show them next to that result while the run is tainted, and nothing
+    # stores them.
+    shown_lessons: dict[tuple[str, str], str] = {}
     # What the run's first request carries, part by part, recorded once (item 735).
     parts_told: bool = False
     step_origin: CallOrigin = CallOrigin(run_id=run.id, purpose="step")
@@ -2687,7 +2813,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
 
     # A step's stream is masked as its stored message is: a secret split between two deltas is not shown (item 551).
     sink: StreamMask = StreamMask(show)
-    await _read_same_goal_skills(agent, history, callable_tools, context, skills.skills, info.vision)
+    shown_lessons.update(
+        await _read_same_goal_skills(agent, history, callable_tools, context, skills.skills, info.vision)
+    )
 
     while True:
         if agent.cancel.is_set():
@@ -2785,8 +2913,15 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         if ledger.compactions > compactions_before:
             present: str = "\n".join(message.content for message in history if message.role == "user")
             recalled_text: str = await recalled_now(present)
-            if recalled_text != "":
-                history.append(await _stored_note(agent, recalled_text))
+            # This run's own note, looked for from its goal on: an earlier run's note may have the same words.
+            this_run: str = "\n".join(
+                message.content for message in _since_goal(history, goal) if message.role == "user"
+            )
+            again: str = "\n\n".join(
+                part for part in ("" if started_text in this_run else started_text, recalled_text) if part != ""
+            )
+            if again != "":
+                history.append(await _stored_note(agent, again))
         routed: _Candidate | None = (
             None
             if route_skip or not candidates
@@ -2797,9 +2932,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         effort: Effort = run.effort if run.effort is not None else runtime.config.models.effort
         # The routed model's level nearest to the run's; the run's own where the model offers no choice.
         routed_effort: Effort | None = None if routed is None else effective_effort(routed.info.efforts, effort)
+        if not agent.gate.tainted:
+            # A message of the owner's cleared the run's mark (item 1192): the lessons it was shown while marked go,
+            # and do not come back if it is marked again.
+            shown_lessons.clear()
         request: ChatRequest = ChatRequest(
             model=step_ref.model,
-            messages=(system, *history),
+            messages=(system, *with_shown(history, shown_lessons, config.keep_recent_tool_results)),
             tools=offered,
             temperature=None,
             max_output_tokens=None,
@@ -2843,8 +2982,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 continue
             reply: ModelReply = heard
             await sink.flush()
-            # A reply the service's content filter stopped is handled as a model that cannot answer this run: a
-            # routed step goes back to the run's own model, the run's own model hands over to a standby one.
+            # A reply the service's content filter stopped: a routed step goes back to the run's own model; on the
+            # run's own model the run ends saying so.
             filtered: ProviderFilterError | None = filtered_stop(reply, step_ref.label)
             if filtered is not None:
                 log.warning("reply_filtered", run_id=run.id, step=steps, model=step_ref.label, finish=reply.raw_finish)
@@ -3075,6 +3214,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             single_last = single_now
             history.extend(results)
             await runtime.store.append_messages(run.thread_id, results)
+            shown_lessons.update(
+                {
+                    shown_key(message): outcome.shown
+                    for outcome, message in zip(outcomes, results, strict=True)
+                    if outcome.shown
+                }
+            )
             delegated_note: str | None = await _close_delegated_steps(agent, outcomes)
             if delegated_note is not None:
                 history.append(await _stored_note(agent, delegated_note))
@@ -3194,34 +3340,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             elif answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text, needs="")
             elif nudges >= config.finish_nudges:
-                # Empty again and again on the run's own model: a standby model takes the run over where one is left
-                # (item 789), as for a content filter; else, and on a step routed to another model, the run ends.
-                empty: _EmptyReplies = _EmptyReplies("the model returned empty replies", {"model": ref.label})
-                moved: _Standby | None = (
-                    None
-                    if answered or routed is not None
-                    else await _to_standby(
-                        agent, ref, empty, left, bool(specs), estimate_tokens([system], specs), steps
-                    )
+                # Empty again and again: the run ends, on no other model (item 1225).
+                return _run_end(
+                    agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
                 )
-                if moved is None:
-                    return _run_end(
-                        agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
-                    )
-                history.append(
-                    await _stored_note(
-                        moved.agent, _SWITCH_NOTE.format(to=moved.ref.label, old=ref.label, reason=moved.reason)
-                    )
-                )
-                agent, run, ref, info, scaffold = moved.agent, moved.agent.run, moved.ref, moved.info, moved.scaffold
-                left = left | {ref.label}
-                candidates = still_routable(candidates, left)
-                context = replace(context, output_chars=scaffold.tool_output_chars)
-                if not info.vision:
-                    history = drop_old_images(history, 0)
-                nudges = 0
-                ratio = 1.0
-                continue
             else:
                 nudges += 1
                 if answered:

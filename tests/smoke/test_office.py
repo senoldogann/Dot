@@ -359,7 +359,8 @@ async def _until(done: Callable[[], bool]) -> None:
 
 async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: dict[str, str]) -> None:
     """Item 898, the owner's word of 2026-11-01: every message from the office made a new chat. The panel shows the
-    agent's chat; a message goes to the run at work, else on in that chat; "New chat" starts the next one afresh."""
+    agent's chat; a message goes to the run at work, else on in that chat; "New chat" starts the next one afresh. The
+    chat is the agent's conversation the daemon names (item 1233), whatever its schedule ran since."""
     steered: list[dict[str, object]] = []
     started: list[dict[str, object]] = []
     queued: list[dict[str, object]] = []
@@ -377,14 +378,32 @@ async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: di
             "parent_run_id": None,
             "source": "ui",
         }
+        mine[0]["home"] = {
+            "id": "t",
+            "latest_run_id": "run_x",
+            "latest_status": "running",
+            "title": "Hello",
+            "last_message": "Read the week's sources",
+            "last_role": "user",
+        }
+        # Its newest run is its schedule's, in a chat of its own; its conversation with the owner is the daemon's
+        # `home` (item 1233), which a message goes on in all the same.
         mine[1]["latest"] = {
-            "id": "run_y",
-            "status": "blocked" if waiting else "done",
-            "goal": "Tighten the brief",
-            "thread_id": "t2",
+            "id": "run_s",
+            "status": "done",
+            "goal": "The weekly brief",
+            "thread_id": "ts",
             "parent_run_id": None,
-            "source": "ui",
-            "result": "Done: two lines shorter.",
+            "source": "schedule",
+            "result": "Sent.",
+        }
+        mine[1]["home"] = {
+            "id": "t2",
+            "latest_run_id": "run_y",
+            "latest_status": "blocked" if waiting else "done",
+            "title": "Tighten the brief",
+            "last_message": "Done: two lines shorter.",
+            "last_role": "assistant",
         }
         await route.fulfill(status=200, body=json.dumps(listed), headers={"content-type": "application/json"})
 
@@ -487,7 +506,7 @@ async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: di
             )
             await expect(panel.locator('.office-chat[data-kept="yes"]')).to_have_count(1)
             await panel.get_by_role("button", name="Close").click()
-            # A free one whose last chat was the owner's: the message goes on in that chat.
+            # A free one whose newest run was its schedule's: the message goes on in its conversation all the same.
             await office.locator(".office-tag", has_text="Copy Editor").click()
             panel = office.locator(".office-panel")
             await expect(panel.locator(".office-turn-agent")).to_have_text(["Done: two lines shorter."])

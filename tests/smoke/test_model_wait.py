@@ -253,6 +253,8 @@ async def test_a_run_an_error_fails_shows_its_message_and_keeps_its_context_with
     assert finished.data["error"] == {
         "message": REFUSED_WITH_CONTEXT.message,
         "context": {"payload": "the request of the run", "response_body": "the answer of the provider", "status": 400},
+        # A refused request lasts: a schedule's task it ended is not tried again (item 1206).
+        "kind": "lasting",
     }
 
 

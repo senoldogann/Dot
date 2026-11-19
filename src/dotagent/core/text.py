@@ -3,7 +3,7 @@ data, and times of day."""
 
 import re
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 
 from pydantic import JsonValue
@@ -470,3 +470,44 @@ def has_verification(report: str) -> bool:
     rest: str = found.group(1) + report[found.end() :]
     section: str = re.split(r"(?m)^[ \t]*#{1,4}[ \t]", rest, maxsplit=1)[0]
     return len("".join(section.split()).strip("*_:-")) >= _VERIFIED_CHARS
+
+
+def without_trailing_blanks(text: str) -> str:
+    """``text`` with the spaces and tabs at the end of each line taken off, in time that grows with its length: the
+    pattern ``[ \t]+\n`` this replaces went back over a long run of blanks that no line break ends from each of its
+    places, so a page of 40,000 tabs took 3 s and one of a megabyte half an hour, with the daemon held all that while
+    (the code review of 2026-11-19, item 1242)."""
+    return "\n".join(line.rstrip(" \t") for line in text.split("\n"))
+
+
+_LINE_END: re.Pattern[str] = re.compile(r"\r\n|\r|\n")
+
+
+async def stream_lines(chunks: AsyncIterator[str]) -> AsyncIterator[str]:
+    """The lines of a stream of text as a line feed, a carriage return or both end them, and nothing else: httpx's
+    ``aiter_lines`` and ``str.splitlines`` also end a line at U+0085, U+2028 and U+2029, which a JSON encoder leaves raw
+    in a string, so an event whose text held one was cut in two and the stream broke (the code review of 2026-11-19,
+    item 1243). A carriage return at the end of a piece waits for the next, which may begin with its line feed."""
+    pieces: list[str] = []
+    async for chunk in chunks:
+        if "\n" not in chunk and "\r" not in chunk:
+            pieces.append(chunk)
+            continue
+        pieces.append(chunk)
+        text: str = "".join(pieces)
+        held: str = "\r" if text.endswith("\r") else ""
+        parts: list[str] = _LINE_END.split(text.removesuffix(held))
+        pieces = [parts.pop() + held]
+        for part in parts:
+            yield part
+    rest: list[str] = _LINE_END.split("".join(pieces))
+    if rest[-1] == "":
+        rest.pop()
+    for part in rest:
+        yield part
+
+
+def file_lines(text: str) -> list[str]:
+    """The lines of a file's text as a line feed ends them (a carriage return before it is dropped), and nothing else:
+    ``str.splitlines`` also ends a line at U+0085, U+2028 and U+2029, which a JSON line may hold raw (item 1243)."""
+    return [line.removesuffix("\r") for line in text.removesuffix("\n").split("\n")] if text else []

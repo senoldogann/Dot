@@ -2,9 +2,10 @@
 
 It opens one window with a button, a checkbox, a text field, a secure field, a scroll view and a pad that reacts to the
 mouse. Every event it receives is appended to a JSON-lines log, so a test can compare what a tool did with what the
-application actually saw. Four controls are there for what a step's outcome is checked against: a field that takes
-digits alone and puts anything else back, a button that does nothing, a button whose result shows a moment later, and a
-button that brings Finder to the front. Usage: ``python dot_fixture_app.py <log path>``.
+application actually saw. Five controls are there for what a step's outcome is checked against: a field that takes
+digits alone and puts anything else back, a button that does nothing, a button whose result shows a moment later, a
+button that brings Finder to the front, and a button that opens a sheet asking for a name, whose field is logged once,
+when the sheet closes, with the button that closed it. Usage: ``python dot_fixture_app.py <log path>``.
 """
 
 import json
@@ -14,6 +15,8 @@ from pathlib import Path
 
 import objc
 from AppKit import (
+    NSAlert,
+    NSAlertFirstButtonReturn,
     NSApplication,
     NSApplicationActivationPolicyRegular,
     NSBackingStoreBuffered,
@@ -28,6 +31,7 @@ from AppKit import (
     NSMenuItem,
     NSRectFill,
     NSRunningApplication,
+    NSScrollerStyleOverlay,
     NSScrollView,
     NSSecureTextField,
     NSString,
@@ -242,6 +246,26 @@ class FixtureDelegate(NSObject):
             front = active is not None and str(active.bundleIdentifier()) == _FINDER
         log_event("front_other", front=front)
 
+    def exportPressed_(self, sender: object) -> None:
+        """A sheet that asks for a name, with Export and Cancel: what the run typed counts only once Export takes it."""
+        alert = NSAlert.alloc().init()
+        alert.setMessageText_("Export")
+        alert.setInformativeText_("Name the export.")
+        alert.addButtonWithTitle_("Export")
+        alert.addButtonWithTitle_("Cancel")
+        field = NSTextField.alloc().initWithFrame_(NSMakeRect(0, 0, 220, 24))
+        field.setPlaceholderString_("Export name")
+        field.setAccessibilityLabel_("Export name")
+        alert.setAccessoryView_(field)
+        alert.window().setInitialFirstResponder_(field)
+
+        def answered(code: int) -> None:
+            chosen: str = "Export" if code == NSAlertFirstButtonReturn else "Cancel"
+            log_event("dialog", button=chosen, value=str(field.stringValue()))
+
+        alert.beginSheetModalForWindow_completionHandler_(sender.window(), answered)
+        log_event("dialog_open")
+
     def scrolled_(self, notification: object) -> None:
         origin = notification.object().bounds().origin
         log_event("scrolled", x=round(float(origin.x), 1), y=round(float(origin.y), 1))
@@ -347,6 +371,13 @@ def build_window(delegate: FixtureDelegate) -> NSWindow:
     finder.setAction_("finderPressed:")
     content.addSubview_(finder)
 
+    export = NSButton.alloc().initWithFrame_(NSMakeRect(480, 440, 140, 30))
+    export.setTitle_("Export…")
+    export.setBezelStyle_(NSBezelStyleRounded)
+    export.setTarget_(delegate)
+    export.setAction_("exportPressed:")
+    content.addSubview_(export)
+
     pad = PadView.alloc().initWithFrame_(NSMakeRect(20, 280, 300, 100))
     pad.setAccessibilityElement_(True)
     pad.setAccessibilityRole_("AXGroup")
@@ -356,6 +387,9 @@ def build_window(delegate: FixtureDelegate) -> NSWindow:
     scroll = LoggingScrollView.alloc().initWithFrame_(NSMakeRect(20, 20, 600, 240))
     scroll.setHasVerticalScroller_(True)
     scroll.setHasHorizontalScroller_(True)
+    # The scroll bars lie over the grid whatever the Mac's setting, so the grid shows 600 by 240 points of itself on any
+    # Mac (the desktop bank's scroll task is judged by that size).
+    scroll.setScrollerStyle_(NSScrollerStyleOverlay)
     scroll.setAccessibilityLabel_("Grid scroller")
     grid = GridView.alloc().initWithFrame_(NSMakeRect(0, 0, _GRID_WIDTH, _GRID_HEIGHT))
     scroll.setDocumentView_(grid)

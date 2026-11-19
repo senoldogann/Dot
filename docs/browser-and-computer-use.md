@@ -430,7 +430,10 @@ Both modes share what follows.
   alone. A form with no method is a form that sends by GET, to a browser: before a password or a code goes into it, Dot
   makes it send by POST, and keeps it so as it is sent (item 775). A vault login's
   password is in the Mac's Keychain (service `dot-vault`), never in Dot's database, whose record of a login holds its
-  site and username alone. It fills only on the login's own site, never a password or a code in your own Chrome
+  site and username alone. It fills only on the login's own site; on another page the refusal sends the run to the
+  login's own site to fill there, and when that site sends it back to a page the login does not name
+  (`account.apple.com`, where App Store Connect signs in), it does not fill and tells you so in one line; whether the
+  login should name that page too is yours to decide (item 1208); never a password or a code in your own Chrome
   (`attach`: that Chrome's requests are not held, so nothing would keep a value out of an address), and not in a chat in
   which a script (`browser_eval`) ran in a tab that is still open: there the fill first closes every tab of the chat and
   opens the page again in a new tab, with no history, and asks the run to fill again with that page's refs (item 697;
@@ -453,7 +456,10 @@ Both modes share what follows.
   closes every tab of the chat but the current one. Only the chat's own tabs are closed: those of a chat at work at the
   same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a link or a page that
   opens a new tab) is the chat's, also when you opened it that way (a middle click in a tab of Dot's in your Chrome).
-  The current tab is told which closed. A tab whose page does not answer a script as simple as `1` within the navigation
+  The current tab is told which closed. A tab number the chat no longer has (`browser_switch_tab`, `browser_close_tab`
+  with a number seen before the tabs were tidied) fails naming the tabs the chat has now, by number and address, and
+  the last tabs that closed without the run closing them, with what closed each: Dot, when a run ended, once it
+  stood unused or to stay within `max_tabs`, or its page or Chrome (item 1209). A tab whose page does not answer a script as simple as `1` within the navigation
   timeout (`navigation_timeout_s`; a page stuck in a loop of its own, a Chrome too loaded to answer) fails saying so,
   and that it is to be closed and the page opened in a new tab (item 753): it was told as a document not yet parsed. A
   page busy for a while (a heavy app starting) has that whole time to answer. A page `browser_open` or `browser_new_tab`
@@ -474,6 +480,12 @@ Both modes share what follows.
   clicked in its place. When no chooser opens and the page has exactly one file field, that field takes them, since no
   other control can be the one meant. A field beside the element, on a page with several, is not taken, as it may be
   another control's.
+  A control the page drew anew since the view that showed its ref (a mail or post composer redraws its toolbar, also
+  while the upload waits for its yes; the ref was then "not in the latest snapshot") is looked for in a new snapshot of
+  the whole page (item 1199): the one control of the same role and name, in the same frame, takes the files, and the
+  page's notes say which ref it was. Not when the page is at another address than that view's, when the view or the new
+  snapshot was of a part of the page only, and not when the page now shows no such control or several: then the upload
+  fails as before, saying to take a new snapshot.
 - With `idle_close_s` (seconds; 600 by default since item 1168, the time after which the chats' own tabs close; 0 keeps
   it open until the daemon stops; item 454), Dot's own Chrome (`own`) closes, the Playwright driver with it, once
   nothing used it for that long: no chat's step is under way in it, no run at work holds tabs in it, no page is being
@@ -484,6 +496,16 @@ Both modes share what follows.
   Chrome application, so while it runs macOS takes it for yours: a click on Chrome in the Dock brings Dot's forward
   instead of opening yours. Once Dot's has closed, the Dock opens yours again; while a run works in its browser, the
   mode `attach` lets Dot work in your own Chrome instead.
+- Only one Chrome can hold a profile, and a `dotx` command (`dotx chat`, `dotx resume`, and `dotx run` with no daemon
+  of its home; with one, `dotx run` hands its run to the daemon, which works in its own Chrome, item 1203) works in a
+  process of its own beside the daemon, each with its own Chrome (item 1198). When one of them must start Dot's own Chrome and the other's
+  holds the profile, it asks that one to let go: a Chrome no work uses at that moment (no chat's step under way in it,
+  no run at work holding tabs in it, no page read in it for the web tools, no task taught in it) closes within about
+  two seconds, whatever its idle time and wherever its window is, and the asking one starts its own on the same
+  profile. A Chrome a run of the other process works in is kept; the start waits 20 seconds and then fails with *Dot's
+  browser is in use by a run of another Dot process*, to be tried again once that run no longer uses it. A Chrome
+  window no Dot process started (Sign in…, or one you opened on the profile) is never closed: the start fails at once
+  and asks for that window to be closed.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`, and the
   addresses a call of the web-research server's tools holds (`web_scrape`, `web_extract`, `web_map` and
   `web_crawl_start`, item 583: checked as `web_fetch`'s is, and a long one is flagged as it is, see
@@ -661,7 +683,9 @@ every mode but `yolo` (item 433).
   without announcing anything in between shows in the next view.
 - A step's line says whether it was sent and what Dot checked of it, as a browser step's does (item 1146): done says
   that it was sent, and verified, uncertain or not checked stands beside it. What `set_value` set is read back as
-  before, and now says so: verified, or the step fails as sent and not kept. What `type` and `paste` put in is read
+  before: uncertain when the field shows it, since a value set through accessibility reaches no key handler and the
+  application's own checks and saves may not see it (the step says to click the field and type where the application
+  must take it, item 1222), or the step fails as sent and not kept. What `type` and `paste` put in is read
   back from the field the step names, or from the one that has the keyboard, for up to a second, since keys reach an
   application after the step returns: verified once the text is in the field one more time than before (as typed, or
   with the same letters and digits), otherwise uncertain and never contradicted. A secure field is never read; a field
@@ -713,8 +737,13 @@ every mode but `yolo` (item 433).
   not name the program, and never replaces the error it belongs to. An AppleScript that times out says which
   application it names shows a window on screen, with its title, that may wait for an answer (Microsoft Word's own
   "Grant File Access" sheet for a file outside its sandbox is one), the Automation approval dialog staying one
-  possibility. A screen capture that comes back empty is asked for once more, and a second empty answer says how long
-  it took and whether Screen Recording is granted.
+  possibility. An AppleScript that fails is read by the error number osascript ends its message with, which macOS
+  writes the same in every language (item 1216): the failure says what the number means and the move that helps
+  next (-1743: the owner allows Dot under Privacy & Security › Automation, and the model is told not to send the
+  script again until then; -600: start the application first; -1728: the object named does not exist; -1708: read
+  the dictionary; and the others of `OSASCRIPT_ERRORS`), with macOS's own words kept beside it. A screen capture that
+  comes back empty is asked for once more, and a second empty answer says how long it took and whether Screen
+  Recording is granted.
 - A step the owner was asked about is read again before it goes (item 555): when the application, the kind of window,
   the control, its name or the default button is no longer what the question was about (a page put a "Buy now" where
   the "Send" was while they decided), the step is not done and the run is told to look again. While a batch waits for

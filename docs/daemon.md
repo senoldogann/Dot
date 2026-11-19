@@ -73,8 +73,11 @@ Above the list: a search over the titles (⌘K or `/`) and, while you have no ag
 **Campaigns** and **Schedules** (a page of its own since item 401) are icons at the right of the sidebar's head
 (item 855: they were rows of their own), before the **+** of a new chat (⇧⌘O; item 834, where a row under the search
 said New chat). Under the search your agents stand as faces (item
-835), as a messaging app's people: the three that worked last, each its face over its name on one line, to its page,
-where a message to it starts, the one whose page is open marked, and **All**, the page of every agent and team, in
+835), as a messaging app's people: the three that worked last, each its face over its name on one line, to its
+conversation (item 1233: its home chat, where a message to it goes on; its page while it has none), the one whose page
+or conversation is open marked, a face whose agent's newest run works wearing its working look and one whose
+conversation is unread the dot of an unread chat (item 1235, as Grok Bot's column of faces marks a bot that wrote; not
+while that chat is open), and **All**, the page of every agent and team, in
 four columns the sidebar holds whole (item 855: the row scrolled sideways and cut a face at its edge); an agent made,
 changed or deleted on a page shows there at once, and one a run made once that run ends. In the foot, **Connect apps**
 ([Connect apps](extending.md#connect-apps), items 492 and 545), which opens
@@ -192,7 +195,8 @@ about; two rows a section (a run without the runs it delegated), then **Show N m
 in place (item 364), and the page scrolls to what does not fit. A section folds on a click of
 its title, which counts its rows, and the folds are kept in that browser. The line and the strip follow the lifecycle
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
-and `due`. The composer is one frame on a 24 px corner with a soft shadow under it, as a messaging app's box (item 833):
+and `due`. The composer is one frame on a 22 px corner, 18 once its words wrap, drawn by a ring of half a pixel that grows
+stronger in focus (no halo) with a soft shadow under it, as a messaging app's box (items 833 and 1205):
 one line of the **+**, the words ("Message Miro", the name you call Dot by; "Follow up" in the box of a run; the box's
 tooltip says that @ opens the apps and / the skills and commands) and the microphone at the right, with the files
 attached and the picks above it; as the words take more lines, the buttons stay at the last. A file uploads as it
@@ -231,13 +235,15 @@ size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
 the bar is still one line. A phone's box shows its choices while it is used, not by the **+** menu: the words take
-their own line, and the **+**, the model (whose menu holds the reasoning, the approvals and the mode), the context
-meter, the microphone and the send stand on the line under them ([Phone](phone.md), items 1120 and 1121). On a phone the bar's buttons are 36 px and answer a
+their own line, and the **+**, the model (which opens the chat's settings, a sheet from the foot of the screen with the models, the
+reasoning, the mode, the approvals and How Dot works, item 1202), the context meter, the microphone and the send stand
+on the line under them ([Phone](phone.md), items 1120, 1121 and 1202). On a phone the bar's buttons are 36 px and answer a
 finger's 44 px around them (item
 787, as every icon button of the bars and the lists does), and the box's text is the size chosen for it, at
 least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item
-311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a pick or Escape
-or a click outside closes it. The model's menu (item 208) has a rail on its left, a star for the
+311). While Keep going is on, one line under the frame says so. On a wider window each pill opens its menu above it, and a pick or
+Escape or a click outside closes it; a phone's chat settings stay open after a pick, until Done, Close, Escape, a tap on
+the dim or a drag of the sheet's head down. The model's menu (item 208) has a rail on its left, a star for the
 favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the models
 of the view shown (item 395), as its placeholder and its label say, which keeps its words when the rail shows another
 view, has the keys as the menu opens and reads names, providers and "free"; and on each model a star
@@ -1104,7 +1110,8 @@ window drawn in the scheme it names: System (the default, split down the middle)
 them. **Themes** is one strip of cards that slides sideways (a mouse drags it, a touch and a trackpad scroll it, the
 arrow keys, Home and End move from card to card, and it opens on the theme in use), each with a light and a dark orb:
 the card takes its theme for both schemes, an orb for its own scheme only (a sun or a moon marks the picks), so light
-can wear one theme and dark another. Dot's two looks are **Neutral** (warm grey and ink, round and quiet; the default)
+can wear one theme and dark another. Dot's two looks are **Neutral** (neutral grey and ink after OpenMausBot's Midnight and Daylight, a white page that
+is not cream in light and a phone's own darker greys on a phone in dark while Neutral is the theme of both schemes, item 1205; round and quiet; the default)
 and **Paper** (warm paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it
 is picked for; Dot's thirteen palettes are **Clean** (near-white, grey and a blue accent), **Rose** (blush whites and
 a raspberry accent), **Grove**, **Ocean**, **Ember**, **Iris**, **Midnight**, **Nord**, **Solarized**, **Sepia**,
@@ -1155,22 +1162,28 @@ ink on a soft fill (`--fine` and `--fine-weak`, item 839: they were green), whil
 convention of the data (a diff's additions, a string in code, a trade that rose); surfaces step up by lightness (page,
 sunken sidebar, raised cards) rather
 than by shadow in dark; borders are the text colour at a small alpha so they sit on every surface; the text tiers are
-measured against every surface by a unit test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones; the
-neutral and the paper look hold the muted one to 4.5:1 too, the sidebar's group labels being set in it); the yellow is
+measured against every surface by a unit test (4.5:1 for all four tiers, the muted and the faint ones too, item
+1205; the sidebar's group labels are set in the muted one); the yellow is
 the owner's bubbles. Type: the system's face for the interface and the answers (item 1057; Inter, served from Dot's own
 origin with Geist Mono, a choice), Geist Mono for code and identifiers (`static/fonts`, SIL Open Font License); on a
 phone an answer's text is 16 on 22 px (item 1057, 17 on 26 before); seven sizes each with its line-height (12/16 badges and
 chips, 13/18 meta and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles,
 24/32 the greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit
 test refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: a box of the
-pages (a card, a settings' group, a tile) has no frame, a surface on a 16 px corner with a soft shadow under it
-(`--box-border` and `--box-shadow`, item 837: it had a hairline on a 12 px corner and no shadow), and the contrast
-setting frames it again; a box within a box is a soft fill rather than a second shadow; a card holds 20 px of room
-(item 838, 16 before; the compact density keeps 12); shadows otherwise stay on what floats (menus, dialogs, the
-composer); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
+pages (a card, a settings' group, a tile) has no frame, a surface on a 16 px corner (18 on a phone) drawn by a ring of
+half a pixel of the text at a tenth (`--edge`, `--box-shadow`, item 1205) rather than a shadow, and the contrast
+setting frames it again; a box within a box is a soft fill; a card holds 20 px of room (item 838; the compact density
+keeps 12); only what floats casts a shadow (menus, on a 12 px corner, 22 on a phone, with rows 30 px tall on a 6 px
+corner and icons of a 1.5 stroke against the interface's 1.75; dialogs; sheets, on 28 px on a phone; the composer);
+the open row of the sidebar and the open tab of Settings are a flat tint of the ink, the row's name a step bolder; a
+chat's name and last line in the sidebar fade out over their last 28 px where they are cut; motion has one easing
+(`cubic-bezier(0.22, 1, 0.36, 1)`): a menu opens from 96 %, a sheet rises 32 px in 260 ms and a message you just sent
+180 ms, all still under reduced motion but for a fade; bold in an answer is 600 and its paragraphs wrap with no lone
+last word (`text-wrap: pretty`); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
 string; an empty page or list stands a mark in a quiet ring, a title and one line that says what brings something there,
 in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages in an ink
-bubble (`--msg-me`: the text's colour in light, one surface raised in the dark), and what Dot and its agents say, the
+bubble (`--msg-me`: the text's colour in light, one surface raised in the dark) on an 18 px corner with 7 by 12 px
+of room (item 1205), two of yours in a row on a touch screen joined at a 6 px corner as iMessage draws them, and what Dot and its agents say, the
 answer and the lines along the way, as plain text beside the face, on no fill (item 854: a soft bubble until then), and
 on a phone's width each in a soft bubble of its own (`--msg-agent`, item 1091, the owner's ask); the
 line under an answer that ended well and under your message shows where the pointer rests or the focus is (a reaction
@@ -1204,12 +1217,12 @@ it from Chrome's performance metrics and caps it). `#/controls` shows every shap
 Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what sits
 a breath apart; a unit test checks it); the sidebar is a tone darker than the page with no line between them, has no
 dividers between its groups, its labels are the lightest ink that reads, a chat's last activity sits at the right of its
-row in figures of one width ("5m", "3h", "2d") and its open row is a surface step rather than a tint; the top bar's
+row in figures of one width ("5m", "3h", "2d") and its open row is a flat tint of the ink (item 1205); the top bar's
 pills show a border only when they count something; a card's head is lighter than its body; a folded step of the
-timeline is one line whose duration shows on hover. Motion: three durations (120, 200 and 320 ms) and two easings for
-what changes, and the rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every
+timeline is one line whose duration shows on hover. Motion: three durations (120, 200 and 320 ms), the rise of a message
+sent (180 ms) and of a sheet (260 ms), and one easing for what changes (item 1205), and the rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every
 transition and animation to them. The face breathes slowly at rest and pulses while a run works; cards, rows, the slash
-menu and the toasts fade in; a state badge cross-fades. Under the system's reduced-motion setting every transform goes
+menu and the toasts fade in, and a menu of actions opens from 96 %; a state badge cross-fades. Under the system's reduced-motion setting every transform goes
 (the breath, the pulse, the spinners, the ring of a working run's dot, the drawer's slide) and the fades stay, so a
 state change is still seen. What repeats without end stands still while Dot's window is not the one in front or is out
 of sight, and moves again once it is (item 662: the page marks itself away, and every endless animation takes its play
@@ -1421,7 +1434,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
-| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170) |
+| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170) |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs (`stored=true`: only those stored so far, item 734); lifecycle of all runs |
 | `GET /runs/streams?ids=a,b&after=N`                                              | the events of several runs (12 at most) on one stream, without their sub-runs, the stored ones after `N` first, ending once none works (item 889: the office's, as a browser keeps six connections to a server); 404 for a run that is not, 422 for none or too many |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
@@ -1445,7 +1458,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /threads/{id}/helpers?limit=N`                                            | the runs a chat's runs delegated, newest first (the side panel's Agents tab; 404 for no chat) |
 | `GET /threads/{id}/terminals`                                                  | the chat's terminal sessions: command, background or not, start, end and exit status (404 for no chat) |
 | `DELETE /threads/{id}/terminals/{session}`                                     | ends a session's program and what it started; the chat is told nothing (404 for no such session) |
-| `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
+| `GET /approvals`, `GET /approvals/{id}`, `POST /approvals/{id}/decision`      | pending approvals; one as stored; answer one (`by`: `"ui"`, the default, or `"cli"` for the terminal of a `dotx run` whose run the daemon drives) |
 | `POST /approvals/{id}/secret` (`{"value": …}`)                                 | give the secret a card of severity `secret` asks for (item 857): held for its chat's commands for 24 hours, the card answered with no note; `/decision` refuses to approve such a card (422), and this route refuses a card that is no secret's or no longer open |
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules; each of `GET`'s names in `never_decided_by` the earlier rule that fits every action it fits, or null (item 449) |
 | `POST /rules/{id}/move` (`{"direction": "up"\|"down"}`)                        | moves a rule one place in the order and numbers the rules 1 to n; answers the list (422 past either end, 404 for no rule) |
@@ -1489,6 +1502,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /phone/tailnet`, `POST /phone/awake` (`{"on": true}`)                     | Tailscale set up for this daemon and its name written into `[server] reach` (422 with why when Tailscale is missing or not signed in); the Mac kept awake while it charges, or not (`[server] keep_awake`) (item 271) |
 | `POST /phone/tailscale`, `GET /phone/qr/tailscale`, `GET /phone/qr/dot` | Tailscale's page in the Mac App Store while it is missing, else its app to sign in (item 421); a QR code (PNG) of Tailscale's download page, and of Dot's address on the tailnet once the daemon answers to it (422 before) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | a key of the phone's own for a good pairing code, once (403 when it is wrong, used or out of date; 422 when twenty phones are paired; item 670) |
+| `GET /iphone`                                                                   | the link to the owner's iPhone over WebDriverAgent as the keeper's last look left it: `enabled`, `state` (`up`, `locked`, `unclear`, `unreachable`), the address that answered, how long the state has lasted and when it was checked (item 1196, [Dot and your iPhone](phone-control.md)); not the addresses a phone reaches Dot at, which `GET /phone` gives |
 | `GET /phone/phones`, `DELETE /phone/phones/{id}` (the token only, never a phone's key) | the phones that hold a key of their own, with their names and when they were paired and last used, never the key; a phone removed, its key refused from then on and its open streams ended (404 when it is not paired) (item 670) |
 | `GET /channels`, `POST /channels/imessage/switch` (`{"on": true}`; the switch, the code, the confirmation and the removal take the token only, never a phone's key: item 670) | the channels of Settings › Channels (item 572, [Channels](channels.md)): iMessage's switch, paired numbers and addresses, a code that waits, what macOS granted (`database`, `automation`), what keeps it from working (`problem`, `needs`) and what the channel sees of Messages' database (`seen`, item 595: when it looked, the cursor, the newest row, the sizes and times of `chat.db` and `chat.db-wal`, the last command and error, a `warning` when the log changed for two minutes and nothing Dot reads did, and `cursor_reset`, item 611, when the cursor had to come down to the newest row of a database rebuilt or restored: `{"from_row", "to_row", "at"}`), and the address its links open at (`links`: the name `[server] reach` gives, `null` when it names none and no link is sent); the switch, at once and in `[channels] imessage` (422 when the config file cannot be changed, and the switch stays as it was); `POST /channels/progress` (`{"on": true}`) turns on or off the messages of progress of a run started from a channel (item 618; `progress` in `GET /channels`), at once and in `[channels] progress` (`"steps"` or `"off"`; 422 when the config file cannot be changed) |
 | `POST /channels/imessage/code` (`{"handle": "+358401234567"}`), `POST /channels/imessage/confirm` (`{"code": "482 913"}`), `POST /channels/imessage/remove` (`{"handle": …}`), `POST /channels/imessage/check`, `POST /channels/imessage/poll` | send a pairing code to a number (with its country code) or an address through Messages; pair it when the code is typed back (422 for a wrong one, with the tries left, and for one out of date or used up); forget a paired one; show macOS's question whether Dot may control Messages, a minute for the answer; look at Messages' database now (Check now, item 595): a poll like the loop's, never reading a row twice with it, when the channel is on and a number paired, else a look that reads no message |
@@ -1558,8 +1572,8 @@ the agent itself. On a Mac that has no Dot, the shell installs one first (**Inst
      before it is moved).
   2. **The models**: what `dotx setup` offers, less OpenCode's own agent (the list is `providers.json`, which a test
      keeps equal to `CHOICES` of `cli_setup.py`): Ollama, when it answers on 127.0.0.1:11434 (its models are listed; a
-     cloud model needs `ollama signin` once), or an API key of OpenAI, Anthropic, OpenRouter or OpenCode Go, in a
-     password field.
+     cloud model needs `ollama signin` once), or an API key of OpenAI, Anthropic, OpenRouter, Google (the Gemini models,
+     free within their daily limits) or OpenCode Go, in a password field.
   3. **Install**, one button, four steps. `uv --no-config tool install --constraints <constraints.txt in the app's
      Resources> --python 3.13 dotagent-macos==<the app's version>`, with the `uv` the app carries (the constraints file
      pins every dependency of the package to the version of the `uv.lock` the release was built and tested with, so a

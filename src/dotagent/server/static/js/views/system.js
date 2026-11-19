@@ -722,7 +722,7 @@ function buildFailsafe() {
 const HEALTH_GROUPS = [
   { key: "setup", title: "Setup", takes: /^(home directory|env file|ripgrep|google chrome|chrome|xcode tools|backups)\b/, open: true },
   { key: "desktop", title: "Desktop control", takes: /^desktop\b/, open: true },
-  { key: "models", title: "AI services and models", takes: /( api| key$|^ollama|^web search|^judge|^model\b|^review model)/, open: false },
+  { key: "models", title: "AI services and models", takes: /( api| key$| login$|^ollama|^web search|^judge|^model\b|^review model)/, open: false },
   { key: "browser", title: "Browser", takes: /^browser\b/, open: false },
   { key: "tools", title: "Memory, skills and plugins", takes: /^(memory|mcp|skills|plugins|office apps|one-time codes|onedrive)\b/, open: false },
   { key: "other", title: "Other", takes: /./, open: false },
@@ -1196,8 +1196,13 @@ function problemNote(provider, inUse) {
     "div",
     { class: "note bad" },
     icon("alert"),
-    el("span", null, provider.error),
-    provider.problem === "key_refused" ? el("a", { href: KEYS_TAB }, "Check the key") : null,
+    el(
+      "span",
+      null,
+      provider.error,
+      // In the line's own flow, where a phone skips it as a link inside text and it reads as the sentence goes on.
+      provider.problem === "key_refused" ? [" ", el("a", { href: KEYS_TAB }, "Check the key")] : null,
+    ),
   );
 }
 

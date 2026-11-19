@@ -75,6 +75,7 @@ AUTO: AgentConfig = DEFAULTS.model_copy(update={"tool_surface": "auto"})
         ("memory_update", "memory_admin"),
         ("memory_forget", "memory_admin"),
         ("draft_message", "drafts"),
+        ("watch_video", "video"),
         ("mail_search", "accounts"),
         ("calendar_events", "accounts"),
         ("mcp__github__create_issue", "mcp__github"),
@@ -91,6 +92,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "browser",
         "memory_admin",
         "todos",
+        "pipeline",
         "drafts",
         "accounts",
         "schedule",
@@ -102,6 +104,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "skills",
         "vault",
         "meetings",
+        "video",
         "terminal",
         "desktop",
     )
@@ -110,6 +113,8 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
     assert groups_of([spec.name for spec in specs_for_mode(REGISTRY, "research")]) == (
         "browser",
         "todos",
+        # A research run reads a pipeline's ledger; it keeps none (item 1227).
+        "pipeline",
         "accounts",
         "schedule",
         "office",
@@ -118,6 +123,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "pages",
         "skills",
         "meetings",
+        "video",
         "desktop",
     )
     core: tuple[ToolSpec, ...] = offered_specs(TASK_SPECS, frozenset({CORE_GROUP}))
@@ -178,6 +184,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "memory_admin",
         "office",
         "pages",
+        "pipeline",
         "recon",
         "replies",
         "skills",
@@ -185,6 +192,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "terminal",
         "todos",
         "vault",
+        "video",
         "waits",
     }
     assert (hidden["apple_script"], hidden["memory_forget"]) == ("desktop", "memory_admin")
@@ -245,6 +253,9 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "- memory_admin: correcting or forgetting saved notes (memory_update, memory_forget)",
         "- todos: your own list of work to do for the owner later, on your own while the Mac is idle, and their "
         "objectives (todo_add, todo_drop, objective_add, objective_update, objectives)",
+        "- pipeline: the ledger of a continuing piece of work (clients, leads) in its record file: each one's status "
+        "and next step, every mail or message begun before it goes out and ended with what showed it, and what came "
+        "of them (pipeline_view, pipeline_client, pipeline_begin, pipeline_end, pipeline_outcome)",
         "- drafts: an email or a message you write for the owner, who sends it from the conversation (draft_message)",
         "- accounts: the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only "
         "(mail_search, mail_read, calendar_events)",
@@ -264,6 +275,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "- vault: the owner's saved contact details (name, address, phone, email) to type into forms (vault_contacts)",
         "- meetings: the owner's Google Meet call: joining it to take notes and answer, reading them, posting on "
         "their yes (meeting_join, meeting_read, meeting_post, meeting_leave)",
+        "- video: watching a video file or a video link: frames of what it shows and a transcript of what is said "
+        "(watch_video)",
         "- terminal: programs that ask questions, REPLs and servers that stay up, on a terminal of their own "
         "(terminal_open, terminal_send, terminal_read, terminal_close)",
         "- desktop: the Mac's applications, windows, clipboard and AppleScript (desktop_apps, desktop_open_app, "
@@ -387,7 +400,7 @@ def test_a_run_of_more_tools_than_some_providers_take_at_once_starts_grouped() -
 
 
 def _outcome(call_id: str, name: str, arguments: JsonObject, result: ToolResult) -> ToolOutcome:
-    return ToolOutcome(call=_call(call_id, name, arguments), result=result, seconds=0.0, action=None)
+    return ToolOutcome(call=_call(call_id, name, arguments), result=result, seconds=0.0, action=None, shown="")
 
 
 def test_a_step_turns_on_the_groups_of_the_off_tools_it_called_and_of_use_tools_that_worked() -> None:

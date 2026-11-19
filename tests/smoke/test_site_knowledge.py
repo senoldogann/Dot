@@ -38,6 +38,7 @@ _HOST: str = "127.0.0.1"
 _GOAL: str = "Check the local test page."
 _HERE: str = "On 127.0.0.1 the second table holds what the first one leaves out."
 _THERE: str = "On example.org the menu hides the archive."
+_OUTSIDE: str = "On 127.0.0.1 the hours table loads after the heading."
 _NOTE_START: str = "[system note] Earlier runs learned this where this run just arrived."
 _RUN_WAIT_S: float = 60.0
 
@@ -136,6 +137,10 @@ async def test_a_run_that_reaches_a_site_is_handed_what_was_learned_there(runtim
     there: MemoryRecord = (
         await save_memory(runtime.memory, _THERE, (LESSON_TAG, site_tag("example.org")), "run_old", None, None, False)
     ).record
+    # A lesson of the page's host saved while reading outside content (item 1192).
+    outside: MemoryRecord = (
+        await save_memory(runtime.memory, _OUTSIDE, (LESSON_TAG, site_tag(_HOST)), "run_old", None, None, True)
+    ).record
     # The shop's skill fits the goal's words and is the one the instructions list; the local page's skill is not.
     listed: Playbook = _learned("check the shop page", "shop.example.com", "Check the local test page of the shop.")
     local: Playbook = _learned("read the hours table", _HOST, "Read the opening hours from the library table.")
@@ -175,10 +180,26 @@ async def test_a_run_that_reaches_a_site_is_handed_what_was_learned_there(runtim
     assert f"On {_HOST}:\n- [{here.id}] {_HERE}" in notes[0]
     assert f"- Learned skill {local.name}: Read the opening hours from the library table." in notes[0]
     assert _THERE not in notes[0] and listed.name not in notes[0]
-    # The lesson counts as handed to the run, and the run's page says where it was learned.
-    assert await runtime.store.handed_memory_ids(run.id) == {here.id}
+    # The lesson saved while reading outside content is not in that note, which the chat keeps for a later run that may
+    # start clean (item 1192): the next step saw it next to the result of the call that reached the page, which
+    # tainted the run, fenced; neither that result as the chat keeps it nor its event holds it.
+    assert _OUTSIDE not in notes[0]
+    shown: str = next(
+        message.content
+        for message in model.requests[1].messages
+        if message.role == "tool" and message.tool_name == "browser_open"
+    )
+    assert shown.index('<web_content nonce="') < shown.index('url="dot-memory:lessons"') < shown.index(_OUTSIDE), shown
+    opened: EventRecord = (await runtime.store.events_of_kind(run.id, "tool_result", 5))[0]
+    assert opened.data["tainted"] is True and _OUTSIDE not in str(opened.data["text"])
+    assert not any(_OUTSIDE in message.content for message in await runtime.store.load_messages(run.thread_id, 2))
+    # The lessons count as handed to the run, and the run's page says where they were learned.
+    assert await runtime.store.handed_memory_ids(run.id) == {here.id, outside.id}
     events: list[EventRecord] = await runtime.store.events_of_kind(run.id, "memories", 5)
-    assert [(event.data["ids"], event.data["site"]) for event in events] == [([here.id], _HOST)]
+    told: set[tuple[tuple[str, ...], str, bool]] = {
+        (tuple(event.data["ids"]), str(event.data["site"]), event.data.get("outside") is True) for event in events
+    }
+    assert told == {((here.id,), _HOST, False), ((outside.id,), _HOST, True)}
     # A lesson of this run that names the page's host is tagged with it; one that names nothing it reached is not.
     assert await runtime.store.run_sites(run.id) == [_HOST]
     assert await lesson_tags(runtime.store, run.id, "On 127.0.0.1 the table has two pages.") == (

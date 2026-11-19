@@ -108,7 +108,7 @@ from dotagent.tools.groups import group_of
 from dotagent.tools.meta import USE_TOOLS_TOOL
 from dotagent.tools.pages import PAGE_SUFFIXES, SHOW_PAGE_TOOL
 from dotagent.vault.choices import LoginChoice, find_login, login_choices
-from dotagent.vault.hosts import fills_on, site_label
+from dotagent.vault.hosts import elsewhere_advice, fills_on, site_label
 from dotagent.vault.items import LoginDraft, LoginFill
 from dotagent.vault.onepassword import Login, LoginSecret, VaultError, kept_token
 
@@ -1614,7 +1614,7 @@ def _fill_login_tool() -> RegisteredTool:
         if not fills_on(url, login.websites):
             raise ToolInputError(
                 f"the login {login.title} is for {sites}, and this page is {_clip(url, 120) or 'no page'}: Dot fills a "
-                "login only on its own site, over https",
+                f"login only on its own site, over https. {elsewhere_advice(url, login.websites, login.source_name)}",
                 {"login": login.id, "url": url},
             )
         if args.otp is not None and login.onepassword is None:

@@ -336,9 +336,59 @@ marked as having read outside content, and such a run may add a line of progress
 stands (done, dropped); a run that read nothing of the kind does that, when you ask. The Agents page shows the active
 objectives at the top of its **Work orders** part, read only.
 
+**Continuing work** (item 1227). An objective that is continuing work (a client pipeline, a weekly report) also says
+how it is done, each part optional: `sources` (where its facts come from), `rules` (what its decisions follow),
+`evidence` (what shows a step done), `exceptions` (what is handled otherwise or brought to you), `next_step`, and
+`record`, the workspace file that is the one record of its items. `objective_add` and `objective_update` set them (an
+empty text clears one); a run reads them with the objective, and the look for work and the brief read its next step and
+record. A run that read outside content may set the next step, never the rules, sources, evidence, exceptions or
+record, and the next step it set is marked: the look and the brief count it and do not quote it, until a run that read
+nothing of the kind sets it again. The run that sets one up takes these from what you said and from two or three of your real cases (a mail you
+sent, a reply you got, a lead you skipped), and asks only for a part none of them shows; a one-off task gets none of
+this.
+
+**The record's ledger.** In the record file Dot keeps a block of its own between two markers (`<!--
+dot:pipeline:start ... -->` and `<!-- dot:pipeline:end -->`), three Markdown tables you can read and edit a cell of:
+**Clients** (id, name, contact, status, last action and when, the answer expected, the next step and when),
+**Actions** (each external action, one row per client and action however often tried: its way of doing it, state,
+tries, when and what showed it) and **Outcomes** (what a client did: a reply, a meeting, a proposal, won, lost,
+declined, bounced, unsubscribed, dated as its source dates it and with where it was seen). The rest of the file is
+yours and is never touched; a file with no block gets it at its end. The tool group `pipeline` keeps it:
+`pipeline_view` (what is unsettled first, then the clients, then how each way of acting did), `pipeline_client`,
+`pipeline_begin`, `pipeline_end` and `pipeline_outcome`.
+
+- **An action is written down before it goes out.** `pipeline_begin` writes it begun; `pipeline_end` says what came of
+  it with what showed it (and, for one recorded after the fact, `at`, when its evidence says it went out; never later
+  than now, item 1231): sent (seen in Sent, in the channel's history), failed (seen not to have gone) or uncertain
+  (could not tell). A run that breaks off between the two leaves it begun, and the next run finds it first.
+- **Nothing is begun twice.** An action begun or uncertain cannot be begun again until a run looked and ended it; one
+  sent is never begun again under its name (a further mail is an action of its own, `reminder-1`); only one that failed
+  is tried again, and its tries are counted. A result that was not seen is never taken for a failure. The guard holds
+  for a run that begins its send there, as the tools tell it to: no code sees a Send pressed on a web page (your
+  webmail) as a mail to a client, so a run that skipped `pipeline_begin` would not be stopped.
+- **What you hold back stays held.** A client `paused` or `do-not-contact` gets no action, and a run that read outside
+  content (a reply's) cannot change that status. A status or a state edited into none of the ledger's words (`Paused`,
+  `Sent`) stops the block from being used until it is one of them, as a broken marker does: read loosely, it would let
+  a held client be written to or a sent mail be sent again.
+- **Outside words stay marked.** Once a run that read outside content (a reply's) wrote the block, its start line says
+  so, and `pipeline_view` hands the ledger fenced, marking the run that reads it as having read outside content; so does
+  a refusal of a tool for the part that quotes a cell of it (a client's name, an action's evidence), while what to do
+  next stays outside the fence, as Dot's own words. A
+  cell holds no comment mark (`<!--`, `-->`), so that a third party's words cannot end the block.
+- **Outcomes are not actions.** What Dot did and what came of it are kept apart, and an outcome needs its date and its
+  source: nothing is guessed. `pipeline_view` compares the ways of acting by the clients each reached, those who answered
+  after it and those won, from the record alone, and says when a number is too small to tell.
+- **Several runs at once.** Each change reads, changes and writes the block under a lock beside the record
+  (`.<name>.dot-lock`), so that a schedule's run and the reply's run it handed take turns; the write replaces the file
+  at once and is noted for `dotx undo`. The record, its lock and its write are opened with no link followed along the
+  path the call was allowed (item 681). A block whose markers or columns were broken is neither read nor written until
+  it is mended. An editor of yours does not take the lock: save while no run writes, or what you saved in the same
+  instant may be overwritten.
+
 ## Telling you
 
-What Dot tells you on its own, the brief and the watchers, goes through one function, `tell_owner(bus, title, text,
+What Dot tells you on its own, the brief, the watchers and a model whose account ran out of money ([Models](models.md),
+item 1207), goes through one function, `tell_owner(bus, title, text,
 url)` in `dotagent/notify/owner.py`: a title, a line or two of text and the route of Dot's own pages that a tap opens
 (`#/runs/<id>`; an address of anything else is refused, so that nobody whose words are in a tell can send you
 elsewhere). It is an event of Dot itself, `owner_told`, live only like the other notices (see [The

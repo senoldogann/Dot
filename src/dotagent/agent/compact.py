@@ -1,7 +1,7 @@
 """Context management: token estimates, trimming of stale output and repair of broken tool pairing."""
 
 from bisect import bisect_left
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import CHARS_PER_TOKEN, redact_secrets, truncate_middle
@@ -60,6 +60,34 @@ def shrink_old_tool_results(messages: Sequence[Message], keep_recent: int) -> li
     return [
         message.model_copy(update={"content": truncate_middle(message.content, _OLD_RESULT_CHARS)})
         if index in stale and len(message.content) > _OLD_RESULT_CHARS
+        else message
+        for index, message in enumerate(messages)
+    ]
+
+
+def shown_key(message: Message) -> tuple[str, str]:
+    """What binds words shown next to a tool message to it (item 1192): its call's id and its text. An id alone is
+    unique within one reply only, as some providers name every call of every reply alike."""
+    return (message.tool_call_id or "", message.content)
+
+
+def with_shown(messages: Sequence[Message], shown: Mapping[tuple[str, str], str], keep_recent: int) -> list[Message]:
+    """``messages`` as a step's request carries them, with the words ``shown`` (by :func:`shown_key`) next to the
+    results they came with (item 1192: the lessons saved while reading outside content, which the chat stores
+    nowhere), on the newest ``keep_recent`` tool messages alone, which trimming leaves whole: as a result grows old,
+    its words go."""
+    if not shown:
+        return list(messages)
+    results: list[int] = [index for index, message in enumerate(messages) if message.role == "tool"]
+    recent: set[int] = set(results[max(0, len(results) - keep_recent) :])
+    # The first result of a key alone: two calls that a provider named alike and that read the same text share their
+    # key, and the words were handed with the first, as a lesson is handed once to a run.
+    first: dict[tuple[str, str], int] = {}
+    for index in sorted(recent):
+        first.setdefault(shown_key(messages[index]), index)
+    return [
+        message.model_copy(update={"content": f"{message.content}\n\n{shown[shown_key(message)]}"})
+        if index in recent and first.get(shown_key(message)) == index and shown_key(message) in shown
         else message
         for index, message in enumerate(messages)
     ]

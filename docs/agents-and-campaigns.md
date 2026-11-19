@@ -57,7 +57,7 @@ second while nobody walks and the camera rests, with fewer pixels when the Mac o
 the still room is baked into one mesh per material and its sun shadows drawn once, a few hundred draw calls where it was
 1,420), one frame each time something changes when motion is reduced, and a browser without WebGL 2 is told so and shows
 the rest of the page. The room grows with the number of agents (two desks a pod, three pods across), and is 20 by 15
-metres at least (item 898). Its panel is a chat (item 898): the agent's newest chat of yours shows its last turns, your
+metres at least (item 898). Its panel is a chat (item 898): the agent's conversation (item 1233: its home chat, as its page's) shows its last turns, your
 words at the right and its answers at the left, and what you write goes on in that chat rather than starting a new chat
 each time: while the agent works, or waits for you, it waits in that chat's queue, or reaches the run at once with
 **Steer** chosen under Settings › General › Messages, as a message in its chat does; **New chat** starts the next
@@ -88,7 +88,19 @@ wherever the agent shows, and until you choose one the shape and colour its id's
 /api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look" card of Settings › General, kept by the daemon
 for every browser: its face and **Change**, which opens the picker and Save). **Agents** in the sidebar lists Dot first and then your agents, each with its newest chat; **New
 agent** opens the editor; an agent's page greets with its face and role, takes a message for it ("Message Scout") and
-lists its chats, with Edit and Delete in the bar. The box of that page has the home's Mode, Model, Reasoning and Options
+lists its chats, with Edit and Delete in the bar. An agent is one conversation (item 1233, the owner's word of
+2026-11-19 after Grok Bot, whose bots are each one ongoing chat: "a bot has one purpose, and its chat is used all the
+time"): its home chat is the newest chat of yours with it, whose latest run is the agent's (the daemon names it, `home`
+in `GET /api/agents` and `GET /api/agents/{id}`, however many chats are newer: one the pages or `dotx run` started,
+its welcome among them, not one a schedule, a watcher, Dot's initiative, a lead's work order or the agents' work among
+themselves started, nor a team's or a campaign's), its face in the
+sidebar opens that chat and is marked while it is open, and its page's box goes on in it, as the office's panel does
+(item 898): to the run at work while there is one, queued or steered as Settings › General › Messages says, and the
+chat opens. Under the box, **Open your chat with Scout** leads back into it. **New chat** in the page's "…" starts the
+next message afresh (the way back hides until then); that chat is then the newest, and the conversation from there on.
+Chats deleted in the sidebar may take the conversation with them: the face and the open page then name the one left. With no chat yet, the face opens
+the page, whose first message starts the conversation. In a chat with an agent, its name in the bar opens its page
+(item 1234), where its role, schedules and what it learned are. The box of that page has the home's Mode, Model, Reasoning and Options
 pickers (item 426), starting from the agent's own: its model, its reasoning level and its approvals, not what this
 browser has chosen for the home's box; the mode starts on Auto, as the home's does, the message's words settling it, and
 `/auto`, `/task`, `/chat` and `/research` name one (item 513); the mode, model, reasoning level and approvals chosen
@@ -110,7 +122,7 @@ that work with the tools it names (item 936): Dot's ways of working name the she
 message, and carries the agent's id (item 553). Ask the delegated run to end with a `Verification:` section: the
 command or check it ran and the answer. A report without one, or with one that holds no check (a word or two,
 "none"), is marked as a claim (item 1065), so the sender does not close a plan
-step on trust alone. The run's page wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on
+step on trust alone. The run's page wears the agent's face and name in the bar, the name a link to its page (item 1234); its rows in the sidebar and on
 the home's Today strip wear the face too. A schedule can run as one of your agents (its **Agent** on Schedules, item
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting an agent leaves its chats, its lessons and its
 learned skills to Dot, and switches its schedules off ("switched off: its agent was deleted"), as Dot's with no agent
@@ -459,7 +471,8 @@ order the same way when its run had read such content. An order marked so keeps 
 try of it starts untrusted, whatever run sends it back (a clean run that returns or reassigns it included), its notes
 mark the run that reads them, and `review_work` and `work_orders` mark the run that calls them. Such an order's title is counted and not quoted by the brief and
 the look for work. A try starts as untrusted as the run that gave it, and answers the policy's questions as that run
-does. `dotx run` cannot hand out orders (its runs end with the process); the daemon can.
+does. A run of a `dotx` command's own process cannot hand out orders (its runs end with the process); the daemon can, a
+`dotx run` it was handed too (item 1203).
 
 The **Work orders** part of the Agents page lists them read only, under the active objectives: a badge with where the
 order stands, its title, its agent, tries, age, due time, the last note and a link to its newest task. `GET
@@ -559,8 +572,8 @@ the campaign's own check takes its place, so starting one with goal mode on is r
 (`run_max_minutes`, `run_max_tokens`) apply to each session. Sessions run only while the daemon runs; one the daemon cut
 off is not resumed as a run: the next session starts once the daemon is back (after `campaign_gap_minutes` when the
 daemon died while it worked, so that a session that brings it down does not run again and again), and its brief says the
-last one was cut off. A session whose `dotx` command died (the first one, from `dotx run --standing`) is closed by the
-daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. A session whose end could not
+last one was cut off. A session whose `dotx` command died (the first one, from `dotx run --standing` with no daemon
+running; with one, the daemon drives that session too, item 1203) is closed by the daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. A session whose end could not
 plan the next leaves the campaign planned again by the scheduler 10 minutes after it ended, `campaign_gap_minutes`
 later (item 1104). The threads of the sessions
 after the first are not in the chat list; the campaign's page links them. What you write in the campaign's conversation,

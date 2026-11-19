@@ -291,6 +291,11 @@ class OutOfRequests(GalleryError):
     waits for the next one."""
 
 
+class TokenRefused(GalleryError):
+    """GitHub answered 401 to a request sent with the owner's token: the night ends there and the owner is told, since
+    no later request can succeed until the token is renewed in Customize › Connectors (item 1215)."""
+
+
 class GitHub:
     """GitHub's REST interface, read with a token when there is one. Every request has :data:`TIMEOUT_S`; an answer
     that is not 200 is a GalleryError with its status, which the scout logs before it goes on with the next lead.
@@ -310,6 +315,13 @@ class GitHub:
         )
         self.requests: int = 0
         self.remaining: int | None = None
+        # Whether GitHub answered 401 to a request sent with a token (item 1215): the token is expired or revoked, so
+        # every later request fails too and the night ends at once instead of failing lead by lead (six blind nights,
+        # 201 failures, 2026-11-12..17).
+        self.token_refused: bool = False
+        # How many requests GitHub answered with 200 tonight: a night that failed and was answered none was blind.
+        self.answered: int = 0
+        self._has_token: bool = bool(token)
 
     @property
     def exhausted(self) -> bool:
@@ -331,8 +343,12 @@ class GitHub:
                 self.remaining = int(left)
             if int(left) == 0 and response.status_code in (httpx.codes.FORBIDDEN, httpx.codes.TOO_MANY_REQUESTS):
                 raise OutOfRequests(f"GitHub answered {response.status_code}: its requests ran out", {"url": url})
+        if response.status_code == httpx.codes.UNAUTHORIZED and self._has_token:
+            self.token_refused = True
+            raise TokenRefused("GitHub refused the token (401): it is expired or revoked", {"url": url})
         if response.status_code != httpx.codes.OK:
             raise GalleryError(f"GitHub answered {response.status_code}", {"url": url})
+        self.answered += 1
         if len(response.content) > CATALOGUE_LIMIT_BYTES:
             raise GalleryError("GitHub's answer is too large", {"url": url})
         try:

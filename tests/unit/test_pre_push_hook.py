@@ -1,6 +1,6 @@
 """The pre-push review hook (item 540): a push that only brings main in is not reviewed again, a push that changes the
 branch's own change is, and the hook says so after three earlier reviews of the branch that BLOCKed. A stand-in for the
-`claude` command answers PASS and records that it was asked: no model is called."""
+`dotx` command answers PASS and records that it was asked: no model is called."""
 
 import os
 import subprocess
@@ -45,19 +45,26 @@ def repo(tmp_path: Path) -> Path:
     return work
 
 
-def _run_hook(repo: Path, tmp_path: Path, local: str, remote: str) -> tuple[subprocess.CompletedProcess[str], int]:
+def _run_hook(
+    repo: Path, tmp_path: Path, local: str, remote: str, answer: str = "No issues found.\nVERDICT: PASS"
+) -> tuple[subprocess.CompletedProcess[str], int]:
     """The hook as git runs it before a push of ``local`` over ``remote``, and how many times the stand-in was asked."""
-    return _run_hook_on(repo, tmp_path, f"refs/heads/feature {local} refs/heads/feature {remote}\n")
+    return _run_hook_on(repo, tmp_path, f"refs/heads/feature {local} refs/heads/feature {remote}\n", answer)
 
 
-def _run_hook_on(repo: Path, tmp_path: Path, refs: str) -> tuple[subprocess.CompletedProcess[str], int]:
-    """The hook as git runs it with ``refs`` on its stdin; the stand-in reads its stdin whole, as `claude -p` does."""
+def _run_hook_on(
+    repo: Path, tmp_path: Path, refs: str, answer: str = "No issues found.\nVERDICT: PASS"
+) -> tuple[subprocess.CompletedProcess[str], int]:
+    """The hook as git runs it with ``refs`` on its stdin; the stand-in records that it was asked."""
     bin_dir: Path = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     asked: Path = tmp_path / "asked"
-    stand_in: Path = bin_dir / "claude"
+    stand_in: Path = bin_dir / "dotx"
+    answer_file: Path = tmp_path / "answer"
+    answer_file.write_text(answer + "\n", encoding="utf-8")
     stand_in.write_text(
-        f'#!/bin/sh\ncat > /dev/null\necho asked >> "{asked}"\necho "No issues found."\necho "VERDICT: PASS"\n',
+        f'#!/bin/sh\ncat > /dev/null\necho asked >> "{asked}"\ncat "{answer_file}"\n'
+        'echo "run run_test, thread thr_test"\n',
         encoding="utf-8",
     )
     stand_in.chmod(0o755)
@@ -200,7 +207,7 @@ def test_a_push_of_main_taken_in_and_a_commit_on_top_reads_only_the_branchs_chan
 
 
 def test_a_push_of_two_branches_reviews_both(repo: Path, tmp_path: Path) -> None:
-    """Item 1020: `claude -p` reads a piped stdin; the hook's stdin is git's list of refs, so a review that inherited it
+    """Item 1020: a review read a piped stdin; the hook's stdin is git's list of refs, so a review that inherited it
     swallowed the second ref, which was then pushed unreviewed."""
     first: str = _git(repo, "rev-parse", "HEAD")
     _git(repo, "checkout", "-q", "-b", "second", "main")
@@ -210,3 +217,18 @@ def test_a_push_of_two_branches_reviews_both(repo: Path, tmp_path: Path) -> None
     )
     done, asked = _run_hook_on(repo, tmp_path, refs)
     assert (done.returncode, asked) == (0, 2), done.stdout + done.stderr
+
+
+def test_a_block_stops_the_push(repo: Path, tmp_path: Path) -> None:
+    """A review that found an Important thing stops the push: the verdict line decides, not the run's exit status,
+    which says only that the run finished (item 1211: the Claude review refused this diff with [cyber] and stopped a
+    push it never read)."""
+    done, asked = _run_hook(
+        repo,
+        tmp_path,
+        _git(repo, "rev-parse", "HEAD"),
+        _ZERO,
+        answer="One important finding in the hook.\nVERDICT: BLOCK",
+    )
+    assert (done.returncode, asked) == (1, 1), done.stdout + done.stderr
+    assert "push stopped" in done.stderr

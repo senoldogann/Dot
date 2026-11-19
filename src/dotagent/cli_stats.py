@@ -34,6 +34,7 @@ from dotagent.harness.schedule import STEP_OFF, STEP_TIME_KEY, schedule_from
 from dotagent.scheduler.failures import SCHEDULE_FAILURES_KEY, FiringFailure, FiringFailures, parse_failures
 from dotagent.store.endings import ENDING_LABELS
 from dotagent.store.stats import (
+    CACHED_TOKEN_WEIGHT,
     ActStats,
     ChannelStats,
     CompactionStats,
@@ -161,7 +162,8 @@ def render_time(stats: Sequence[ModelStats]) -> list[str]:
     width: int = max(len("model"), *(len(entry.model) for entry in stats))
     header: str = (
         f"  {'model':<{width}}  {'timed runs':>10}  {'model s':>9}  {'step median s':>13}  {'step p90 s':>10}  "
-        f"{'compaction s':>12}  {'side calls s':>12}  {'cached tokens':>13}  {'cached':>6}"
+        f"{'compaction s':>12}  {'side calls s':>12}  {'cached tokens':>13}  {'cached':>6}  {'fresh tokens':>12}  "
+        f"{'weighted*':>9}"
     )
     timed: list[ModelStats] = [entry for entry in stats if entry.time.timed_runs > 0]
     rows: list[str] = []
@@ -171,7 +173,8 @@ def render_time(stats: Sequence[ModelStats]) -> list[str]:
             f"  {entry.model:<{width}}  {f'{time.timed_runs} of {entry.runs}':>10}  {_seconds(time.model_seconds):>9}  "
             f"{_seconds(time.step_seconds_median):>13}  {_seconds(time.step_seconds_p90):>10}  "
             f"{_seconds(time.compaction_seconds):>12}  {_seconds(time.side_call_seconds):>12}  "
-            f"{_count(time.cached_tokens):>13}  {_share(time.cached_share):>6}"
+            f"{_count(time.cached_tokens):>13}  {_share(time.cached_share):>6}  {_count(time.fresh_tokens):>12}  "
+            f"{_count(round(time.weighted_tokens)):>9}"
         )
     untimed: int = sum(entry.runs - entry.time.timed_runs for entry in stats)
     note: list[str] = (
@@ -179,7 +182,17 @@ def render_time(stats: Sequence[ModelStats]) -> list[str]:
         if untimed
         else []
     )
-    return ["Time, from the model calls the runs recorded (side calls: every call but a step):", header, *rows, *note]
+    weight: list[str] = [
+        f"  * weighted: fresh input plus cached input at {CACHED_TOKEN_WEIGHT:g} of a fresh token (assumed, not read "
+        "from a bill); judge a change of the context by it, not by the raw input."
+    ]
+    return [
+        "Time, from the model calls the runs recorded (side calls: every call but a step):",
+        header,
+        *rows,
+        *note,
+        *(weight if timed else []),
+    ]
 
 
 def render_tools(tools: Sequence[ToolStats]) -> list[str]:

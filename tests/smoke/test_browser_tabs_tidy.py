@@ -21,6 +21,7 @@ from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession
 from dotagent.browser.types import PageView, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
+from dotagent.core.errors import BrowserError
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -215,3 +216,28 @@ async def test_a_popup_on_its_way_while_the_tabs_are_made_new_for_a_login_does_n
         assert reset[0] is not None and popups[0].is_closed()
     finally:
         await browser.release_thread("racy")
+
+
+async def test_a_tab_number_from_before_the_tabs_closed_is_told_what_the_chat_has_and_what_closed(
+    browser: BrowserSession, site: str
+) -> None:
+    """Item 1209: the next run of a chat, which saw "Tab 2 of 2" before the end of the run that opened it closed it,
+    switched to it and was told only that there is no such tab."""
+    await browser.open_url("again", f"{site}/first", True)
+    await browser.new_tab("again", f"{site}/second", True)
+    await browser.new_tab("again", f"{site}/third", True)
+    await browser.switch_tab("again", 1, True)
+    try:
+        await browser.end_of_run("again", keep_current=True)
+        await browser.new_tab("again", f"{site}/fourth", True)
+        # A page that closes itself, or that the owner closes in Chrome.
+        await browser._threads["again"].tabs[1].page.close()
+        with pytest.raises(BrowserError) as raised:
+            await browser.switch_tab("again", 3, True)
+    finally:
+        await browser.release_thread("again")
+    said: str = raised.value.message
+    assert f"there is no tab 3: the chat has these tabs open: [1]* {site}/first" in said
+    assert f"{site}/second (Dot closed it when the run that left it in the background ended)" in said
+    assert f"{site}/fourth (its page closed it, or it was closed in Chrome)" in said
+    assert "browser_new_tab" in said

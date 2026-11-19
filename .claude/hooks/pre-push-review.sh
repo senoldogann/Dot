@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Git pre-push hook: Claude Code reviews the commits about to be pushed, following REVIEW.md, on the claude.ai
-# subscription the local `claude` command is signed in with. An Important finding stops the push.
+# Git pre-push hook: Dot's own model reviews the commits about to be pushed, following REVIEW.md, in research mode
+# (read-only). An Important finding stops the push. The review ran on Claude Code until item 1211: that model answered
+# `[cyber]` to a diff it declined to read, and stopped a push it never judged.
 #
 # Install once: ln -sf ../../.claude/hooks/pre-push-review.sh .git/hooks/pre-push
 # Skip once:    git push --no-verify
@@ -27,12 +28,6 @@ repo_root=$(git rev-parse --show-toplevel)
 review_dir="$(git rev-parse --path-format=absolute --git-common-dir)/claude-review"
 mkdir -p "$review_dir"
 cd "$repo_root"
-
-if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-  echo "claude-review: ANTHROPIC_API_KEY is set, so the review would be billed to the API, not the subscription." >&2
-  echo "claude-review: unset it, or push with --no-verify." >&2
-  exit 1
-fi
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   # A deleted branch has nothing to review.
@@ -81,31 +76,47 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       "the approach (the structural fix, or two smaller changes) rather than closing the next spelling." >&2
   fi
 
-  echo "claude-review: reviewing $base..$local_sha ($local_ref -> $remote_ref) with Claude Code"
+  echo "claude-review: reviewing $base..$local_sha ($local_ref -> $remote_ref) on opencode_go:deepseek-v4.1-flash"
   review_file="$review_dir/$local_sha.md"
   diff_file="$review_dir/$local_sha.diff"
   {
     git log --format='commit %h%n%n%B' "$base..$local_sha"
     git diff "$base..$local_sha"
   } >"$diff_file"
-  prompt="Review the change in $diff_file (its commit messages, then the diff of $base..$local_sha) in this \
-repository; the working tree may differ, so trust the diff for what changed. Follow REVIEW.md exactly: what failure \
+  prompt="Review the change in $diff_file (its commit messages, then the diff of $base..$local_sha) in the repository \
+at $repo_root; its working tree may differ, so trust the diff for what changed, and read every file by its path under \
+$repo_root, since the run's own workspace is elsewhere. Follow $repo_root/REVIEW.md exactly: what failure \
 looks like here, file-and-line evidence, the Important / Nit / Pre-existing tags, at most 3 nits, and a summary that \
 starts with the finding count. Read the surrounding code before reporting a finding. Review only; change nothing. End \
 your answer with one last line that is exactly \`VERDICT: BLOCK\` if there is at least one Important finding or you \
 could not review the change, otherwise exactly \`VERDICT: PASS\`."
 
-  # The model is named because the user's default routes each turn to the cheapest model that can do it. Its stdin is
-  # /dev/null (item 1020): `claude -p` reads a piped stdin into the prompt, and the hook's stdin is git's list of refs,
-  # so it would swallow the refs after this one and push them unreviewed.
-  if ! claude -p "$prompt" \
-    --model claude-opus-5-5 \
-    --permission-mode dontAsk \
-    --allowedTools "Read" "Grep" "Glob" \
-    --no-session-persistence \
-    </dev/null >"$review_file"; then
-    echo "claude-review: the claude command failed; its output is in $review_file" >&2
-    exit 1
+  # Dot's own model is named rather than left to the configured main model: the review is the one step that must not
+  # drift. Research mode refuses every step that would change the repository or run a command's side effect, so the
+  # review reads the code and cannot edit it; it may still read the web and keep a note. Its stdin is /dev/null (item
+  # 1020): the hook's stdin is git's list of refs, and nothing may swallow the refs after this one.
+  dotx=${DOTX:-$(command -v dotx || echo "$HOME/Desktop/Dot/.venv/bin/dotx")}
+  # The chat the review is kept in belongs to the branch being pushed, not to the one checked out: `git push origin
+  # other`, `git push --all` and the repair flow push a branch that is not HEAD.
+  branch=${local_ref#refs/heads/}
+  thread_file="$review_dir/thread-${branch//\//-}"
+  review() {
+    local args=(run --mode research --model opencode_go:deepseek-v4.1-flash --effort high --no-input)
+    if [[ -s "$thread_file" ]]; then
+      args+=(--thread "$(cat "$thread_file")")
+    fi
+    "$dotx" "${args[@]}" "$prompt" </dev/null
+  }
+  # The status of a run says whether it finished, not what it found: a BLOCK ends a run that exited cleanly, so the
+  # verdict line decides. A thread that no longer exists is no reason to skip the review: it gets one more try in a
+  # chat of its own.
+  review >"$review_file" 2>&1 || true
+  if ! grep -qE '^VERDICT: (PASS|BLOCK)$' "$review_file"; then
+    rm -f "$thread_file"
+    review >"$review_file" 2>&1 || true
+  fi
+  if thread=$(grep -oE 'thread thr_[a-z0-9_]+' "$review_file" | tail -n 1); then
+    printf '%s\n' "${thread#thread }" >"$thread_file"
   fi
 
   cat "$review_file"
@@ -119,7 +130,9 @@ could not review the change, otherwise exactly \`VERDICT: PASS\`."
       exit 1
       ;;
     *)
-      echo "claude-review: the review gave no VERDICT line; read $review_file" >&2
+      echo "claude-review: the reviewer did not start or gave no VERDICT line; its last lines follow, and the whole" \
+        "output is in $review_file" >&2
+      tail -n 5 "$review_file" >&2 || true
       exit 1
       ;;
   esac

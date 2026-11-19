@@ -3,6 +3,7 @@
 import asyncio
 import os
 import sys
+import time
 from collections.abc import Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
@@ -81,9 +82,13 @@ from dotagent.meetings.desk import MeetingDesk, launch_meeting_chrome
 from dotagent.meetings.notes import MeetingNotes, make_notes
 from dotagent.meetings.types import MeetingLine
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
+from dotagent.notify.money import MoneyTeller
 from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.oauth.accounts import Accounts
 from dotagent.oauth.keychain import Keychain, keychain_file
+from dotagent.phone.desk import PhoneDesk
+from dotagent.phone.devicectl import XcrunDevicectl, run_command
+from dotagent.phone.wda import WdaClient
 from dotagent.plugins.catalog import PluginShelf, load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
@@ -116,6 +121,8 @@ from dotagent.tools.notes import build_notes_tools
 from dotagent.tools.objectives import build_objective_tools
 from dotagent.tools.office import build_office_tools
 from dotagent.tools.pages import build_page_tools
+from dotagent.tools.phone import build_phone_tools
+from dotagent.tools.pipeline import build_pipeline_tools
 from dotagent.tools.posts import build_post_tools
 from dotagent.tools.recall import build_recall_tools
 from dotagent.tools.recon import build_recon_tool
@@ -130,6 +137,7 @@ from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.todos import build_todo_tools
 from dotagent.tools.trading import build_trading_tools
+from dotagent.tools.video import build_video_tools
 from dotagent.tools.waits import build_wait_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.tools.work_orders import build_work_order_tools
@@ -139,6 +147,7 @@ from dotagent.trading.service import Trading, TradingSettings
 from dotagent.vault.items import VaultItems
 from dotagent.vault.onepassword import OnePassword
 from dotagent.vault.secretstore import LoginKeychain
+from dotagent.voice.helper import Transcriber
 from dotagent.web.client import WebClient
 from dotagent.web.keyed import keyed_engines
 from dotagent.web.ladder import SearchEngine
@@ -247,6 +256,10 @@ class Runtime:
     trading: Trading
     # Dot in the owner's calls (item 1138, docs/meetings.md): the meeting it is in, watched with no model.
     meetings: MeetingDesk
+    # The owner's iPhone over WebDriverAgent (docs/phone-control.md); ``None`` while [phone] is off.
+    phone: PhoneDesk | None
+    # The Mac's dictation model (item 626): what the owner says into a page, and what is said in a video (item 1212).
+    transcriber: Transcriber
 
     @property
     def search_key_present(self) -> bool:
@@ -273,6 +286,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_memory_tools(),
         build_todo_tools(),
         build_objective_tools(),
+        build_pipeline_tools(),
         (build_draft_tool(),),
         build_mail_calendar_tools(),
         build_schedule_tools(),
@@ -290,15 +304,30 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         (build_skill_tool(), build_find_help_tool(), build_skill_save_tool()),
         build_contacts_tools(),
         build_meeting_tools(),
+        build_video_tools(),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),
         *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
         # The trading tools exist only while the owner has trading on (docs/trading.md).
         *((build_trading_tools(),) if config.trading.mode != "off" else ()),
+        # The phone tool exists only while the owner has [phone] on (docs/phone-control.md).
+        *((build_phone_tools(),) if config.phone.enabled else ()),
     )
     if not config.desktop.enabled:
         return core
     return (*core, build_desktop_tools(), (build_apple_tool(),))
+
+
+def _phone(config: AppConfig) -> PhoneDesk | None:
+    """The owner's iPhone, reached over WebDriverAgent, while ``[phone] enabled``."""
+    if not config.phone.enabled:
+        return None
+    return PhoneDesk(
+        config.phone,
+        WdaClient(config.phone.wda_urls, config.phone.request_timeout_s),
+        XcrunDevicectl(run_command),
+        time.monotonic,
+    )
 
 
 def _trading(config: AppConfig, store: Store, zone: ZoneInfo) -> Trading:
@@ -593,6 +622,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             order=tuple(config.web.search_order),
         )
         router.on_retire(partial(_refresh_search_key, config, search_keys))
+        router.on_money_pause(MoneyTeller(bus))
         approvals: ApprovalBroker = ApprovalBroker(store, bus, config.policy.approval_timeout_s)
         approvals.switch_free(config.policy.free)
         assistant: Assistant = Assistant(config.assistant, await asyncio.to_thread(mac_first_name))
@@ -641,6 +671,8 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             notify=show_notification,
             peers=peers,
             trading=_trading(config, store, schedule_zone),
+            phone=_phone(config),
+            transcriber=Transcriber(voice_dir()),
             meetings=MeetingDesk(
                 store,
                 approvals,
@@ -717,6 +749,8 @@ async def close_runtime(runtime: Runtime) -> None:
         closing.push_async_callback(runtime.mcp.close)
         closing.push_async_callback(runtime.browsers.aclose)
         closing.push_async_callback(runtime.meetings.aclose)
+        if runtime.phone is not None:
+            closing.push_async_callback(runtime.phone.aclose)
         closing.push_async_callback(runtime.desktop.close)
         closing.push_async_callback(runtime.awake.stop)
         closing.push_async_callback(runtime.terminals.aclose)

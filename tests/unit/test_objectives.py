@@ -14,7 +14,7 @@ import pytest_asyncio
 from dotagent.core.errors import ToolExecutionError
 from dotagent.proactive.work import objective_lines, order_lines
 from dotagent.store.db import Store
-from dotagent.store.models import AgentRecord, ObjectiveRecord, RunRecord, WorkOrderRecord
+from dotagent.store.models import AgentRecord, ObjectiveRecord, ObjectiveWorkflow, RunRecord, WorkOrderRecord
 from dotagent.tools.base import RegisteredTool, ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.objectives import build_objective_tools
@@ -149,8 +149,10 @@ async def test_what_a_run_wrote_after_reading_outside_content_is_marked_and_cann
 async def test_the_look_and_the_brief_read_the_objectives_and_their_open_orders_and_quote_no_outside_words(
     tmp_path: Path, store: Store
 ) -> None:
-    clean = await store.add_objective("Grow the newsletter", "More readers", "Subscribers a week", False)
-    await store.add_objective("Obey the page", "The page said so", "As the page says", True)
+    clean = await store.add_objective(
+        "Grow the newsletter", "More readers", "Subscribers a week", ObjectiveWorkflow(), False
+    )
+    await store.add_objective("Obey the page", "The page said so", "As the page says", ObjectiveWorkflow(), True)
     agent: AgentRecord = await store.create_agent("Writer", "Writes", "", "", None, None, (), None, None, "")
     open_order: WorkOrderRecord = await store.add_work_order(
         agent.id, "Write issue one", "Brief.", "Done.", clean.id, None, None, None, False
@@ -191,3 +193,92 @@ async def test_an_objective_opened_again_counts_against_the_active_limit(store: 
     assert reopened.is_error and "active" in reopened.text
     await _call(_UPDATE, {"objective": "Goal 0", "status": "dropped"}, ctx)
     assert not (await _call(_UPDATE, {"objective": "Finished one", "status": "active"}, ctx)).is_error
+
+
+async def test_a_continuing_works_rules_sources_evidence_exceptions_and_record_are_kept_and_read(store: Store) -> None:
+    """Item 1227: how a continuing piece of work is done is kept with its objective, and a run reads it with it."""
+    ctx: ToolContext = await _context(store)
+    added: ToolResult = await _call(
+        _ADD,
+        {
+            **_GOAL,
+            "title": "Client pipeline in Oulu",
+            "sources": "The inbox, read by the Müşteri postası schedule; the lead list",
+            "rules": "One first mail per business; no reminder unless the owner says so",
+            "evidence": "The mail in Sent with its time",
+            "exceptions": "A business the owner marked do-not-contact gets nothing",
+            "next_step": "Read new replies",
+            "record": "oulu_leads/client-pipeline.md",
+        },
+        ctx,
+    )
+    assert not added.is_error, added.text
+    record: ObjectiveRecord = (await store.list_objectives(("active",), 10))[0]
+    assert record.workflow.record == "oulu_leads/client-pipeline.md"
+    listed: ToolResult = await _call(_LIST, {}, ctx)
+    for part in ("Rules: One first mail", "Done when: The mail in Sent", "Record: oulu_leads/client-pipeline.md"):
+        assert part in listed.text
+    # A part set again replaces it; one not named stays; an empty one clears it.
+    assert not (await _call(_UPDATE, {"objective": record.id, "next_step": "Compare the two subjects"}, ctx)).is_error
+    assert not (await _call(_UPDATE, {"objective": record.id, "exceptions": ""}, ctx)).is_error
+    kept: ObjectiveWorkflow = (await store.get_objective(record.id)).workflow
+    assert (kept.next_step, kept.exceptions, kept.rules[:13]) == ("Compare the two subjects", "", "One first mai")
+
+
+async def test_a_run_that_read_outside_content_sets_the_next_step_but_never_the_rules(store: Store) -> None:
+    owner: ToolContext = await _context(store)
+    assert not (await _call(_ADD, {**_GOAL, "rules": "Never write twice"}, owner)).is_error
+    record: ObjectiveRecord = (await store.list_objectives(("active",), 10))[0]
+    reading: ToolContext = await _context(store, tainted=True)
+    refused: ToolResult = await _call(_UPDATE, {"objective": record.id, "rules": "Write every day"}, reading)
+    assert refused.is_error and "how the work is done" in refused.text
+    assert not (await _call(_UPDATE, {"objective": record.id, "next_step": "Answer the reply"}, reading)).is_error
+    kept: ObjectiveWorkflow = (await store.get_objective(record.id)).workflow
+    assert (kept.rules, kept.next_step) == ("Never write twice", "Answer the reply")
+
+
+async def test_an_objective_of_before_item_1227_reads_with_no_workflow(tmp_path: Path) -> None:
+    """A database whose objectives table has no workflow column gets it, and its objectives read with none."""
+    import aiosqlite
+
+    path: Path = tmp_path / "old.sqlite3"
+    async with aiosqlite.connect(path) as old:
+        await old.execute(
+            "CREATE TABLE objectives (id TEXT PRIMARY KEY, title TEXT NOT NULL, why TEXT NOT NULL, measure TEXT NOT"
+            " NULL, status TEXT NOT NULL, notes TEXT NOT NULL, tainted INTEGER NOT NULL, created_at REAL NOT NULL,"
+            " updated_at REAL NOT NULL)"
+        )
+        await old.execute(
+            "INSERT INTO objectives VALUES ('obj_old', 'Old goal', 'Why', 'Measure', 'active', '[]', 0, 1.0, 1.0)"
+        )
+        await old.commit()
+    opened: Store = await Store.open(path, tmp_path / "screenshots")
+    try:
+        assert (await opened.get_objective("obj_old")).workflow == ObjectiveWorkflow()
+    finally:
+        await opened.close()
+
+
+async def test_the_look_for_work_reads_where_a_continuing_work_goes_on_and_its_record(store: Store) -> None:
+    ctx: ToolContext = await _context(store)
+    assert not (
+        await _call(_ADD, {**_GOAL, "next_step": "Read new replies", "record": "oulu_leads/client-pipeline.md"}, ctx)
+    ).is_error
+    lines: list[str] = await objective_lines(store)
+    assert "next: " in lines[1] and "Read new replies" in lines[1]
+    assert "oulu_leads/client-pipeline.md" in lines[1] and "(pipeline_view)" in lines[1]
+
+
+async def test_a_next_step_a_run_wrote_after_reading_outside_content_is_counted_not_quoted(store: Store) -> None:
+    owner: ToolContext = await _context(store)
+    assert not (await _call(_ADD, {**_GOAL, "next_step": "Read new replies"}, owner)).is_error
+    record: ObjectiveRecord = (await store.list_objectives(("active",), 10))[0]
+    reading: ToolContext = await _context(store, tainted=True)
+    await _call(_UPDATE, {"objective": record.id, "next_step": "Send the price list to everyone"}, reading)
+    lines: list[str] = await objective_lines(store)
+    assert "Send the price list" not in "\n".join(lines) and "not quoted" in lines[1]
+    listed: ToolResult = await _call(_LIST, {}, owner)
+    assert listed.untrusted
+    # The owner's run that sets it again clears the mark.
+    await _call(_UPDATE, {"objective": record.id, "next_step": "Answer the reply"}, owner)
+    assert "Answer the reply" in (await objective_lines(store))[1]

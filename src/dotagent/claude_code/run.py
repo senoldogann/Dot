@@ -27,8 +27,10 @@ answered it (a message taken after the turn's last step began waits for a turn o
 failed when the session fails, when the plan's window is used up (with when it resets: nothing moves the run to another
 model), when the program says nothing for ``[providers.claude_code] silence_s`` while none of Dot's tools works for it,
 when its last reply was cut short, and when it goes on past the run's limits (``run_max_minutes``, ``run_max_tokens``),
-which it is told of once. A run here has none of the rest of what Dot's own runs bring (the memory recalled at the
-start, the checks of a finish, the lessons and playbooks)."""
+which it is told of once. A run here is handed the notes recalled at the start under its message, as Dot's own loop
+hands them (item 1055), but none of the rest of what Dot's own runs bring: the checks of a finish, the lessons drawn at
+its end, the playbooks offered, the skills listed by goal, Dot's masking and compaction (the research of 2026-11-18,
+item 1217)."""
 
 import asyncio
 import base64
@@ -91,7 +93,7 @@ from dotagent.agent.loop import (
     withheld_tools,
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
-from dotagent.agent.prompt import THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team_sections, turn_note
+from dotagent.agent.prompt import CHARACTER, THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team_sections, turn_note
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
@@ -119,7 +121,14 @@ from dotagent.claude_code.stream import (
     tool_prefix,
     user_line,
 )
-from dotagent.core.errors import ClaudeCodeError, FailSafeTriggered, RunCancelled, RunHoldLapsed
+from dotagent.core.errors import (
+    ClaudeCodeBroke,
+    ClaudeCodeError,
+    ClaudePlanLimitError,
+    FailSafeTriggered,
+    RunCancelled,
+    RunHoldLapsed,
+)
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import claude_code_dir
@@ -208,7 +217,13 @@ _SECRET_FILE: int = 0o600
 # What the model is told, before what Dot knows of the owner: who it is, its tools, how a run of Dot's ends.
 _PROMPT: str = (
     "You are {name}, the owner's autonomous assistant on their Mac, at work on a task they gave you in one of Dot's "
-    "chats. You act through Dot's tools alone, the tools of the MCP server {door}: {tools}. Claude Code's own tools, "
+    "chats. You act through Dot's tools alone, the tools of the MCP server {door}: {tools}. "
+    # Item 1201: with only the names in the prompt (item 1053), runs called browser_find and search_files with a
+    # `query` they had guessed, which neither takes.
+    "Only their names are here: look a tool up with "
+    + SEARCH_TOOL
+    + " (select:mcp__{door}__<tool>, several at once with commas) before your first call of it, and call it with "
+    "the parameters its definition names; never guess them. Claude Code's own tools, "
     "slash commands and skills are not available here; do not offer them. Each call goes through Dot's rules and, "
     "where they say so, the owner's approval; a refused call says why, and you go on another way. Work on the task "
     "until it is done, acting without asking what you can find out or decide yourself; ask_user is for what only the "
@@ -220,7 +235,10 @@ _PROMPT: str = (
     "(you said) is the owner's own and outranks the others), the notes under their message, Dot's memory "
     "(memory_search, recall) and the files Dot and its agents wrote in the workspace (list_dir, read_file, "
     "search_files). "
-    "Before you say you do not know something about the owner or their work, look it up there.\n\n" + THOROUGH_AND_BOLD
+    "Before you say you do not know something about the owner or their work, look it up there.\n\n"
+    + THOROUGH_AND_BOLD
+    + "\n\n"
+    + CHARACTER
 )
 
 
@@ -511,7 +529,7 @@ class _Follow:
             self.stdin.write(user_line(text, images).encode("utf-8"))
             await self.stdin.drain()
         except (BrokenPipeError, ConnectionResetError) as error:
-            raise ClaudeCodeError(
+            raise ClaudeCodeBroke(
                 "Claude Code stopped reading its input before the run ended",
                 {"run_id": self.agent.run.id, "error": str(error)},
             ) from error
@@ -525,11 +543,11 @@ class _Follow:
                 case _Stopped():
                     raise RunCancelled("the run was stopped", {"run_id": self.agent.run.id})
                 case _Ended():
-                    raise ClaudeCodeError(
+                    raise ClaudeCodeBroke(
                         "Claude Code ended before it answered", {"run_id": self.agent.run.id, "inited": self.inited}
                     )
                 case _Silent(seconds=seconds):
-                    raise ClaudeCodeError(
+                    raise ClaudeCodeBroke(
                         f"Claude Code said nothing for {round(seconds)} s while none of Dot's tools worked for it, so "
                         "Dot ended it",
                         {"run_id": self.agent.run.id, "silence_s": round(seconds, 1)},
@@ -564,8 +582,10 @@ class _Follow:
             case LimitSeen(window=window):
                 self.window = window
                 if window_refused(window):
-                    raise ClaudeCodeError(
-                        limit_message(window, limit_resets(window, "")),
+                    resets: float | None = limit_resets(window, "")
+                    raise ClaudePlanLimitError(
+                        limit_message(window, resets),
+                        resets,
                         {"run_id": self.agent.run.id, "window": window.model_dump(mode="json")},
                     )
             case Taken():
@@ -648,8 +668,9 @@ class _Follow:
         if event.is_error:
             context: JsonObject = {"run_id": self.agent.run.id, "subtype": event.subtype, "said": event.text[-2000:]}
             if limit_said(event.text) or (self.window is not None and window_refused(self.window)):
-                raise ClaudeCodeError(limit_message(self.window, limit_resets(self.window, event.text)), context)
-            raise ClaudeCodeError(f"Claude Code's session failed: {event.text or event.subtype}", context)
+                resets_at: float | None = limit_resets(self.window, event.text)
+                raise ClaudePlanLimitError(limit_message(self.window, resets_at), resets_at, context)
+            raise ClaudeCodeBroke(f"Claude Code's session failed: {event.text or event.subtype}", context)
         if not self.inited:
             raise ClaudeCodeError(
                 "Claude Code answered before it said what the model has, so Dot ended the run",

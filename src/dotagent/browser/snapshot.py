@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 from urllib.parse import urljoin
 
 from dotagent.browser.types import Dropdown, DropdownOption
-from dotagent.core.text import unclosing
+from dotagent.core.text import unclosing, without_trailing_blanks
 
 _INDENT: re.Pattern[str] = re.compile(r"^( *)- ")
 _BOX: re.Pattern[str] = re.compile(r" \[box=(-?[\d.]+),(-?[\d.]+),([\d.]+),([\d.]+)\]")
@@ -38,7 +38,6 @@ _SHAPE: re.Pattern[str] = re.compile(
 )
 _NAMED: re.Pattern[str] = re.compile(r'^\s*- (?!generic\b)([A-Za-z][\w-]*) "((?:[^"\\]|\\.)*)"')
 _BLANK_RUNS: re.Pattern[str] = re.compile(r"\n{3,}")
-_TRAILING_SPACE: re.Pattern[str] = re.compile(r"[ \t]+\n")
 _INVISIBLE_CHARS: re.Pattern[str] = re.compile("[" + chr(0x200B) + chr(0x00AD) + "]")  # zero-width space, soft hyphen
 _WORD: re.Pattern[str] = re.compile(r"\w{3,}")
 _MAX_LINE_CHARS: int = 400
@@ -135,10 +134,20 @@ def _make_line(raw: str, depth: int) -> SnapshotLine:
     )
 
 
+def fed_lines(text: str) -> list[str]:
+    """The lines of ``text`` as a line feed ends them, and nothing else: ``str.splitlines`` also ends a line at U+0085,
+    U+2028, U+2029 and some control characters, which a page can put in an element's name (item 1241)."""
+    return text.removesuffix("\n").split("\n") if text else []
+
+
 def parse_snapshot(snapshot: str) -> tuple[SnapshotLine, ...]:
-    """Split a snapshot into lines with their depth, ref, box and shape; lines that are not list items are dropped."""
+    """Split a snapshot into lines with their depth, ref, box and shape; lines that are not list items are dropped.
+    Playwright ends a line with a line feed and writes an element's name as it is, so a name may hold U+0085, U+2028 or
+    another character ``str.splitlines`` also breaks at: a page that put one in a name forged a line of its own, with a
+    control's ref, ahead of the control's real line (the code review of 2026-11-19, item 1241): only a line feed
+    ends one here (:func:`fed_lines`)."""
     lines: list[SnapshotLine] = []
-    for raw in snapshot.splitlines():
+    for raw in fed_lines(snapshot):
         indent: re.Match[str] | None = _INDENT.match(raw)
         if indent is not None:
             lines.append(_make_line(raw, len(indent.group(1)) // 2))
@@ -309,10 +318,10 @@ def count_refs(lines: Sequence[SnapshotLine]) -> int:
 
 def diff_views(previous: str, current: str) -> ViewDiff:
     """Line-level multiset diff of two rendered views. Refs stay stable while an element's role and name do not."""
-    before: Counter[str] = Counter(line.strip() for line in previous.splitlines())
+    before: Counter[str] = Counter(line.strip() for line in fed_lines(previous))
     budget: Counter[str] = Counter(before)
     added: list[str] = []
-    current_lines: list[str] = current.splitlines()
+    current_lines: list[str] = fed_lines(current)
     for line in current_lines:
         key: str = line.strip()
         if budget[key] > 0:
@@ -353,7 +362,7 @@ def fit_to_budget(text: str, max_chars: int) -> tuple[str, int]:
     """Cut ``text`` at a line boundary so it fits ``max_chars``; returns the text and how many lines were dropped."""
     if len(text) <= max_chars:
         return text, 0
-    lines: list[str] = text.splitlines()
+    lines: list[str] = fed_lines(text)
     used: int = 0
     kept: list[str] = []
     for line in lines:
@@ -427,6 +436,33 @@ def link_lines(lines: Sequence[SnapshotLine], base_url: str, needle: str, limit:
             if len(hits) >= limit:
                 break
     return tuple(hits)
+
+
+_FRAME_OF_REF: re.Pattern[str] = re.compile(r"^(f\d+)?e")
+
+
+def redrawn_ref(shown: Sequence[SnapshotLine], now: Sequence[SnapshotLine], ref: str) -> str | None:
+    """The ref the control ``ref`` of the view ``shown`` has in the snapshot ``now``, once the page drew it anew
+    (item 1199): ``ref`` itself while ``now`` holds it, else the ref of the one line of ``now`` of the same role and the
+    same name, in the same frame. ``None`` when ``shown`` has no such line or it has no name, and when ``now`` has no
+    alike line or several, which cannot be told apart."""
+    before: SnapshotLine | None = next((line for line in shown if line.ref == ref), None)
+    if before is None or not before.role or not before.name:
+        return None
+    if any(line.ref == ref for line in now):
+        return ref
+    frame: re.Match[str] | None = _FRAME_OF_REF.match(ref)
+    alike: list[str] = [
+        line.ref
+        for line in now
+        if line.ref is not None
+        and line.role == before.role
+        and line.name == before.name
+        and (match := _FRAME_OF_REF.match(line.ref)) is not None
+        and frame is not None
+        and match.group(1) == frame.group(1)
+    ]
+    return alike[0] if len(alike) == 1 else None
 
 
 def line_for_ref(lines: Sequence[SnapshotLine], ref: str) -> str | None:
@@ -605,7 +641,7 @@ def fence_untrusted(url: str, body: str, nonce: str) -> str:
 
 def squeeze_text(text: str) -> str:
     """Page text without trailing blanks and with at most one empty line in a row."""
-    return _BLANK_RUNS.sub("\n\n", _TRAILING_SPACE.sub("\n", text.replace("\r\n", "\n"))).strip()
+    return _BLANK_RUNS.sub("\n\n", without_trailing_blanks(text.replace("\r\n", "\n"))).strip()
 
 
 def controls_near(lines: Sequence[SnapshotLine], ref: str) -> tuple[str, ...]:

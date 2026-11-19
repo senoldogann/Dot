@@ -101,6 +101,33 @@ def next_firing(cron: str, after: float, zone: ZoneInfo) -> float | None:
     return found[0] if found else None
 
 
+# How many firings :func:`newest_missed` reads at a time.
+_MISSED_BATCH: int = 256
+
+
+class MissedFirings(FrozenModel):
+    """The firings of a repeating schedule that came due while it could not fire (item 1204): the newest of them, and
+    how many came before it."""
+
+    newest: float
+    older: int
+
+
+def newest_missed(cron: str, due: float, now: float, zone: ZoneInfo) -> MissedFirings:
+    """The firings of ``cron`` from ``due`` (the schedule's next time, itself one, at or before ``now``) up to ``now``:
+    the newest, and how many came before it. The firings strictly after ``due`` are those of :func:`firings`."""
+    newest: float = due
+    older: int = 0
+    while True:
+        batch: list[float] = firings(cron, newest, zone, _MISSED_BATCH)
+        passed: list[float] = [moment for moment in batch if moment <= now]
+        if passed:
+            older += len(passed)
+            newest = passed[-1]
+        if len(passed) < _MISSED_BATCH:
+            return MissedFirings(newest=newest, older=older)
+
+
 def plan_cron(cron: str, zone: ZoneInfo, min_interval_s: int, now: float) -> Timing:
     fields: list[str] = cron.split()
     if len(fields) != _CRON_FIELDS:

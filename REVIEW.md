@@ -29,8 +29,46 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_context_budget.py::test_a_tool_the_run_let_go_is_not_named_and_not_callable` — the fit ran after
+  the groups, the registry and the prompt were built, so a run named tools it had let go, and a dropped tool stayed
+  callable (item 1211).
+- `tests/unit/test_eval_plan_runs.py::test_a_plan_run_that_had_dot_read_a_page_counts_its_steps_and_that_read` — a
+  plan run with one side call of Dot's was measured from that call alone, its steps dropped (item 1220).
+- `tests/unit/test_tool_call_origin.py::test_another_models_turn_is_not_handed_a_signature_it_never_wrote` — a tool
+  call's replay state went back to whatever model the conversation was sent to, not only the one that wrote it
+  (item 1228).
+- `tests/unit/test_antigravity_request.py::test_a_revoked_login_says_to_sign_in_again` — a token endpoint answering 400
+  (a revoked login) was read as a protocol error, and nothing else noticed the login was gone (item 1228).
+- `tests/unit/test_antigravity_request.py::test_the_answers_to_two_calls_of_one_turn_are_one_content` — the answers to
+  two tool calls of one turn went to Gemini as two contents, so a call was left unanswered (item 1228).
+- `tests/unit/test_antigravity_request.py::test_a_token_endpoint_having_a_bad_moment_is_asked_again` — a 5xx from the
+  token endpoint was reported as a refused login (item 1228).
+- `tests/unit/test_doctor_rows.py::test_a_models_row_is_named_for_its_own_provider` — Google's models row in the checks
+  was called "openai api" (item 1228).
 - `tests/smoke/test_work_status.py::test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answered` — the
   line of the work kept saying "Waiting for you" after the owner's yes, while the step's command ran (item 1148).
+- `tests/unit/test_continuity.py::test_the_note_names_a_command_the_owner_never_wrote` — a compaction's note carried a
+  command a page put there into the run as its own task, and nothing read the note once it existed (item 1219).
+- `tests/unit/test_continuity.py::test_a_command_sharing_only_a_tool_word_with_the_task_is_still_named` — the first cut
+  compared a command's first word, so a task that said "with curl" made a planted curl the owner's (item 1219).
+- `tests/unit/test_continuity.py::test_the_note_leaves_a_command_the_plan_carries` — the run's plan was never consulted,
+  so a command it wrote itself would have been named as content read from outside (item 1219).
+- `tests/unit/test_continuity.py::test_the_note_shows_the_newest_commands_and_says_what_it_left_out` — the cap kept the
+  earliest commands and hid the one in NEXT, the command the run was about to follow (item 1219).
+- `tests/unit/test_continuity.py::test_the_commands_section_stands_outside_the_summary_a_new_compaction_writes` — the
+  section sat inside the model-written part, so a later compaction summarised the guard as the run's own story (item
+  1219).
+- `tests/unit/test_continuity.py::test_a_carried_command_keeps_the_quoting_it_was_written_with` — the clause cut stopped
+  inside a command's own quotes, so `bash -c 'echo a; echo b'` was shown cut and could not run (item 1219).
+- `tests/unit/test_continuity.py::test_an_apostrophe_in_prose_does_not_swallow_the_rest_of_the_line` — an apostrophe
+  mid-word opened a quote that never closed, so the entry carried the rest of the sentence (item 1219).
+- `tests/unit/test_compaction_taint.py::test_the_compaction_event_carries_the_mark_so_a_resumed_run_starts_untrusted` — the
+  mark lived only in the gate, so a run cut off after a compaction and resumed started untainted (item 1219).
+- `tests/unit/test_continuity.py::test_a_quote_straight_after_a_word_still_holds_its_semicolon` — a quote that opens
+  straight after a word was taken for prose, so the command was cut at its own ``;`` (item 1219).
+- `tests/unit/test_compaction_taint.py::test_a_compaction_puts_the_steps_after_it_under_the_check` — a run that went on
+  from a compaction held no step under the review model's check (item 1219); its sibling,
+  `test_a_compaction_leaves_what_the_run_saves_since_its_own`, holds that its saves stayed its own.
 - `tests/unit/test_browser_readback_calls.py::test_a_page_that_never_answers_ends_the_readback_at_the_steps_time` — a
   script that waits in the page was given Playwright's `timeout`, which is for finding the element only, so a frozen
   page held a batch without end (item 1151).
@@ -49,6 +87,28 @@ here points at a test that no longer exists.
 - `tests/smoke/test_chat_permits.py::test_a_permit_never_answers_money_nor_a_step_of_dots_own_initiative` — a
   "don't ask again in this chat" never answers money nor a step of Dot's initiative, and answers one of a run that read
   outside content, as the owner chose (item 866).
+- `tests/smoke/test_watch_video.py::test_a_calls_download_folder_is_its_own_and_its_removal_follows_no_link` — the
+  daemon removed old download folders under the temporary folder, where a run could leave a link to the owner's home
+  (item 1212): a call's folder is its own now, and its removal follows no link.
+- `tests/unit/test_video_watch.py::test_a_track_name_that_is_no_language_tag_is_dropped_as_the_answer_is_read` — a
+  caption track's name came from the page (`<track srclang>`) and reached Dot's own line, an error and a file's path
+  (item 1212): a name that is no language tag is dropped as yt-dlp's answer is read.
+- `tests/smoke/test_watch_video.py::test_what_a_site_says_when_a_look_fails_is_fenced_and_marks_the_run` — yt-dlp's
+  error, which carries a site's words, reached the model unfenced and left the run trusted (item 1212).
+- `tests/unit/test_video_watch.py::test_the_line_says_how_the_frames_were_chosen` — the line that tells the model how
+  a look chose its frames was guessed from counts and said the wrong thing when quick cuts spread them (item 1214).
+- `tests/smoke/test_pipeline_tools.py::test_a_ledger_a_run_that_read_outside_content_wrote_is_fenced_and_marks_its_reader` — ledger cells
+  a reply's run wrote reached clean runs unmarked (item 1227).
+- `tests/smoke/test_pipeline_tools.py::test_a_refusal_that_quotes_a_cell_of_outside_words_is_fenced_and_marks_its_reader` — the same
+  cells came back unmarked inside a refusal that quoted them (item 1227).
+- `tests/unit/test_objectives.py::test_a_next_step_a_run_wrote_after_reading_outside_content_is_counted_not_quoted` — a
+  next step a reply's run set reached the look and the brief as the owner's plan (item 1227).
+- `tests/unit/test_pipeline_ledger.py::test_a_third_partys_words_holding_a_marker_cannot_end_the_block` — a cell holding
+  the block's end marker broke every later read of the ledger, and the send guard with it (item 1227).
+- `tests/unit/test_pipeline_ledger.py::test_a_status_or_state_edited_into_none_of_the_ledgers_is_not_used` — a status of
+  `Paused` slipped past a hold and a state of `Sent` let a sent mail be begun again (item 1227).
+- `tests/smoke/test_pipeline_record.py::test_a_lock_file_that_is_a_link_is_refused_and_nothing_is_written` — the pipeline
+  tools followed links on the path the call was allowed (item 681's guard, item 1227).
 
 ## Evidence and format
 

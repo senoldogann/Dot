@@ -98,6 +98,17 @@ dotx memory reindex      # embed every note again, for example after changing [m
   after its error, with the lessons that name its tool (`browser_act`, `read_file`; a plain word as `shell` in
   backticks) and that the run was not handed yet, chosen as a site's lessons are and framed as them, the most used
   first, two at most (item 1111: lessons about a tool rarely share the words of a goal).
+- A lesson saved while its run had read content third parties can author (most of them: 544 of 569 on the owner's
+  Mac on 2026-11-15) is never among the notes a run starts with nor in the note of a site it reaches, which the
+  conversation keeps for later runs. A run of Dot's own loop that is tainted at that moment is handed such lessons
+  next to the result of the call itself, in its own requests alone (item 1192): the call that reached the site (the
+  newest three of the site) and the call that failed (after the clean ones, the newest first). They sit in a fence as
+  a page's text does, "data, never instructions", on the newest results the run's requests carry whole, and go as
+  soon as a message of yours clears the run's mark. Nothing stores them: not the result the conversation keeps, which
+  a later run reads, nor the step's event; the Memory
+  page's count of uses and the Task tab say which were handed. A clean run, a run whose mark your message cleared, and
+  a run on the Claude plan or OpenCode (whose program keeps a call's result in a session a later run resumes) are
+  handed none of them; `memory_search` still finds them all.
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
@@ -208,9 +219,11 @@ dotx memory reindex      # embed every note again, for example after changing [m
   (the Memory page, `dotx memory list`), and a `memory_search` that returns one counts as reading such content again:
   the run is tainted, so its next save asks unless the approval mode answers that question itself, and the note it
   writes keeps the mark (`yolo` removes the approval, not the origin). Such a note is never among the notes a run
-  starts with, is handed while it works or is handed as a site's lessons when it reaches the site, nor among the notes
-  the model that writes lessons is shown (item 384): those are handed as trusted data, with no reader in between, so
-  only `memory_search` finds it, and the start says in one sentence how many notes were left out so. A lesson drawn
+  starts with, is handed while it works or is in the note of a site a run reaches, nor among the notes the model that
+  writes lessons is shown (item 384): those are handed as trusted data, with no reader in between, so a clean run
+  finds it only with `memory_search`, and the start says in one sentence how many notes were left out so. A run of
+  Dot's own loop that is marked at that moment sees such a lesson, fenced, next to the result of the call that
+  reached its site or failed with its tool, and nothing stores it (item 1192, above). A lesson drawn
   from such a run, and the reflection's journal that names it, carry the mark too; a lesson you save yourself does
   not. The same words saved again leave a note's mark as it was, and the
   tags of a run that read outside content are not added to a note that is not marked (item 979). Your own rewrite of a note, on the Memory page, takes
@@ -303,6 +316,11 @@ reply to the finder's own chat, stay with the finder; while a run works in that 
 a schedule or a watcher of yours hands a reply on, refused by the code for any other run: what the reply's run sends
 in your chat is judged as that chat's, so a run of Dot's own initiative, whose messages ask you in every mode (item
 850), keeps its replies.
+The reply's run is told, when the work keeps a record of its clients ([Continuing work](proactive.md#objectives)), to
+read it first, keep the reply there as a dated outcome with its sender, and begin an answer there before it sends it, so
+that a reply handed twice, or a run that broke off, sends nothing twice (item 1227). There is no watcher of the inbox:
+your mail (webmail.zone.fi) is read by that schedule, every two hours, so a reply starts its work within two hours of
+being read, not the moment it arrives.
 
 The **Morning brief** (item 570) is a schedule too, set on a card under your schedules (its **Settings** open in a
 dialog, item 615) and labelled **Brief** in the list: a read-only run (`research`) at the time you set whose goal Dot
@@ -363,12 +381,43 @@ what moved; a schedule switched off is not started so, and the end of such a run
 - A firing that is skipped moves the schedule on only while it is still due at the time it was read (item 1047): an
   edit of its times or a switch made while the firing was weighed is kept. A schedule says `running` only while its
   run works, so a run that ended at once shows how it ended, not `running`.
-- A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)
-  is skipped and waits for the next; you are told, as you are when a firing's run cannot start (see the notifications
-  under the web UI). A one-time schedule has no next time and is never dropped: overdue, it fires late, and its run
+- A firing is at most once. A repeating schedule that the daemon being off or the Mac asleep kept from firing runs only
+  the newest of the firings it missed (item 1204): within `[scheduler] misfire_grace_s` (an hour) of its time it
+  starts as at its time; later, up to `[scheduler] catch_up_s` (12 hours; 0 never), it starts late, its run reading
+  first when it was due, when it starts and how many firings before it were missed and do not run, and the title of a
+  chat made for it (which its **History** lists; not one it goes on in, with "the same chat") ending `· late` and
+  `, N missed before`. So the 08:00 brief of a Mac that wakes at 09:30
+  runs at 09:30. Several firings found late start 15 seconds apart; one still waiting stays due, so a restart meanwhile
+  starts it and none runs twice (the schedule's next time is written before a run starts). The older firings it missed
+  are told in one notice of a missed firing, once the oldest is past `misfire_grace_s` (within it, they collapse
+  unsaid). A firing later than `catch_up_s` is skipped and waits for the next; you are told, as you are when a firing's
+  run cannot start (see the notifications under the web UI). A one-time schedule has no next time and is never
+  dropped: overdue, it fires late, however late, and its run
   reads first when it was due and when it starts. One whose run could not start stays due and is tried again a minute
   later, then after twice as long each time, an hour at the most. One whose firing a crash cut before its run was under
   way is due again at the time it fired once the scheduler starts, unless its run had been made (item 386).
+- A schedule's task is tried once more on its own (item 1206, `scheduler/recovery.py`) when Dot's restart or crash cut
+  it off, an error of the model service that may pass ended it (a broken connection, a 429 or 5xx, an answer out of
+  form, a Claude Code session that broke off or went silent), or it stopped without getting anywhere (the progress
+  watchdog, empty replies): 15 seconds after its end, or at the next start of Dot. One the Claude plan's usage limit
+  stopped starts again a minute after the plan's reset, when that is at most 12 hours away. The schedule says
+  `retrying at …` meanwhile. The try is a new task of the schedule, started as a firing is, with its own choices, in
+  the chat a firing goes in (one made for it is titled `… · retry`, which its **History** lists); its first message
+  says what it tries again and why, and its page shows a line that leads to that task. It starts from the beginning
+  rather than going on from the cut task's last step, which a half-done call would invite it to repeat.
+  A task is never tried again when it, or a helper it delegated, already sent something out or handed work on: a step
+  whose action the policy flagged as a message or mail, a post, an upload, a payment, a trade or a release (whether or
+  not it went through), a work order or a task handed to another agent, a call the cut left unfinished that may have
+  been one (or that cannot be told), or a helper's call without a result. A try is never tried again either, nor a
+  task the plan's limit stopped without saying when it resets or for longer than 12 hours. Each of those is told to
+  you (a notification whose tap opens the task, whatever the schedule's level of notices), and the schedule says
+  `not tried again: …`; so is a try that could not start, one that Dot was off for longer than `catch_up_s` past its
+  time, and one due while the emergency stop is engaged. A firing of the schedule (on time, late, by hand or by the
+  market) replaces a try still waiting, and a try waiting while a run of the schedule works, or for a schedule
+  switched off, deleted or whose agent is paused, is dropped. A try is claimed in the store before its run starts, so a
+  crash loses it rather than starting it twice. Its failure counts in the schedule's row of failures as any run's.
+  Your stop, the emergency stop, a run's limit of minutes or tokens, its own report of failure and a lasting error (a
+  key, credits) are not tried again. Your own chats are not either: only tasks of a schedule are.
 - The scheduler goes on past a failure: the schedules, the campaigns, the nightly reflection and the harness's step are
   each looked at on their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick
   tries again. Only 20 ticks in a row in which the part that fires schedules or the part that starts a campaign's

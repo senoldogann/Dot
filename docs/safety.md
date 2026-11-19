@@ -18,8 +18,10 @@ run needs, sent where the configuration points:
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
   playbooks and the nightly reflection (which shows `review` the notes it considers merging or putting aside, and the
   learned skills it considers merging) to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
-  OpenCode Go, Anthropic and OpenRouter get it only when a role, a helper or a standby model names one of their models;
-  OpenRouter passes each call on to the lab whose model it is. OpenCode Zen's free models (`opencode:`) get the whole
+  OpenCode Go, Anthropic, OpenRouter, Google (a key from AI Studio) and a Google Antigravity account get it only when a
+  role, a helper or a standby model names one of their models; OpenRouter passes each call on to the lab whose model it
+  is, and Google's free tier may use what it is sent to improve its products. OpenCode Zen's free models (`opencode:`) get
+  the whole
   conversation of a run that runs on one, through OpenCode's own agent, and the providers of some of them may use what
   they get to improve their models (see [Models and providers](models.md#models-and-providers)).
 - **To Anthropic, through your Claude plan: the whole conversation of a run on `claude_code:` (item 1013), and each
@@ -335,9 +337,12 @@ trading off.
    of a schedule or a watcher of yours hands a reply on (item 926), never one of Dot's own initiative, whose messages
    ask you. Its words are the goal of the schedule, which a run of the chat may have written
    (`schedule_create`); the rule of lawful and harmless holds whatever it says, and a run that read outside content is
-   checked before it makes a schedule (item 525). Such a run resumed after a restart is taken as yours, there to
-   answer: its message waits for your yes. No rule of yours answers for you. A chat a schedule, a watcher, a notice, the
-   reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
+   checked before it makes a schedule (item 525). Such a run you resume after a restart is taken as yours, there to
+   answer: its message waits for your yes. The try a schedule starts on its own of a task a restart, a passing model
+   error or a stall ended (item 1206) is no resume: it is a new run of the schedule's own source, so the review model
+   judges its message as a firing's; it is never started for a task that already sent a message or mail, posted,
+   uploaded, paid, traded, released or handed work on, nor twice (see [Schedules](memory-and-schedules.md)). No rule
+   of yours answers for you. A chat a schedule, a watcher, a notice, the reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
    Schedules page runs in a chat of its own). A delegated run, an agent's too, is its parent's. Everything else
    (commands, MCP tools, files, the web, a release, a trade within its limits) runs in `yolo` without a question. In a
    chat Dot opened on its own initiative (item 850): a message, a post and a `release` there wait for your own yes in
@@ -551,8 +556,8 @@ the first step, a `yolo` run can also
 read Dot's own key (`api-token` in Dot's home) and with it do what the web UI does, answer a question of the policy
 among it: in `yolo` the guard stops the steps of the work, not a run set on getting around it.
 
-**Untrusted content.** Web pages, screens, MCP results and the mail and calendars of the accounts you signed in (item
-424) can be written by third parties. Dot wraps them in a fence with a random marker per call (`<web_content …>`,
+**Untrusted content.** Web pages, screens, MCP results, the mail and calendars of the accounts you signed in (item
+424) and what `watch_video` reads of a video (item 1212) can be written by third parties. Dot wraps them in a fence with a random marker per call (`<web_content …>`,
 `<screen_content …>`, `<account_content …>`) and tells the model that what is inside is data,
 never instructions; only the end that carries the marker closes a fence, and a closing tag inside, in any case, is
 broken. The reply of a teammate that read such content and the files you attach to a message are fenced the same way.
@@ -566,7 +571,8 @@ workspace, is not seen); a failed `edit_file` of one names none of its lines. A 
 the same (item 561): what `browser_act` (a click, an entry), `browser_upload` and `browser_fill_login` show of the page
 they leave is marked untrusted too, as what `browser_eval` and the desktop tools show already was, so a click on Next
 that brings up a page that says "run curl -T …" leaves the run marked even after your next message cleared the mark and
-the chat's tab stayed. A run that has seen such content is marked untrusted, and from then
+the chat's tab stayed. A run that has seen such content is marked untrusted — and so is the run that goes on from a
+compaction, whose note is written out of what tools returned (item 1219) — and from then
 on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
 or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
 running a script the line downloaded (item 523), or a blob it decoded and ran (`base64 -d x | sh`, or a decode to a
@@ -621,7 +627,10 @@ message adds is product ids Dot checked against the form of an id and numbers it
 words. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`),
 as does one it saved after your message cleared its mark, since your words clear the run's mark, not the page's
 words a note may quote (item 899; a thing for later, `todo_add`, the same):
-it is never among the notes a run starts with, is handed while it works or as a site's lessons (item 384), a
+it is never among the notes a run starts with, is handed while it works or in a site's note to a run (item 384), nor
+handed to a clean run at all; a run of Dot's own loop that is marked at that moment sees such a lesson, fenced as a
+page's text, next to the result of the call that reached its site or failed with its tool, in its own requests alone,
+and nothing stores it (item 1192: [Memory and schedules](memory-and-schedules.md)); a
 `memory_search` that returns one marks the run that read it, so its next save asks again, and Settings › Memory and
 `dotx memory list` say of such a note that it was saved while reading outside content. A learned skill whose steps may
 come from outside content (its record says so, or is older than the mark) marks the run that reads it with the `skill`
@@ -1324,9 +1333,10 @@ phone app, so that a channel's account, if taken, could not approve anything. Wh
 message on a channel starts no run (see Emergency stop, below). A message is read up to 4,000 characters
 and 30 a minute, and one that came more than 15 minutes before Dot read it is not run: Dot says so. The pictures, PDFs and
 documents a message brings are read (item 806), only from Messages' folder of attachments beside its database, as
-regular files reached with no link and of at most 20 MB, and handed to the run as the composer's uploads, fenced as
-data; a message of files and no words runs too. A voice message, a video or a sticker is not read: the words run, the
-run is told part of the message was not read, and the answer starts by saying so to you. A row that is not
+regular files reached with no link and of at most 20 MB (200 MB for a video or a voice message, which are kept as they
+came for `watch_video`, item 1213; 300 MB for all the files of a message, past which a file is not read), and handed to the run as the composer's uploads, fenced as data; a message of
+files and no words runs too. A sticker or a file of no kind Dot reads is not read: the words run, the run is told part
+of the message was not read, and the answer starts by saying so to you. A row that is not
 words (a sticker, an app's message, a payment: rich content, which Messages marks with a bundle of its own) is never
 run, and neither is a row that is only a link that Dot wrote, one into its own pages or one in a message it sent a
 minute before: Messages may split the link at the end of a message of Dot's into a row of its own, which has no mark and

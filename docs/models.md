@@ -37,7 +37,10 @@ model menu (item 1044): the favourites and every provider on a rail, a search, a
 starred as in the composer. A role's menu offers only the models that can do its work: the fast and the vision model
 offer no model of an agent program of its own (OpenCode's free models, the Claude plan), and the own work model none
 of OpenCode's free models, whose provider stays on the rail and says why, while the default model, the review model
-and the night's roles offer the Claude plan's too.
+and the night's roles offer the Claude plan's too. A cloud model that Ollama's service retired stays in Ollama's own
+list until `ollama rm` removes it, and refuses every question with HTTP 410: the menu leaves it out and the log names
+it (`ollama_model_retired`, with the command that removes it), so that it does not take Ollama's other models with it
+(item 1195: `mistral-large-3:675b-cloud`, retired on 2026-11-09, emptied the menu of Ollama).
 A model of your Claude plan (`claude_code:opus`, `claude_code:sonnet`, or any other it offers) may be the review model, as every question of it is a single one the
 plan answers (item 1032), and the own work model, as its look is a run that has every tool of Dot's own loop there
 (its list, your mail and calendar; item 1063); not the fast model, which takes a run's steps, nor the vision model,
@@ -83,11 +86,10 @@ and the end of a long one) and the newest screenshot, which only a helper that c
 `[agent] consult_max_per_run` questions (5); `0` offers no `consult`. A delegated run asks none (its parent does), and
 the run's own model is never its helper.
 
-`standby` lists the models a run moves to when its own model answers with a quota, rate-limit or key error (HTTP 401),
-refuses access to it (HTTP 403: a model, a region or a plan the key may not use; or OpenRouter's 404 for a model the
-account's privacy settings leave no provider of, item 361), its provider has no key, its service's content filter
-stops the reply (item 437; that pauses the model for no other run), or the run's own model answers with nothing as
-often as a run is nudged to answer (item 789; that pauses it for no other run either): the run goes on from the same step, with the tools
+`standby` lists the models a run moves to when its own model's credits, usage window, quota or rate are spent, and
+then only (item 1225, the owner's word of 2026-11-19): a refusal, a content filter's stop, replies with nothing, a
+refused key or access and a missing key end the run on its own model, saying why, and a run that needs you asks you
+first. On a spent credit or limit the run goes on from the same step, with the tools
 that step had, on the first standby model that can take it over, the model is told, and the timeline shows the switch,
 which the model chip follows. The run's reasoning level becomes the nearest one the new model offers. A run takes each
 model once at most, in the order of the list, and never goes back to one it left. A standby model that cannot call tools
@@ -116,7 +118,12 @@ pauses it as "out of credits". Dot sends no `max_tokens` unless a call sets one,
 the model's longest answer (131072 tokens for some), so an account with few credits can be refused a call whose answer
 would be short; when that 402 names the longest answer the credits pay for (`can only afford 29597`) and it is at least
 1,024 tokens, the connector asks once more with that as `max_tokens`, logs `openrouter_max_tokens_lowered`, and the
-model is not paused. The fast model's work leaves a paused fast model out as well (item 240): a run's
+model is not paused. A pause for money ("out of credits", "quota exhausted", "not in the plan") that begins, or
+replaces a pause for another reason, tells the owner (item 1207): a notice on their phone and desktop, titled
+"A model cannot answer: payment needed" (in the owner's language on iMessage), with the model, why, and the
+provider's own words (which say where to top up), and a tap that opens the models page. A provider is told about at most once a day while its money stays spent, and once more after the daemon restarts; a rate
+limit, a plan's usage window that passes on its own (Ollama's hourly or weekly limit, OpenCode Go's) or a refused
+key tells nothing. The fast model's work leaves a paused fast model out as well (item 240): a run's
 summary is written by the run's own model at once, and `web_extract` reads no source and says until when the fast model
 cannot answer, instead of spending the connector's retries on a provider that has refused already. Each model is paused
 alone: a local Ollama model stays available while a cloud one is paused, and a provider whose key or quota fails all its
@@ -150,9 +157,9 @@ for a server it cannot connect to checks every 5 s and asks the same step again 
 and is rewritten when the connection is back ("The connection to openrouter.ai is back after 4m 10s; Dot asks … again").
 A local server that is not running (Ollama on `localhost:11434`) is waited for the same way. OpenCode's agent, a server
 of Dot's own, is not checked. A stop ends the wait at once. A model still out of reach when the wait is over fails the run,
-and the result names the wait and the error. A refused request ends the run at once; a key or access error, spent
-credits (OpenRouter's, Anthropic's prepaid balance, OpenCode's `CreditsError`), a model the plan does not include or a
-missing key moves it to a standby model or ends it at once.
+and the result names the wait and the error. A refused request ends the run at once; spent credits (OpenRouter's,
+Anthropic's prepaid balance, OpenCode's `CreditsError`) move it to a standby model or end it at once; a key or access
+error, a model the plan does not include or a missing key ends it at once.
 
 **A spent quota** (item 713). When the run's model cannot answer for a while that comes back by itself and no standby
 model can take the run over, the run waits instead of failing: a rate limit, or a subscription's usage window (OpenCode
@@ -175,6 +182,8 @@ answer keeps its words, Ollama's too.
 | OpenCode Go | `opencode_go:<model>`      | each model is served on exactly one of Chat Completions, Responses and Messages | `OPENCODE_API_KEY`                                             |
 | Anthropic   | `anthropic:<model>`        | Messages API                                                                    | `ANTHROPIC_API_KEY`                                            |
 | OpenRouter  | `openrouter:<lab>/<model>` | Chat Completions, the models of many labs                                       | `OPENROUTER_API_KEY`                                           |
+| Antigravity | `antigravity:<model>`      | Cloud Code Assist, the models of a Google Antigravity plan                      | none; the Google login Antigravity holds                   |
+| Google      | `google:<model>`           | Chat Completions, the Gemini API's OpenAI-compatible route of a Google AI Studio key | `GOOGLE_API_KEY` (aistudio.google.com; free tier)         |
 | OpenCode    | `opencode:<model>`         | OpenCode's own agent, in the `opencode serve` Dot starts (Zen's free models)    | none; the `opencode` program                                   |
 
 - **Ollama**: `[providers.ollama] base_url` is `http://localhost:11434` by default. Cloud models go through the local
@@ -182,6 +191,21 @@ answer keeps its words, Ollama's too.
   talking to ollama.com directly.
 - **OpenAI**: on the Responses wire Dot sends the whole conversation on every call (`store: false`) and carries the
   encrypted reasoning items from step to step, so no state lives on the server.
+- **Google**: a key from [Google AI Studio](https://aistudio.google.com/api-keys) serves the Gemini and Gemma models over
+  `https://generativelanguage.googleapis.com/v1beta/openai`; `dotx auth set GOOGLE_API_KEY` stores it. The key's
+  project is on the free tier until billing is set up, and each model keeps its own daily request limit there (Gemini 3.x
+  Flash 20 a day, Flash Lite 500, Gemma 14.4K); a prompt on the free tier may be used to improve Google's products.
+  `dotx models google` lists the ids the key can reach.
+- **Antigravity**: the models of a Google Antigravity plan, straight over Cloud Code Assist, with no proxy and no key.
+  `[providers.antigravity] credentials_file` names the Google login the Antigravity client on this Mac already holds
+  (the Antigravity driver a desktop client installs writes `acp_token.json`; a `*` glob is allowed and the newest
+  match wins), `project`
+  the Cloud Code project that login belongs to, and `user_agent` the client Google gates the route on: a retired
+  version answers with a text asking for an update, so keep it equal to the installed Antigravity's
+  (`antigravity/hub/<version> ...`). `dotx models antigravity` lists what the account is served: the Gemini 3.x Flash
+  models (`gemini-3.8-flash-high|medium|low`, `gemini-3-flash`, `gemini-3.5-flash-lite`), Claude Sonnet and Opus 4.6 and
+  GPT-OSS 120B. They read images and call tools. The login lives as long as the one Antigravity signed in with; when it
+  is revoked, sign in to Antigravity again on this Mac.
 - **OpenRouter** (item 349): one key and one balance for the models of many labs,
   `openrouter:anthropic/claude-sonnet-5.5` or `openrouter:openai/gpt-5.6-luna` for example. What each model can do comes
   from OpenRouter's own list of its models, read when a model is first asked about and kept for `[providers.openrouter]
@@ -210,7 +234,7 @@ answer keeps its words, Ollama's too.
   model whose providers keep what they are sent is under Zero Data Retention, is answered 404; Dot reads that as a
   refused access: the error names what excluded the providers and where to change it
   (https://openrouter.ai/settings/privacy), or to choose another model. As after a 403, a run whose own model it is
-  moves to its standby model, and the model is paused (item 361).
+  ends saying so, and the model is paused (item 361).
 - **OpenCode Go**: Dot knows the route of the models in its catalog, and of a new Claude, Qwen, MiniMax, Grok, GPT or
   Muse model by the start of its name; any other new model goes to Chat Completions. `route_overrides = { "<model-id>" =
   "chat" }` in `[providers.opencode_go]` adds or corrects one (`chat`, `responses` or `messages`). The Messages route
@@ -230,7 +254,8 @@ answer keeps its words, Ollama's too.
   without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes), and
   from one run of a chat to the next: the system prompt is the same bytes from one message of a chat to the next (it
   names the day and the time zone; the time of day, the notes recalled for the message and the skills that fit it go in
-  a note under the message, item 404), so the cache holds the instructions and the history up to the message. A
+  a note under the message, item 404, and so does how the run was started, by the owner, a schedule, a watcher, a
+  phone's message or another run, with what that asks of it, item 1219), so the cache holds the instructions and the history up to the message. A
   question Dot asks once (the review model's, a summary, a recap, a consult) is not cached (item 1010): writing the
   cache costs a quarter more than reading the prompt, and nothing would read it back. A request may use the model's
   whole output limit. The thinking of earlier steps is sent back; a block whose earlier context has
@@ -310,7 +335,8 @@ answer keeps its words, Ollama's too.
   shell guard and time limit as a call of Dot's own loop does, and shows on the timeline under the tool's own name. The
   program is started with no tool of its own but `ToolSearch` (`--tools ToolSearch`, item 1053: the door's tools are
   named in the prompt and the model looks one up as it needs it: with 296 tools a new chat wrote 10,800 tokens to the
-  cache rather than 99,000, and its first word came in 1.2 s; it reaches nothing but the door's list), no settings
+  cache rather than 99,000, and its first word came in 1.2 s; it reaches nothing but the door's list; the prompt tells
+  the model to look a tool up before its first call of it rather than guess its parameters, item 1201), no settings
   file of yours, a project's or the workspace's
   (`--setting-sources ""`: no hook runs, no `CLAUDE.md` or `AGENTS.md` is read), no MCP server but the door
   (`--strict-mcp-config`), no slash command, and a permission mode that refuses whatever the door and the search do
@@ -364,7 +390,8 @@ answer keeps its words, Ollama's too.
   this to no one else. That is a judgment, not an exception Anthropic documents: the plans' limits assume ordinary
   individual use, and an always-on agent may be held to more, so use it as you would use Claude Code yourself.
 
-`dotx models [ollama|openai|opencode_go|anthropic|openrouter|opencode|claude_code]` lists what a provider offers, including the
+`dotx models [ollama|openai|opencode_go|anthropic|openrouter|google|antigravity|opencode|claude_code]` lists what a provider
+offers, including the
 reasoning levels of each model, and ends with 1 when no provider answered (the one named, when one is). An Ollama server
 on this Mac is asked for its list once, so one that is not running is reported at once, here, in the model menu and by
 `dotx doctor`, not after the retries a network needs (item 212). `dotx models profile [provider:model]` shows how
@@ -434,16 +461,17 @@ changing the file take turns); `dotx auth status` shows which keys are present. 
 is a template for the file. An OpenAI key is created on platform.openai.com under API keys (`OPENAI_API_KEY`); the
 OpenCode Go key (`OPENCODE_API_KEY`) is the one the OpenCode Console at opencode.ai/auth shows once you have subscribed
 to Go; an Anthropic key (`ANTHROPIC_API_KEY`) is created in the Claude Console at platform.claude.com/settings/keys; an
-OpenRouter key (`OPENROUTER_API_KEY`) at openrouter.ai/settings/keys. The
+OpenRouter key (`OPENROUTER_API_KEY`) at openrouter.ai/settings/keys, a Gemini key (`GOOGLE_API_KEY`) at
+aistudio.google.com/api-keys — free within the tier's daily limits, which each model has its own of. The
 Ollama models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key added
 later when a run first uses that provider, without a restart.
 
 Settings › AI services in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows where
 the key in use comes from (the daemon's environment, Dot's `.env` file or the Keychain) and, for a key of 16 characters
 or more, its last four characters; a key never comes back from the daemon whole. **Check** asks the provider whether it
-takes the key in use: the model listing of OpenAI and Anthropic, the subscription of OpenCode Go and the key's own page
-at OpenRouter (what it has spent and may spend) cost nothing, the Ollama key is tried with one search of its hosted web
-search. **Add key** or **Replace key** asks for the key in a dialog (item 615), saves it in `<home>/.env` and then runs
+takes the key in use: the model listing of OpenAI, Anthropic and Google, the subscription of OpenCode Go and the key's
+own page at OpenRouter (what it has spent and may spend) cost nothing, the Ollama key is tried with one search of its
+hosted web search. **Add key** or **Replace key** asks for the key in a dialog (item 615), saves it in `<home>/.env` and then runs
 **Check**; the key is hidden until you show it, a key with a space inside is refused there, and one typed and dropped
 is gone when the dialog opens again; **Remove** takes away the
 key saved there (a key from the environment or the Keychain is left alone). The page warns when the daemon was started

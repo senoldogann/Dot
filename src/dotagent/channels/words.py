@@ -276,7 +276,7 @@ ENGLISH: Words = Words(
         "again if you still want it."
     ),
     attachment_only=(
-        "Dot could not read that: it reads pictures, PDFs, text and Office files, not voice messages or videos yet."
+        "Dot could not read that: it reads pictures, videos, voice messages, PDFs, text and Office files."
     ),
     files_coming="That file had not come down to this Mac yet. Send it again in a moment.",
     unread_answer="Dot did not read the picture or file that came with your message, so this answers your words only.",
@@ -383,9 +383,7 @@ TURKISH: Words = Words(
         "Bu mesaj 15 dakikadan önce geldi, Dot o sırada okumuyordu; bu yüzden çalıştırmadı. Hâlâ istiyorsan yeniden "
         "gönder."
     ),
-    attachment_only=(
-        "Bunu okuyamadım: resim, PDF, metin ve Office dosyalarını okuyorum; sesli mesajları ve videoları henüz değil."
-    ),
+    attachment_only=("Bunu okuyamadım: resim, video, sesli mesaj, PDF, metin ve Office dosyalarını okuyorum."),
     files_coming="Bu dosya henüz bu Mac'e inmedi. Birazdan yeniden gönder.",
     unread_answer="Mesajınla gelen resmi ya da dosyayı okuyamadım; bu cevap yalnızca yazdıklarına.",
     flood="Bir dakikada 30'dan fazla mesaj geldi. Ortalık sakinleşene kadar Dot yenilerini okumuyor.",
@@ -436,6 +434,9 @@ TURKISH: Words = Words(
         "Dot fixed a problem of its own": "Kendi sorunumu düzelttim",
         "A fix of Dot's own is ready": "Bir düzeltmem hazır",
         "A fix of Dot's own needs you": "Bir düzeltmem sana bakıyor",
+        "A model cannot answer: payment needed": "Bir model cevap veremiyor: ödeme gerekiyor",
+        "The plugin scout cannot read GitHub: renew the token": "Eklenti taraması GitHub'ı okuyamıyor: token'ı yenile",
+        "The plugin scout's night failed": "Eklenti taramasının gecesi başarısız oldu",
     },
     not_sent="{names} gönderilemedi. Nedeni günlükte yazıyor.",
     rest_in_dot="\n\n… Cevabın devamı Dot'ta: ",

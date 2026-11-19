@@ -20,7 +20,15 @@ from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.runtime import Runtime
 from dotagent.store.db import Store
 from dotagent.store.endings import PREFIX_EMERGENCY_STOP
-from dotagent.store.models import OPEN_WORK_ORDERS, AgentRecord, ObjectiveNote, RunRecord, RunStatus, WorkOrderRecord
+from dotagent.store.models import (
+    OPEN_WORK_ORDERS,
+    AgentRecord,
+    ObjectiveNote,
+    ObjectiveWorkflow,
+    RunRecord,
+    RunStatus,
+    WorkOrderRecord,
+)
 from dotagent.tools.context import DelegateOutcome
 
 _MODEL: str = "scripted:test"
@@ -571,6 +579,25 @@ async def test_an_order_whose_run_never_started_is_sent_to_review_after_a_while(
     assert (await desk.store.get_work_order(stuck.id)).status == "in_review"
 
 
+async def test_a_returned_order_whose_new_attempt_never_started_goes_back_to_review(desk: _Desk) -> None:
+    """The code review of 2026-11-19 (item 1237): ``returned`` could not move to ``in_review``, so the follow-up of an
+    order sent back whose new attempt never started raised on every tick, stopping the look at the orders after it, and
+    the order stayed ``returned`` for good."""
+    agent: AgentRecord = await _agent(desk.store)
+    sent_back: WorkOrderRecord = await desk.store.add_work_order(
+        agent.id, "Sent back", "Brief.", "Done.", None, None, desk.lead.id, desk.dot_thread, False
+    )
+    await desk.store.move_work_order(sent_back.id, "in_review", ("assigned",))
+    returned = await desk.store.move_work_order(sent_back.id, "returned", ("in_review",), note="sent back")
+    assert returned is not None and returned.status == "returned"
+    later: WorkOrderRecord = await desk.store.add_work_order(
+        agent.id, "After it", "Brief.", "Done.", None, None, desk.lead.id, desk.dot_thread, False
+    )
+    await desk.desk.follow_up(max(returned.updated_at, later.updated_at) + 600)
+    assert (await desk.store.get_work_order(sent_back.id)).status == "in_review"
+    assert (await desk.store.get_work_order(later.id)).status == "in_review"
+
+
 async def test_a_reassignment_that_cannot_start_leaves_the_order_in_review_not_assigned(desk: _Desk) -> None:
     first: AgentRecord = await _agent(desk.store)
     other: AgentRecord = await _agent(desk.store, "Fixer")
@@ -679,11 +706,13 @@ async def test_orders_and_objectives_are_kept_across_a_restart(tmp_path: Path) -
     store: Store = await Store.open(path, tmp_path / "screenshots")
     try:
         agent: AgentRecord = await _agent(store)
-        objective = await store.add_objective("Grow the newsletter", "More readers", "Subscribers per week", False)
+        objective = await store.add_objective(
+            "Grow the newsletter", "More readers", "Subscribers per week", ObjectiveWorkflow(), False
+        )
         order = await store.add_work_order(agent.id, "T", "B", "A", objective.id, None, "run_x", "thread_x", False)
         await store.move_work_order(order.id, "working", ("assigned",), new_run="run_a", lead_run_id="run_y")
         await store.update_objective(
-            objective.id, None, ObjectiveNote(at=5.0, text="Sent the first issue.", tainted=False)
+            objective.id, None, ObjectiveNote(at=5.0, text="Sent the first issue.", tainted=False), None
         )
     finally:
         await store.close()
@@ -708,10 +737,14 @@ async def test_orders_and_objectives_are_kept_across_a_restart(tmp_path: Path) -
 async def test_an_objective_keeps_its_notes_in_order_and_changes_its_status(tmp_path: Path) -> None:
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     try:
-        objective = await store.add_objective("Ship 1.0", "The owner wants it", "Released on PyPI", True)
+        objective = await store.add_objective(
+            "Ship 1.0", "The owner wants it", "Released on PyPI", ObjectiveWorkflow(), True
+        )
         assert (objective.status, objective.notes, objective.tainted) == ("active", (), True)
-        await store.update_objective(objective.id, None, ObjectiveNote(at=1.0, text="First.", tainted=False))
-        done = await store.update_objective(objective.id, "done", ObjectiveNote(at=2.0, text="Second.", tainted=True))
+        await store.update_objective(objective.id, None, ObjectiveNote(at=1.0, text="First.", tainted=False), None)
+        done = await store.update_objective(
+            objective.id, "done", ObjectiveNote(at=2.0, text="Second.", tainted=True), None
+        )
         assert done.status == "done" and [note.text for note in done.notes] == ["First.", "Second."]
         assert [each.id for each in await store.list_objectives(("active",), 10)] == []
         assert [each.id for each in await store.list_objectives(("done", "dropped"), 10)] == [objective.id]

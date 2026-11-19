@@ -382,6 +382,14 @@ class RunGate:
         """A fresh instruction from the user restores trust in what follows."""
         self.tainted = False
 
+    def rewrite_from_outside(self) -> None:
+        """Record that the run's own history was rewritten out of what tools returned, as a compaction writes it: a
+        summary carries a page's words back to the run as its own story, so every step after one is checked as a step
+        after untrusted content is (item 1219). What the run saves since stays its own: this is not a read of a page,
+        there is no third party in the note but the one a tool already met."""
+        self.tainted = True
+        self._noted_yes = frozenset()
+
     async def authorize(self, info: ActionInfo) -> str:
         """Let the action through or raise. Returns the note the user wrote when approving it, or an empty string."""
         return (await self.authorize_recorded(info)).note

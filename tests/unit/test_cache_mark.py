@@ -4,13 +4,22 @@ cache mark (a run of tool_use blocks, or of tool_result blocks, is one position)
 nothing to read and every such step read the whole prompt anew. A step's request now also marks the end of the part
 of the run the next step sends unchanged."""
 
-from dotagent.agent.compact import last_settled, shrink_old_tool_results
+from dotagent.agent.compact import last_settled, shown_key, shrink_old_tool_results, with_shown
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.anthropic import claude_traits
 from dotagent.llm.codec_messages import MessagesOptions, build_messages_body
 from dotagent.llm.traits import ModelTraits
-from dotagent.llm.types import ChatRequest, ImageData, Message, ToolCall, system_message, tool_message, user_message
+from dotagent.llm.types import (
+    ChatRequest,
+    ImageData,
+    Message,
+    ToolCall,
+    assistant_message,
+    system_message,
+    tool_message,
+    user_message,
+)
 
 _LOOKBACK: int = 20
 # The defaults of [agent] keep_recent_tool_results and keep_recent_screenshots.
@@ -159,3 +168,31 @@ def test_a_question_asked_once_writes_no_cache_and_a_step_does() -> None:
         assert "cache_control" not in asked
         assert _marks(_positions(asked)) == []
         assert build_messages_body(step, _OPUS, _ORIGIN, options)["cache_control"] == {"type": "ephemeral"}
+
+
+def test_the_words_shown_next_to_results_stand_on_the_newest_results_alone_past_the_settled_mark() -> None:
+    """Item 1192: the lessons shown next to a call's result in a step's request, which nothing stores, stand on the
+    newest results that trimming leaves whole: the part of the prompt the cache keeps never changes for them, and a
+    result that grows old loses them."""
+    calls: list[ToolCall] = [
+        ToolCall(id=f"call_{index}", name="read_file", arguments={"path": f"{index}.txt"}) for index in range(9)
+    ]
+    history: list[Message] = [user_message("Read the files.", ())]
+    for call in calls:
+        history.append(assistant_message("", None, (call,)))
+        history.append(tool_message(call, f"text of {call.id}", ()))
+    first, last = history[2], history[-1]
+    seen: list[Message] = with_shown(history, {shown_key(first): "OLD", shown_key(last): "NEW"}, _KEEP_RESULTS)
+    settled: int | None = last_settled(history, _KEEP_RESULTS, _KEEP_IMAGES)
+    assert settled is not None
+    assert seen[: settled + 1] == history[: settled + 1]
+    assert [message.content for message in seen if message.role == "tool"][-1] == "text of call_8\n\nNEW"
+    assert all("OLD" not in message.content for message in seen)
+    assert with_shown(history, {}, _KEEP_RESULTS) == history
+    # The words go with the result they came with, not with another call that a provider gave the same id, and only
+    # once where two such calls read the same text.
+    twin: Message = tool_message(ToolCall(id="call_8", name="read_file", arguments={}), "another text", ())
+    assert with_shown([*history, twin], {shown_key(last): "NEW"}, _KEEP_RESULTS)[-1] == twin
+    same: Message = tool_message(ToolCall(id="call_8", name="read_file", arguments={}), last.content, ())
+    doubled: list[Message] = with_shown([*history, same], {shown_key(last): "NEW"}, _KEEP_RESULTS)
+    assert doubled[-2].content.endswith("NEW") and doubled[-1] == same

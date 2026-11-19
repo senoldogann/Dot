@@ -157,9 +157,9 @@ def test_the_tokens_are_declared_once_each_in_the_base_look() -> None:
 _LOOKS: tuple[tuple[str, str], ...] = (("neutral", ":root {"), ("paper", ':root[data-theme="paper"] {'))
 _SURFACES: tuple[str, ...] = ("--bg", "--sidebar", "--surface", "--surface-2", "--surface-3")
 _PAIR: re.Pattern[str] = re.compile(r"(--[a-z0-9-]+): light-dark\((#[0-9a-f]{6}), (#[0-9a-f]{6})\);")
-# The least contrast of a text tier against a surface: body text and its second tier read at AA; the muted and the
-# faint tiers, which label and annotate, at the AA level of large text.
-_LEAST: tuple[tuple[str, float], ...] = (("--text", 4.5), ("--text-2", 4.5), ("--muted", 3.0), ("--faint", 3.0))
+# The least contrast of a text tier against a surface: every tier reads at AA, the muted and the faint ones too, as
+# small labels and annotations are set in them (item 1205; they were held to 3:1, the level of large text).
+_LEAST: tuple[tuple[str, float], ...] = (("--text", 4.5), ("--text-2", 4.5), ("--muted", 4.5), ("--faint", 4.5))
 _ON: tuple[tuple[str, str], ...] = (
     ("--on-accent", "--accent"),
     ("--on-bubble", "--bubble"),
@@ -186,7 +186,7 @@ def _pairs(look: str) -> dict[str, tuple[str, str]]:
     """Each token of ``look`` with its light and its dark hex, for the tokens written as a pair of hexes."""
     pairs: dict[str, tuple[str, str]] = {name: (light, dark) for name, light, dark in _PAIR.findall(_block(look))}
     if look == "neutral":
-        pairs["--on-bubble"] = ("#1c1b19", "#1c1b19")
+        pairs["--on-bubble"] = ("#1c1c1c", "#1c1c1c")
     else:
         pairs["--bubble"] = pairs["--accent-weak"]
         pairs["--on-bubble"] = pairs["--text"]
@@ -242,6 +242,28 @@ def test_the_muted_ink_and_the_sidebars_group_labels_read_at_aa_in_the_two_looks
     assert label is not None, "the .side-label rule sets no colour token"
     ratio = contrast(pairs[label.group(1)][scheme], pairs["--sidebar"][scheme])
     assert ratio >= 4.5, f".side-label ({label.group(1)}) on --sidebar: {ratio:.2f} < 4.5"
+
+
+def test_a_phones_greys_keep_every_text_tier_at_aa_and_step_up_as_a_macs_do() -> None:
+    """Item 1205: on a phone the neutral look takes a phone's own dark greys (themes.css); the text tiers of the look
+    read on each of them at 4.5:1, and the surfaces still step up from the page."""
+    themes: str = (_CSS / "themes.css").read_text(encoding="utf-8")
+    start: int = themes.index(':root[data-theme="neutral"] {') + len(':root[data-theme="neutral"] {')
+    phone: dict[str, tuple[str, str]] = {
+        name: (light, dark) for name, light, dark in _PAIR.findall(themes[start : themes.index("}", start)])
+    }
+    assert set(phone) == set(_SURFACES), phone
+    pairs: dict[str, tuple[str, str]] = {**_pairs("neutral"), **phone}
+    short: list[str] = [
+        f"{tier} on {surface} ({scheme}): {contrast(pairs[tier][scheme], pairs[surface][scheme]):.2f}"
+        for tier, least in _LEAST
+        for surface in _SURFACES
+        for scheme in (0, 1)
+        if contrast(pairs[tier][scheme], pairs[surface][scheme]) < least
+    ]
+    assert short == [], short
+    dark: list[float] = [_luminance(pairs[name][1]) for name in ("--bg", "--surface", "--surface-2", "--surface-3")]
+    assert dark == sorted(dark), dark
 
 
 def test_the_surfaces_step_up_by_lightness_in_dark_and_down_in_light() -> None:

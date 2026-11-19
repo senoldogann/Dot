@@ -40,6 +40,10 @@ _PREFIX_GROUPS: tuple[tuple[str, str], ...] = (
     ("trading_", "trading"),
     # Dot in the owner's calls (item 1138).
     ("meeting_", "meetings"),
+    # The owner's iPhone over WebDriverAgent, while [phone] is on.
+    ("phone_", "phone"),
+    # The ledger of a continuing piece of work in its record file (item 1227).
+    ("pipeline_", "pipeline"),
 )
 _GROUP_OF_TOOL: dict[str, str] = {
     "apple_script": "desktop",
@@ -75,10 +79,13 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "wait_until": "waits",
     # A skill of the owner's words in a chat (item 893): rare, asked for, so out of core.
     "skill_save": "skills",
+    # A video of the Mac or of a link, seen and heard (item 1212).
+    "watch_video": "video",
 }
 _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
     "meetings": "the owner's Google Meet call: joining it to take notes and answer, reading them, posting on their yes",
+    "phone": "the owner's iPhone over WebDriverAgent: whether it answers and whether it is locked",
     "desktop": "the Mac's applications, windows, clipboard and AppleScript",
     "schedule": "goals that run later, once or on a cron expression",
     "terminal": "programs that ask questions, REPLs and servers that stay up, on a terminal of their own",
@@ -97,7 +104,12 @@ _PURPOSES: dict[str, str] = {
     "trading": "trading crypto on Coinbase under the owner's limits: prices, the account, orders",
     "waits": "waiting in code until a file is there, an address answers or a check passes",
     "skills": "saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way",
+    "video": "watching a video file or a video link: frames of what it shows and a transcript of what is said",
     "recon": "a site or host you own: addresses, TLS, headers, technology, open ports, and a form's payload check",
+    "pipeline": (
+        "the ledger of a continuing piece of work (clients, leads) in its record file: each one's status and next "
+        "step, every mail or message begun before it goes out and ended with what showed it, and what came of them"
+    ),
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
 LISTED_TOOLS: int = 16

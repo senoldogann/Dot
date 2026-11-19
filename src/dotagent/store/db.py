@@ -86,6 +86,7 @@ from dotagent.store.models import (
     ObjectiveNote,
     ObjectiveRecord,
     ObjectiveStatus,
+    ObjectiveWorkflow,
     PushSubscription,
     QueuedMessage,
     ReactionName,
@@ -203,7 +204,8 @@ CREATE INDEX IF NOT EXISTS work_orders_status ON work_orders(status, created_at)
 CREATE INDEX IF NOT EXISTS work_orders_objective ON work_orders(objective_id);
 CREATE TABLE IF NOT EXISTS objectives (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, why TEXT NOT NULL, measure TEXT NOT NULL, status TEXT NOT NULL,
-    notes TEXT NOT NULL, tainted INTEGER NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL
+    notes TEXT NOT NULL, tainted INTEGER NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL,
+    workflow TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS objectives_status ON objectives(status, created_at);
 CREATE TABLE IF NOT EXISTS drafts (
@@ -1017,6 +1019,7 @@ def _objective(row: aiosqlite.Row) -> ObjectiveRecord:
         tainted=bool(row["tainted"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        workflow=ObjectiveWorkflow.model_validate_json(row["workflow"]),
     )
 
 
@@ -1425,6 +1428,8 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
+    # How a continuing piece of work is done (item 1227; an ``ObjectiveWorkflow`` as JSON): an older objective has none.
+    await _add_columns(connection, "objectives", (("workflow", "TEXT NOT NULL DEFAULT '{}'"),))
     await _add_columns(connection, "queued_messages", _ADDED_QUEUE_COLUMNS)
     await _add_columns(connection, "harness_experiences", _ADDED_HARNESS_EXPERIENCE_COLUMNS)
     await _add_columns(connection, "harness_probes", _ADDED_HARNESS_PROBE_COLUMNS)
@@ -1568,6 +1573,35 @@ _MOVING_SQL: str = ", ".join(f"'{status}'" for status in sorted(get_args(Working
 _OCCUPIED_SQL: str = ", ".join(f"'{status}'" for status in sorted(OCCUPIED_STATUSES))
 # Whether the run of the bound id works (item 1047).
 _RUN_WORKS_SQL: str = f"EXISTS (SELECT 1 FROM runs WHERE runs.id = ? AND runs.status IN ({_WORKING_SQL}))"
+
+
+def _thread_summaries_sql(where: str, order: str) -> str:
+    """The query of the chats' summaries (``Store.list_thread_summaries``), with ``where`` after its joins (its own
+    marks after the seven of the query) and ``order`` after its ORDER BY."""
+    return (
+        "WITH ranked AS ("
+        " SELECT thread_id, id, status, mode, created_at, finished_at,"
+        "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place,"
+        "  COUNT(*) OVER (PARTITION BY thread_id) AS run_count"
+        " FROM runs WHERE parent_run_id IS NULL AND rewound_at IS NULL"
+        " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns))"
+        " AND (? IS NULL OR thread_id IN (SELECT id FROM threads WHERE team_id = ?)))"
+        " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
+        "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
+        "  r.created_at AS latest_created_at,"
+        "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread,"
+        "  COALESCE(latest.agent_id, latest.campaign_id, team.id) AS actor_id,"
+        "  team.id AS team_id, team.name AS team_name, team.agents AS team_agents,"
+        "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result,"
+        f"  (SELECT s.cron FROM schedules AS s WHERE {_CHAT_LOOP}"
+        "   ORDER BY s.next_run_at IS NULL, s.next_run_at LIMIT 1) AS loop_cron,"
+        f"  (SELECT MIN(s.next_run_at) FROM schedules AS s WHERE {_CHAT_LOOP}) AS loop_next_at,"
+        "  (SELECT c.id FROM campaigns AS c WHERE c.thread_id = t.id ORDER BY c.created_at DESC LIMIT 1)"
+        "   AS campaign_id"
+        " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
+        " JOIN runs AS latest ON latest.id = r.id LEFT JOIN teams AS team ON team.id = t.team_id"
+        f"{where} ORDER BY {order}"
+    )
 
 
 class Store:
@@ -1920,6 +1954,7 @@ class Store:
             raise NotFoundError("harness step not found", {"step_id": step_id})
         return await self.get_harness_step(step_id)
 
+    @_writing
     async def close_unfinished_harness_steps(self) -> int:
         """Steps still ``running`` when the daemon starts (their process went before :meth:`finish_harness_step`)
         become failed. Idempotent: a second start finds none running. Returns how many closed."""
@@ -2316,28 +2351,7 @@ class Store:
         schedules that make none of their own going on in their chat when ``same_chat`` (``[scheduler] same_chat``),
         and the team it is with (item 610); with ``team_id``, only the chats with that team are listed."""
         rows: list[aiosqlite.Row] = await self._all(
-            "WITH ranked AS ("
-            " SELECT thread_id, id, status, mode, created_at, finished_at,"
-            "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place,"
-            "  COUNT(*) OVER (PARTITION BY thread_id) AS run_count"
-            " FROM runs WHERE parent_run_id IS NULL AND rewound_at IS NULL"
-            " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns))"
-            " AND (? IS NULL OR thread_id IN (SELECT id FROM threads WHERE team_id = ?)))"
-            " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
-            "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
-            "  r.created_at AS latest_created_at,"
-            "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread,"
-            "  COALESCE(latest.agent_id, latest.campaign_id, team.id) AS actor_id,"
-            "  team.id AS team_id, team.name AS team_name, team.agents AS team_agents,"
-            "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result,"
-            f"  (SELECT s.cron FROM schedules AS s WHERE {_CHAT_LOOP}"
-            "   ORDER BY s.next_run_at IS NULL, s.next_run_at LIMIT 1) AS loop_cron,"
-            f"  (SELECT MIN(s.next_run_at) FROM schedules AS s WHERE {_CHAT_LOOP}) AS loop_next_at,"
-            "  (SELECT c.id FROM campaigns AS c WHERE c.thread_id = t.id ORDER BY c.created_at DESC LIMIT 1)"
-            "   AS campaign_id"
-            " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
-            " JOIN runs AS latest ON latest.id = r.id LEFT JOIN teams AS team ON team.id = t.team_id"
-            " ORDER BY t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?",
+            _thread_summaries_sql("", "t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?"),
             (
                 team_id,
                 team_id,
@@ -2349,6 +2363,41 @@ class Store:
             ),
         )
         return [_summary(row) for row in rows]
+
+    async def agent_home_chats(
+        self, sources: Sequence[str], same_chat: bool = False, agent_id: str | None = None
+    ) -> dict[str, ThreadSummary]:
+        """Each agent's home chat (item 1233), by its id: the chat of the latest activity among those whose latest run
+        is the agent's, that a source of ``sources`` started (the owner's: not a schedule's, a watcher's or the
+        agents' work among themselves) and that is with no team and is no campaign's, however many chats are newer;
+        with ``agent_id``, that agent's alone. A chat is as ``list_thread_summaries`` makes it."""
+        named: tuple[str, ...] = tuple(sources)
+        if not named:
+            return {}
+        marks: str = ", ".join("?" for _ in named)
+        rows: list[aiosqlite.Row] = await self._all(
+            _thread_summaries_sql(
+                f" WHERE latest.agent_id IS NOT NULL AND (? IS NULL OR latest.agent_id = ?) AND t.source IN ({marks})"
+                " AND t.team_id IS NULL AND latest.campaign_id IS NULL"
+                " AND NOT EXISTS (SELECT 1 FROM campaigns AS home_c WHERE home_c.thread_id = t.id)",
+                "updated_at DESC",
+            ),
+            (
+                None,
+                None,
+                _LAST_MESSAGE_READ_CHARS,
+                _LAST_MESSAGE_READ_CHARS,
+                int(same_chat),
+                int(same_chat),
+                agent_id,
+                agent_id,
+                *named,
+            ),
+        )
+        homes: dict[str, ThreadSummary] = {}
+        for row in rows:
+            homes.setdefault(row["actor_id"], _summary(row))
+        return homes
 
     async def delete_threads(self, thread_ids: Sequence[str]) -> list[str]:
         """Delete chats with everything they hold, in one transaction: their messages (with what was kept aside of their
@@ -3841,6 +3890,31 @@ class Store:
             for row in rows
         ]
 
+    async def helper_calls_without_result(self, run_id: str) -> int:
+        """How many calls of the runs ``run_id`` delegated (its family but itself) started and have no result: a
+        ``tool_call`` event each, without the ``tool_result`` every call that ends gets (item 1206: a call a stop or a
+        crash cut while it ran)."""
+        row = await self._one(
+            _family_of("SELECT ?") + " SELECT COALESCE(SUM(open), 0) AS open FROM (SELECT"
+            " MAX(SUM(e.kind = 'tool_call') - SUM(e.kind = 'tool_result'), 0) AS open FROM events AS e"
+            " WHERE e.run_id IN (SELECT id FROM family) AND e.run_id != ? AND e.kind IN ('tool_call', 'tool_result')"
+            " GROUP BY e.run_id)",
+            (run_id, run_id),
+        )
+        return 0 if row is None else int(row["open"])
+
+    async def calls_without_result(self, run_id: str) -> list[str]:
+        """The tools of the calls of ``run_id`` itself that started and have no result, oldest first: a ``tool_call``
+        event without a later ``tool_result`` of the same call id in the run (item 1206). A run on the Claude plan or
+        OpenCode keeps its calls in these events alone, not in its chat's messages."""
+        rows = await self._all(
+            "SELECT json_extract(c.data, '$.tool') AS tool FROM events AS c WHERE c.run_id = ? AND c.kind = 'tool_call'"
+            " AND NOT EXISTS (SELECT 1 FROM events AS r WHERE r.run_id = c.run_id AND r.kind = 'tool_result'"
+            " AND r.id > c.id AND json_extract(r.data, '$.call_id') = json_extract(c.data, '$.call_id')) ORDER BY c.id",
+            (run_id,),
+        )
+        return [str(row["tool"] or "") for row in rows]
+
     async def run_sites(self, run_id: str) -> list[str]:
         """The sites a run's calls reached (the ``site`` of its ``tool_result`` events: page hosts and applications),
         the one it reached most often first (item 308)."""
@@ -4615,7 +4689,9 @@ class Store:
     # ----- objectives (item 908) ------------------------------------------------------------
 
     @_writing
-    async def add_objective(self, title: str, why: str, measure: str, tainted: bool) -> ObjectiveRecord:
+    async def add_objective(
+        self, title: str, why: str, measure: str, workflow: ObjectiveWorkflow, tainted: bool
+    ) -> ObjectiveRecord:
         """Put an objective on the list, active, with no progress yet."""
         now: float = time.time()
         record: ObjectiveRecord = ObjectiveRecord(
@@ -4628,11 +4704,12 @@ class Store:
             tainted=tainted,
             created_at=now,
             updated_at=now,
+            workflow=workflow,
         )
         await self._db.execute(
-            "INSERT INTO objectives(id, title, why, measure, status, notes, tainted, created_at, updated_at)"
-            " VALUES(?, ?, ?, ?, 'active', '[]', ?, ?, ?)",
-            (record.id, title, why, measure, int(tainted), now, now),
+            "INSERT INTO objectives(id, title, why, measure, status, notes, tainted, created_at, updated_at, workflow)"
+            " VALUES(?, ?, ?, ?, 'active', '[]', ?, ?, ?, ?)",
+            (record.id, title, why, measure, int(tainted), now, now, workflow.model_dump_json()),
         )
         await self._db.commit()
         return record
@@ -4654,11 +4731,15 @@ class Store:
 
     @_writing
     async def update_objective(
-        self, objective_id: str, status: ObjectiveStatus | None, note: ObjectiveNote | None
+        self,
+        objective_id: str,
+        status: ObjectiveStatus | None,
+        note: ObjectiveNote | None,
+        workflow: ObjectiveWorkflow | None,
     ) -> ObjectiveRecord:
-        """Change where an objective stands, and add a dated line of progress: the notes only grow. A move
-        :data:`OBJECTIVE_MOVES` does not allow is refused. The write matches the status just read, so a move made
-        meanwhile is not overwritten."""
+        """Change where an objective stands, add a dated line of progress (the notes only grow), and replace how it
+        is done (``workflow``, item 1227; ``None`` keeps it). A move :data:`OBJECTIVE_MOVES` does not allow is refused.
+        The write matches the status just read, so a move made meanwhile is not overwritten."""
         current: ObjectiveRecord = await self.get_objective(objective_id)
         wanted: ObjectiveStatus = current.status if status is None else status
         if wanted != current.status and wanted not in OBJECTIVE_MOVES[current.status]:
@@ -4667,11 +4748,13 @@ class Store:
                 {"objective_id": objective_id, "from": current.status, "to": wanted},
             )
         notes: tuple[ObjectiveNote, ...] = current.notes if note is None else (*current.notes, note)
+        kept: ObjectiveWorkflow = current.workflow if workflow is None else workflow
         cursor = await self._db.execute(
-            "UPDATE objectives SET status = ?, notes = ?, updated_at = ? WHERE id = ? AND status = ?",
+            "UPDATE objectives SET status = ?, notes = ?, workflow = ?, updated_at = ? WHERE id = ? AND status = ?",
             (
                 wanted,
                 _OBJECTIVE_NOTES.dump_json(notes).decode(),
+                kept.model_dump_json(),
                 time.time(),
                 objective_id,
                 current.status,
@@ -6730,16 +6813,25 @@ class Store:
         """Change a campaign only while its status is one of ``statuses`` (item 1046): whether it changed. A campaign
         that is not there is an error; one whose status moved meanwhile (the owner stopped it, a session achieved it) is
         left as it is."""
+        if await self._campaign_rows_in(campaign_id, assignments, params, statuses) > 0:
+            return True
+        await self.get_campaign(campaign_id)
+        return False
+
+    @_writing
+    async def _campaign_rows_in(
+        self, campaign_id: str, assignments: str, params: Sequence[object], statuses: Sequence[CampaignStatus]
+    ) -> int:
+        """The write of :meth:`_update_campaign_in`, under the write lock as every write is: its commit, made beside
+        another writer's unit, ended that unit half way (the code review of 2026-11-19, item 1236). How many rows it
+        changed."""
         marks: str = ", ".join("?" * len(statuses))
         cursor: aiosqlite.Cursor = await self._db.execute(
             f"UPDATE campaigns SET {assignments}, updated_at = ? WHERE id = ? AND status IN ({marks})",
             (*params, time.time(), campaign_id, *statuses),
         )
         await self._db.commit()
-        if cursor.rowcount > 0:
-            return True
-        await self.get_campaign(campaign_id)
-        return False
+        return cursor.rowcount
 
     async def plan_campaign_sessions(self, campaign_id: str, cron: str, next_session_at: float) -> bool:
         """Give an active campaign's sessions the rhythm ``cron``, with the next one at ``next_session_at``; whether
@@ -6779,6 +6871,16 @@ class Store:
                 campaign_id, "status = 'achieved', evidence = ?, next_session_at = NULL", (evidence,)
             )
             return True
+        if await self._achieve_active_campaign(campaign_id, evidence):
+            return True
+        # A campaign that is not there is an error, as for the other guarded updates (the pre-push review of 1236).
+        await self.get_campaign(campaign_id)
+        return False
+
+    @_writing
+    async def _achieve_active_campaign(self, campaign_id: str, evidence: str) -> bool:
+        """The write of :meth:`achieve_campaign` for a campaign that must still be active, under the write lock
+        (item 1236)."""
         cursor: aiosqlite.Cursor = await self._db.execute(
             "UPDATE campaigns SET status = 'achieved', evidence = ?, next_session_at = NULL, updated_at = ?"
             " WHERE id = ? AND status = 'active'",

@@ -14,7 +14,9 @@ dictation Safari does not hear says so, names what the Mac lacks, and Reload bri
 A message shows no buttons under it on the phone (item 1064), only the reactions that stand on it: hold a message (about
 half a second) and a sheet rises from the foot of the screen, with when it was sent and how long its work took, the
 seven reactions of Dot's messages, a thumb's size each, and what the message can do, a row each: copy it, select its
-text (a hold no longer selects it), read it aloud, show its steps, edit from here (your own), open its task. A press
+text (a hold no longer selects it; the words selected so take the phone's own Copy menu), read it aloud, show its
+steps, edit from here (your own), open its task. Every message can be copied there: what Dot said between steps, and
+your message while its run works, whose controls are kept back, have Copy the text (item 1226). A press
 outside the sheet, a swipe down or Escape closes it. A reaction does on the phone what it does elsewhere: a 👎 on a run
 at work reaches it, a ✋ holds it until you write, a 📌 keeps the message as a note (item 586; see
 [Reactions](runs.md#reactions-on-dots-messages)).
@@ -212,8 +214,9 @@ in the middle of the dock, not across all of it (item 427).
 A list row (Campaigns, Schedules, agents, notes) is its face or switch, its title and its buttons on one line, and
 what else it says (chips, text, times) under them across the row's whole width; a card's head with a line beside its
 name puts the line under the name (item 436). The conversation keeps a chat's rhythm (item 401):
-a turn after a turn keeps 8 px and the rows of what a run did 4, a message's bubble holds its words in 4 px above and
-below and is rounded 20 px, so one of a line is a pill and a longer one a rounded box (item 1101), a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
+a turn after a turn keeps 8 px and the rows of what a run did 4, a message's bubble holds its words in 7 px above and
+below and 12 at the sides and is rounded 18 px, so one of a line is nearly a pill and a longer one a rounded box (items
+1101 and 1205), a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
 phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
 keyboard move nothing else. The composer floats over the conversation's foot as a pane of glass, with no band of the
@@ -222,9 +225,14 @@ composer grows (items 374 and 401). At rest the composer is the "+", the words a
 words are touched or typed in, the words take their whole line and the line under them holds the "+", the model, the
 context meter, the microphone and the send, each 36 px, and a touch elsewhere puts that line away again. The model's
 pill stands for every choice of the run (item 1121): after the name it says the mode when one is named and the
-reasoning level in small words, not the approvals, which the owner read as a part of the model's name (item 1163), and its menu holds them in
-tabs under a bar at its top (item 1122): Model, Reasoning when the model offers a choice, Options (the approvals and
-How Dot works) and Mode, the menu keeping one height as the tabs change and opening on Model. The conversation scrolls up and down only
+reasoning level in small words, not the approvals, which the owner read as a part of the model's name (item 1163); a
+long name gives way to an ellipsis and the level stays whole. A tap on it opens the chat's settings (item 1202), a
+sheet from the foot of the screen with Close, the title and Done at its head: the default's row with Change, the
+favourites, then a section per provider that opens and folds (the chosen model's open, the others saying how many
+models they hold), each model with a tick and a star; under them the Options, Reasoning, Mode and Approvals as rows
+that say their value and open in place, and How Dot works with its switches; the search of the models stays at the
+sheet's foot. A pick keeps the sheet open; Done, Close, a tap on the dim above it or a drag of its head down puts it
+away. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
 tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A delegated run's row, under the helpers it belongs to, is one line tall at this width:
 its face, its goal, its state and time, and the way to its page, with the goal or the last line cut by an ellipsis
@@ -343,3 +351,5 @@ copy was kept of it (the first opening from the home screen after the app is add
 `offline.html`, which the service worker keeps as it installs: it says that the Mac cannot be reached, and to check that
 it is on and that Dot runs on it, then to try again. A script or a font that cannot be had is still an error. Without
 Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
+
+Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).

@@ -668,8 +668,8 @@ async def test_a_large_photo_goes_smaller_and_a_send_while_it_uploads_says_to_wa
 async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) -> None:
     """Items 1120 and 1121 on a phone's width: the box at rest is the "+", the words and the send, YOLO's pill and the
     microphone away too; a touch in the words brings the line under them, the model's pill alone standing for the
-    choices, and its menu holds the approvals and the mode; a touch elsewhere puts the line away, and the "+" menu has
-    no Model and options."""
+    choices, and its sheet (item 1202) holds the approvals and the mode; a touch elsewhere puts the line away, and the
+    "+" menu has no Model and options."""
     page: Page = await browser.new_page(viewport={"width": 390, "height": 900}, reduced_motion="reduce")
     await page.goto(ui_url(host, port, TOKEN))
     composer: Locator = page.locator(".composer").last
@@ -698,27 +698,26 @@ async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) ->
     assert round(mic[4]) == round(send[4]) == 36, rects
     assert plus[3] <= pill[2] and pill[3] <= mic[2] and mic[3] <= send[2] + 1, rects
     await model.click()
-    menu: Locator = page.locator(".composer-popover[aria-label='Model']")
-    # A tab each (item 1122): the models first, the mode and the options a tab away.
-    await expect(menu.get_by_role("tab", name="Model", exact=True)).to_have_attribute("aria-selected", "true")
-    await menu.get_by_role("tab", name="Mode", exact=True).click()
+    # The chat's settings (item 1202): a sheet with the models, then the Mode and the Approvals as rows that open in
+    # place.
+    menu: Locator = page.get_by_role("dialog", name="Chat settings")
+    await expect(menu).to_be_visible()
+    await menu.locator("summary", has_text="Mode").click()
     await expect(menu.get_by_role("listbox", name="Mode", exact=True)).to_be_visible()
-    await menu.get_by_role("tab", name="Options", exact=True).click()
+    await menu.locator("summary", has_text="Approvals").click()
     # The approval mode is no part of the model's name (the owner read "Pay or send" as one).
     await menu.locator(".pop-option[data-mode='yolo']").click()
     await expect(menu.locator(".pop-option[data-mode='yolo']")).to_have_attribute("aria-selected", "true")
     await expect(model).not_to_contain_text("Pay or send")
+    # The row says the mode chosen as it is chosen.
+    await expect(menu.locator("summary", has_text="Approvals")).to_contain_text("Ask only to pay or send")
+    # A pick repaints the sheet: the row stays open, and the sheet stays within the screen.
     await menu.locator(".pop-option[data-mode='ask']").click()
-    # A pick repaints the menu (item 1128): the box keeps its line, and the menu stays over it, its tabs in sight.
-    await menu.locator(".pop-option[data-mode='yolo']").click()
+    await expect(menu.locator(".pop-option[data-mode='ask']")).to_have_attribute("aria-selected", "true")
     await expect(composer).not_to_have_attribute("data-quiet", "")
-    await menu.locator(".pop-option[data-mode='ask']").click()
-    await expect(composer).not_to_have_attribute("data-quiet", "")
-    await expect(model).to_be_visible()
-    tabs = await menu.locator(".pop-tabs").bounding_box()
     shown = await menu.bounding_box()
-    assert tabs is not None and shown is not None
-    assert tabs["y"] >= 0 and shown["y"] + shown["height"] <= 900, (tabs, shown)
+    assert shown is not None
+    assert shown["y"] >= 0 and shown["y"] + shown["height"] <= 900, shown
     await page.keyboard.press("Escape")
     await page.mouse.click(4, 240)
     await expect(composer).to_have_attribute("data-quiet", "")

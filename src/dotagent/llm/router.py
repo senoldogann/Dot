@@ -8,20 +8,24 @@ from dotagent.agent.sizes import ContextSizes
 from dotagent.config import AppConfig
 from dotagent.core.errors import (
     ConfigError,
+    DotError,
     MissingSecretError,
     ProviderAccessError,
     ProviderAuthError,
     ProviderCreditError,
     ProviderQuotaError,
     ProviderRateLimitError,
+    ProviderWindowError,
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.llm import reach
 from dotagent.llm.anthropic import FAST_MODE_MODELS, AnthropicProvider
+from dotagent.llm.antigravity import AntigravityProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, ClaudeCodeProvider
 from dotagent.llm.claude_code import FAST_MODELS as CLAUDE_FAST_MODELS
+from dotagent.llm.google import GoogleProvider
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode import OpenCodeProvider
@@ -83,6 +87,12 @@ class Pause(FrozenModel):
 # The longest pause: a provider that names a longer wait (or an endless one) is asked again after a day.
 MAX_PAUSE_S: float = 86_400.0
 
+# The reasons of a pause that only the owner can end, by paying or by changing the plan: the credits or the balance of
+# an account spent, a quota used up, a model the plan does not pay for (item 1207). A rate limit, a plan's usage window
+# that is spent ("usage window spent") and a refused key are not among them: the first two pass on their own, the
+# third is told where the key is saved.
+MONEY_REASONS: frozenset[str] = frozenset({"out of credits", "quota exhausted", "not in the plan"})
+
 
 def unavailable_reason(error: Exception) -> str | None:
     """Why the model whose call raised ``error`` cannot answer for a while: the quota or the rate of its provider is
@@ -92,6 +102,8 @@ def unavailable_reason(error: Exception) -> str | None:
     before such an error reaches its caller."""
     if isinstance(error, ProviderCreditError):
         return "out of credits"
+    if isinstance(error, ProviderWindowError):
+        return "usage window spent"
     if isinstance(error, ProviderQuotaError):
         return "not in the plan" if error.status == 402 else "quota exhausted"
     if isinstance(error, ProviderRateLimitError):
@@ -194,6 +206,8 @@ class ModelRouter:
         self._closings: int = 0
         # What reads whether a provider's key is set, told each time the provider is retired (:meth:`on_retire`).
         self._retire_listeners: list[Callable[[str], Awaitable[None]]] = []
+        # What is told each time a model begins a pause for one of :data:`MONEY_REASONS` (:meth:`on_money_pause`).
+        self._money_listeners: list[Callable[[ModelRef, Pause, str], Awaitable[None]]] = []
 
     def _maker(self, name: str) -> asyncio.Lock:
         """The lock of the provider ``name`` (a known one: :data:`KNOWN_PROVIDERS` bounds the locks)."""
@@ -225,6 +239,12 @@ class ModelRouter:
                 many = self._config.providers.openrouter
                 many_key: str = await asyncio.to_thread(require_secret, many.api_key_env, "the openrouter provider")
                 return OpenRouterProvider(many, many_key)
+            case "google":
+                gemini = self._config.providers.google
+                gemini_key: str = await asyncio.to_thread(require_secret, gemini.api_key_env, "the google provider")
+                return GoogleProvider(gemini, gemini_key)
+            case "antigravity":
+                return AntigravityProvider(self._config.providers.antigravity)
             case "opencode":
                 return OpenCodeProvider(OpenCodeServer(self._config.providers.opencode, self._login_env), ToolBridge())
             case "claude_code":
@@ -284,6 +304,12 @@ class ModelRouter:
         provider is saved or removed: what reads whether the key is set reads it again (item 558)."""
         self._retire_listeners.append(listener)
 
+    def on_money_pause(self, listener: Callable[[ModelRef, Pause, str], Awaitable[None]]) -> None:
+        """Have ``listener`` called with the model, its pause and the provider's own words each time a model that was
+        answering begins a pause for one of :data:`MONEY_REASONS` (item 1207): a balance spent stops every run and
+        schedule on the model, and nothing else tells the owner."""
+        self._money_listeners.append(listener)
+
     async def complete(self, ref: ModelRef, request: ChatRequest, sink: DeltaSink, origin: CallOrigin) -> ModelReply:
         """Send ``request`` to the provider of ``ref`` and hand the recorder what the call cost: its seconds and tokens,
         or, for a call that failed, the type of its error (:data:`CANCELLED` for one that a stop or the caller's
@@ -309,23 +335,38 @@ class ModelRouter:
             )
             raise
         except Exception as error:
-            self._pause(ref, error)
+            begun: Pause | None = self._pause(ref, error)
             await self._record_failure(
                 _failed(ref, request, origin, time.monotonic() - started, _first(first), type(error).__name__)
             )
+            if begun is not None and begun.reason in MONEY_REASONS:
+                await self._tell_money(ref, begun, error.message if isinstance(error, DotError) else str(error))
             raise
         self._pauses.pop(ref.label, None)
         await self._recorder(_answered(ref, request, origin, time.monotonic() - started, _first(first), reply))
         return reply
 
-    def _pause(self, ref: ModelRef, error: Exception) -> None:
+    def _pause(self, ref: ModelRef, error: Exception) -> Pause | None:
         """Pause the model of ``ref`` after ``error``; the newest error decides how long, as the provider's latest
-        word."""
-        pause: Pause | None = pause_for(error, self._config.models.helper_cooldown_s, time.time())
+        word. Returns the pause when it begins one or changes why the model is paused (a 402 after a rate limit),
+        ``None`` when the error pauses nothing or the model was paused already for the same reason."""
+        now: float = time.time()
+        pause: Pause | None = pause_for(error, self._config.models.helper_cooldown_s, now)
         if pause is None:
-            return
+            return None
+        before: Pause | None = self._pauses.get(ref.label)
         self._pauses[ref.label] = pause
         log.warning("model_paused", provider=ref.provider, model=ref.label, reason=pause.reason, until=pause.until)
+        return pause if before is None or before.until <= now or before.reason != pause.reason else None
+
+    async def _tell_money(self, ref: ModelRef, pause: Pause, words: str) -> None:
+        """Tell the listeners of :meth:`on_money_pause`. The caller gets the call's own error: a listener that fails is
+        logged instead, as a failed record of the call is."""
+        for listener in self._money_listeners:
+            try:
+                await listener(ref, pause, words)
+            except Exception as error:
+                log.error("money_pause_not_told", model=ref.label, reason=pause.reason, exc_info=error)
 
     def paused(self, now: float) -> dict[str, Pause]:
         """The models (``provider:model`` labels) that cannot answer for a while at ``now`` (seconds since the epoch),
@@ -366,6 +407,8 @@ class ModelRouter:
                 return providers.anthropic.base_url
             case "openrouter":
                 return providers.openrouter.base_url
+            case "google":
+                return providers.google.base_url
             case _:
                 return None
 

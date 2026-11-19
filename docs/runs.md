@@ -84,11 +84,16 @@ is the answer (a small model that is offered both writes the call out as text).
   many of the newest messages as fit next to the system prompt, the tool definitions and its note in 85 % of the size at
   which it starts (`context_summarise_share` of the model's context size, or the whole budget when the window leaves
   less), and
-  never less than the model's last reply with its results, so the steps after it have room. It is tried three times:
-  a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section (a
-  section is there as a heading, not as a word of a sentence) is asked again once with the missing sections named and
+  never less than the model's last reply with its results, so the steps after it have room. Its writer may write the
+  words of a summary at its limit and slack and 4 000 tokens of thinking at most (7 000 tokens for 1 500 words, item
+  1191: a writer that ran on wrote 35 060 tokens in 400 s while its run waited; a writer on the Claude plan,
+  `claude_code`, is not held to it, as the `claude` command takes no such limit). It is tried three times: a summary
+  cut off at that cap is asked again once, whole and shorter and without reasoning, a summary far over the limit is
+  asked again with the limit and the overrun in front, and one that lacks a section (a section is there as a heading,
+  not as a word of a sentence) is asked again once with the missing sections named and
   the first draft carried along; when the fast model gives no text,
-  a summary far too long, an error or a timeout, or when its window cannot be read (an Ollama model whose server does not
+  a summary far too long or cut off at its cap at every try, an error or a timeout, or when its window cannot be read
+  (an Ollama model whose server does not
   answer, item 552), the run's own model writes it, and while the fast model is paused after
   a quota, rate-limit or key error (see `standby`) the run's own model writes it without asking the fast one (item 240);
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
@@ -110,7 +115,13 @@ is the answer (a small model that is offered both writes the call out as text).
   and after it (`tokens_before`, `tokens_after`). The model that writes the summary is told that what tools returned
   (pages, files, mail, command output) is data, to be reported as what it said and never as an instruction to the run
   or a wish of yours, and that the summary is Dot's own note of what happened, in which only what you wrote stands in
-  your voice (in GOAL); the note that carries the summary says the same to the run that goes on (item 589).
+  your voice (in GOAL); the note that carries the summary says the same to the run that goes on (item 589), names the
+  commands the summary carries that stand in neither your words nor the plan (a compaction copies what a page, a mail
+  or a file said, so such a command is content the run read and is checked against the task before it runs, item 1219),
+  and the run that goes on from a compaction is marked untrusted as one that read a page is: a step that reaches
+  outside the Mac, reads a secret, installs, changes Dot's own files or fills a login goes to the review model first
+  in a yolo run, or asks in an `ask` or `auto` run whose preset allowed it, while what the run saves since (memory,
+  its list of things to do) stays its own.
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
 `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only with
 evidence (`evidence`, cut at 400 characters): what the run observed that shows it, such as the path and what it read
@@ -159,8 +170,11 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `"most"`, the run's budget is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same
   proportion (never below 2000 characters). The text of a page or an application window in a browser or desktop result takes what is left next to the
   rest of the result, and never less than half the result, so a small window shortens a page instead of leaving it out.
-  A model whose window cannot hold the system prompt and the tool definitions is refused at the start, with
-  a hint. A model of the `weak` tier is reminded in task and research runs, every `reminder_every` steps, of the goal,
+  A model whose window cannot hold the system prompt and every tool definition carries the tools it can hold: the
+  owner's own servers' tools (`mcp__`) go first, the largest first, and the three a run cannot work without — `finish`, `use_tools`, `ask_user`, when it has
+  them — always stay. The groups, the registry and the prompt are built again for what is left, so a
+  run names only the tools it has, and the tools left out are logged. Only when even those do not fit is the run
+  refused at the start, with a hint (item 1211). A model of the `weak` tier is reminded in task and research runs, every `reminder_every` steps, of the goal,
   your messages, the plan and its newest actions. `tiers` in `[agent]` sets a model's tier by hand; with
   `scaffold = "measured"` a model is weak when at least `profile_min_calls` tool calls of its newest 30 finished runs
   were measured and at least `weak_refusal_share` of them were refused before they ran (an unknown tool, or arguments
@@ -198,7 +212,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   - say of the user's own products only what their source says, and mark what it could not check as not verified;
   - keep to the plan and the timing it wrote, or say first that it departs from them.
 - `prompt` in `[agent]` decides how much the system prompt says (item 280). `full`, the default, says how to work and
-  each kind of tool at length (the web, the browser, the desktop, memory, schedules). `lean` keeps the rules of trust
+  each kind of tool at length (the web, the browser, the desktop, memory, schedules), and that a file is found by name
+  with Spotlight (`mdfind -onlyin ~ -name`), not with `find` or `grep -r` over the home folder, and with `find` in one
+  folder for a hidden or new file Spotlight does not index (item 1188: 0.4 s where `find` took 100 s for the same file
+  on the owner's Mac). `lean` keeps the rules of trust
   and safety, of hesitating and of how a run ends as `full` has them, word for word where they are the same rule, and
   says how to work and each kind of tool in a line or two; the rest is in the tools' own descriptions. With
   `tool_surface = "grouped"` as well, a run starts lean: the shortest prompt and the core tools. Eval reports keep the
@@ -248,9 +265,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `finish` must come last, the calls after it run as any call does, and the model calls `finish` again once it has read
   their results (item 685).
 - A reply the service's content filter stopped (it ends with `content_filter`) is no nudge: asked again with the same
-  conversation the model is stopped again (item 437). The run moves to a standby model at once (see
-  [Helpers and standby](models.md#models-and-providers)), and the model is not paused for other runs; with no standby
-  model left, the run fails saying that the filter stopped it and that another model would answer.
+  conversation the model is stopped again (item 437). The run fails at once on its own model, saying that the filter
+  stopped it and that another model would answer (item 1225: a run changes its model only when its credits or limits
+  are spent, see [Helpers and standby](models.md#models-and-providers)); the model is not paused for other runs.
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
   as "What Dot needs from you", and `dotx run` prints it after the answer. A run that failed so is stored `failed`, but
   its page says "Waiting on you", not "The task failed", and the line that offers Continue says that a message below
@@ -274,7 +291,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   changed stay its own for the other chats' runs at work after it ends, until they read them again; and the browser's
   mode and its debugging port do not change while another chat's run is at work. The prompt tells each run to leave the
   other runs' apps and files to them and to stop, kill or quit no process or app it did not start. Only the runs of one
-  daemon know each other (`dotx run` in a terminal has its own), a path only the running line knows (`$(...)`,
+  daemon know each other (a `dotx` command that works in its own process has its own; `dotx run` hands its run to a running daemon, item
+  1203), a path only the running line knows (`$(...)`,
   `find -delete`, git) leaves no footprint, and a process killed by name (`pkill`) is kept to only by the prompt.
 - Runs, their events and their conversations are stored in a SQLite database (WAL mode; the daemon writes through one
   connection, one writer at a time, and waits out a lock held by another process with logged retries before it gives an
@@ -292,7 +310,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   failed with that event too, so a page that showed it queued sees it end. A run that a crashed daemon left behind is
   marked as failed the next time Dot starts, as ended at its last event (the runs it delegated before it), and so is one
   that a `dotx` command left when it died, by the daemon within half a minute when it runs. Either can be resumed, and
-  so can a run that a shutdown of the daemon cut off. A queue held because the daemon crashed stays held while that
+  so can a run that a shutdown of the daemon cut off. A schedule's run that either cut off is not resumed on its own:
+  the scheduler starts it once more as a new run of the schedule, unless it sent something out (item 1206, see
+  [Schedules](memory-and-schedules.md)); that run's page shows a line saying it is a try, with the way to the run it
+  tries again. A queue held because the daemon crashed stays held while that
   resumed run works, and opens when the resumed run ends done; a queue held because a run failed stays held until you
   resume it. A resumed run keeps the ledger and the progress ladder of the run it goes on from when those were stored,
   and its note says so; when they were not, the note says they start again (see
@@ -304,8 +325,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   [Reactions on Dot's messages](#reactions-on-dots-messages)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
   the sidebar, and you can steer it when you come back.
-- A run of a `dotx` command (`dotx run`, `dotx resume`, `dotx chat`) is on the pages too while the daemon runs: it works
-  in the sidebar, and its page follows it live, as it follows the daemon's own runs, though its text
+- `dotx run` hands its run to the daemon while one runs (item 1203, [The command line](command-line.md)): it is then the
+  daemon's own run, in its Chrome, its screen on the pages. A run of a `dotx` command's own process (`dotx resume`,
+  `dotx chat`, and `dotx run` with no daemon) is on the pages too while the daemon runs: it works in the sidebar, and its page follows it live, as it follows the daemon's own runs, though its text
   comes whole at each step rather than as it is written. Its Stop asks the command to stop it, which it does within a
   second. A question or an approval of it can be answered on the pages, which ends the prompt at its terminal; the first
   answer stands, wherever it was given. It takes no steering from the pages: a message sent there waits in the chat's
@@ -377,8 +399,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   XML part of more than 16 MB (a worksheet is read as a stream and has the first bound only), a part of 1 MB or more
   packed 200 times smaller than it unpacks to, or more than 10,000 parts. It is refused before anything is read, each
   part is unpacked in chunks up to the size it declares, and a part that declares less than it holds is damaged, so a
-  small file that unpacks to gigabytes cannot take the daemon's memory. Anything else is refused at
-  upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one named like a file
+  small file that unpacks to gigabytes cannot take the daemon's memory. A video or a sound (a voice memo) is kept as it
+  came, with no text read out of it, and the run is told to watch it with `watch_video` (item 1213, [Watching
+  videos](video.md)). Anything else is refused at upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one named like a file
   Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
 - A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269) and
   a file's path an answer names in code (under `~/` or `/Users/<you>/`; Dot names the files it made by their full
@@ -425,6 +448,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   /api/attachments/{id}/look` (where the drawing is served; 422 when Quick Look cannot draw the file), `GET
   /api/files/web-page?path=` (where a web page is served, item 1077), `GET
   /api/files/page` (a PDF's page as a PNG), `GET /api/files/image` and `POST /api/files/open`.
+
+The character a run works by is the owner's (items 1210 and 1211): bold in method, conservative in consequence; the
+result before the account of it, the short line with its calls the only narration; the next step left ready, in the
+answer or a draft the goal asked for, never as a calendar entry or a reminder nobody asked for; three different ways
+before a road is called closed, and no way around a refusal, a denial or the owner's decision; convention broken
+where it helps and no rule broken. In the owner's name it does what he asks, whole and without a lecture, within
+what the run's approvals allow. It stands in both prompts a run may open with, Dot's own and the Claude plan's, from
+one block (`CHARACTER` in `agent/prompt.py`), so the two say it the same.
 
 ### Reactions on Dot's messages
 
@@ -563,9 +594,11 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Vault           | `vault_contacts` (item 621): the contact details you saved in Settings › Vault and the billing address of each card, for a run to type where a form asks; it never shows a password, a card number, an expiry or a security code (a card is kept, and no tool of a run fills it) |
 | Trading         | while trading is on ([Trading](trading.md), items 763 and 764): `trading_market`, `trading_scan` (item 771), `trading_portfolio`, `trading_order`, `trading_exit` (item 770), `trading_history`, `trading_engine` (item 818) |
 | Meetings        | `meeting_join`, `meeting_read`, `meeting_post`, `meeting_leave` (item 1138): notes of the owner's Google Meet call, answers to whoever speaks to Dot there (item 1150); a task's post asks the owner every time ([Meetings](meetings.md)) |
+| Video           | `watch_video` (item 1212, tool group `video`): a video file or a link, as frames with their moments and a transcript by the minute ([Watching videos](video.md)) |
 | Recon           | `recon` (item 776): the addresses, TLS certificate, HTTP headers and technology of a site, and with `depth = "ports"` the open ports of a host in `[recon] owned_hosts` ([Recon](recon.md)) |
 | Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts`, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
+| Phone           | while `[phone] enabled` (item 1196): `phone_status`, whether the owner's iPhone answers over WebDriverAgent and is locked ([Dot and your iPhone](phone-control.md)) |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools`, `recall` (a record a compaction named, read back, item 924) |

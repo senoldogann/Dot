@@ -203,6 +203,35 @@ class ClaudeCodeConfig(FrozenModel):
     silence_s: float = Field(gt=0, allow_inf_nan=False)
 
 
+class AntigravityConfig(FrozenModel):
+    """The models of a Google Antigravity account over Cloud Code Assist (``llm/antigravity.py``): no key, but the
+    Google login a client on this Mac keeps, which ``credentials_file`` names (a home directory ``~`` and a ``*`` glob
+    allowed), the Cloud Code ``project`` that login belongs to, and the ``user_agent`` Google gates the route on (the
+    installed Antigravity's client name and version)."""
+
+    base_url: ServiceAddress
+    credentials_file: str
+    project: str
+    user_agent: str
+    connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    attempts: int = Field(ge=1)
+    max_concurrent: int = Field(ge=1)
+
+
+class GoogleConfig(FrozenModel):
+    """The Gemini models of a Google AI Studio key, over the Gemini API's OpenAI-compatible route
+    (``https://generativelanguage.googleapis.com/v1beta/openai``). ``api_key_env`` holds the key from
+    aistudio.google.com; a model is free while the key's project stays inside its free tier (docs/models.md)."""
+
+    base_url: ServiceAddress
+    api_key_env: str
+    connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    attempts: int = Field(ge=1)
+    max_concurrent: int = Field(ge=1)
+
+
 class AnthropicConfig(FrozenModel):
     base_url: ServiceAddress
     api_key_env: str
@@ -253,6 +282,8 @@ class ProvidersConfig(FrozenModel):
     opencode_go: OpenCodeGoConfig
     anthropic: AnthropicConfig
     openrouter: OpenRouterConfig
+    antigravity: AntigravityConfig
+    google: GoogleConfig
     opencode: OpenCodeConfig
     claude_code: ClaudeCodeConfig
 
@@ -787,6 +818,9 @@ class SchedulerConfig(FrozenModel):
     tick_s: float = Field(gt=0, allow_inf_nan=False)
     min_interval_s: int
     misfire_grace_s: int
+    # Item 1204: a repeating schedule whose newest missed firing is late by more than misfire_grace_s but at most this
+    # many seconds runs it late, once, and the older ones are told as missed; one later than this skips (0: never).
+    catch_up_s: int = Field(ge=0)
     max_schedules: int
     # Item 257: how many earlier runs of a schedule a firing's opening carries the answers of (0: none), in how many
     # characters at most, and whether a firing goes on in the chat of the one before instead.
@@ -1188,6 +1222,30 @@ class MeetingsConfig(FrozenModel):
     headless: bool
 
 
+class PhoneConfig(FrozenModel):
+    """The owner's iPhone, reached over WebDriverAgent (``[phone]``, item 1196, docs/phone-control.md)."""
+
+    enabled: bool
+    # The addresses of WebDriverAgent's server on the phone, tried in order (Tailscale first, then the home network).
+    wda_urls: list[str]
+    # The phone's UDID for ``xcrun devicectl``; empty leaves the keeper to relaunch nothing.
+    udid: str
+    # The bundle id of the WebDriverAgent runner app that opening starts the server.
+    runner_bundle: str
+    check_every_s: float = Field(gt=0, allow_inf_nan=False)
+    # How long the phone stays out of reach (or unclear) before the owner is told, once until it is up again.
+    notify_after_s: float = Field(ge=0, allow_inf_nan=False)
+    request_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+
+    @field_validator("wda_urls")
+    @classmethod
+    def _http_urls(cls, urls: list[str]) -> list[str]:
+        wrong: list[str] = [url for url in urls if not url.startswith(("http://", "https://"))]
+        if wrong:
+            raise ValueError("[phone] wda_urls are http(s) addresses, as http://100.64.0.1:8100: " + ", ".join(wrong))
+        return urls
+
+
 class AppConfig(FrozenModel):
     mcp: list[McpServerConfig]
     builtin_mcp: BuiltinMcpConfig
@@ -1220,6 +1278,7 @@ class AppConfig(FrozenModel):
     recon: ReconConfig
     trading: TradingConfig
     meetings: MeetingsConfig
+    phone: PhoneConfig
 
     @field_validator("mcp")
     @classmethod
@@ -1249,6 +1308,11 @@ def _read_toml(path: Path) -> JsonObject:
             parsed: JsonObject = tomllib.load(handle)
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError("config file is not valid TOML", {"path": str(path), "error": str(exc)}) from exc
+    except UnicodeDecodeError as exc:
+        # Not text at all: the daemon and ``dotx`` said a traceback and nothing of the file (item 1238).
+        raise ConfigError(
+            "config file is not UTF-8 text", {"path": str(path), "byte": exc.start, "error": exc.reason}
+        ) from exc
     return parsed
 
 
@@ -1361,6 +1425,7 @@ def providers_by_key(config: AppConfig) -> dict[str, str]:
         providers.anthropic.api_key_env: "anthropic",
         providers.opencode_go.api_key_env: "opencode_go",
         providers.openrouter.api_key_env: "openrouter",
+        providers.google.api_key_env: "google",
         providers.ollama.api_key_env: "ollama",
         config.judge.api_key_env: JUDGE_SERVICE,
     }

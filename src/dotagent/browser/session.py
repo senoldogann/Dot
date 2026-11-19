@@ -12,6 +12,7 @@ import asyncio
 import base64
 import contextlib
 import math
+import os
 import re
 import secrets
 import time
@@ -89,13 +90,22 @@ from dotagent.browser.pages import (
     add_note,
     attach_handlers,
     chrome_lists,
+    missing_tab,
+    note_closed,
     page_target_id,
     taken_in,
     target_id_of,
     unhanded_tab,
     watch_births,
 )
-from dotagent.browser.profile_lock import held_for_start, profile_holder_pid
+from dotagent.browser.profile_lock import (
+    ask_handover,
+    handover_asked,
+    held_for_start,
+    profile_holder_pid,
+    started_by_dot,
+    withdraw_handover,
+)
 from dotagent.browser.profiles import (
     HIDE_CRASH_BUBBLE,
     INCOGNITO_PROFILE,
@@ -119,6 +129,7 @@ from dotagent.browser.snapshot import (
     link_lines,
     overlay_lines,
     prefer_diff,
+    redrawn_ref,
     render_diff,
     render_lines,
     squeeze_text,
@@ -157,6 +168,7 @@ from dotagent.core.errors import (
     ForbiddenUrlError,
     HandedOff,
     PolicyDenied,
+    RefGoneError,
     RunConflict,
     StepNotSent,
     TabSilentError,
@@ -350,6 +362,10 @@ _REMARKED_PARTS: frozenset[VaultFieldKind] = frozenset({"password", "otp"})
 # Chrome exits by itself a few seconds after the driver that started it died.
 _CHROME_EXIT_WAIT_S: float = 10.0
 _CHROME_EXIT_POLL_S: float = 0.2
+# How often Dot's own Chrome looks whether another Dot process asks for its profile (item 1198), and how long a start
+# waits for that process to let go of it: it looks each second, and closing its Chrome takes a few more.
+_HANDOVER_POLL_S: float = 1.0
+_HANDOVER_WAIT_S: float = 20.0
 
 
 def _ms(seconds: float) -> int:
@@ -1004,6 +1020,8 @@ class BrowserSession:
         # with the setting up of its session, which a navigation of the page waits for.
         self._guarded: dict[Page, asyncio.Task[None]] = {}
         self._reaper: asyncio.Task[None] | None = None
+        # The watch for another Dot process that asks for the profile of Dot's own Chrome (item 1198).
+        self._handing: asyncio.Task[None] | None = None
         # The uses of Chrome under way that no chat's tabs hold (a page read for the web tools, a count of the cookies),
         # and when Chrome was last started or such a use ended: the idle close counts both as uses (item 454).
         self._uses: int = 0
@@ -1085,6 +1103,23 @@ class BrowserSession:
             case "attach":
                 return await self._attach(unattended)
 
+    async def _ask_for_profile(self) -> int | None:
+        """Ask the Dot process whose own Chrome holds the profile (a ``dotx run`` beside the daemon, or the
+        daemon beside it) to let go of it (item 1198, :meth:`_hand_over_when_asked`), and wait up to
+        ``_HANDOVER_WAIT_S`` for it to: the pid of the Chrome that still holds the profile then, ``None`` once it is
+        free."""
+        request: Path = await asyncio.to_thread(ask_handover, self._profile, os.getpid())
+        try:
+            for _ in range(int(_HANDOVER_WAIT_S / _CHROME_EXIT_POLL_S)):
+                holder: int | None = await asyncio.to_thread(profile_holder_pid, self._profile)
+                if holder is None:
+                    _log.info("browser_profile_handed_over", profile=str(self._profile))
+                    return None
+                await asyncio.sleep(_CHROME_EXIT_POLL_S)
+            return await asyncio.to_thread(profile_holder_pid, self._profile)
+        finally:
+            await asyncio.to_thread(withdraw_handover, request)
+
     async def _launch_own(self) -> _Opened:
         """Start Dot's own Chrome (:meth:`_start_own`) with the profile held for the start (item 554): an import of
         sign-ins (``dotx browser import-chrome``) swaps files into a profile that no Chrome has open, and runs not at
@@ -1098,6 +1133,14 @@ class BrowserSession:
         reach that program instead."""
         config: BrowserConfig = self._config
         holder: int | None = await asyncio.to_thread(profile_holder_pid, self._profile)
+        if holder is not None and await asyncio.to_thread(started_by_dot, holder):
+            holder = await self._ask_for_profile()
+            if holder is not None:
+                raise BrowserError(
+                    "Dot's browser is in use by a run of another Dot process (the daemon or a dotx command); it is "
+                    "let go once that run no longer uses it: wait and try again, and do not quit Chrome",
+                    {"profile": str(self._profile), "pid": holder},
+                )
         if holder is not None:
             raise BrowserError(
                 "the Dot browser profile is open in another process; close that Chrome window and try again",
@@ -1280,6 +1323,8 @@ class BrowserSession:
         self._used_at = time.monotonic()
         if self._reaper is None:
             self._reaper = asyncio.create_task(self._reap_idle())
+        if self._handing is None and self._config.mode == "own":
+            self._handing = asyncio.create_task(self._hand_over_when_asked())
         return context
 
     def _on_context_closed(self, context: BrowserContext) -> None:
@@ -1471,6 +1516,11 @@ class BrowserSession:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._reaper
             self._reaper = None
+        if self._handing is not None:
+            self._handing.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._handing
+            self._handing = None
         await self._let_go()
         # The ledger says, once its writes have landed, that this process has no tab left open (item 703).
         await asyncio.gather(*self._ledger_writes, return_exceptions=True)
@@ -1624,10 +1674,36 @@ class BrowserSession:
         config: BrowserConfig = self._config
         if config.mode != "own" or config.idle_close_s == 0 or self._playwright is None or self._closed:
             return False
-        if self._uses > 0 or self._teaching is not None or threads_in_use(self._threads, self._kept()):
+        if not self._free_now():
             return False
         used: float = max([self._used_at, *(thread.last_used for thread in self._threads.values())])
         return time.monotonic() - used >= config.idle_close_s
+
+    def _free_now(self) -> bool:
+        """Whether no work uses Dot's own Chrome at this moment: no chat's step is under way in it, no run at work holds
+        tabs in it, no use that no chat holds is under way (:meth:`_in_use`) and no task is being taught in it."""
+        return self._uses == 0 and self._teaching is None and not threads_in_use(self._threads, self._kept())
+
+    async def _hand_over_when_asked(self) -> None:
+        """Let go of Dot's own Chrome when another Dot process asks for its profile (item 1198,
+        :meth:`_ask_for_profile`) and no work uses it now (:meth:`_free_now`): a ``dotx run`` beside the daemon, or
+        the daemon beside one, would otherwise find the profile held by a Chrome nothing uses until the idle close
+        (``idle_close_s``), which also waits while that Chrome's window is in front. A run of this process at work
+        keeps it; the asking start then fails and says so. Errors are logged and the watch goes on."""
+        while True:
+            await asyncio.sleep(_HANDOVER_POLL_S)
+            if self._context is None or self._closed or not self._free_now():
+                continue
+            try:
+                if not await asyncio.to_thread(handover_asked, self._profile):
+                    continue
+                async with self._launch_lock:
+                    if self._context is None or self._closed or not self._free_now():
+                        continue
+                    await self._let_go()
+                _log.info("browser_handed_over", profile=str(self._profile))
+            except Exception:  # noqa: BLE001 - logged with its traceback
+                _log.exception("browser_hand_over_failed", profile=str(self._profile))
 
     async def _close_unused(self) -> None:
         """Close Dot's own Chrome and stop the driver once they are unused (:meth:`_unused`, item 454), unless its
@@ -1710,7 +1786,9 @@ class BrowserSession:
             async with thread.lock:
                 if self._threads.get(thread_id) is not thread:
                     continue
-                closed: list[Tab] = await self._close_background(thread, idle_background_tabs(thread, cutoff))
+                closed: list[Tab] = await self._close_background(
+                    thread, idle_background_tabs(thread, cutoff), "Dot closed it once it stood unused in the background"
+                )
             if closed:
                 _log.info("browser_idle_background_tabs_closed", thread_id=thread_id, tabs=len(closed))
 
@@ -1733,19 +1811,23 @@ class BrowserSession:
             if self._threads.get(thread_id) is not thread or thread_id in self._kept():
                 return
             background: list[Tab] = [tab for index, tab in enumerate(thread.tabs) if index != thread.active]
-            closed: list[Tab] = await self._close_background(thread, background)
+            closed: list[Tab] = await self._close_background(
+                thread, background, "Dot closed it when the run that left it in the background ended"
+            )
         if closed:
             _log.info("browser_run_background_tabs_closed", thread_id=thread_id, tabs=len(closed))
 
-    async def _close_background(self, thread: ThreadTabs, tabs: Sequence[Tab]) -> list[Tab]:
-        """Close ``tabs`` of ``thread``, but not its current one nor the tab a task is being shown in, and note on the
-        current tab what closed; return the tabs closed."""
+    async def _close_background(self, thread: ThreadTabs, tabs: Sequence[Tab], why: str) -> list[Tab]:
+        """Close ``tabs`` of ``thread``, but not its current one nor the tab a task is being shown in, note on the
+        current tab what closed and keep it with ``why`` for a run that asks for one of them (item 1209); return the
+        tabs closed."""
         current: Tab | None = thread.tabs[thread.active] if thread.tabs else None
         teaching: object = None if self._teaching is None else self._teaching.page
         closing: list[Tab] = [tab for tab in tabs if tab is not current and tab.page is not teaching]
         for tab in closing:
             url: str = tab.page.url
             await self._close_tab_object(thread, tab)
+            note_closed(thread, url, why)
             if current is not None:
                 add_note(current, f"closed a tab no longer in use: {truncate_middle(url, _LAUNCH_ERROR_CHARS)}")
         return closing
@@ -1912,7 +1994,9 @@ class BrowserSession:
             self._teaching = None
         for thread in self._threads.values():
             if tab in thread.tabs:
+                # A tab Dot closes has left its thread by now: one still in it was closed by its page or in Chrome.
                 thread.remove(tab)
+                note_closed(thread, tab.page.url, "its page closed it, or it was closed in Chrome")
                 return
 
     def _take_initial_page(self) -> Page | None:
@@ -1959,7 +2043,9 @@ class BrowserSession:
             keep: Tab = thread.tabs[thread.active]
             victim: Tab = next(tab for tab in thread.tabs if tab is not keep)
             add_note(keep, f"closed the oldest background tab to stay within max_tabs={self._config.max_tabs}")
+            url: str = victim.page.url
             await self._close_tab_object(thread, victim)
+            note_closed(thread, url, f"Dot closed it to stay within max_tabs={self._config.max_tabs}")
 
     async def _close_tab_object(self, thread: ThreadTabs, tab: Tab) -> None:
         if tab in thread.tabs:
@@ -4114,7 +4200,7 @@ class BrowserSession:
 
     async def switch_tab(self, thread_id: str, index: int, hide_secrets: bool) -> PageView:
         async with self._locked(thread_id) as thread:
-            self._require_tab_index(thread, index)
+            self._require_tab_index(thread_id, thread, index)
             thread.active = index - 1
             tab: Tab = thread.tabs[thread.active]
             # The tab is made the window's visible one only when the window may be raised (item 97).
@@ -4131,32 +4217,61 @@ class BrowserSession:
                 for other in [tab for tab in thread.tabs if tab is not current]:
                     await self._close_tab_object(thread, other)
             else:
-                self._require_tab_index(thread, index)
+                self._require_tab_index(thread_id, thread, index)
                 await self._close_tab_object(thread, thread.tabs[index - 1])
             tab: Tab = await self._current_tab(thread)
             return await self._full_view(thread, tab, hide_secrets)
 
-    def _require_tab_index(self, thread: ThreadTabs, index: int) -> None:
-        if not 1 <= index <= len(thread.tabs):
-            raise BrowserError("there is no such tab", {"index": index, "open_tabs": len(thread.tabs)})
+    def _require_tab_index(self, thread_id: str, thread: ThreadTabs, index: int) -> None:
+        """Refuse a tab number the chat has no tab for, naming the tabs it has and those that closed (item 1209)."""
+        if 1 <= index <= len(thread.tabs):
+            return
+        error: BrowserError = BrowserError(missing_tab(index, thread), {"index": index, "open_tabs": len(thread.tabs)})
+        self.mask_held(thread_id, error)
+        raise error
 
     async def upload(self, thread_id: str, ref: str, paths: Sequence[str], hide_secrets: bool) -> PageView:
         """Give ``paths`` to the file field of the upload control ``ref``, or to the file chooser a click on it opens
-        (:func:`upload_files`)."""
+        (:func:`upload_files`). A control the page drew anew since the view that showed ``ref`` (a composer redraws its
+        toolbar, also while the step waits for its yes) is the one alike control the page shows now
+        (:meth:`_redrawn`, item 1199)."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             await self._enforce_landing(tab)
+            given: str = ref
             tab.expect_chooser = True
             try:
-                await upload_files(tab.page, ref, list(paths), _ms(self._config.action_timeout_s))
+                try:
+                    await upload_files(tab.page, ref, list(paths), _ms(self._config.action_timeout_s))
+                except RefGoneError:
+                    again: str | None = await self._redrawn(tab, ref, hide_secrets)
+                    if again is None:
+                        raise
+                    await upload_files(tab.page, again, list(paths), _ms(self._config.action_timeout_s))
+                    given = again
+                    add_note(tab, f"the page drew the control {ref} anew since it was read: the files went to {again}")
             finally:
                 tab.expect_chooser = False
             unsettled: str | None = await self._settle_acted(tab)
             view: PageView = await _read_after(
                 self._changes_view(thread, tab, hide_secrets),
-                f"the upload went through: {len(paths)} file(s) given to {ref}",
+                f"the upload went through: {len(paths)} file(s) given to {given}",
             )
             return view if unsettled is None else view.model_copy(update={"notes": (*view.notes, unsettled)})
+
+    async def _redrawn(self, tab: Tab, ref: str, hide_secrets: bool) -> str | None:
+        """The ref the control ``ref`` of the tab's last view has on the page now (:func:`redrawn_ref`), from a new
+        snapshot of the whole page, which becomes the tab's lines. ``None`` while the page is at another address than
+        that view's, and when that view or the new snapshot was of a part of the page only: one alike control in a part
+        may be one of several on the page."""
+        if tab.rendered_partial or tab.page.url != tab.rendered_url:
+            return None
+        shown: tuple[SnapshotLine, ...] = tab.lines
+        capture: _Capture = await self._capture(tab, hide_secrets)
+        tab.lines = capture.lines
+        found: str | None = None if capture.partial else redrawn_ref(shown, capture.lines, ref)
+        _log.info("browser_ref_redrawn", ref=ref, found=found, url=tab.page.url)
+        return found
 
     # ------------------------------------------------------------------ reads without browser access
 

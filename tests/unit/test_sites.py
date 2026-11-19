@@ -6,10 +6,13 @@ from pathlib import Path
 from dotagent.agent.executor import reached_sites
 from dotagent.agent.playbooks import PlaybookEntry, PlaybookMeta
 from dotagent.agent.sites import (
+    MOST_OUTSIDE_SITE_LESSONS,
     MOST_SITE_LESSONS,
     SiteKnowledge,
     names_site,
     new_sites,
+    outside_site_lessons,
+    outside_site_note,
     site_lessons,
     site_note,
     site_skills,
@@ -120,6 +123,23 @@ def test_a_run_is_handed_a_sites_lessons_it_was_not_handed_that_rest_not_and_are
     # A lesson saved while reading outside content is left to memory_search (item 384).
     marked: MemoryRecord = _note("mem_marked", None).model_copy(update={"tainted": True})
     assert site_lessons([marked, notes[2]], set(), None, set()) == (notes[2],)
+
+
+def test_a_tainted_run_is_handed_only_the_sites_lessons_saved_after_outside_content_fenced_the_newest_few() -> None:
+    """Item 1192: the lessons of a site saved while reading outside content, which only a tainted run is handed, in the
+    result of the call that reached the site: those it may read that rest not and were not handed, the newest few."""
+    marked: list[MemoryRecord] = [
+        _note(f"mem_{index}", None).model_copy(update={"tainted": True})
+        for index in range(MOST_OUTSIDE_SITE_LESSONS + 3)
+    ]
+    clean: MemoryRecord = _note("mem_clean", None)
+    theirs: MemoryRecord = _note("mem_agent", "agent_1").model_copy(update={"tainted": True})
+    handed: tuple[MemoryRecord, ...] = outside_site_lessons([clean, theirs, *marked], {"mem_0"}, None, {"mem_1"})
+    assert [note.id for note in handed] == [f"mem_{index}" for index in range(2, 2 + MOST_OUTSIDE_SITE_LESSONS)]
+    note: str = outside_site_note([("www.amazon.com", handed[:1])], "n0nce")
+    assert note.startswith("[system note] Earlier runs learned this where this call arrived.")
+    fence: str = '<web_content nonce="n0nce" url="dot-memory:lessons">\nOn www.amazon.com:\n- [mem_2] Lesson mem_2'
+    assert fence in note and note.endswith('</web_content nonce="n0nce">')
 
 
 def test_a_run_is_offered_the_learned_skills_of_the_site_its_instructions_do_not_list_the_most_used_first() -> None:

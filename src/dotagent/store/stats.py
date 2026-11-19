@@ -310,6 +310,16 @@ class TimeStats(FrozenModel):
     side_call_seconds: float
     cached_tokens: int
     cached_share: float | None
+    # The input the provider read at full price (not from its cache), and the input weighed as it is billed: a cached
+    # token at CACHED_TOKEN_WEIGHT of a fresh one (item 1218). Raw input overstated a DeepSeek bill about six times
+    # (93.5 % cached), and a change that breaks the cache shows here and not in the raw count.
+    fresh_tokens: int
+    weighted_tokens: float
+
+
+# What a cached input token costs against a fresh one: DeepSeek's and most providers' cache discount (Anthropic bills
+# cache reads at 0.1x too). An assumption until bills are read, so the table marks the column with it.
+CACHED_TOKEN_WEIGHT: float = 0.1
 
 
 class ActStats(FrozenModel):
@@ -823,6 +833,10 @@ def time_stats(calls: Sequence[CallSample]) -> TimeStats:
     steps: list[float] = [call.seconds for call in calls if call.purpose == "step" and call.answered]
     input_tokens: int = sum(call.input_tokens for call in calls if call.answered)
     cached_tokens: int = sum(call.cached_tokens for call in calls)
+    answered_cached: int = sum(call.cached_tokens for call in calls if call.answered)
+    # Every adapter counts cached tokens inside the input, so this is never negative; a negative one shows a broken
+    # usage parser rather than being hidden.
+    fresh: int = input_tokens - answered_cached
     return TimeStats(
         timed_runs=len({call.run_id for call in calls}),
         model_seconds=sum(call.seconds for call in calls),
@@ -832,6 +846,8 @@ def time_stats(calls: Sequence[CallSample]) -> TimeStats:
         side_call_seconds=sum(call.seconds for call in calls if call.purpose != "step"),
         cached_tokens=cached_tokens,
         cached_share=None if input_tokens == 0 else cached_tokens / input_tokens,
+        fresh_tokens=fresh,
+        weighted_tokens=fresh + CACHED_TOKEN_WEIGHT * answered_cached,
     )
 
 

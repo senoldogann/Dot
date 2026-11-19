@@ -175,12 +175,14 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Safety and privacy](docs/safety.md): what leaves this Mac, the policy, the sandbox
 - [The daemon, the web UI and the desktop shell](docs/daemon.md)
 - [Dot on the phone](docs/phone.md)
+- [Dot and your iPhone](docs/phone-control.md): the daemon keeps WebDriverAgent on the phone up and says how it stands
 - [Channels](docs/channels.md): reach Dot from the phone's own Messages
 - [Browser and computer use](docs/browser-and-computer-use.md)
 - [Memory and schedules](docs/memory-and-schedules.md)
 - [Dot comes to you](docs/proactive.md): the morning brief and the watchers
 - [Agents and campaigns](docs/agents-and-campaigns.md)
 - [Trading](docs/trading.md): crypto on Coinbase, paper or live, under limits no run can change
+- [Watching videos](docs/video.md): a video file or a link, seen in frames and heard in a transcript, for any model
 - [Meetings](docs/meetings.md): your Google Meet calls: Dot answers in them and takes notes; a task's post asks you
 - [Recon](docs/recon.md): what a site says about itself, and the open ports of a host you own
 - [Security scan](docs/security.md): the forms of a host you own, tried with benign payloads

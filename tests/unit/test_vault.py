@@ -19,7 +19,7 @@ from dotagent.policy.engine import decide, route_for
 from dotagent.policy.shell import assess_shell
 from dotagent.policy.types import ActionInfo, Decision, Flag
 from dotagent.store.models import Behavior, RuleRecord
-from dotagent.vault.hosts import SameOrigin, fills_on, website_hosts
+from dotagent.vault.hosts import SameOrigin, elsewhere_advice, fills_on, website_hosts
 from dotagent.vault.masking import MASK, in_address, mask_error, masked
 
 
@@ -469,3 +469,20 @@ async def test_connect_without_the_1password_app_says_so_and_that_the_vault_keep
     await asyncio.to_thread((tmp_path / "1Password.app").mkdir)
     with pytest.raises(onepassword.VaultError, match="Integrate with 1Password CLI"):
         await client.connect()
+
+
+def test_a_login_refused_on_another_page_sends_the_run_to_its_own_site_and_proposes_no_wider_one() -> None:
+    """Item 1208: App Store Connect signs in on account.apple.com, which a login of appstoreconnect.apple.com is not
+    filled on; the run is sent to the login's own site, and told to tell the owner, never which site to widen it to."""
+    websites: tuple[str, ...] = ("https://appstoreconnect.apple.com/login?x=1",)
+    assert not fills_on("https://account.apple.com/sign-in", websites)
+    apple: str = elsewhere_advice("https://account.apple.com/sign-in", websites, "Dot's vault")
+    assert "browser_open https://appstoreconnect.apple.com and" in apple
+    assert "sends you back to account.apple.com" in apple and "tell the owner" in apple
+    assert "apple.com (" not in apple and "should be" not in apple
+    bank: str = elsewhere_advice("https://mybank-signin.co.uk/login", ("mybank.co.uk",), "1Password")
+    assert "co.uk " not in bank.replace("mybank-signin.co.uk", "").replace("mybank.co.uk", "")
+    plain: str = elsewhere_advice("http://appstoreconnect.apple.com/login", websites, "Dot's vault")
+    assert plain.startswith("This page is on the login's own host but not over https")
+    assert "browser_open http://localhost:3000 " in elsewhere_advice("about:blank", ("http://localhost:3000",), "x")
+    assert "names no website" in elsewhere_advice("https://a.example", (), "Dot's vault")

@@ -3,7 +3,8 @@
 An upload is stored as ``<workspace>/attachments/<id>/<name>``, next to ``meta.json`` (its name, type and kind) and,
 for text, code, PDF, Word, Excel and PowerPoint files, ``text.txt`` with the text read out of it at upload
 (``dotagent.office`` for the last three), so a broken or locked file is refused right away instead of in the middle
-of a run. The agent can open the whole file with its file and shell tools.
+of a run. A video or a sound (a voice message) is kept as it came, and the run is told to watch it with
+``watch_video`` (item 1213). The agent can open the whole file with its file and shell tools.
 
 When a message with attachments reaches a run, the text of each file that is no image goes into the message (long
 ones shortened in the middle, with the path to read the rest) and images go to the model as images, or, for a model
@@ -60,7 +61,24 @@ _IMAGE_MAGIC: tuple[tuple[bytes, str], ...] = (
 )
 _IMAGE_TYPES: frozenset[str] = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
 
-type AttachmentKind = Literal["image", "pdf", "office", "text"]
+type AttachmentKind = Literal["image", "pdf", "office", "text", "video", "audio"]
+# Videos and sounds (a voice message among them) are kept as they came, for watch_video to see and hear (item 1213).
+_MEDIA_SUFFIXES: dict[str, AttachmentKind] = {
+    ".mov": "video",
+    ".mp4": "video",
+    ".m4v": "video",
+    ".3gp": "video",
+    ".webm": "video",
+    ".mkv": "video",
+    ".caf": "audio",
+    ".m4a": "audio",
+    ".mp3": "audio",
+    ".aac": "audio",
+    ".amr": "audio",
+    ".wav": "audio",
+}
+# An iPhone's minute of video sent over iMessage is tens of megabytes; a file that is larger is not kept.
+MAX_MEDIA_BYTES: int = 200 * 1024 * 1024
 # What a note about the owner's reactions does to the run that reads it (item 586): ``quiet`` asks nothing (a 👍, a ❤️),
 # so the step under way is not given up for it, and it is dropped when the run ends before another step; ``note`` asks
 # the run to change what it does, as a message of the owner does; ``hold`` holds the run before its next step until the
@@ -152,6 +170,15 @@ def attachments_root(workspace: Path) -> Path:
     return workspace / ATTACHMENTS_DIR
 
 
+def media_kind(name: str, media_type: str) -> AttachmentKind | None:
+    """``video`` or ``audio`` for a file of those kinds, by its declared type or its name; ``None`` for any other."""
+    if media_type.startswith("video/"):
+        return "video"
+    if media_type.startswith("audio/"):
+        return "audio"
+    return _MEDIA_SUFFIXES.get(Path(name).suffix.casefold())
+
+
 def _image_type(media_type: str, head: bytes) -> str | None:
     if media_type in _IMAGE_TYPES:
         return media_type
@@ -179,7 +206,7 @@ def _kind_of(name: str, media_type: str, data: bytes) -> tuple[AttachmentKind, s
             return "text", media_type or "text/plain"
         case "binary":
             raise InvalidValueError(
-                "only text, code, PDF, Word, Excel, PowerPoint and image files can be attached",
+                "only text, code, PDF, Word, Excel, PowerPoint, image, video and sound files can be attached",
                 {"name": name, "media_type": media_type, "bytes": len(data)},
             )
 
@@ -209,15 +236,21 @@ def store_attachment(workspace: Path, name: str, media_type: str, data: bytes) -
     """Check an upload and keep it in the workspace. Blocking file work: call it off the event loop."""
     if not data:
         raise InvalidValueError("the file is empty", {"name": name})
-    if len(data) > MAX_ATTACHMENT_BYTES:
-        raise InvalidValueError(
-            "the file is too large to attach", {"name": name, "bytes": len(data), "limit": MAX_ATTACHMENT_BYTES}
-        )
-    kind, declared = _kind_of(name, media_type, data)
+    # A declared type is not taken on its word: a browser calls a TypeScript file ``video/mp2t``. A file whose first
+    # bytes read as text, a PDF or a page is no video or sound.
+    media: AttachmentKind | None = (
+        media_kind(name, media_type) if document_kind("", data[:_SNIFF_BYTES]) == "binary" else None
+    )
+    limit: int = MAX_ATTACHMENT_BYTES if media is None else MAX_MEDIA_BYTES
+    if len(data) > limit:
+        raise InvalidValueError("the file is too large to attach", {"name": name, "bytes": len(data), "limit": limit})
+    kind, declared = (
+        (media, media_type or "application/octet-stream") if media is not None else _kind_of(name, media_type, data)
+    )
     text: str = ""
     if kind == "image":
         encode_image(data, _IMAGE_EDGE, _IMAGE_QUALITY)
-    else:
+    elif media is None:
         text = _text_of(name, kind, data)
     attachment_id: str = new_id("att")
     path: Path = attachments_root(workspace) / attachment_id / _upload_name(name)
@@ -226,7 +259,7 @@ def store_attachment(workspace: Path, name: str, media_type: str, data: bytes) -
     folder: int = workspace_folder(workspace, (ATTACHMENTS_DIR, attachment_id), make=True)
     try:
         write_new(folder, path.name, data)
-        if kind != "image":
+        if kind not in ("image", "video", "audio"):
             write_new(folder, _TEXT, text.encode("utf-8"))
         stored: StoredAttachment = StoredAttachment(
             id=attachment_id,
@@ -281,6 +314,12 @@ def _file_block(file: StoredAttachment, nonce: str) -> str:
     end: str = f'</attachment nonce="{nonce}">'
     if file.kind == "image":
         return f"{head}\n(the image comes with this message)\n{end}"
+    if file.kind in ("video", "audio"):
+        what: str = "a video" if file.kind == "video" else "a sound or a voice message"
+        return (
+            f"{head}\n({what}: watch_video on the path above sees it and writes down what is said; name the language "
+            f"spoken)\n{end}"
+        )
     text: str = (Path(file.path).parent / _TEXT).read_text(encoding="utf-8")
     if not text.strip():
         body: str = "(no text could be read from it; a scanned PDF has none)" if file.kind == "pdf" else "(empty)"

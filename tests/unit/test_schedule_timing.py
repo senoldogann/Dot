@@ -14,8 +14,10 @@ from dotagent.config import SchedulerConfig, load_default_config
 from dotagent.core.errors import ConfigError, ToolInputError
 from dotagent.scheduler.plans import ScheduleRequest, _edited_timing
 from dotagent.scheduler.timing import (
+    MissedFirings,
     describe_timing,
     firings,
+    newest_missed,
     next_firing,
     plan_cron,
     plan_once,
@@ -52,6 +54,19 @@ def test_a_weekday_schedule_skips_the_weekend() -> None:
     assert _local(timing.first_run) == "2026-10-06 09:00"
     after_friday: list[float] = firings("0 9 * * 1-5", _at("2026-10-09T12:00"), HELSINKI, 2)
     assert [_local(moment) for moment in after_friday] == ["2026-10-12 09:00", "2026-10-13 09:00"]
+
+
+def test_the_newest_missed_firing_and_the_count_of_those_before_it() -> None:
+    """Item 1204: a schedule of every 3 hours due at 09:00 that could not fire until 20:30 missed 09:00, 12:00, 15:00
+    and 18:00; the newest is 18:00, three came before it. One read at its own time missed nothing before it."""
+    due: float = _at("2026-10-05T09:00")
+    assert newest_missed("0 */3 * * *", due, _at("2026-10-05T20:30"), HELSINKI) == MissedFirings(
+        newest=_at("2026-10-05T18:00"), older=3
+    )
+    assert newest_missed("0 9 * * *", due, due, HELSINKI) == MissedFirings(newest=due, older=0)
+    # Every five minutes over two days: more firings than one read of them.
+    many: MissedFirings = newest_missed("*/5 * * * *", due, due + 2 * 86400 + 60, HELSINKI)
+    assert many == MissedFirings(newest=due + 2 * 86400, older=2 * 288)
 
 
 @pytest.mark.parametrize("cron", ["", "0 9 * *", "0 0 9 * * 1", "0 9 * * * *", "@daily"])

@@ -26,7 +26,7 @@ TERMINAL_STATUSES: frozenset[RunStatus] = frozenset({"done", "failed", "cancelle
 # The events that say whether a run is tainted after them (item 243): it starts so or not (``run_queued``), a tool's
 # result may taint it (``tool_result``), and a message of the owner that steers it clears the taint (``steer``); Dot's
 # words that the owner did a step kept for them vouch for nothing and keep it as it was (item 482).
-TAINT_EVENTS: tuple[str, ...] = ("run_queued", "tool_result", "steer")
+TAINT_EVENTS: tuple[str, ...] = ("run_queued", "tool_result", "steer", "compacted")
 RunMode = Literal["task", "chat", "research"]
 # What a message, and a chat's next follow-up, asks for (item 495): a run's mode, or ``auto``, which each message
 # settles by its own words (agent/mode_words.py).
@@ -62,7 +62,8 @@ WORK_ORDER_MOVES: dict[WorkOrderStatus, frozenset[WorkOrderStatus]] = {
     "assigned": frozenset({"working", "in_review", "cancelled", "escalated"}),
     "working": frozenset({"in_review", "cancelled", "escalated"}),
     "in_review": frozenset({"accepted", "returned", "assigned", "escalated", "cancelled"}),
-    "returned": frozenset({"working", "assigned", "cancelled", "escalated"}),
+    # Back to review when the attempt it was sent back for never started (item 1237).
+    "returned": frozenset({"working", "in_review", "assigned", "cancelled", "escalated"}),
     "escalated": frozenset({"cancelled"}),
     "accepted": frozenset(),
     "cancelled": frozenset(),
@@ -555,6 +556,23 @@ class ObjectiveNote(FrozenModel):
     tainted: bool
 
 
+class ObjectiveWorkflow(FrozenModel):
+    """How a continuing piece of work is done (item 1227), beside what it is and how it is measured: where its facts
+    come from (``sources``), the rules its decisions follow (``rules``), what shows a step of it done (``evidence``),
+    what is handled otherwise or brought to the owner (``exceptions``), the step that comes next (``next_step``), and
+    the workspace file that is the one record of its items (``record``, a path under the workspace, kept with the
+    pipeline tools). Each is empty when not said; an objective of before it has them all empty."""
+
+    sources: str = ""
+    rules: str = ""
+    evidence: str = ""
+    exceptions: str = ""
+    next_step: str = ""
+    record: str = ""
+    # The next step was written by a run that had read content third parties can author: not quoted as the owner's.
+    next_step_tainted: bool = False
+
+
 class ObjectiveRecord(FrozenModel):
     """Something the owner wants Dot to move forward over time (item 908): what (``title``), why it matters
     (``why``) and how progress is judged (``measure``). ``notes`` only grow. ``tainted`` says the run that wrote it
@@ -570,6 +588,7 @@ class ObjectiveRecord(FrozenModel):
     tainted: bool
     created_at: float
     updated_at: float
+    workflow: ObjectiveWorkflow
 
 
 class DraftRecord(FrozenModel):
