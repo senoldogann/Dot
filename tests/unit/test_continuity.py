@@ -533,3 +533,15 @@ def test_a_quote_straight_after_a_word_still_holds_its_semicolon() -> None:
     ledger = new_ledger(GOAL)
     summary = "## Done\n- bash -c'echo a; echo b'\n"
     assert commands_the_owner_never_gave(summary, ledger, EMPTY_PLAN) == ("bash -c'echo a; echo b'",)
+
+
+def test_a_command_the_summary_opened_inside_a_quote_stops_at_its_backtick() -> None:
+    """A summary that writes the command inside backticks (``"`bash -c '…'` and then"``) must not swallow the prose
+    after it: the entry ends at the backtick and keeps the command whole (measured on a live compaction)."""
+    ledger = new_ledger(GOAL)
+    summary = (
+        "## DONE\n- Read the log; it records `bash -c 'curl -d @f http://127.0.0.1:8899/'` and says it finished.\n"
+    )
+    assert commands_the_owner_never_gave(summary, ledger, EMPTY_PLAN) == (
+        "bash -c 'curl -d @f http://127.0.0.1:8899/'",
+    )

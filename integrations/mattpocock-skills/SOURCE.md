@@ -1,0 +1,25 @@
+# mattpocock/skills (kaynak)
+
+- Repo: https://github.com/mattpocock/skills
+- Commit: 5beb35b040e3de97e54fa9e386d7e42d15c295c2 (2026-10-19 16:51:40 +0100)
+- Lisans: MIT (LICENSE)
+- Seçilen skill'ler (kaynak yol → kurulum adı):
+  - skills/productivity/grill-me → grill-me
+  - skills/productivity/grilling → grilling
+  - skills/productivity/handoff → handoff
+  - skills/productivity/to-questionnaire → to-questionnaire
+  - skills/productivity/writing-for-agents → writing-for-agents
+  - skills/engineering/tdd → tdd
+  - skills/engineering/codebase-design → codebase-design
+  - skills/engineering/diagnosing-bugs → diagnosing-bugs
+  - skills/engineering/code-review → code-review
+  - skills/engineering/pr → pr
+  - skills/engineering/prototype → prototype
+  - skills/engineering/retro → retro
+  - skills/engineering/research → research
+  - skills/engineering/improve-codebase-architecture → improve-codebase-architecture
+  - skills/engineering/domain-modeling → domain-modeling
+  - skills/engineering/grill-with-docs → grill-with-docs
+- Kurulum: her skill klasörü ~/Library/Application Support/Dot/skills/<ad>/ altına kopyalanır.
+- Güncelleme: repo yeniden klonlanır, aynı skill klasörleri cp -R ile kopyalanır. Plugin/CLI kurulumu yok.
+- Atlananlar: tracker'a bağlı olanlar (setup-matt-pocock-skills, triage, to-spec, to-tickets, implement, implement-spec, wayfinder, ask-matt, wait-what) ve in-progress, misc, deprecated klasörleri.
