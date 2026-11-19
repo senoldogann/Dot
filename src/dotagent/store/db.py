@@ -2405,6 +2405,25 @@ class Store:
             homes.setdefault(row["actor_id"], _summary(row))
         return homes
 
+    async def dot_home_chat(self, sources: Sequence[str], same_chat: bool) -> ThreadSummary | None:
+        """Dot's home chat (item 1245), as :meth:`agent_home_chats` names an agent's: the chat of the latest activity
+        among those whose latest run is Dot's (no agent's, no campaign's), that a source of ``sources`` started and
+        that is with no team, however many chats are newer; ``None`` before the owner had one with Dot."""
+        named: tuple[str, ...] = tuple(sources)
+        if not named:
+            return None
+        marks: str = ", ".join("?" for _ in named)
+        row: aiosqlite.Row | None = await self._one(
+            _thread_summaries_sql(
+                f" WHERE latest.agent_id IS NULL AND t.source IN ({marks})"
+                " AND t.team_id IS NULL AND latest.campaign_id IS NULL"
+                " AND NOT EXISTS (SELECT 1 FROM campaigns AS home_c WHERE home_c.thread_id = t.id)",
+                "updated_at DESC LIMIT 1",
+            ),
+            (None, None, _LAST_MESSAGE_READ_CHARS, _LAST_MESSAGE_READ_CHARS, int(same_chat), int(same_chat), *named),
+        )
+        return None if row is None else _summary(row)
+
     async def delete_threads(self, thread_ids: Sequence[str]) -> list[str]:
         """Delete chats with everything they hold, in one transaction: their messages (with what was kept aside of their
         history) and queue, their runs, the runs
@@ -5828,6 +5847,26 @@ class Store:
     async def count_memories(self) -> int:
         row = await self._one("SELECT COUNT(*) AS n FROM memories", ())
         return 0 if row is None else int(row["n"])
+
+    async def count_auto_lessons_since(self, since: float) -> int:
+        """How many lessons ``auto`` saved as new notes at ``since`` or later (item 1247): its ``lesson_saved`` events,
+        not the owner's Save anyway nor a lesson that was a note already."""
+        row = await self._one(
+            "SELECT COUNT(*) AS n FROM events WHERE kind = 'lesson_saved' AND ts >= ?"
+            " AND json_extract(data, '$.by') = 'auto' AND json_extract(data, '$.created') = 1",
+            (since,),
+        )
+        return 0 if row is None else int(row["n"])
+
+    async def awake_memories_with_tag(self, tag: str, rest_tag: str) -> list[MemoryRecord]:
+        """Every memory carrying ``tag`` and not ``rest_tag``, the oldest change first (item 1247: the night's
+        retirement reads them all, not only the most recently changed)."""
+        rows = await self._all(
+            "SELECT * FROM memories WHERE instr(',' || tags || ',', ?) > 0 AND instr(',' || tags || ',', ?) = 0"
+            " ORDER BY updated_at",
+            (f",{tag},", f",{rest_tag},"),
+        )
+        return [_memory(row) for row in rows]
 
     async def search_memories_terms(
         self, terms: Sequence[str], limit: int, among: AwakeNotes | None = None

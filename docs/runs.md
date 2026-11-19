@@ -22,7 +22,9 @@ the turn's run showed with `show_page` stands where it came, in its frame
 and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
 Appearance › *Fold steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). Settings › Interface › *Work in a chat* (item 663)
-chooses between **Every step** and **What it is doing**, the default since item 830 (the conversation as people chat,
+chooses between **Every step** and **What it is doing**, the default since item 830 (a browser that had Dot open before
+item 1246 dropped its choice once, with *Fold steps*, the side panel's and the composer's line of choices, so that it
+shows these defaults; the conversation as people chat,
 as the owner's screenshots of another agent app showed it): the steps and the thoughts of every turn are out
 of the conversation, and one line under it says what the run does now, in a few words from its latest event. The line
 starts with the face of who works and its words where the words of the messages start, nothing after them (item 971:

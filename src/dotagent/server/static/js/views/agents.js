@@ -9,8 +9,8 @@
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
 import { isTrader, TRADING_DESK } from "../agentpanel.js";
+import { sendToWork } from "../sendwork.js";
 import { AGENTS_CHANGED_EVENT, api } from "../api.js";
-import { BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
@@ -1263,6 +1263,8 @@ export function startComposer({ name, bounds, owner, ctx, follow }) {
   const { pills } = choices;
   frame.options.append(pills.mode, pills.model, pills.reasoning, pills.options);
   const stopStatus = onChange(choices.sync);
+  // The message whose sending failed and where it went (item 1245), so that sent again it goes there with its key.
+  let unsent = null;
   let starting = false;
   const keys = messageKeys();
 
@@ -1278,46 +1280,13 @@ export function startComposer({ name, bounds, owner, ctx, follow }) {
     }
     starting = true;
     frame.sendButton.disabled = true;
-    const where = follow?.() ?? { threadId: null, working: null };
+    // A message sent again after an answer that was lost goes where its first sending went, with its key (item 189).
+    const where = unsent !== null && unsent.text === text ? unsent.where : (follow?.() ?? { threadId: null, working: null });
+    unsent = { text, where };
     try {
       await attempt(async () => {
-        if (where.working !== null && where.threadId !== null && settingValue(BUSY_SEND) !== "steer") {
-          // The agent works and Settings › General › Messages says to queue (item 230, the default): the message waits in
-          // its chat's queue for the work under way to end, as one sent in the chat does (the review of item 898).
-          await choices.ready();
-          const chosen = choices.value();
-          const body = {
-            text,
-            mode: chosen.mode,
-            model: chosen.model,
-            effort: chosen.effort,
-            speed: chosen.speed,
-            once: chosen.once,
-            approvals: chosen.approvals,
-            goal_mode: chosen.goal_mode,
-            attachments: attachments.ids(),
-            ...owner,
-            ...frame.picks.body(),
-          };
-          await api.post(`/threads/${encodeURIComponent(where.threadId)}/queue`, { ...body, key: keys.of("queue", where.threadId, body) });
-          keys.sent();
-          choices.sent();
-          frame.picks.sent();
-          frame.clear();
-          ctx.queued?.(where.working, text);
-          return;
-        }
-        if (where.working !== null) {
-          // The agent works and the owner chose Steer: the message reaches that run, as one sent in its chat does. A
-          // steer joins the run under way, which keeps what it has (item 259): picks wait for a new task, and say so.
-          if (frame.picks.count() > 0) {
-            toast("ok", "Sent to the task under way, which keeps what it has. Plugins, skills and Plan first wait for a message that starts a new task.");
-          }
-          const steer = { text, attachments: attachments.ids() };
-          await api.post(`/runs/${encodeURIComponent(where.working)}/steer`, { ...steer, key: keys.of("steer", where.working, steer) });
-          keys.sent();
-          frame.clear();
-          ctx.steered?.(where.working, text);
+        if (await sendToWork({ where, text, choices, frame, owner, keys, ctx })) {
+          unsent = null;
           return;
         }
         // A kept reasoning level is checked against the model's own, so the models are known first.
@@ -1343,6 +1312,7 @@ export function startComposer({ name, bounds, owner, ctx, follow }) {
         choices.sent();
         frame.picks.sent();
         frame.clear();
+        unsent = null;
         ctx.started?.(created);
         ctx.navigate(`/runs/${created.id}`);
       });

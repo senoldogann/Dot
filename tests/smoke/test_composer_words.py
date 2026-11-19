@@ -210,7 +210,9 @@ async def test_the_word_in_the_box_is_the_choice_for_that_message(
                 await _expect_boost(frame, pill, "ultrathink", "Ultrathink")
                 await goal.fill("Say hi.")
                 await _expect_boost(frame, pill, None, "Medium")
-                # The message goes with the choice, the word stays in its goal, and the box is plain again after.
+                # The message goes with the choice, the word stays in its goal, and the box is plain again after. It
+                # starts a chat of its own: Dot's conversation (item 1245) is the chat of the model without the levels.
+                await page.get_by_role("button", name="New chat").click()
                 await goal.fill("Say hi, and ultrathink.")
                 await _expect_boost(frame, pill, "ultrathink", "Ultrathink")
                 await goal.press("Enter")

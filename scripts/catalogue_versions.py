@@ -1,5 +1,6 @@
 """The versions of the packages Dot's catalogue starts on this Mac (item 695), for the owner who bumps them: for each
-service started with ``npx`` or ``uvx``, the version the catalogue pins and the newest one its registry has, with the
+service started with ``npx`` or ``uvx`` (and Firecrawl Local's npm package, which it starts with ``npx`` itself, item
+1244), the version the catalogue pins and the newest one its registry has, with the
 ones that differ marked. It asks npm's registry and PyPI, so it needs the network and no test runs it.
 
 A service's version is pinned in ``src/dotagent/mcp/catalogue.py`` (``@x.y.z`` after an npm package, ``==x.y.z`` after a

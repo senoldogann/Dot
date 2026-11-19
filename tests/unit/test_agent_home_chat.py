@@ -95,3 +95,22 @@ async def test_no_source_names_no_home(tmp_path: Path) -> None:
         assert await store.agent_home_chats(()) == {}
     finally:
         await store.close()
+
+
+async def test_dots_home_chat_is_its_newest_of_the_owners_and_no_agents_or_schedules(tmp_path: Path) -> None:
+    """Dot is one conversation too (item 1245): its home chat is the owner's newest with Dot, not a newer chat of a
+    schedule's or of an agent's."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        assert await store.dot_home_chat(_OWNERS, False) is None
+        await _chat(store, "Dot's first", "ui", None)
+        home: ThreadRecord = await _chat(store, "Dot's second", "cli", None)
+        await _chat(store, "A schedule of Dot's", "schedule", None)
+        await _chat(store, "Dot's own initiative", "initiative", None)
+        await _chat(store, "Scout's", "ui", "agt_scout")
+        found = await store.dot_home_chat(_OWNERS, False)
+        assert found is not None
+        assert found.id == home.id
+        assert await store.dot_home_chat((), False) is None
+    finally:
+        await store.close()

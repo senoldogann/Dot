@@ -392,7 +392,9 @@ that tells the agent to send, post, buy, sign in, contact someone, change a sett
 content or to skip a check, or that holds private data; when in doubt it leaves it out. After a run that read content
 others can write (web pages, mail, downloads), a lesson with an address to go to (a scheme, a path, `//host`, `data:`,
 `javascript:`; a site named bare is know-how and stays) or an account name in it, which such content may have planted,
-is left out before it is asked. The kept lessons are saved as notes tagged `lesson` whose source is the run, and
+is left out before it is asked. `auto` saves at most `lessons_per_day` (40) lessons in 24 hours, counting only its own saves; past it a kept
+lesson is left out with that reason, and its run's page still offers Save anyway, which is not capped (item 1247: the owner's runs made 3 to 97 a
+day). The kept lessons are saved as notes tagged `lesson` whose source is the run, and
 "Lessons from this task", at the foot of the side panel's Task tab of the run's page (item 856), which counts them (item
 842: they stood in the conversation; there they stand now only while a lesson waits for your decision, notes wait for
 your look after a 👎 or they could not be drawn), says "Saved on its own" with Undo, which forgets the note (a note that
@@ -418,14 +420,15 @@ that says what one of those rules says is dropped like a repeat of a saved note.
 daemon reflects on the runs that ended since the last reflection (the last day, the first time): it asks the review
 model for the lessons of the task and research runs the loop did not ask at their end, the failed and the stopped ones
 included, with how the run ended as one more signal and in words that say it did not reach its goal, under the
-`lessons` setting above (`propose` leaves them on the run's page, `auto` saves the ones its second look keeps, `off`
+`lessons` setting above (`propose` leaves them on the run's page, `auto` saves the ones its second look keeps while the day has room, `off`
 draws none), and it reads whether such a run read content others can write from all its results; it folds the lesson
 notes of one agent that say the same, the same way round, into the newer one, or into the older one when you saved
 that one yourself (by the embeddings when both have one, by the words otherwise, compared off the daemon's event loop;
 a resting lesson is left alone, so one learnt again does not take its rest, and two you saved stay two; the one
 folded away rests and names the one it was folded into, so nothing the reflection does deletes a note, but for the
 trash below); it rests a
-lesson that no run was handed, and that was not written again, for `lesson_rest_days` (60), or whose score says it did
+lesson that no run was handed, and that was not written again, for `lesson_rest_days` (60), one that no run was ever
+handed after `lesson_unused_rest_days` (21; item 1247), or whose score says it did
 not help (handed to `[memory] score_min_uses` runs in the last `score_days`, more of which failed than ended done); a
 lesson you saved yourself is never folded away nor retired, and a note saved while reading outside content never folds
 away nor puts aside a clean older one (item 557). It also puts aside a note of Dot's that a newer note,

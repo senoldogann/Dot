@@ -258,8 +258,6 @@ export const EN = {
   "sidebar.theirTasksGo": "Their tasks go with them, with every step and approval of those. This cannot be undone.",
   "sidebar.deletedOne": "Deleted {count} chat.",
   "sidebar.deletedMany": "Deleted {count} chats.",
-  "sidebar.newChat": "New chat",
-  "sidebar.newChatKeys": "New chat (⇧⌘O)",
   "sidebar.connectApps": "Connect apps",
   "sidebar.settings": "Settings",
   "sidebar.settingsOf": "Settings, {owner}",

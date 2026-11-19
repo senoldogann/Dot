@@ -255,8 +255,6 @@ export const TR = {
   "sidebar.theirTasksGo": "Görevleri de her adımı ve onayıyla birlikte silinir. Bu geri alınamaz.",
   "sidebar.deletedOne": "{count} sohbet silindi.",
   "sidebar.deletedMany": "{count} sohbet silindi.",
-  "sidebar.newChat": "Yeni sohbet",
-  "sidebar.newChatKeys": "Yeni sohbet (⇧⌘O)",
   "sidebar.connectApps": "Uygulama bağla",
   "sidebar.settings": "Ayarlar",
   "sidebar.settingsOf": "Ayarlar, {owner}",

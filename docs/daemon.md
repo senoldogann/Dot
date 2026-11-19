@@ -71,9 +71,10 @@ chat of it at work stands with what works like every chat (item 202) and comes b
 pinned stays under Pinned.
 Above the list: a search over the titles (⌘K or `/`) and, while you have no agent of your own, the way to **Agents**;
 **Campaigns** and **Schedules** (a page of its own since item 401) are icons at the right of the sidebar's head
-(item 855: they were rows of their own), before the **+** of a new chat (⇧⌘O; item 834, where a row under the search
-said New chat). Under the search your agents stand as faces (item
-835), as a messaging app's people: the three that worked last, each its face over its name on one line, to its
+(item 855: they were rows of their own); no **+** starts a new chat (item 1245, which took away item 834's): Dot is
+one conversation, as each agent is. Under the search Dot and your agents stand as faces (item
+835), as a messaging app's people: Dot's first, to its conversation (item 1245: its home chat, the owner's newest with
+Dot, else the home), and the two agents that worked last, each its face over its name on one line, to its
 conversation (item 1233: its home chat, where a message to it goes on; its page while it has none), the one whose page
 or conversation is open marked, a face whose agent's newest run works wearing its working look and one whose
 conversation is unread the dot of an unread chat (item 1235, as Grok Bot's column of faces marks a bot that wrote; not
@@ -94,7 +95,7 @@ proposals; a row of the Memory, Vault and Schedules pages shows one action (a sc
 its **…**. Every icon draws about the same area at its size, with the same stroke (item 849): a "+", a speaker or
 a microphone no smaller than a copy beside it, each shape seen through a frame of its own (`icons.js`). The sections
 at the foot (Dot's work, a channel's) fold on a click of their label, and the folds are kept between visits. The
-sidebar's head holds the button that folds it away, at its left, and the **+** of a new chat. **Select** turns the list
+sidebar's head holds the button that folds it away, at its left (no **+** of a new chat since item 1245). **Select** turns the list
 into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
 and approval of theirs; they leave the list at the yes, while the daemon deletes them, and come back with why if the
@@ -102,9 +103,9 @@ delete fails (item 1248). A chat with a run under way is refused, the run of a `
 end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a
 drawer. On a touch screen of a phone's width it has no X (item 888): a chat you choose closes it, and so does a swipe
 to the left; a narrow window of the Mac keeps its button. On a phone the list is the home (item 991, the owner's
-ask of 2026-11-05 for a plain one): your initials at the head's left open the settings and the **+** of a new chat
-stands at its right, after Campaigns and Schedules; Dot's own face stands large with its name under it, over the faces
-of the other agents, centred; the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
+ask of 2026-11-05 for a plain one): your initials at the head's left open the settings, with Campaigns and Schedules
+at its right; Dot's own face stands large with its name under it, to its conversation (item 1245), over the faces of
+the other agents, centred; the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
 of a Mac having moved to your initials. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
 deleted under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only
 when the page comes to another chat (item 204).
@@ -177,7 +178,15 @@ run stands in the sidebar as a small face in the row of the run that delegated i
 progress ("step 3 · web_fetch", then "done · 12 steps"), its steps so far, the time it has worked and an **open** link to
 the run's own page.
 
-**New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
+The home, **New chat** in the tab's title, goes on in Dot's conversation (item 1245): a message sent there goes on in
+Dot's home chat (as the daemon names it, `home` of Dot in `GET /api/agents`: the chat of the latest activity whose
+latest run is Dot's and that the pages or `dotx run` started, not a schedule's, a watcher's, Dot's initiative's, a
+team's or a campaign's), to the run at work there while there is one, queued or steered as Settings › General ›
+Messages says, and that chat opens; with an agent picked, in that agent's (item 1233). Under the box, **Open your chat
+with Dot** leads back into it, and **New chat** makes the next message start a chat of its own; Keep going and a
+`/loop` always do. Before the first chat with Dot the home starts it.
+
+The home is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
 with "Faces that move" off), and shows the state of the whole of Dot (waiting when something waits for you, working
 while a run is active, else idle) under the name you call Dot by, and a greeting by the hour says your name ("Good

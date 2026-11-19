@@ -392,6 +392,10 @@ class AgentConfig(FrozenModel):
     # run being handed it a lesson rests.
     reflection_time: str
     lesson_rest_days: int = Field(ge=1)
+    # After how many days a lesson that no run was ever handed rests (item 1247), and the most lessons ``auto`` saves in
+    # a day (24 hours); past it a lesson is left out with the reason, and the run's page still offers Save anyway.
+    lesson_unused_rest_days: int = Field(ge=1)
+    lessons_per_day: int = Field(ge=1)
     playbooks: bool
     # The acting steps a done task run must have taken before it is distilled into a learned skill.
     skill_min_steps: int = Field(ge=1)

@@ -13,6 +13,21 @@
       return null;
     }
   };
+  // Once (item 1246): a browser that had Dot open before the plain shell after Grok Bot (items 1233 to 1245) drops its
+  // layout choices, the side panel, the folded steps, the steps in full and the composer's line of choices, so that it
+  // shows the defaults the owner never saw; a browser new to Dot has none to drop. Each is a click away to choose again.
+  try {
+    if (localStorage.getItem("dot.layoutReset") === null) {
+      if (localStorage.getItem("dot.lastChat") !== null) {
+        ["dot.inspector", "dot.foldSteps", "dot.work", "dot.composer.choices"].forEach(function (key) {
+          localStorage.removeItem(key);
+        });
+      }
+      localStorage.setItem("dot.layoutReset", "1246");
+    }
+  } catch {
+    // Storage is blocked: there are no choices kept to drop.
+  }
   var scheme = read("dot.scheme");
   if (scheme === "light" || scheme === "dark") {
     root.dataset.scheme = scheme;

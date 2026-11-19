@@ -8,7 +8,8 @@ page, ``auto`` saves the ones its second look keeps, ``off`` draws none); it fol
 tagged ``lesson`` into one (by the cosine of their embeddings when both have one, by their words otherwise), the newer
 unless the older is one the owner saved, off the event loop, and the other rests and names the one it was folded into
 (item 306); it retires the lessons that no run was handed for
-``[agent] lesson_rest_days`` to the ``rest`` tag, after which a search no longer finds them and the Memory page still
+``[agent] lesson_rest_days``, and the ones no run was ever handed after ``lesson_unused_rest_days`` (item 1247), to the
+``rest`` tag, after which a search no longer finds them and the Memory page still
 lists them; it puts aside the notes newer ones made outdated (item 306, :func:`outdated_pairs`: the review model
 judges each older note against a newer one close to it, and one it calls outdated rests and names the note that
 replaced it, so the Memory page still lists it and the owner can wake it); it merges the notes the review model says
@@ -305,16 +306,22 @@ def duplicate_pairs(
     return pairs
 
 
-def to_retire(notes: Sequence[MemoryRecord], now: float, rest_days: int, owner_saved: Set[str]) -> list[MemoryRecord]:
-    """The lesson notes that rest from now on: not resting yet, not saved by the owner (``owner_saved``), and last
+def to_retire(
+    notes: Sequence[MemoryRecord], now: float, rest_days: int, unused_days: int, owner_saved: Set[str]
+) -> list[MemoryRecord]:
+    """The lesson notes that rest from now on: not resting yet, not saved by the owner (``owner_saved``), and either
+    never handed to a run and written more than ``unused_days`` days before ``now`` (item 1247: every lesson of the
+    owner's first 22 days that a later run was handed was handed first within 20 days of being written), or last
     handed to a run or written (a lesson learnt again is written anew) more than ``rest_days`` days before ``now``."""
-    limit: float = now - rest_days * 86400.0
     return [
         note
         for note in notes
         if REST_TAG not in note.tags
         and note.id not in owner_saved
-        and max(note.last_used_at or note.created_at, note.updated_at) < limit
+        and (
+            max(note.last_used_at or note.created_at, note.updated_at) < now - rest_days * 86400.0
+            or (note.last_used_at is None and max(note.created_at, note.updated_at) < now - unused_days * 86400.0)
+        )
     ]
 
 
@@ -567,13 +574,19 @@ async def _retire(runtime: Runtime, notes: Sequence[MemoryRecord], now: float, o
     """Rest the lessons no run was handed for long, and the ones whose score says they did not help, but none the owner
     saved; the log says which reason, with the numbers."""
     retired: int = 0
-    aged: list[MemoryRecord] = to_retire(notes, now, runtime.config.agent.lesson_rest_days, owner_saved)
+    aged: list[MemoryRecord] = to_retire(
+        notes,
+        now,
+        runtime.config.agent.lesson_rest_days,
+        runtime.config.agent.lesson_unused_rest_days,
+        owner_saved,
+    )
     for note in aged:
         await runtime.store.rest_memory(note.id, (*note.tags, REST_TAG), now)
         log.info(
             "lesson_retired",
             memory_id=note.id,
-            reason="unused",
+            reason="unused" if note.last_used_at is not None else "never_handed",
             last_used_at=note.last_used_at,
             created_at=note.created_at,
         )
@@ -738,8 +751,10 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
     owner_saved: set[str] = await store.owner_saved_memory_ids() | await store.pinned_memory_ids()
     vectors: dict[str, Vector] = dict(await store.all_memory_vectors()) if runtime.memory.embedder is not None else {}
     merged: int = await merge_duplicates(store, own, vectors, owner_saved)
-    kept: list[MemoryRecord] = _own(await store.memories_with_tag(LESSON_TAG, _LESSON_NOTES)) if merged else own
-    retired: int = await _retire(runtime, kept, now, owner_saved)
+    # Retirement reads every awake lesson, not the window the merge reads (item 1247: the oldest lessons, the ones
+    # never handed, fell out of the 500 most recently changed).
+    awake: list[MemoryRecord] = _own(await store.awake_memories_with_tag(LESSON_TAG, REST_TAG))
+    retired: int = await _retire(runtime, awake, now, owner_saved)
     outdated: int = await _put_aside_outdated(runtime, vectors, since, now, owner_saved)
     retired += await rest_repeating_habits(runtime, owner_saved, now)
     merged += await merge_near_duplicates(runtime, owner_saved, now)

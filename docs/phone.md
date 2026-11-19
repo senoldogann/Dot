@@ -199,7 +199,7 @@ brings messages there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, the phone's home (item 991): your initials at its head's left open the settings
-and the **+** of a new chat stands at its right; Dot's face stands large (88 px, item 998) with its name over the faces of the other
+(no **+** of a new chat since item 1245); Dot's face stands large (88 px, item 998) with its name, to its conversation, over the faces of the other
 agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, round, in its middle the face and name of whom the chat is with (item
 1101; the title and the model are in the panel's Details), and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The bar has

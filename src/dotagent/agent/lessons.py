@@ -33,6 +33,7 @@ not asked twice.
 import asyncio
 import math
 import re
+import time
 from collections.abc import Sequence
 from typing import Literal
 
@@ -93,6 +94,7 @@ _NEGATION: re.Pattern[str] = re.compile(r"\b(?:not|no|never|cannot|değil|yok|as
 _KNOWN_NOTES: int = 8
 # The saved notes that the memory search finds for a lesson and that it is compared with.
 _LIKE_NOTES: int = 5
+_DAY_S: float = 86400.0
 # The events of one kind that are read; more alerts or send-backs than this tell nothing new.
 _EVENTS_READ: int = 20
 _SIGNAL_CHARS: int = 300
@@ -486,10 +488,20 @@ async def vet_lessons(runtime: Runtime, case: LessonCase, lessons: tuple[str, ..
     return vetted(lessons, checked, vetting)
 
 
+def day_full(saved: int, cap: int) -> str | None:
+    """Why ``auto`` leaves a lesson out when it saved ``saved`` lessons in the last 24 hours and ``cap`` is the most
+    it saves (``[agent] lessons_per_day``, item 1247), ``None`` while there is room."""
+    if saved < cap:
+        return None
+    lessons: str = "1 lesson was" if saved == 1 else f"{saved} lessons were"
+    return f"{lessons} saved in the last 24 hours, the most a day keeps is {cap}"
+
+
 async def _decide_all(
     runtime: Runtime, deciding: asyncio.Lock, case: LessonCase, lessons: tuple[str, ...]
 ) -> str | None:
-    """``auto``: save every lesson the second look keeps and dismiss the others with why, each under ``deciding`` and
+    """``auto``: save every lesson the second look keeps, while the day has room (:func:`day_full`), and dismiss the
+    others with why, each under ``deciding`` and
     only while the owner has not decided it first. An error (a review model, an embedding service that fails) stops it,
     and the lessons not decided stay proposed with the error, which it returns (``None`` when there was none)."""
     try:
@@ -497,10 +509,16 @@ async def _decide_all(
     except DotError as error:
         return await _failed(runtime, case.run_id, error, "The lessons of this run could not be checked")
     agent_id: str | None = await _agent_of(runtime.store, case.run_id)
-    for index, (lesson, why) in enumerate(zip(lessons, left_out, strict=True)):
+    for index, (lesson, vetted_out) in enumerate(zip(lessons, left_out, strict=True)):
         async with deciding:
             if (await _lesson_of(runtime.store, case.run_id, index)).state != "proposed":
                 continue
+            why: str | None = vetted_out
+            if why is None:
+                since: float = time.time() - _DAY_S
+                why = day_full(
+                    await runtime.store.count_auto_lessons_since(since), runtime.config.agent.lessons_per_day
+                )
             if why is not None:
                 log.info("lesson_left_out", run_id=case.run_id, index=index, reason=why)
                 await _emit_dismissed(runtime, case.run_id, index, "auto", why)
