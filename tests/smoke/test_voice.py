@@ -18,6 +18,7 @@ from typing import Any, Literal
 import pytest
 import pytest_asyncio
 from channel_stand_ins import PROVIDER, Replies, finish
+from home_afresh import start_afresh
 from playwright.async_api import Browser, BrowserContext, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -406,6 +407,7 @@ async def test_a_dictated_message_is_sent_as_the_owner_sends_any(
     await _recorder(page).get_by_role("button", name="Put the words in the box").click()
     await expect(page.locator(GOAL)).to_have_value("what is the weather in Oulu")
     assert await _run_count(runtime) == runs
+    await start_afresh(page)
     await page.locator(GOAL).press("Enter")
     await expect(page.get_by_role("article", name="Answer")).to_contain_text("It is sunny in Oulu.")
     assert await _run_count(runtime) == runs + 1
@@ -830,6 +832,7 @@ async def test_a_browser_that_cannot_listen_or_speak_shows_no_microphone_and_no_
     await expect(voice.get_by_role("switch", name="Read answers aloud")).to_be_disabled()
     await page.goto(f"{address}/#/runs")
     await page.locator(GOAL).fill("say something")
+    await start_afresh(page)
     await page.locator(GOAL).press("Enter")
     await expect(page.get_by_role("article", name="Answer")).to_contain_text("Nothing to hear.")
     await expect(page.get_by_role("button", name="Read the answer aloud")).to_have_count(0)
@@ -842,6 +845,7 @@ async def test_the_speaker_of_an_answer_reads_it_again_or_stops_it_and_an_answer
     replies.push(finish("**Done.** The report is in [the folder](https://example.com/x).\n\n```sh\nls\n```"))
     page: Page = await _open(browser, address, 1280)
     await page.locator(GOAL).fill("make the report")
+    await start_afresh(page)
     await page.locator(GOAL).press("Enter")
     answer: Locator = page.get_by_role("article", name="Answer")
     await expect(answer).to_contain_text("The report is in the folder")
@@ -874,6 +878,7 @@ async def test_an_answer_being_read_stops_when_the_owner_leaves_the_chat(
     replies.push(finish("Done. The report is in the folder."))
     page: Page = await _open(browser, address, 1280)
     await page.locator(GOAL).fill("make the report")
+    await start_afresh(page)
     await page.locator(GOAL).press("Enter")
     answer: Locator = page.get_by_role("article", name="Answer")
     await expect(answer).to_contain_text("The report is in the folder")
@@ -921,6 +926,7 @@ async def test_an_answer_is_read_with_a_voice_kept_on_this_mac_and_not_a_network
     page: Page = await _open(browser, address, 1280)
     await page.evaluate(_VOICES)
     await page.locator(GOAL).fill("make the report")
+    await start_afresh(page)
     await page.locator(GOAL).press("Enter")
     answer: Locator = page.get_by_role("article", name="Answer")
     await expect(answer).to_contain_text("The report is in the folder")
@@ -965,6 +971,7 @@ async def test_an_answer_that_comes_in_is_read_aloud_in_the_chosen_language_when
         # The run is held at its first model call, so that its answer comes in under the reader's eyes.
         replies.gate = asyncio.Event()
         await page.locator(GOAL).fill("what is the weather in Oulu?")
+        await start_afresh(page)
         await page.locator(GOAL).press("Enter")
         await expect(page.locator(MESSAGE)).to_be_visible()
         await expect(page.locator(".bubble.user")).to_contain_text("what is the weather in Oulu?")
@@ -996,6 +1003,7 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_words_o
             if place == "a run's page":
                 replies.push(finish("A run to open."))
                 await page.locator(GOAL).fill("open a run")
+                await start_afresh(page)
                 await page.locator(GOAL).press("Enter")
                 await expect(page.locator(MESSAGE)).to_be_visible()
                 await expect(page.get_by_role("article", name="Answer")).to_be_visible()

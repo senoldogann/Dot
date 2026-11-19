@@ -16,6 +16,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from composer_choices import show_choices
+from home_afresh import start_afresh
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -338,6 +339,7 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 await expect(pill).to_contain_text("Ultrathink")
                 await expect(pill.locator("[data-icon='sparkle']")).to_have_count(1)
                 await page.screenshot(path=str(tmp_path / "pill-ultrathink.png"), animations="disabled")
+                await start_afresh(page)
                 await page.locator(_HOME_GOAL).fill("Say hi.")
                 await page.locator(_HOME_GOAL).press("Enter")
                 await expect(page).to_have_url(re.compile(r"#/runs/run_"))

@@ -265,7 +265,8 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     async def list_agents() -> list[AgentSummary]:
         """Dot first, then the agents the owner made, oldest first, each with its newest run and the title of the chat
         that run is in: Dot's in a chat of its own (item 633), which its card said none of while the owner chatted
-        with it every day; and each agent's home chat, its conversation with the owner (item 1233)."""
+        with it every day; and each one's home chat, its conversation with the owner (items 1233 and 1245, Dot's
+        too)."""
         latest: dict[str, RunRecord] = await store.latest_agent_runs()
         homes: dict[str, ThreadSummary] = await store.agent_home_chats(
             _HOME_SOURCES, ctx.runtime.config.scheduler.same_chat
@@ -278,6 +279,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             record=await dot_record(store),
             latest=dots,
             latest_title=None if dots is None else titles.get(dots.thread_id),
+            home=await store.dot_home_chat(_HOME_SOURCES, ctx.runtime.config.scheduler.same_chat),
         )
         return [dot] + [
             AgentSummary(
@@ -557,7 +559,13 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     @router.get("/agents/{agent_id}")
     async def get_agent(agent_id: str) -> AgentDetail:
         if agent_id == DOT_AGENT_ID:
-            return AgentDetail(record=await dot_record(store), runs=[], messages=[], learned=_NOTHING_LEARNED)
+            return AgentDetail(
+                record=await dot_record(store),
+                runs=[],
+                messages=[],
+                learned=_NOTHING_LEARNED,
+                home=await store.dot_home_chat(_HOME_SOURCES, ctx.runtime.config.scheduler.same_chat),
+            )
         record: AgentRecord = await store.get_agent(agent_id)
         return AgentDetail(
             record=record,

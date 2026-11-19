@@ -925,7 +925,7 @@ class TemplateUse(FrozenModel):
 class AgentSummary(FrozenModel):
     """An agent as the list shows it: the record and its newest run, ``None`` before it ran, with the title of the chat
     that run is in (item 610), and its home chat (item 1233): the newest chat of the owner's with it, which its face
-    opens and its page's box goes on in, ``None`` before the owner had one with it (and for Dot)."""
+    opens and its page's box goes on in (Dot's too, item 1245), ``None`` before the owner had one with it."""
 
     record: AgentRecord
     latest: RunRecord | None
