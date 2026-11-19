@@ -17,7 +17,7 @@ from pathlib import Path
 
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.held import held_folder, open_regular
-from dotagent.pipeline.ledger import Ledger, LedgerFormatError, parse, written
+from dotagent.pipeline.ledger import Ledger, LedgerFormatError, LedgerRefusal, parse, written
 from dotagent.tools.files import atomic_write
 from dotagent.undo.journal import JournalTarget
 
@@ -25,6 +25,16 @@ from dotagent.undo.journal import JournalTarget
 LOCK_WAIT_S: float = 10.0
 _LOCK_POLL_S: float = 0.05
 _LOCK_FLAGS: int = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW
+
+
+class RecordRefusal(Exception):
+    """A change the ledger refused (:class:`LedgerRefusal`), with whether its block holds outside words: the refusal
+    may quote a cell (a client's name, an action's evidence), which a reply's run may have written."""
+
+    def __init__(self, message: str, outside: bool) -> None:
+        super().__init__(message)
+        self.message: str = message
+        self.outside: bool = outside
 
 
 def lock_path(record: Path) -> Path:
@@ -107,14 +117,18 @@ def _locked(folder: int, record: Path) -> int:
 def change[T](record: Path, journal: JournalTarget, outside: bool, apply: Callable[[Ledger], tuple[Ledger, T]]) -> T:
     """Change the ledger of ``record`` with ``apply`` under the record's lock, and write it when it changed: what
     ``apply`` returns beside the new ledger comes back. ``outside`` says the run had read content third parties can
-    author: a block it changed says so from then on. A refusal ``apply`` raises leaves the file as it was."""
+    author: a block it changed says so from then on. A refusal ``apply`` raises leaves the file as it was and comes
+    back as a :class:`RecordRefusal`."""
     folder: int = _folder(record, True)
     try:
         lock: int = _locked(folder, record)
         try:
             text: str = _text_in(folder, record)
             before: Ledger = _parsed(text, record)
-            after, said = apply(before)
+            try:
+                after, said = apply(before)
+            except LedgerRefusal as refusal:
+                raise RecordRefusal(str(refusal), before.outside) from refusal
             if after != before:
                 kept: Ledger = replace(after, outside=after.outside or outside)
                 atomic_write(record, written(text, kept), journal)
