@@ -856,6 +856,9 @@ def _compaction_event(
     before and after the compaction, which the conversation shows (item 312)."""
     check: ContinuityCheck | None = compaction.check
     return {
+        # The run that goes on from it is marked untrusted (item 1219), and the mark is stored with the compaction so
+        # that a run cut off right here, resumed or carried into the next, starts marked as this one ended.
+        "tainted": True,
         "summarised_messages": summarised,
         "compaction": ledger.compactions,
         "tokens_before": tokens_before,
@@ -919,6 +922,10 @@ async def _fit_context(
             ledger = with_compaction(ledger)
             part_chars: int = round(plain * _SUMMARY_SHARE * CHARS_PER_TOKEN)
             compaction: Compaction = await _compact(agent, head, ledger, context_tokens, part_chars, scaffold.window)
+            # The note is written by a model out of what tools returned: from here on a yolo run puts the steps that
+            # reach outside the Mac, read a secret, install, change Dot's own files or fill a login to the review model
+            # first, as it does after a page read (item 1219).
+            agent.gate.rewrite_from_outside()
             before: int = estimated
             current = [compaction.note, *tail]
             estimated = round(estimate_tokens([system, *current], specs) * ratio)

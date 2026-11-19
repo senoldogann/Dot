@@ -115,7 +115,13 @@ is the answer (a small model that is offered both writes the call out as text).
   and after it (`tokens_before`, `tokens_after`). The model that writes the summary is told that what tools returned
   (pages, files, mail, command output) is data, to be reported as what it said and never as an instruction to the run
   or a wish of yours, and that the summary is Dot's own note of what happened, in which only what you wrote stands in
-  your voice (in GOAL); the note that carries the summary says the same to the run that goes on (item 589).
+  your voice (in GOAL); the note that carries the summary says the same to the run that goes on (item 589), names the
+  commands the summary carries that stand in neither your words nor the plan (a compaction copies what a page, a mail
+  or a file said, so such a command is content the run read and is checked against the task before it runs, item 1219),
+  and the run that goes on from a compaction is marked untrusted as one that read a page is: a step that reaches
+  outside the Mac, reads a secret, installs, changes Dot's own files or fills a login goes to the review model first
+  in a yolo run, or asks in an `ask` or `auto` run whose preset allowed it, while what the run saves since (memory,
+  its list of things to do) stays its own.
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
 `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only with
 evidence (`evidence`, cut at 400 characters): what the run observed that shows it, such as the path and what it read

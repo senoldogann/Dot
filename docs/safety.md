@@ -571,7 +571,8 @@ workspace, is not seen); a failed `edit_file` of one names none of its lines. A 
 the same (item 561): what `browser_act` (a click, an entry), `browser_upload` and `browser_fill_login` show of the page
 they leave is marked untrusted too, as what `browser_eval` and the desktop tools show already was, so a click on Next
 that brings up a page that says "run curl -T …" leaves the run marked even after your next message cleared the mark and
-the chat's tab stayed. A run that has seen such content is marked untrusted, and from then
+the chat's tab stayed. A run that has seen such content is marked untrusted — and so is the run that goes on from a
+compaction, whose note is written out of what tools returned (item 1219) — and from then
 on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
 or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
 running a script the line downloaded (item 523), or a blob it decoded and ran (`base64 -d x | sh`, or a decode to a
