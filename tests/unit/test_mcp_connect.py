@@ -6,7 +6,15 @@ import pytest
 from dotagent.config import McpServerConfig
 from dotagent.connections.directory import PLUGINS
 from dotagent.core.errors import ConfigError, McpError, NotFoundError
-from dotagent.mcp.catalogue import MCP_SERVICES, McpService, StartedPackage, package_of, unversioned
+from dotagent.mcp.catalogue import (
+    FIRECRAWL_LOCAL,
+    FIRECRAWL_MCP_PACKAGE,
+    MCP_SERVICES,
+    McpService,
+    StartedPackage,
+    package_of,
+    unversioned,
+)
 from dotagent.mcp.launch import referenced_secrets
 from dotagent.mcp.signin import checked_link
 from dotagent.server.routes_mcp import (
@@ -61,8 +69,13 @@ def test_each_service_of_the_catalogue_is_a_server_dot_can_have() -> None:
         if service.kind == "remote":
             assert config.url is not None and config.url.startswith("https://") and config.command is None
         else:
-            # Started on this Mac: a package of its registry (npx, uvx), or a tool of Xcode's own (xcrun, item 535).
-            assert config.command in ("npx", "uvx", "xcrun") and config.url is None and not service.signs_in
+            # Started on this Mac: a package of its registry (npx, uvx), a tool of Xcode's own (xcrun, item 535),
+            # or the firecrawl-local binary installed with cargo.
+            assert (
+                config.command in ("npx", "uvx", "xcrun", "firecrawl-local")
+                and config.url is None
+                and not service.signs_in
+            )
         # Its secrets are referred to by the names Dot keeps them under, nothing else is.
         kept: set[str] = set(kept_secret_names(service).values())
         assert set(referenced_secrets(config)) == kept, service.id
@@ -84,9 +97,26 @@ def test_each_server_started_on_this_mac_runs_the_one_version_the_catalogue_pins
         assert word == (
             f"{package.name}@{package.version}" if package.registry == "npm" else f"{package.name}=={package.version}"
         )
-    # What else is started has no registry to pin by (Xcode's own bridge), and a service at an address starts nothing.
-    assert [service.id for service in MCP_SERVICES if service.command not in (None, "npx", "uvx")] == ["xcode"]
-    assert all(package_of(service) is None for service in MCP_SERVICES if service.command not in ("npx", "uvx"))
+    # Firecrawl Local runs its npm package with npx itself, the one its variable names, pinned too (item 1244); it
+    # refuses localhost and the private network, as web_fetch does.
+    local: McpService = next(service for service in MCP_SERVICES if service.command == FIRECRAWL_LOCAL)
+    assert local.args == ("mcp", "--public-only")
+    named: StartedPackage | None = package_of(local)
+    assert named is not None and named.pinned and named.name == "firecrawl-mcp", named
+    assert local.env[FIRECRAWL_MCP_PACKAGE] == f"firecrawl-mcp@{named.version}"
+    # Only its search goes to Firecrawl's cloud, not a page that refuses this Mac.
+    assert local.env["FIRECRAWL_CLOUD"] == "search"
+    # What else is started has no registry to pin by (Xcode's own bridge, the firecrawl-local program itself), and a
+    # service at an address starts nothing.
+    assert [service.id for service in MCP_SERVICES if service.command not in (None, "npx", "uvx")] == [
+        "firecrawl-local",
+        "xcode",
+    ]
+    assert all(
+        package_of(service) is None
+        for service in MCP_SERVICES
+        if service.command not in ("npx", "uvx", FIRECRAWL_LOCAL)
+    )
     # The directory names its ways by the catalogue's ids: each way started on this Mac is one of those pinned.
     for listing in PLUGINS:
         for way in listing.ways:

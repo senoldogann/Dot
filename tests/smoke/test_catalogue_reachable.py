@@ -115,7 +115,7 @@ def test_a_service_at_an_address_answers_as_its_entry_says(client: httpx.Client,
 
 
 @pytest.mark.parametrize(
-    "service", [one for one in MCP_SERVICES if one.command in ("npx", "uvx")], ids=lambda one: one.id
+    "service", [one for one in MCP_SERVICES if package_of(one) is not None], ids=lambda one: one.id
 )
 def test_a_service_started_on_this_mac_names_a_package_its_registry_has(
     client: httpx.Client, service: McpService

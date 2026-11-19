@@ -141,10 +141,23 @@ class StartedPackage(FrozenModel):
         return self.version is not None and _EXACT_VERSION.match(self.version) is not None
 
 
+# Firecrawl Local's program, and the variable that names the npm package its ``mcp`` runs with ``npx`` (item 1244).
+FIRECRAWL_LOCAL: str = "firecrawl-local"
+FIRECRAWL_MCP_PACKAGE: str = "FIRECRAWL_MCP_PACKAGE"
+
+
 def package_of(service: McpService) -> StartedPackage | None:
     """The package ``service`` starts with ``npx`` or ``uvx``: npx's first word that is not an option
     (``name@version``), uvx's word after ``--from`` or else its first word (``name==version``). ``None`` for a service
-    at an address and for a program of this Mac (``xcrun``)."""
+    at an address and for a program of this Mac (``xcrun``). Firecrawl Local runs its npm package with ``npx`` itself,
+    the one ``FIRECRAWL_MCP_PACKAGE`` names (``name@version``)."""
+    if service.command == FIRECRAWL_LOCAL:
+        word_set: str | None = service.env.get(FIRECRAWL_MCP_PACKAGE)
+        if word_set is None:
+            return None
+        named: re.Match[str] | None = _NPM_WORD.match(word_set)
+        assert named is not None, (service.id, service.env)
+        return StartedPackage(registry="npm", name=named.group(1), version=named.group(2))
     if service.command not in ("npx", "uvx"):
         return None
     args: list[str] = list(service.args)
@@ -305,6 +318,23 @@ MCP_SERVICES: tuple[McpService, ...] = (
         url="https://mcp.firecrawl.dev/v2/mcp",
         headers={"Authorization": "Bearer ${FIRECRAWL_API_KEY}"},
         secrets=(ServiceSecret(name="FIRECRAWL_API_KEY", label="Key", help="https://www.firecrawl.dev/app/api-keys"),),
+    ),
+    McpService(
+        # Firecrawl Local (https://docs.firecrawl.dev/quickstarts/firecrawl-local): one Rust program, installed with
+        # ``cargo install firecrawl-local``, that scrapes, crawls and maps from this Mac with no key and no account;
+        # its ``mcp`` command serves those tools over standard input and output. ``FIRECRAWL_CLOUD=search``: only its
+        # search goes to Firecrawl's cloud, not a page that refuses this Mac (by default the cloud fetches that one, and
+        # the page's address would leave for Firecrawl, the pre-push review of item 1244).
+        # ``--public-only``: it refuses localhost and the private network, as ``web_fetch`` does unless
+        # ``[web] allow_private_hosts`` (a page's hidden words must not steer a run into this Mac's own services).
+        # The tools are the npm package ``firecrawl-mcp``, which it runs with ``npx``: pinned by
+        # ``FIRECRAWL_MCP_PACKAGE`` as every package ``npx`` starts is (item 695), the newest a week old on 2026-11-19.
+        id="firecrawl-local",
+        name="Firecrawl Local",
+        does="Scrape, crawl and map the web as clean Markdown from this Mac, with no key.",
+        command=FIRECRAWL_LOCAL,
+        args=("mcp", "--public-only"),
+        env={FIRECRAWL_MCP_PACKAGE: "firecrawl-mcp@3.40.0", "FIRECRAWL_CLOUD": "search"},
     ),
     McpService(
         id="tavily",
