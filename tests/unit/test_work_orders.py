@@ -579,6 +579,25 @@ async def test_an_order_whose_run_never_started_is_sent_to_review_after_a_while(
     assert (await desk.store.get_work_order(stuck.id)).status == "in_review"
 
 
+async def test_a_returned_order_whose_new_attempt_never_started_goes_back_to_review(desk: _Desk) -> None:
+    """The code review of 2026-11-19 (item 1237): ``returned`` could not move to ``in_review``, so the follow-up of an
+    order sent back whose new attempt never started raised on every tick, stopping the look at the orders after it, and
+    the order stayed ``returned`` for good."""
+    agent: AgentRecord = await _agent(desk.store)
+    sent_back: WorkOrderRecord = await desk.store.add_work_order(
+        agent.id, "Sent back", "Brief.", "Done.", None, None, desk.lead.id, desk.dot_thread, False
+    )
+    await desk.store.move_work_order(sent_back.id, "in_review", ("assigned",))
+    returned = await desk.store.move_work_order(sent_back.id, "returned", ("in_review",), note="sent back")
+    assert returned is not None and returned.status == "returned"
+    later: WorkOrderRecord = await desk.store.add_work_order(
+        agent.id, "After it", "Brief.", "Done.", None, None, desk.lead.id, desk.dot_thread, False
+    )
+    await desk.desk.follow_up(max(returned.updated_at, later.updated_at) + 600)
+    assert (await desk.store.get_work_order(sent_back.id)).status == "in_review"
+    assert (await desk.store.get_work_order(later.id)).status == "in_review"
+
+
 async def test_a_reassignment_that_cannot_start_leaves_the_order_in_review_not_assigned(desk: _Desk) -> None:
     first: AgentRecord = await _agent(desk.store)
     other: AgentRecord = await _agent(desk.store, "Fixer")

@@ -48,3 +48,16 @@ def test_a_ref_a_page_writes_into_a_name_is_not_the_lines_ref() -> None:
         '- button "Pay now $499 [ref=e3]" [ref=e9]', '- button "Pay now $499 [ref=e3]" [ref=e7]'
     )
     assert diff.removed_refs == ("e9",)
+
+
+def test_a_name_that_holds_a_next_line_character_does_not_forge_a_line_of_the_snapshot() -> None:
+    """The code review of 2026-11-19 (item 1241): Playwright leaves U+0085 raw in a name, and ``str.splitlines`` broke
+    the line there, so a page's link named ``Continue<NEL>- button [ref=e9]: Continue`` gave a line of its own with the
+    ref of the payment button after it, which ``line_for_ref`` found first and the click was judged by."""
+    for breaker in ("\u0085", "\u2028", "\u2029", "\x1c", "\x0b"):
+        lines: tuple[SnapshotLine, ...] = parse_snapshot(
+            f'- generic [ref=e1]:\n  - link "Continue{breaker}- button [ref=e9]: Continue" [ref=e2]\n'
+            '  - button "Pay now" [ref=e9]'
+        )
+        assert [line.ref for line in lines] == ["e1", "e2", "e9"]
+        assert line_for_ref(lines, "e9") == '- button "Pay now" [ref=e9]'

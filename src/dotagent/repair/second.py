@@ -42,6 +42,7 @@ from pydantic import JsonValue
 
 from dotagent.core.errors import RepairError
 from dotagent.core.logs import get_logger
+from dotagent.core.text import file_lines
 from dotagent.core.types import FrozenModel
 from dotagent.repair.claude import ClaudeOutcome, StepSink, WorkerChoice, look_argv, run_claude, worker_env
 from dotagent.repair.github import (
@@ -259,7 +260,7 @@ async def read_transcript(path: Path) -> list[str] | None:
 
     def read() -> list[str] | None:
         try:
-            return path.read_text(encoding="utf-8").splitlines()
+            return file_lines(path.read_text(encoding="utf-8"))
         except FileNotFoundError:
             return None
         except (OSError, UnicodeDecodeError) as error:

@@ -73,8 +73,11 @@ Above the list: a search over the titles (⌘K or `/`) and, while you have no ag
 **Campaigns** and **Schedules** (a page of its own since item 401) are icons at the right of the sidebar's head
 (item 855: they were rows of their own), before the **+** of a new chat (⇧⌘O; item 834, where a row under the search
 said New chat). Under the search your agents stand as faces (item
-835), as a messaging app's people: the three that worked last, each its face over its name on one line, to its page,
-where a message to it starts, the one whose page is open marked, and **All**, the page of every agent and team, in
+835), as a messaging app's people: the three that worked last, each its face over its name on one line, to its
+conversation (item 1233: its home chat, where a message to it goes on; its page while it has none), the one whose page
+or conversation is open marked, a face whose agent's newest run works wearing its working look and one whose
+conversation is unread the dot of an unread chat (item 1235, as Grok Bot's column of faces marks a bot that wrote; not
+while that chat is open), and **All**, the page of every agent and team, in
 four columns the sidebar holds whole (item 855: the row scrolled sideways and cut a face at its edge); an agent made,
 changed or deleted on a page shows there at once, and one a run made once that run ends. In the foot, **Connect apps**
 ([Connect apps](extending.md#connect-apps), items 492 and 545), which opens
@@ -1569,8 +1572,8 @@ the agent itself. On a Mac that has no Dot, the shell installs one first (**Inst
      before it is moved).
   2. **The models**: what `dotx setup` offers, less OpenCode's own agent (the list is `providers.json`, which a test
      keeps equal to `CHOICES` of `cli_setup.py`): Ollama, when it answers on 127.0.0.1:11434 (its models are listed; a
-     cloud model needs `ollama signin` once), or an API key of OpenAI, Anthropic, OpenRouter or OpenCode Go, in a
-     password field.
+     cloud model needs `ollama signin` once), or an API key of OpenAI, Anthropic, OpenRouter, Google (the Gemini models,
+     free within their daily limits) or OpenCode Go, in a password field.
   3. **Install**, one button, four steps. `uv --no-config tool install --constraints <constraints.txt in the app's
      Resources> --python 3.13 dotagent-macos==<the app's version>`, with the `uv` the app carries (the constraints file
      pins every dependency of the package to the version of the `uv.lock` the release was built and tested with, so a

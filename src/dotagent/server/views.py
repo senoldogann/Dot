@@ -924,11 +924,13 @@ class TemplateUse(FrozenModel):
 
 class AgentSummary(FrozenModel):
     """An agent as the list shows it: the record and its newest run, ``None`` before it ran, with the title of the chat
-    that run is in (item 610)."""
+    that run is in (item 610), and its home chat (item 1233): the newest chat of the owner's with it, which its face
+    opens and its page's box goes on in, ``None`` before the owner had one with it (and for Dot)."""
 
     record: AgentRecord
     latest: RunRecord | None
     latest_title: str | None
+    home: ThreadSummary | None = None
 
 
 class WorkOrderView(FrozenModel):
@@ -1228,7 +1230,7 @@ class AgentWork(FrozenModel):
 
 class AgentDetail(FrozenModel):
     """An agent's page: the record, its newest runs (newest first), the newest messages it sent or received, what it
-    learned, what its runs used and how its work orders went."""
+    learned, what its runs used, how its work orders went and its home chat (item 1233, as ``AgentSummary``'s)."""
 
     record: AgentRecord
     runs: list[RunRecord]
@@ -1236,6 +1238,7 @@ class AgentDetail(FrozenModel):
     learned: AgentLearning
     usage: AgentUsage | None = None
     work: AgentWork | None = None
+    home: ThreadSummary | None = None
 
 
 class CampaignChip(FrozenModel):

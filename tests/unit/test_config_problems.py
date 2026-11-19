@@ -46,3 +46,24 @@ def test_the_messages_of_progress_are_steps_or_off_and_any_other_word_is_refused
     assert load_config(off).channels.progress == "off" and load_config(off).channels.imessage is False
     error: ConfigError = _refused(tmp_path, '[channels]\nprogress = "sometimes"\n')
     assert error.message.startswith("configuration failed validation: channels.progress: ")
+
+
+def test_a_file_that_is_not_utf8_text_is_named_and_not_a_traceback(tmp_path: Path) -> None:
+    """Item 1238: a ``config.toml`` with bytes that are no UTF-8 raised a bare ``UnicodeDecodeError``, which the daemon
+    and ``dotx`` show as a traceback that names neither the file nor the place."""
+    path: Path = tmp_path / "config.toml"
+    path.write_bytes(b'[agent]\nname = "\xff"\n')
+    with pytest.raises(ConfigError, match="not UTF-8 text") as refused:
+        load_config(path)
+    assert refused.value.context["path"] == str(path)
+
+
+def test_the_browser_settings_of_a_file_that_is_not_utf8_text_are_refused_by_name(tmp_path: Path) -> None:
+    """The pre-push review of item 1238: ``browser_values`` read the file as ``_edit_all`` does but let the bare
+    ``UnicodeDecodeError`` through."""
+    from dotagent.config_edit import browser_values
+
+    path: Path = tmp_path / "config.toml"
+    path.write_bytes(b'[browser]\nzoom = "\xff"\n')
+    with pytest.raises(ConfigError, match="not UTF-8 text"):
+        browser_values(path, ("zoom",))

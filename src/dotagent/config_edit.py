@@ -517,7 +517,14 @@ def browser_values(
     """What the config file at ``path`` holds for ``keys`` of ``[browser]`` now, ``None`` for one it does not hold: to
     put them back as they were (:func:`restore_browser_values`)."""
     with _EDITING:
-        settings: JsonObject = _parse(path.read_text(encoding="utf-8"), path) if path.exists() else {}
+        try:
+            text: str = path.read_text(encoding="utf-8") if path.exists() else ""
+        except UnicodeDecodeError as error:
+            # As ``config.py``'s ``_read_toml`` says it, not a bare traceback (the pre-push review of item 1238).
+            raise ConfigError(
+                "config file is not UTF-8 text", {"path": str(path), "byte": error.start, "error": error.reason}
+            ) from error
+        settings: JsonObject = _parse(text, path) if text else {}
     table: object = settings.get("browser")
     held: dict[str, object] = table if isinstance(table, dict) else {}
     values: list[tuple[BrowserSetting, SettingValue | None]] = []

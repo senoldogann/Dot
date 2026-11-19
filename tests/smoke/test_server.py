@@ -357,9 +357,11 @@ async def test_a_malformed_request_is_answered_with_what_is_wrong(client: httpx.
     assert unknown_model.json()["context"]["providers"] == [
         "ollama",
         "openai",
+        "google",
         "opencode_go",
         "anthropic",
         "openrouter",
+        "antigravity",
         "opencode",
         "claude_code",
     ]
@@ -675,9 +677,11 @@ async def test_the_status_the_models_and_the_checks_describe_this_installation(c
     assert [entry["provider"] for entry in models.json()] == [
         "ollama",
         "openai",
+        "google",
         "opencode_go",
         "anthropic",
         "openrouter",
+        "antigravity",
         "opencode",
         "claude_code",
     ]
@@ -809,6 +813,7 @@ async def test_a_key_is_saved_shown_by_its_end_only_used_at_once_and_removed(
         "anthropic",
         "opencode_go",
         "openrouter",
+        "google",
         "ollama",
         "typesafe",
     ]

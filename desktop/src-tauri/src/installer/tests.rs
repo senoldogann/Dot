@@ -763,7 +763,14 @@ fn the_page_chooses_a_provider_a_model_and_a_key_and_nothing_else() {
             .iter()
             .map(|p| p.provider.as_str())
             .collect::<Vec<_>>(),
-        ["ollama", "openai", "anthropic", "opencode_go", "openrouter"]
+        [
+            "ollama",
+            "openai",
+            "anthropic",
+            "opencode_go",
+            "openrouter",
+            "google"
+        ]
     );
     let taken = Choice::check(
         input("openai", " gpt-5.5 ", Some(&format!(" {KEY}\n"))),

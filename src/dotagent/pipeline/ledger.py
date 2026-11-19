@@ -429,6 +429,19 @@ def begin(ledger: Ledger, client_id: str, action: str, variant: str, now: str) -
     return replace(ledger, actions=actions)
 
 
+def when_of(at: str | None, now: datetime) -> str:
+    """When an action ended, as the ledger writes it: ``now`` when ``at`` is not given, else ``at`` as its evidence
+    dates it (an action recorded after the fact, item 1231: the ledger compared a reply of 3 November with a send it
+    dated by the day it was recorded, and counted no answer). A moment after ``now`` is refused: nothing ends in the
+    future."""
+    if at is None:
+        return minute(now)
+    when: datetime = moment(at)
+    if when > now:
+        raise LedgerRefusal("", f"'{at}' is after now: an action ends when it happened, never later than now")
+    return at.strip() if _dated_only(at) else minute(when)
+
+
 def end(ledger: Ledger, key: str, result: ActionResult, evidence: str, now: str) -> Ledger:
     """``ledger`` with the begun or uncertain action ``key`` ended as ``result`` at ``now``, with what showed it. A sent
     action is the client's last; one that failed may be begun again; one uncertain stays in the way until it is

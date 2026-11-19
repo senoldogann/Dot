@@ -36,7 +36,8 @@ _CUED: re.Pattern[str] = re.compile(
     r"(?<![\d-])(\d{3}[- ]\d{3}|\d{4,8})(?![\d-])"
 )
 _PREFIXED: re.Pattern[str] = re.compile(r"\bG-(\d{6})\b")
-_LEADING: re.Pattern[str] = re.compile(r"^\W*(\d{3}[- ]\d{3}|\d{4,8})\b", re.M)
+# Within its own line: ``\W*`` went over the line breaks after it too, from each of them (item 1242).
+_LEADING: re.Pattern[str] = re.compile(r"^[^\w\n]*(\d{3}[- ]\d{3}|\d{4,8})\b", re.M)
 _LONE: re.Pattern[str] = re.compile(r"(?<![\d.,:/-])(\d{6})(?![\d.,:/-])")
 
 

@@ -120,9 +120,10 @@ _TECH_MARKS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"asp\.net|__viewstate", re.IGNORECASE), "ASP.NET"),
 )
 _GENERATOR: re.Pattern[str] = re.compile(
-    r"<meta[^>]+name=[\"']generator[\"'][^>]+content=[\"']([^\"']{1,120})", re.IGNORECASE
+    r"<meta[^<>]+name=[\"']generator[\"'][^<>]+content=[\"']([^\"']{1,120})", re.IGNORECASE
 )
-_TITLE: re.Pattern[str] = re.compile(r"<title[^>]*>(.{0,200}?)</title>", re.IGNORECASE | re.DOTALL)
+# A tag holds no ``<``: a page of unclosed ``<title`` or ``<meta`` is read once, not to its end from each (item 1242).
+_TITLE: re.Pattern[str] = re.compile(r"<title[^<>]*>(.{0,200}?)</title>", re.IGNORECASE | re.DOTALL)
 _VERSIONED: re.Pattern[str] = re.compile(r"\d+\.\d+")
 
 

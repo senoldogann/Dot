@@ -30,6 +30,7 @@ from dotagent.pipeline.ledger import (
     note_outcome,
     summary,
     upsert_client,
+    when_of,
 )
 from dotagent.pipeline.record import RecordRefusal
 from dotagent.policy.types import ActionInfo
@@ -99,6 +100,9 @@ class EndArgs(RecordArgs):
     key: str = Field(min_length=3, max_length=100, description="<client>/<action>")
     result: ActionResult = Field(description="What you saw; uncertain when you could not tell, never failed then.")
     evidence: str = Field(min_length=3, max_length=_TEXT_CHARS, description="What showed it, with its time.")
+    at: str | None = Field(
+        default=None, max_length=32, description="When it went out, as the evidence dates it, if not just now."
+    )
 
 
 class OutcomeArgs(RecordArgs):
@@ -270,14 +274,15 @@ def _begin_tool() -> RegisteredTool:
 
 def _end_tool() -> RegisteredTool:
     async def run(args: EndArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
-        now: str = _now()
+        right_now: datetime = datetime.now()
+
+        def apply_(ledger: Ledger) -> tuple[Ledger, str]:
+            # When it went out, as its evidence dates it, for an action recorded after the fact (item 1231).
+            when: str = when_of(args.at, right_now)
+            return end(ledger, args.key, args.result, args.evidence, when), when
+
         try:
-            await _change(
-                ctx,
-                authorized,
-                PIPELINE_END_TOOL,
-                lambda ledger: (end(ledger, args.key, args.result, args.evidence, now), None),
-            )
+            now: str = await _change(ctx, authorized, PIPELINE_END_TOOL, apply_)
         except RecordRefusal as refusal:
             return _refused(refusal)
         follow: str = {

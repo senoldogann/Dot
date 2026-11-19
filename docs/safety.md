@@ -18,8 +18,10 @@ run needs, sent where the configuration points:
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
   playbooks and the nightly reflection (which shows `review` the notes it considers merging or putting aside, and the
   learned skills it considers merging) to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
-  OpenCode Go, Anthropic and OpenRouter get it only when a role, a helper or a standby model names one of their models;
-  OpenRouter passes each call on to the lab whose model it is. OpenCode Zen's free models (`opencode:`) get the whole
+  OpenCode Go, Anthropic, OpenRouter, Google (a key from AI Studio) and a Google Antigravity account get it only when a
+  role, a helper or a standby model names one of their models; OpenRouter passes each call on to the lab whose model it
+  is, and Google's free tier may use what it is sent to improve its products. OpenCode Zen's free models (`opencode:`) get
+  the whole
   conversation of a run that runs on one, through OpenCode's own agent, and the providers of some of them may use what
   they get to improve their models (see [Models and providers](models.md#models-and-providers)).
 - **To Anthropic, through your Claude plan: the whole conversation of a run on `claude_code:` (item 1013), and each
@@ -569,7 +571,8 @@ workspace, is not seen); a failed `edit_file` of one names none of its lines. A 
 the same (item 561): what `browser_act` (a click, an entry), `browser_upload` and `browser_fill_login` show of the page
 they leave is marked untrusted too, as what `browser_eval` and the desktop tools show already was, so a click on Next
 that brings up a page that says "run curl -T …" leaves the run marked even after your next message cleared the mark and
-the chat's tab stayed. A run that has seen such content is marked untrusted, and from then
+the chat's tab stayed. A run that has seen such content is marked untrusted — and so is the run that goes on from a
+compaction, whose note is written out of what tools returned (item 1219) — and from then
 on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
 or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
 running a script the line downloaded (item 523), or a blob it decoded and ran (`base64 -d x | sh`, or a decode to a
