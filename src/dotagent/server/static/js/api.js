@@ -303,7 +303,8 @@ export async function request(method, path, body) {
   if (method !== "GET" && TEAM_CHANGE.test(path)) {
     window.dispatchEvent(new CustomEvent(TEAMS_CHANGED_EVENT));
   }
-  if (method !== "GET" && AGENT_CHANGE.test(path)) {
+  // Chats deleted may take an agent's conversation with them (item 1233): its face and its page name the one now.
+  if (method !== "GET" && (AGENT_CHANGE.test(path) || (method === "DELETE" && path === "/threads"))) {
     window.dispatchEvent(new CustomEvent(AGENTS_CHANGED_EVENT));
   }
   if (method === "POST" && RUN_START.test(path)) {

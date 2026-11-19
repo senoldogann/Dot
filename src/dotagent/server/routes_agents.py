@@ -37,7 +37,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.secrets import known_secrets
-from dotagent.server import UI_SOURCE
+from dotagent.server import CLI_SOURCE, UI_SOURCE
 from dotagent.server.activity import start_of_today
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_system import learned_skill_view
@@ -70,6 +70,7 @@ from dotagent.store.models import (
     RunRecord,
     TeamRecord,
     ThreadRecord,
+    ThreadSummary,
     WorkOrderRecord,
 )
 from dotagent.tools.base import ToolResult
@@ -79,6 +80,9 @@ from dotagent.tools.team import MESSAGE_AGENT_TOOL, find_agent, render_reply
 log = get_logger(__name__)
 
 # How many of its newest runs an agent's page shows.
+# The sources of the chats the owner started (item 1233): the pages' and ``dotx run``'s, an agent's welcome among them;
+# an agent's home chat is the newest of these.
+_HOME_SOURCES: tuple[str, ...] = (UI_SOURCE, CLI_SOURCE)
 _PAGE_RUNS: int = 50
 # How many work orders and objectives the Agents page lists (items 907, 908).
 _WORK_ORDERS_LISTED: int = 60
@@ -261,8 +265,11 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     async def list_agents() -> list[AgentSummary]:
         """Dot first, then the agents the owner made, oldest first, each with its newest run and the title of the chat
         that run is in: Dot's in a chat of its own (item 633), which its card said none of while the owner chatted
-        with it every day."""
+        with it every day; and each agent's home chat, its conversation with the owner (item 1233)."""
         latest: dict[str, RunRecord] = await store.latest_agent_runs()
+        homes: dict[str, ThreadSummary] = await store.agent_home_chats(
+            _HOME_SOURCES, ctx.runtime.config.scheduler.same_chat
+        )
         dots: RunRecord | None = await store.latest_dot_run()
         titles: dict[str, str] = await store.thread_titles(
             [run.thread_id for run in latest.values()] + ([] if dots is None else [dots.thread_id])
@@ -277,6 +284,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
                 record=agent,
                 latest=latest.get(agent.id),
                 latest_title=titles.get(latest[agent.id].thread_id) if agent.id in latest else None,
+                home=homes.get(agent.id),
             )
             for agent in await store.list_agents()
         ]
@@ -558,6 +566,9 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             learned=await agent_learning(store, agent_id, ctx.runtime.config.agent.skill_rest_days),
             usage=agent_usage(record, await store.agent_tool_use(agent_id, _USAGE_WINDOW), known()),
             work=agent_work(await store.agent_work_orders(agent_id)),
+            home=(await store.agent_home_chats(_HOME_SOURCES, ctx.runtime.config.scheduler.same_chat, agent_id)).get(
+                agent_id
+            ),
         )
 
     @router.put("/agents/{agent_id}")
