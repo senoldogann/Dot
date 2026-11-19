@@ -117,6 +117,8 @@ from dotagent.vault.onepassword import Login, LoginSecret, VaultError, kept_toke
 _log = get_logger(__name__)
 
 _NONCE_BYTES: int = 8
+# The steps that name a pixel, not a ref: judged by the element of the snapshot under it (B2-01).
+_PIXEL_ACTIONS: frozenset[str] = frozenset({"click_at", "drag_at"})
 # How long the copies of an upload are kept for the browser, which reads them when the page sends them (item 681).
 _UPLOAD_COPIES_KEPT_S: float = 86400.0
 _HEADROOM_CHARS: int = 3500  # room next to the page body for steps, tabs, notes and the fence lines
@@ -557,6 +559,30 @@ async def _retry_unchanged(
     return outcome.model_copy(update={"steps": tuple(steps), "view": view})
 
 
+def _refs_at(x: float | None, y: float | None, ctx: ToolContext) -> tuple[str, ...]:
+    """The refs of the elements under a step's pixel, from the tab's last snapshot (B2-01 of the code review of
+    2026-11-19): a click or a drag at a pixel is judged by what it may land on, as one on its ref is. Empty where no
+    element of the snapshot is there (a canvas): the step is judged as before, by its pixel alone."""
+    if x is None or y is None:
+        return ()
+    return ctx.browser.peek_at(ctx.thread_id, x, y)
+
+
+def _pixels_judged_on_the_snapshot(steps: Sequence[Step]) -> None:
+    """A step at a pixel is judged by the snapshot the batch starts from, so it comes before any step that may move the
+    page (a scroll, a click on a ref, typing); after one, the pixel may stand on another element than the one judged."""
+    moved: bool = False
+    for step in steps:
+        if step.action in _PIXEL_ACTIONS and moved:
+            raise ToolInputError(
+                "A click_at or drag_at is judged by what the last snapshot shows under its pixel, so it goes first "
+                "in a batch (several of them in a row are fine): send the steps before it in a call of their own, "
+                "then take the pixel from a new screenshot.",
+                {"step": step.action},
+            )
+        moved = moved or step.action not in _PIXEL_ACTIONS
+
+
 def _element_at(ref: str | None, ctx: ToolContext) -> Element | None:
     if ref is None:
         return None
@@ -664,13 +690,32 @@ def _act_tool() -> RegisteredTool:
     async def classify(args: ActArgs, ctx: ToolContext) -> ActionInfo:
         steps: list[Step] = first_steps(args.steps, ctx.runtime.config.browser.max_batch_steps)
         # A key or a text that names no field goes where the batch last put the focus (item 682).
-        refs: list[str | None] = keys_go_to(steps, [step.ref for step in steps])
+        _pixels_judged_on_the_snapshot(steps)
+        # A step at a pixel is judged by every element it may land on (item 1252): the first stands for it, the others
+        # add their reasons to its own.
+        pixels: list[tuple[str, ...]] = [
+            _refs_at(step.x, step.y, ctx) if step.action in _PIXEL_ACTIONS else () for step in steps
+        ]
+        refs: list[str | None] = [
+            (under[0] if under else None) if step.action in _PIXEL_ACTIONS else ref
+            for step, ref, under in zip(steps, keys_go_to(steps, [step.ref for step in steps]), pixels, strict=True)
+        ]
         elements: list[Element | None] = [_element_at(ref, ctx) for ref in refs]
-        targets: list[Element | None] = [_element_at(step.to_ref, ctx) for step in steps]
+        others: list[list[Element]] = [
+            [element for ref in under[1:] if (element := _element_at(ref, ctx)) is not None] for under in pixels
+        ]
+        targets: list[Element | None] = [
+            _element_at(next(iter(_refs_at(step.to_x, step.to_y, ctx)), None), ctx)
+            if step.action == "drag_at"
+            else _element_at(step.to_ref, ctx)
+            for step in steps
+        ]
         judged: list[tuple[Step, Element | None, Element | None]] = list(zip(steps, elements, targets, strict=True))
         assessed: list[StepAssessment] = [
-            _assessed(step, ref, element, target, ctx)
-            for (step, element, target), ref in zip(judged, refs, strict=True)
+            combine_assessments(
+                [_assessed(step, ref, element, target, ctx), *(assess_step(step, other, None) for other in more)]
+            )
+            for (step, element, target), ref, more in zip(judged, refs, others, strict=True)
         ]
         assessment: StepAssessment = combine_assessments(assessed)
         kind: ActionKind = _act_kind(steps)
@@ -681,7 +726,12 @@ def _act_tool() -> RegisteredTool:
         # flags it adds are recorded with the step.
         # The judge is a model of its own: it reads no login filled from the password manager either (item 493), nor
         # a cookie a script ran with (item 533).
-        unexplained: tuple[Element, ...] = unexplained_clicks([(step, element) for step, element, _ in judged])
+        unexplained: tuple[Element, ...] = unexplained_clicks(
+            [
+                *((step, element) for step, element, _ in judged),
+                *((step, other) for step, more in zip(steps, others, strict=True) for other in more),
+            ]
+        )
         judgments: list[ClickJudgment] = await asyncio.gather(
             *(
                 ctx.runtime.judge.judge_click(

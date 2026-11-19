@@ -130,6 +130,7 @@ from dotagent.browser.snapshot import (
     overlay_lines,
     prefer_diff,
     redrawn_ref,
+    refs_at_point,
     render_diff,
     render_lines,
     squeeze_text,
@@ -4281,6 +4282,15 @@ class BrowserSession:
         if thread is None or not thread.tabs:
             return None
         return line_for_ref(thread.tabs[thread.active].lines, ref)
+
+    def peek_at(self, thread_id: str, x: float, y: float) -> tuple[str, ...]:
+        """The refs of the elements at the viewport pixel (``x``, ``y``) in the thread's current tab, as its last
+        snapshot drew them (:func:`dotagent.browser.snapshot.refs_at_point`), for judging a click at a pixel before it
+        runs."""
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        if thread is None or not thread.tabs:
+            return ()
+        return refs_at_point(thread.tabs[thread.active].lines, x, y)
 
     def peek_near(self, thread_id: str, ref: str) -> tuple[str, ...]:
         """The snapshot lines of the buttons near the field ``ref`` in the thread's current tab, which Enter in it may
