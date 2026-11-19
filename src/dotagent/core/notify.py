@@ -1,41 +1,25 @@
 """Notifications to the owner: a banner of macOS Notification Center."""
 
-import asyncio
 from collections.abc import Awaitable, Callable
 
-from dotagent.core.errors import ToolExecutionError
+from dotagent.core.errors import DesktopError
+from dotagent.desktop.script import run_osascript
 
 # Shows a notification with a title and a text.
 type Notifier = Callable[[str, str], Awaitable[None]]
 
 _NOTIFY_TIMEOUT_S: float = 15.0
+_SCRIPT: str = "on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv)\nend run"
 
 
 async def show_notification(title: str, message: str) -> None:
-    """Show a macOS notification through ``osascript``; the texts are passed as arguments, never as script source.
-    Raises ``ToolExecutionError`` when it fails or does not end in time."""
-    process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-        "/usr/bin/osascript",
-        "-e",
-        "on run argv",
-        "-e",
-        "display notification (item 2 of argv) with title (item 1 of argv)",
-        "-e",
-        "end run",
-        title,
-        message,
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    """Show a macOS notification through ``osascript``. The title and the text reach the script as its values, after
+    ``--`` (:func:`run_osascript`), never as its words: a title a run gave that starts with ``-e`` was read by
+    ``osascript`` as one more line of the script, and a ``property`` line runs a command as the script is compiled (the
+    code review of 2026-11-19, item 1240). Raises ``DesktopError`` when it fails or does not end in time: its message
+    is the notification's, and the runner's own, which speaks of an application's Automation dialog a banner never waits
+    on, is kept as the ``reason`` of its context."""
     try:
-        _, stderr = await asyncio.wait_for(process.communicate(), timeout=_NOTIFY_TIMEOUT_S)
-    except TimeoutError as error:
-        process.kill()
-        await process.wait()
-        raise ToolExecutionError("the notification did not show in time", {"timeout_s": _NOTIFY_TIMEOUT_S}) from error
-    if process.returncode != 0:
-        raise ToolExecutionError(
-            "the notification could not be shown",
-            {"returncode": process.returncode, "stderr": stderr.decode("utf-8", errors="replace")[:300]},
-        )
+        await run_osascript("AppleScript", _SCRIPT, (title, message), (), _NOTIFY_TIMEOUT_S, None, ())
+    except DesktopError as error:
+        raise DesktopError("the notification could not be shown", {"reason": error.message, **error.context}) from error
