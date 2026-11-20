@@ -333,6 +333,13 @@ a {
   white-space: nowrap;
 }
 
+/* On a phone a chip takes a finger (test_phone_type: 32 px for what sits in a line), not only a link's line height. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .prose a.link-pill {
+    min-height: calc(var(--space-6) + var(--space-2));
+  }
+}
+
 .prose a.link-pill .link-pill-icon,
 .prose a.link-pill .link-pill-fallback {
   width: var(--space-4);
