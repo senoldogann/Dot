@@ -282,7 +282,10 @@ A release is one version, the same in `pyproject.toml`, `src/dotagent/__init__.p
 `desktop/src-tauri/Cargo.toml` and `desktop/src-tauri/tauri.conf.json` (`tests/unit/test_version.py` keeps them alike),
 with its section `## <version> (<date>)` in `CHANGELOG.md`, which `uv run python scripts/fold_changes.py <version>
 <date>` writes from the entries under Unreleased and the files of `changes/` (and removes those), in the commit that
-raises the version. It is made from one commit of `main`, in two parts: the
+raises the version. `scripts/check_versions.py` fails when the five files disagree. `Cargo.toml` and
+`desktop/package.json` are included when they carry a version; the root `package.json` is the interface checks, not a
+release. The gate's checks job runs the script, and `desktop/release.sh` checks the same files again before it builds.
+A release is made from one commit of `main`, in two parts: the
 desktop app, built on a Mac, and the Python package, which the release's tag publishes on PyPI. A version is released
 once: the next release raises it in the five files first. The desktop app installs the Python package of its own
 version from PyPI (item 575), so the package comes first: the tag, then PyPI listing the version, then the release that
@@ -400,6 +403,12 @@ Then, on a clean checkout of the commit to release:
 ```bash
 desktop/release.sh
 ```
+
+`.github/workflows/desktop-artifacts.yml` builds the disk image and `latest.json` on a macOS runner when someone starts
+it by hand. `scripts/desktop_artifact.sh` follows the build steps of `release.sh` (the tools, the hashed requirements,
+this version's wheel, then the disk image) and uploads those two files as artifacts of the run. Signing and
+notarization are skipped when their secrets are absent, and the workflow does not tag or publish. A signed release is
+still `desktop/release.sh` on the owner's Mac.
 
 The script publishes nothing. It ends with the commands that do, with the commit and the files, in the order a release
 needs. The app carries this version's wheel and installs that, checked against its hash; the package is still published

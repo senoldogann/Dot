@@ -121,6 +121,9 @@ jobs:
       - uses: $/.github/actions/prepare
         with:
           node: true
+      # The release is one version. This fails in seconds, on Linux, before the macOS tests.
+      - name: Versions
+        run: uv run python scripts/check_versions.py
       - name: Format
         run: uv run ruff format --check src tests
       - name: Lint
