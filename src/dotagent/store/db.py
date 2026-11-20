@@ -1545,10 +1545,9 @@ def _copy_before_upgrade(path: Path, found: int) -> None:
         # Beside the database, both folders: Dot's home for its own database, a test's folder for a test's.
         backup: Backup = make_backup(path, folder, path.parent / PARTIAL_DIR, time.time())
     except (sqlite3.Error, OSError) as error:
-        full: bool = isinstance(error, OSError) and error.errno == errno.ENOSPC
         raise StoreError(
             "the copy of the database made before an upgrade failed"
-            + (": the disk is full; free some space, then start Dot again" if full else ""),
+            + (": the disk is full; free some space, then start Dot again" if disk_full(error) else ""),
             {"path": str(path), "folder": str(folder), "error": str(error), "free_bytes": _free_bytes(path.parent)},
         ) from error
     log.info("store_backed_up_before_upgrade", path=backup.path, size=backup.size, schema_version=found)
@@ -1556,8 +1555,21 @@ def _copy_before_upgrade(path: Path, found: int) -> None:
         Path(older.path).unlink(missing_ok=True)
 
 
-def _free_bytes(folder: Path) -> int:
-    return shutil.disk_usage(folder).free
+def disk_full(error: sqlite3.Error | OSError) -> bool:
+    """Whether ``error`` is a full disk: SQLite's own (the online backup's write of the whole database, the copy's
+    largest) or the system's (the compressed copy's)."""
+    if isinstance(error, sqlite3.Error):
+        return error.sqlite_errorcode == sqlite3.SQLITE_FULL
+    return error.errno == errno.ENOSPC
+
+
+def _free_bytes(folder: Path) -> int | None:
+    """The free space where the database is, or None when it cannot be read: the copy's own error is what is told."""
+    try:
+        return shutil.disk_usage(folder).free
+    except OSError as error:
+        log.warning("store_free_space_unread", folder=str(folder), error=str(error))
+        return None
 
 
 async def _migrate(connection: aiosqlite.Connection, path: Path) -> None:

@@ -133,10 +133,9 @@ def _clear_leftovers(directory: Path, pattern: re.Pattern[str], now: float) -> N
 def make_backup(database: Path, folder: Path, partial: Path, now: float) -> Backup:
     """Copy ``database`` into ``folder`` as it stands at ``now``: SQLite's online backup into a hidden file of
     ``partial`` (:func:`partial_folder` for the database of Dot's home; 0600), checked with ``quick_check``, compressed
-    into ``folder`` under a hidden name and
-    linked to its own name when it is whole. Both hidden names hold the process's id, so two copies at once never share
-    one, and what a copy cut off left is cleared by the next. Raises StoreError for a database that is not there and for
-    a copy that is damaged."""
+    into ``folder`` under a hidden name and linked to its own name when it is whole. Both hidden names hold the
+    process's id, so two copies at once never share one, and what a copy cut off left is cleared by the next. Raises
+    StoreError for a database that is not there and for a copy that is damaged."""
     if not database.is_file():
         raise StoreError("there is no database to copy", {"database": str(database)})
     folder.mkdir(mode=_FOLDER_MODE, parents=True, exist_ok=True)

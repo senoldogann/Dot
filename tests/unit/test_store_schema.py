@@ -3,6 +3,7 @@ in order, one of a later version (a newer Dot wrote it) is refused, and the tabl
 change of the tables without a new version and its step fails here."""
 
 import asyncio
+import errno
 import gzip
 import hashlib
 import sqlite3
@@ -198,3 +199,35 @@ def _write_a_chat(database: Path) -> None:
         connection.commit()
     finally:
         connection.close()
+
+
+def _full_sqlite() -> sqlite3.Error:
+    error: sqlite3.OperationalError = sqlite3.OperationalError("database or disk is full")
+    error.sqlite_errorcode = sqlite3.SQLITE_FULL
+    return error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [_full_sqlite(), OSError(errno.ENOSPC, "No space left on device")],
+    ids=["sqlite", "system"],
+)
+async def test_a_copy_that_meets_a_full_disk_says_the_disk_is_full(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    database: Path = tmp_path / "dot.sqlite3"
+    old: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        old.executescript(db._SCHEMA)
+        old.commit()
+    finally:
+        old.close()
+
+    def full(database: Path, folder: Path, partial: Path, now: float) -> None:
+        raise error
+
+    monkeypatch.setattr(db, "make_backup", full)
+    with pytest.raises(StoreError, match="the disk is full") as refused:
+        await Store.open(database, tmp_path / "images")
+    assert isinstance(refused.value.context["free_bytes"], int)
+    assert _version(database) == 0
