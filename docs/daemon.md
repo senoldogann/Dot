@@ -89,7 +89,9 @@ changed or deleted on a page shows there at once, and one a run made once that r
 [Customize › Connectors](extending.md#customize--connectors), over your account's row, your initials and your name,
 which opens **Settings** (item 999, after a cog beside Connect apps), and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
-sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
+sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close (in Dot.app the
+sidebar's head, its opener and the settings' Hide sidebar are 32 px, so that the five buttons of the head fit beside
+the traffic lights: item 1273). The top bar
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
 longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
 while it is being made or lost; what works stands at the top of the list. A page's name in the top bar has an (i) beside it
