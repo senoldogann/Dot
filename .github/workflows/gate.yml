@@ -1,6 +1,6 @@
-# The gate every change passes before it is merged. The format check, the lint, mypy and the checks of the interface
-# run on Linux: none of them imports PyObjC, and the marker on those dependencies lets `uv sync` install there. The
-# tests stay on macOS, because the package imports PyObjC and a run of them on Linux does not get past the import.
+# The gate every change passes before it is merged. The format check, the lint, mypy, the checks of the interface and
+# the unit tests but those that need macOS (item 1270) run on Linux: the marker on the PyObjC dependencies lets `uv
+# sync` install there. Every unit test, `dotx eval check` and the smoke tests run on macOS.
 # The smoke tests here are every one that needs no service, chosen by their marks: a scripted model or a stand-in
 # plays the real loop, tools, policy and store; one that needs the local Ollama server's embedding model skips itself
 # here. Beside them, the `browser` job runs the core of the browser tests (item 486): the URL rules of Dot's Chrome,

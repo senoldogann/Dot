@@ -33,8 +33,8 @@ dependencies = [
     "pillow>=12.3.0",
     "playwright>=1.62.0",
     "pydantic>=2.14.1",
-    # PyObjC exists on macOS only. The marker lets the format, lint and type checks install on Linux
-    # (gate.yml); the package still runs on macOS alone, and the tests that import it stay there.
+    # PyObjC exists on macOS only. The marker lets the format, lint and type checks and the unit tests install on
+    # Linux (gate.yml, item 1270); the package still runs on macOS alone, and the tests that need it stay there.
     "pyobjc-framework-applicationservices>=12.2.2; sys_platform == 'darwin'",
     "pyobjc-framework-cocoa>=12.2.2; sys_platform == 'darwin'",
     "pyobjc-framework-quartz>=12.2.2; sys_platform == 'darwin'",
