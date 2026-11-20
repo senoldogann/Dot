@@ -49,7 +49,7 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (390, "light"),
     (390, "dark"),
 )
-_HOME_FRAME: str = "section.composer[aria-label='New chat']"
+_HOME_FRAME: str = "section.composer[aria-label='Chat']"
 _HOME_GOAL: str = "textarea[aria-label='Goal']"
 _ANY: re.Pattern[str] = re.compile(r".+")
 _REPLY: ScriptedTurn = ScriptedTurn(text="Hi.", calls=())
@@ -174,13 +174,6 @@ async def test_the_word_in_the_box_is_the_choice_for_that_message(
 ) -> None:
     manager, address = served
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
-    # A chat of the model without the levels, for its dock.
-    async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
-        response: httpx.Response = await http.post(
-            "/api/runs", json={"goal": "Say hi.", "mode": "chat", "model": HAIKU}
-        )
-        assert response.status_code == 201, response.text
-        haiku: RunRecord = await _ended(manager, response.json()["id"])
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
@@ -210,9 +203,9 @@ async def test_the_word_in_the_box_is_the_choice_for_that_message(
                 await _expect_boost(frame, pill, "ultrathink", "Ultrathink")
                 await goal.fill("Say hi.")
                 await _expect_boost(frame, pill, None, "Medium")
-                # The message goes with the choice, the word stays in its goal, and the box is plain again after. It
-                # starts a chat of its own: Dot's conversation (item 1245) is the chat of the model without the levels.
-                await page.get_by_role("button", name="New chat").click()
+                # The message goes with the choice, the word stays in its goal, and the box is plain again after. It is
+                # the first of Dot's one conversation (item 1279: the home has no New chat), so the chat of the model
+                # without the levels is made after it.
                 await goal.fill("Say hi, and ultrathink.")
                 await _expect_boost(frame, pill, "ultrathink", "Ultrathink")
                 await goal.press("Enter")
@@ -229,7 +222,13 @@ async def test_the_word_in_the_box_is_the_choice_for_that_message(
                 await page.screenshot(path=str(tmp_path / "dock-ultracode.png"), animations="disabled")
                 await dock_goal.fill("")
                 await _expect_boost(dock, dock_pill, None, "Medium")
-                # The model without the levels reads the word as any other.
+                # The model without the levels reads the word as any other: a chat of it, for its dock.
+                async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
+                    response: httpx.Response = await http.post(
+                        "/api/runs", json={"goal": "Say hi.", "mode": "chat", "model": HAIKU}
+                    )
+                    assert response.status_code == 201, response.text
+                    haiku: RunRecord = await _ended(manager, response.json()["id"])
                 await page.goto(f"{address}/#/runs/{haiku.id}")
                 dock = page.locator(".dock .composer")
                 await dock.locator("textarea").fill("ultrathink: say hi.")

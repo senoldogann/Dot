@@ -109,11 +109,12 @@ function placeholderFor(name) {
 /**
  * Where a message from the home goes (item 1245): Dot is one conversation, as each agent is (item 1233), so a message
  * to Dot or to the agent picked goes on in its home chat as the daemon names it (`home` of `GET /api/agents`), and
- * reaches the run at work there; a new chat only when the owner asked for one (`fresh`), when Keep going or a loop
- * starts work of its own, or before the owner had a chat with it.
+ * reaches the run at work there; a chat of its own only when Keep going or a loop starts work of its own, or before
+ * the owner had a chat with it. The home has no New chat (item 1279, the owner's one chat per agent): an agent's
+ * conversation is left by the "…" of its page, Dot's, which has no such page, by deleting the chat.
  */
-function whereTo(summaries, actorId, fresh) {
-  const home = fresh ? null : (summaries.find((summary) => summary.record.id === actorId)?.home ?? null);
+function whereTo(summaries, actorId) {
+  const home = summaries.find((summary) => summary.record.id === actorId)?.home ?? null;
   if (home === null) {
     return { threadId: null, working: null };
   }
@@ -124,7 +125,7 @@ function whereTo(summaries, actorId, fresh) {
 function buildComposer(ctx, listener) {
   const start = readHomeChoices();
   const frame = composerFrame({
-    label: "New chat",
+    label: "Chat",
     boxLabel: "Goal",
     placeholder: placeholderFor(dotName()),
     maxPx: MAX_GOAL_PX,
@@ -230,36 +231,17 @@ function buildComposer(ctx, listener) {
       ),
     ],
   });
-  // The conversation under the box (item 1245): the way back into the home chat of the one the box writes to, and New
-  // chat, which makes the next message start a chat of its own.
+  // The conversation under the box (item 1245): the way back into the home chat of the one the box writes to. There is
+  // no New chat here (item 1279): an agent has one chat, which the box goes on in.
   let summaries = [];
-  let fresh = false;
   const conversationLabel = el("span");
   const conversation = el("a", { class: "btn ghost sm agent-conversation", hidden: true }, icon("message"), conversationLabel);
-  const freshButton = el(
-    "button",
-    {
-      class: "btn ghost sm",
-      type: "button",
-      hidden: true,
-      title: "The next message starts a chat of its own; the conversation stays as it is",
-      onclick: () => {
-        fresh = true;
-        paintConversation();
-        toast("ok", "Your next message starts a new chat.");
-        goal.focus();
-      },
-    },
-    icon("plus"),
-    "New chat",
-  );
-  const conversationRow = el("div", { class: "row home-conversation" }, conversation, freshButton);
+  const conversationRow = el("div", { class: "row home-conversation" }, conversation);
   function paintConversation() {
     const actorId = agentId === "" ? DOT_ID : agentId;
     const summary = summaries.find((candidate) => candidate.record.id === actorId) ?? null;
     const home = summary?.home ?? null;
-    conversation.hidden = home === null || fresh;
-    freshButton.hidden = home === null || fresh;
+    conversation.hidden = home === null;
     if (home !== null) {
       conversation.setAttribute("href", `#/runs/${home.latest_run_id}`);
       conversation.title = home.title;
@@ -270,7 +252,7 @@ function buildComposer(ctx, listener) {
     return sharedGet("/agents").then((found) => {
       summaries = found;
       paintConversation();
-      // Read: whether New chat shows is known.
+      // Read: whether the way back into the chat shows is known.
       conversationRow.dataset.state = "read";
       return found;
     });
@@ -338,7 +320,7 @@ function buildComposer(ctx, listener) {
             ? unsent.where
             : loop !== null || standing.value()
               ? { threadId: null, working: null }
-              : whereTo(await api.get("/agents"), agentId === "" ? DOT_ID : agentId, fresh);
+              : whereTo(await api.get("/agents"), agentId === "" ? DOT_ID : agentId);
         unsent = { text, where };
         const owner = { agent_id: agentId === "" ? null : agentId };
         const opening = { ...ctx, steered: (runId) => ctx.navigate(`/runs/${runId}`), queued: (runId) => ctx.navigate(`/runs/${runId}`) };
@@ -532,7 +514,7 @@ export function mount(root, ctx) {
   const home = el(
     "div",
     { class: "home" },
-    el("h1", { class: "visually-hidden" }, "New chat"),
+    el("h1", { class: "visually-hidden" }, "Chat"),
     start,
     away?.element ?? null,
     day ? presence.strip : null,

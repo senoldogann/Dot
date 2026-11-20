@@ -185,13 +185,14 @@ run stands in the sidebar as a small face in the row of the run that delegated i
 progress ("step 3 · web_fetch", then "done · 12 steps"), its steps so far, the time it has worked and an **open** link to
 the run's own page.
 
-The home, **New chat** in the tab's title, goes on in Dot's conversation (item 1245): a message sent there goes on in
+The home, **Chat** in the tab's title (it read New chat before item 1279), goes on in Dot's conversation (item 1245): a message sent there goes on in
 Dot's home chat (as the daemon names it, `home` of Dot in `GET /api/agents`: the chat of the latest activity whose
 latest run is Dot's and that the pages or `dotx run` started, not a schedule's, a watcher's, Dot's initiative's, a
 team's, a campaign's or a chat that is an agent's), to the run at work there while there is one, queued or steered as Settings › General ›
 Messages says, and that chat opens; with an agent picked, in that agent's (item 1233). Under the box, **Open your chat
-with Dot** leads back into it, and **New chat** makes the next message start a chat of its own; Keep going and a
-`/loop` always do. Before the first chat with Dot the home starts it.
+with Dot** leads back into it. There is no New chat on the home (item 1279, your one chat per agent: Dot has one
+conversation, as each agent has); only Keep going and a `/loop` start a chat of their own. Before the first chat with
+Dot the home starts it.
 
 The home is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
@@ -1086,7 +1087,7 @@ Keychain refused part way, why it stopped (`{"removed": 40, "stopped": "…"}`);
 failed and never a value.
 
 **Dot's first conversation** (item 420). On a first open, while Dot has not introduced itself (`[assistant] introduced`)
-and there is no chat yet, New chat shows Dot's first conversation in the place of the greeting, over the composer, with
+and there is no chat yet, the home shows Dot's first conversation in the place of the greeting, over the composer, with
 no model called: Dot greets you by name and asks what to call it (a few names to pick, or one to type; "Name changed to
 Miro" notes a new one), says in a few lines what it does (and, in Ask and Supervised, what it asks you about; in Auto,
 that a second AI answers for you and money and passwords stay yours), and offers to
@@ -1097,7 +1098,7 @@ to take off your hands: that look is a run of its own whose goal tells it to onl
 the introduction and the first message you send end it, and the daemon keeps that it was had.
 
 **First steps** (item 811). While Dot is fresh (its first run is not 14 days old, or it has none) and a step is left,
-New chat lists the first steps under the greeting and the composer, which keep their place in the middle: tell Dot
+the home lists the first steps under the greeting and the composer, which keep their place in the middle: tell Dot
 your name (Settings › General), bring your passwords (Settings › Vault, Import from CSV), reach Dot from iMessage
 (Settings › Channels), pair your phone (Settings › Phone), connect your apps (Customize › Connectors) and introduce
 yourself (a first chat), each a link to its page and a check once it is done, with how many are. **Hide** puts the
@@ -1106,7 +1107,7 @@ card away for good in that browser, and it goes by itself once every step is don
 and the Connectors page's servers).
 
 **A chat that is gone** (item 810). Dot opens at the chat screen you were on last; when that chat is gone by then (Dot
-started with an empty store, the chat was deleted), New chat opens in its place, saying so, and the next open starts
+started with an empty store, the chat was deleted), the home opens in its place, saying so, and the next open starts
 there too. A task you go to that is not found still says *Task not found*.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
@@ -1266,7 +1267,7 @@ put on the page by a small script in the document's head before the first paint,
 light on the way in; a screenshot tour (`tests/smoke/test_tour.py`) photographs every page in both schemes at 1280 and
 390 for reading by eye.
 
-While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
+While you are elsewhere, the tab title counts the approvals that wait: `(2) Chat · Dot`. Settings › General ›
 Notifications adds desktop notifications (off until you switch them on; the browser asks for its permission on that
 click): Dot says when it asks for an approval, a question or your help, and when it leaves you a question that a run
 could not wait for (a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or

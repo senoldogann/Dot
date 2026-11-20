@@ -16,7 +16,6 @@ import httpx
 import pytest
 import pytest_asyncio
 from composer_choices import show_choices
-from home_afresh import start_afresh
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -291,10 +290,6 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
 ) -> None:
     manager, address = served
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
-    # A chat of each other model, for its menu.
-    async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
-        sonnet: RunRecord = await _started(http, manager, {"goal": "Say hi.", "mode": "chat", "model": SONNET})
-        haiku: RunRecord = await _started(http, manager, {"goal": "Say hi.", "mode": "chat", "model": HAIKU})
     claude.asked.clear()
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
@@ -339,7 +334,6 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 await expect(pill).to_contain_text("Ultrathink")
                 await expect(pill.locator("[data-icon='sparkle']")).to_have_count(1)
                 await page.screenshot(path=str(tmp_path / "pill-ultrathink.png"), animations="disabled")
-                await start_afresh(page)
                 await page.locator(_HOME_GOAL).fill("Say hi.")
                 await page.locator(_HOME_GOAL).press("Enter")
                 await expect(page).to_have_url(re.compile(r"#/runs/run_"))
@@ -360,6 +354,11 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 await expect(dock).to_contain_text("Medium")
                 await page.close()
             assert claude.asked == [("claude-opus-5-5", "max", False), ("claude-opus-5-5", "xhigh", True)]
+            # A chat of each other model, for its menu: made after the home's own, which goes on in Dot's one
+            # conversation (item 1279: the home has no New chat).
+            async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
+                sonnet: RunRecord = await _started(http, manager, {"goal": "Say hi.", "mode": "chat", "model": SONNET})
+                haiku: RunRecord = await _started(http, manager, {"goal": "Say hi.", "mode": "chat", "model": HAIKU})
             # Sonnet offers Max alone, so Ultrathink alone; Haiku offers neither, so the menu has no such choice.
             for run, offered in ((sonnet, ["Ultrathink"]), (haiku, [])):
                 page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")

@@ -234,13 +234,12 @@ async def test_dot_is_one_conversation(served: tuple[RunManager, httpx.AsyncClie
             assert second != first
             assert (await client.get(f"/api/runs/{second}")).json()["run"]["thread_id"] == thread
 
-            # New chat under the box starts the next message afresh, and the face follows the newest chat.
+            # No New chat under the box (item 1279, the owner's one chat per agent): the way back into the chat is all
+            # the home offers, and the face leads to the newest run of the same chat.
             await page.goto(home)
-            await page.get_by_role("button", name="New chat").click()
-            await expect(page.get_by_role("link", name="Open your chat with Dot")).to_be_hidden()
-            third: str = await _sent_from_home(manager, page, "Something else entirely")
-            assert (await client.get(f"/api/runs/{third}")).json()["run"]["thread_id"] != thread
-            await expect(face).to_have_attribute("href", f"#/runs/{third}")
+            await expect(page.get_by_role("link", name="Open your chat with Dot")).to_be_visible()
+            await expect(page.get_by_role("button", name="New chat")).to_have_count(0)
+            await expect(face).to_have_attribute("href", f"#/runs/{second}")
             await page.close()
         finally:
             await browser.close()

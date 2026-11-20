@@ -505,13 +505,12 @@ export function mountOffice(holder, { composerFor, openAgent }) {
 
     // The chat in the panel (item 898, the owner's word of 2026-11-01: "every message made a new chat; we should start
     // a conversation there and go on in it"): the agent's newest chat, its turns as the owner's words and the answers,
-    // and the box sends on in it, to the run at work while there is one. "New chat" starts the next message afresh.
+    // and the box sends on in it, to the run at work while there is one. There is no New chat here (item 1279).
     const AUTOMATIC = new Set(["schedule", "watcher", "initiative", "notice"]);
     const TURNS_SHOWN = 6;
     /** @type {Map<string, { key: string, turns: { id: string, goal: string, result: string, status: string }[] }>} */
     const chats = new Map();
     const readingChats = new Set();
-    const freshChat = new Set();
     // What the owner sent a run at work from here, shown at once, until the run has read it (its steer event, which
     // comes when the run takes it before its next step).
     /** @type {Map<string, string[]>} */
@@ -539,7 +538,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
     function followOf(id) {
       return () => {
         const chat = conversationOf(actors.get(id)?.summary);
-        if (freshChat.has(id) || chat === null) return { threadId: null, working: null };
+        if (chat === null) return { threadId: null, working: null };
         // Waiting for the owner (blocked) is at work too: the message reaches that run, as in its chat (the review).
         const working = WORKING_STATES.has(chat.status);
         return { threadId: chat.thread_id, working: working ? chat.id : null };
@@ -596,9 +595,7 @@ export function mountOffice(holder, { composerFor, openAgent }) {
       let thread = "";
       /** @type {(HTMLElement | null)[]} */
       let nodes;
-      if (freshChat.has(id)) {
-        nodes = [noteNode("Your next message starts a new chat.")];
-      } else if (chat === null) {
+      if (chat === null) {
         // No chat of the owner's with it yet: an empty chat, ready for the first message (item 901), with what its run
         // does now under it.
         nodes = [noteNode("No chat yet. Write to start one.")];
@@ -675,10 +672,10 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         return;
       }
       const { record, latest } = actor.summary;
-      const conversation = freshChat.has(record.id) ? null : conversationOf(actor.summary);
+      const conversation = conversationOf(actor.summary);
       const mode = modeOf(latest, waitingRuns());
       // What it does, in a word: the goal of a chat of the owner's is its first message below, not said again (item
-      // 905); a run that is no such chat (a schedule's, Dot's own, a helper's), or one a new chat leaves out, says it.
+      // 905); a run that is no such chat (a schedule's, Dot's own, a helper's) says it.
       const inChat = conversation !== null && latest !== null && latest.id === conversation.id;
       const doing = el(
         "p",
@@ -693,20 +690,6 @@ export function mountOffice(holder, { composerFor, openAgent }) {
         "div",
         { class: "office-panel-links" },
         conversation !== null || latest !== null ? el("a", { class: "btn ghost sm", href: `#/runs/${(conversation ?? latest).id}` }, "Open its chat") : null,
-        conversation !== null
-          ? el(
-              "button",
-              {
-                class: "btn ghost sm",
-                type: "button",
-                onclick: () => {
-                  freshChat.add(record.id);
-                  paintPanel();
-                },
-              },
-              "New chat",
-            )
-          : null,
         record.id !== DOT_ID ? el("button", { class: "btn ghost sm", type: "button", onclick: () => openAgent(record.id) }, "Its page") : null,
       );
       if (panel !== null && panel.dispose !== undefined && panelSlot.dataset.agent === record.id) {
@@ -725,7 +708,6 @@ export function mountOffice(holder, { composerFor, openAgent }) {
           // The chat it went on in, or the one it began, is the conversation until the agents are read again.
           const home = { id: run.thread_id, latest_run_id: run.id, latest_status: run.status, title: run.goal, last_message: run.goal, last_role: "user" };
           actor.summary = { ...actor.summary, latest: run, ...(record.id === DOT_ID ? {} : { home }) };
-          freshChat.delete(record.id);
           toast("ok", `${record.name} is on it.`);
           readSoon();
           panelSoon();

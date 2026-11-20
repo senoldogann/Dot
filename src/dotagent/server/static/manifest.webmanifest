@@ -16,8 +16,8 @@
   ],
   "shortcuts": [
     {
-      "name": "New chat",
-      "short_name": "New chat",
+      "name": "Chat",
+      "short_name": "Chat",
       "url": "/#/runs",
       "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
     },
