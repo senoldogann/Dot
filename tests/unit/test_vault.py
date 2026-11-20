@@ -487,3 +487,22 @@ def test_a_login_refused_on_another_page_sends_the_run_to_its_own_site_and_propo
     assert plain.startswith("This page is on the login's own host but not over https")
     assert "browser_open http://localhost:3000 " in elsewhere_advice("about:blank", ("http://localhost:3000",), "x")
     assert "names no website" in elsewhere_advice("https://a.example", (), "Dot's vault")
+
+
+def test_the_probe_chrome_sends_of_every_page_is_refused_without_a_line_in_the_log_and_any_other_refusal_has_one(
+    tmp_path: Path,
+) -> None:
+    """``chrome-extension://invalid/`` was 57% of two days of the log (24,600 lines), and the seven days it keeps were
+    two: it is refused all the same, at the debug level, and a refusal of any other address stays a line."""
+    from structlog.testing import capture_logs
+
+    session: BrowserSession = _session(tmp_path)
+    with capture_logs() as logs:
+        probe = session._judge("chrome-extension://invalid/", False, "script", None, None, None)
+        other = session._judge("file:///etc/passwd", True, "document", None, None, None)
+    assert not probe.allowed and not other.allowed
+    refused: dict[str, object] = {
+        str(entry["url"]): entry["log_level"] for entry in logs if entry["event"] == "browser_request_refused"
+    }
+    assert refused.get("chrome-extension://invalid/") in (None, "debug")
+    assert refused["file:///etc/passwd"] == "info"
