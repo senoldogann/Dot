@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol
 
-from dotagent.browser.session import BrowserSession
 from dotagent.policy.sandbox import UNSANDBOXED, Sandbox
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.store.models import RunMode, RunRecord
@@ -16,6 +15,7 @@ from dotagent.web.refused import RefusedHosts
 if TYPE_CHECKING:
     from dotagent.agent.orders import WorkDesk
     from dotagent.agent.verify import RunFacts
+    from dotagent.browser.session import BrowserSession
     from dotagent.runtime import Runtime
 
 
@@ -117,7 +117,8 @@ class ToolContext:
 
     runtime: "Runtime"
     # The browser session this run works in: the daemon's, or the one of the mode its campaign asked for.
-    browser: BrowserSession
+    # Named for the type checker, so importing a tool does not load the desktop frameworks.
+    browser: "BrowserSession"
     run_id: str
     # The agent whose run it is (item 94), ``None`` for Dot's: what the memory tools search as.
     agent_id: str | None
