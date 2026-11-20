@@ -108,8 +108,9 @@ end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection.
 drawer. On a touch screen of a phone's width it has no X (item 888): a chat you choose closes it, and so does a swipe
 to the left; a narrow window of the Mac keeps its button. On a phone the list is the home (item 991, the owner's
 ask of 2026-11-05 for a plain one): your initials at the head's left open the settings, with Campaigns and Schedules
-at its right with the **+** of a new agent; Dot's own face stands large with its name under it, to its conversation
-(item 1245), over your agents as rows of the list (item 1259, [Phone](phone.md)); the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
+at its right with the **+** of a new agent; the six agents you worked with last stand as rows under their label and
+count (item 1265), Dot's own conversation their first row (item 1245) and **All agents** their last (item 1259,
+[Phone](phone.md)); the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
 of a Mac having moved to your initials. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
 deleted under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only
 when the page comes to another chat (item 204).
