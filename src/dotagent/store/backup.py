@@ -54,10 +54,14 @@ class Backup(FrozenModel):
     size: int
 
 
+# The folder of a copy under way, beside the database.
+PARTIAL_DIR: str = "backups-partial"
+
+
 def partial_folder() -> Path:
     """Where a copy under way writes its uncompressed file: a folder of Dot's home, guarded from runs as the database
     is (``runtime._guarded_files``)."""
-    return dot_home() / "backups-partial"
+    return dot_home() / PARTIAL_DIR
 
 
 def backup_folder(config: StoreConfig) -> Path:
@@ -126,16 +130,16 @@ def _clear_leftovers(directory: Path, pattern: re.Pattern[str], now: float) -> N
             continue
 
 
-def make_backup(database: Path, folder: Path, now: float) -> Backup:
+def make_backup(database: Path, folder: Path, partial: Path, now: float) -> Backup:
     """Copy ``database`` into ``folder`` as it stands at ``now``: SQLite's online backup into a hidden file of
-    :func:`partial_folder` (0600), checked with ``quick_check``, compressed into ``folder`` under a hidden name and
-    linked to its own name when it is whole. Both hidden names hold the process's id, so two copies at once never share
-    one, and what a copy cut off left is cleared by the next. Raises StoreError for a database that is not there and for
-    a copy that is damaged."""
+    ``partial`` (:func:`partial_folder` for the database of Dot's home; 0600), checked with ``quick_check``, compressed
+    into ``folder`` under a hidden name and linked to its own name when it is whole. Both hidden names hold the
+    process's id, so two copies at once never share one, and what a copy cut off left is cleared by the next. Raises
+    StoreError for a database that is not there and for a copy that is damaged."""
     if not database.is_file():
         raise StoreError("there is no database to copy", {"database": str(database)})
     folder.mkdir(mode=_FOLDER_MODE, parents=True, exist_ok=True)
-    home: Path = partial_folder()
+    home: Path = partial
     home.mkdir(mode=_FOLDER_MODE, parents=True, exist_ok=True)
     _clear_leftovers(home, _RAW_PARTIAL, now)
     _clear_leftovers(folder, _PACKED_PARTIAL, now)
@@ -223,7 +227,7 @@ async def keep_backups(config: StoreConfig, database: Path) -> None:
                     # Nothing to copy: look again soon, so that a write after a quiet spell is copied soon too.
                     await asyncio.sleep(min(every_s, _QUIET_POLL_S))
                     continue
-            made: Backup = await asyncio.to_thread(make_backup, database, folder, time.time())
+            made: Backup = await asyncio.to_thread(make_backup, database, folder, partial_folder(), time.time())
             gone: list[Backup] = await asyncio.to_thread(
                 thin_backups, folder, config.backup_keep_hourly, config.backup_keep_days, time.time()
             )
