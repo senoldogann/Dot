@@ -547,7 +547,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const keptSections = new Map();
   const keptLabels = new Map();
   const ageTicker = setInterval(() => {
-    for (const node of list.querySelectorAll(".side-age")) {
+    for (const node of [...list.querySelectorAll(".side-age"), ...botsNav.querySelectorAll(".side-age")]) {
       setText(node, age(Number(node.dataset.ts)));
     }
   }, AGE_REFRESH_MS);
@@ -627,6 +627,22 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // last tile, All, is the page of every agent and team, which the Agents row is while the owner has no agent of their
   // own. A list that did not load leaves the row as it was.
   const facesNav = el("nav", { class: "side-agent-faces", "aria-label": t("sidebar.yourAgents"), hidden: true });
+  // On a phone the agents are the list itself (item 1259), as a messaging app's people: a row each, its face, its name
+  // over the last words of its conversation, at its right their age and the dot of an unread one, the one that talked
+  // last first. Their conversations then leave the days, which hold the other chats. The faces' column is the desktop's.
+  // Its last row is All agents, the page of every agent and team, as the faces' last tile is.
+  const botsNav = el("nav", { class: "side-bots", "aria-label": t("sidebar.agentRows"), hidden: true });
+  const botLinks = new Map();
+  const allRow = el(
+    "a",
+    { class: "side-run side-bot side-bot-all", href: "#/agents", "aria-label": t("sidebar.allAgents"), onclick: onNavigate },
+    el("span", { class: "side-agent-mark", "aria-hidden": "true" }, icon("users")),
+    el("span", { class: "side-chat-text" }, el("span", { class: "side-run-goal" }, t("sidebar.allAgents"))),
+  );
+  // What the rows show, as last drawn: the same agents read again leave them standing, the focus on one among them.
+  let botsDrawn = null;
+  // The chats that are an agent's conversation (item 1233), which a phone's list shows as the agent's row.
+  let agentHomes = new Set();
   const allAgents = el(
     "a",
     { class: "side-agent-face side-agent-all", href: "#/agents", title: t("sidebar.allAgents"), "aria-label": t("sidebar.allAgents"), onclick: onNavigate },
@@ -702,10 +718,68 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     // Dot's face alone is a phone's large one (item 991): the column there holds the agents, and stands hidden without.
     facesNav.dataset.agents = String(agentsOwn.length);
     facesNav.hidden = mine.length === 0;
+    paintBots(agentsOwn, working, unread);
     agentsLink.hidden = agentsOwn.length > 0;
     allAgents.hidden = agentsOwn.length === 0;
     markFaces();
   }
+  /** The agents' rows of a phone's list (item 1259), the one whose conversation moved last first. */
+  function paintBots(agentsOwn, working, unread) {
+    const lastAt = (summary) => summary.home?.updated_at ?? summary.latest?.created_at ?? summary.record.created_at;
+    const sorted = [...agentsOwn].sort((one, other) => lastAt(other) - lastAt(one));
+    // Every agent's conversation, beside those of the faces `paintFaces` put there: its row is marked while it is open.
+    for (const { record, home } of agentsOwn) {
+      homes.set(record.id, home ?? null);
+    }
+    const drawn = JSON.stringify(
+      sorted.map((summary) => [summary.record.id, summary.record.name, summary.record.role, summary.record.look, summary.home, lastAt(summary), working(summary), unread(summary)]),
+    );
+    if (drawn !== botsDrawn) {
+      botsDrawn = drawn;
+      botLinks.clear();
+      for (const summary of sorted) {
+        botLinks.set(summary.record.id, botRow(summary, lastAt(summary), working(summary), unread(summary)));
+      }
+      botsNav.replaceChildren(...botLinks.values(), allRow);
+    }
+    botsNav.hidden = sorted.length === 0;
+    const now = new Set(agentsOwn.flatMap(({ home }) => (home === null || home === undefined ? [] : [home.id])));
+    if ([...now].join() !== [...agentHomes].join()) {
+      agentHomes = now;
+      paintLists();
+    }
+  }
+
+  /** An agent's row: to its conversation, else to its page, whose box starts one. */
+  function botRow(summary, at, isWorking, isUnread) {
+    const { record, home } = summary;
+    const words = home === null || home === undefined ? "" : serviceWords(home.last_message ?? "").text;
+    const last = words === "" ? record.role : home.last_role === "user" ? t("side.you", { words }) : words;
+    return el(
+      "a",
+      {
+        class: "side-run side-bot",
+        href: home === null || home === undefined ? `#/agents/${record.id}` : `#/runs/${home.latest_run_id}`,
+        "aria-label": isUnread ? `${record.name} (${t("side.unread")})` : record.name,
+        dataset: { name: record.name },
+        onclick: onNavigate,
+      },
+      actorFace(record.id, isWorking ? "working" : "idle", record.look),
+      el(
+        "span",
+        { class: "side-chat-text" },
+        el("span", { class: "side-run-goal" }, record.name),
+        last === "" ? null : el("span", { class: "side-chat-last" }, el("span", { class: "side-chat-words" }, clip(last, 120))),
+      ),
+      el(
+        "span",
+        { class: "side-chat-meta" },
+        el("span", { class: "side-age", "data-ts": String(at), title: dateTime(at) }, age(at)),
+        isUnread ? el("span", { class: "side-unread" }) : null,
+      ),
+    );
+  }
+
   async function loadFaces() {
     const mine = ++facesTicket;
     let found;
@@ -741,6 +815,19 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       link.setAttribute("aria-label", dot !== null && !reading ? `${name} (${t("side.unread")})` : name);
     }
     mark(allAgents, routeTab === "agents" && (open === null || !faceLinks.has(open)));
+    for (const [id, row] of botLinks) {
+      const home = homes.get(id) ?? null;
+      const reading = routeTab === "runs" && home !== null && home.id === routeThreadId;
+      mark(row, (routeTab === "agents" && id === open) || reading);
+      // The dot of its unread conversation, but not while that chat is on the page, as a face's (item 1235).
+      const dot = row.querySelector(".side-unread");
+      if (dot instanceof HTMLElement) {
+        dot.hidden = reading;
+      }
+      const name = row.dataset.name ?? "";
+      row.setAttribute("aria-label", dot !== null && !reading ? `${name} (${t("side.unread")})` : name);
+    }
+    mark(allRow, routeTab === "agents" && (open === null || !botLinks.has(open)));
   }
 
   // The rows the arrow keys walk and the search's Enter opens, in order: what waits (during a search, the chats among it
@@ -799,9 +886,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     // The face whose conversation it is loses its dot too (item 1235).
     for (const [id, home] of homes) {
       const link = faceLinks.get(id);
-      if (home?.id === open.id && link !== undefined) {
+      if (home?.id === open.id) {
         homes.set(id, { ...home, unread: false });
-        link.querySelector(".side-agent-unread")?.remove();
+        link?.querySelector(".side-agent-unread")?.remove();
+        botLinks.get(id)?.querySelector(".side-unread")?.remove();
       }
     }
     markFaces();
@@ -965,7 +1053,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const shown = shownChats();
     // The chats of the channels stand at the foot, in a section of their own each (item 619); the others among the days.
     const channelChats = shown.filter((chat) => channelOf(chat) !== null);
-    const own = shown.filter((chat) => channelOf(chat) === null);
+    const own = shown.filter((chat) => channelOf(chat) === null && !(PHONE.matches && needle === "" && agentHomes.has(chat.id)));
     paintChannels(channelChats);
     if (own.length === 0) {
       list.replaceChildren(...emptyNote(channelChats.length > 0), ...olderNote());
@@ -1602,6 +1690,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     { class: "side-body" },
     searchBox,
     facesNav,
+    botsNav,
     el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink),
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav),
@@ -1677,6 +1766,18 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     settingsLink.setAttribute("aria-label", owner === "" ? t("sidebar.settings") : t("sidebar.settingsOf", { owner }));
   }
   paintOwner();
+  // A new agent is a "+" at the right of the head (item 1259, where item 834's new chat stood until item 1245): its face
+  // and its name, then its conversation. Dot itself stays one conversation, which its face opens. Its dialog is loaded
+  // when asked for, as the page's first paint needs none of it.
+  const newBot = el(
+    "button",
+    { class: "icon-btn side-compose", type: "button", title: t("sidebar.newBot"), "aria-label": t("sidebar.newBot"), onclick: () => void attempt(openNewBotDialog) },
+    icon("plus"),
+  );
+  async function openNewBotDialog() {
+    const { openNewBot } = await import("./newbot.js");
+    await openNewBot();
+  }
   const heroName = el("span", { class: "side-dot-name" }, dotName());
   const dotHero = el(
     "a",
@@ -1704,6 +1805,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
     connectButton.firstElementChild.replaceWith(icon(PHONE.matches ? "appsGrid" : "plug"));
+    sideHead.append(newBot);
     if (PHONE.matches) {
       close.after(ownerLink);
       connectButton.after(searchBox);
@@ -1716,6 +1818,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
   placeForWidth();
   PHONE.addEventListener("change", placeForWidth);
+  // A phone's days leave out the agents' conversations, which a wider sidebar lists (item 1259).
+  PHONE.addEventListener("change", paintLists);
   // While the settings are open the sidebar is their nav in place of the chats and the pages (item 562); a phone keeps the
   // sidebar as it is, its settings being a list of tabs on a page of their own.
   const settingsNav = buildSettingsNav({ homeHref, onCollapse, onNavigate });

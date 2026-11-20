@@ -199,8 +199,12 @@ brings messages there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, the phone's home (item 991): your initials at its head's left open the settings
-(no **+** of a new chat since item 1245); Dot's face stands large (88 px, item 998) with its name, to its conversation, over the faces of the other
-agents, which stand on nothing, hovered or open; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, round, in its middle the face and name of whom the chat is with (item
+and the **+** at its right makes a new agent (item 1259: its face and its name, then its conversation); Dot's face
+stands large (88 px, item 998) with its name, to its conversation, over your agents, a row each (item 1259): its face
+(56 px), its name over the last words of its conversation, their age and the dot of an unread one at its right, the
+one that talked last first, to its conversation (its page while it has none), its unread dot gone while that chat
+is open, and **All agents** under them, the page of every agent and team. Their conversations leave the days,
+which hold your other chats; a search finds them there too; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, round, in its middle the face and name of whom the chat is with (item
 1101; the title and the model are in the panel's Details), and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The bar has
 no ground of its own (item 1119): its three parts are panes of glass and the conversation scrolls under them, as under
