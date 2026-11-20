@@ -2,6 +2,7 @@
 in order, one of a later version (a newer Dot wrote it) is refused, and the tables of each version are pinned, so that a
 change of the tables without a new version and its step fails here."""
 
+import asyncio
 import gzip
 import hashlib
 import sqlite3
@@ -13,11 +14,11 @@ from dotagent.core.errors import StoreError
 from dotagent.store import db
 from dotagent.store.db import BEFORE_UPGRADE_DIR, SCHEMA_VERSION, Store
 
-# The tables, columns and indexes of each version, as `_tables_digest` reads them. A change of the tables gives another
-# digest: add the step that brings an older database to it in `db._MIGRATIONS`, raise `SCHEMA_VERSION`, and pin the new
-# digest under the new version.
+# The tables, columns and indexes of the version, as `_tables_digest` reads them. A new column or index (added at every
+# open by `db._add_missing_columns`) changes it under the same version: pin the new digest. Any other change of the
+# tables needs a step in `db._MIGRATIONS` under the next version, `SCHEMA_VERSION` raised, and its digest pinned there.
 _PINNED: dict[int, str] = {
-    1: "f9057ff1d3df13ad106db39c6e3674fb22332a795afb6d781389b9ff45173a64",
+    1: "e58f68b5c41098388860efc1c0f8813a1d73f665f61d9377d4f54d15a217115c",
 }
 
 
@@ -31,10 +32,12 @@ def _tables_digest(path: Path) -> str:
         for (table,) in tables:
             for column in connection.execute(f"PRAGMA table_info({table})").fetchall():
                 lines.append(f"{table}.{column[1]} {column[2]} notnull={column[3]} default={column[4]} pk={column[5]}")
-        for name, table in connection.execute(
-            "SELECT name, tbl_name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL ORDER BY name"
+        # An index, a trigger or a view as written: an index changed under the same name changes the digest too.
+        for kind, name, sql in connection.execute(
+            "SELECT type, name, sql FROM sqlite_master WHERE type IN ('index', 'trigger', 'view') AND sql IS NOT NULL"
+            " ORDER BY name"
         ).fetchall():
-            lines.append(f"index {name} on {table}")
+            lines.append(f"{kind} {name}: {sql}")
     finally:
         connection.close()
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()
@@ -59,7 +62,8 @@ async def test_a_new_database_is_made_at_the_schema_version_with_the_pinned_tabl
     await store.close()
     assert _version(database) == SCHEMA_VERSION
     assert _tables_digest(database) == _PINNED[SCHEMA_VERSION], (
-        "the tables changed: add a step to db._MIGRATIONS, raise SCHEMA_VERSION and pin the new digest"
+        "the tables changed: an added column or index is pinned again; anything else needs a step in db._MIGRATIONS"
+        " under a new SCHEMA_VERSION"
     )
     # A new database has nothing to keep: no copy is made.
     assert not (tmp_path / BEFORE_UPGRADE_DIR).exists()
@@ -86,10 +90,10 @@ async def test_a_database_from_before_versions_is_copied_then_brought_to_the_ver
         await store.close()
     assert _version(database) == SCHEMA_VERSION
     assert _tables_digest(database) == _PINNED[SCHEMA_VERSION]
-    copies: list[Path] = sorted((tmp_path / BEFORE_UPGRADE_DIR).glob("dot-*.sqlite3.gz"))
+    copies: list[Path] = sorted((tmp_path / BEFORE_UPGRADE_DIR / "v0").glob("dot-*.sqlite3.gz"))
     assert len(copies) == 1
     # The copy is the database as it was: version 0, its row, none of the added columns.
-    restored: Path = _unpacked(copies[0], tmp_path / "restored.sqlite3")
+    restored: Path = await asyncio.to_thread(_unpacked, copies[0], tmp_path / "restored.sqlite3")
     assert _version(restored) == 0
     connection: sqlite3.Connection = sqlite3.connect(restored)
     try:
@@ -99,7 +103,7 @@ async def test_a_database_from_before_versions_is_copied_then_brought_to_the_ver
     # Opened again, it is at the version: nothing more is copied.
     again: Store = await Store.open(database, tmp_path / "images")
     await again.close()
-    assert len(list((tmp_path / BEFORE_UPGRADE_DIR).glob("dot-*.sqlite3.gz"))) == 1
+    assert len(list((tmp_path / BEFORE_UPGRADE_DIR / "v0").glob("dot-*.sqlite3.gz"))) == 1
 
 
 async def test_a_database_of_a_later_version_is_refused_and_left_as_it_was(tmp_path: Path) -> None:
@@ -121,3 +125,26 @@ async def test_a_database_of_a_later_version_is_refused_and_left_as_it_was(tmp_p
     assert _version(database) == SCHEMA_VERSION + 1
     assert _tables_digest(database) == before
     assert not (tmp_path / BEFORE_UPGRADE_DIR).exists()
+
+
+async def test_a_migration_that_fails_at_every_open_copies_the_database_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database: Path = tmp_path / "dot.sqlite3"
+    old: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        old.executescript(db._SCHEMA)
+        old.commit()
+    finally:
+        old.close()
+
+    async def broken(connection: object) -> None:
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr(db, "_add_missing_columns", broken)
+    for _ in range(3):
+        with pytest.raises(StoreError):
+            await Store.open(database, tmp_path / "images")
+    # Left as it was at every try, and copied once: a daemon that launchd starts again and again does not fill the disk.
+    assert _version(database) == 0
+    assert len(list((tmp_path / BEFORE_UPGRADE_DIR / "v0").glob("dot-*.sqlite3.gz"))) == 1

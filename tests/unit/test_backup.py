@@ -25,6 +25,7 @@ from dotagent.store.backup import (
     keep_backups,
     list_backups,
     make_backup,
+    partial_folder,
     thin_backups,
 )
 
@@ -67,7 +68,7 @@ def _store(folder: Path, every_hours: float = 1.0) -> StoreConfig:
 def test_a_copy_is_the_whole_database_checked_compressed_and_private(tmp_path: Path) -> None:
     database: Path = _database(tmp_path / "dot.sqlite3", 500)
     folder: Path = tmp_path / "copies"
-    made: Backup = make_backup(database, folder, NOW)
+    made: Backup = make_backup(database, folder, partial_folder(), NOW)
     path: Path = Path(made.path)
     assert path.name == "dot-20270115-080000.sqlite3.gz" and made.made_at == NOW and made.size == path.stat().st_size
     assert (path.stat().st_mode & 0o777, folder.stat().st_mode & 0o777) == (0o600, 0o700)
@@ -103,7 +104,7 @@ def test_a_copy_finishes_while_another_connection_writes(tmp_path: Path) -> None
     writer: threading.Thread = threading.Thread(target=write)
     writer.start()
     try:
-        made: Backup = make_backup(database, tmp_path / "copies", NOW)
+        made: Backup = make_backup(database, tmp_path / "copies", partial_folder(), NOW)
     finally:
         stop.set()
         writer.join()
@@ -113,9 +114,9 @@ def test_a_copy_finishes_while_another_connection_writes(tmp_path: Path) -> None
 def test_a_copy_made_in_the_same_second_leaves_the_first_as_it_is(tmp_path: Path) -> None:
     database: Path = _database(tmp_path / "dot.sqlite3", 3)
     folder: Path = tmp_path / "copies"
-    first: Backup = make_backup(database, folder, NOW)
+    first: Backup = make_backup(database, folder, partial_folder(), NOW)
     kept: int = Path(first.path).stat().st_ino
-    second: Backup = make_backup(database, folder, NOW)
+    second: Backup = make_backup(database, folder, partial_folder(), NOW)
     assert second.path == first.path and Path(first.path).stat().st_ino == kept
     assert [child.name for child in folder.iterdir()] == [Path(first.path).name]
 
@@ -132,9 +133,9 @@ def test_a_copy_on_a_disk_without_links_is_renamed_unless_its_second_is_taken(
         raise OSError(errno.ENOTSUP, "Operation not supported")
 
     monkeypatch.setattr(os, "link", no_links)
-    first: Backup = make_backup(database, folder, NOW)
+    first: Backup = make_backup(database, folder, partial_folder(), NOW)
     kept: int = Path(first.path).stat().st_ino
-    again: Backup = make_backup(database, folder, NOW)
+    again: Backup = make_backup(database, folder, partial_folder(), NOW)
     assert again.path == first.path and Path(first.path).stat().st_ino == kept
     assert [child.name for child in folder.iterdir()] == [Path(first.path).name]
 
@@ -151,7 +152,7 @@ def test_a_relative_folder_for_the_copies_is_refused() -> None:
 
 def test_there_is_no_copy_of_a_database_that_is_not_there(tmp_path: Path) -> None:
     with pytest.raises(StoreError, match="no database to copy"):
-        make_backup(tmp_path / "missing.sqlite3", tmp_path / "copies", NOW)
+        make_backup(tmp_path / "missing.sqlite3", tmp_path / "copies", partial_folder(), NOW)
     assert not (tmp_path / "copies").exists()
 
 
@@ -269,7 +270,7 @@ def test_a_copy_clears_what_a_copy_cut_off_left_and_nothing_else(tmp_path: Path,
         path.write_text("left", encoding="utf-8")
     for path in (left_raw, left_journal, left_packed, *others):
         os.utime(path, (old, old))
-    make_backup(database, folder, time.time())
+    make_backup(database, folder, partial_folder(), time.time())
     assert not left_raw.exists() and not left_journal.exists() and not left_packed.exists()
     assert young.exists() and all(path.exists() for path in others)
     # The copy's own uncompressed file is gone once it is whole.

@@ -13,6 +13,7 @@ import hashlib
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 import struct
 import tempfile
@@ -33,7 +34,7 @@ from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import Effort, ImageData, Message, OneMessage, Speed
 from dotagent.policy.types import ApprovalMode, PaceClass
-from dotagent.store.backup import make_backup
+from dotagent.store.backup import PARTIAL_DIR, make_backup
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.models import (
     NO_PICKS,
@@ -1429,8 +1430,8 @@ async def _add_columns(
 
 
 async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
-    """Give a database created by an older version the columns added since, and the indexes on them (schema version
-    1). Called inside the migration's transaction (:func:`_migrate`)."""
+    """Give a database created by an older version the columns added since, and the indexes on them, each only where it
+    is missing: at every open, inside the migration's transaction (:func:`_migrate`)."""
     added_to_runs: tuple[str, ...] = await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
@@ -1476,18 +1477,23 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_kept ON approvals(digest, status)")
 
 
-# The schema's version (item 1268), kept in the database's header (``PRAGMA user_version``): a database is brought to it
-# by the steps of ``_MIGRATIONS`` after its own version, in order, in one transaction, after a copy of it is made. A
-# database of a later version (a newer Dot wrote it) is refused, so that this one never writes what it does not know.
-# A change of the tables (``_SCHEMA``, the added columns) adds the next step and raises this; test_store_schema.py pins
-# the tables of each version and fails while one changed without a new version.
+# The schema's version (item 1268), kept in the database's header (``PRAGMA user_version``). Every open makes the tables
+# of ``_SCHEMA`` and adds the columns and indexes added since (``_add_missing_columns``), each only where it is missing,
+# as before versions: a new column needs no new version. A change that cannot be made again and again (a table dropped
+# or renamed, data rewritten) is a step of ``_MIGRATIONS`` under the next version, and raises this. A database below
+# the version is copied first; one of a later version (a newer Dot wrote it) is refused, so that this one never writes
+# what it does not know. test_store_schema.py pins the tables of the version.
 SCHEMA_VERSION: int = 1
-_MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = (
-    # Every column and index added before the schema had a version: each one added only where it is missing.
-    (1, _add_missing_columns),
-)
-# Where the copy made before a migration goes, beside the database: these copies are never thinned.
+# The steps after the additive layer, each under the version it brings the database to, in order. Version 1 is the
+# additive layer itself, which every open applies: no step.
+_MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = ()
+# Where the copy made before a migration goes, beside the database, in a folder of the version it was copied from: one
+# copy per version, so that a migration that fails at every start does not copy the database at every start. These
+# copies are never thinned, and runs neither read nor change them (``runtime._guarded_files``), as the other copies.
 BEFORE_UPGRADE_DIR: str = "backups-before-upgrade"
+# The statements of ``_SCHEMA``, run one by one inside the migration's transaction: ``executescript`` commits first, out
+# of the lock, and would write to a database another process is migrating or this one is about to refuse.
+_SCHEMA_STATEMENTS: tuple[str, ...] = tuple(part.strip() for part in _SCHEMA.split(";") if part.strip() != "")
 
 
 async def _schema_version(connection: aiosqlite.Connection) -> int:
@@ -1510,32 +1516,48 @@ def refuse_newer(found: int, path: Path) -> None:
         )
 
 
-def pending_steps(found: int) -> tuple[int, ...]:
-    """The versions of the steps a database of version ``found`` still needs, in order."""
-    return tuple(version for version, _ in _MIGRATIONS if version > found)
+def _copy_before_upgrade(path: Path, found: int) -> None:
+    """Copy the database into ``BEFORE_UPGRADE_DIR/v<found>`` unless a copy of that version is there already."""
+    folder: Path = path.parent / BEFORE_UPGRADE_DIR / f"v{found}"
+    if folder.is_dir() and any(folder.glob("dot-*.sqlite3.gz")):
+        log.info("store_copy_before_upgrade_kept", folder=str(folder), schema_version=found)
+        return
+    try:
+        # Beside the database, both folders: Dot's home for its own database, a test's folder for a test's.
+        backup = make_backup(path, folder, path.parent / PARTIAL_DIR, time.time())
+    except (sqlite3.Error, OSError) as error:
+        raise StoreError(
+            "the copy of the database made before an upgrade failed: free some space or move the database, then start"
+            " Dot again",
+            {"path": str(path), "folder": str(folder), "error": str(error), "free_bytes": _free_bytes(path.parent)},
+        ) from error
+    log.info("store_backed_up_before_upgrade", path=backup.path, size=backup.size, schema_version=found)
+
+
+def _free_bytes(folder: Path) -> int:
+    return shutil.disk_usage(folder).free
 
 
 async def _migrate(connection: aiosqlite.Connection, path: Path) -> None:
-    """Bring the database to ``SCHEMA_VERSION``: a new one is made and brought to it; an older one is copied first (into
-    ``BEFORE_UPGRADE_DIR``), then takes its pending steps in one transaction, its version written in the same, so that a
-    process that dies part way leaves it as it was and the next open does it all."""
+    """Bring the database to ``SCHEMA_VERSION`` (the comment above): an older one is copied first, then, in one
+    transaction with its new version, takes the tables, the added columns and its pending steps, so that a process that
+    dies part way leaves it as it was and the next open does it all. A new database is made at the version."""
     found: int = await _schema_version(connection)
     refuse_newer(found, path)
     fresh: bool = not await _has_tables(connection)
-    if not fresh and pending_steps(found):
-        backup = await asyncio.to_thread(make_backup, path, path.parent / BEFORE_UPGRADE_DIR, time.time())
-        log.info("store_backed_up_before_upgrade", path=backup.path, size=backup.size, schema_version=found)
-    await connection.executescript(_SCHEMA)
+    if not fresh and found < SCHEMA_VERSION:
+        await asyncio.to_thread(_copy_before_upgrade, path, found)
     # Immediate: the daemon and a `dotx` command opening an old database at once take turns, rather than the second
     # failing on a snapshot the first changed (the review of 2026-11-01); the second finds the version written.
     await connection.execute("BEGIN IMMEDIATE")
     try:
         found = await _schema_version(connection)
         refuse_newer(found, path)
-        # A new database takes the steps too: ``_SCHEMA`` makes the tables as first written, the steps what came since.
-        steps: tuple[int, ...] = pending_steps(found)
+        for statement in _SCHEMA_STATEMENTS:
+            await connection.execute(statement)
+        await _add_missing_columns(connection)
         for version, step in _MIGRATIONS:
-            if version in steps:
+            if version > found:
                 await step(connection)
         if found != SCHEMA_VERSION:
             # A pragma takes no parameter; the version is this module's own integer.
