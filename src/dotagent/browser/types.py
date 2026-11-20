@@ -360,12 +360,17 @@ class Attachment(FrozenModel):
 
 
 class Screenshot(FrozenModel):
-    """A JPEG of the viewport; one pixel is one CSS pixel, so coordinates in it work with ``click_at``."""
+    """A JPEG of the viewport; one pixel is one CSS pixel, so coordinates in it work with ``click_at``.
+
+    ``data`` is the page as it was taken, which is what is kept for the owner. ``marked`` is the same picture with the
+    refs of the latest snapshot drawn on the interactive elements in view, which is what a model is shown; empty when
+    there is nothing to mark, and then the model is shown ``data``."""
 
     url: str
     width: int
     height: int
     data: bytes
+    marked: bytes = b""
 
 
 class Frame(FrozenModel):

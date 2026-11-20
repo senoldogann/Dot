@@ -181,6 +181,13 @@ Both modes share what follows.
   743). The whole read that timed out runs on in the page, so the part is named once the page answers again, after up
   to twice `action_timeout_s` (item 923). A page for which no part smaller than the page can be named, or that stays
   busy longer, still fails with the timeout.
+- `browser_screenshot` is the viewport, one CSS pixel a pixel, so a point in the picture is a point for `click_at`.
+  The picture a model is sent has a small box at the top-left of each interactive element in the viewport, holding
+  that element's ref from the latest snapshot (`e12`, and `f1e2` for one in a frame), at most 40, in the order the
+  snapshot lists them (item 1261). An element outside the viewport is not marked, and neither is one that only lays
+  the page out or is read rather than pressed (a heading). The picture kept with the step, which is what you see, has
+  no marks. A mark is where the latest snapshot drew the element: a page that has moved since is marked there, and a
+  new snapshot lines the marks up again. A model that cannot see is shown the same marked picture.
 - A collapsed dropdown lists its options on its own line, for example
   `combobox "Shipping" [ref=e3]: options "Standard (3-5 days)" [selected], "Express (next day)"`. `select` takes the
   label or the value of one of them, written as listed; a choice that is not there is refused at once with the options

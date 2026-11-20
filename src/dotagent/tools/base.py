@@ -39,12 +39,16 @@ def at_most(bound: float) -> BeforeValidator:
 
 class ToolResult(FrozenModel):
     """What the model reads back. ``untrusted`` marks text that other people or programs can author (what an
-    application shows on the screen): the run counts it as untrusted input from then on."""
+    application shows on the screen): the run counts it as untrusted input from then on.
+
+    ``images`` are what a model is shown. ``shown_images``, when set, are what is kept for the owner instead: a
+    browser screenshot whose model picture carries ref marks and whose kept picture does not."""
 
     text: str
     images: tuple[ImageData, ...]
     is_error: bool
     untrusted: bool = False
+    shown_images: tuple[ImageData, ...] = ()
 
 
 def ok(text: str) -> ToolResult:
@@ -55,8 +59,8 @@ def fail(text: str) -> ToolResult:
     return ToolResult(text=text, images=(), is_error=True)
 
 
-def ok_with_images(text: str, images: tuple[ImageData, ...]) -> ToolResult:
-    return ToolResult(text=text, images=images, is_error=False)
+def ok_with_images(text: str, images: tuple[ImageData, ...], shown: tuple[ImageData, ...] = ()) -> ToolResult:
+    return ToolResult(text=text, images=images, is_error=False, shown_images=shown)
 
 
 def mark_untrusted(result: ToolResult) -> ToolResult:

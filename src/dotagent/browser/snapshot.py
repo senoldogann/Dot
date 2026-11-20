@@ -465,6 +465,12 @@ def redrawn_ref(shown: Sequence[SnapshotLine], now: Sequence[SnapshotLine], ref:
     return alike[0] if len(alike) == 1 else None
 
 
+def frame_origins(lines: Sequence[SnapshotLine]) -> tuple[tuple[float, float] | None, ...]:
+    """Where each line's box is measured from, in the page's viewport: ``(0, 0)`` for the page itself, and where an
+    iframe stands for a line inside it. ``None`` when an iframe holding the line has no box."""
+    return tuple(_page_origins(lines))
+
+
 def _page_origins(lines: Sequence[SnapshotLine]) -> list[tuple[float, float] | None]:
     """Where each line's frame starts in the page's viewport: (0, 0) for the top frame, an iframe's own place plus its
     frame's start for the lines inside it; ``None`` when an iframe holding the line has no box."""
