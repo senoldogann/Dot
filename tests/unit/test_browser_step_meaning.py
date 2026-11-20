@@ -62,6 +62,39 @@ def test_text_with_no_field_says_where_the_ref_of_the_field_comes_from() -> None
     assert "browser_find" not in str(clicked.value)
 
 
+def test_text_with_no_field_after_a_click_names_the_ref_the_click_has() -> None:
+    # Item 1253: runs clicked a field by its ref and typed with no ref (run_mwk33lk4, a post's text); told only where a
+    # ref comes from, the run wrote the post with a browser_eval script instead, past the checks a step makes at its
+    # field. The refusal names the ref the step before it clicks, and Dot still writes only into a field a step names.
+    for action in ("type", "insert", "fill"):
+        with pytest.raises(ValidationError) as refused:
+            ActArgs.model_validate(
+                {
+                    "steps": [
+                        {"action": "click", "ref": "f1e3654"},
+                        {"action": "snapshot"},
+                        {"action": action, "text": "Catch up without interrupting."},
+                    ]
+                }
+            )
+        message: str = str(refused.value)
+        assert f"{action} needs a ref" in message
+        assert '"ref": "f1e3654"' in message
+    # With no click before it, the refusal is the one of item 1133.
+    with pytest.raises(ValidationError) as pressed:
+        ActArgs.model_validate({"steps": [{"action": "press", "key": "Meta+a"}, {"action": "insert", "text": "Ada"}]})
+    assert "browser_find" in str(pressed.value)
+
+
+def test_a_wait_for_something_names_the_tool_that_waits() -> None:
+    # Item 1253: a wait with text (run_mwlu71zd) is no bare wait, so it was refused with the list of actions, and the
+    # run sent its click alone twice before it found browser_wait_text.
+    with pytest.raises(ValidationError, match="call browser_wait_text"):
+        ActArgs.model_validate(
+            {"steps": [{"action": "wait", "text": "Message sent"}, {"action": "click", "ref": "e9"}]}
+        )
+
+
 def test_an_upload_step_names_the_tool_that_uploads() -> None:
     with pytest.raises(ValidationError, match="call browser_upload"):
         ActArgs.model_validate({"steps": [{"action": "upload", "ref": "e362", "paths": ["/tmp/cv.pdf"]}]})
