@@ -146,7 +146,7 @@ _HELP_VECTORS_ASKED: int = 500
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT NOT NULL,
-    created_at REAL NOT NULL, updated_at REAL NOT NULL, pinned_at REAL, seen_at REAL, choices TEXT
+    created_at REAL NOT NULL, updated_at REAL NOT NULL, pinned_at REAL, seen_at REAL, choices TEXT, agent_id TEXT
 );
 CREATE TABLE IF NOT EXISTS messages (
     thread_id TEXT NOT NULL, seq INTEGER NOT NULL, body TEXT NOT NULL,
@@ -584,6 +584,7 @@ def _thread(row: aiosqlite.Row) -> ThreadRecord:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         team_id=row["team_id"],
+        agent_id=row["agent_id"],
     )
 
 
@@ -1383,6 +1384,8 @@ _ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (
     ("schedule_id", "TEXT"),
     ("history_version", "INTEGER NOT NULL DEFAULT 0"),
     ("team_id", "TEXT"),
+    # The agent a chat is with: NULL for a chat that is nobody's or Dot's, and for every chat from before it existed.
+    ("agent_id", "TEXT"),
 )
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
 _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -1466,6 +1469,8 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await connection.execute("CREATE INDEX IF NOT EXISTS threads_schedule ON threads(schedule_id)")
     # The chats of a team (item 610), which its page and its card list.
     await connection.execute("CREATE INDEX IF NOT EXISTS threads_team ON threads(team_id)")
+    # The chat an agent is with, which is its home chat however many chats are newer.
+    await connection.execute("CREATE INDEX IF NOT EXISTS threads_agent ON threads(agent_id, updated_at)")
     # The campaign whose conversation a chat is, which the list of chats marks (item 705).
     await connection.execute("CREATE INDEX IF NOT EXISTS campaigns_thread ON campaigns(thread_id, created_at)")
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_status ON approvals(status, created_at)")
@@ -1598,6 +1603,7 @@ def _thread_summaries_sql(where: str, order: str) -> str:
         "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread,"
         "  COALESCE(latest.agent_id, latest.campaign_id, team.id) AS actor_id,"
         "  team.id AS team_id, team.name AS team_name, team.agents AS team_agents,"
+        "  t.agent_id AS bound_agent,"
         "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result,"
         f"  (SELECT s.cron FROM schedules AS s WHERE {_CHAT_LOOP}"
         "   ORDER BY s.next_run_at IS NULL, s.next_run_at LIMIT 1) AS loop_cron,"
@@ -2234,18 +2240,46 @@ class Store:
     # ----- threads and messages ------------------------------------------------------------
 
     @_writing
-    async def create_thread(self, title: str, source: str, team_id: str | None = None) -> ThreadRecord:
-        """A new thread; with ``team_id`` it is a chat with that team (item 610), which every run of it is told."""
+    async def create_thread(
+        self, title: str, source: str, team_id: str | None = None, agent_id: str | None = None
+    ) -> ThreadRecord:
+        """A new thread; with ``team_id`` it is a chat with that team (item 610), which every run of it is told, and
+        with ``agent_id`` a chat with that agent, which is its home chat."""
         now: float = time.time()
         record: ThreadRecord = ThreadRecord(
-            id=new_id("thr"), title=title, source=source, created_at=now, updated_at=now, team_id=team_id
+            id=new_id("thr"),
+            title=title,
+            source=source,
+            created_at=now,
+            updated_at=now,
+            team_id=team_id,
+            agent_id=agent_id,
         )
         await self._db.execute(
-            "INSERT INTO threads(id, title, source, created_at, updated_at, team_id) VALUES(?, ?, ?, ?, ?, ?)",
-            (record.id, record.title, record.source, record.created_at, record.updated_at, record.team_id),
+            "INSERT INTO threads(id, title, source, created_at, updated_at, team_id, agent_id)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                record.title,
+                record.source,
+                record.created_at,
+                record.updated_at,
+                record.team_id,
+                record.agent_id,
+            ),
         )
         await self._db.commit()
         return record
+
+    @_writing
+    async def bind_thread_agent(self, thread_id: str, agent_id: str) -> None:
+        """Make the chat the agent's own, unless it is another agent's or a team's already: the chat an agent was
+        messaged in stays its own from then on, whichever run comes last in it."""
+        await self._db.execute(
+            "UPDATE threads SET agent_id = ? WHERE id = ? AND agent_id IS NULL AND team_id IS NULL",
+            (agent_id, thread_id),
+        )
+        await self._db.commit()
 
     async def latest_thread(self, source: str, title: str) -> ThreadRecord | None:
         """The newest thread of ``source`` titled ``title``, or ``None``: the chat recurring work of that name goes on
@@ -2373,35 +2407,45 @@ class Store:
     async def agent_home_chats(
         self, sources: Sequence[str], same_chat: bool = False, agent_id: str | None = None
     ) -> dict[str, ThreadSummary]:
-        """Each agent's home chat (item 1233), by its id: the chat of the latest activity among those whose latest run
-        is the agent's, that a source of ``sources`` started (the owner's: not a schedule's, a watcher's or the
-        agents' work among themselves) and that is with no team and is no campaign's, however many chats are newer;
-        with ``agent_id``, that agent's alone. A chat is as ``list_thread_summaries`` makes it."""
+        """Each agent's home chat (item 1233), by its id: the chat that is the agent's own — a message the owner sends
+        in it goes to that agent (:meth:`bind_thread_agent`) — and for an agent with none yet, the chat of the latest
+        activity among those whose latest run is the agent's, that a source of ``sources`` started (the owner's: not a
+        schedule's, a watcher's or the agents' work among themselves) and that is with no team and is no campaign's,
+        however many chats are newer; with ``agent_id``, that agent's alone. A chat is as ``list_thread_summaries``
+        makes it."""
         named: tuple[str, ...] = tuple(sources)
         if not named:
             return {}
         marks: str = ", ".join("?" for _ in named)
-        rows: list[aiosqlite.Row] = await self._all(
-            _thread_summaries_sql(
-                f" WHERE latest.agent_id IS NOT NULL AND (? IS NULL OR latest.agent_id = ?) AND t.source IN ({marks})"
-                " AND t.team_id IS NULL AND latest.campaign_id IS NULL"
-                " AND NOT EXISTS (SELECT 1 FROM campaigns AS home_c WHERE home_c.thread_id = t.id)",
-                "updated_at DESC",
-            ),
-            (
-                None,
-                None,
-                _LAST_MESSAGE_READ_CHARS,
-                _LAST_MESSAGE_READ_CHARS,
-                int(same_chat),
-                int(same_chat),
-                agent_id,
-                agent_id,
-                *named,
-            ),
-        )
+
+        async def rows(where: str) -> list[aiosqlite.Row]:
+            return await self._all(
+                _thread_summaries_sql(where, "updated_at DESC"),
+                (
+                    None,
+                    None,
+                    _LAST_MESSAGE_READ_CHARS,
+                    _LAST_MESSAGE_READ_CHARS,
+                    int(same_chat),
+                    int(same_chat),
+                    agent_id,
+                    agent_id,
+                    *named,
+                ),
+            )
+
         homes: dict[str, ThreadSummary] = {}
-        for row in rows:
+        for row in await rows(
+            " WHERE t.agent_id IS NOT NULL AND (? IS NULL OR t.agent_id = ?) AND t.source IN"
+            f" ({marks}) AND t.team_id IS NULL AND latest.campaign_id IS NULL"
+            " AND NOT EXISTS (SELECT 1 FROM campaigns AS home_c WHERE home_c.thread_id = t.id)"
+        ):
+            homes.setdefault(row["bound_agent"], _summary(row))
+        for row in await rows(
+            f" WHERE t.agent_id IS NULL AND latest.agent_id IS NOT NULL AND (? IS NULL OR latest.agent_id = ?)"
+            f" AND t.source IN ({marks}) AND t.team_id IS NULL AND latest.campaign_id IS NULL"
+            " AND NOT EXISTS (SELECT 1 FROM campaigns AS home_c WHERE home_c.thread_id = t.id)"
+        ):
             homes.setdefault(row["actor_id"], _summary(row))
         return homes
 
@@ -2415,7 +2459,7 @@ class Store:
         marks: str = ", ".join("?" for _ in named)
         row: aiosqlite.Row | None = await self._one(
             _thread_summaries_sql(
-                f" WHERE latest.agent_id IS NULL AND t.source IN ({marks})"
+                f" WHERE latest.agent_id IS NULL AND t.agent_id IS NULL AND t.source IN ({marks})"
                 " AND t.team_id IS NULL AND latest.campaign_id IS NULL"
                 " AND NOT EXISTS (SELECT 1 FROM campaigns AS home_c WHERE home_c.thread_id = t.id)",
                 "updated_at DESC LIMIT 1",
@@ -7097,6 +7141,8 @@ class Store:
         await self.get_agent(agent_id)
         await self._db.execute("UPDATE runs SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
         await self._db.execute("UPDATE memories SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
+        # Its chats stay, as plain chats that answer as Dot: a message there must not look for an agent that is gone.
+        await self._db.execute("UPDATE threads SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
         await self._db.execute(
             "UPDATE schedules SET enabled = 0, next_run_at = NULL, agent_id = NULL, last_status = ? WHERE agent_id = ?",
             (AGENT_DELETED_STATUS, agent_id),

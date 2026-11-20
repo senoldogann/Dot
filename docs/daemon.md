@@ -76,7 +76,8 @@ Above the list: a search over the titles (⌘K or `/`) and, while you have no ag
 one conversation, as each agent is. Under the search Dot and your agents stand as faces (item
 835), as a messaging app's people: Dot's first, to its conversation (item 1245: its home chat, the owner's newest with
 Dot, else the home), and the two agents that worked last, each its face over its name on one line, to its
-conversation (item 1233: its home chat, where a message to it goes on; its page while it has none), the one whose page
+conversation (item 1233: its home chat, where a message to it goes on, the chat bound to it ever after; its page while
+it has none), the one whose page
 or conversation is open marked, a face whose agent's newest run works wearing its working look and one whose
 conversation is unread the dot of an unread chat (item 1235, as Grok Bot's column of faces marks a bot that wrote; not
 while that chat is open), and **All**, the page of every agent and team, in
@@ -182,7 +183,7 @@ the run's own page.
 The home, **New chat** in the tab's title, goes on in Dot's conversation (item 1245): a message sent there goes on in
 Dot's home chat (as the daemon names it, `home` of Dot in `GET /api/agents`: the chat of the latest activity whose
 latest run is Dot's and that the pages or `dotx run` started, not a schedule's, a watcher's, Dot's initiative's, a
-team's or a campaign's), to the run at work there while there is one, queued or steered as Settings › General ›
+team's, a campaign's or a chat that is an agent's), to the run at work there while there is one, queued or steered as Settings › General ›
 Messages says, and that chat opens; with an agent picked, in that agent's (item 1233). Under the box, **Open your chat
 with Dot** leads back into it, and **New chat** makes the next message start a chat of its own; Keep going and a
 `/loop` always do. Before the first chat with Dot the home starts it.
