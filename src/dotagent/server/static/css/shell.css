@@ -23,9 +23,11 @@
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
 }
 
+/* Clipped, not hidden (item 1273): a hidden overflow can still be scrolled, and the focus going to a control that stood
+   past the edge scrolled the whole sidebar sideways, its left edge cut off. */
 .shell[data-nav="docked"] .sidebar {
   min-width: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .shell[data-nav="docked"] .sidebar > * {
@@ -1147,6 +1149,20 @@
   height: 52px;
   min-height: 0;
   padding: 0 8px 0 96px;
+}
+
+/* The sidebar's head of the desktop shell holds the button that folds the sidebar, Watch, Campaigns, Schedules and the
+   "+" beside the lights (item 1273): at the 36 px of the bar's buttons they needed 292 px of the sidebar's 272, and the
+   "+" stood past its edge. Its buttons are 32 px and 4 px apart after the lights' 96 px, where the bar's opener stands
+   too (the button does not move as the sidebar folds): 272 px with the 8 px at the right. The sidebar stays 272 px
+   wide, as the panel beside a conversation needs its room in a 1280 px window. */
+:root[data-shell="desktop"] .side-head {
+  gap: 4px;
+}
+
+:root[data-shell="desktop"] .side-head :is(.icon-btn, .side-page) {
+  width: 32px;
+  height: 32px;
 }
 
 :root[data-shell="desktop"] .stagebar-row {
