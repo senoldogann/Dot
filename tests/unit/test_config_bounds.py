@@ -24,7 +24,6 @@ def _with(path: tuple[str, ...], value: JsonValue) -> JsonObject:
 @pytest.mark.parametrize(
     "path",
     [
-        ("agent", "max_concurrent_runs"),
         ("agent", "parallel_tools"),
         ("agent", "model_call_timeout_s"),
         ("scheduler", "tick_s"),

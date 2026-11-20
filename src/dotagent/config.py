@@ -371,7 +371,8 @@ class AgentConfig(FrozenModel):
     connection_check_s: float = Field(ge=0, allow_inf_nan=False)
     model_wait_s: float = Field(ge=0, allow_inf_nan=False)
     quota_wait_s: float = Field(ge=0, allow_inf_nan=False)
-    max_concurrent_runs: int = Field(ge=1)
+    # How many runs go at once; 0: no limit.
+    max_concurrent_runs: int = Field(ge=0)
     scaffold: ScaffoldMode
     tiers: dict[str, Tier]
     profile_min_calls: int
