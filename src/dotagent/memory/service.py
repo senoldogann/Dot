@@ -5,13 +5,16 @@ merges their rankings with reciprocal rank fusion, so a name or an identifier is
 Embeddings come from Ollama or from the OpenAI API (``[memory] embed_provider``); with ``embed_enabled = false`` only
 the words are searched, and a failing provider is never answered by the other one. Saving a note, rewriting one and
 searching go on when the embedding service fails (:class:`~dotagent.core.errors.ProviderError`, item 1254): the failure
-is logged, the note is stored without a vector and the search returns what the words found. :func:`backfill` embeds a
-note that has none once the service answers. A caller that must hear the failure (the notes a run starts with, a lesson
-checked by meaning) still gets the error. Any other error still fails the call.
+is logged, the note is stored without a vector and the search returns what the words found. A search or a save embeds
+at most one batch of notes that have no vector, then uses the vectors already stored and the words (item 1263).
+:func:`backfill` embeds the rest, and the daemon's scheduler runs that pass in the background. A caller that must hear
+the failure (the notes a run starts with, a lesson checked by meaning) still gets the error. Any other error still
+fails the call.
 
 Each stored vector belongs to the embedding model that made it. The model name is kept in the ``kv`` table, and
 :func:`sync_embedding_model` drops all vectors when the configured model is another one; :func:`backfill` embeds
-the notes that have no vector, so a search always covers every note.
+the notes that have no vector. A search covers every note by its words, and by meaning the notes that already have a
+vector plus that one batch.
 """
 
 import re
@@ -53,7 +56,11 @@ OWNER_KEY: str = "owner.section"
 # The most lines Dot's part of the owner section holds.
 OWNER_LINES: int = 12
 _MODEL_KEY: str = "memory.embed_model"
+# How many notes one embedding call takes. One call with hundreds of them broke Ollama's model runner.
 _BACKFILL_BATCH: int = 32
+# How many such calls a search or a save may spend on notes that have no vector. The query, or the note being saved,
+# is one more call. The rest wait for :func:`backfill`, which the scheduler runs off the request path.
+_REQUEST_BATCHES: int = 1
 _QUERY_CHARS: int = 1500
 _SIMILAR_SHOWN: int = 3
 _MIN_NOTE_CHARS: int = 3
@@ -175,13 +182,18 @@ async def sync_embedding_model(index: MemoryIndex) -> None:
     await index.store.kv_set(_MODEL_KEY, embedder.model)
 
 
-async def backfill(index: MemoryIndex) -> int:
-    """Embed the notes that have no vector yet; returns how many were embedded."""
+async def backfill(index: MemoryIndex, *, batches: int | None = None) -> int:
+    """Embed notes that have no vector yet; returns how many were embedded.
+
+    ``batches`` is how many embedding calls this pass may make (``None``: until none are left). Each note's vector is
+    stored before the next call, so a process that dies mid-way leaves the notes it wrote and the rest for the next
+    pass. A pass over notes that already have vectors embeds nothing."""
     embedder: Embedder | None = index.embedder
-    if embedder is None:
+    if embedder is None or batches == 0:
         return 0
     embedded: int = 0
-    while True:
+    made: int = 0
+    while batches is None or made < batches:
         pending: list[MemoryRecord] = await index.store.memories_without_vectors(_BACKFILL_BATCH)
         if not pending:
             return embedded
@@ -189,6 +201,8 @@ async def backfill(index: MemoryIndex) -> int:
         for record, vector in zip(pending, vectors, strict=True):
             await index.store.set_memory_vector(record.id, vector, record.content)
         embedded += len(pending)
+        made += 1
+    return embedded
 
 
 async def reindex(index: MemoryIndex) -> int:
@@ -234,7 +248,7 @@ async def save_memory(
     similar: tuple[MemoryHit, ...] = ()
     if index.embedder is not None:
         try:
-            await backfill(index)
+            await backfill(index, batches=_REQUEST_BATCHES)
             vector = (await index.embedder.embed([text]))[0]
         except ProviderError as error:
             _embedding_down("save", error)
@@ -376,7 +390,7 @@ async def _recall(
     similarities: dict[str, float] = {}
     if index.embedder is not None:
         try:
-            await backfill(index)
+            await backfill(index, batches=_REQUEST_BATCHES)
             query_vector: Vector = (await index.embedder.embed([text]))[0]
             close: list[Similar] = most_similar(
                 query_vector, await index.store.all_memory_vectors(among), config.min_similarity, config.candidate_pool
