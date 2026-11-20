@@ -169,11 +169,27 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                 try:
                     for width, scheme in _SHOTS:
                         page: Page = await _open_sidebar(browser, address, width, scheme)
+                        if width < 860:
+                            # A phone lists the agents as rows (item 1259), the page of every one at their foot.
+                            rows: Locator = page.get_by_role("navigation", name="Agents", exact=True)
+                            await expect(rows.locator(".side-run-goal")).to_have_text(
+                                ["Competitor Watch", re.compile(r"^Scout( Two)?$"), "All agents"]
+                            )
+                            await expect(rows.get_by_role("link", name="All agents")).to_have_attribute(
+                                "href", "#/agents"
+                            )
+                            await expect(page.get_by_role("navigation", name="Your agents")).to_be_hidden()
+                            await page.screenshot(
+                                path=str(tmp_path / f"faces-{width}-{scheme}.png"), animations="disabled"
+                            )
+                            await page.close()
+                            continue
                         faces: Locator = page.get_by_role("navigation", name="Your agents")
-                        await expect(faces.get_by_role("link")).to_have_count(3)
-                        # The newest first, as neither has worked yet (item 855: the ones that worked last first).
+                        await expect(faces.get_by_role("link")).to_have_count(4)
+                        # Dot first (item 1245), then the newest, as neither has worked yet (item 855: the ones that
+                        # worked last first).
                         await expect(faces.locator(".side-agent-name")).to_have_text(
-                            ["Competitor Watch", re.compile(r"^Scout( Two)?$"), "All"]
+                            ["Dot", "Competitor Watch", re.compile(r"^Scout( Two)?$"), "All"]
                         )
                         # The row holds every tile whole: it does not scroll, and no tile runs past its edge.
                         assert await faces.evaluate(
@@ -230,7 +246,7 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                     # An agent deleted from its page leaves the row at once; with none left, the Agents row is back.
                     page = await _open_sidebar(browser, address, 1280, "light")
                     faces = page.get_by_role("navigation", name="Your agents")
-                    await expect(faces.get_by_role("link")).to_have_count(3)
+                    await expect(faces.get_by_role("link")).to_have_count(4)
                     for agent_id in agents.values():
                         await page.evaluate(
                             "async (id) => { const { api } = await import('/js/api.js');"
@@ -238,7 +254,9 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                             agent_id,
                         )
                     agents.clear()
-                    await expect(faces).to_be_hidden()
+                    # Dot's face stays (item 1245), All goes with the agents.
+                    await expect(faces.get_by_role("link")).to_have_count(1)
+                    await expect(faces.get_by_role("link", name="All agents")).to_be_hidden()
                     await expect(
                         page.locator("#sidebar nav.side-links").get_by_role("link", name="Agents", exact=True)
                     ).to_be_visible()

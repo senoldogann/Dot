@@ -72,8 +72,10 @@ chat of it at work stands with what works like every chat (item 202) and comes b
 pinned stays under Pinned.
 Above the list: a search over the titles (⌘K or `/`) and, while you have no agent of your own, the way to **Agents**;
 **Campaigns** and **Schedules** (a page of its own since item 401) are icons at the right of the sidebar's head
-(item 855: they were rows of their own); no **+** starts a new chat (item 1245, which took away item 834's): Dot is
-one conversation, as each agent is. Under the search Dot and your agents stand as faces (item
+(item 855: they were rows of their own), and at the far right the **+** makes a new agent (item 1259, where item 834's
+new chat stood until item 1245): a dialog of its face (shape and colour) and its name, then its page, whose box starts
+its conversation; its instructions, model and actions start at the defaults and are set with Edit. Dot is one
+conversation, as each agent is. Under the search Dot and your agents stand as faces (item
 835), as a messaging app's people: Dot's first, to its conversation (item 1245: its home chat, the owner's newest with
 Dot, else the home), and the two agents that worked last, each its face over its name on one line, to its
 conversation (item 1233: its home chat, where a message to it goes on; its page while it has none), the one whose page
@@ -96,7 +98,7 @@ proposals; a row of the Memory, Vault and Schedules pages shows one action (a sc
 its **…**. Every icon draws about the same area at its size, with the same stroke (item 849): a "+", a speaker or
 a microphone no smaller than a copy beside it, each shape seen through a frame of its own (`icons.js`). The sections
 at the foot (Dot's work, a channel's) fold on a click of their label, and the folds are kept between visits. The
-sidebar's head holds the button that folds it away, at its left (no **+** of a new chat since item 1245). **Select** turns the list
+sidebar's head holds the button that folds it away, at its left, and the **+** of a new agent at its right (item 1259). **Select** turns the list
 into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
 and approval of theirs; they leave the list at the yes, while the daemon deletes them, and come back with why if the
@@ -105,8 +107,8 @@ end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection.
 drawer. On a touch screen of a phone's width it has no X (item 888): a chat you choose closes it, and so does a swipe
 to the left; a narrow window of the Mac keeps its button. On a phone the list is the home (item 991, the owner's
 ask of 2026-11-05 for a plain one): your initials at the head's left open the settings, with Campaigns and Schedules
-at its right; Dot's own face stands large with its name under it, to its conversation (item 1245), over the faces of
-the other agents, centred; the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
+at its right with the **+** of a new agent; Dot's own face stands large with its name under it, to its conversation
+(item 1245), over your agents as rows of the list (item 1259, [Phone](phone.md)); the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
 of a Mac having moved to your initials. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
 deleted under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only
 when the page comes to another chat (item 204).

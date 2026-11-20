@@ -1,8 +1,8 @@
 """An agent is one conversation (item 1233, the owner's word of 2026-11-19 after Grok Bot): its face in the sidebar
 opens its chat, its page's box goes on in that chat rather than starting a new one each time, New chat in its page's
 "…" starts the next message afresh, and its name in the chat's bar opens its page (item 1234). Dot is one
-conversation too (item 1245): the home's box goes on in Dot's chat, and no "+" starts a new one. A real server on a
-scripted model, in Chrome."""
+conversation too (item 1245): the home's box goes on in Dot's chat. The "+" makes a new agent, whose conversation opens
+next, and a phone lists the agents as rows of the list (item 1259). A real server on a scripted model, in Chrome."""
 
 import asyncio
 import re
@@ -60,7 +60,7 @@ async def served(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[tupl
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [_FINISH] * 12))
+    await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [_FINISH] * 16))
     manager: RunManager = RunManager(runtime)
     stopping: asyncio.Event = asyncio.Event()
     listener = bind_listener("127.0.0.1", 0)
@@ -242,5 +242,61 @@ async def test_dot_is_one_conversation(served: tuple[RunManager, httpx.AsyncClie
             assert (await client.get(f"/api/runs/{third}")).json()["run"]["thread_id"] != thread
             await expect(face).to_have_attribute("href", f"#/runs/{third}")
             await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_the_plus_makes_an_agent_and_a_phone_lists_the_agents_as_rows(
+    served: tuple[RunManager, httpx.AsyncClient],
+) -> None:
+    """Item 1259: on a phone each agent is a row under Dot's face, its name over its conversation's last words, and its
+    conversation leaves the days; the "+" makes an agent from a face and a name and opens its page, whose box talks to
+    it."""
+    manager, client = served
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            context = await browser.new_context(
+                viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, reduced_motion="reduce"
+            )
+            page: Page = await context.new_page()
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.get_by_role("button", name="Show sidebar").click()
+            await page.get_by_role("button", name="New agent").click()
+            dialog: Locator = page.get_by_role("dialog", name="New agent")
+            create: Locator = dialog.get_by_role("button", name="Create")
+            await expect(create).to_be_disabled()
+            await dialog.get_by_role("textbox", name="Name").fill("Quill")
+            await create.click()
+            await page.wait_for_url(re.compile(r".*#/agents/agt_[a-z0-9_]+$"))
+            agent_id: str = page.url.rsplit("/", 1)[1]
+            started = await client.post("/api/runs", json={"goal": "Draft a short note", "agent_id": agent_id})
+            assert started.status_code == 201, started.text
+            await _settled(manager, started.json()["id"])
+
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.get_by_role("button", name="Show sidebar").click()
+            row: Locator = page.locator(".side-bots a.side-bot").filter(has_text="Quill")
+            await expect(row).to_be_visible()
+            await expect(row.locator(".side-run-goal")).to_have_text("Quill")
+            await expect(row.locator(".side-chat-words")).to_have_text("Done.")
+            home = (await client.get(f"/api/agents/{agent_id}")).json()["home"]
+            await expect(row).to_have_attribute("href", f"#/runs/{home['latest_run_id']}")
+            # Its conversation is the agent's row, not a chat among the days, once they are read; the faces' column is
+            # the desktop's.
+            await expect(page.locator(".side-runs .spinner")).to_have_count(0)
+            await expect(page.locator(".side-runs .side-chat").filter(has_text="Draft a short note")).to_have_count(0)
+            # Unread until its chat is open; the row's dot goes then, as a face's does (item 1235).
+            await expect(row.locator(".side-unread")).to_be_visible()
+            await row.click()
+            await page.wait_for_url(f"**/#/runs/{home['latest_run_id']}")
+            await page.get_by_role("button", name="Show sidebar").click()
+            await expect(row.locator(".side-unread")).to_have_count(0)
+            await expect(row).to_have_attribute("aria-current", "page")
+            await expect(page.locator(".side-agent-faces")).to_be_hidden()
+            await context.close()
         finally:
             await browser.close()
