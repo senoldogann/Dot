@@ -17,6 +17,7 @@ import shutil
 import time
 from collections.abc import Sequence
 from dataclasses import replace
+from itertools import pairwise
 from pathlib import Path, PurePosixPath
 from typing import Annotated, Literal, Self
 from urllib.parse import unquote, urlsplit
@@ -54,6 +55,7 @@ from dotagent.browser.safety import (
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.browser.types import (
     PAGE_UNCHANGED,
+    WRITING_ACTIONS,
     ActOutcome,
     FindResult,
     PageView,
@@ -366,6 +368,35 @@ def _links_tool() -> RegisteredTool:
 _LOOKING_STEPS: frozenset[str] = frozenset({"snapshot", "screenshot", "look", "wait"})
 
 
+# The steps that put the focus on the element their ref names, which a step written after them with no ref of its own
+# meant to write in (item 1253).
+_FOCUSING_CLICKS: frozenset[str] = frozenset({"click", "double_click"})
+
+
+def refuse_text_after_a_click_with_no_field(steps: list[object]) -> None:
+    """Refuses a step that writes text (``fill``, ``type``, ``insert``) with no ref and no point, right after a click
+    on a ref (a look between them left out), naming that ref (item 1253): the field the run meant, as plain as its
+    correction. Runs told only where a ref comes from (item 1133) wrote the text with a ``browser_eval`` script
+    instead, past the checks a step makes at its field. The ref is not filled in for the step: a click may open an
+    editor elsewhere, and keys typed into a button press it, so text goes only into a field a step names."""
+    for before, step in pairwise(steps):
+        if not (isinstance(before, dict) and isinstance(step, dict)):
+            continue
+        clicked: object = before.get("ref")
+        action: object = step.get("action")
+        if (
+            before.get("action") in _FOCUSING_CLICKS
+            and isinstance(clicked, str)
+            and action in WRITING_ACTIONS
+            and all(step.get(name) is None for name in ("ref", "x", "y"))
+        ):
+            raise ValueError(
+                f"{action} needs a ref: a step writes only into the field it names, not where the click before it "
+                f'left the focus; if the field is the one that click names, write "ref": "{clicked}" in the {action} '
+                "step too"
+            )
+
+
 # The call's own guess of what its steps will show, in the model's words, by the name a step may not carry.
 _CALL_GUESS: str = "expect"
 
@@ -423,6 +454,7 @@ class ActArgs(ToolArgs):
             for step in data["steps"]
             if not (isinstance(step, dict) and step.get("action") in _LOOKING_STEPS and len(step) == 1)
         ]
+        refuse_text_after_a_click_with_no_field(steps)
         # The looks go first, so that an expectation beside the steps lands on the last step that acts (item 1161).
         return guesses_to_the_call(
             expectation_on_last_step({**data, "steps": steps or data["steps"]}, BROWSER_EXPECTATIONS)
