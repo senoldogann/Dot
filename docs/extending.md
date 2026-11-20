@@ -174,7 +174,9 @@ managers (item 493), Code, Design, Data, Research, Communication, Productivity, 
 492), each titled with its count. The page opens on the Popular chip (item 1000: every section at once ran to 43,000
 px on a phone), with a line under it that counts the rest; the chip All, another chip, a search (which looks in every
 section) or Connected lists them. Popular stands up as Plugins' New & noteworthy does, four cards a row (two on a
-narrower window); on a phone its cards are rows as the other sections' are, the mark beside the words (item 604). Each
+narrower window); on a phone its cards are rows as the other sections' are, the mark beside the words (item 604), and
+since item 1266 the services stand as one list in one frame, a hairline between the rows, as Grok Bot's apps sheet: a
+mark, a name with a single line of what it does, its button at the right, and the badge of where it stands kept. Each
 card has the service's mark, what Dot does with it, how it connects (Sign in, Key, Open to all, On this Mac, On this Mac · Key; and by Connected app,
 Mac app, Dot's browser, Synced folder or 1Password), where it stands, and its first step
 in words on the line of its name (**Add**, **Allow**, **Sign in**, **Connect**); a card
