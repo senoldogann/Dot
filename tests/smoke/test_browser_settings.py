@@ -102,6 +102,9 @@ class _Recorder:
 async def _offered(enabled: bool) -> frozenset[str]:
     """The tools the first step of a task was offered, in a throw-away home whose runs may use the browser or not."""
     config: AppConfig = eval_config(load_default_config())
+    # Every tool at every step: the test reads which ones the browser setting takes away (groups are the default since
+    # item 1280, and keep the browser's out of the first step).
+    config = config.model_copy(update={"agent": config.agent.model_copy(update={"tool_surface": "full"})})
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     model: _Recorder = _Recorder(ScriptedProvider(_PROVIDER, [_FINISH]))
     with scratch_home() as home, eval_environment(home, {}):

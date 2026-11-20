@@ -190,8 +190,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   went through a GUI: the prompt sends the agent to a command or an API first, the browser second, the desktop last.
   The side panel's Task tab shows under Set up a budget cut to the window, why a model is weak, and each reminder
   (item 365).
-- `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
-  step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
+- `tool_surface` in `[agent]` decides which tools a run's model sees. `full` offers all of them at every step. `grouped`, the default
+  since item 1280, starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
   the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
   `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, `waits`, `recon`, `skills`, and `mcp__<server>` for
   each MCP server) are
@@ -222,7 +222,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   and safety, of hesitating and of how a run ends as `full` has them, word for word where they are the same rule, and
   says how to work and each kind of tool in a line or two; the rest is in the tools' own descriptions. With
   `tool_surface = "grouped"` as well, a run starts lean: the shortest prompt and the core tools. Eval reports keep the
-  style, and `dotx eval report` shows it beside the tool surface. `full` stays the default because the evals of item 280
+  style, and `dotx eval report` shows it beside the tool surface. `prompt = "full"` stays the default because the evals of item 280
   (in `ROADMAP.md`, with the numbers) did not show the lean start doing as well.
 - `mcp_purposes` in `[agent]` (on by default, item 659) decides whether the line of an MCP server's tool group says
   what the server is for: the `description` of its `[[mcp]]` table, Dot's words for the server that comes with it, or

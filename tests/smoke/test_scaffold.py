@@ -152,8 +152,13 @@ async def login_env() -> dict[str, str]:
 
 def _config(tiers: dict[str, Tier], reminder_every: int) -> AppConfig:
     config: AppConfig = eval_config(load_default_config())
+    # Every tool at every step, as before item 1280 made groups the default: these runs fill a small window with them.
     return config.model_copy(
-        update={"agent": config.agent.model_copy(update={"tiers": tiers, "reminder_every": reminder_every})}
+        update={
+            "agent": config.agent.model_copy(
+                update={"tiers": tiers, "reminder_every": reminder_every, "tool_surface": "full"}
+            )
+        }
     )
 
 
