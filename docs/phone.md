@@ -131,7 +131,9 @@ code** takes its place. The same by hand:
 On a phone Dot works as an iPhone app does (item 1079): a menu (a chat's "…", a row's "…") is a sheet from the foot
 of the screen, its choices in groups and Cancel at the foot; a finger's hold of a chat's row in the sidebar opens the
 same sheet, as a right-click does with a mouse; a swipe from the screen's left edge does what the button at the top
-left does (back, or the list of chats); a row of a list and a chat's row darken while pressed, with no grey box of the
+left does (back, or the list of chats), and in the iPhone app it is the only swipe back: WebKit's own went back in the
+history at the same time, to the chat opened before (item 1272; it takes a new build of the app, and in a Safari tab
+Safari's own swipe still goes back in the history, which a page cannot turn off); a row of a list and a chat's row darken while pressed, with no grey box of the
 browser, and nothing stays tinted after a tap (item 1086: every style of a pointer resting on something applies only
 where a pointer can rest, `@media (hover: hover)`, which `tests/unit/test_touch_hover.py` holds), and a sheet takes
 the focus itself, so that its first choice is not drawn ringed; a queued message goes up a place from its own button (a finger cannot drag a row on an iPhone). Settings ›
@@ -210,7 +212,9 @@ which hold your other chats; a search finds them there too; Connect apps (item 4
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The bar has
 no ground of its own (item 1119): its three parts are panes of glass and the conversation scrolls under them, as under
 the composer. A new chat and an agent's page wear the same bar (item 1123): the way back round, an agent's face and
-name in the middle, its tools (the Trader's desk and the "…") in one pill, all on glass over the page. The line over the
+name in the middle, its tools (the Trader's desk and the "…") in one pill, all on glass over the page. An agent's page
+is its conversation (item 1272): it loads as a chat does, Dot's three dots in the middle, its face, name and box stand
+in the middle of the room under the bar, and its way back is the list of chats, or the agents' page it was opened from. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
 end, in the same pane; it is a row of 40 px, a translucent surface with the page blurred under it, a hairline and a
@@ -262,8 +266,8 @@ The button at the top left is the one way back (item 338): a chevron on the page
 sidebar comes over the page: the address stays the run's, and no page of chats stands between them (item 401). On a
 delegated run's page it says Back and leads to the run that started it. On any other page opened by a link of another
 page (a service from Connectors, a tab from the settings' list) it says Back and returns to that page; on a page opened
-directly that has one above it (a settings tab, a service's page, an agent's, a team's or a campaign's page, Handoffs) it
-leads there; on a page opened from the sidebar it is the way back to the list of chats. The browser's own Back and
+directly that has one above it (a settings tab, a service's page, a team's or a campaign's page, Handoffs) it
+leads there; an agent's page is its conversation and opens the list of chats, as a chat's does (item 1272); on a page opened from the sidebar it is the way back to the list of chats. The browser's own Back and
 Forward and a reload keep it as it was, and it is reckoned again when the phone turns. A chat that goes on at another of
 its runs (a follow-up, the queue's next message, Continue, an answer, a rewind) stays the same page: it keeps its way to
 the chats, and the browser's Back skips the run it went on from (item 345). The pages' own links back show in a wider

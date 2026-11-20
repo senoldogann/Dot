@@ -8,8 +8,8 @@ import { actorFace, rememberLook, setActorState, teamDuo, teamFaces } from "../a
 import { api } from "../api.js";
 import { ago, clip, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { touchFirst } from "../layout.js";
-import { errorPanel, loadingPanel, statusBadge } from "../panels.js";
+import { touchFirst, trackHeight } from "../layout.js";
+import { chatLoading, errorPanel, statusBadge } from "../panels.js";
 import { readFolds, writePref } from "../prefs.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { onLifecycle, onStreamBack } from "../state.js";
@@ -82,7 +82,9 @@ function mountPage(root, ctx, teamId) {
   let folds = readFolds(FOLDS_KEY);
   const top = el("div", { class: "home-start agent-top team-top" });
   const sections = el("section", { class: "home-today agent-sections", "aria-label": "The team's work" });
-  const page = el("div", { class: "home agent-home team-home" }, loadingPanel());
+  // As an agent's page (item 1272): Dot's three dots while it is read, and the top kept in the middle of the room.
+  const page = el("div", { class: "home agent-home team-home" }, chatLoading());
+  const stopCentring = trackHeight(top, page, "--home-start-h");
 
   function stageOf(detail) {
     const { record } = detail;
@@ -249,6 +251,7 @@ function mountPage(root, ctx, teamId) {
   attempt(reload);
   return () => {
     disposed = true;
+    stopCentring();
     stopLifecycle();
     stopBack();
     disposeComposer();
