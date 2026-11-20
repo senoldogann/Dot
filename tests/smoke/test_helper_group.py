@@ -178,6 +178,11 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                     head: Locator = group.locator("summary.helpers-head")
                     await expect(head.locator(".helpers-title")).to_have_text("4 helpers")
                     await expect(head.locator(".helpers-state")).to_have_text("1 working · 3 done")
+                    # While one works the head says how many they are and no more (item 1281): how they stand and how
+                    # long it has been is the status line's over the composer.
+                    await expect(group).to_have_attribute("data-live", "")
+                    await expect(head.locator(".helpers-state")).to_be_hidden()
+                    await expect(head.locator(".helpers-time")).to_be_hidden()
                     await expect(head.locator(".helpers-faces .avatar")).to_have_count(3)
                     await expect(head.locator(".helpers-more")).to_have_text("+1")
                     span: Locator = head.locator(".helpers-time")
@@ -218,8 +223,13 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                 page = await _open_run(browser, address, parent.id, 1280, "light")
                 state: Locator = page.locator(".helpers .helpers-state")
                 await expect(state).to_have_text("1 working · 3 done")
+                await expect(state).to_be_hidden()
                 manager.cancel(working.id)
                 await expect(state).to_have_text("3 done · 1 stopped")
+                # Once none works the head says how they stand and how long it took.
+                await expect(page.locator(".helpers")).not_to_have_attribute("data-live", "")
+                await expect(state).to_be_visible()
+                await expect(page.locator(".helpers .helpers-time")).to_be_visible()
                 async with asyncio.timeout(WAIT_S):
                     assert (await manager.wait(parent.id)).status == "done"
                 # The time stands still once none works.
@@ -236,6 +246,20 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                 await expect(_row(page, working.id).locator(".child-progress")).to_contain_text("cancelled")
                 await page.screenshot(path=str(tmp_path / "group-loaded-again.png"))
                 await page.close()
+
+                # On a touch screen, which has no pointer to hide it, the way to a helper's page shows on an open row
+                # and not as a second icon beside the chevron of every closed one (item 1281).
+                touch: Page = await browser.new_page(
+                    viewport={"width": 390, "height": 900}, has_touch=True, is_mobile=True, reduced_motion="reduce"
+                )
+                await touch.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await touch.goto(f"{address}/#/runs/{parent.id}")
+                row: Locator = _row(touch, working.id)
+                await expect(row).to_have_count(1)
+                await expect(row.locator("a.child-open")).to_be_hidden()
+                await row.locator("summary.child-row").click()
+                await expect(row.locator("a.child-open")).to_be_visible()
+                await touch.close()
             finally:
                 await browser.close()
 

@@ -566,6 +566,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     setText(flock.group.title, tCount(helpers.length, "timeline.helperOne", "timeline.helperMany"));
     setText(flock.group.state, flockState(helpers.map((helper) => helper.status)));
     flock.group.state.classList.toggle("bad", !live && helpers.some((helper) => helper.status === "failed"));
+    flock.group.node.toggleAttribute("data-live", live);
     setText(flock.group.time, duration(Math.max(ended - began, 0)));
   }
 
