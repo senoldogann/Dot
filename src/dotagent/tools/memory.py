@@ -218,8 +218,7 @@ def _search_tool() -> RegisteredTool:
     return make_tool(
         name="memory_search",
         description=(
-            "Search the notes you saved in earlier runs, by words or by meaning. When the search by meaning cannot "
-            "be made, the words alone are returned. The notes related to the goal are "
+            "Search the notes you saved in earlier runs, by words or by meaning. The notes related to the goal are "
             "already under the message that recalled them; use this to look for older ones or to check before saving."
         ),
         args_model=SearchArgs,
