@@ -10,9 +10,9 @@ from dataclasses import dataclass
 
 from dotagent.core.outcomes import render_outcomes, render_step
 from dotagent.core.text import fold_search, truncate_middle, unclosing
-from dotagent.desktop.ax import INTERACTIVE_ROLES
 from dotagent.desktop.types import (
     DEFAULT_SCROLL_PX,
+    INTERACTIVE_ROLES,
     ActOutcome,
     AppView,
     Node,

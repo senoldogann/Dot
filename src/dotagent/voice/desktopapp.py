@@ -26,7 +26,6 @@ from pathlib import Path
 from typing import Literal
 from xml.parsers.expat import ExpatError
 
-import AppKit
 from pydantic import BaseModel, ConfigDict
 
 from dotagent.core.errors import DesktopError
@@ -125,6 +124,8 @@ def run_program(arguments: Sequence[str]) -> subprocess.CompletedProcess[str]:
 
 def running_apps(bundle_id: str) -> tuple[Path, ...]:
     """The bundles of the applications that run under ``bundle_id``, each once."""
+    import AppKit
+
     found: list[Path] = []
     for application in AppKit.NSRunningApplication.runningApplicationsWithBundleIdentifier_(bundle_id):
         url = application.bundleURL()

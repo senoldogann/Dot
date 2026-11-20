@@ -163,6 +163,7 @@ def test_a_path_in_an_answer_is_also_read_on_past_its_spaces() -> None:
     )
 
 
+@pytest.mark.macos
 def test_a_path_is_missing_when_no_reading_exists_and_no_successful_call_named_it(tmp_path: Path) -> None:
     (tmp_path / "Application Support").mkdir()
     (tmp_path / "Application Support" / "notes.md").write_text("notes")

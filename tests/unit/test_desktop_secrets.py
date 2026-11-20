@@ -13,7 +13,7 @@ from dotagent.core.errors import DesktopError
 from dotagent.desktop import actions, apps
 from dotagent.desktop import input as hid
 from dotagent.desktop.actions import Inspection, StepEnv, _pastes, refuse_secrets
-from dotagent.desktop.input import parse_chord
+from dotagent.desktop.chords import parse_chord
 from dotagent.desktop.safety import (
     AppRole,
     StepContext,

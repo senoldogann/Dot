@@ -8,7 +8,6 @@ follow-up snapshot after a click costs a few lines instead of the whole window a
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from dotagent.desktop.ax import INTERACTIVE_ROLES
 from dotagent.desktop.render import (
     Delta,
     Line,
@@ -21,6 +20,7 @@ from dotagent.desktop.render import (
     search_lines,
 )
 from dotagent.desktop.types import (
+    INTERACTIVE_ROLES,
     AppInfo,
     AppView,
     Node,

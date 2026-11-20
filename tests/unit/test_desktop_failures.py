@@ -9,9 +9,10 @@ from types import SimpleNamespace
 from typing import cast
 
 import pytest
+import Quartz
 
 from dotagent.core.errors import DesktopError, DesktopPermissionError
-from dotagent.desktop import actions, capture, perms, script
+from dotagent.desktop import actions, capture, perms, screen, script
 from dotagent.desktop.actions import StepEnv
 from dotagent.desktop.types import DisplayInfo, Rect, WindowInfo
 
@@ -29,7 +30,7 @@ def test_the_hint_for_a_missing_permission_never_raises_when_the_program_cannot_
     assert "switch on the app that runs Dot, then start it again" in perms.grant_hint("accessibility")
     # The error it is part of comes out, not the error of the hint.
     monkeypatch.setattr(perms, "_accessibility_granted", lambda: False)
-    monkeypatch.setattr(perms.Quartz, "CGPreflightPostEventAccess", lambda: True)
+    monkeypatch.setattr(Quartz, "CGPreflightPostEventAccess", lambda: True)
     with pytest.raises(DesktopPermissionError, match="has not granted Accessibility"):
         perms.require_accessibility()
 
@@ -68,7 +69,7 @@ async def _timeout(monkeypatch: pytest.MonkeyPatch, windows: object, targets: tu
         return _Osascript()
 
     monkeypatch.setattr(script.asyncio, "create_subprocess_exec", start)
-    monkeypatch.setattr(script.screen, "windows_everywhere", windows)
+    monkeypatch.setattr(screen, "windows_everywhere", windows)
     with pytest.raises(DesktopError) as caught:
         await script.run_osascript(
             "AppleScript", 'tell application "Microsoft Word" to open x', (), (), 0.05, None, targets

@@ -68,6 +68,7 @@ async def _crawl(web: _Web, max_pages: int, max_depth: int, renderer: object = N
     )
 
 
+@pytest.mark.macos
 @pytest.mark.asyncio
 async def test_a_page_that_cannot_be_read_is_left_out_with_its_reason_and_the_others_are_kept() -> None:
     web: _Web = _Web(

@@ -268,6 +268,7 @@ def test_dots_own_code_names_the_app_the_daemon_starts_with_and_the_folder_it_is
     assert build_path(home) == home / ".dot-app-build"
 
 
+@pytest.mark.macos
 def test_macos_keeps_a_command_from_changing_the_program_launchd_starts_the_daemon_with(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -307,6 +308,7 @@ def test_macos_keeps_a_command_from_changing_the_program_launchd_starts_the_daem
     assert (home / "note.txt").read_text(encoding="utf-8") == "note\n"
 
 
+@pytest.mark.macos
 def test_macos_keeps_a_command_from_changing_what_the_web_research_server_reads_back(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -354,6 +356,7 @@ def test_macos_keeps_a_command_from_changing_what_the_web_research_server_reads_
     assert (home / "note.txt").read_text(encoding="utf-8") == "note\n"
 
 
+@pytest.mark.macos
 def test_macos_keeps_a_command_from_changing_the_program_the_daemon_builds_to_write_recordings_down(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -418,6 +421,7 @@ def test_dots_own_code_names_the_runtime_folder_the_desktop_app_installs_dot_in(
     assert runtime_path(home) in _dot_paths(load_default_config())
 
 
+@pytest.mark.macos
 def test_macos_keeps_a_command_from_changing_what_the_desktop_app_runs_at_its_start(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

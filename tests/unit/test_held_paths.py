@@ -116,6 +116,7 @@ def test_the_browser_is_given_copies_of_what_was_checked(tmp_path: Path, monkeyp
         upload_copies([checked], time.time())
 
 
+@pytest.mark.macos
 def test_a_page_shown_by_its_path_is_read_with_no_link_followed(tmp_path: Path) -> None:
     """The fifth code review of item 681: ``show_page`` read the page by its name, following a link a command put on
     its path after it was judged."""

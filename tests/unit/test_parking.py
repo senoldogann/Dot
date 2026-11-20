@@ -156,6 +156,7 @@ def test_what_the_run_is_told_of_a_question_kept_allowed_or_skipped() -> None:
     assert "skipped this exact step when it was kept for them (apr-2)" in skipped_text("apr-2")
 
 
+@pytest.mark.macos
 def test_a_command_run_somewhere_else_is_another_step(tmp_path: Path) -> None:
     """Where a command runs, when the call names it, is on its card and in its fingerprint (item 483): a yes to it in
     one folder is no yes to the same line in another."""

@@ -34,6 +34,7 @@ from dotagent.desktop.render import (
 from dotagent.desktop.safety import StepContext, assess_step, exceeds, is_secrets_app, reaches_a_shell, shell_input
 from dotagent.desktop.session import DOT_NAME, StepReview
 from dotagent.desktop.types import (
+    DESKTOP_ACT_TOOL,
     ActOutcome,
     AppView,
     OpenedApp,
@@ -77,7 +78,6 @@ _LABEL_CHARS: int = 50
 _DEFAULT_READ_CHARS: int = 6000
 _QUICK_TIMEOUT_S: float = 45.0
 _SLOW_TIMEOUT_S: float = 120.0
-DESKTOP_ACT_TOOL: str = "desktop_act"
 
 _REF_HELP: str = (
     "Refs (a12, …) come from the latest snapshot of that application; they stay valid until the window is rebuilt, "

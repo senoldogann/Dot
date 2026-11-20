@@ -32,6 +32,7 @@ async def test_a_script_starts_what_it_runs_with_the_environment_it_is_given(mon
     assert await run_osascript("AppleScript", _ECHO, (), (), SCRIPT_TIMEOUT_S) == "leaked agent-socket absent"
 
 
+@pytest.mark.macos
 async def test_the_apple_script_tool_gives_its_script_the_environment_of_a_runs_commands(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

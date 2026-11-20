@@ -59,3 +59,6 @@ def folder_state(installed: bool, synced: bool) -> ConnectionState:
 def folder_step(state: ConnectionState) -> ConnectionStep | None:
     """The application itself, to sign in there, while it syncs no folder."""
     return "open_app" if state == "not_synced" else None
+
+
+type AutomationState = Literal["allowed", "not_asked", "refused", "not_open"]

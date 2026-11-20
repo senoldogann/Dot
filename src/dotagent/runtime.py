@@ -9,6 +9,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 from pydantic import SecretStr
@@ -64,8 +65,6 @@ from dotagent.core.paths import (
     workspace_dir,
 )
 from dotagent.desktop.pointer import PointerOverlay
-from dotagent.desktop.session import DesktopSession
-from dotagent.desktop.snapshots import SnapshotService
 from dotagent.dot_app import app_path, build_path, runtime_path
 from dotagent.events import EventBus
 from dotagent.help.added import AddedServers, added_server_configs, read_added_servers
@@ -99,7 +98,6 @@ from dotagent.store.backup import backup_folder, partial_folder
 from dotagent.store.db import Store
 from dotagent.store.models import MeetingLineRecord
 from dotagent.terminal.session import Terminals
-from dotagent.tools.apple import build_apple_tool
 from dotagent.tools.base import RegisteredTool
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.campaign import build_campaign_tools
@@ -107,7 +105,6 @@ from dotagent.tools.codes import build_code_tools
 from dotagent.tools.consult import build_consult_tools
 from dotagent.tools.contacts import build_contacts_tools
 from dotagent.tools.delegate import build_delegate_tools
-from dotagent.tools.desktop import build_desktop_tools
 from dotagent.tools.drafts import build_draft_tool
 from dotagent.tools.files import build_file_tools
 from dotagent.tools.help import build_find_help_tool
@@ -151,6 +148,13 @@ from dotagent.voice.helper import Transcriber
 from dotagent.web.client import WebClient
 from dotagent.web.keyed import keyed_engines
 from dotagent.web.ladder import SearchEngine
+
+if TYPE_CHECKING:
+    # The desktop session drives macOS through AppKit, Quartz and the accessibility API: made in ``build_runtime``, so
+    # that what imports the runtime loads where they are not, as on the Linux that runs a cloud agent's unit tests
+    # (item 1270). So is the service of Snapshots, which listens to the keyboard through AppKit.
+    from dotagent.desktop.session import DesktopSession
+    from dotagent.desktop.snapshots import SnapshotService
 
 log = get_logger(__name__)
 
@@ -209,7 +213,7 @@ class Runtime:
     # The browser sessions: ``browser`` is the main one (the configured mode), ``browsers`` gives the one of a mode.
     browser: BrowserSession
     browsers: BrowserPool
-    desktop: DesktopSession
+    desktop: "DesktopSession"
     # The daemon's hold on the Mac's sleep while it charges (item 271); off until the daemon starts it.
     awake: KeepAwake
     # The name the owner calls Dot by and the owner's own (item 420), as the web UI changes them.
@@ -232,7 +236,7 @@ class Runtime:
     builtin_names: frozenset[str]
     memory: MemoryIndex
     # Snapshots (item 405): the watch of the Command key and the captures waiting for a composer.
-    snapshots: SnapshotService
+    snapshots: "SnapshotService"
     # Help found by meaning with the memory's embeddings (item 169); ``None`` when they are off.
     help_vectors: HelpVectors | None
     registry: ToolRegistry
@@ -315,6 +319,11 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
     )
     if not config.desktop.enabled:
         return core
+    # The desktop's tools drive macOS: loaded only for a runtime that has them, so that the runtime loads where macOS's
+    # frameworks are not, as on the Linux that runs a cloud agent's unit tests (item 1270).
+    from dotagent.tools.apple import build_apple_tool
+    from dotagent.tools.desktop import build_desktop_tools
+
     return (*core, build_desktop_tools(), (build_apple_tool(),))
 
 
@@ -526,6 +535,7 @@ async def build_runtime(config: AppConfig) -> Runtime:
     its startup files, which a run's commands may change, so it starts in the sandbox of a run's commands: what a run
     put there reaches no further at Dot's start than the run could. The services take the same sandbox, so it is
     built and checked once."""
+
     confinement: _Confinement = await _confinement(config)
     login_env: dict[str, str] = await read_login_env(
         config.shell.login_env_timeout_s, confinement.sandbox.current().commands
@@ -575,6 +585,9 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
 
 async def _open_services(config: AppConfig, login_env: dict[str, str], confinement: _Confinement) -> Runtime:
     """Every service of :func:`open_runtime`, in the confinement already made."""
+    from dotagent.desktop.session import DesktopSession
+    from dotagent.desktop.snapshots import SnapshotService
+
     protected, dot_paths, sandbox = confinement.protected, confinement.dot_paths, confinement.sandbox
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)

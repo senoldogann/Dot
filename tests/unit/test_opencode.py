@@ -159,6 +159,7 @@ def test_the_free_models_are_zens_own_that_cost_nothing() -> None:
     )
 
 
+@pytest.mark.macos
 def test_a_permission_is_weighed_as_the_same_action_of_dots_own_tools(tmp_path: Path) -> None:
     workspace: Path = tmp_path / "workspace"
     secrets: Path = tmp_path / "secrets"
@@ -193,6 +194,7 @@ def test_a_permission_is_weighed_as_the_same_action_of_dots_own_tools(tmp_path: 
     assert (unknown.tool, unknown.risk) == ("opencode_teleport", "high")
 
 
+@pytest.mark.macos
 def test_a_patch_is_weighed_by_every_file_it_writes_and_a_command_in_its_own_folder(tmp_path: Path) -> None:
     """Item 677: a patch of several files names them all in its patterns and joins them by commas in ``filepath``, which
     read as one path inside the workspace; and a command runs in the folder its call names, not the workspace."""
