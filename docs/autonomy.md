@@ -27,9 +27,10 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   question; the run waits for your answer to what the policy raises, on a card that shows what the action acts on whole
   (a long command wraps and scrolls within the box of code every command of a chat is in, whose copy takes it whole).
 - `auto` (Auto, a shield): the review model (`[models] review`) does. It is given your instructions (the goal and every
-  message you sent to the run: the only authority it recognises), the action (up to 12,000 characters of what it acts
-  on, and of a page's script, which it reads whole too; a longer one comes to you without asking the model, which would
-  read its start and its end alone, items 680 and 985), why
+  message you sent to the run: the only authority it recognises), the action (what it acts on and what it runs, a
+  page's script, the whole arguments of an MCP call and the whole goal of a schedule: up to 12,000 characters in one
+  question, a longer one in overlapping parts of that size, each its own question, of which the strictest answer
+  decides, and one longer than eight parts comes to you without asking the model; items 680, 985 and 1251), why
   the policy stopped at it and whether the run has read untrusted content. It answers `approve` when the action is
   plainly what you asked for; `deny` when it is not, goes further than you asked or looks like something other than your
   instructions caused it; and `escalate` when it cannot tell, and then the question comes to you as in `ask`, with the

@@ -3,12 +3,18 @@
 A search runs two rankers over the same notes - BM25 over the words and cosine similarity over the embeddings - and
 merges their rankings with reciprocal rank fusion, so a name or an identifier is found as reliably as a paraphrase.
 Embeddings come from Ollama or from the OpenAI API (``[memory] embed_provider``); with ``embed_enabled = false`` only
-the words are searched. Nothing here falls back silently: when the embedding service fails, the call fails with its
-error.
+the words are searched, and a failing provider is never answered by the other one. Saving a note, rewriting one and
+searching go on when the embedding service fails (:class:`~dotagent.core.errors.ProviderError`, item 1254): the failure
+is logged, the note is stored without a vector and the search returns what the words found. A search or a save embeds
+at most one batch of notes that have no vector, then uses the vectors already stored and the words (item 1263).
+:func:`backfill` embeds the rest, and the daemon's scheduler runs that pass in the background. A caller that must hear
+the failure (the notes a run starts with, a lesson checked by meaning) still gets the error. Any other error still
+fails the call.
 
 Each stored vector belongs to the embedding model that made it. The model name is kept in the ``kv`` table, and
 :func:`sync_embedding_model` drops all vectors when the configured model is another one; :func:`backfill` embeds
-the notes that have no vector, so a search always covers every note.
+the notes that have no vector. A search covers every note by its words, and by meaning the notes that already have a
+vector plus that one batch.
 """
 
 import re
@@ -19,8 +25,9 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 
 from dotagent.config import AppConfig, MemoryConfig
-from dotagent.core.errors import InvalidValueError, StoreError
+from dotagent.core.errors import InvalidValueError, ProviderError, StoreError
 from dotagent.core.learned_text import OWNER_MARK, gate
+from dotagent.core.logs import get_logger
 from dotagent.core.text import estimate_text_tokens
 from dotagent.core.types import FrozenModel
 from dotagent.memory.embedder import Embedder, build_embedder
@@ -29,6 +36,8 @@ from dotagent.memory.words import lowercase, search_terms
 from dotagent.secrets import mask_filled
 from dotagent.store.db import Store
 from dotagent.store.models import AwakeNotes, MemoryRecord, MemoryScore
+
+log = get_logger("dotagent.memory")
 
 CORE_TAG: str = "core"
 # The tags the nightly reflection (:mod:`dotagent.agent.reflection`) writes: the day's journal note, and a lesson
@@ -47,7 +56,11 @@ OWNER_KEY: str = "owner.section"
 # The most lines Dot's part of the owner section holds.
 OWNER_LINES: int = 12
 _MODEL_KEY: str = "memory.embed_model"
+# How many notes one embedding call takes. One call with hundreds of them broke Ollama's model runner.
 _BACKFILL_BATCH: int = 32
+# How many such calls a search or a save may spend on notes that have no vector. The query, or the note being saved,
+# is one more call. The rest wait for :func:`backfill`, which the scheduler runs off the request path.
+_REQUEST_BATCHES: int = 1
 _QUERY_CHARS: int = 1500
 _SIMILAR_SHOWN: int = 3
 _MIN_NOTE_CHARS: int = 3
@@ -65,6 +78,16 @@ class MemoryIndex:
     store: Store
     embedder: Embedder | None
     config: MemoryConfig
+
+
+def _embedding_down(purpose: str, error: ProviderError) -> None:
+    """The embedding service failed for ``purpose`` (a save, a rewrite or a search). The call goes on without it."""
+    log.warning(
+        "memory_embedding_failed",
+        purpose=purpose,
+        error_type=type(error).__name__,
+        error=error.message,
+    )
 
 
 def words_only(index: MemoryIndex) -> MemoryIndex:
@@ -159,13 +182,18 @@ async def sync_embedding_model(index: MemoryIndex) -> None:
     await index.store.kv_set(_MODEL_KEY, embedder.model)
 
 
-async def backfill(index: MemoryIndex) -> int:
-    """Embed the notes that have no vector yet; returns how many were embedded."""
+async def backfill(index: MemoryIndex, *, batches: int | None = None) -> int:
+    """Embed notes that have no vector yet; returns how many were embedded.
+
+    ``batches`` is how many embedding calls this pass may make (``None``: until none are left). Each note's vector is
+    stored before the next call, so a process that dies mid-way leaves the notes it wrote and the rest for the next
+    pass. A pass over notes that already have vectors embeds nothing."""
     embedder: Embedder | None = index.embedder
-    if embedder is None:
+    if embedder is None or batches == 0:
         return 0
     embedded: int = 0
-    while True:
+    made: int = 0
+    while batches is None or made < batches:
         pending: list[MemoryRecord] = await index.store.memories_without_vectors(_BACKFILL_BATCH)
         if not pending:
             return embedded
@@ -173,6 +201,8 @@ async def backfill(index: MemoryIndex) -> int:
         for record, vector in zip(pending, vectors, strict=True):
             await index.store.set_memory_vector(record.id, vector, record.content)
         embedded += len(pending)
+        made += 1
+    return embedded
 
 
 async def reindex(index: MemoryIndex) -> int:
@@ -206,7 +236,9 @@ async def save_memory(
     third parties can author saves a tainted note (``tainted``): a note keeps where it came from. A note that had the
     text already keeps the mark it had, since the same words bring nothing new in; nor do the tags of such a run, which
     are its words too, come into an unmarked note (item 979). A new note comes back with the
-    existing notes the saver is handed that are nearly the same, so the caller can retire the ones that are outdated."""
+    existing notes the saver is handed that are nearly the same, so the caller can retire the ones that are outdated.
+    When the embedding service fails the note is stored with no vector, for :func:`backfill` to embed later, and no
+    near notes are named."""
     text: str = _checked_text(content, index.config.max_chars)
     clean_tags: tuple[str, ...] = normalize_tags(tags)
     existing: MemoryRecord | None = await index.store.find_memory_by_content(text, agent_id)
@@ -215,9 +247,13 @@ async def save_memory(
     vector: Vector | None = None
     similar: tuple[MemoryHit, ...] = ()
     if index.embedder is not None:
-        await backfill(index)
-        vector = (await index.embedder.embed([text]))[0]
-        similar = tuple(hit for hit in await _similar_notes(index, vector) if visible_to(hit.record, agent_id))
+        try:
+            await backfill(index, batches=_REQUEST_BATCHES)
+            vector = (await index.embedder.embed([text]))[0]
+        except ProviderError as error:
+            _embedding_down("save", error)
+        else:
+            similar = tuple(hit for hit in await _similar_notes(index, vector) if visible_to(hit.record, agent_id))
     record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector, expires_at, tainted)
     if not created:
         # Another save of the text, by another run or process, added it meanwhile.
@@ -322,17 +358,24 @@ async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
     ``dotx memory``, the lesson writer's check for a note that says it already): the fusion of the two rankers, with
     the agent's notes lifted by how lately a run was handed them (:func:`dotagent.memory.ranking.ranked_by_use`,
     half-life ``[memory] use_half_life_days``) and by their score (:func:`recent_scores`), either way. A note the
-    reflection retired (tagged ``rest``) is never one, nor one whose time ran out (:func:`expired`)."""
-    return await _recall(index, query, limit, None, False)
+    reflection retired (tagged ``rest``) is never one, nor one whose time ran out (:func:`expired`). When the
+    embedding service fails, the words alone are returned and the failure is logged."""
+    return await _recall(index, query, limit, None, False, words_when_down=True)
 
 
-async def recall_for(index: MemoryIndex, query: str, limit: int, agent_id: str | None) -> list[MemoryHit]:
+async def recall_for(
+    index: MemoryIndex, query: str, limit: int, agent_id: str | None, *, words_when_down: bool = False
+) -> list[MemoryHit]:
     """Like :func:`recall`, as a run of the agent ``agent_id`` searches (``None`` for Dot's run): among the notes it
-    may be handed (:func:`visible_to`), by the scores of its own runs (:func:`recent_scores_for`)."""
-    return await _recall(index, query, limit, agent_id, True)
+    may be handed (:func:`visible_to`), by the scores of its own runs (:func:`recent_scores_for`). A provider error
+    is raised, which the notes a run starts with and a lesson checked by meaning rely on, unless ``words_when_down``:
+    then the words alone are returned and the failure is logged, as a search asks."""
+    return await _recall(index, query, limit, agent_id, True, words_when_down=words_when_down)
 
 
-async def _recall(index: MemoryIndex, query: str, limit: int, agent_id: str | None, scoped: bool) -> list[MemoryHit]:
+async def _recall(
+    index: MemoryIndex, query: str, limit: int, agent_id: str | None, scoped: bool, *, words_when_down: bool = False
+) -> list[MemoryHit]:
     text: str = normalize_text(query)[:_QUERY_CHARS]
     total: int = await index.store.count_memories()
     if not text or limit <= 0 or total == 0:
@@ -346,13 +389,18 @@ async def _recall(index: MemoryIndex, query: str, limit: int, agent_id: str | No
     rankings: list[list[str]] = [await index.store.search_memories_terms(terms, config.candidate_pool, among)]
     similarities: dict[str, float] = {}
     if index.embedder is not None:
-        await backfill(index)
-        query_vector: Vector = (await index.embedder.embed([text]))[0]
-        close: list[Similar] = most_similar(
-            query_vector, await index.store.all_memory_vectors(among), config.min_similarity, config.candidate_pool
-        )
-        rankings.append([item.id for item in close])
-        similarities = {item.id: item.similarity for item in close}
+        try:
+            await backfill(index, batches=_REQUEST_BATCHES)
+            query_vector: Vector = (await index.embedder.embed([text]))[0]
+            close: list[Similar] = most_similar(
+                query_vector, await index.store.all_memory_vectors(among), config.min_similarity, config.candidate_pool
+            )
+            rankings.append([item.id for item in close])
+            similarities = {item.id: item.similarity for item in close}
+        except ProviderError as error:
+            if not words_when_down:
+                raise
+            _embedding_down("search", error)
     scores: dict[str, float] = fused_scores(rankings)
     candidates: list[MemoryRecord] = [
         record
@@ -660,11 +708,15 @@ async def rewrite_memory_note(
 
 
 async def _embedded(index: MemoryIndex, content: str) -> tuple[str, Vector | None]:
-    """A note's text, checked, and its embedding, or ``None`` when embeddings are off."""
+    """A note's text, checked, and its embedding, or ``None`` when embeddings are off or the service fails."""
     text: str = _checked_text(content, index.config.max_chars)
     if index.embedder is None:
         return text, None
-    return text, (await index.embedder.embed([text]))[0]
+    try:
+        return text, (await index.embedder.embed([text]))[0]
+    except ProviderError as error:
+        _embedding_down("update", error)
+        return text, None
 
 
 async def forget_memory(index: MemoryIndex, memory_id: str) -> MemoryRecord:

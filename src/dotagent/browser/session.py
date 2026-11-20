@@ -82,6 +82,7 @@ from dotagent.browser.driver import (
 )
 from dotagent.browser.extract import extract_records, render_records
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
+from dotagent.browser.labels import mark_screenshot
 from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.network import Fetched, answer_text, call_lines, hidden_address
 from dotagent.browser.pages import (
@@ -130,6 +131,7 @@ from dotagent.browser.snapshot import (
     overlay_lines,
     prefer_diff,
     redrawn_ref,
+    refs_at_point,
     render_diff,
     render_lines,
     squeeze_text,
@@ -3083,7 +3085,12 @@ class BrowserSession:
             data: bytes = await asyncio.to_thread(
                 jpeg_of_size, shot, viewport.width, viewport.height, config.screenshot_quality
             )
-            return Screenshot(url=tab.page.url, width=viewport.width, height=viewport.height, data=data)
+            # The model is shown the refs of the latest snapshot on the elements; the picture kept for the owner is
+            # the page with none (item 1261).
+            marked: bytes = await asyncio.to_thread(
+                mark_screenshot, data, tab.lines, viewport.width, viewport.height, config.screenshot_quality
+            )
+            return Screenshot(url=tab.page.url, width=viewport.width, height=viewport.height, data=data, marked=marked)
 
     def _tab_of(self, thread_id: str) -> Tab | None:
         """The current tab of the thread without waiting for its lock, ``None`` when the thread has no open tab. Starts
@@ -4281,6 +4288,15 @@ class BrowserSession:
         if thread is None or not thread.tabs:
             return None
         return line_for_ref(thread.tabs[thread.active].lines, ref)
+
+    def peek_at(self, thread_id: str, x: float, y: float) -> tuple[str, ...]:
+        """The refs of the elements at the viewport pixel (``x``, ``y``) in the thread's current tab, as its last
+        snapshot drew them (:func:`dotagent.browser.snapshot.refs_at_point`), for judging a click at a pixel before it
+        runs."""
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        if thread is None or not thread.tabs:
+            return ()
+        return refs_at_point(thread.tabs[thread.active].lines, x, y)
 
     def peek_near(self, thread_id: str, ref: str) -> tuple[str, ...]:
         """The snapshot lines of the buttons near the field ``ref`` in the thread's current tab, which Enter in it may

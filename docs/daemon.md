@@ -62,7 +62,8 @@ above iMessage: one section for the chats of Dot's own initiative (a chat for ea
 each look for work, [Proactive](proactive.md#on-its-own)) and of the schedules, folded until you open it, so that the
 days hold your own chats; opened, it stays open as you left it (until item 855 they were two, **On its own** and
 **Scheduled**). **Agents' work** stands so too, under it (item 1082): the chat of each agent, where the work Dot sends
-it goes on, folded until you open it. The days themselves have no heading and no fold (item 855: a **Chats** label named the list and
+it goes on, folded until you open it. **Code reviews** stands so too, under it: the chats of the pre-push review
+(`dotx run --review`, a thread whose `source` is `review`), folded until you open it. The days themselves have no heading and no fold (item 855: a **Chats** label named the list and
 folded it); their labels (Pinned, Today, Yesterday…) are small and quiet, and **Select** stands at the right of the
 first of them.
 Folded over a chat you have not read, the label shows the accent's dot after its count. Its chat is a row like any
@@ -71,11 +72,14 @@ chat of it at work stands with what works like every chat (item 202) and comes b
 pinned stays under Pinned.
 Above the list: a search over the titles (⌘K or `/`) and, while you have no agent of your own, the way to **Agents**;
 **Campaigns** and **Schedules** (a page of its own since item 401) are icons at the right of the sidebar's head
-(item 855: they were rows of their own); no **+** starts a new chat (item 1245, which took away item 834's): Dot is
-one conversation, as each agent is. Under the search Dot and your agents stand as faces (item
+(item 855: they were rows of their own), and at the far right the **+** makes a new agent (item 1259, where item 834's
+new chat stood until item 1245): a dialog of its face (shape and colour) and its name, then its page, whose box starts
+its conversation; its instructions, model and actions start at the defaults and are set with Edit. Dot is one
+conversation, as each agent is. Under the search Dot and your agents stand as faces (item
 835), as a messaging app's people: Dot's first, to its conversation (item 1245: its home chat, the owner's newest with
 Dot, else the home), and the two agents that worked last, each its face over its name on one line, to its
-conversation (item 1233: its home chat, where a message to it goes on; its page while it has none), the one whose page
+conversation (item 1233: its home chat, where a message to it goes on, the chat bound to it ever after; its page while
+it has none), the one whose page
 or conversation is open marked, a face whose agent's newest run works wearing its working look and one whose
 conversation is unread the dot of an unread chat (item 1235, as Grok Bot's column of faces marks a bot that wrote; not
 while that chat is open), and **All**, the page of every agent and team, in
@@ -95,7 +99,7 @@ proposals; a row of the Memory, Vault and Schedules pages shows one action (a sc
 its **…**. Every icon draws about the same area at its size, with the same stroke (item 849): a "+", a speaker or
 a microphone no smaller than a copy beside it, each shape seen through a frame of its own (`icons.js`). The sections
 at the foot (Dot's work, a channel's) fold on a click of their label, and the folds are kept between visits. The
-sidebar's head holds the button that folds it away, at its left (no **+** of a new chat since item 1245). **Select** turns the list
+sidebar's head holds the button that folds it away, at its left, and the **+** of a new agent at its right (item 1259). **Select** turns the list
 into checkboxes, each chat keeping its creature and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
 and approval of theirs; they leave the list at the yes, while the daemon deletes them, and come back with why if the
@@ -104,8 +108,9 @@ end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection.
 drawer. On a touch screen of a phone's width it has no X (item 888): a chat you choose closes it, and so does a swipe
 to the left; a narrow window of the Mac keeps its button. On a phone the list is the home (item 991, the owner's
 ask of 2026-11-05 for a plain one): your initials at the head's left open the settings, with Campaigns and Schedules
-at its right; Dot's own face stands large with its name under it, to its conversation (item 1245), over the faces of
-the other agents, centred; the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
+at its right with the **+** of a new agent; the six agents you worked with last stand as rows under their label and
+count (item 1265), Dot's own conversation their first row (item 1245) and **All agents** their last (item 1259,
+[Phone](phone.md)); the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
 of a Mac having moved to your initials. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
 deleted under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only
 when the page comes to another chat (item 204).
@@ -181,7 +186,7 @@ the run's own page.
 The home, **New chat** in the tab's title, goes on in Dot's conversation (item 1245): a message sent there goes on in
 Dot's home chat (as the daemon names it, `home` of Dot in `GET /api/agents`: the chat of the latest activity whose
 latest run is Dot's and that the pages or `dotx run` started, not a schedule's, a watcher's, Dot's initiative's, a
-team's or a campaign's), to the run at work there while there is one, queued or steered as Settings › General ›
+team's, a campaign's or a chat that is an agent's), to the run at work there while there is one, queued or steered as Settings › General ›
 Messages says, and that chat opens; with an agent picked, in that agent's (item 1233). Under the box, **Open your chat
 with Dot** leads back into it, and **New chat** makes the next message start a chat of its own; Keep going and a
 `/loop` always do. Before the first chat with Dot the home starts it.
@@ -1448,7 +1453,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
-| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170) |
+| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (`"review"` for `dotx run --review`, kept under Code reviews; a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170) |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs (`stored=true`: only those stored so far, item 734); lifecycle of all runs |
 | `GET /runs/streams?ids=a,b&after=N`                                              | the events of several runs (12 at most) on one stream, without their sub-runs, the stored ones after `N` first, ending once none works (item 889: the office's, as a browser keeps six connections to a server); 404 for a run that is not, 422 for none or too many |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |

@@ -414,8 +414,9 @@ trading off.
    summary (a shell command's starts with `Run: ` and names the folder it runs in when the call names one, item 483,
    so an expression can fit that folder too), a line break and its target (the command, the path, the address), and
    for a page's script (`browser_eval`), whose summary shows its start and whose target is the page, a line break and
-   the whole script, which the review model of `auto` reads whole too, or hands to you past 12,000 characters, the
-   card of the approval showing it whole under Script (item 985);
+   the whole script, which the review model of `auto` reads whole too (in parts past 12,000 characters, item 1251), the
+   card of the approval showing it whole under Script (item 985), and for an MCP call whose summary shows the start of
+   its arguments, a line break and the whole of them, secrets masked (item 1251), so a rule may fit text deep in them;
    one that takes longer than 0.25 s to match is stopped and the action refused, as for a rule that cannot be read, so
    that a pattern that backtracks for long cannot hold the daemon (item 387). A rule
    reads as a sentence in Settings › Rules, "When Dot wants to run a command that mentions “git push”, it asks you
@@ -671,8 +672,9 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   of your secrets, a deletion outside the workspace), the review model (`[models] review`) judges it against your own
   instructions, as it does in `auto`, with the run marked untrusted. A step it refuses is refused: the run is told why
   and goes on with the rest, and the record names the review model. Any other answer, `escalate` too, lets the step run
-  as yolo runs it. A follow or a like is left to the pace of its site. A review model that cannot answer fails the step
-  with its error. `[policy] yolo_taint_check = false` turns the check off.
+  as yolo runs it, but for a step too long for the review model to read whole even in parts (more than eight overlapping
+  parts, about 82,000 characters), which is refused with how to go on: split it (item 1251; before, it ran unread). A
+  follow or a like is left to the pace of its site. A review model that cannot answer fails the step with its error. `[policy] yolo_taint_check = false` turns the check off.
 - *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, but free mode (item
   1097, your choice), a run marked untrusted has
   a step refused whose words would send a secret Dot holds out of the Mac: a key read in this process (saved with `dotx
@@ -1393,12 +1395,20 @@ event and approval.
 
 > **The shell guardrail is best-effort; the sandbox holds only Dot's own files and what would act outside it.** Dot
 > reads a shell command before it runs it and judges what it would touch: it reads the line as the shell does (quotes,
-> comments, here-documents, the commands substituted into it, a `case` inside one, a `cd` however it is spelt, a
-> variable, a link it makes, a wrapper such as `bash -c`, `env`, `xargs`, `xcrun` or `uv run`, a `trap`, the settings
-> and variables that make git or another program run a command line), compares paths, and the names of commands, without
-> case (`RM -rf`, `SUDO` and `CURL … | SH` run the commands of the lower-case names on this Mac's file system, item
-> 538), and treats what it cannot read (a command named by a substitution or a pattern, `eval` of one, a setting of git
-> it does not know, a line it cannot parse) as a destructive step outside the workspace, which every preset asks about.
+> comments, here-documents, the commands substituted into it and a comment or a here-document inside one, a `case`
+> inside one, a `cd` however it is spelt, zsh's `chdir`, `cd OLD NEW`, `CDPATH` and `cdpath` included, a variable and
+> what `+=` adds to it or a quote right after its name ends it with, a `~` as the `HOME` the line set, a link it makes,
+> an element of zsh's `aliases` or `functions` table, judged as the line it is, braces in the command's place, which make several words of it, a wrapper such as `bash -c`,
+> `env`, `xargs`, `xcrun`, `uv run` or `npx -c`, zsh's `-` before a command, a `trap` and an `alias`, whose line is
+> judged where it is defined, the settings and variables that make git or another program run a command line, and the
+> line a program it does not know is given with `-c`, `-e` or `--command`, item 1250), compares paths, and the names of
+> commands, without case and without the version a shell or an interpreter carries in its name (`RM -rf`, `SUDO` and
+> `CURL … | SH` run the commands of the lower-case names on this Mac's file system, item 538; `perl5.34` is `perl`), and
+> treats what it cannot read (a command named by a substitution or a pattern, `eval` of one, a setting of git it does
+> not know, a line it cannot parse, a C shell's line, `csh` and `tcsh`) as a destructive step outside the workspace,
+> which every preset asks about. How it reads is checked against zsh itself: a test runs the lines that fooled it
+> before in a real zsh whose only programs are recorders, and every recorded delete outside the workspace or read of a
+> protected file must be a line a preset asks about (item 1250).
 > A script the line downloads and then runs (`curl -o`, `wget -O` or `git clone`, then a shell, `source`, its path or an
 > interpreter such as `python3`, also after a `cp`, an `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh |
 > bash`) is judged as piping the download into a shell; a file named after an at sign (`curl --data-binary @file`) as

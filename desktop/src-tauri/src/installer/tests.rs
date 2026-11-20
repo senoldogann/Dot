@@ -49,12 +49,13 @@ impl Drop for Scratch {
     }
 }
 
-/// `uv --no-config tool install [--reinstall] [--constraints FILE] --python 3.13 dotagent-macos==X`, as a stand-in: it
-/// makes the Python of the tool environment (a stand-in for the package's command, below) and the metadata folder that
-/// names the version, and fails when the test asks it to: `fail-uv` always, leaving the environment as it was;
-/// `break-uv-once` on the next call only, after it broke the environment (a download that stopped half way: the Python
-/// stand-in then fails to start until an install ends well); `conflict-with-constraints` when it is given a constraints
-/// file.
+/// The installer's uv, as a stand-in. It records the command and makes the Python of the package's environment (and
+/// the `dotx` script a hashed install links) plus the metadata folder that names the version. The version is
+/// `dotagent-macos==X` on the command, or the `# dotagent-macos==X` line of a requirements file when the command is
+/// `pip sync`. It fails when the test asks it to: `fail-uv` always; `break-uv-once` on the next install (not `venv`),
+/// after it marked the environment broken; `conflict-with-constraints` and `network-down` when it is given
+/// `--constraints`; a requirements entry whose hash is 64 zeros, when the command has `--require-hashes`, which is
+/// what a wrong hash does to `uv pip sync`.
 const FAKE_UV: &str = r#"#!/bin/sh
 root=$(cd "$(dirname "$0")/.." && pwd)
 echo "uv $*" >> "$root/calls.log"
@@ -62,12 +63,25 @@ if [ -e "$root/fail-uv" ]; then
   echo "error: No solution found when resolving dependencies" >&2
   exit 1
 fi
-if [ -e "$root/break-uv-once" ]; then
-  rm "$root/break-uv-once"
-  : > "$root/broken-env"
-  echo "error: Failed to install: connection reset" >&2
-  exit 1
-fi
+case " $* " in
+  *" venv "*) ;;
+  *)
+    if [ -e "$root/break-uv-once" ]; then
+      rm "$root/break-uv-once"
+      : > "$root/broken-env"
+      echo "error: Failed to install: connection reset" >&2
+      exit 1
+    fi ;;
+esac
+case " $* " in
+  *" --require-hashes "*)
+    for arg in "$@"; do
+      if [ -f "$arg" ] && grep -q 'sha256:0000000000000000000000000000000000000000000000000000000000000000' "$arg"; then
+        echo "Hash mismatch for the requirement" >&2
+        exit 1
+      fi
+    done ;;
+esac
 case " $* " in
   *" --constraints "*)
     if [ -e "$root/network-down" ]; then
@@ -79,18 +93,36 @@ case " $* " in
       echo "  ╰─▶ Because dotagent-macos==0.1.0 depends on fastapi<0.140 and you require fastapi==0.143.0, we can" >&2
       echo "      conclude that your requirements are unsatisfiable." >&2
       exit 1
-    fi;;
+    fi ;;
+esac
+case " $* " in
+  *" venv "*) exit 0 ;;
 esac
 rm -f "$root/broken-env"
-for last; do :; done
-version=${last#dotagent-macos==}
+version=
+comment=
+for arg in "$@"; do
+  case "$arg" in
+    dotagent-macos==*) version=${arg#dotagent-macos==} ;;
+  esac
+  if [ -f "$arg" ]; then
+    found=$(sed -n 's/^# dotagent-macos==//p' "$arg" | head -1)
+    if [ -n "$found" ]; then comment=$found; fi
+  fi
+done
+if [ -z "$version" ]; then version=$comment; fi
+if [ -z "$version" ]; then
+  echo "the stand-in uv was not told a version" >&2
+  exit 64
+fi
 env="$UV_TOOL_DIR/dotagent-macos"
 site="$env/lib/python3.13/site-packages"
 mkdir -p "$env/bin" "$site"
 rmdir "$site"/dotagent_macos-*.dist-info 2>/dev/null
 mkdir "$site/dotagent_macos-$version.dist-info"
 cp "$root/fake-python" "$env/bin/python"
-chmod 755 "$env/bin/python"
+cp "$root/fake-python" "$env/bin/dotx"
+chmod 755 "$env/bin/python" "$env/bin/dotx"
 echo "Installed 1 executable: dotx"
 "#;
 
@@ -475,10 +507,11 @@ fn words(plan: &Plan) -> Vec<String> {
 fn the_commands_are_built_with_fixed_words_and_the_apps_own_version() {
     let tools = tools_at("/Applications/Dot.app/Contents/Resources/tools");
     let runtime = Runtime::of(Path::new("/Users/me/Library/Application Support/Dot"));
-    let install = uv_install(&tools, &runtime, "0.1.0", false);
-    assert_eq!(install.program, tools.uv());
+    let install = uv_install(&tools, &runtime, "0.1.0", false).expect("no requirements file");
+    assert_eq!(install.len(), 1);
+    assert_eq!(install[0].program, tools.uv());
     assert_eq!(
-        words(&install),
+        words(&install[0]),
         [
             "--no-config",
             "tool",
@@ -488,9 +521,9 @@ fn the_commands_are_built_with_fixed_words_and_the_apps_own_version() {
             "dotagent-macos==0.1.0"
         ]
     );
-    let upgrade = uv_install(&tools, &runtime, "0.2.0", true);
+    let upgrade = uv_install(&tools, &runtime, "0.2.0", true).expect("no requirements file");
     assert_eq!(
-        words(&upgrade),
+        words(&upgrade[0]),
         [
             "--no-config",
             "tool",
@@ -625,7 +658,8 @@ fn names_of(environment: Vec<(OsString, OsString)>) -> Vec<String> {
 fn a_program_inherits_a_short_list_of_the_apps_environment_and_nothing_else() {
     let tools = tools_at("/t");
     let runtime = Runtime::of(Path::new("/h"));
-    let plan = uv_install(&tools, &runtime, "0.1.0", false);
+    let plans = uv_install(&tools, &runtime, "0.1.0", false).expect("no requirements file");
+    let plan = &plans[0];
     let inherited = pairs(&[
         // What a person's session or a program of theirs could have set, which the step does not ask for.
         ("__PYVENV_LAUNCHER__", "/tmp/planted-python"),
@@ -730,6 +764,7 @@ fn a_program_is_started_with_nothing_but_that_environment() {
         env: vec![("UV_TOOL_DIR".to_string(), "/somewhere".to_string())],
         stdin: None,
         limit: Duration::from_secs(20),
+        directory: None,
     };
     let ran = run(&plan, &scratch.0, &log, &AtomicBool::new(false), |_| {});
     assert_eq!(ran.ended, Ended::Exited(0));
@@ -849,6 +884,7 @@ fn a_program_is_given_the_key_on_its_input_and_what_it_prints_is_masked_before_i
         env: vec![],
         stdin: Some(Secret(KEY.to_string())),
         limit: Duration::from_secs(20),
+        directory: None,
     };
     let mut seen = Vec::new();
     let ran = run(&plan, &scratch.0, &log, &AtomicBool::new(false), |line| {
@@ -878,6 +914,7 @@ fn a_program_that_runs_too_long_or_whose_install_is_closed_is_ended_and_one_that
         env: vec![],
         stdin: None,
         limit,
+        directory: None,
     };
     let started = Instant::now();
     let slow = run(
@@ -910,6 +947,7 @@ fn a_program_that_runs_too_long_or_whose_install_is_closed_is_ended_and_one_that
         env: vec![],
         stdin: None,
         limit: Duration::from_secs(5),
+        directory: None,
     };
     assert!(matches!(
         run(&missing, &scratch.0, &log, &AtomicBool::new(false), |_| {}).ended,
@@ -931,6 +969,7 @@ fn a_program_gets_the_environment_the_plan_gives_and_a_folder_of_its_own() {
         env: vec![("UV_TOOL_DIR".to_string(), "/somewhere/uv-tools".to_string())],
         stdin: None,
         limit: Duration::from_secs(20),
+        directory: None,
     };
     let ran = run(&plan, &scratch.0, &log, &AtomicBool::new(false), |_| {});
     assert_eq!(ran.ended, Ended::Exited(0));
@@ -1354,6 +1393,7 @@ fn a_line_is_masked_before_it_is_cut_so_that_a_key_across_the_cut_is_not_left_in
         env: vec![],
         stdin: Some(Secret(KEY.to_string())),
         limit: Duration::from_secs(20),
+        directory: None,
     };
     let ran = run(&plan, &scratch.0, &log, &AtomicBool::new(false), |_| {});
     assert_eq!(ran.ended, Ended::Exited(0));
@@ -1545,25 +1585,68 @@ fn an_upgrade_that_fails_says_so_and_leaves_the_marker_and_the_package_as_they_w
     );
 }
 
-/// A fixture whose install of 0.1.0 is done, with the constraints file the app carries (its path is the last of the
-/// three), and the context of the app at 0.2.0: what an upgrade that fails starts from.
-fn upgrade_after_a_failure(test: &str) -> (Fixture, Context, String) {
-    let fixture = Fixture::new(test);
-    let constraints = fixture
+fn hashed_requirements(version: &str) -> String {
+    format!(
+        "# dotagent-macos=={version}\n./{} --hash=sha256:{}\nfastapi==0.143.0 \\\n    --hash=sha256:{}\n",
+        wheel_name(version),
+        "ab".repeat(32),
+        "cd".repeat(32),
+    )
+}
+
+fn carry(fixture: &Fixture, version: &str) -> PathBuf {
+    fixture.scratch.write(&wheel_name(version), "wheel bytes\n");
+    fixture
         .scratch
-        .write("constraints.txt", "fastapi==0.143.0\n")
-        .display()
-        .to_string();
+        .write("requirements.txt", &hashed_requirements(version))
+}
+
+fn env_of(runtime: &Runtime) -> String {
+    runtime.tool_dir().join(PACKAGE).display().to_string()
+}
+
+fn venv_line(runtime: &Runtime) -> String {
+    format!(
+        "uv --no-config venv --no-project --allow-existing --python 3.13 {}",
+        env_of(runtime)
+    )
+}
+
+fn sync_line(runtime: &Runtime, requirements: &Path, reinstall: bool) -> String {
+    let again = if reinstall { " --reinstall" } else { "" };
+    format!(
+        "uv --no-config pip sync --require-hashes --default-index https://pypi.org/simple --python {}{again} {}",
+        env_of(runtime),
+        requirements.display()
+    )
+}
+
+fn rollback_line(runtime: &Runtime, version: &str, pins: Option<&Path>) -> String {
+    let pins = pins
+        .map(|path| format!(" --constraints {}", path.display()))
+        .unwrap_or_default();
+    format!(
+        "uv --no-config pip install --default-index https://pypi.org/simple --python {} --reinstall-package dotagent-macos{pins} dotagent-macos=={version}",
+        env_of(runtime)
+    )
+}
+
+/// A fixture whose install of 0.1.0 is done, with the requirements file the app at 0.2.0 carries (the updated app's
+/// own wheel and hashes), and the context of that app: what an upgrade that fails starts from.
+fn upgrade_after_a_failure(test: &str) -> (Fixture, Context, PathBuf) {
+    let fixture = Fixture::new(test);
+    carry(&fixture, "0.1.0");
     complete_install(&fixture, "0.1.0");
+    let requirements = carry(&fixture, "0.2.0");
     let mut ctx = fixture.ctx.clone();
     ctx.version = "0.2.0".to_string();
-    (fixture, ctx, constraints)
+    (fixture, ctx, requirements)
 }
 
 #[test]
 fn an_upgrade_that_broke_the_environment_installs_the_older_package_again_under_the_same_constraints(
 ) {
-    let (fixture, ctx, constraints) = upgrade_after_a_failure("upgrade-breaks");
+    let (fixture, ctx, requirements) = upgrade_after_a_failure("upgrade-breaks");
     fixture.scratch.write("break-uv-once", "");
     let words = keep_in_step(&ctx).expect_err("uv failed");
     assert!(words.contains("could not be updated to 0.2.0"), "{words}");
@@ -1571,12 +1654,16 @@ fn an_upgrade_that_broke_the_environment_installs_the_older_package_again_under_
         words.contains("put back at 0.1.0, and Dot works as before"),
         "{words}"
     );
+    let runtime = ctx.runtime();
+    let pins = runtime.dir.join("rollback-constraints.txt");
     assert_eq!(
         fixture.calls(),
         [
-            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.2.0"),
+            venv_line(&runtime),
+            sync_line(&runtime, &requirements, true),
             "python -P -c import dotagent.server.daemon".to_string(),
-            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.1.0"),
+            venv_line(&runtime),
+            rollback_line(&runtime, "0.1.0", Some(&pins)),
             "python -P -c import dotagent.server.daemon".to_string(),
         ]
     );
@@ -1596,7 +1683,7 @@ fn an_upgrade_that_broke_the_environment_installs_the_older_package_again_under_
 
 #[test]
 fn an_older_package_that_cannot_be_installed_under_the_constraints_is_installed_without_them() {
-    let (fixture, ctx, constraints) = upgrade_after_a_failure("upgrade-conflict");
+    let (fixture, ctx, requirements) = upgrade_after_a_failure("upgrade-conflict");
     fixture.scratch.write("break-uv-once", "");
     fixture.scratch.write("conflict-with-constraints", "");
     let words = keep_in_step(&ctx).expect_err("uv failed");
@@ -1604,13 +1691,18 @@ fn an_older_package_that_cannot_be_installed_under_the_constraints_is_installed_
         words.contains("put back at 0.1.0, and Dot works as before"),
         "{words}"
     );
+    let runtime = ctx.runtime();
+    let pins = runtime.dir.join("rollback-constraints.txt");
     assert_eq!(
         fixture.calls(),
         [
-            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.2.0"),
+            venv_line(&runtime),
+            sync_line(&runtime, &requirements, true),
             "python -P -c import dotagent.server.daemon".to_string(),
-            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.1.0"),
-            "uv --no-config tool install --reinstall --python 3.13 dotagent-macos==0.1.0".to_string(),
+            venv_line(&runtime),
+            rollback_line(&runtime, "0.1.0", Some(&pins)),
+            venv_line(&runtime),
+            rollback_line(&runtime, "0.1.0", None),
             "python -P -c import dotagent.server.daemon".to_string(),
         ]
     );
@@ -1621,7 +1713,7 @@ fn an_older_package_that_cannot_be_installed_under_the_constraints_is_installed_
 fn a_put_back_that_failed_for_another_reason_than_the_constraints_does_not_drop_them() {
     // The security review of item 694: only uv's word that the requirements cannot be met lifts the app's pins; a
     // download that failed takes the newest of the day no more than the upgrade did.
-    let (fixture, ctx, constraints) = upgrade_after_a_failure("upgrade-network");
+    let (fixture, ctx, requirements) = upgrade_after_a_failure("upgrade-network");
     fixture.scratch.write("break-uv-once", "");
     fixture.scratch.write("network-down", "");
     let words = keep_in_step(&ctx).expect_err("uv failed");
@@ -1629,12 +1721,16 @@ fn a_put_back_that_failed_for_another_reason_than_the_constraints_does_not_drop_
         words.contains("0.1.0 could not be put back either"),
         "{words}"
     );
+    let runtime = ctx.runtime();
+    let pins = runtime.dir.join("rollback-constraints.txt");
     assert_eq!(
         fixture.calls(),
         [
-            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.2.0"),
+            venv_line(&runtime),
+            sync_line(&runtime, &requirements, true),
             "python -P -c import dotagent.server.daemon".to_string(),
-            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.1.0"),
+            venv_line(&runtime),
+            rollback_line(&runtime, "0.1.0", Some(&pins)),
         ]
     );
 }
@@ -1686,21 +1782,37 @@ fn an_older_package_that_cannot_be_put_back_is_said_and_the_marker_is_left() {
 }
 
 #[test]
-fn the_apps_constraints_are_given_to_uv_at_the_install_and_at_the_upgrade() {
-    let fixture = Fixture::new("constraints");
-    let constraints = fixture
-        .scratch
-        .write("constraints.txt", "fastapi==0.143.0\n");
+fn the_apps_requirements_are_synced_with_hashes_at_the_install_and_at_the_upgrade() {
+    let fixture = Fixture::new("requirements");
+    let requirements = carry(&fixture, "0.1.0");
     let shared = shared_for(choice("ollama", "minimax-m2.7:cloud", None));
     fixture.run(&shared, &|| fixture.nothing_else_is_here());
     assert_eq!(shared.with(|inner| inner.phase), Phase::Done);
-    let path = constraints.display();
+    let runtime = fixture.ctx.runtime();
     assert_eq!(
-        fixture.calls()[0],
-        format!(
-            "uv --no-config tool install --constraints {path} --python 3.13 dotagent-macos==0.1.0"
-        )
+        fixture.calls()[0..=1],
+        [
+            venv_line(&runtime),
+            sync_line(&runtime, &requirements, false)
+        ]
     );
+    assert!(fixture
+        .ctx
+        .runtime()
+        .bin_dir()
+        .join("dotx")
+        .symlink_metadata()
+        .expect("the dotx link")
+        .file_type()
+        .is_symlink());
+    let plans =
+        uv_install(&fixture.ctx.tools, &runtime, "0.1.0", false).expect("the file pins 0.1.0");
+    assert_eq!(
+        plans[1].directory.as_deref(),
+        requirements.parent(),
+        "the sync runs next to the wheel the requirements name"
+    );
+    carry(&fixture, "0.2.0");
     let mut ctx = fixture.ctx.clone();
     ctx.version = "0.2.0".to_string();
     keep_in_step(&ctx)
@@ -1708,34 +1820,83 @@ fn the_apps_constraints_are_given_to_uv_at_the_install_and_at_the_upgrade() {
         .expect("there was something to do");
     assert!(fixture
         .calls()
-        .contains(&format!(
-            "uv --no-config tool install --reinstall --constraints {path} --python 3.13 dotagent-macos==0.2.0"
-        )));
+        .contains(&sync_line(&ctx.runtime(), &requirements, true)));
+    assert_eq!(installed_version(&ctx.runtime()).as_deref(), Some("0.2.0"));
 }
 
 #[test]
-fn a_build_with_no_constraints_file_installs_as_it_always_did() {
-    // A development build has none, or the empty stand-in `build.rs` makes: no `--constraints`, at either step.
-    let scratch = Scratch::new("no-constraints");
+fn a_build_with_no_requirements_file_installs_as_it_always_did() {
+    // A development build has none, or the empty stand-in `build.rs` makes: `uv tool install`, and no
+    // `--require-hashes`.
+    let scratch = Scratch::new("no-requirements");
     let tools = Tools {
         dir: scratch.path("resources/tools"),
     };
     let runtime = Runtime::of(&scratch.path("home"));
-    assert_eq!(tools.constraints(), None);
-    scratch.write("resources/constraints.txt", "");
-    assert_eq!(tools.constraints(), None);
-    scratch.write("resources/constraints.txt", "fastapi==0.143.0\n");
-    assert_eq!(
-        tools.constraints(),
-        Some(scratch.path("resources/constraints.txt"))
+    assert_eq!(tools.requirements(), None);
+    scratch.write("resources/requirements.txt", "");
+    assert_eq!(tools.requirements(), None);
+    scratch.write(
+        "resources/requirements.txt",
+        "fastapi==0.143.0 --hash=sha256:abcd\n",
     );
-    fs::remove_file(scratch.path("resources/constraints.txt")).expect("the file");
-    fs::create_dir(scratch.path("resources/constraints.txt")).expect("a folder in its place");
-    assert_eq!(tools.constraints(), None, "a folder is no file to pin by");
+    assert!(
+        uv_install(&tools, &runtime, "0.1.0", false).is_err(),
+        "a requirements file that does not pin this version's wheel is not installed without hashes"
+    );
+    fs::remove_file(scratch.path("resources/requirements.txt")).expect("the file");
+    fs::create_dir(scratch.path("resources/requirements.txt")).expect("a folder in its place");
+    assert_eq!(tools.requirements(), None, "a folder is no file to pin by");
     for reinstall in [false, true] {
-        assert!(!words(&uv_install(&tools, &runtime, "0.1.0", reinstall))
-            .contains(&"--constraints".to_string()));
+        let plans = uv_install(&tools, &runtime, "0.1.0", reinstall).expect("no file");
+        assert_eq!(plans.len(), 1);
+        assert!(!words(&plans[0]).contains(&"--require-hashes".to_string()));
+        assert!(words(&plans[0]).contains(&"tool".to_string()));
     }
+}
+
+/// A requirements file that names a hash the artifact does not have must stop the install (item 694 left the hashes
+/// out, because `uv tool install --constraints` ignores them). The command the installer runs is what has to require
+/// the hashes: a file uv is not asked to check is installed all the same.
+#[test]
+fn a_requirements_entry_with_a_wrong_hash_fails_the_install() {
+    let fixture = Fixture::new("bad-hash");
+    let zeros = "0".repeat(64);
+    fixture.scratch.write(
+        "requirements.txt",
+        &format!(
+            "# dotagent-macos==0.1.0\n./dotagent_macos-0.1.0-py3-none-any.whl --hash=sha256:{zeros}\n"
+        ),
+    );
+    fixture
+        .scratch
+        .write("dotagent_macos-0.1.0-py3-none-any.whl", "not a wheel\n");
+    let shared = shared_for(choice("ollama", "minimax-m2.7:cloud", None));
+    fixture.run(&shared, &|| fixture.nothing_else_is_here());
+    let (phase, failure) = shared.with(|inner| (inner.phase, inner.failure.clone()));
+    assert_eq!(
+        phase,
+        Phase::Failed,
+        "a wrong hash must stop the install, calls: {:?}",
+        fixture.calls()
+    );
+    let failure = failure.expect("the install failed");
+    assert!(
+        fixture
+            .calls()
+            .iter()
+            .any(|call| call.contains("--require-hashes")),
+        "the installer must ask uv to require hashes, calls: {:?}",
+        fixture.calls()
+    );
+    assert!(
+        failure
+            .output
+            .iter()
+            .any(|line| line.to_lowercase().contains("hash mismatch"))
+            || failure.message.to_lowercase().contains("hash"),
+        "{failure:?}"
+    );
 }
 
 // ----------------------------------------------------- what completes the install, and what the next start does with it

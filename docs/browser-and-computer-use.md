@@ -181,6 +181,13 @@ Both modes share what follows.
   743). The whole read that timed out runs on in the page, so the part is named once the page answers again, after up
   to twice `action_timeout_s` (item 923). A page for which no part smaller than the page can be named, or that stays
   busy longer, still fails with the timeout.
+- `browser_screenshot` is the viewport, one CSS pixel a pixel, so a point in the picture is a point for `click_at`.
+  The picture a model is sent has a small box at the top-left of each interactive element in the viewport, holding
+  that element's ref from the latest snapshot (`e12`, and `f1e2` for one in a frame), at most 40, in the order the
+  snapshot lists them (item 1261). An element outside the viewport is not marked, and neither is one that only lays
+  the page out or is read rather than pressed (a heading). The picture kept with the step, which is what you see, has
+  no marks. A mark is where the latest snapshot drew the element: a page that has moved since is marked there, and a
+  new snapshot lines the marks up again. A model that cannot see is shown the same marked picture.
 - A collapsed dropdown lists its options on its own line, for example
   `combobox "Shipping" [ref=e3]: options "Standard (3-5 days)" [selected], "Express (next day)"`. `select` takes the
   label or the value of one of them, written as listed; a choice that is not there is refused at once with the options
@@ -314,7 +321,13 @@ Both modes share what follows.
   `type` and `insert` need a text that is not empty. A drop onto a password, card or one-time-code field is refused
   like typing into it, and a drag that fails releases the mouse button. `click_at` presses a viewport pixel from
   `browser_screenshot`; `drag_at` presses at one pixel and lets go at another, for a canvas, a slider or a cross-origin
-  widget such as a captcha, where no ref reaches inside the frame. See [Captcha](captcha.md).
+  widget such as a captcha, where no ref reaches inside the frame. See [Captcha](captcha.md). Either is judged by the
+  elements the last snapshot drew under its pixel, as a click on their refs is (item 1252): of the boxes there, in a
+  frame too, each that holds no other, put in the place of the control above it (a button's icon presses the button),
+  and all of them where boxes overlap, since the snapshot does not say which is on top; so a payment button is a payment
+  by its pixel as by its ref. Where the snapshot drew nothing (a canvas), the step is judged by its pixel alone, as
+  before. A step at a pixel goes first in its batch (several in a row are fine): after a step that may move the page it
+  is sent back, to be taken from a new screenshot.
 - In a rich editor (a contenteditable area such as X's composer) `fill`, `type` and `insert` give the editor the focus
   when it does not have it and wait until it has settled, check the field that has the focus for a secret, write, and
   fail when the editor's text did not change, instead of reporting done; a `fill` that leaves the editor holding its
@@ -789,3 +802,23 @@ every mode but `yolo` (item 433).
   [Safety](safety.md#safety)).
 - `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show
   what the agent would see.
+
+### Watch: the Mac's screen, live
+
+**Watch** in the sidebar's head (the screen beside Campaigns and Schedules; `#/watch`) shows the Mac's main display
+live, in a browser on the Mac or on a paired phone, whether a task works or not (item 1264). ScreenCaptureKit captures
+it at up to 1920 pixels on its longest side and 60 frames a second, the Mac's hardware encoder makes it H.264
+(VideoToolbox), and the page's own decoder (WebCodecs: Safari 16.4 or later, Chrome) draws it. Measured on a MacBook: 57
+frames a second, about 15 ms to encode a frame, 8% of one core and 1 to 1.5 Mbit/s for an ordinary desktop, the first
+picture within a third of a second.
+
+- It only watches: the mouse and the keyboard stay the Mac's.
+- One capture serves every page that watches; it starts with the first and stops a second or two after the last one
+  closes or goes out of sight, so nothing is captured while nobody watches, and macOS shows its screen recording mark
+  meanwhile. A page that falls behind (a slow network) drops frames until the next key frame and so shows the screen
+  as it is now, not with a growing delay.
+- `GET /api/screen/live` is read with the installation's token or a phone's key, like any other answer of the API: a
+  plain HTTP answer whose body is the stream, as the daemon lets no WebSocket through. Its format is in
+  `dotagent/desktop/live.py`. A Mac that has not granted Screen Recording to the app that runs Dot answers with that
+  error.
+- The whole screen goes: what it shows, passwords typed in the open included, is seen by whoever holds a key.

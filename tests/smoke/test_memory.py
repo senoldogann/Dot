@@ -2,8 +2,8 @@
 
 The embeddings come from the real local Ollama server (``bge-m3``); the tests that need it are skipped when it is not
 there. Covers recall by meaning and by words, duplicates, the notes that say nearly the same, the vectors
-that belong to one embedding model, strict failure when the embedder is down, the words-only mode and the tools the
-model calls. That model is multilingual: Turkish notes are found by meaning too.
+that belong to one embedding model, a note kept with no vector when the embedder is down, the words-only mode and
+the tools the model calls. That model is multilingual: Turkish notes are found by meaning too.
 """
 
 import asyncio
@@ -21,7 +21,7 @@ import pytest_asyncio
 
 from dotagent.agent.verify import new_facts
 from dotagent.config import AppConfig, load_config
-from dotagent.core.errors import ConfigError, ProviderAuthError, ProviderTransportError, StoreError
+from dotagent.core.errors import ConfigError, ProviderAuthError, StoreError
 from dotagent.core.paths import env_file_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.memory.embedder import OpenAIEmbedder, build_embedder, build_ollama_embedder, build_openai_embedder
@@ -277,9 +277,10 @@ async def test_a_lesson_that_fits_the_goal_reaches_the_run_however_many_notes_th
     assert 0 < len(given) - 1 < len(places), "the owner's notes come along as far as their share and what is left"
 
 
-async def test_a_failing_embedder_fails_the_call_instead_of_saving_without_meaning(
+async def test_a_failing_embedder_saves_the_note_without_a_vector(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A provider that cannot be reached does not lose the note: it is stored with no vector, for backfill."""
     monkeypatch.setenv("DOT_HOME", str(tmp_path))
     config: AppConfig = load_config(tmp_path / "config.toml")
     broken: AppConfig = config.model_copy(
@@ -290,9 +291,11 @@ async def test_a_failing_embedder_fails_the_call_instead_of_saving_without_meani
         }
     )
     async with _opened(tmp_path, broken) as index:
-        with pytest.raises(ProviderTransportError):
-            await save_memory(index, DOG, [], None, None, None, False)
-        assert await index.store.count_memories() == 0
+        saved: SavedMemory = await save_memory(index, DOG, [], None, None, None, False)
+        assert saved.created
+        assert saved.record.content == DOG
+        assert await index.store.all_memory_vectors() == []
+        assert await index.store.count_memories() == 1
 
 
 @requires_embedder

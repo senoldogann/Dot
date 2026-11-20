@@ -31,7 +31,7 @@ from dotagent.core.errors import (
 from dotagent.core.logs import get_logger
 from dotagent.core.text import mask_known, redact_json, redact_known, strip_blobs_keep_text, truncate_middle
 from dotagent.core.types import JsonObject
-from dotagent.llm.types import ToolCall, invalid_arguments_text
+from dotagent.llm.types import ImageData, ToolCall, invalid_arguments_text
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo
 from dotagent.secrets import known_secrets
 from dotagent.tools.apple import APPLE_SCRIPT_TOOL, script_apps
@@ -460,7 +460,10 @@ async def _execute_one(
         # The run is tainted already (only then are such lessons handed); kept so by construction.
         gate.taint()
     seconds: float = time.monotonic() - started
-    files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
+    # What the owner is shown. A result that carries a second picture (a browser screenshot whose model picture is
+    # marked with refs) keeps that one; every other result keeps the picture the model was sent.
+    kept_images: tuple[ImageData, ...] = clipped.shown_images or clipped.images
+    files: list[str] = await ctx.runtime.store.save_images(kept_images) if kept_images else []
     # The step as its record shows it: a command or an address carries the secrets Dot holds as the call's arguments do,
     # masked there and so here (item 551). What the loop and the peers read of the call stays as it is.
     shown: ActionInfo | None = None if action is None else masked_action(action, known)

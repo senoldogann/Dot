@@ -669,6 +669,34 @@ textarea {
   }
 }
 
+/* A new agent from the sidebar's "+" (newbot.js, item 1259): its face large in the middle, its name under it, then the
+   shapes and the colours, with no words; the expression stays the neutral one, and the agent's page changes it. */
+.new-bot .look-picker {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+.new-bot .look-preview {
+  align-self: center;
+  padding: var(--space-3) 0;
+}
+
+.new-bot .field-label,
+.new-bot .look-name,
+.new-bot .look-options[aria-label="Expression"] {
+  display: none;
+}
+
+.new-bot .look-options {
+  justify-content: center;
+}
+
+.new-bot .new-bot-name {
+  font-size: var(--text-lg);
+  text-align: center;
+}
+
 /* A face (actors.js): a still character 40 px wide, cropped to its body; its state (face.js) is on the wrapper. A
    slight breath at rest, a pulse while it works; the waiting pastille, the done smile and the failed look are in the
    frame itself. */
@@ -12749,4 +12777,43 @@ dialog.teach {
     width: auto;
     max-height: 70%;
   }
+}
+
+/* ---------- Watch (item 1264) ---------- */
+
+/* The Mac's screen as large as the page allows, whole: the canvas keeps the screen's shape inside the room left under the
+   bar. */
+.page[data-layout="watch"] {
+  max-width: none;
+}
+
+.watch-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.watch-screen {
+  display: block;
+  width: 100%;
+  max-height: calc(100dvh - 160px);
+  object-fit: contain;
+  background: var(--computer-backdrop);
+  border-radius: var(--radius-sm);
+}
+
+.watch-screen:fullscreen {
+  max-height: none;
+  border-radius: 0;
+}
+
+.watch-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.watch-status[hidden] {
+  display: none;
 }

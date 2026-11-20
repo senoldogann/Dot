@@ -267,6 +267,16 @@
   height: 19px;
 }
 
+/* The agents' rows are a phone's list (item 1259); a wider sidebar has their faces' column. */
+.side-bots {
+  display: none;
+}
+
+/* The agents' label and rows are a phone's home's (item 1265): a wide window shows them as the column of faces above. */
+.side-group.side-agents-phone {
+  display: none;
+}
+
 /* Rows never carry muted text while they are tinted: the tint would take it below the contrast limit. */
 .side-link,
 .side-run {
@@ -754,10 +764,9 @@
   }
 }
 
-/* Your initials and Dot's large face are a phone's home's alone (item 991). */
+/* Your initials are a phone's home's alone (item 991). */
 @media (min-width: 720.02px) {
-  .side-owner,
-  .side-dot-hero {
+  .side-owner {
     display: none;
   }
 }
@@ -1248,25 +1257,6 @@
     text-decoration: none;
   }
 
-  /* Dot's own face, large, its name under it, over the faces of the other agents. */
-  .side-dot-hero {
-    display: flex;
-    flex: none;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-4) 0 var(--space-3);
-    color: var(--text);
-    font-size: var(--text-md);
-    text-decoration: none;
-  }
-
-  .side-dot-hero > .avatar {
-    width: 88px;
-    height: 88px;
-  }
-
-
   .side-body {
     padding: 8px 12px 12px;
   }
@@ -1290,7 +1280,8 @@
   }
 
   .side-foot > .side-link,
-  .side-foot > .side-connect {
+  .side-foot > .side-connect,
+  .side-compose {
     display: grid;
     place-items: center;
     flex: none;
@@ -1342,35 +1333,66 @@
     display: none;
   }
 
-  .side-owner,
-  .side-dot-hero {
+  .side-owner {
     text-decoration: none;
   }
 
   @media (hover: hover) {
-    .side-owner:hover,
-    .side-dot-hero:hover {
+    .side-owner:hover {
       text-decoration: none;
   
     }
   }
 
-  /* The other agents' faces stand centred under Dot's, as many as there are, rather than in four columns from the
-     left. */
-  .side-agent-faces {
+  /* Under the agents' label their rows are the list itself (item 1259), as a messaging app's people: a face, the name,
+     the last words under it, Dot's own conversation first. */
+  .side-agents-phone:not([hidden]) {
     display: flex;
-    justify-content: center;
-    gap: var(--space-4);
+    flex-direction: column;
   }
 
-  .side-agent-faces > .side-agent-face {
-    width: 72px;
+  .side-agents-phone > .side-label {
+    padding: 8px 8px 4px;
   }
 
-  /* Dot's face is the large one over the column (item 1245), which holds the agents alone, and none without them. */
-  .side-agent-faces > .side-dot-face,
-  .side-agent-faces[data-agents="0"] {
+  /* The faces' own label is a wide window's (item 1265): a phone's rows carry theirs. */
+  .side-faces-head {
     display: none;
+  }
+
+  .side-agent-faces {
+    display: none;
+  }
+
+  /* An agent's row is fuller than a chat's (item 1259), as a messaging app's people: a large face, the name a step
+     larger, the last words under it. */
+  .side-bots:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: var(--space-3);
+  }
+
+  .side-bots > .side-bot {
+    gap: var(--space-2);
+    padding: 8px var(--space-2);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .side-bots > .side-bot > .avatar,
+  .side-bots > .side-bot > .side-agent-mark {
+    flex: none;
+    width: 44px;
+    height: 44px;
+  }
+
+  .side-bots > .side-bot .side-run-goal {
+    font-size: var(--text-md);
+  }
+
+  .side-bots > .side-bot .side-chat-last {
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
   }
 }
 

@@ -503,7 +503,7 @@ def _failed_in_row(sessions: list[RunRecord]) -> int:
 
 
 class RunManager:
-    """Owns the live runs of one process. At most ``max_concurrent_runs`` execute at the same time.
+    """Owns the live runs of one process. At most ``max_concurrent_runs`` execute at the same time (0: any number).
 
     Runs that other runs wait for (a delegated run, a message to an agent) do not count against that limit: their parent
     holds a place while it waits for them, so a full set of waiting parents would otherwise keep every one of them from
@@ -512,7 +512,8 @@ class RunManager:
 
     def __init__(self, runtime: Runtime) -> None:
         self._runtime: Runtime = runtime
-        self._slots: asyncio.Semaphore = asyncio.Semaphore(runtime.config.agent.max_concurrent_runs)
+        places: int = runtime.config.agent.max_concurrent_runs
+        self._slots: asyncio.Semaphore | None = asyncio.Semaphore(places) if places > 0 else None
         self._handles: dict[str, RunHandle] = {}
         # The hold of each run the owner holds, whose page they may use from the screen (items 470 and 479), and the
         # releases of what their input left pressed, under way.
@@ -1326,6 +1327,9 @@ class RunManager:
             None,
             agent.id,
         )
+        # The chat the owner first messaged the agent in is the agent's own from then on: a message there goes to it
+        # without the page saying so, and it stays the agent's home chat though a newer chat exists.
+        await self._runtime.store.bind_thread_agent(run.thread_id, agent.id)
         return run
 
     async def start_for_team(
@@ -3007,6 +3011,16 @@ class RunManager:
         ``campaign_id`` makes it a session of that campaign; ``team_id`` makes the new chat it opens (``thread_id``
         ``None``) a chat with that team (item 610)."""
         runtime: Runtime = self._runtime
+        if agent_id is None and thread_id is not None and campaign_id is None:
+            # A chat that is an agent's own answers as that agent to every message that reaches it, whichever path it
+            # came by: the pages, the chat list, the phone, a reaction, a queue that drains, a background command that
+            # ends. It is its agent's from the start, so the agent's model, reasoning level and approvals are the ones
+            # the run is checked and started with, as :meth:`start_for_agent` does for a page's message. A campaign's
+            # session is Dot's whatever chat it opens in: a campaign is one owner's from its opening session on.
+            agent_id = (await runtime.store.get_thread(thread_id)).agent_id
+            if agent_id is not None:
+                bounds: AgentBounds = agent_bounds(await runtime.store.get_agent(agent_id), model, effort, approvals)
+                model, effort, approvals = bounds.model, bounds.effort, bounds.approvals
         model_ref: str = model if model is not None else self._main_model
         runs_on: ModelRef = parse_model_ref(model_ref)
         level: Effort = runtime.config.models.effort if effort is None else effort
@@ -3507,7 +3521,9 @@ class RunManager:
             await self._check_effort(ref, ONE_MESSAGE_LEVELS[once])
 
     def _place_for(self, run: RunRecord) -> AbstractAsyncContextManager[None]:
-        return nullcontext() if run.source in (DELEGATE_SOURCE, TEAM_SOURCE) else self._slots
+        if self._slots is None or run.source in (DELEGATE_SOURCE, TEAM_SOURCE):
+            return nullcontext()
+        return self._slots
 
     async def _drive(
         self,

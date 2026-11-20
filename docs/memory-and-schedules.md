@@ -209,7 +209,13 @@ dotx memory reindex      # embed every note again, for example after changing [m
   `embed_enabled = false` searches by words only. An answer of Ollama that says its model runner broke off is asked
   again, as a broken connection is; when the embedding service still fails at the start of a run, the run recalls its
   notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Task tab, under Set
-  up, say so in a warning line (`embedding_failed`, items 256 and 365). The word search does not mind case, accents or
+  up, say so in a warning line (`embedding_failed`, items 256 and 365). A save, a rewrite and a search go on the same
+  way when the service fails after those retries (item 1254): the note is kept with no vector, the search returns what
+  the words found, and the failure is logged (`memory_embedding_failed`). A search or a save embeds at most one batch
+  (32 notes) of those that have no vector, then answers from the vectors already stored and from the words (item 1263).
+  The daemon's scheduler embeds the rest in the background, each note stored before the next batch, so a process that
+  dies mid-way leaves what it wrote and the next pass takes the rest; a pass that finds nothing to embed makes no call.
+  `dotx memory reindex` embeds every note at once. The word search does not mind case, accents or
   the Turkish dotted and dotless i (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the
   words that start with its first five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`). The
   embeddings of the skills' texts are made as the daemon starts, in the background and 32 texts a call, and kept in the
@@ -243,8 +249,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   `mxbai-embed-large`). `min_similarity` and `inject_min_similarity` are set for its scores. For another Ollama model
   set `[memory] embed_model`, run `dotx memory reindex` and adjust the thresholds to the scores of that model.
 - To embed the notes with the OpenAI API instead, for example when the local model gives you trouble, add the key once
-  and choose the provider. It is a choice, never a fallback: a failing provider is an error and the other one is not
-  tried, and the text of every note and search then leaves this Mac.
+  and choose the provider. It is a choice, never a fallback to the other provider: a failing provider is not answered
+  by the other one. A save, a rewrite and a search go on without a vector, by words, and the text of every note and
+  search that is embedded still leaves this Mac once a provider is reached.
 
   ```bash
   dotx auth set OPENAI_API_KEY

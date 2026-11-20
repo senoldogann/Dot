@@ -32,7 +32,7 @@ from dotagent.agent.parking import (
     permit_parkable,
     skipped_text,
 )
-from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
+from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, review_reads_whole, shorten_reason
 from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import (
     ApprovalNoted,
@@ -79,6 +79,11 @@ log = get_logger(__name__)
 _TAINT_CHECK_REASON: str = (
     "this run read outside content, and the step is one an instruction planted there would be after; a yolo run "
     "asks the owner nothing, so a step their instructions do not call for is refused"
+)
+# How a run goes on past a step yolo's check refused as too long for the review model to read whole (K3-01).
+_TOO_LONG_FOR_TAINT_CHECK: str = (
+    "a step it did not read is not cleared; split it into shorter steps (a long text into a file first, then a short "
+    "step that uses it)"
 )
 # Who decided, as the approval records and the ``approval_auto`` event state it.
 YOLO_DECIDER: str = "yolo"
@@ -877,18 +882,27 @@ class RunGate:
         """Yolo's check of a step an instruction planted in outside content is after, once the run read such content
         (item 525): the review model judges it against the owner's instructions, and nobody is asked. Its refusal
         stands, as a refusal of the policy does in yolo; any other answer leaves the step to yolo, which does it. A
-        review model that cannot answer fails the step with its error."""
+        review model that cannot answer fails the step with its error. A step too long for the model to read whole,
+        even in parts, is refused too, with how to go on (split it): what the model did not read, it did not clear (the
+        code review of 2026-11-19, K3-01: such a step passed unread before)."""
         verdict: ReviewVerdict = await self._reviewer(
             ReviewRequest(instructions=self._instructions, action=info, reason=_TAINT_CHECK_REASON, tainted=True)
         )
-        if verdict.decision != "deny":
+        unread: bool = not review_reads_whole(info)
+        if verdict.decision != "deny" and not unread:
             log.info("taint_check_passed", run_id=self._run_id, tool=info.tool, decision=verdict.decision)
             return
-        reason: str = shorten_reason(verdict.reason)
+        reason: str = _TOO_LONG_FOR_TAINT_CHECK if unread else shorten_reason(verdict.reason)
+        # What refused it: the model's verdict, or a length the model could not read (it gave no verdict on that).
+        found: str = (
+            "the step is too long for the review model to read"
+            if unread
+            else "the review model found the step not asked for"
+        )
         decision: Decision = Decision(
             verdict="deny",
             source="taint",
-            reason=f"this run read outside content, and the review model found the step not asked for: {reason}",
+            reason=f"this run read outside content, and {found}: {reason}",
             rule_id=None,
         )
         shown, said = await _shown(info, decision)
@@ -897,7 +911,7 @@ class RunGate:
         await self._approvals.record_automatic(
             self._run_id,
             info.tool,
-            f"{shown.summary} — read outside content, and the review model found it not asked for",
+            f"{shown.summary} — read outside content, and {found}",
             approval_severity(info),
             _describe(shown),
             "denied",
@@ -906,7 +920,7 @@ class RunGate:
         )
         log.warning("taint_check_refused", run_id=self._run_id, tool=info.tool)
         raise ApprovalRejected(
-            f"this run read outside content, and the review model found this step not asked for by the owner: {reason}",
+            f"this run read outside content, and {found}: {reason}",
             {"action": _describe(shown), "note": reason},
         )
 

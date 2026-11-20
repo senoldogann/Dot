@@ -90,10 +90,12 @@ for every browser: its face and **Change**, which opens the picker and Save). **
 agent** opens the editor; an agent's page greets with its face and role, takes a message for it ("Message Scout") and
 lists its chats, with Edit and Delete in the bar. An agent is one conversation (item 1233, the owner's word of
 2026-11-19 after Grok Bot, whose bots are each one ongoing chat: "a bot has one purpose, and its chat is used all the
-time"): its home chat is the newest chat of yours with it, whose latest run is the agent's (the daemon names it, `home`
-in `GET /api/agents` and `GET /api/agents/{id}`, however many chats are newer: one the pages or `dotx run` started,
-its welcome among them, not one a schedule, a watcher, Dot's initiative, a lead's work order or the agents' work among
-themselves started, nor a team's or a campaign's), its face in the
+time"): its home chat is the newest of the chats that are its own — each chat a message to it reached, which the daemon
+binds to it (`threads.agent_id`), staying its own whichever run comes last in it, a message you send there going to
+that agent alone — or, for an agent the owner chatted with before that binding existed, the newest chat of yours with
+it, whose latest run is the agent's (the daemon names it, `home`
+in `GET /api/agents` and `GET /api/agents/{id}`, not one a schedule, a watcher, Dot's initiative, a lead's work order
+or the agents' work among themselves started, nor a team's or a campaign's), its face in the
 sidebar opens that chat and is marked while it is open, and its page's box goes on in it, as the office's panel does
 (item 898): to the run at work while there is one, queued or steered as Settings › General › Messages says, and the
 chat opens. Under the box, **Open your chat with Scout** leads back into it. **New chat** in the page's "…" starts the

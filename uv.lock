@@ -690,6 +690,7 @@ dependencies = [
     { name = "pyobjc-framework-cocoa", marker = "sys_platform == 'darwin'" },
     { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin'" },
     { name = "pyobjc-framework-screencapturekit", marker = "sys_platform == 'darwin'" },
+    { name = "pyobjc-framework-videotoolbox", marker = "sys_platform == 'darwin'" },
     { name = "pyobjc-framework-vision", marker = "sys_platform == 'darwin'" },
     { name = "python-docx" },
     { name = "python-pptx" },
@@ -729,6 +730,7 @@ requires-dist = [
     { name = "pyobjc-framework-cocoa", marker = "sys_platform == 'darwin'", specifier = ">=12.2.2" },
     { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin'", specifier = ">=12.2.2" },
     { name = "pyobjc-framework-screencapturekit", marker = "sys_platform == 'darwin'", specifier = ">=12.2.2" },
+    { name = "pyobjc-framework-videotoolbox", marker = "sys_platform == 'darwin'", specifier = ">=12.2.2" },
     { name = "pyobjc-framework-vision", marker = "sys_platform == 'darwin'", specifier = ">=12.2.2" },
     { name = "python-docx", specifier = ">=1.2.0" },
     { name = "python-pptx", specifier = ">=1.0.2" },
@@ -2336,6 +2338,26 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/18/90/12296fef9c0dad7e860112ef69c8b4c930103d28702dedf5a4fcf45cb345/pyobjc_framework_screencapturekit-13.0-cp314-cp314t-macosx_10_15_universal2.whl", hash = "sha256:4ea1d16badb714f2756595eff58d5997fd0e6951df72e4bf6d0e4794e6d61eaa", size = 12942, upload-time = "2026-10-30T10:43:14.625Z" },
     { url = "https://files.pythonhosted.org/packages/de/0b/f403b57e9c8f91412ad07ae785c057ebc8ee6fa61ebb14c49d5d803eb893/pyobjc_framework_screencapturekit-13.0-cp315-cp315-macosx_10_15_universal2.whl", hash = "sha256:f963a15eb5ab555a20753a9f945c29a59e56c4d606d19c5569597432789f210b", size = 12722, upload-time = "2026-10-30T10:43:15.629Z" },
     { url = "https://files.pythonhosted.org/packages/04/cb/92b56811bdc02afae9e91d0ef12a1088f98c2daa86c973cb6cd239315b49/pyobjc_framework_screencapturekit-13.0-cp315-cp315t-macosx_10_15_universal2.whl", hash = "sha256:3df589f0fa2be7c0ef1836588a02a3c3c8060ca2ab56b1c0cef4a87a25257da9", size = 12929, upload-time = "2026-10-30T10:43:16.416Z" },
+]
+
+[[package]]
+name = "pyobjc-framework-videotoolbox"
+version = "13.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyobjc-core" },
+    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-framework-coremedia" },
+    { name = "pyobjc-framework-quartz" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/36/9a/ef2269eb7114c0a77752c7ec43d0dc4cd4422b9538cfdfe9a1de9e74cf19/pyobjc_framework_videotoolbox-13.0.tar.gz", hash = "sha256:51b0e3a8e755c9dd4f95a7de74d6fb7f2866b207a624e136f09607ed9f303b1e", size = 64958, upload-time = "2026-10-30T10:47:52.51Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/14/c8c56b6252b0b96aae5c2f67087005e1a64d20b90c243b29b3fe37e46c4e/pyobjc_framework_videotoolbox-13.0-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:d3667b8c9793d0eed9b54a88136c7771f433418190c8f546648c1663a461e20b", size = 19048, upload-time = "2026-10-30T10:45:11.096Z" },
+    { url = "https://files.pythonhosted.org/packages/02/df/e1290a1733696350c151ea8237273fb236acdad17a532b987b03a453245a/pyobjc_framework_videotoolbox-13.0-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:297a2e3a71b970047f11e610ce5147f4032af68db3c759b052ef0b38bd19f9ee", size = 19253, upload-time = "2026-10-30T10:45:12.182Z" },
+    { url = "https://files.pythonhosted.org/packages/96/e7/98fb29df60aa62d07086cef6a44d54815880bbd0fb8ddc90da9834a65af8/pyobjc_framework_videotoolbox-13.0-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:f6b67c3123883fa0937d867bd5cecf0166eb4a158951050699789629ed5f85b3", size = 19038, upload-time = "2026-10-30T10:45:12.986Z" },
+    { url = "https://files.pythonhosted.org/packages/43/27/0a0c4f1a0cc31f46499d6d30e3cab835c020d2ec8af67efe5f96c5795a38/pyobjc_framework_videotoolbox-13.0-cp314-cp314t-macosx_10_15_universal2.whl", hash = "sha256:e114096db714f87ff49b90e84b0f6d514844347bcc853224cdc1e4f01a3e9946", size = 19231, upload-time = "2026-10-30T10:45:13.809Z" },
+    { url = "https://files.pythonhosted.org/packages/58/07/ef0e6244104f10798303977ccded8bfddabe3126903dff594bf39a55d180/pyobjc_framework_videotoolbox-13.0-cp315-cp315-macosx_10_15_universal2.whl", hash = "sha256:7ea0e376080cdf0454457cf9dd6f99f380ad6b72fd4e474499dc11012109702a", size = 19037, upload-time = "2026-10-30T10:45:14.62Z" },
+    { url = "https://files.pythonhosted.org/packages/69/bb/21f9271bcb3e380fa532267290b7f3295a7c45fa5815fc5903700932d767/pyobjc_framework_videotoolbox-13.0-cp315-cp315t-macosx_10_15_universal2.whl", hash = "sha256:a4a1a26a2b5679d90b015a17f120ccaffb60ace9c43ae50f1bc5c7e1c466c866", size = 19229, upload-time = "2026-10-30T10:45:15.393Z" },
 ]
 
 [[package]]

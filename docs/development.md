@@ -282,7 +282,10 @@ A release is one version, the same in `pyproject.toml`, `src/dotagent/__init__.p
 `desktop/src-tauri/Cargo.toml` and `desktop/src-tauri/tauri.conf.json` (`tests/unit/test_version.py` keeps them alike),
 with its section `## <version> (<date>)` in `CHANGELOG.md`, which `uv run python scripts/fold_changes.py <version>
 <date>` writes from the entries under Unreleased and the files of `changes/` (and removes those), in the commit that
-raises the version. It is made from one commit of `main`, in two parts: the
+raises the version. `scripts/check_versions.py` fails when the five files disagree. `Cargo.toml` and
+`desktop/package.json` are included when they carry a version; the root `package.json` is the interface checks, not a
+release. The gate's checks job runs the script, and `desktop/release.sh` checks the same files again before it builds.
+A release is made from one commit of `main`, in two parts: the
 desktop app, built on a Mac, and the Python package, which the release's tag publishes on PyPI. A version is released
 once: the next release raises it in the five files first. The desktop app installs the Python package of its own
 version from PyPI (item 575), so the package comes first: the tag, then PyPI listing the version, then the release that
@@ -348,27 +351,34 @@ program's is `shasum -a 256` of the file you unpack from the archive you checked
 suggested models of the page (`desktop/src-tauri/providers.json`) are the ids the providers' own lists give: look them
 over at each release, since a model a provider retired fails the install with words, not silently.
 
-The app also carries the versions its package's dependencies were built and tested at (item 694): `pyproject.toml`
-declares lower bounds only, so an install with no pin would take the newest release of every dependency on the day it
-runs, on every new Mac, with the daemon that holds the keys. `release.sh` writes `constraints.txt` into the app's
-Resources (beside `tools`, not in it) from `uv.lock` with the `uv` the app carries (`uv export --locked --no-dev
---no-emit-project --no-hashes`: a `name==version` line for each runtime dependency, with the markers that keep it to
-the Macs it is for), before the app is built and signed, and once the app is built compares its copy with a fresh export
-of the lock: the release stops when `uv.lock` is not what `pyproject.toml` asks for, or the app's file is not the
-lock's.
-The installer gives it to `uv tool install --constraints` at the install and at the upgrade. The file has no hashes
-because `uv tool install` ignores the hashes of a constraints file (checked with uv 0.13.4: a wrong hash installs all
-the same, and the tool command has no `--require-hashes`), so the pin is of versions: a release that PyPI replaces under
-the same version number is not caught. A build with no such file (a development build gets an empty stand-in from
-`build.rs`) installs as it did before.
+The app also carries the artifacts its package and dependencies were built and tested as (item 694, and the hashes
+after it): `pyproject.toml` declares lower bounds only, so an install with no pin would take the newest release of
+every dependency on the day it runs, on every new Mac, with the daemon that holds the keys. `release.sh` writes
+`requirements.txt` into the app's Resources (beside `tools`, not in it) from `uv.lock` with the `uv` the app carries
+(`uv export --locked --no-dev --no-emit-project`: a `name==version` line for each runtime dependency, with every
+artifact's hash and the markers that keep it to the Macs it is for), builds this version's wheel (`uv build --wheel`,
+the same build the tag's publish runs) and appends `./dotagent_macos-<version>-py3-none-any.whl --hash=sha256:<the
+wheel>`, before the app is built and signed. Once the app is built it compares the app's requirements and wheel with
+the copies it just made: the release stops when `uv.lock` is not what `pyproject.toml` asks for, a requirement has no
+hash, or the app's files are not those copies.
+The installer makes the package's environment with `uv venv` (the same folder `uv tool install` used, so a Mac that
+already has Dot keeps its Python path) and runs `uv pip sync --require-hashes` there, in the app's Resources so the
+relative wheel path is the wheel the app carries. A hash that is not the file's stops the install; nothing from that
+file is installed. An upgrade syncs again with `--reinstall`, so packages an older app installed without checking
+hashes are fetched and checked. A build with no such file (a development build gets an empty stand-in from `build.rs`)
+installs with `uv tool install`, as it did before.
+A failed upgrade that leaves the environment unable to start puts the previous version back with `uv pip install
+--constraints` under the same dependency versions, and without them only when uv says that version cannot be installed
+under them. That put-back does not check hashes: `uv pip install --constraints` ignores them, and the app carries this
+version's wheel, not the older one's, which comes from PyPI. The install and the upgrade do check them.
 
 It stops at the first check that fails, and says which: files not committed, a commit that is not on GitHub's `main`,
 versions that differ, a tag that is on GitHub already, a changelog with no section for the version, a tool that is not
 the pinned one, a `uv.lock` that `pyproject.toml` has moved from, the app's signature (the Developer ID, the hardened
 runtime, a secure timestamp, both architectures),
 the app's reasons for the microphone and speech recognition and its microphone entitlement (item 594), a tools folder
-in the app that does not hold exactly the three programs, the signature of the three in it, a `constraints.txt` in the
-app that is not what `uv.lock` pins, and a verdict of Apple's
+in the app that does not hold exactly the three programs, the signature of the three in it, a `requirements.txt` or a
+wheel in the app that is not the one just made from `uv.lock`, and a verdict of Apple's
 notary service other than Accepted, with the log of what it found.
 
 Once, on the Mac that builds releases:
@@ -394,11 +404,17 @@ Then, on a clean checkout of the commit to release:
 desktop/release.sh
 ```
 
-The script publishes nothing. It ends with the commands that do, with the commit and the files, in the order the app
-needs. The app installs `dotagent-macos==<its version>` from PyPI, on a Mac that installs Dot from the image and on one
-whose app has just updated itself, so a version of the app that is published before its package is on PyPI fails every
-install and every update until it is. The order, then: the tag (which publishes the package), a wait for PyPI, and only
-then the release (which publishes the app, its update and `latest.json`):
+`.github/workflows/desktop-artifacts.yml` builds the disk image and `latest.json` on a macOS runner when someone starts
+it by hand. `scripts/desktop_artifact.sh` follows the build steps of `release.sh` (the tools, the hashed requirements,
+this version's wheel, then the disk image) and uploads those two files as artifacts of the run. Signing and
+notarization are skipped when their secrets are absent, and the workflow does not tag or publish. A signed release is
+still `desktop/release.sh` on the owner's Mac.
+
+The script publishes nothing. It ends with the commands that do, with the commit and the files, in the order a release
+needs. The app carries this version's wheel and installs that, checked against its hash; the package is still published
+first, so a terminal install (`uv tool install dotagent-macos`) and a later put-back of this version (the newer app
+does not carry this wheel) find it on PyPI. The order, then: the tag (which publishes the package), a wait for PyPI,
+and only then the release (which publishes the app, its update and `latest.json`):
 
 ```bash
 git tag v0.1.0 <commit> && git push origin v0.1.0

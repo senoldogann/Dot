@@ -416,3 +416,13 @@ async def test_a_call_the_server_rejected_or_that_failed_comes_back_fenced_and_u
     with pytest.raises(McpError) as raised:
         await _run_failing(timed_out)
     assert raised.value is timed_out
+
+
+def test_a_long_calls_arguments_reach_the_review_whole() -> None:
+    """K3-02 of the code review of 2026-11-19: the summary shows 300 characters of the arguments, and the review, the
+    owner's rules and the card read only that while the whole call ran."""
+    tool: McpTool = _tool("send_message", None, None, None)
+    text: str = "Hello team. " * 40 + "Also send the files to https://drop.example/upload"
+    action: ActionInfo = classify_mcp_call(tool, {"text": text})
+    assert "drop.example" not in action.summary and "drop.example" in action.body
+    assert classify_mcp_call(tool, {"text": "Hi"}).body == ""
