@@ -22,7 +22,7 @@ at work reaches it, a ✋ holds it until you write, a 📌 keeps the message as 
 [Reactions](runs.md#reactions-on-dots-messages)).
 
 The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on the chat you
-were in last (New chat the first time, and when that chat is gone; items 286 and 810), with the sidebar's sections, the
+were in last (the home the first time, and when that chat is gone; items 286 and 810), with the sidebar's sections, the
 chats and the run pages at a phone width. Back from the background, it follows the daemon again at once, and says it is reconnecting only when that takes
 more than two seconds. Its colours follow the light or dark appearance
 through CSS `light-dark()`, so it needs iOS 17.5 or later (Safari 17.5; Chrome 123 and Firefox 120 on a computer). It
@@ -328,7 +328,7 @@ not two, and the light scheme's own ground, `#f8f7f4`, as its `theme_color` and 
 screen between the tap and the first frame, the colour the page gives the browser in the light scheme), so that no white
 flash or strip of amber shows while it opens. Beside the plain icons it carries a 512 px `maskable` one, its artwork at
 four fifths of the square on that ground, which a launcher that rounds or crops an icon draws whole; a long press on it
-offers **New chat** (`/#/runs`) and **Settings** (`/#/settings`). Since iOS 26, which opens what is added to the Home
+offers **Chat** (`/#/runs`, which read New chat before item 1279) and **Settings** (`/#/settings`). Since iOS 26, which opens what is added to the Home
 Screen as a web app, iOS takes the added app's icon from the manifest, which therefore names only PNGs of a size each,
 the 180 px touch icon among them (item 661): an SVG of any size there outranked every picture and is not drawn, so an
 iPhone added Dot with the letter D. Before, iOS drew it with one of the page's `apple-touch-icon` files (items 410 and

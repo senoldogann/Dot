@@ -60,11 +60,11 @@ the rest of the page. The room grows with the number of agents (two desks a pod,
 metres at least (item 898). Its panel is a chat (item 898): the agent's conversation (item 1233: its home chat, as its page's) shows its last turns, your
 words at the right and its answers at the left, and what you write goes on in that chat rather than starting a new chat
 each time: while the agent works, or waits for you, it waits in that chat's queue, or reaches the run at once with
-**Steer** chosen under Settings › General › Messages, as a message in its chat does; **New chat** starts the next
-message afresh. A schedule's, a watcher's or Dot's own chat is not gone on in: with no chat of yours, the panel is an
+**Steer** chosen under Settings › General › Messages, as a message in its chat does; the panel has no New chat (item
+1279): the agent has this one chat. A schedule's, a watcher's or Dot's own chat is not gone on in: with no chat of yours, the panel is an
 empty chat, ready for your first message. A free agent's panel is its chat alone; its steps and words show while it
 works or waits (item 901), at the foot of the chat, whoever started the run (a schedule, a watcher, Dot's own
-initiative, a helper's part, or a run a **New chat** leaves out). The chat is written as the chat page writes it (item
+initiative, a helper's part, or a run that is no chat of yours). The chat is written as the chat page writes it (item
 905): your words in a bubble, the answers across the panel with their Markdown rendered (headings, bold, lists, code),
 never as marks, and whole; the words a run at work is writing show their newest whole blocks, 1,600 characters or so
 (as the chat page's reader finds them, so never inside a code block or a list; a code block still being written shows
@@ -99,8 +99,10 @@ in `GET /api/agents` and `GET /api/agents/{id}`, not one a schedule, a watcher, 
 or the agents' work among themselves started, nor a team's or a campaign's), its face in the
 sidebar opens that chat and is marked while it is open, and its page's box goes on in it, as the office's panel does
 (item 898): to the run at work while there is one, queued or steered as Settings › General › Messages says, and the
-chat opens. Under the box, **Open your chat with Scout** leads back into it. **New chat** in the page's "…" starts the
-next message afresh (the way back hides until then); that chat is then the newest, and the conversation from there on.
+chat opens. Under the box, **Open your chat with Scout** leads back into it. **New chat** in the page's "…" is the one
+way to leave the conversation (item 1279: an agent has one chat, so the office's panel and the home have no such button):
+it starts the next message afresh (the way back hides until then); that chat is then the newest, and the conversation
+from there on.
 Chats deleted in the sidebar may take the conversation with them: the face and the open page then name the one left. With no chat yet, the face opens
 the page, whose first message starts the conversation. In a chat with an agent, its name in the bar opens its page
 (item 1234), where its role, schedules and what it learned are. The box of that page has the home's Mode, Model, Reasoning and Options

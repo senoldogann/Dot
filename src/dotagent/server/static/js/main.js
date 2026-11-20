@@ -54,7 +54,7 @@ const MOVED = new Map([
 // `parent(params)` is the page a phone's Back leads to when nothing was opened before this page (item 338), or null
 // for a page whose way back is the list of chats.
 const ROUTES = [
-  { tab: "runs", layout: "home", title: "New chat", pattern: /^\/runs$/, view: runs, parent: () => null },
+  { tab: "runs", layout: "home", title: "Chat", pattern: /^\/runs$/, view: runs, parent: () => null },
   { tab: "runs", layout: "run", title: "Task", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run, parent: () => null },
   {
     tab: "campaigns",

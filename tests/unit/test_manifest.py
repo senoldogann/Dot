@@ -120,12 +120,12 @@ def test_at_least_one_icon_is_maskable() -> None:
     assert all(entry["sizes"] == "512x512" for entry in maskable), maskable
 
 
-def test_the_shortcuts_open_a_new_chat_and_the_settings() -> None:
+def test_the_shortcuts_open_the_chat_and_the_settings() -> None:
     """A long press on Dot's icon on the home screen offers the two pages a phone is most opened for."""
     shortcuts: dict[str, dict[str, Any]] = {shortcut["name"]: shortcut for shortcut in manifest()["shortcuts"]}
-    assert set(shortcuts) == {"New chat", "Settings"}
-    assert shortcuts["New chat"]["short_name"] == "New chat"
-    assert shortcuts["New chat"]["url"] == "/#/runs"
+    assert set(shortcuts) == {"Chat", "Settings"}
+    assert shortcuts["Chat"]["short_name"] == "Chat"
+    assert shortcuts["Chat"]["url"] == "/#/runs"
     assert shortcuts["Settings"]["short_name"] == "Settings"
     assert shortcuts["Settings"]["url"] == "/#/settings"
 

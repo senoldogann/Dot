@@ -359,7 +359,7 @@ async def _until(done: Callable[[], bool]) -> None:
 
 async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: dict[str, str]) -> None:
     """Item 898, the owner's word of 2026-11-01: every message from the office made a new chat. The panel shows the
-    agent's chat; a message goes to the run at work, else on in that chat; "New chat" starts the next one afresh. The
+    agent's chat; a message goes to the run at work, else on in that chat; there is no New chat (item 1279). The
     chat is the agent's conversation the daemon names (item 1233), whatever its schedule ran since."""
     steered: list[dict[str, object]] = []
     started: list[dict[str, object]] = []
@@ -514,13 +514,9 @@ async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: di
             await panel.get_by_role("button", name="Start").click()
             await _until(lambda: len(started) == 1)
             assert started[0]["thread_id"] == "t2" and started[0]["goal"] == "Now the summary."
-            # "New chat": the next message starts afresh.
-            await panel.get_by_role("button", name="New chat").click()
-            await expect(panel.locator(".office-chat-note")).to_have_text("Your next message starts a new chat.")
-            await panel.get_by_role("textbox", name="Message").fill("Something else.")
-            await panel.get_by_role("button", name="Start").click()
-            await _until(lambda: len(started) == 2)
-            assert started[1]["thread_id"] is None
+            # No New chat (item 1279): the panel is the agent's one chat, and offers no way to start another.
+            await expect(panel.get_by_role("button", name="New chat")).to_have_count(0)
+            await expect(panel.get_by_role("link", name="Open its chat")).to_have_count(1)
             await panel.get_by_role("button", name="Close").click()
             # One that waits for the owner (blocked) is at work too: the message reaches that run (the review).
             waiting = True
@@ -533,7 +529,7 @@ async def test_the_panel_is_a_chat_that_goes_on_in_the_agents_chat(login_env: di
             await panel.get_by_role("textbox", name="Message").fill("Yes, go on.")
             await panel.get_by_role("button", name="Start").click()
             await _until(lambda: len(steered) == 2)
-            assert steered[1]["run"] == "run_y" and len(started) == 2
+            assert steered[1]["run"] == "run_y" and len(started) == 1
             assert errors == [], errors
         finally:
             await browser.close()
