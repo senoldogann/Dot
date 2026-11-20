@@ -205,7 +205,9 @@ def _search_tool() -> RegisteredTool:
         return _read_action("memory_search", f"Search saved notes for {args.query}")
 
     async def run(args: SearchArgs, ctx: ToolContext) -> ToolResult:
-        hits: list[MemoryHit] = await recall_for(ctx.runtime.memory, args.query, args.limit, ctx.agent_id)
+        hits: list[MemoryHit] = await recall_for(
+            ctx.runtime.memory, args.query, args.limit, ctx.agent_id, words_when_down=True
+        )
         await ctx.runtime.memory.store.mark_memories_used(
             ctx.run_id, [hit.record.id for hit in hits], time.time(), "search"
         )
