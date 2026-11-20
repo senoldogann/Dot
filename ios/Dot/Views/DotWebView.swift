@@ -32,7 +32,9 @@ struct DotWebView: UIViewRepresentable {
         let webView: WKWebView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
-        webView.allowsBackForwardNavigationGestures = true
+        // The web UI owns the swipe from the left edge (item 1079): it opens the list of chats. WebKit's own swipe went
+        // back in the history at the same time, to the chat opened before.
+        webView.allowsBackForwardNavigationGestures = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         #if DEBUG
             webView.isInspectable = true

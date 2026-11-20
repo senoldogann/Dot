@@ -18,12 +18,12 @@ import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName, plural, setText, switchRow } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
-import { touchFirst } from "../layout.js";
+import { touchFirst, trackHeight } from "../layout.js";
 import { openMenu } from "../menu.js";
 import { mountOffice } from "../office/office.js";
 import { readFolds, readPref, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
-import { aboutToggle, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
+import { aboutToggle, chatLoading, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, heldChoice, KEPT_GOAL_MODE } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { setStageGlass, setStageTitle, setStageTools } from "../stage.js";
@@ -1488,7 +1488,12 @@ function mountPage(root, ctx, agentId) {
   // and under them its chats, what it learned and its messages as the home's Today strip, each only when it has rows.
   const top = el("div", { class: "home-start agent-top" });
   const sections = el("section", { class: "home-today agent-sections", "aria-label": "The agent's work" });
-  const page = el("div", { class: "home agent-home" }, loadingPanel());
+  // While the agent is read its page stands as a chat that opens: Dot's three dots in the middle, not a card's spinner
+  // at the top that read as the office loading.
+  const page = el("div", { class: "home agent-home" }, chatLoading());
+  // Its face, name and box stand in the middle of the room under the bar, as the home's do (item 124): the row above
+  // them takes half of what their height leaves (app.css), so the page keeps that height as it changes.
+  const stopCentring = trackHeight(top, page, "--home-start-h");
 
   // The bar names the agent, as a heading of the page, and so does the tab (`Researcher · Agents · Dot`).
   function stageOf(record) {
@@ -1757,6 +1762,7 @@ function mountPage(root, ctx, agentId) {
   attempt(reload);
   return () => {
     disposed = true;
+    stopCentring();
     stopLifecycle();
     stopBack();
     window.removeEventListener(AGENTS_CHANGED_EVENT, onAgentsChanged);

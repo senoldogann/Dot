@@ -13,7 +13,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -297,6 +297,70 @@ async def test_the_plus_makes_an_agent_and_a_phone_lists_the_agents_as_rows(
             await expect(row.locator(".side-unread")).to_have_count(0)
             await expect(row).to_have_attribute("aria-current", "page")
             await expect(page.locator(".side-agent-faces")).to_be_hidden()
+            await context.close()
+        finally:
+            await browser.close()
+
+
+async def test_a_phone_opens_an_agent_as_a_chat_and_goes_back_to_the_chats(
+    served: tuple[RunManager, httpx.AsyncClient],
+) -> None:
+    """Item 1272: an agent with no chat yet, opened from its row on a phone, loads as a chat does (Dot's three dots, no
+    card), stands its face, name and box in the middle of the room under the bar, and its Back is the list of chats,
+    not the agents' page. Opened from the agents' page, Back still returns there."""
+    _manager, client = served
+    port: int | None = client.base_url.port
+    assert port is not None
+    made = await client.post("/api/agents", json={**_AGENT, "name": "Ledger"})
+    assert made.status_code == 201, made.text
+    agent_id: str = made.json()["id"]
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            # No service worker, so that the test can hold the page's read back.
+            context = await browser.new_context(
+                viewport={"width": 390, "height": 844},
+                has_touch=True,
+                is_mobile=True,
+                reduced_motion="reduce",
+                service_workers="block",
+            )
+            page: Page = await context.new_page()
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            held: asyncio.Event = asyncio.Event()
+
+            async def hold(route: Route) -> None:
+                await held.wait()
+                await route.continue_()
+
+            await page.route("**/api/schedules", hold)
+            button: Locator = page.locator(".stagebar-left button")
+            await button.click()
+            await page.locator(".side-bots a.side-bot").filter(has_text="Ledger").click()
+            await expect(page).to_have_url(re.compile(f"#/agents/{agent_id}$"))
+            await expect(page.locator("main .chat-loading")).to_be_visible()
+            await expect(page.locator("main .agent-home .card")).to_have_count(0)
+            held.set()
+            top: Locator = page.locator("main .agent-top")
+            await expect(page.get_by_role("textbox", name="Message")).to_be_visible()
+            box = await top.bounding_box()
+            bar = await page.locator(".stagebar").bounding_box()
+            assert box is not None and bar is not None
+            room_middle: float = (bar["y"] + bar["height"] + 844) / 2
+            assert abs(box["y"] + box["height"] / 2 - room_middle) < 60, (box, bar)
+            await expect(button).to_have_attribute("aria-label", "Show sidebar")
+            await button.click()
+            await expect(page.locator(".sidebar")).to_be_in_viewport()
+            await expect(page).to_have_url(re.compile(f"#/agents/{agent_id}$"))
+            await page.unroute("**/api/schedules")
+            # From the agents' page, Back returns to it.
+            await page.goto(f"http://127.0.0.1:{port}/#/agents")
+            await page.locator(f"a.agent-card[data-agent='{agent_id}']").click()
+            await expect(page).to_have_url(re.compile(f"#/agents/{agent_id}$"))
+            await expect(button).to_have_attribute("aria-label", "Back")
+            await button.click()
+            await expect(page).to_have_url(re.compile(r"#/agents$"))
             await context.close()
         finally:
             await browser.close()
