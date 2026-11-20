@@ -503,7 +503,7 @@ def _failed_in_row(sessions: list[RunRecord]) -> int:
 
 
 class RunManager:
-    """Owns the live runs of one process. At most ``max_concurrent_runs`` execute at the same time.
+    """Owns the live runs of one process. At most ``max_concurrent_runs`` execute at the same time (0: any number).
 
     Runs that other runs wait for (a delegated run, a message to an agent) do not count against that limit: their parent
     holds a place while it waits for them, so a full set of waiting parents would otherwise keep every one of them from
@@ -512,7 +512,8 @@ class RunManager:
 
     def __init__(self, runtime: Runtime) -> None:
         self._runtime: Runtime = runtime
-        self._slots: asyncio.Semaphore = asyncio.Semaphore(runtime.config.agent.max_concurrent_runs)
+        places: int = runtime.config.agent.max_concurrent_runs
+        self._slots: asyncio.Semaphore | None = asyncio.Semaphore(places) if places > 0 else None
         self._handles: dict[str, RunHandle] = {}
         # The hold of each run the owner holds, whose page they may use from the screen (items 470 and 479), and the
         # releases of what their input left pressed, under way.
@@ -3507,7 +3508,9 @@ class RunManager:
             await self._check_effort(ref, ONE_MESSAGE_LEVELS[once])
 
     def _place_for(self, run: RunRecord) -> AbstractAsyncContextManager[None]:
-        return nullcontext() if run.source in (DELEGATE_SOURCE, TEAM_SOURCE) else self._slots
+        if self._slots is None or run.source in (DELEGATE_SOURCE, TEAM_SOURCE):
+            return nullcontext()
+        return self._slots
 
     async def _drive(
         self,

@@ -277,7 +277,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - A small model with the full tool list sometimes writes the `finish` call out as a plain message (`gpt-oss:20b-cloud`
   did in most trial runs). Dot does not reinterpret such text: it is nudged first when tools were used, otherwise it
   becomes the result as written. Use a larger model as `main` for task and research runs.
-- At most `max_concurrent_runs` runs go at once; the others wait. Delegated runs do not count.
+- At most `max_concurrent_runs` runs go at once; the others wait. Delegated runs do not count. The default, 0, sets no
+  limit.
 - Runs at work at the same time know each other (item 301). Each chat has its own tabs, which no other chat's run
   reaches, and the browser keeps the tabs of a chat with a run at work however long they idle. Each run's model is told
   which other runs are at work, with their goals, the sites of their pages, the applications they drive and the files
