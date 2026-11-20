@@ -18,6 +18,7 @@ def _forget_speed(path: Path) -> None:
         for table in ("runs", "queued_messages", "campaigns"):
             connection.execute(f"ALTER TABLE {table} DROP COLUMN speed")
         connection.execute("UPDATE threads SET choices = json_remove(choices, '$.speed') WHERE choices IS NOT NULL")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()

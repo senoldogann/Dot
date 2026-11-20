@@ -49,6 +49,7 @@ def _forget_pins(path: Path) -> None:
     connection: sqlite3.Connection = sqlite3.connect(path)
     try:
         connection.execute("ALTER TABLE threads DROP COLUMN pinned_at")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()
@@ -88,6 +89,7 @@ def _forget_seen(path: Path) -> None:
     connection: sqlite3.Connection = sqlite3.connect(path)
     try:
         connection.execute("ALTER TABLE threads DROP COLUMN seen_at")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()
@@ -212,6 +214,7 @@ def _forget_choices(path: Path) -> None:
     connection: sqlite3.Connection = sqlite3.connect(path)
     try:
         connection.execute("ALTER TABLE threads DROP COLUMN choices")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()

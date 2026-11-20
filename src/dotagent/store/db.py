@@ -33,6 +33,7 @@ from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import Effort, ImageData, Message, OneMessage, Speed
 from dotagent.policy.types import ApprovalMode, PaceClass
+from dotagent.store.backup import make_backup
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.models import (
     NO_PICKS,
@@ -1428,11 +1429,8 @@ async def _add_columns(
 
 
 async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
-    """Give a database created by an older version the columns added since, and the indexes on them, in one
-    transaction: a process that dies part way leaves the database as it was, and the next start does it all."""
-    # Immediate: the daemon and a `dotx` command opening an old database at once take turns, rather than the second
-    # failing on a snapshot the first changed (the review of 2026-11-01).
-    await connection.execute("BEGIN IMMEDIATE")
+    """Give a database created by an older version the columns added since, and the indexes on them (schema version
+    1). Called inside the migration's transaction (:func:`_migrate`)."""
     added_to_runs: tuple[str, ...] = await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
@@ -1476,7 +1474,78 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_status ON approvals(status, created_at)")
     # The steps kept for the owner: the same one once in a chat, and the ones whose time is over (item 482).
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_kept ON approvals(digest, status)")
-    await connection.commit()
+
+
+# The schema's version (item 1268), kept in the database's header (``PRAGMA user_version``): a database is brought to it
+# by the steps of ``_MIGRATIONS`` after its own version, in order, in one transaction, after a copy of it is made. A
+# database of a later version (a newer Dot wrote it) is refused, so that this one never writes what it does not know.
+# A change of the tables (``_SCHEMA``, the added columns) adds the next step and raises this; test_store_schema.py pins
+# the tables of each version and fails while one changed without a new version.
+SCHEMA_VERSION: int = 1
+_MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = (
+    # Every column and index added before the schema had a version: each one added only where it is missing.
+    (1, _add_missing_columns),
+)
+# Where the copy made before a migration goes, beside the database: these copies are never thinned.
+BEFORE_UPGRADE_DIR: str = "backups-before-upgrade"
+
+
+async def _schema_version(connection: aiosqlite.Connection) -> int:
+    async with connection.execute("PRAGMA user_version") as cursor:
+        row: aiosqlite.Row | None = await cursor.fetchone()
+    return 0 if row is None else int(row[0])
+
+
+async def _has_tables(connection: aiosqlite.Connection) -> bool:
+    async with connection.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' LIMIT 1") as cursor:
+        return await cursor.fetchone() is not None
+
+
+def refuse_newer(found: int, path: Path) -> None:
+    """Raise when the database at ``path`` is of a schema later than this Dot's."""
+    if found > SCHEMA_VERSION:
+        raise StoreError(
+            "the database was written by a newer version of Dot: update Dot to open it",
+            {"path": str(path), "schema_version": found, "supported": SCHEMA_VERSION},
+        )
+
+
+def pending_steps(found: int) -> tuple[int, ...]:
+    """The versions of the steps a database of version ``found`` still needs, in order."""
+    return tuple(version for version, _ in _MIGRATIONS if version > found)
+
+
+async def _migrate(connection: aiosqlite.Connection, path: Path) -> None:
+    """Bring the database to ``SCHEMA_VERSION``: a new one is made and brought to it; an older one is copied first (into
+    ``BEFORE_UPGRADE_DIR``), then takes its pending steps in one transaction, its version written in the same, so that a
+    process that dies part way leaves it as it was and the next open does it all."""
+    found: int = await _schema_version(connection)
+    refuse_newer(found, path)
+    fresh: bool = not await _has_tables(connection)
+    if not fresh and pending_steps(found):
+        backup = await asyncio.to_thread(make_backup, path, path.parent / BEFORE_UPGRADE_DIR, time.time())
+        log.info("store_backed_up_before_upgrade", path=backup.path, size=backup.size, schema_version=found)
+    await connection.executescript(_SCHEMA)
+    # Immediate: the daemon and a `dotx` command opening an old database at once take turns, rather than the second
+    # failing on a snapshot the first changed (the review of 2026-11-01); the second finds the version written.
+    await connection.execute("BEGIN IMMEDIATE")
+    try:
+        found = await _schema_version(connection)
+        refuse_newer(found, path)
+        # A new database takes the steps too: ``_SCHEMA`` makes the tables as first written, the steps what came since.
+        steps: tuple[int, ...] = pending_steps(found)
+        for version, step in _MIGRATIONS:
+            if version in steps:
+                await step(connection)
+        if found != SCHEMA_VERSION:
+            # A pragma takes no parameter; the version is this module's own integer.
+            await connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION:d}")
+        await connection.commit()
+    except BaseException:
+        await connection.rollback()
+        raise
+    if found != SCHEMA_VERSION and not fresh:
+        log.info("store_schema_migrated", path=str(path), from_version=found, to_version=SCHEMA_VERSION)
 
 
 async def _refresh_memory_index(connection: aiosqlite.Connection) -> None:
@@ -1637,8 +1706,7 @@ class Store:
             await connection.execute("PRAGMA journal_mode=WAL")
             await connection.execute("PRAGMA synchronous=NORMAL")
             await connection.execute("PRAGMA busy_timeout=10000")
-            await connection.executescript(_SCHEMA)
-            await _add_missing_columns(connection)
+            await _migrate(connection, path)
             await _refresh_memory_index(connection)
             # The planner's statistics (item 647), made for the tables that have none or have grown since: without
             # them SQLite read a run's events of one kind (its bill, its steps) through every run's events of that kind,
