@@ -16,8 +16,9 @@ _MAX_BYTES: int = 64 * 1024
 
 
 def favicons_router(ctx: ServerContext) -> APIRouter:
-    """``GET /api/favicons/{host}`` answers the site's icon, or 404 when there is none. The host is a name, and the
-    fetch is the web connector's, which refuses an address that is not public."""
+    """``GET /api/favicons/{host}`` answers the site's icon, 404 when it has none (kept for a while) and 502 when it
+    could not be fetched (not kept: the next drawing asks again). The host is a name, and the fetch is the web
+    connector's, which refuses an address that is not public."""
     router: APIRouter = APIRouter(prefix="/api")
     cache: FaviconCache = FaviconCache()
 
@@ -32,11 +33,11 @@ def favicons_router(ctx: ServerContext) -> APIRouter:
             if kept.body is None:
                 raise HTTPException(status_code=404)
             return Response(kept.body, media_type=kept.media_type, headers={"Cache-Control": "private, max-age=86400"})
-        document = None
         try:
             document = await ctx.runtime.web.get(favicon_url(name), _MAX_BYTES)
-        except WebError:
-            document = None
+        except WebError as error:
+            log.warning("favicon_fetch_failed", host=name, error=error.message, context=error.context)
+            raise HTTPException(status_code=502) from error
         found = read_icon(cache, name, document)
         if found is None:
             log.info("favicon_missed", host=name)

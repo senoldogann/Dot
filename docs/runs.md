@@ -100,8 +100,8 @@ is the answer (a small model that is offered both writes the call out as text).
   a quota, rate-limit or key error (see `standby`) the run's own model writes it without asking the fast one (item 240);
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
   and the event says so with the reason. In the conversation a compaction is one short line, "Earlier messages were
-  condensed". The sizes ("Older part of the chat summed up: 401k → 17k", item 312), the summary and any system message,
-  hidden wake or tool-call kept only as plumbing stay in the page and show when **Show internal events** is pressed;
+  condensed". The sizes ("Older part of the chat summed up: 401k → 17k", item 312) stay in the page and show when **Show
+  internal events** is pressed (item 1265), which stands in a chat that holds a compaction, of this turn or an earlier one;
   the facts under the side panel's More count them and say how many checks flagged something (item 260), and the Cost panel
   keeps the summaries' share. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the

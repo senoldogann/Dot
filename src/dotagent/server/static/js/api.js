@@ -758,8 +758,9 @@ const favicons = new Map();
 
 /**
  * A `blob:` URL for the icon of `host`, fetched from this daemon (`GET /api/favicons/<host>`), or null when the site
- * has none or the Mac is offline. The page asks only this Mac: the site itself is fetched by the daemon, and the
- * picture is a blob, which the page's content security policy allows. The same host is asked once.
+ * has none or it could not be fetched. The page asks only this Mac: the site itself is fetched by the daemon, and the
+ * picture is a blob, which the page's content security policy allows. An icon or a site without one is asked once; a
+ * fetch that failed (offline, the daemon's 502) is asked again by the next drawing.
  * @param {string} host
  * @returns {Promise<string | null>}
  */
@@ -771,8 +772,20 @@ export function faviconUrl(host) {
   if (pending === undefined) {
     pending = proven()
       .then(() => fetch(`/api/favicons/${encodeURIComponent(host)}`, { headers: authHeaders(), cache: "force-cache" }))
-      .then(async (response) => (response.ok ? URL.createObjectURL(await response.blob()) : null))
-      .catch(() => null);
+      .then(async (response) => {
+        if (response.ok) {
+          return URL.createObjectURL(await response.blob());
+        }
+        if (response.status !== 404) {
+          favicons.delete(host);
+        }
+        return null;
+      })
+      .catch((error) => {
+        favicons.delete(host);
+        console.warn("favicon not fetched", host, error);
+        return null;
+      });
     favicons.set(host, pending);
   }
   return pending;

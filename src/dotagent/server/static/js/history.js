@@ -217,8 +217,7 @@ function drawFlow(past, flow, asked, events, reactions) {
   let reaction = null;
   let reactedTo = null;
   for (const event of events) {
-    // A compaction, a system message, a hidden wake or tool-call plumbing is not a turn of the conversation. The
-    // record stays in the page, under the details toggle.
+    // A compaction is not a turn of the conversation: one short line, and its record under the details toggle.
     if (!visibleInConversation(event)) {
       batch = null;
       blocks.push({ internal: event });
@@ -331,22 +330,15 @@ function drawFlow(past, flow, asked, events, reactions) {
   });
 }
 
-/** An internal event as it stands in an earlier turn: a compaction says the chat was shortened, and the record itself
- * (the sizes, a system message, a hidden wake) waits for the details toggle. */
+/** A compaction as it stands in an earlier turn: a line says the chat was shortened, and its sizes wait for the details
+ * toggle. */
 function internalRecord(event) {
   const data = event.data ?? {};
   const words =
-    event.kind === "compacted"
-      ? typeof data.tokens_before === "number" && typeof data.tokens_after === "number"
-        ? t("timeline.compactedSized", { before: compact(data.tokens_before), after: compact(data.tokens_after) })
-        : t("timeline.compacted")
-      : typeof event.text === "string" && event.text !== ""
-        ? event.text
-        : event.kind;
+    typeof data.tokens_before === "number" && typeof data.tokens_after === "number"
+      ? t("timeline.compactedSized", { before: compact(data.tokens_before), after: compact(data.tokens_after) })
+      : t("timeline.compacted");
   const record = el("div", { class: "chat-internal" }, el("p", { class: "small muted" }, words));
-  if (event.kind !== "compacted") {
-    return record;
-  }
   return el("div", { class: "compaction" }, el("p", { class: "compaction-notice" }, t("timeline.condensed")), record);
 }
 

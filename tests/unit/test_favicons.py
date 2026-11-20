@@ -54,8 +54,9 @@ def test_a_miss_is_remembered_and_an_icon_is_kept() -> None:
         redirected_from=(),
     )
     assert read_icon(cache, "example.com", missed, now=0.0) is None
-    # A later ask does not need the document again: the miss is the cache's.
-    assert read_icon(cache, "example.com", None, now=1.0) is None
+    # A later ask does not need the site again: the miss is the cache's.
+    miss = cache.get("example.com", 1.0)
+    assert miss is not None and miss.body is None
     kept = FetchedDocument(
         url="https://github.com/favicon.ico",
         status=200,
@@ -66,4 +67,5 @@ def test_a_miss_is_remembered_and_an_icon_is_kept() -> None:
         redirected_from=(),
     )
     assert read_icon(cache, "github.com", kept, now=0.0) == (_PNG, "image/png")
-    assert read_icon(cache, "github.com", None, now=1.0) == (_PNG, "image/png")
+    icon = cache.get("github.com", 1.0)
+    assert icon is not None and (icon.body, icon.media_type) == (_PNG, "image/png")

@@ -6166,7 +6166,9 @@ details:not([open]) > :not(summary) {
   text-align: center;
 }
 
+/* Shown once the page holds an internal record to show (timeline.js), of this run or of an earlier turn. */
 .chat-details-toggle {
+  display: none;
   align-self: center;
   margin: var(--space-1) 0;
   padding: var(--space-half) var(--space-2);
@@ -6174,6 +6176,10 @@ details:not([open]) > :not(summary) {
   background: none;
   color: var(--faint);
   font-size: var(--text-xs);
+}
+
+html:has(.chat-internal) .chat-details-toggle {
+  display: block;
 }
 
 @media (hover: hover) {

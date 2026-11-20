@@ -91,7 +91,7 @@ function linkNode(part) {
   const pill = pillFromPart(part);
   const mark = icon("link");
   mark.classList.add("link-pill-fallback");
-  const image = el("img", { class: "link-pill-icon", alt: "", width: "14", height: "14", hidden: true });
+  const image = el("img", { class: "link-pill-icon", alt: "", width: "16", height: "16", hidden: true });
   const anchor = el(
     "a",
     {

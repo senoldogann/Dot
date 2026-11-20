@@ -118,14 +118,15 @@ def icon_from(document: FetchedDocument) -> tuple[bytes, str] | None:
 
 
 def read_icon(
-    cache: FaviconCache, host: str, document: FetchedDocument | None, now: float | None = None
+    cache: FaviconCache, host: str, document: FetchedDocument, now: float | None = None
 ) -> tuple[bytes, str] | None:
-    """The cached icon of `host`, or the one in `document`, stored either way. ``None`` is cached too."""
+    """The cached icon of `host`, or the one in `document` (the site's answer), stored either way: an answer that is no
+    icon is kept as a miss."""
     moment: float = time.monotonic() if now is None else now
     kept: _Kept | None = cache.get(host, moment)
     if kept is not None:
         return None if kept.body is None else (kept.body, kept.media_type)
-    found: tuple[bytes, str] | None = None if document is None else icon_from(document)
+    found: tuple[bytes, str] | None = icon_from(document)
     if found is None:
         cache.store(host, None, "", moment)
         return None
