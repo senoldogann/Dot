@@ -54,13 +54,6 @@ PIPELINE_CLIENT_TOOL: str = "pipeline_client"
 PIPELINE_BEGIN_TOOL: str = "pipeline_begin"
 PIPELINE_END_TOOL: str = "pipeline_end"
 PIPELINE_OUTCOME_TOOL: str = "pipeline_outcome"
-PIPELINE_TOOLS: tuple[str, ...] = (
-    PIPELINE_VIEW_TOOL,
-    PIPELINE_CLIENT_TOOL,
-    PIPELINE_BEGIN_TOOL,
-    PIPELINE_END_TOOL,
-    PIPELINE_OUTCOME_TOOL,
-)
 _TIMEOUT_S: float = 20.0
 _TEXT_CHARS: int = 400
 _NONCE_BYTES: int = 8

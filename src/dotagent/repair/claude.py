@@ -551,14 +551,6 @@ async def run_claude(
     return outcome
 
 
-def validated_window(raw: str) -> LimitWindow | None:
-    """A window kept as JSON, or ``None`` when what is kept is no window."""
-    try:
-        return LimitWindow.model_validate_json(raw)
-    except ValidationError:
-        return None
-
-
 # ``claude -p /usage``: Claude Code's own report of the plan's windows, read locally with no model call (measured on the
 # owner's Mac, 2026-11-02: no turn, no cost; Codync reads it the same way). The empty strict MCP config keeps it from
 # starting every MCP server the owner set up.

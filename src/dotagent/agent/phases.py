@@ -20,9 +20,6 @@ from dotagent.store.models import (
 # Why a chat's queue is held. ``crash`` is released when the run that goes on from the cut-off ends done.
 # ``owner`` waits until the owner resumes the queue.
 HoldReason = Literal["owner", "crash"]
-# How a resumed run's ledger and progress ladder stand: restored from the snapshot, started again because none was
-# kept, or not mentioned (a note written before the snapshot existed).
-LadderNote = Literal["restored", "reset", "unsaid"]
 # What can happen to a run. ``begin_end`` is the decision to end, before the row that records the end is stored.
 # ``finish`` is that row, and names which terminal state it is.
 RunEvent = Literal["block", "unblock", "begin_end", "finish"]

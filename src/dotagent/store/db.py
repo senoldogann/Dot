@@ -547,10 +547,6 @@ def encode_message(message: Message, image_dir: Path) -> str:
     return dumps_compact(dumped)
 
 
-def decode_message(body: str, image_dir: Path, load_images: bool) -> Message:
-    return _decoded(parse_json_object(body, "stored message"), image_dir, load_images)
-
-
 def _image_refs(parsed: JsonObject) -> list[tuple[str, str]]:
     """The screenshots a stored message names: the media type and the file name of each."""
     refs: object = parsed.get("images")
