@@ -14,7 +14,8 @@ article puts an independent watchdog against. Each look, a process that ends, do
   once, through the daemon (``POST /api/runs/{id}/stuck``), as the daemon tells them anything: the push, the desktop,
   iMessage.
 - What it saw is kept in ``watchdog.json`` in Dot's home, the misses and the runs told, and logged to ``dotx.log``:
-  ``watchdog_unanswered``, ``watchdog_restarted``, ``watchdog_run_stuck``, ``watchdog_failed``.
+  ``watchdog_unanswered``, ``watchdog_restarted``, ``watchdog_run_stuck``, ``watchdog_config_unread`` (the settings do
+  not read: told to the owner once) and ``watchdog_failed``.
 
 The database is read through a read-only connection; the look changes nothing of Dot's but its own file.
 """
@@ -54,6 +55,8 @@ _STUCK_FLOOR_S: float = 30 * 60.0
 _STUCK_MARGIN_S: float = 5 * 60.0
 # How many runs told are kept, the newest: one is told once.
 _TOLD_KEPT: int = 200
+# Kept in ``told`` while the settings cannot be read, so that the owner is told once and not every minute.
+_CONFIG_MARK: str = "config-unread"
 _STATE_FILE: str = "watchdog.json"
 _DB_TIMEOUT_S: float = 5.0
 _TELL_TIMEOUT_S: float = 10.0
@@ -159,9 +162,21 @@ async def _answers(url: str) -> bool:
 
 async def look(uid: int, now: float) -> WatchdogState:
     """One look (the module's docstring); the state it leaves."""
-    config: AppConfig = load_user_config()
     path: Path = dot_home() / _STATE_FILE
     state: WatchdogState = await asyncio.to_thread(read_state, path)
+    runs_told: tuple[str, ...] = tuple(run for run in state.told if run != _CONFIG_MARK)
+    try:
+        config: AppConfig = load_user_config()
+    except DotError as error:
+        # The settings the daemon reads too: it cannot start with them, and the look ended unseen as ``watchdog_failed``
+        # (four times in two days, 2026-11-18 to 11-20). The owner is told once, and again after the settings read.
+        log.warning("watchdog_config_unread", error=error.message)
+        if _CONFIG_MARK not in state.told:
+            await show_notification(
+                "Dot's settings cannot be read", f"Dot cannot start with them: {error.message}"[:200]
+            )
+        return WatchdogState(misses=0, told=(*runs_told[-_TOLD_KEPT + 1 :], _CONFIG_MARK))
+    state = WatchdogState(misses=state.misses, told=runs_told)
     job: JobState | None = await inspect_job(uid)
     if job is None or job.pid is None or await inspect_restart_job(uid) is not None:
         # No service, a service launchd is starting, or a restart that waits for the runs: nothing to do here.
