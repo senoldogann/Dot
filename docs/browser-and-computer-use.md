@@ -802,3 +802,23 @@ every mode but `yolo` (item 433).
   [Safety](safety.md#safety)).
 - `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show
   what the agent would see.
+
+### Watch: the Mac's screen, live
+
+**Watch** in the sidebar's head (the screen beside Campaigns and Schedules; `#/watch`) shows the Mac's main display
+live, in a browser on the Mac or on a paired phone, whether a task works or not (item 1264). ScreenCaptureKit captures
+it at up to 1920 pixels on its longest side and 60 frames a second, the Mac's hardware encoder makes it H.264
+(VideoToolbox), and the page's own decoder (WebCodecs: Safari 16.4 or later, Chrome) draws it. Measured on a MacBook: 57
+frames a second, about 15 ms to encode a frame, 8% of one core and 1 to 1.5 Mbit/s for an ordinary desktop, the first
+picture within a third of a second.
+
+- It only watches: the mouse and the keyboard stay the Mac's.
+- One capture serves every page that watches; it starts with the first and stops a second or two after the last one
+  closes or goes out of sight, so nothing is captured while nobody watches, and macOS shows its screen recording mark
+  meanwhile. A page that falls behind (a slow network) drops frames until the next key frame and so shows the screen
+  as it is now, not with a growing delay.
+- `GET /api/screen/live` is read with the installation's token or a phone's key, like any other answer of the API: a
+  plain HTTP answer whose body is the stream, as the daemon lets no WebSocket through. Its format is in
+  `dotagent/desktop/live.py`. A Mac that has not granted Screen Recording to the app that runs Dot answers with that
+  error.
+- The whole screen goes: what it shows, passwords typed in the open included, is seen by whoever holds a key.

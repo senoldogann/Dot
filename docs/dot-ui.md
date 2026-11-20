@@ -14,6 +14,7 @@ home page is `runs.js`, and one run is `run.js`.
 | Agents | `agents.js` | The owner's agent profiles: face, name, role, instructions, tools and model. |
 | Team | `team.js` | The day's messages between agents, oldest first. |
 | One team | `teams.js` | A team's agents, its name and purpose, and a box to message it. |
+| Watch | `watch.js` | The Mac's screen, live, whether a task works or not. |
 | Campaigns | `campaigns.js` | Goals Dot keeps working on in sessions until a check confirms the outcome. |
 | Schedules | `schedules.js` | Goals once or on a cron schedule while the daemon runs. |
 | Rules | `rules.js` | What Dot may do on its own, what it asks first, and what it leaves to the owner. |

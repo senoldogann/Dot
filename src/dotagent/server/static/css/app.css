@@ -12778,3 +12778,42 @@ dialog.teach {
     max-height: 70%;
   }
 }
+
+/* ---------- Watch (item 1264) ---------- */
+
+/* The Mac's screen as large as the page allows, whole: the canvas keeps the screen's shape inside the room left under the
+   bar. */
+.page[data-layout="watch"] {
+  max-width: none;
+}
+
+.watch-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.watch-screen {
+  display: block;
+  width: 100%;
+  max-height: calc(100dvh - 160px);
+  object-fit: contain;
+  background: var(--computer-backdrop);
+  border-radius: var(--radius-sm);
+}
+
+.watch-screen:fullscreen {
+  max-height: none;
+  border-radius: 0;
+}
+
+.watch-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.watch-status[hidden] {
+  display: none;
+}
