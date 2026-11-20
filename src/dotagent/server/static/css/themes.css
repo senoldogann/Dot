@@ -82,7 +82,6 @@
   --boost-start: #35b27a;
   --boost-mid: #f08a24;
   --boost-end: #8a5cf5;
-  --on-brand: #1c1c1c;
   /* The twelve colours of a character's body (character/skins.js, item 101), bloub's palette; ink and cream follow the
      scheme so a body is never the colour of the ground, and the pastille is bloub's notification blue. */
   --character-ink: light-dark(#0a0a0c, #ecebe6);
@@ -122,14 +121,11 @@
   --file-kind: light-dark(#3a6fc4, #7fabf0);
   --on-file-kind: light-dark(#ffffff, #0f2036);
   --scrim: light-dark(rgb(28 28 28 / 40%), rgb(0 0 0 / 55%));
-  --scrim-strong: light-dark(rgb(28 28 28 / 78%), rgb(0 0 0 / 80%));
   /* Shadows: a trace of ink in light, none in dark but under what floats over a scrim. */
   --shadow-ink: light-dark(rgb(28 28 28 / 5%), transparent);
   --shadow-ink-soft: light-dark(rgb(28 28 28 / 10%), rgb(0 0 0 / 30%));
   --shadow-ink-deep: light-dark(rgb(28 28 28 / 24%), rgb(0 0 0 / 60%));
   --shadow: 0 1px 2px var(--shadow-ink), 0 4px 16px var(--shadow-ink);
-  /* Under a box of the pages, which has no frame (item 837): a hairline of shadow and a soft one round it. */
-  --shadow-card: 0 1px 2px var(--shadow-ink), 0 4px 14px var(--shadow-ink);
   /* The focus ring: the accent at a third, so focus is seen without a dark frame (item 95). */
   --ring: color-mix(in srgb, var(--accent) 38%, transparent);
   --shadow-seg: 0 1px 2px var(--shadow-ink-soft);
