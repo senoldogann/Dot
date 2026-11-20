@@ -127,7 +127,7 @@ async def test_a_database_of_a_later_version_is_refused_and_left_as_it_was(tmp_p
     assert not (tmp_path / BEFORE_UPGRADE_DIR).exists()
 
 
-async def test_a_migration_that_fails_at_every_open_copies_the_database_once(
+async def test_a_migration_that_fails_at_every_open_keeps_two_copies(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     database: Path = tmp_path / "dot.sqlite3"
@@ -145,6 +145,56 @@ async def test_a_migration_that_fails_at_every_open_copies_the_database_once(
     for _ in range(3):
         with pytest.raises(StoreError):
             await Store.open(database, tmp_path / "images")
-    # Left as it was at every try, and copied once: a daemon that launchd starts again and again does not fill the disk.
+        # As launchd starts it again, seconds apart: an open that fails writes nothing the next would take for a use.
+        await asyncio.sleep(1.1)
+    # Left as it was at every try, and two copies kept: a daemon that launchd starts again and again does not fill the
+    # disk.
     assert _version(database) == 0
-    assert len(list((tmp_path / BEFORE_UPGRADE_DIR / "v0").glob("dot-*.sqlite3.gz"))) == 1
+    assert len(list((tmp_path / BEFORE_UPGRADE_DIR / "v0").glob("dot-*.sqlite3.gz"))) == 2
+
+
+async def test_a_database_used_again_since_its_copy_is_copied_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database: Path = tmp_path / "dot.sqlite3"
+    old: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        old.executescript(db._SCHEMA)
+        old.commit()
+    finally:
+        old.close()
+
+    async def broken(connection: object) -> None:
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr(db, "_add_missing_columns", broken)
+    with pytest.raises(StoreError):
+        await Store.open(database, tmp_path / "images")
+    # The owner went back to the Dot of before and used it: written after the copy (its name is to the second).
+    await asyncio.sleep(1.1)
+    _write_a_chat(database)
+    with pytest.raises(StoreError):
+        await Store.open(database, tmp_path / "images")
+    newest: Path = sorted((tmp_path / BEFORE_UPGRADE_DIR / "v0").glob("dot-*.sqlite3.gz"))[-1]
+    restored: Path = await asyncio.to_thread(_unpacked, newest, tmp_path / "restored.sqlite3")
+    assert _titles(restored) == ["Later"]
+
+
+def _titles(database: Path) -> list[str]:
+    connection: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        return [row[0] for row in connection.execute("SELECT title FROM threads ORDER BY title")]
+    finally:
+        connection.close()
+
+
+def _write_a_chat(database: Path) -> None:
+    connection: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        connection.execute(
+            "INSERT INTO threads (id, title, source, created_at, updated_at)"
+            " VALUES ('thr_new', 'Later', 'ui', 2.0, 2.0)"
+        )
+        connection.commit()
+    finally:
+        connection.close()

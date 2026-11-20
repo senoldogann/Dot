@@ -118,9 +118,9 @@ and start the daemon again (`dotx service install`).
 **The database's version** (item 1268). The database keeps the version of its tables (SQLite's `user_version`). Every
 start makes the tables it lacks and adds the columns added since, each only where it is missing, as before versions; a
 change that cannot be made twice (a table dropped or renamed, data rewritten) comes with a new version. A Dot that finds
-a database of an older version first copies it as above, into `<home>/backups-before-upgrade/v<version>` (one copy per
-version it is upgraded from, made again only when none is there, so a start that fails again and again copies once;
-these copies are never thinned, and runs neither read nor change them, as the other copies), then brings it to its own
+a database of an older version first copies it as above, into `<home>/backups-before-upgrade/v<version>` (the newest two
+copies of each version it is upgraded from are kept, so a start that fails again and again does not fill the disk;
+runs neither read nor change them, as the other copies), then brings it to its own
 version in one transaction with the new version, so that a start cut off part way leaves the database as it was and the
 next start does it all; the daemon and a `dotx` command starting at once take turns. The first start after such an
 upgrade takes longer by the copy (a 320 MB database: about 12 s, a 91 MB copy), and needs room for it: a copy that

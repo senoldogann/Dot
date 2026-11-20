@@ -9,6 +9,7 @@ statements that must be stored whole, or that reads what it then writes (a threa
 import asyncio
 import base64
 import contextlib
+import errno
 import hashlib
 import os
 import re
@@ -34,7 +35,7 @@ from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import Effort, ImageData, Message, OneMessage, Speed
 from dotagent.policy.types import ApprovalMode, PaceClass
-from dotagent.store.backup import PARTIAL_DIR, make_backup
+from dotagent.store.backup import PARTIAL_DIR, Backup, list_backups, make_backup
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.models import (
     NO_PICKS,
@@ -1487,13 +1488,31 @@ SCHEMA_VERSION: int = 1
 # The steps after the additive layer, each under the version it brings the database to, in order. Version 1 is the
 # additive layer itself, which every open applies: no step.
 _MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = ()
-# Where the copy made before a migration goes, beside the database, in a folder of the version it was copied from: one
-# copy per version, so that a migration that fails at every start does not copy the database at every start. These
-# copies are never thinned, and runs neither read nor change them (``runtime._guarded_files``), as the other copies.
+# Where the copy made before a migration goes, beside the database, in a folder of the version it was copied from,
+# which keeps its newest two (``_copy_before_upgrade``); runs neither read nor change them (``runtime._guarded_files``),
+# as the other copies.
 BEFORE_UPGRADE_DIR: str = "backups-before-upgrade"
+_UPGRADE_COPIES: int = 2
+
+
 # The statements of ``_SCHEMA``, run one by one inside the migration's transaction: ``executescript`` commits first, out
 # of the lock, and would write to a database another process is migrating or this one is about to refuse.
-_SCHEMA_STATEMENTS: tuple[str, ...] = tuple(part.strip() for part in _SCHEMA.split(";") if part.strip() != "")
+def _statements(script: str) -> tuple[str, ...]:
+    """The statements of ``script``, each ended where SQLite says it is complete (a ``;`` in a string or a trigger's
+    body does not end one)."""
+    statements: list[str] = []
+    pending: str = ""
+    for line in script.splitlines(keepends=True):
+        pending += line
+        if sqlite3.complete_statement(pending):
+            statements.append(pending.strip())
+            pending = ""
+    if pending.strip() != "":
+        raise StoreError("the schema ends inside a statement", {"rest": pending.strip()[:200]})
+    return tuple(statements)
+
+
+_SCHEMA_STATEMENTS: tuple[str, ...] = _statements(_SCHEMA)
 
 
 async def _schema_version(connection: aiosqlite.Connection) -> int:
@@ -1517,21 +1536,24 @@ def refuse_newer(found: int, path: Path) -> None:
 
 
 def _copy_before_upgrade(path: Path, found: int) -> None:
-    """Copy the database into ``BEFORE_UPGRADE_DIR/v<found>`` unless a copy of that version is there already."""
+    """Copy the database into ``BEFORE_UPGRADE_DIR/v<found>`` and keep the newest ``_UPGRADE_COPIES`` there: a
+    database used again since its copy (gone back to an older Dot, then upgraded again) has its copy of now, and a
+    migration that fails at every start does not fill the disk with copies. Whether the database changed since a copy
+    cannot be told from its file: a start that failed writes it too."""
     folder: Path = path.parent / BEFORE_UPGRADE_DIR / f"v{found}"
-    if folder.is_dir() and any(folder.glob("dot-*.sqlite3.gz")):
-        log.info("store_copy_before_upgrade_kept", folder=str(folder), schema_version=found)
-        return
     try:
         # Beside the database, both folders: Dot's home for its own database, a test's folder for a test's.
-        backup = make_backup(path, folder, path.parent / PARTIAL_DIR, time.time())
+        backup: Backup = make_backup(path, folder, path.parent / PARTIAL_DIR, time.time())
     except (sqlite3.Error, OSError) as error:
+        full: bool = isinstance(error, OSError) and error.errno == errno.ENOSPC
         raise StoreError(
-            "the copy of the database made before an upgrade failed: free some space or move the database, then start"
-            " Dot again",
+            "the copy of the database made before an upgrade failed"
+            + (": the disk is full; free some space, then start Dot again" if full else ""),
             {"path": str(path), "folder": str(folder), "error": str(error), "free_bytes": _free_bytes(path.parent)},
         ) from error
     log.info("store_backed_up_before_upgrade", path=backup.path, size=backup.size, schema_version=found)
+    for older in list_backups(folder)[_UPGRADE_COPIES:]:
+        Path(older.path).unlink(missing_ok=True)
 
 
 def _free_bytes(folder: Path) -> int:
