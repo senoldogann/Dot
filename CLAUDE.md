@@ -100,6 +100,8 @@ A change that takes days is many pushes, each waiting on the review and the gate
 - Small: prose only (`docs/`, `ROADMAP.md`, `roadmap/`, `CHANGELOG.md`, `changes/`, comments), or under about 50 changed
   lines outside the
   "Always needs a human" paths. No `PLAN.md`, no review but the pre-push hook, the checks of what changed; push it.
+  (CI still runs the whole gate for `roadmap/` and `changes/`: its item-records check is part of it, and only `docs/`
+  and the root's `*.md` skip it.)
 - A roadmap or changelog entry goes in the pull request of the change it records, not in a pull request of its own,
   in files of the change's own: `roadmap/<item>.md` and `changes/<item>.md` (their READMEs say how), not in ROADMAP.md
   or CHANGELOG.md, which changes made side by side would all write at the same lines.
