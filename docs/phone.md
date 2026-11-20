@@ -248,6 +248,9 @@ setting that turns it on. Dot's computer opens over the whole screen, with the p
 over), and goes back to the side panel when it closes. **Zoom** beside the address, or a tap on the page while it is
 only watched (in a Mac's window too), opens the view in the full-screen viewer, live (item 1071): two fingers, a double tap or − and + zoom it,
 to read a page's small print; the frames come at JPEG quality 80 (50 before), so the print holds when zoomed.
+**Watch** in the sidebar's head shows the Mac's whole screen live, at any moment, with no task needed
+([Watch](browser-and-computer-use.md#watch-the-macs-screen-live), item 1264); turn the phone sideways for a
+larger picture.
 **Use it here** holds the run and uses its page from the phone
 (item 475): a tap clicks, a drag scrolls the page, a finger held still and then dragged drags on it, two fingers zoom
 the picture, and **Keyboard** types into the page; the card of a browser step handed to you offers it too, and **Return

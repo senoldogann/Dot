@@ -622,6 +622,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     accountName,
   );
   const schedulesLink = el("a", { class: "icon-btn side-page", href: "#/schedules", title: t("sidebar.schedules"), "aria-label": t("sidebar.schedules"), onclick: onNavigate }, icon("calendar"));
+  // The Mac's screen, live (item 1264): at any moment, whether a task works or not.
+  const watchLink = el("a", { class: "icon-btn side-page", href: "#/watch", title: t("sidebar.watch"), "aria-label": t("sidebar.watch"), onclick: onNavigate }, icon("monitor"));
   // The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name, to its
   // conversation (item 1233), where a message to it goes on, else to its page; the three that worked last (item 855: the row scrolled and cut a face), and its
   // last tile, All, is the page of every agent and team, which the Agents row is while the owner has no agent of their
@@ -1800,7 +1802,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     { class: "side-head", "data-tauri-drag-region": "" },
     close,
     el("span", { class: "side-title" }, dotName()),
-    el("nav", { class: "side-pages", "aria-label": "Pages" }, campaignsLink, schedulesLink),
+    el("nav", { class: "side-pages", "aria-label": "Pages" }, watchLink, campaignsLink, schedulesLink),
   );
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
