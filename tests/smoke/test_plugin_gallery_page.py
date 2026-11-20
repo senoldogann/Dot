@@ -18,7 +18,7 @@ import time
 from collections.abc import AsyncIterator
 from datetime import date
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import httpx
 import pytest
@@ -268,6 +268,25 @@ async def test_the_gallery_installs_lists_and_removes_a_plugin(
                 await expect(page.locator(".gallery")).not_to_contain_text("null")
                 await expect(page.locator(".gallery")).not_to_contain_text("undefined")
                 await _fits(page)
+                if width == 390:
+                    # The plugins are one list in one frame (item 1268): a row each, no card of its own.
+                    frame: dict[str, Any] = await page.locator(".gallery-grid").evaluate(
+                        "(grid) => {"
+                        "  const s = getComputedStyle(grid);"
+                        "  const cards = [...grid.querySelectorAll(':scope > .gallery-card')];"
+                        "  return {"
+                        "    gap: s.rowGap,"
+                        "    frame: s.borderTopWidth,"
+                        "    own: cards.map((card) => getComputedStyle(card).borderTopWidth),"
+                        "    xs: cards.map((card) => Math.round(card.getBoundingClientRect().x)),"
+                        "  };"
+                        "}"
+                    )
+                    assert frame["gap"] == "0px", frame
+                    assert frame["frame"] != "0px", frame
+                    assert frame["own"][0] == "0px", frame
+                    assert set(frame["own"][1:]) == {"1px"}, frame
+                    assert len(set(frame["xs"])) == 1, frame
                 await page.screenshot(path=str(tmp_path / f"gallery-{width}-{scheme}.png"), full_page=True)
                 # Newest puts the plugin the gallery took last first.
                 await page.get_by_role("button", name="Newest").click()
@@ -388,6 +407,29 @@ async def test_a_plugin_whose_pin_the_gallery_moved_since_says_older_version(
                         await page.get_by_role("button", name=re.compile(r"^Installed 2$")).click()
                         await expect(acme).to_be_visible()
                         await _fits(page)
+                        if width == 390:
+                            # Installed is the same one frame (item 1268), and "Not from the gallery" a row of it.
+                            installed: dict[str, Any] = await page.locator(".gallery-grid").evaluate(
+                                "(grid) => {"
+                                "  const s = getComputedStyle(grid);"
+                                "  const cards = [...grid.querySelectorAll(':scope > .gallery-card')];"
+                                "  const heading = grid.querySelector(':scope > .gallery-others-title');"
+                                "  const title = getComputedStyle(heading);"
+                                "  return {"
+                                "    gap: s.rowGap,"
+                                "    frame: s.borderTopWidth,"
+                                "    xs: cards.map((card) => Math.round(card.getBoundingClientRect().x)),"
+                                "    titleLeft: title.paddingLeft,"
+                                "    titleEdge: title.borderTopWidth,"
+                                "    rowLeft: getComputedStyle(cards[0]).paddingLeft,"
+                                "  };"
+                                "}"
+                            )
+                            assert installed["gap"] == "0px", installed
+                            assert installed["frame"] != "0px", installed
+                            assert len({*installed["xs"]}) == 1, installed
+                            assert installed["titleLeft"] == installed["rowLeft"], installed
+                            assert installed["titleEdge"] != "0px", installed
                         # The plugin's own page says which commit its files are from, beside the one pinned now.
                         await acme.locator(".gallery-card-name").click()
                         facts: Locator = page.locator(".gallery-facts")
