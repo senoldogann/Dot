@@ -6176,8 +6176,10 @@ details:not([open]) > :not(summary) {
   font-size: var(--text-xs);
 }
 
-.chat-details-toggle:hover {
-  color: var(--muted);
+@media (hover: hover) {
+  .chat-details-toggle:hover {
+    color: var(--muted);
+  }
 }
 
 /* Internal events stay in the page and out of the conversation until the reader asks for them. */
