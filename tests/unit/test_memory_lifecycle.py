@@ -105,6 +105,7 @@ async def test_a_store_from_before_the_item_opens_with_its_notes_whole(tmp_path:
         for column in _COLUMNS:
             connection.execute(f"ALTER TABLE memories DROP COLUMN {column}")
         connection.execute("DROP TABLE memory_trash")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()

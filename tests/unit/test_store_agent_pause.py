@@ -41,6 +41,7 @@ def _forget_pauses(path: Path) -> None:
     connection: sqlite3.Connection = sqlite3.connect(path)
     try:
         connection.execute("ALTER TABLE agents DROP COLUMN paused_at")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()

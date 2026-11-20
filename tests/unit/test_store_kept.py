@@ -279,6 +279,7 @@ def _forget_scopes(path: Path) -> None:
     try:
         for column in ("scope_thread_id", "scope_campaign_id"):
             connection.execute(f"ALTER TABLE approvals DROP COLUMN {column}")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()
@@ -308,6 +309,7 @@ def _forget_kept_columns(path: Path) -> None:
         connection.execute("DROP INDEX approvals_kept")
         for column in ("digest", "kept_until", "permit_until", "used_at"):
             connection.execute(f"ALTER TABLE approvals DROP COLUMN {column}")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()

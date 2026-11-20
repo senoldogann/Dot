@@ -46,7 +46,7 @@ async def test_backup_now_copies_the_database_and_list_lists_it(home: Path, caps
 async def test_a_folder_that_cannot_be_written_ends_with_dot_s_error(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def refused(database: Path, folder: Path, now: float) -> None:
+    def refused(database: Path, folder: Path, partial: Path, now: float) -> None:
         raise PermissionError(13, "Operation not permitted", str(folder))
 
     monkeypatch.setattr(cli_backup, "make_backup", refused)
