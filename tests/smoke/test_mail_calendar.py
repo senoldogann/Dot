@@ -199,7 +199,10 @@ class _Gate:
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
-    (home / "config.toml").write_text("[browser]\nheadless = true\n", encoding="utf-8")
+    # Every tool at every step (the default is groups since item 1280): the test reads what the first step carries.
+    (home / "config.toml").write_text(
+        '[browser]\nheadless = true\n\n[agent]\ntool_surface = "full"\n', encoding="utf-8"
+    )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(home / "chrome"))
@@ -362,6 +365,8 @@ async def test_a_run_has_the_tools_and_names_the_accounts_only_once_one_is_signe
     )
     model: _Recording = _Recording(ScriptedProvider(parse_model_ref(SCRIPTED_MODEL).provider, [done, done]))
     config: AppConfig = eval_config(load_default_config())
+    # Every tool at every step (groups are the default since item 1280): the test reads what each step carries.
+    config = config.model_copy(update={"agent": config.agent.model_copy(update={"tool_surface": "full"})})
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(config, login_env)

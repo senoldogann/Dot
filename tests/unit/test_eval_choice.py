@@ -264,13 +264,13 @@ def test_a_stand_in_answers_from_its_table_and_says_how_a_key_looks_when_it_has_
 
 def test_a_grouped_task_plays_with_its_tools_in_groups_and_its_servers_given() -> None:
     config = eval_config(load_default_config())
-    assert config.agent.tool_surface == "full" and config.agent.mcp_purposes is True
+    assert config.agent.tool_surface == "grouped" and config.agent.mcp_purposes is True
     task: EvalTask = select_tasks(["rates-server-by-its-words"])[0]
     played = with_servers(config, task)
     assert played.agent.tool_surface == "grouped"
     assert [server.name for server in played.mcp] == ["ab-tools", "zq-kit"]
     # The setting of the lines is the run's, not the task's; the rest of the agent's settings are as they were.
-    assert played.agent.model_copy(update={"tool_surface": "full"}) == config.agent
+    assert played.agent == config.agent
     quiet = with_servers(config, select_tasks(["write-todo-note"])[0])
     assert quiet.agent == config.agent and quiet.mcp == []
     off = with_servers(

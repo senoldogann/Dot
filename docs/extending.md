@@ -368,10 +368,10 @@ The ways a service connects:
   server offers by default, are that page's words and code, and stay out of a run's tools; a server added before keeps
   the arguments it was added with.
 
-**Choose actions** (items 426 and 524): a server offers a run every tool it lists, however many. With the default `[agent]
+**Choose actions** (items 426 and 524): a server offers a run every tool it lists, however many. With `[agent]
 tool_surface = "full"` each step of a run carries the definition of every one of them, so a server of many tools makes
-every request longer; `tool_surface = "grouped"` keeps a server's tools out of a run until it turns the server's group
-on. A run of more than 128 tools starts grouped whatever the setting, as some providers refuse more in one request
+every request longer; `tool_surface = "grouped"`, the default since item 1280, keeps a server's tools out of a run until
+it turns the server's group on. A run of more than 128 tools starts grouped whatever the setting, as some providers refuse more in one request
 ([runs](runs.md)). The groups a grouped run has on (those its chat used before, the servers picked for its message, and
 those it turns on) may still bring a request past what its provider takes, and the request then fails with the
 provider's error, so cut a big server down here. A model whose window is smaller than the system prompt and every tool

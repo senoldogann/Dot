@@ -389,9 +389,12 @@ steer_single_actions = true
 # search and saving, delegation, skills, the plan and finish) and the groups the thread already used. The other groups
 # (browser, desktop, schedule, memory_admin, one per MCP server) are listed in the prompt; a group is turned on when the
 # model calls use_tools or one of its tools, and stays on for the rest of the run. "auto": grouped for a model of the
-# weak tier or whose window cut the context budget, full otherwise. "full" until evals show that groups help. A run of
-# more than 128 tools starts grouped whatever this says, as some providers take no more in one request (item 524).
-tool_surface = "full"
+# weak tier or whose window cut the context budget, full otherwise. "grouped" is the default since item 1280: the eval
+# catalog (47 tasks, one attempt each, deepseek-v4.1-flash, 2026-11-20) passed 47 of 47 grouped against 46 of 47 full at
+# 69.6 k tokens a pass against 123.0 k, and 188 of the 205 task runs in the owner's database had started grouped
+# already (more than 128 tools). A run of more than 128 tools starts grouped whatever this says, as some providers take no more
+# in one request (item 524).
+tool_surface = "grouped"
 # How much the system prompt says (item 280). "full": how to work, each kind of tool at length, trust and safety.
 # "lean": the same rules of trust and safety, of hesitating and of how a run ends, and how to work and each kind of
 # tool in a few lines. With tool_surface = "grouped" as well, a run starts lean: the shortest prompt and the core tools.

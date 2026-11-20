@@ -178,7 +178,12 @@ async def test_a_tool_the_run_let_go_is_not_named_and_not_callable() -> None:
     again for what stays — so no section of the prompt opens for a tool it let go, and calling that tool answers
     unknown.
     A fit that runs after the prompt is built (or a registry built from the tools before the fit) turns this red."""
-    config: AppConfig = _with_context_size(eval_config(load_default_config()), 12_000)
+    # Every tool at every step (item 1280: groups are the default): `tools_offered` then counts every tool the run kept,
+    # which is what the check below that fewer than all were offered rests on.
+    full: AppConfig = eval_config(load_default_config())
+    config: AppConfig = _with_context_size(
+        full.model_copy(update={"agent": full.agent.model_copy(update={"tool_surface": "full"})}), 12_000
+    )
     asked: ScriptedTurn = ScriptedTurn(
         text="", calls=(ScriptedCall(tool="show_page", arguments={"title": "x", "html": "<b>x</b>"}),)
     )
@@ -218,7 +223,11 @@ async def test_a_tool_the_run_let_go_is_not_named_and_not_callable() -> None:
 
 
 async def test_a_fresh_homes_first_step_stays_within_its_budget() -> None:
-    parts: ContextParts = await _first_parts(eval_config(load_default_config()))
+    # The budget is that of every tool offered and the full prompt: the surface is `full` here (item 1280 made groups
+    # the default, whose first step carries the core tools and the lines of the groups, and is smaller in all).
+    config: AppConfig = eval_config(load_default_config())
+    config = config.model_copy(update={"agent": config.agent.model_copy(update={"tool_surface": "full"})})
+    parts: ContextParts = await _first_parts(config)
     system: int = round(sum(parts.system.values()) / 3.2)
     tools: int = round(sum(parts.tools.values()) / 3.2)
     said: str = (

@@ -360,8 +360,8 @@ def _scaffold(tier: Tier, context_tokens: int, chosen: int | None) -> Scaffold:
 
 
 def test_auto_groups_the_tools_of_a_weak_model_and_of_a_window_that_cut_the_budget() -> None:
-    assert DEFAULTS.tool_surface == "full"
-    assert surface_for(DEFAULTS, _scaffold("weak", 18_000, None)) == ("full", '[agent] tool_surface is "full"')
+    assert DEFAULTS.tool_surface == "grouped"
+    assert surface_for(DEFAULTS, _scaffold("weak", 18_000, None)) == ("grouped", '[agent] tool_surface is "grouped"')
     assert surface_for(GROUPED, _scaffold("standard", 48_000, None)) == ("grouped", '[agent] tool_surface is "grouped"')
     assert surface_for(AUTO, _scaffold("weak", 48_000, None)) == (
         "grouped",
