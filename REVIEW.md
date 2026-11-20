@@ -120,6 +120,9 @@ here points at a test that no longer exists.
   schedule's goal cut in the middle, and an MCP call's arguments cut at 300 characters (K3-02, item 1251).
 - `tests/unit/test_pixel_click.py::test_a_part_of_a_button_presses_the_button` — a click at a pixel was judged by no
   element, so a payment button held back by its ref was pressed by its pixel (B2-01, item 1252).
+- `tests/unit/test_check_item_records.py::test_a_commit_that_writes_another_items_records_is_an_offence` — a branch
+  renumbered to the number main had just taken wrote over that item's changelog and roadmap, twice in one pull request
+  (item 1265, the gate's `scripts/check_item_records.py`).
 
 ## Evidence and format
 
