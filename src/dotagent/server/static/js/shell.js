@@ -139,7 +139,7 @@ export function buildShell({ homeRoute }) {
   let back = null;
   let pageBack;
   const menu = el("button", {
-    class: "icon-btn",
+    class: "icon-btn side-opener",
     type: "button",
     "aria-controls": "sidebar",
     "aria-expanded": "false",
