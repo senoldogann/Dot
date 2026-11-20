@@ -27,7 +27,7 @@ from dotagent.events import Subscription
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.server import CLI_SOURCE
+from dotagent.server import CLI_SOURCE, REVIEW_SOURCE
 from dotagent.store.models import RunMode, RunRecord
 
 log = get_logger(__name__)
@@ -57,6 +57,7 @@ async def execute_run(
     approvals: ApprovalMode | None,
     goal_mode: bool | None,
     thread_id: str | None,
+    source: str,
 ) -> RunRecord:
     """Start one run, show its events live and return the finished record. Ctrl-C stops the run."""
     return await follow_run(
@@ -64,7 +65,7 @@ async def execute_run(
         manager,
         ui,
         lambda: manager.start(
-            goal, mode, model, thread_id, CLI_SOURCE, None, effort, "standard", None, approvals, goal_mode, ()
+            goal, mode, model, thread_id, source, None, effort, "standard", None, approvals, goal_mode, ()
         ),
     )
 
@@ -198,7 +199,7 @@ async def run_here(config: AppConfig, command: RunCommand, goal: str, options: U
                     command.mode,
                     command.model,
                     command.thread,
-                    CLI_SOURCE,
+                    REVIEW_SOURCE if command.review else CLI_SOURCE,
                     command.effort,
                     "standard",
                     None,
@@ -220,6 +221,7 @@ async def run_here(config: AppConfig, command: RunCommand, goal: str, options: U
                 command.approvals,
                 command.goal_mode,
                 command.thread,
+                REVIEW_SOURCE if command.review else CLI_SOURCE,
             )
         )
         # The answer comes first: the lessons are drawn after the run's end.
@@ -282,7 +284,17 @@ async def cmd_chat(command: ChatCommand) -> int:
             if not text:
                 continue
             run: RunRecord = await execute_run(
-                runtime, manager, ui, text, "chat", command.model, command.effort, command.approvals, None, thread_id
+                runtime,
+                manager,
+                ui,
+                text,
+                "chat",
+                command.model,
+                command.effort,
+                command.approvals,
+                None,
+                thread_id,
+                CLI_SOURCE,
             )
             thread_id = run.thread_id
             if not ui.streamed(run.result):

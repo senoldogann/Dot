@@ -415,8 +415,9 @@ class StartRunRequest(FrozenModel):
     key: MessageKey | None = None
     # Who sent it: Dot's pages and phones (``ui``), or ``dotx run``, which hands its run to the daemon (``cli``) and
     # keeps the source a run of its own process has. The two weigh the same for the policy
-    # (``agent.progress.can_ask_user``); the plugin scout reads only the pages' goals as the owner's.
-    source: Literal["ui", "cli"] = "ui"
+    # (``agent.progress.can_ask_user``); the plugin scout reads only the pages' goals as the owner's. ``review``: a
+    # code review of ``dotx run --review``, whose chat is kept apart from the owner's.
+    source: Literal["ui", "cli", "review"] = "ui"
 
     @model_validator(mode="after")
     def _fits_standing(self) -> Self:

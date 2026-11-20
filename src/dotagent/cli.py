@@ -172,6 +172,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     run.add_argument("--thread", default=None, help="continue an existing conversation thread")
+    run.add_argument(
+        "--review",
+        action="store_true",
+        help="a code review: its chat is kept under Code reviews, apart from your chats",
+    )
     run.add_argument("--no-input", action="store_true", help="never prompt; approvals are denied")
     run.add_argument("--thinking", action="store_true", help="show the model's reasoning stream")
     run.add_argument("--verbose", action="store_true", help="show tool output and token use")
