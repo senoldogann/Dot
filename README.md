@@ -6,9 +6,10 @@ screen, mouse and keyboard (computer use), AppleScript, a memory that lasts betw
 and sub-agents.
 
 It runs on models from **Ollama** (local models, and cloud models through the local Ollama server), the **OpenAI** API,
-**OpenCode Go**, the **Anthropic** API (the Claude models), **OpenRouter** (the models of many labs on one key) or
-**OpenCode Zen**'s free models. A daemon on the Mac serves a web UI and a REST API and runs the schedules, and
-`dotx run` and `dotx chat` work in the terminal. Dot runs on macOS only.
+**OpenCode Go**, the **Anthropic** API (the Claude models), **OpenRouter** (the models of many labs on one key),
+**Google**'s Gemini API, a Google Antigravity plan, your own **Claude Code** plan or **OpenCode Zen**'s free models. A
+daemon on the Mac serves a web UI and a REST API and runs the schedules, and `dotx run` and `dotx chat` work in the
+terminal. Dot runs on macOS only.
 
 Dot works on a goal on its own, and by default it asks you before a risky step. In the default approval mode, `ask`,
 edits and routine work run without a question, and what the policy raises waits for your answer on a card in the chat.

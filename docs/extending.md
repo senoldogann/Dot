@@ -680,11 +680,13 @@ one skill folder (`~/.claude/skills/<name>`), to take some skills only: `~/.clau
 Claude Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The skills you wrote for
 Claude Code are then the playbook a campaign can work from.
 
-Dot comes with three skills of its own, for work that has to know this Mac: `excel` (reading and changing a workbook
+Dot comes with five skills of its own, for work that has to know this Mac: `excel` (reading and changing a workbook
 with openpyxl, getting the results of its formulas from LibreOffice or Excel, which openpyxl does not compute, and
 driving Excel with AppleScript), `word` (changing the text of a Word document with python-docx without losing its
 formatting, and driving Word with AppleScript) and `onedrive` (where OneDrive keeps the folders it syncs,
-`~/Library/CloudStorage/OneDrive-*`, the files it keeps only online, and what a change there does in the cloud). They
+`~/Library/CloudStorage/OneDrive-*`, the files it keeps only online, and what a change there does in the cloud),
+`deep-os` (the command behind a Mac setting or an app command, before the window: [deep-os.md](deep-os.md)) and `captcha`
+(the human check in front of a page: [captcha.md](captcha.md)). They
 are read after every other skill, so a skill of yours with the same name is used instead of one of them, and
 `builtin = false` under `[skills]` leaves them out. A skill's instructions name Dot's own Python, which has openpyxl,
 python-docx and python-pptx, as `{{dot_python}}`: the `skill` tool puts the path of that Python there, quoted for the

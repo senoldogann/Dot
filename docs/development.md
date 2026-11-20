@@ -259,6 +259,7 @@ src/dotagent/
   cli*.py     the command line: the parser and the command models (light), one module per command family loaded by name
   agent/      run loop, run manager, approvals, context trimming, vision relay
   llm/        providers (Ollama, OpenAI, OpenCode Go, Anthropic, OpenRouter, Google, Antigravity) and their wire codecs
+  claude_code/ opencode/   a model of your Claude plan (`claude_code:`) and OpenCode's own agent, run through their programs
   policy/     action descriptions, shell analysis, the decision engine
   tools/      the tools the model can call
   browser/    Playwright session, snapshots, safety
