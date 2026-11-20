@@ -81,6 +81,11 @@ _OPENROUTER_NO_ENDPOINT: re.Pattern[str] = re.compile(
 # How OpenRouter words a 402 for credits that do not pay for the longest answer a request allows: "This request requires
 # more credits, or fewer max_tokens. You requested up to 131072 tokens, but can only afford 29597."
 _OPENROUTER_CREDITS: str = "credits"
+# How OpenRouter words a 402 for credits that pay for the request alone but not beside the account's other requests
+# still running, each priced at the longest answer it allows (item 1267): "This request would exceed your available
+# credits given your current in-flight requests. Retry after in-flight requests settle, or add credits." It passes
+# once they end, as a burst does.
+_OPENROUTER_IN_FLIGHT: str = "in-flight requests"
 _OPENROUTER_AFFORDABLE: re.Pattern[str] = re.compile(r"can only afford (\d+)")
 # How Ollama's server words a model runner that broke off: its request to the runner on the loopback failed (item 256;
 # seen as an HTTP 400 of the embedding route, `Post "http://127.0.0.1:<port>/tokenize": ... connection reset by peer`).
@@ -260,11 +265,14 @@ def classify_openrouter(
     status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject, routed: bool = False
 ) -> ProviderHttpError:
     """OpenRouter: a 402 that speaks of credits is :class:`ProviderCreditError`, with the longest answer the credits pay
-    for when the message names it; a 404 that says the account's privacy settings leave no provider of the model is a
-    refused access, worded with what excluded them and where to change that (item 361). ``routed``: the request carried
-    the model's ``[providers.openrouter] routing``, which may be what left no provider (item 737), so a 404 of that
-    kind, or one that says no allowed provider, or no endpoint that can handle the requested parameters, is left,
+    for when the message names it, except one that says the requests still running hold them, which is a rate limit
+    retried until they end (item 1267); a 404 that says the account's privacy settings leave no provider of the model is
+    a refused access, worded with what excluded them and where to change that (item 361). ``routed``: the request
+    carried the model's ``[providers.openrouter] routing``, which may be what left no provider (item 737), so a 404 of
+    that kind, or one that says no allowed provider, or no endpoint that can handle the requested parameters, is left,
     is a refused access that names the routing too."""
+    if status == 402 and wire is not None and _OPENROUTER_IN_FLIGHT in wire.message.lower():
+        return ProviderRateLimitError(error_message(status, wire), status, retry_after_s, detail)
     if status == 402 and wire is not None and _OPENROUTER_CREDITS in wire.message.lower():
         found: re.Match[str] | None = _OPENROUTER_AFFORDABLE.search(wire.message)
         affordable: int | None = None if found is None else int(found.group(1))
