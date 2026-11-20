@@ -24,8 +24,6 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from Quartz import CGEventSourceSecondsSinceLastEventType, kCGAnyInputEventType, kCGEventSourceStateHIDSystemState
-
 from dotagent.agent.manager import RunManager, goes_on_from, thread_title
 from dotagent.agent.resume import RESUME_SOURCE, cut_off_by
 from dotagent.config import InitiativeConfig
@@ -158,6 +156,9 @@ def in_peak(now: float, hours: tuple[int, ...]) -> bool:
 def idle_seconds() -> float | None:
     """How long nobody touched the keyboard, the mouse or the trackpad, in seconds; ``None`` when macOS cannot say,
     which counts as not idle."""
+    # Quartz is loaded by the look, so the initiative loads where it is not (item 1270).
+    from Quartz import CGEventSourceSecondsSinceLastEventType, kCGAnyInputEventType, kCGEventSourceStateHIDSystemState
+
     try:
         seconds: object = CGEventSourceSecondsSinceLastEventType(
             kCGEventSourceStateHIDSystemState, kCGAnyInputEventType

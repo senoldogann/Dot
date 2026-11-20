@@ -60,6 +60,7 @@ def test_macos_answers_mean_a_state_and_each_state_offers_its_step() -> None:
     assert [folder_step("not_synced"), folder_step("synced")] == ["open_app", None]
 
 
+@pytest.mark.macos
 def test_macos_is_asked_about_automation_without_a_question() -> None:
     assert mac.automation_state("com.apple.finder") in {"allowed", "not_asked", "refused", "not_open"}
     assert mac.automation_state("com.example.no-such-application") == "not_open"

@@ -56,6 +56,7 @@ async def test_a_run_moves_between_its_working_states_until_it_ends(tmp_path: Pa
         await store.close()
 
 
+@pytest.mark.macos
 async def test_a_run_ended_while_queued_does_none_of_its_work(monkeypatch: pytest.MonkeyPatch) -> None:
     """A run closed as it was about to start (a dead command's close, the daemon's start) starts no work: no
     ``run_started``, no call of its model, and the end it had is the only one it keeps (item 1045)."""

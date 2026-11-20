@@ -26,6 +26,7 @@ def test_videos_and_sounds_are_told_by_their_type_or_their_name() -> None:
     assert media_kind("notes.pdf", "application/pdf") is None
 
 
+@pytest.mark.macos
 def test_a_video_is_kept_as_it_came_and_the_run_is_told_to_watch_it(tmp_path: Path) -> None:
     # Past the limit of a document: a minute of an iPhone's video is tens of megabytes.
     data: bytes = b"\x00" * (MAX_ATTACHMENT_BYTES + 1)
@@ -37,6 +38,7 @@ def test_a_video_is_kept_as_it_came_and_the_run_is_told_to_watch_it(tmp_path: Pa
     assert 'kind="video"' in told and "watch_video on the path above" in told and "name the language spoken" in told
 
 
+@pytest.mark.macos
 def test_a_voice_message_is_kept_as_a_sound(tmp_path: Path) -> None:
     stored: StoredAttachment = store_attachment(tmp_path, "Audio Message.caf", "audio/caf", _CAF)
     assert stored.kind == "audio"
@@ -48,6 +50,7 @@ def test_a_document_keeps_its_own_limit(tmp_path: Path) -> None:
         store_attachment(tmp_path, "big.txt", "text/plain", b"a" * (MAX_ATTACHMENT_BYTES + 1))
 
 
+@pytest.mark.macos
 def test_a_text_file_a_browser_calls_a_video_is_read_as_text(tmp_path: Path) -> None:
     # A browser calls a TypeScript file video/mp2t: its first bytes read as text, so it is no video.
     stored: StoredAttachment = store_attachment(tmp_path, "app.ts", "video/mp2t", b"export const x = 1;\n")

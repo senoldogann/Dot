@@ -22,7 +22,9 @@ it). A plugin's card has its mark, its name with a check when its publisher make
 publishes it, its kind and how many skills it brings, what it does, and **Install**, or **Installed** with a Remove. A
 card opens the plugin's own page: the skills it brings, the repository and the commit Dot pins, its licence, its stars
 and since when the gallery has it. A plugin with no logo wears a skill's puzzle piece (item 537), in the theme's ink on
-the quiet tile every mark stands on (item 946). On a phone New & noteworthy is a row that scrolls sideways. `GET
+the quiet tile every mark stands on (item 946). On a phone New & noteworthy is a row that scrolls sideways, and the
+plugins of **All plugins** (Installed's among them, "Not from the gallery" a row of the list) stand as one list in one
+frame, a hairline between the rows, as Connectors' services do (items 1266 and 1269). `GET
 /api/plugin-gallery` lists the plugins with where each stands (`available`, `installed`, or `taken` when a plugin of
 Dot's has its name) and the plugins Dot reads that are not the gallery's, which **Installed** lists under "Not from the
 gallery", with a Remove for one in Dot's own plugins folder.

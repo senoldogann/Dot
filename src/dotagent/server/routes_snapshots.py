@@ -3,6 +3,7 @@ yet claimed, a setting changed from the page (live, and kept in the config file)
 claim a composer makes of the captures waiting for it."""
 
 import asyncio
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Request
 
@@ -10,9 +11,13 @@ from dotagent.config import SnapshotSound
 from dotagent.config_edit import set_setting
 from dotagent.core.errors import ConfigError
 from dotagent.core.paths import config_path
-from dotagent.desktop.snapshots import SHORTCUT_WORDS, SnapshotService
+from dotagent.desktop.snapshot_models import SHORTCUT_WORDS
 from dotagent.server.context import ServerContext
 from dotagent.server.views import SnapshotsClaimed, SnapshotSettingRequest, SnapshotsView
+
+if TYPE_CHECKING:
+    # The service listens to the keyboard through AppKit; the runtime makes it (item 1270).
+    from dotagent.desktop.snapshots import SnapshotService
 
 
 def snapshots_router(ctx: ServerContext) -> APIRouter:

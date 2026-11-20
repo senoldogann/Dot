@@ -37,6 +37,7 @@ from pptx.util import Inches
 from dotagent.agent.attachments import StoredAttachment, store_attachment
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_default_config
+from dotagent.desktop import apps
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -44,7 +45,6 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.office import OFFICE_MEDIA_TYPES
 from dotagent.previews import quicklook
 from dotagent.runtime import Runtime, close_runtime, open_runtime
-from dotagent.server import routes_files
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
@@ -521,7 +521,7 @@ async def test_a_file_a_message_carries_or_an_answer_names_opens_beside_the_conv
 ) -> None:
     """Before, a file's chip and a path in an answer were text: nothing showed the file."""
     opened: list[Path] = []
-    monkeypatch.setattr(routes_files, "open_document", opened.append)
+    monkeypatch.setattr(apps, "open_document", opened.append)
     with scratch_home() as home, eval_environment(home, {}):
         user_home: Path = _user_home(home)
         async with _daemon(login_env, user_home) as (runtime, manager, address), async_playwright() as playwright:

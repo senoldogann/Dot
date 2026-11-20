@@ -18,23 +18,20 @@ from typing import Protocol
 
 import AppKit
 import Quartz
-from pydantic import JsonValue
 
 from dotagent.config import DesktopConfig, SnapshotsConfig, SnapshotSound
 from dotagent.core.errors import DesktopError, DotError, InvalidValueError
 from dotagent.core.logs import get_logger
-from dotagent.core.types import FrozenModel
 from dotagent.desktop import apps, ax, capture, perms, render, safety, screen
 from dotagent.desktop.flight import FlightCommand, Frame
 from dotagent.desktop.pointer import PointerOverlay
 from dotagent.desktop.show_dot import Shower
+from dotagent.desktop.snapshot_models import Capture, Kept, SnapshotTaken
 from dotagent.desktop.types import AppInfo, AXElement, WindowInfo
 from dotagent.events import SNAPSHOT_EVENT, SNAPSHOT_FAILED_EVENT, SYSTEM_RUN_ID, EventBus
 
 log = get_logger(__name__)
 
-# How the shortcut reads on the page.
-SHORTCUT_WORDS: str = "⌘ ⌘"
 # The system sounds of the choices.
 SOUND_NAMES: dict[SnapshotSound, str] = {"click": "Tink", "pop": "Pop", "glass": "Glass", "off": ""}
 # The most characters of a window's text that go into the file.
@@ -52,38 +49,6 @@ _RIGHT_COMMAND: int = 0x10
 # A tap refused (the permission missing) is tried again this often, so the grant needs no restart of Dot.
 _RETRY_S: float = 5.0
 _SLOW: str = "the watch of the Command key did not start in time"
-
-
-class SnapshotTaken(FrozenModel):
-    """A capture kept: the application and the title of the window, the files it was kept as (as the composer lists
-    them: ``id``, ``name``, ``kind``, ``size``), and when."""
-
-    app: str
-    title: str
-    files: list[JsonValue]
-    taken_at: float
-
-
-class Capture(FrozenModel):
-    """A capture as taken, before it is kept: the application and the title of the window, the name its files take
-    before their extension, the picture as JPEG, the window's text ("" without) and where the window is on the screen
-    (for the flash and the flight, item 414)."""
-
-    app: str
-    title: str
-    stem: str
-    image: bytes
-    text: str
-    frame: Frame
-
-
-class Kept(FrozenModel):
-    """A capture kept: what the composer is handed (``snapshot``), where the window was (``frame``) and the picture's
-    file (``picture``), which the card of the flight shows."""
-
-    snapshot: SnapshotTaken
-    frame: Frame
-    picture: str
 
 
 class TapDetector:

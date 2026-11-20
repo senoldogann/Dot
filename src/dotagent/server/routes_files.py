@@ -12,7 +12,6 @@ from fastapi.responses import FileResponse, Response
 from dotagent.agent.attachments import StoredAttachment, load_attachment
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import FrozenModel
-from dotagent.desktop.apps import open_document
 from dotagent.previews.paths import HEAD_BYTES, OFFICE_KINDS, image_type, located_file, opens_on_mac, shown_kind
 from dotagent.previews.pdfpages import page_png
 from dotagent.previews.quicklook import PAGE, QuickLook, media_type, part_path
@@ -151,7 +150,10 @@ def files_router(ctx: ServerContext, looks: QuickLook) -> APIRouter:
             raise InvalidValueError(
                 f"a {found.suffix or 'suffixless'} file is not opened in an application", {"path": request.path}
             )
-        await asyncio.to_thread(open_document, found)
+        # AppKit opens it: loaded by the open, so the server loads where AppKit is not (item 1270).
+        from dotagent.desktop import apps
+
+        await asyncio.to_thread(apps.open_document, found)
 
     return router
 

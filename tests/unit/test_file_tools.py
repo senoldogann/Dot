@@ -54,6 +54,7 @@ async def test_an_empty_text_to_replace_is_refused_before_anything_runs() -> Non
         await tool.prepare({"path": "a.txt", "old": "", "new": "X", "replace_all": True}, SimpleNamespace())  # type: ignore[arg-type]
 
 
+@pytest.mark.macos
 def test_a_heic_photo_is_read_as_an_image(tmp_path: Path) -> None:
     photo: Path = tmp_path / "IMG_0001.HEIC"
     photo.write_bytes(HEIC)
@@ -61,6 +62,7 @@ def test_a_heic_photo_is_read_as_an_image(tmp_path: Path) -> None:
     assert (read.is_error, read.text, len(read.images)) == (False, "Image IMG_0001.HEIC: 16x12px", 1)
 
 
+@pytest.mark.macos
 def test_a_heic_photo_stored_on_its_side_is_read_as_it_is_held(tmp_path: Path) -> None:
     photo: Path = tmp_path / "IMG_0002.HEIC"
     photo.write_bytes(HEIC_ON_ITS_SIDE)
@@ -68,6 +70,7 @@ def test_a_heic_photo_stored_on_its_side_is_read_as_it_is_held(tmp_path: Path) -
     assert (read.is_error, read.text, len(read.images)) == (False, "Image IMG_0002.HEIC: 12x16px", 1)
 
 
+@pytest.mark.macos
 def test_a_new_file_gets_the_usual_permission_bits_and_a_file_that_was_there_keeps_its_own(tmp_path: Path) -> None:
     made: Path = tmp_path / "site" / "index.html"
     atomic_write(made, "<p>Hello</p>\n", _journal(tmp_path))

@@ -9,13 +9,9 @@ import subprocess
 import time
 from functools import cache
 from pathlib import Path
-from typing import Literal
 
-import AppKit
-
+from dotagent.connections.states import AutomationState as AutomationState
 from dotagent.core.errors import DesktopError
-
-type AutomationState = Literal["allowed", "not_asked", "refused", "not_open"]
 
 _CORE_SERVICES: str = "/System/Library/Frameworks/CoreServices.framework/CoreServices"
 # The answers of AEDeterminePermissionToAutomateTarget: noErr, errAEEventWouldRequireUserConsent,
@@ -96,6 +92,8 @@ def ask_automation(bundle_id: str) -> AutomationState:
 
 def installed_app(bundle_id: str) -> Path | None:
     """Where Launch Services finds the application ``bundle_id``; ``None`` when it is not installed."""
+    import AppKit
+
     url: object = AppKit.NSWorkspace.sharedWorkspace().URLForApplicationWithBundleIdentifier_(bundle_id)
     return None if url is None else Path(str(AppKit.NSURL.path(url)))
 

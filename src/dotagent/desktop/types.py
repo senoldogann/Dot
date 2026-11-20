@@ -45,6 +45,35 @@ DEFAULT_SCROLL_PX: int = 400
 _REF: re.Pattern[str] = re.compile(r"^a?(\d{1,7})$")
 
 
+# The name of the desktop's acting tool, which a resumed run reads too (``agent/resume.py``): here, of the types, so
+# that reading it loads none of the desktop's frameworks (item 1270).
+DESKTOP_ACT_TOOL: str = "desktop_act"
+
+# The roles of the elements a step acts on: what a snapshot numbers and a view counts (``ax``, ``render``, ``views``).
+# Here, of the types, so that the pure parts that read it load without the accessibility frameworks (item 1270).
+INTERACTIVE_ROLES: frozenset[str] = frozenset(
+    {
+        "AXButton",
+        "AXCheckBox",
+        "AXRadioButton",
+        "AXTextField",
+        "AXTextArea",
+        "AXComboBox",
+        "AXPopUpButton",
+        "AXMenuButton",
+        "AXMenuItem",
+        "AXMenuBarItem",
+        "AXLink",
+        "AXSlider",
+        "AXTab",
+        "AXSwitch",
+        "AXDisclosureTriangle",
+        "AXIncrementor",
+        "AXSearchField",
+    }
+)
+
+
 @dataclass(frozen=True, slots=True)
 class Point:
     x: float

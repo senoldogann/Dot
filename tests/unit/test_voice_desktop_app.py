@@ -218,6 +218,7 @@ def test_the_reader_asks_for_the_desktop_app_by_its_bundle_identifier() -> None:
     assert asked == ["dev.dot.desktop", "dev.example.other"]
 
 
+@pytest.mark.macos
 def test_no_app_runs_under_a_bundle_identifier_nobody_has() -> None:
     # The real NSRunningApplication, asked for an app that cannot be running.
     assert running_apps("dev.dot.no-such-app-636") == ()

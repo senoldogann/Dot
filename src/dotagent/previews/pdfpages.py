@@ -1,34 +1,12 @@
 """The pages of a PDF as pictures for the panel beside a chat, drawn by Core Graphics: a page shows as it is in every
 browser, a phone's too, where a PDF in a frame shows its first page alone or nothing. Core Graphics draws on any
-thread, so a page is drawn off the event loop."""
+thread, so a page is drawn off the event loop. Core Graphics is imported by the functions that draw, so that the panel's
+routes load where it is not, as on the Linux that runs a cloud agent's unit tests (item 1270)."""
 
 import io
 from pathlib import Path
 
-from Foundation import NSURL
 from PIL import Image
-from Quartz import (
-    CGBitmapContextCreate,
-    CGBitmapContextGetBytesPerRow,
-    CGBitmapContextGetData,
-    CGColorSpaceCreateDeviceRGB,
-    CGContextConcatCTM,
-    CGContextDrawPDFPage,
-    CGContextFillRect,
-    CGContextScaleCTM,
-    CGContextSetRGBFillColor,
-    CGPDFDocumentCreateWithURL,
-    CGPDFDocumentGetNumberOfPages,
-    CGPDFDocumentGetPage,
-    CGPDFDocumentIsUnlocked,
-    CGPDFPageGetBoxRect,
-    CGPDFPageGetDrawingTransform,
-    CGPDFPageGetRotationAngle,
-    CGRectMake,
-    PDFDocument,
-    kCGImageAlphaPremultipliedLast,
-    kCGPDFCropBox,
-)
 
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import FrozenModel
@@ -45,6 +23,9 @@ class PageSize(FrozenModel):
 
 
 def _document(path: Path) -> object:
+    from Foundation import NSURL
+    from Quartz import CGPDFDocumentCreateWithURL, CGPDFDocumentIsUnlocked
+
     document: object | None = CGPDFDocumentCreateWithURL(NSURL.fileURLWithPath_(str(path)))
     if document is None:
         raise InvalidValueError("the PDF cannot be read", {"path": str(path)})
@@ -54,6 +35,8 @@ def _document(path: Path) -> object:
 
 
 def _size(page: object) -> PageSize:
+    from Quartz import CGPDFPageGetBoxRect, CGPDFPageGetRotationAngle, kCGPDFCropBox
+
     box = CGPDFPageGetBoxRect(page, kCGPDFCropBox)
     turned: bool = CGPDFPageGetRotationAngle(page) % 180 != 0
     width, height = (box.size.height, box.size.width) if turned else (box.size.width, box.size.height)
@@ -62,6 +45,8 @@ def _size(page: object) -> PageSize:
 
 def page_sizes(path: Path) -> tuple[PageSize, ...]:
     """The size of each page of the PDF at ``path``. ``InvalidValueError`` when it cannot be read or is locked."""
+    from Quartz import CGPDFDocumentGetNumberOfPages, CGPDFDocumentGetPage
+
     document: object = _document(path)
     return tuple(
         _size(CGPDFDocumentGetPage(document, number))
@@ -77,6 +62,9 @@ def pdf_text(path: Path, most_chars: int) -> tuple[str, bool]:
     """The text of the first ``TEXT_PAGES`` pages of the PDF at ``path``, in order, at most ``most_chars`` characters
     in all, and whether it was cut at either bound (item 403): what the panel's copy takes. A PDF of pictures alone,
     or one PDFKit cannot read, gives ""."""
+    from Foundation import NSURL
+    from Quartz import PDFDocument
+
     # PDFKit's proxies carry no types: the document and its pages are read through PyObjC as they come.
     document = PDFDocument.alloc().initWithURL_(NSURL.fileURLWithPath_(str(path)))
     if document is None:
@@ -104,6 +92,24 @@ MOST_PAGE_HEIGHT: int = 20_000
 
 def page_png(path: Path, number: int, width: int) -> bytes:
     """Page ``number`` (from 1) of the PDF at ``path`` as a PNG ``width`` pixels wide, on white."""
+    from Quartz import (
+        CGBitmapContextCreate,
+        CGBitmapContextGetBytesPerRow,
+        CGBitmapContextGetData,
+        CGColorSpaceCreateDeviceRGB,
+        CGContextConcatCTM,
+        CGContextDrawPDFPage,
+        CGContextFillRect,
+        CGContextScaleCTM,
+        CGContextSetRGBFillColor,
+        CGPDFDocumentGetNumberOfPages,
+        CGPDFDocumentGetPage,
+        CGPDFPageGetDrawingTransform,
+        CGRectMake,
+        kCGImageAlphaPremultipliedLast,
+        kCGPDFCropBox,
+    )
+
     if width not in PAGE_WIDTHS:
         raise InvalidValueError("a page is drawn at one of the widths of PAGE_WIDTHS", {"width": width})
     document: object = _document(path)

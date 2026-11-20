@@ -284,6 +284,7 @@ async def test_structured_content_is_used_when_there_is_no_other_content() -> No
     assert "(the tool returned no content)" in empty.text and empty.is_error
 
 
+@pytest.mark.macos
 async def test_a_long_answer_is_kept_whole_in_a_file_and_its_start_shown_inside_the_fence(tmp_path: Path) -> None:
     body: str = "\n".join(f"line {number}" for number in range(1, 5001))
     result: CallToolResult = CallToolResult(content=[TextContent(text=body)], is_error=False)
@@ -307,6 +308,7 @@ async def test_an_answer_within_the_budget_writes_no_file(tmp_path: Path) -> Non
     assert not await asyncio.to_thread((tmp_path / "kept").exists)
 
 
+@pytest.mark.macos
 async def test_one_line_longer_than_the_budget_shows_its_start(tmp_path: Path) -> None:
     result: CallToolResult = CallToolResult(content=[TextContent(text="y" * 50_000)], is_error=False)
     rendered: ToolResult = await render_call_result("srv", "tool", result, 1000, 512, 70, "n0nce", tmp_path)

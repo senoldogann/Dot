@@ -26,6 +26,7 @@ async def _kill_processes(marker: str) -> None:
     await process.wait()
 
 
+@pytest.mark.macos
 async def test_a_cancelled_script_does_not_leave_osascript_running() -> None:
     # The marker sits in a comment of the script, so it names this osascript among the processes and nothing else.
     marker: str = f"dot-test-176-{uuid.uuid4().hex}"

@@ -3,6 +3,8 @@ the daemon resumes on its own, and what the resumed run is told."""
 
 from datetime import UTC, datetime
 
+import pytest
+
 from dotagent.agent.compact import pending_calls
 from dotagent.agent.continuity import continuity_note, named_ids, new_ledger, with_actions
 from dotagent.agent.plan import EMPTY_PLAN, PlanItem, PlanPayload
@@ -151,6 +153,7 @@ def test_a_meta_call_is_repeated_only_when_a_second_call_sets_what_the_first_set
     assert "find_help {}: it was cut off while it ran. It only reads, so it may run again." in note
 
 
+@pytest.mark.macos
 def test_the_meta_tools_named_repeatable_are_tools_that_exist() -> None:
     names: set[str] = {tool.spec.name for group in _tool_groups(load_default_config(), False) for tool in group}
     assert names >= REPEATABLE_META_TOOLS, REPEATABLE_META_TOOLS - names

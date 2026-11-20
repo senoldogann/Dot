@@ -50,6 +50,7 @@ def test_the_staging_folder_is_a_folder_of_dots_own_under_the_owners_pictures_un
     assert staging_dir() == tmp_path / "elsewhere"
 
 
+@pytest.mark.macos
 def test_a_test_run_stages_in_a_pytest_folder_and_a_staging_folder_anywhere_else_is_refused(
     home: Layout, tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -94,6 +95,7 @@ def test_a_copy_wears_the_files_name_made_safe_and_the_extension_its_type_gives_
     assert staged_name(picture(name, kind)) == expected
 
 
+@pytest.mark.macos
 def test_a_copy_is_made_in_a_new_private_folder_of_its_own(home: Layout, staging: Staging) -> None:
     found: Picture = pictured(home, kind="jpeg")
     first: Staged = staging.stage(found, NOW)
@@ -113,6 +115,7 @@ def test_a_copy_is_made_in_a_new_private_folder_of_its_own(home: Layout, staging
     assert (home.workspace / "chart.png").read_bytes() == HEADS["jpeg"]
 
 
+@pytest.mark.macos
 def test_a_picture_that_is_no_longer_one_leaves_no_folder_behind(home: Layout, staging: Staging) -> None:
     found: Picture = pictured(home)
     (home.workspace / "chart.png").write_bytes(NOT_IMAGE)
@@ -121,6 +124,7 @@ def test_a_picture_that_is_no_longer_one_leaves_no_folder_behind(home: Layout, s
     assert list(home.staging.iterdir()) == []
 
 
+@pytest.mark.macos
 def test_a_staging_folder_that_cannot_be_made_is_told(home: Layout, tmp_path: Path) -> None:
     (tmp_path / "blocked").write_text("a file where the folder should be")
     broken: Staging = Staging(tmp_path / "blocked" / "Dot", home.finder)
@@ -128,6 +132,7 @@ def test_a_staging_folder_that_cannot_be_made_is_told(home: Layout, tmp_path: Pa
         broken.stage(pictured(home), NOW)
 
 
+@pytest.mark.macos
 def test_a_copy_that_was_sent_stays_for_a_while_and_is_removed_when_its_time_is_over(
     home: Layout, staging: Staging
 ) -> None:
@@ -141,6 +146,7 @@ def test_a_copy_that_was_sent_stays_for_a_while_and_is_removed_when_its_time_is_
     assert not staged.folder.exists() and home.staging.exists() and not staging.due(NOW + STAGED_KEPT_S)
 
 
+@pytest.mark.macos
 def test_each_copy_goes_at_its_own_time(home: Layout, staging: Staging) -> None:
     early: Staged = staging.stage(pictured(home), NOW)
     late: Staged = staging.stage(pictured(home), NOW + 100)
@@ -152,12 +158,14 @@ def test_each_copy_goes_at_its_own_time(home: Layout, staging: Staging) -> None:
     assert not late.folder.exists()
 
 
+@pytest.mark.macos
 def test_a_copy_of_a_send_that_failed_is_removed_at_once(home: Layout, staging: Staging) -> None:
     staged: Staged = staging.stage(pictured(home), NOW)
     staging.drop(staged)
     assert not staged.folder.exists() and list(home.staging.iterdir()) == []
 
 
+@pytest.mark.macos
 def test_the_copies_an_earlier_daemon_left_are_removed_as_the_next_starts_and_nothing_else_is(
     home: Layout, staging: Staging
 ) -> None:
@@ -177,6 +185,7 @@ def test_the_copies_an_earlier_daemon_left_are_removed_as_the_next_starts_and_no
     assert own_file.is_file()
 
 
+@pytest.mark.macos
 def test_a_link_named_like_a_folder_of_ours_is_not_followed_or_removed(home: Layout, staging: Staging) -> None:
     precious: Path = home.home / "Documents" / "precious"
     precious.mkdir(parents=True)
@@ -188,6 +197,7 @@ def test_a_link_named_like_a_folder_of_ours_is_not_followed_or_removed(home: Lay
     assert (precious / "keep.txt").read_text() == "keep" and trap.is_symlink()
 
 
+@pytest.mark.macos
 def test_a_folder_named_like_ours_that_holds_no_mark_of_dots_is_never_removed(home: Layout, staging: Staging) -> None:
     """The staging folder is the owner's: a folder in it that Dot did not make stays, whatever its name says."""
     home.staging.mkdir(parents=True)
@@ -201,6 +211,7 @@ def test_a_folder_named_like_ours_that_holds_no_mark_of_dots_is_never_removed(ho
     assert [(entry["event"], entry["log_level"]) for entry in logs] == [("staged_picture_folder_left_alone", "info")]
 
 
+@pytest.mark.macos
 @pytest.mark.parametrize("mark", ["gone", "other words", "a link"])
 def test_a_folder_that_lost_the_mark_of_dots_is_not_removed_by_a_sweep_or_a_drop(
     home: Layout, staging: Staging, tmp_path: Path, mark: str
@@ -220,6 +231,7 @@ def test_a_folder_that_lost_the_mark_of_dots_is_not_removed_by_a_sweep_or_a_drop
     assert staged.path.exists()
 
 
+@pytest.mark.macos
 def test_a_folder_of_dots_that_holds_a_folder_is_left_whole(home: Layout, staging: Staging) -> None:
     """Only the files of a folder of Dot's go with it, never a tree: a folder in it is not Dot's."""
     staged: Staged = staging.stage(pictured(home), NOW - STAGED_KEPT_S)
@@ -232,6 +244,7 @@ def test_a_folder_of_dots_that_holds_a_folder_is_left_whole(home: Layout, stagin
     assert staged.path.exists() and (staged.folder / MARKER).exists()
 
 
+@pytest.mark.macos
 def test_a_link_in_a_folder_of_dots_goes_as_a_link_and_what_it_leads_to_stays(
     home: Layout, staging: Staging, tmp_path: Path
 ) -> None:
@@ -248,6 +261,7 @@ def test_a_link_in_a_folder_of_dots_goes_as_a_link_and_what_it_leads_to_stays(
     assert precious.read_text(encoding="utf-8") == "keep" and (tree / "keep.txt").read_text(encoding="utf-8") == "keep"
 
 
+@pytest.mark.macos
 def test_a_folder_whose_mark_cannot_be_written_is_taken_back(
     home: Layout, staging: Staging, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -260,6 +274,7 @@ def test_a_folder_whose_mark_cannot_be_written_is_taken_back(
     assert list(home.staging.iterdir()) == []
 
 
+@pytest.mark.macos
 def test_sweeping_a_staging_folder_that_does_not_exist_is_nothing(tmp_path: Path, home: Layout) -> None:
     Staging(tmp_path / "none" / "there", home.finder).sweep_old(NOW)
     Staging(tmp_path / "none" / "there", home.finder).sweep(NOW)

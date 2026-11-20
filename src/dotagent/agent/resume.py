@@ -30,6 +30,7 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.desktop.types import DESKTOP_ACT_TOOL
 from dotagent.llm.types import ToolCall
 from dotagent.policy.types import READ_ONLY_KINDS, ActionInfo, ActionKind, Flag
 from dotagent.runtime import Runtime
@@ -40,7 +41,6 @@ from dotagent.store.endings import classify_ending
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool
 from dotagent.tools.context import ToolContext
-from dotagent.tools.desktop import DESKTOP_ACT_TOOL
 from dotagent.tools.help import FIND_HELP_TOOL
 from dotagent.tools.meta import ASK_USER_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.pages import SHOW_PAGE_TOOL

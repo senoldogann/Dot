@@ -88,6 +88,7 @@ def test_the_property_list_is_in_dots_home_and_names_a_module_that_exists() -> N
     assert importlib.util.find_spec(RESTART_MODULE) is not None
 
 
+@pytest.mark.macos
 def test_macos_accepts_the_property_list(tmp_path: Path) -> None:
     plist: Path = tmp_path / f"{RESTART_LABEL}.plist"
     plist.write_bytes(render_restart_job(build_restart_job("/usr/bin/python3", tmp_path, tmp_path / "logs", {})))
@@ -608,6 +609,7 @@ async def test_a_run_cannot_stop_the_daemon_at_once(
     assert not (launchctl / "calls").exists()
 
 
+@pytest.mark.macos
 async def test_asking_while_a_restart_is_on_its_way_leaves_it_as_it_is(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, launchctl: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -631,6 +633,7 @@ def test_status_names_a_restart_whose_program_ended_without_restarting() -> None
     assert "has ended without restarting" in line and "asks for a new one" in line
 
 
+@pytest.mark.macos
 async def test_a_restart_left_loaded_without_a_process_is_replaced(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, launchctl: Path
 ) -> None:

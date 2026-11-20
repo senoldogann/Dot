@@ -27,9 +27,15 @@ NOTES_TOOL: str = "write_notes"
 NOTES_FOLDER: str = "notes"
 _TIMEOUT_S: float = 60.0
 _SUMMARY_CHARS: int = 200
+
+
 # The notes folder is opened through no link, at it or above it, and the file in it is read and replaced by its name in
-# that open folder: a link made after the folder was checked does not lead the write elsewhere either.
-_FOLDER_FLAGS: int = os.O_SEARCH | os.O_DIRECTORY | os.O_NOFOLLOW_ANY
+# that open folder: a link made after the folder was checked does not lead the write elsewhere either. Read at the call:
+# ``O_SEARCH`` and ``O_NOFOLLOW_ANY`` are macOS's, and this module loads where the unit tests run on Linux (item 1270).
+def _folder_flags() -> int:
+    return os.O_SEARCH | os.O_DIRECTORY | os.O_NOFOLLOW_ANY
+
+
 _FILE_FLAGS: int = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
 _OWN_FILE: str = "write_notes writes its own file in the notes folder of the workspace and nothing else"
 
@@ -63,7 +69,7 @@ def _opened(folder: Path) -> int:
     with contextlib.suppress(FileExistsError):
         folder.mkdir()
     try:
-        return os.open(folder, _FOLDER_FLAGS)
+        return os.open(folder, _folder_flags())
     except OSError as exc:
         if exc.errno in (errno.ELOOP, errno.ENOTDIR):
             raise _refused("the notes folder is a link or not a folder", folder) from exc

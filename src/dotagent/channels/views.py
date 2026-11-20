@@ -7,7 +7,7 @@ from pydantic import Field, StrictBool
 
 from dotagent.channels.imessage import Access, Needs, Verifying
 from dotagent.channels.seen import Seen
-from dotagent.connections.mac import AutomationState
+from dotagent.connections.states import AutomationState
 from dotagent.core.types import FrozenModel
 
 # What macOS says of Dot's right to control Messages, or that it was not asked (the Messages app is not running, or

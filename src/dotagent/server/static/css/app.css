@@ -2791,6 +2791,47 @@ textarea {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* A phone's plugins are one list in one frame (item 1268), as the services of Connectors are (item 1266): a row
+     each, a hairline between them, no card of its own. A card per plugin left a screen with four of them and a scroll
+     for the rest. */
+  .gallery-grid:has(> .gallery-card) {
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--box-border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .gallery-grid > .gallery-card {
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .gallery-grid > .gallery-card + .gallery-card {
+    border-top: 1px solid var(--border);
+  }
+
+  /* "Not from the gallery" is a row of the list too (item 1268): the words of the rows' column, and the hairline over
+     it. Without it the heading stood against the frame's border and read as a row that lost its line. */
+  .gallery-grid > .gallery-others-title {
+    margin: 0;
+    padding: var(--space-3) var(--space-3) var(--space-1);
+    border-top: 1px solid var(--border);
+  }
+
+  .gallery-grid .gallery-card-does {
+    -webkit-line-clamp: 1;
+  }
+
+  /* The frame clips what leaves it, so a row's focus ring is drawn inside it (item 1268). */
+  .gallery-grid > .gallery-card a.gallery-card-name:focus-visible::after {
+    border-radius: 0;
+    outline-offset: -2px;
+  }
+
   /* The mark stays beside the name; the buttons take the card's width under it. */
   .scout-card {
     display: grid;
