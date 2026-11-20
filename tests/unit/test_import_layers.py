@@ -2,9 +2,8 @@
 
 ``llm``, ``policy``, ``store``, ``memory``, ``config`` and ``tools.base`` are what a check on Linux can load.
 They must not import AppKit, Quartz or ApplicationServices while they are imported. Those frameworks belong to
-the modules that drive the desktop and the browser window, loaded when that code runs. ``policy.paths`` reads
-``os.O_EVTONLY`` as it is imported; that flag is not a framework, so a process that has no such flag is given the
-macOS value before the imports, and the failure this test looks for is a framework.
+the modules that drive the desktop and the browser window, loaded when that code runs. The gate's Linux job runs the
+unit tests whole since item 1270, which this test keeps checked on a Mac too.
 """
 
 import os
@@ -24,17 +23,12 @@ _MODULES = (
     "dotagent.repair.claude",
 )
 _FRAMEWORKS = ("AppKit", "Quartz", "ApplicationServices", "CoreFoundation", "Foundation", "objc")
-# macOS O_EVTONLY. policy.paths combines it into an open flag at import; Linux has no such name.
-_O_EVTONLY = 0x8000
 
 _PROBE = """
 import importlib
 import os
 import sys
 import traceback
-
-if not hasattr(os, "O_EVTONLY"):
-    os.O_EVTONLY = {o_evtonly}
 
 _FRAMEWORKS = frozenset({frameworks!r})
 
@@ -72,7 +66,7 @@ def _pure_modules() -> tuple[str, ...]:
 
 def test_pure_layers_import_when_macos_frameworks_cannot(tmp_path: Path) -> None:
     """A fresh interpreter that cannot import the frameworks still imports the pure layers."""
-    probe = _PROBE.format(o_evtonly=_O_EVTONLY, frameworks=_FRAMEWORKS, modules=_pure_modules())
+    probe = _PROBE.format(frameworks=_FRAMEWORKS, modules=_pure_modules())
     environment = {
         **os.environ,
         "DOT_HOME": str(tmp_path / "home"),

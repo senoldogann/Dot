@@ -211,6 +211,7 @@ def test_mcp_list_marks_the_server_that_comes_with_dot_and_says_which_setting_sw
     assert render_report(_report(enabled=False)) == "web-research: disabled (enabled = false)"
 
 
+@pytest.mark.macos
 async def test_the_doctor_has_a_row_for_the_server_that_comes_with_dot(web_research_comes: None, home: Path) -> None:
     (row,) = await mcp_checks(list(builtin_servers(_config(True))), 5.0, frozenset({WEB_RESEARCH}))
     assert (row.name, row.ok, row.required) == ("mcp web-research", True, False)

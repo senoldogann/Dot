@@ -207,6 +207,7 @@ def _changes(line: str, workspace: Path) -> tuple[str, ...]:
     return assessment.changes
 
 
+@pytest.mark.macos
 def test_a_command_line_names_the_files_it_changes_or_removes(tmp_path: Path) -> None:
     (tmp_path / "out").mkdir()
     assert _changes("sort data.csv > sorted.csv && echo done >> log.txt 2>/dev/null", tmp_path) == (
@@ -225,6 +226,7 @@ def test_a_command_line_names_the_files_it_changes_or_removes(tmp_path: Path) ->
     assert _changes("mkdir -p out && touch out/x && cat notes.md && rm -rf $(pwd)/tmp", tmp_path) == ()
 
 
+@pytest.mark.macos
 def test_the_files_a_command_names_take_part_in_no_judgement(tmp_path: Path) -> None:
     """The guard judges a line as it did before it named the files: a write into the workspace stays as mild."""
     assessment: ShellAssessment = assess_shell("echo hi > notes.md", tmp_path, tmp_path, (), ())
@@ -245,6 +247,7 @@ def test_a_command_that_changes_a_file_another_run_changed_is_refused_until_it_i
     assert peers.conflict("run-a", "write_file", _action("write", _SHARED)) is not None
 
 
+@pytest.mark.macos
 def test_a_script_that_drives_a_free_app_and_changes_a_file_another_run_changed_is_refused(tmp_path: Path) -> None:
     peers: Peers = _two_runs()
     shared: str = str(tmp_path / "report.md")

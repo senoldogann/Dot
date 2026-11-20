@@ -17,7 +17,7 @@ import objc
 from dotagent.core.errors import DesktopError, DesktopPermissionError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search
-from dotagent.desktop.types import AXElement, Node, Point, Rect, Snapshot, SnapshotScope
+from dotagent.desktop.types import INTERACTIVE_ROLES, AXElement, Node, Point, Rect, Snapshot, SnapshotScope
 
 _log = get_logger("dotagent.desktop.ax")
 
@@ -94,27 +94,6 @@ _TOGGLE_NAMES: dict[str, tuple[str, str, str]] = {
     "AXDisclosureTriangle": ("collapsed", "expanded", "mixed"),
 }
 _NUMBER_ROLES: frozenset[str] = frozenset({"AXSlider", "AXIncrementor", "AXProgressIndicator", "AXLevelIndicator"})
-INTERACTIVE_ROLES: frozenset[str] = frozenset(
-    {
-        "AXButton",
-        "AXCheckBox",
-        "AXRadioButton",
-        "AXTextField",
-        "AXTextArea",
-        "AXComboBox",
-        "AXPopUpButton",
-        "AXMenuButton",
-        "AXMenuItem",
-        "AXMenuBarItem",
-        "AXLink",
-        "AXSlider",
-        "AXTab",
-        "AXSwitch",
-        "AXDisclosureTriangle",
-        "AXIncrementor",
-        "AXSearchField",
-    }
-)
 _PASSTHROUGH_ROLES: frozenset[str] = frozenset(
     {"AXGroup", "AXSplitGroup", "AXScrollArea", "AXLayoutArea", "AXLayoutItem", "AXUnknown", "AXGenericElement"}
 )

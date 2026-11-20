@@ -8,7 +8,7 @@ from pathlib import Path
 
 from dotagent.agent.attachments import StoredAttachment, attachment_summary, store_attachment
 from dotagent.config import DesktopConfig
-from dotagent.desktop.snapshots import Capture, Kept, SnapshotTaken, capture_front_window
+from dotagent.desktop.snapshot_models import Capture, Kept, SnapshotTaken
 
 
 def stored_taker(desktop: DesktopConfig, workspace: Path) -> Callable[[bool], Kept]:
@@ -17,6 +17,9 @@ def stored_taker(desktop: DesktopConfig, workspace: Path) -> Callable[[bool], Ke
     service calls it off the event loop."""
 
     def take(with_text: bool) -> Kept:
+        # The capture is macOS's: loaded when one is taken, so this loads where its frameworks are not (item 1270).
+        from dotagent.desktop.snapshots import capture_front_window
+
         taken: Capture = capture_front_window(desktop, with_text)
         picture: StoredAttachment = store_attachment(workspace, f"{taken.stem}.jpg", "image/jpeg", taken.image)
         files: list[StoredAttachment] = [picture]

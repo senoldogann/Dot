@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -26,6 +27,7 @@ async def _kill_processes(marker: str) -> None:
     await process.wait()
 
 
+@pytest.mark.skipif(shutil.which("rg") is None, reason="needs ripgrep")
 async def test_a_cancelled_search_does_not_leave_ripgrep_running(tmp_path: Path) -> None:
     # Ripgrep blocks opening a FIFO until something writes to it, which makes a search that never ends.
     pipe: Path = tmp_path / "never-written"

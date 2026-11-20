@@ -10,7 +10,7 @@ from typing import Literal
 from dotagent.core.errors import DesktopError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
-from dotagent.desktop import screen, views
+from dotagent.desktop import views
 
 type ScriptLanguage = Literal["AppleScript", "JavaScript"]
 
@@ -74,6 +74,9 @@ async def _windows_of_targets(targets: tuple[str, ...]) -> str:
     cannot be listed: a script that timed out is explained by what is on the screen, never made to fail by looking."""
     if not targets:
         return ""
+    # The window list is Quartz's: loaded when a script timed out, so the script tools load where it is not (item 1270).
+    from dotagent.desktop import screen
+
     try:
         windows = await asyncio.wait_for(asyncio.to_thread(screen.windows_everywhere), _WINDOW_LOOK_TIMEOUT_S)
         return _window_note(views.titles_of_windows_shown_by(targets, windows))

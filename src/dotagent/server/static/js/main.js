@@ -70,7 +70,10 @@ const ROUTES = [
     title: "Agents",
     pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/,
     load: () => import("./views/agents.js"),
-    parent: ([id]) => (id === undefined ? null : "/agents"),
+    // An agent's page is its conversation (item 1233), so its way back is the list of chats, as a chat's is: the sidebar
+    // opens it on a phone, and a Back to the office between them left the chats behind. Opened by a link of the agents'
+    // page, it still goes back there.
+    parent: () => null,
   },
   { tab: "agents", layout: "page", title: "Handoffs", pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
   // A team of the owner's (item 610): its agents' faces, a box for a message to it and its chats.

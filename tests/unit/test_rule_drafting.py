@@ -74,6 +74,7 @@ def _page(url: str) -> ActionInfo:
         ("git push origin main", False),
     ],
 )
+@pytest.mark.macos
 def test_a_rule_that_lets_dot_run_a_command_fits_it_alone(command: str, fits: bool, tmp_path: Path) -> None:
     rule: DraftedRule = rule_from_draft(_draft("shell", "allow", ["git status", "git diff"], []), TOOLS)
     assert _fits(rule, _shell(command, tmp_path)) is fits
@@ -89,6 +90,7 @@ def test_a_rule_that_lets_dot_run_a_command_fits_it_alone(command: str, fits: bo
         ("git status", False),
     ],
 )
+@pytest.mark.macos
 def test_a_rule_that_stops_dot_catches_a_command_anywhere(command: str, fits: bool, tmp_path: Path) -> None:
     rule: DraftedRule = rule_from_draft(_draft("shell", "ask", ["rm"], []), TOOLS)
     assert _fits(rule, _shell(command, tmp_path)) is fits
@@ -231,6 +233,7 @@ def test_the_drafters_prompt_and_the_field_say_what_the_refusal_says_of_the_appl
     assert "covers the AppleScript tool (apple_script" in str(RuleDraft.model_fields["mentions"].description)
 
 
+@pytest.mark.macos
 def test_a_rule_drafted_from_a_command_fits_it_alone_where_the_same_words_would_fit_a_chain(tmp_path: Path) -> None:
     """The owner's "let Dot run git push" is drafted as ``commands``: the pattern fits the command alone, where the
     same words as ``mentions`` (refused above) would have fitted ``git push; <anything>`` too."""

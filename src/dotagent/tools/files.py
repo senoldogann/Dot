@@ -15,9 +15,7 @@ from itertools import islice
 from pathlib import Path
 from typing import BinaryIO
 
-from Foundation import NSData
 from pydantic import AliasChoices, Field, JsonValue
-from Quartz import PDFDocument
 
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.held import held_folder, open_regular
@@ -130,6 +128,10 @@ def write_action(
 
 
 def _pdf_text(path: Path, data: bytes) -> str:
+    # PDFKit is macOS's: loaded when a PDF is read, so the file tools load where it is not (item 1270).
+    from Foundation import NSData
+    from Quartz import PDFDocument
+
     document = PDFDocument.alloc().initWithData_(NSData.dataWithBytes_length_(data, len(data)))
     if document is None:
         raise ToolExecutionError("the PDF could not be opened", {"path": str(path)})

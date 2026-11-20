@@ -2,9 +2,6 @@
 
 from typing import Protocol
 
-from Foundation import NSData
-from Quartz import PDFDocument
-
 from dotagent.core.errors import WebError
 
 
@@ -18,6 +15,10 @@ class PdfDocumentLike(Protocol):
 
 def pdf_to_text(data: bytes, url: str) -> str:
     """The text layer of a PDF. A scanned PDF has none, so the result can be empty."""
+    # PDFKit is macOS's: loaded when a PDF is read, so the web tools load where it is not (item 1270).
+    from Foundation import NSData
+    from Quartz import PDFDocument
+
     opened: PdfDocumentLike | None = PDFDocument.alloc().initWithData_(NSData.dataWithBytes_length_(data, len(data)))
     if opened is None:
         raise WebError("the PDF could not be opened", {"url": url, "bytes": len(data)})

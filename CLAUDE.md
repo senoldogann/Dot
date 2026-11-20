@@ -34,6 +34,8 @@ uv run pytest tests/smoke -q -n auto -m "not live and not browser and not intern
 npm run check
 ```
 
+- On Linux (a cloud agent), `uv run pytest tests/unit` runs every unit test but those that need macOS
+  ([Development](docs/development.md)); the smoke tests and `dotx eval check` need a Mac.
 - A change to a tool, the policy or the loop: `dotx eval check` must pass.
 - A change the browser tests cover: add them with `-m "not live and not internet and not hosted and not desktop"`.
 - `desktop/src-tauri`: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`.

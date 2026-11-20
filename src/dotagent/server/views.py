@@ -33,7 +33,7 @@ from dotagent.connections.directory import PluginView, ServiceMark
 from dotagent.connections.states import ConnectionState, ConnectionStep
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
-from dotagent.desktop.snapshots import SnapshotTaken
+from dotagent.desktop.snapshot_models import SnapshotTaken
 from dotagent.help.elsewhere import FoundElsewhere
 from dotagent.llm.roles import LearningRole, ModelRole
 from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource

@@ -11,7 +11,7 @@ from typing import Literal
 
 from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel
-from dotagent.desktop.input import Chord, parse_chord
+from dotagent.desktop.chords import Chord, parse_chord
 from dotagent.desktop.types import Rect, Step, WindowInfo
 from dotagent.policy.elements import (
     Element,

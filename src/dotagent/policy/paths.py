@@ -55,10 +55,16 @@ _ROOT_LINKS: tuple[tuple[str, tuple[str, ...]], ...] = (
 _BY_NUMBER: str = ".vol"
 # The room F_GETPATH writes a path into: MAXPATHLEN on macOS.
 _KERNEL_PATH_BYTES: int = 1024
+
+
 # How a folder is opened to be asked its path: for its events alone, which reads nothing of it, and only when it is a
 # folder and not a link. A file, a pipe or a device is never opened: a pipe nobody writes to would hold the open, and
-# opening a device can wake it.
-_FOLDER_FLAGS: int = os.O_EVTONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+# opening a device can wake it. Read at the call: ``O_EVTONLY`` is macOS's, and this module is imported where Dot's
+# unit tests run on Linux (item 1270).
+def _folder_flags() -> int:
+    return os.O_EVTONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
 # What such an open says of a place that is no folder this process can open: not there, a file, a pipe, a socket, a
 # device or a link (ENOTDIR), a loop of links, closed to it (by its mode or by macOS's privacy), a name too long, or a
 # prefix that names no place by itself (``/.resolve/<flags>``, EINVAL). Any other failure (no descriptor left, an I/O
@@ -72,7 +78,7 @@ def _folder_path(folder: Path) -> Path | None:
     """The path the kernel names for ``folder`` (``F_GETPATH``), or None when ``folder`` is no folder this process can
     open: not there, a file, a pipe, a device, a link, or closed to it (:data:`_NOT_A_FOLDER`)."""
     try:
-        descriptor: int = os.open(folder, _FOLDER_FLAGS)
+        descriptor: int = os.open(folder, _folder_flags())
     except OSError as error:
         if error.errno in _NOT_A_FOLDER:
             return None
