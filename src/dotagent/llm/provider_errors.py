@@ -82,7 +82,7 @@ _OPENROUTER_NO_ENDPOINT: re.Pattern[str] = re.compile(
 # more credits, or fewer max_tokens. You requested up to 131072 tokens, but can only afford 29597."
 _OPENROUTER_CREDITS: str = "credits"
 # How OpenRouter words a 402 for credits that pay for the request alone but not beside the account's other requests
-# still running, each priced at the longest answer it allows (item 1254): "This request would exceed your available
+# still running, each priced at the longest answer it allows (item 1267): "This request would exceed your available
 # credits given your current in-flight requests. Retry after in-flight requests settle, or add credits." It passes
 # once they end, as a burst does.
 _OPENROUTER_IN_FLIGHT: str = "in-flight requests"
@@ -266,7 +266,7 @@ def classify_openrouter(
 ) -> ProviderHttpError:
     """OpenRouter: a 402 that speaks of credits is :class:`ProviderCreditError`, with the longest answer the credits pay
     for when the message names it, except one that says the requests still running hold them, which is a rate limit
-    retried until they end (item 1254); a 404 that says the account's privacy settings leave no provider of the model is
+    retried until they end (item 1267); a 404 that says the account's privacy settings leave no provider of the model is
     a refused access, worded with what excluded them and where to change that (item 361). ``routed``: the request
     carried the model's ``[providers.openrouter] routing``, which may be what left no provider (item 737), so a 404 of
     that kind, or one that says no allowed provider, or no endpoint that can handle the requested parameters, is left,

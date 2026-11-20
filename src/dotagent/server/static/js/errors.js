@@ -103,7 +103,7 @@ export function serviceWords(line) {
   return { text: words === "" ? t("errors.serviceCode", { code: found[1] }) : sentence(words), details: line.trim() };
 }
 
-// OpenRouter's 402 for credits held by the account's requests still running (item 1254, `llm/provider_errors.py`
+// OpenRouter's 402 for credits held by the account's requests still running (item 1267, `llm/provider_errors.py`
 // reads it as a rate limit): it passes once they end, so it is a limit reached, not a balance to top up.
 const HELD_BY_RUNNING = /in-flight requests/i;
 

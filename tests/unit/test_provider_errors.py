@@ -4,7 +4,7 @@ another 429 stays a rate limit to retry; and the pause of a model names which it
 runner broke off is retried as a broken connection is (item 256). OpenRouter's 404 for a model the account's privacy
 settings leave no provider of is a refused access that says why and where to change it (item 361), and its 402 for
 credits that do not pay for the longest answer a request allows says so and how long an answer they do pay for, while
-its 402 for credits held by requests still running is a rate limit that is retried (item 1254)."""
+its 402 for credits held by requests still running is a rate limit that is retried (item 1267)."""
 
 from dotagent.core.errors import (
     ProviderAccessError,
@@ -130,7 +130,7 @@ def test_openrouters_402_for_credits_is_out_of_credits_and_names_the_answer_they
     assert not isinstance(unplanned, ProviderCreditError) and unavailable_reason(unplanned) == "not in the plan"
 
 
-# OpenRouter's answer, seen ten times in the owner's record (item 1254), to a call made while others were running.
+# OpenRouter's answer, seen ten times in the owner's record (item 1267), to a call made while others were running.
 _IN_FLIGHT_BODY: str = (
     '{"error": {"message": "This request would exceed your available credits given your current in-flight requests. '
     'Retry after in-flight requests settle, or add credits.", "code": 402}}'
