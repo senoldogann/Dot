@@ -312,46 +312,56 @@ a {
   text-underline-offset: 2px;
 }
 
-/* A link in a message is a pill: the site's icon and a short label, on one line with the words around it. */
+/* A link in a message is a chip: the site's icon and one line of label, on the raised surface, in both schemes.
+   No margin of its own, so the spaces of the sentence are the only room around it. */
 .prose a.link-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  margin: 0 0.12em;
-  padding: 1px 8px 1px 4px;
-  border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
+  gap: var(--space-1);
+  max-width: 18em;
+  margin: 0;
+  padding: var(--space-half) var(--space-2) var(--space-half) var(--space-1);
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text) 7%, var(--surface));
+  background: var(--surface-2);
   color: var(--text);
-  font-size: 0.92em;
-  line-height: 1.45;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  line-height: var(--leading-xs);
   text-decoration: none;
-  vertical-align: -0.2em;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
-.prose a.link-pill:hover {
-  text-decoration: none;
-  border-color: var(--border-strong);
-}
-
-.link-pill-icon,
-.link-pill-fallback {
-  width: 14px;
-  height: 14px;
+.prose a.link-pill .link-pill-icon,
+.prose a.link-pill .link-pill-fallback {
+  width: var(--space-4);
+  height: var(--space-4);
   flex: none;
-  border-radius: 3px;
+  overflow: hidden;
 }
 
-.link-pill-fallback {
+.prose a.link-pill .link-pill-icon {
+  border-radius: var(--radius-joined);
+  object-fit: cover;
+}
+
+.prose a.link-pill .link-pill-fallback {
   color: var(--muted);
 }
 
-.link-pill-label {
+.prose a.link-pill .link-pill-label {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+@media (hover: hover) {
+  .prose a.link-pill:hover {
+    text-decoration: none;
+    background: var(--surface-3);
+    border-color: var(--border-strong);
+  }
 }
 
 .bubble.user .prose a.link-pill {
@@ -362,6 +372,13 @@ a {
 
 .bubble.user .prose a.link-pill .link-pill-fallback {
   color: inherit;
+}
+
+@media (hover: hover) {
+  .bubble.user .prose a.link-pill:hover {
+    text-decoration: none;
+    background: color-mix(in oklab, var(--on-msg-me) 22%, transparent);
+  }
 }
 
 @media (hover: hover) {
@@ -6152,7 +6169,7 @@ details:not([open]) > :not(summary) {
 .chat-details-toggle {
   align-self: center;
   margin: var(--space-1) 0;
-  padding: 2px 8px;
+  padding: var(--space-half) var(--space-2);
   border: 0;
   background: none;
   color: var(--faint);

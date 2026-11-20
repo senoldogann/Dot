@@ -740,7 +740,8 @@ const favicons = new Map();
 
 /**
  * A `blob:` URL for the icon of `host`, fetched from this daemon (`GET /api/favicons/<host>`), or null when the site
- * has none or the Mac is offline. The same host is asked once. Images need the token, so they are not `<img src>` links.
+ * has none or the Mac is offline. The page asks only this Mac: the site itself is fetched by the daemon, and the
+ * picture is a blob, which the page's content security policy allows. The same host is asked once.
  * @param {string} host
  * @returns {Promise<string | null>}
  */
