@@ -47,6 +47,7 @@ def test_the_profile_seals_guards_and_keeps_in_place_each_folder_above_once_and_
     ]
 
 
+@pytest.mark.macos
 def test_the_profile_keeps_a_process_from_having_another_program_act_for_it() -> None:
     rules: list[str] = sandbox_profile((), (), Path("/home/Library/LaunchAgents")).splitlines()
     assert "(deny lsopen)" in rules
@@ -64,6 +65,7 @@ def test_the_profile_keeps_a_process_from_having_another_program_act_for_it() ->
     assert "(deny job-creation)" in rules
 
 
+@pytest.mark.macos
 def test_macos_holds_a_command_to_its_profile(tmp_path: Path) -> None:
     home: Path = Path(os.path.realpath(tmp_path)) / "home"
     skills: Path = home / "skills"
@@ -98,6 +100,7 @@ def test_macos_holds_a_command_to_its_profile(tmp_path: Path) -> None:
     assert UNSANDBOXED.commands == UNSANDBOXED.search == ()
 
 
+@pytest.mark.macos
 def test_macos_closes_dots_home_to_a_command_but_for_the_workspace(tmp_path: Path) -> None:
     """Item 676: the daemon opens and writes files in its home and its logs with the owner's rights, so a command may
     leave nothing there, not even a link in place of the daemon's pid file, which the daemon would empty and write at
@@ -154,6 +157,7 @@ def test_the_open_folders_are_allowed_back_before_every_other_rule(tmp_path: Pat
     assert '(literal "/home/workspace")' in kept and '(literal "/home")' in kept
 
 
+@pytest.mark.macos
 def test_macos_refuses_the_service_that_would_run_what_a_program_hands_it(tmp_path: Path) -> None:
     """Item 418: what the profile refuses is not the program but the service behind it, so a program a run wrote is held
     to it too. ``shortcuts`` reaches the Shortcuts service, which runs a shortcut outside the sandbox ("Run Shell
@@ -198,6 +202,7 @@ def test_macos_refuses_the_service_that_would_run_what_a_program_hands_it(tmp_pa
         subprocess.run([str(registers), "-u", str(bundle.parent)], capture_output=True, text=True, check=False)
 
 
+@pytest.mark.macos
 async def test_the_switch_starts_processes_without_the_sandbox_while_off_and_with_it_once_on(tmp_path: Path) -> None:
     built: Sandbox = build_sandbox(
         (tmp_path / "token",), (tmp_path / "token",), (tmp_path / "skills",), tmp_path / "LaunchAgents"
@@ -482,6 +487,7 @@ def test_a_sealed_file_that_has_another_name_is_found(tmp_path: Path) -> None:
     assert hard_linked([]) == {}
 
 
+@pytest.mark.macos
 def test_a_hard_link_made_outside_the_sandbox_is_the_one_name_of_a_sealed_file_the_profile_does_not_close(
     tmp_path: Path,
 ) -> None:

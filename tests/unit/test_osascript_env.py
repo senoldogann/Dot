@@ -23,6 +23,7 @@ def _commands_env() -> dict[str, str]:
     return {"PATH": "/usr/bin:/bin", "HOME": str(Path.home()), "DOT_PROBE_OPEN": "kept"}
 
 
+@pytest.mark.macos
 async def test_a_script_starts_what_it_runs_with_the_environment_it_is_given(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DOT_PROBE_TOKEN", "leaked")
     monkeypatch.setenv("SSH_AUTH_SOCK", "agent-socket")
