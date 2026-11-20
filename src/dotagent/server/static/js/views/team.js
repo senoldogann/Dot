@@ -27,7 +27,7 @@ function memberLink(id, name) {
 }
 
 /** One message of the thread: who to whom, the line, the reply, the time and the runs. */
-export function messageRow(message) {
+function messageRow(message) {
   const working = WORKING.has(message.status);
   return el(
     "div",

@@ -3,8 +3,9 @@
 // The list (#/agents) is in parts, one shown at a time (item 1136): Dot and the agents as a grid of compact cards, each
 // with its newest chat, and under them the ready teams (item 504) and the templates (item 315) agents start from in one
 // click; the owner's teams (item 610), each a card with its agents' faces; the work orders; and the office. An agent's
-// page (#/agents/<id>) greets with its face and role, takes a message for it and lists its chats; the editor makes or
-// changes an agent. An agent goes out as a file from its page and comes back, in this home or another, from Import an
+// page (#/agents/<id>) greets with its face and role, takes a message for it, and lists its schedules and what it
+// learned (item 1266: the counts of its chats, actions, orders and messages left the page); the editor makes or changes
+// an agent. An agent goes out as a file from its page and comes back, in this home or another, from Import an
 // agent under the list's "…". A team's own page is views/teams.js.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
@@ -14,7 +15,7 @@ import { AGENTS_CHANGED_EVENT, api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
-import { ago, clip, compact, el, modelName, plural, setText, switchRow } from "../dom.js";
+import { ago, clip, el, modelName, plural, setText, switchRow } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
@@ -22,13 +23,12 @@ import { openMenu } from "../menu.js";
 import { mountOffice } from "../office/office.js";
 import { readFolds, readPref, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
-import { aboutToggle, errorPanel, field, loadingPanel, pageHead, segmented, statusBadge } from "../panels.js";
+import { aboutToggle, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, heldChoice, KEPT_GOAL_MODE } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { setStageGlass, setStageTitle, setStageTools } from "../stage.js";
 import { scoreLine } from "./memory.js";
 import { skillRow } from "./skills.js";
-import { messageRow } from "./team.js";
 import { getSnapshot, loadModels, onChange, onLifecycle, onStreamBack } from "../state.js";
 import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
@@ -1151,19 +1151,6 @@ function officeComposer(record, ctx, onStarted, follow, onSteered) {
 
 // ------------------------------------------------------------------------------------------------- the page
 
-function runRow(run) {
-  return el(
-    "div",
-    { class: "list-row", dataset: { run: run.id } },
-    el(
-      "div",
-      { class: "row-main" },
-      el("div", { class: "row" }, el("a", { class: "row-title", href: `#/runs/${run.id}` }, clip(run.goal, GOAL_CHARS)), statusBadge(run.status)),
-      el("div", { class: "row-meta" }, el("span", null, ago(run.created_at)), el("span", null, modelName(run.model))),
-    ),
-  );
-}
-
 /**
  * Where the composer of a page keeps its choices, for `record`, the agent whose page it is, or, for a team's page (item
  * 610), the bounds of Dot's own runs (`{ model: "", effort: null, approvals: null }`). It starts from the bounds, the
@@ -1413,98 +1400,6 @@ function suggestedScheduleRow(template, onAdd) {
   );
 }
 
-/** How the agent's work orders went (item 1066): one row, the orders and how many were accepted the first time, and
- * under it those accepted after a return, waiting for you (escalated) and open, and the returns in all; none for an
- * agent that has had none. */
-function workRows(work) {
-  if (work === null || work === undefined || work.orders === 0) {
-    return [];
-  }
-  const later = work.accepted - work.accepted_first;
-  const facts = [
-    later > 0 ? `${later} after a return` : null,
-    work.escalated > 0 ? `${work.escalated} waiting for you` : null,
-    work.open > 0 ? `${work.open} open` : null,
-    `${plural(work.returns, "return", "returns")} in all`,
-  ].filter((fact) => fact !== null);
-  return [
-    el(
-      "div",
-      { class: "list-row", dataset: { work: "orders" } },
-      el(
-        "div",
-        { class: "row-main" },
-        el("div", { class: "row-title" }, `${plural(work.orders, "work order", "work orders")}: ${work.accepted_first} accepted the first time`),
-        el("div", { class: "row-meta" }, facts.join(" · ")),
-      ),
-    ),
-  ];
-}
-
-/**
- * What the agent's newest ended runs used (item 874): their count and tokens, the actions they called most, and,
- * once enough of them ended, the actions it may use that none called, with a way to take them away (`onTrim()`). An
- * agent with every action is offered to keep only the ones its runs called. None before a run of it ended.
- */
-function usageRows(record, usage, onTrim) {
-  if (usage === null || usage === undefined || usage.runs === 0) {
-    return [];
-  }
-  const called = Object.entries(usage.calls);
-  const top = called.slice(0, 8).map(([tool, calls]) => `${tool} ×${calls}`);
-  const rows = [
-    el(
-      "div",
-      { class: "list-row", dataset: { usage: "runs" } },
-      el(
-        "div",
-        { class: "row-main" },
-        el("div", { class: "row-title" }, `Its last ${plural(usage.runs, "run", "runs")}: ${compact(usage.tokens)} tokens, ${plural(called.length, "action", "actions")} called`),
-        el("div", { class: "row-meta" }, top.length === 0 ? "It called no action." : `Most called: ${top.join(", ")}`),
-      ),
-    ),
-  ];
-  const trim = (label, title) => el("div", { class: "row-actions" }, el("button", { class: "btn sm", type: "button", title, onclick: onTrim }, label));
-  if (!usage.enough) {
-    rows.push(
-      el(
-        "div",
-        { class: "list-row", dataset: { usage: "wait" } },
-        el("div", { class: "row-main" }, el("div", { class: "row-meta" }, "Which actions it never calls is told once three of its runs have ended.")),
-      ),
-    );
-  } else if (record.tools.length === 0 && usage.own.length > 0) {
-    rows.push(
-      el(
-        "div",
-        { class: "list-row", dataset: { usage: "every" } },
-        el(
-          "div",
-          { class: "row-main" },
-          el("div", { class: "row-title" }, "It has every action"),
-          el("div", { class: "row-meta" }, `Its last ${plural(usage.runs, "run", "runs")} called ${plural(usage.own.length, "action", "actions")} of its own; an action its role does not need is a way to go astray.`),
-        ),
-        trim("Keep only these", "Give it only the actions its runs called, and message_agent"),
-      ),
-    );
-  } else if (usage.unused.length > 0) {
-    rows.push(
-      el(
-        "div",
-        { class: "list-row", dataset: { usage: "unused" } },
-        el(
-          "div",
-          { class: "row-main" },
-          el("div", { class: "row-title" }, `Not called in its last ${plural(usage.runs, "run", "runs")}: ${plural(usage.unused.length, "action", "actions")}`),
-          el("div", { class: "row-text" }, usage.unused.join(", ")),
-        ),
-        trim("Remove them", "Take these actions away; Edit gives any of them back"),
-      ),
-    );
-  }
-  return rows;
-}
-
 /** A lesson the agent learned: the note, how the agent's own runs fared after it, and Forget. */
 function lessonRow(record, score, onForget) {
   const forget = el("button", { class: "btn ghost sm", type: "button" }, "Forget");
@@ -1726,24 +1621,6 @@ function mountPage(root, ctx, agentId) {
     await refresh();
   }
 
-  /** Take away the actions the agent's runs never called (item 874), once the owner says so. */
-  async function trimTools(record, usage) {
-    const every = record.tools.length === 0;
-    const confirmed = await confirmDialog({
-      title: every ? `Keep only the actions ${record.name} used?` : `Remove ${plural(usage.unused.length, "action", "actions")} from ${record.name}?`,
-      message: every
-        ? `It keeps the ${plural(usage.own.length, "action", "actions")} its last ${plural(usage.runs, "run", "runs")} called, and message_agent. Edit gives any action back.`
-        : `${usage.unused.join(", ")}. Edit gives any of them back.`,
-      confirmLabel: every ? "Keep only these" : "Remove",
-      focusCancel: true,
-    });
-    if (confirmed) {
-      const saved = await api.post(`/agents/${record.id}/trim-tools`, null);
-      toast("ok", `${saved.name} keeps ${plural(saved.tools.length, "action", "actions")}.`);
-      await refresh();
-    }
-  }
-
   async function forget(record) {
     const confirmed = await confirmDialog({
       title: "Forget this lesson?",
@@ -1786,8 +1663,8 @@ function mountPage(root, ctx, agentId) {
     }
   }
 
-  // The lists under the top: chats, lessons and skills, messages. The top stays where it is, so the focus and what is
-  // typed in it stay too.
+  // The lists under the top: lessons and skills, schedules. The top stays where it is, so the focus and what is typed
+  // in it stay too.
   function toggleFold(key) {
     folds = { ...folds, [key]: folds[key] !== true };
     writePref(FOLDS_KEY, JSON.stringify(folds));
@@ -1818,11 +1695,7 @@ function mountPage(root, ctx, agentId) {
         folds,
         toggleFold,
       ),
-      homeSection("chats", "Chats", detail.runs.map(runRow), folds, toggleFold),
-      homeSection("usage", "What it used", usageRows(detail.record, detail.usage, () => attempt(() => trimTools(detail.record, detail.usage))), folds, toggleFold),
-      homeSection("work", "How its work went", workRows(detail.work), folds, toggleFold),
       homeSection("learned", "What it learned", learned, folds, toggleFold),
-      homeSection("messages", "Messages", detail.messages.map(messageRow), folds, toggleFold),
     ];
     sections.replaceChildren(...parts.filter((part) => part !== null));
     sections.hidden = sections.childElementCount === 0;
