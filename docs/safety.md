@@ -66,7 +66,7 @@ run needs, sent where the configuration points:
   with a small, read-only set of payloads (item 781); it too runs only on a host in `[recon] owned_hosts`, and every
   form action must stay on that host (see [Security scan](security.md)).
 - **To the sites a chat links to: a request for their icon.** A link in a message is drawn as a pill with the site's
-  icon (item 1266): the daemon asks `https://<host>/favicon.ico` of that host, as the page draws the message, whether or
+  icon (item 1269): the daemon asks `https://<host>/favicon.ico` of that host, as the page draws the message, whether or
   not a run works, and follows the site's redirects (at most six, often to its CDN), each checked as the first request;
   every host on the way learns the Mac's address and when the chat was opened, not the page linked. A host that is not
   a public name is refused, and the fetch is the web tools' (public addresses only). An icon is kept a day, a site that
