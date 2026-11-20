@@ -83,6 +83,8 @@ const ROUTES = [
     load: () => import("./views/schedules.js"),
     parent: () => null,
   },
+  // The Mac's screen, live (item 1264).
+  { tab: "watch", layout: "watch", title: "Watch", pattern: /^\/watch$/, load: () => import("./views/watch.js"), parent: () => null },
   {
     tab: "customize",
     layout: "page",

@@ -515,6 +515,24 @@ export async function* sse(path, signal, onOpen, awayMs) {
   }
 }
 
+/** The body of a binary stream of the API (Watch's screen), once its answer began; it ends when `signal` aborts. */
+export async function binaryStream(path, signal) {
+  await proven();
+  let response;
+  try {
+    response = await fetch(`/api${path}`, { headers: authHeaders(), signal, cache: "no-store" });
+  } catch (cause) {
+    if (signal.aborted) {
+      throw cause;
+    }
+    throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
+  }
+  if (!response.ok) {
+    throw await errorOf(response, path);
+  }
+  return response.body;
+}
+
 /**
  * Wait `ms` before a stream is tried again, or less: once the browser is back on the network, or the page back in
  * view (a Mac that woke), it is tried at once. Ends at once when `signal` aborts.

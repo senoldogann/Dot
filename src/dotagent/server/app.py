@@ -87,6 +87,7 @@ from dotagent.server.routes_trading import trading_router
 from dotagent.server.routes_vault import vault_router
 from dotagent.server.routes_vaultitems import vault_items_router
 from dotagent.server.routes_voice import voice_router
+from dotagent.server.routes_watch import watch_router
 from dotagent.server.routes_websearch import websearch_router
 from dotagent.server.views import ErrorView
 
@@ -231,6 +232,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(phone_router(ctx, phones))
     app.include_router(channels_router(ctx))
     app.include_router(snapshots_router(ctx))
+    app.include_router(watch_router(ctx))
     app.include_router(repair_router(ctx))
     app.include_router(assistant_router(ctx))
     app.include_router(accounts_router(ctx))
