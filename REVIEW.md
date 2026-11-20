@@ -29,6 +29,9 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/unit/test_store_schema.py::test_a_copy_that_meets_a_full_disk_says_the_disk_is_full` — the copy made before
+  an upgrade told a full disk only from the system's error, while SQLite's online backup, its largest write, reports
+  it as its own (item 1268).
 - `tests/smoke/test_context_budget.py::test_a_tool_the_run_let_go_is_not_named_and_not_callable` — the fit ran after
   the groups, the registry and the prompt were built, so a run named tools it had let go, and a dropped tool stayed
   callable (item 1211).

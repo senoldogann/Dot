@@ -48,6 +48,7 @@ it). Two environment variables of the process move things: `DOT_HOME` (the home 
 | `run-owners/`                                    | one lock per process that drives runs (the daemon, `dotx run`)       |
 | `backups/`                                       | the copies of the database, unless `[store] backup_dir` names a folder |
 | `backups-partial/`                               | the uncompressed file of a copy under way                            |
+| `backups-before-upgrade/`                        | the copy of the database made before a new version changed its tables |
 
 `config.toml` and `.env` may be links to files you keep elsewhere (a dotfiles repository): what Dot changes in them
 (Settings, `dotx auth`, the keys of Customize › Connectors) is written where the link leads, and the link stays (item
@@ -113,6 +114,20 @@ that fails is logged (`backup_failed`) and tried again ten minutes later. To go 
 service uninstall`), move `dot.sqlite3` and its `dot.sqlite3-wal` and `dot.sqlite3-shm` aside (an old write-ahead log
 left beside the copy would be applied to it), unpack the copy in its place (`gunzip -c <copy> > "<home>/dot.sqlite3"`),
 and start the daemon again (`dotx service install`).
+
+**The database's version** (item 1268). The database keeps the version of its tables (SQLite's `user_version`). Every
+start makes the tables it lacks and adds the columns added since, each only where it is missing, as before versions; a
+change that cannot be made twice (a table dropped or renamed, data rewritten) comes with a new version. A Dot that finds
+a database of an older version first copies it as above, into `<home>/backups-before-upgrade/v<version>` (the newest two
+copies of each version it is upgraded from are kept, so a start that fails again and again does not fill the disk;
+runs neither read nor change them, as the other copies), then brings it to its own
+version in one transaction with the new version, so that a start cut off part way leaves the database as it was and the
+next start does it all; the daemon and a `dotx` command starting at once take turns. The first start after such an
+upgrade takes longer by the copy (a 320 MB database: about 12 s, a 91 MB copy), and needs room for it: a copy that
+cannot be made stops the start and says so, with the free space. A database of a later version, written by a newer
+Dot, is refused with "the database was written by a newer version of Dot: update Dot to open it" before anything is
+written to it, by a Dot from item 1268 on (an older one does not read the version). To go back from an upgrade,
+restore that copy as above, with the Dot that wrote it: what was written since the upgrade is not in it.
 
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log` (another folder with `DOT_LOG_DIR`: `dotx service status`
 names the one in use, and the sign-in screen of a daemon that could not answer points to it); at 10 MB it is moved to

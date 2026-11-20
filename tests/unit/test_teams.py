@@ -175,6 +175,7 @@ def _forget_teams(path: Path) -> None:
         connection.execute("DROP INDEX threads_team")
         connection.execute("ALTER TABLE threads DROP COLUMN team_id")
         connection.execute("DROP TABLE teams")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()

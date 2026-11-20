@@ -95,7 +95,7 @@ from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, che
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.secrets import env_lock_path, optional_secret
 from dotagent.store.backup import backup_folder, partial_folder
-from dotagent.store.db import Store
+from dotagent.store.db import BEFORE_UPGRADE_DIR, Store
 from dotagent.store.models import MeetingLineRecord
 from dotagent.terminal.session import Terminals
 from dotagent.tools.base import RegisteredTool
@@ -366,7 +366,8 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     gave Dot (its tokens), the browser profiles (Dot's own, the Chrome of the user, and the one of its meetings, where
     Dot's own Google account is signed in: item 1138), the settings that decide what it
     may do (policy, rules, MCP servers), its own database and its copies (item 526: a copy is the whole database, and
-    one planted in their folder would be what the owner goes back to), the journals of file changes (``dotx undo``
+    one planted in their folder would be what the owner goes back to; the copy made before an upgrade too, item 1268),
+    the journals of file changes (``dotx undo``
     writes back what a journal says), the locks that tell which process drives a run, the ledger of the tabs Dot has
     open in the Chrome of the user (item 703: Dot writes and reads it outside the sandbox), and the daemon's pid file
     and mark, which it opens and writes at its start (item 676), and the copies of the files a run uploaded, which the
@@ -397,6 +398,7 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         database.with_name(f"{database.name}-shm"),
         backup_folder(config.store),
         partial_folder(),
+        database.parent / BEFORE_UPGRADE_DIR,
         undo_dir(),
         run_owners_dir(),
         *ledger_files(),

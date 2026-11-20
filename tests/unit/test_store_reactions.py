@@ -234,6 +234,7 @@ def _forget_reactions(path: Path) -> None:
     try:
         connection.execute("DROP TABLE reactions")
         connection.execute("ALTER TABLE queued_messages DROP COLUMN follow_up")
+        connection.execute("PRAGMA user_version = 0")  # a store of before item 1268
         connection.commit()
     finally:
         connection.close()
