@@ -96,7 +96,9 @@ ReactionName = Literal["good", "love", "wrong", "again", "remember", "explain", 
 
 class ThreadRecord(FrozenModel):
     """A chat's thread. ``team_id`` is the team the chat is with (item 610), ``None`` for any other chat: every run of
-    the thread is told that team's context, whoever started it."""
+    the thread is told that team's context, whoever started it. ``agent_id`` is the agent the chat is with, ``None`` for
+    a chat that is nobody's or Dot's: a message the owner sends in it goes to that agent, and it is the agent's home
+    chat however many chats are newer."""
 
     id: str
     title: str
@@ -104,6 +106,7 @@ class ThreadRecord(FrozenModel):
     created_at: float
     updated_at: float
     team_id: str | None
+    agent_id: str | None = None
 
 
 class ChatChoices(FrozenModel):
