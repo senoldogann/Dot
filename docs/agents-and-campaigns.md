@@ -88,7 +88,8 @@ wherever the agent shows, and until you choose one the shape and colour its id's
 /api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look" card of Settings › General, kept by the daemon
 for every browser: its face and **Change**, which opens the picker and Save). **Agents** in the sidebar lists Dot first and then your agents, each with its newest chat; **New
 agent** opens the editor; an agent's page greets with its face and role, takes a message for it ("Message Scout") and
-lists its chats, with Edit and Delete in the bar. An agent is one conversation (item 1233, the owner's word of
+keeps Edit and Delete in the bar, and under its box lists its schedules and what it learned (item 1266: the folds of
+its chats, its actions, its orders and its messages left the page). An agent is one conversation (item 1233, the owner's word of
 2026-11-19 after Grok Bot, whose bots are each one ongoing chat: "a bot has one purpose, and its chat is used all the
 time"): its home chat is the newest of the chats that are its own — each chat a message to it reached, which the daemon
 binds to it (`threads.agent_id`), staying its own whichever run comes last in it, a message you send there going to
@@ -291,22 +292,21 @@ so renaming the agent keeps it and two agents of one template never share a file
 (Sales Outbound's `prospects.csv`, Research Desk's `research-<topic>.md`, Release QA's last walk). A teammate's folder
 is not named to another agent's run; it is a folder of the workspace, not a wall: the file tools reach it as any other.
 
-**What it used** (item 874), on an agent's page, reads its newest twenty runs that ended: how many, the tokens
+**What it used** (item 874), read by `GET /api/agents/{id}`, counts its newest twenty runs that ended: how many, the tokens
 they spent and the actions they called most, each with its count. Once three of them have ended (one run says little
 of what a role needs), it names the actions the agent may use that none of them called, but for the ones every agent's
-run has (finishing, asking) and `message_agent`, its way to its team, with **Remove them**: on your yes they go, and
-Edit gives any of them back. An agent with every action is offered **Keep only these**: the actions its runs called
-that are tools here, and `message_agent`. An action a role never needs is a way for the agent to go astray, so the
-page says which. The API: `GET /api/agents/{id}` gives `usage` (`window`, `runs`, `tokens`, `newest`, `calls`,
-`enough`, `unused`), and `POST /api/agents/{id}/trim-tools` takes them away (422 before three runs ended, and when
-nothing would go or nothing would be left).
+run has (finishing, asking) and `message_agent`, its way to its team. An action a role never needs is a way for the
+agent to go astray, so the fold named it and `POST /api/agents/{id}/trim-tools` took them away (422 before three runs
+ended, and when nothing would go or nothing would be left). The page's fold is gone (item 1266): `usage` gives
+`window`, `runs`, `tokens`, `newest`, `calls`, `enough` and `unused`, and the page keeps its schedules and what it
+learned.
 
-**How its work went** (item 1066), on an agent's page with work orders, reads how they went rather than how much the
+**How its work went** (item 1066), `work` of `GET /api/agents/{id}`, reads how the work orders went rather than how much the
 agent wrote: the orders it has (one reassigned is its newest agent's), how many were accepted on their first attempt,
 how many after a return, how many wait for you (escalated: one you drop is cancelled and leaves that count) and how
 many are open, and the returns in all; the attempts of an order reassigned count for the agent that has it now. It is how to tell which
-agent's, or which model's, work holds. `GET /api/agents/{id}` gives it as `work` (`orders`, `accepted`,
-`accepted_first`, `returns`, `escalated`, `open`).
+agent's, or which model's, work holds. The page's fold of it is gone (item 1266). `work` gives `orders`, `accepted`,
+`accepted_first`, `returns`, `escalated` and `open`.
 
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
@@ -396,7 +396,8 @@ folded there too until you open it (item 859: item 830 had it open, and each ret
 you opened stays open in that tab when the chat is drawn again.
 The run that answers a message names the agent in its `run_queued` event (`agent_name`), which the page reads; a
 helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (under the "…" of the Agents page, `#/team`) lists today's messages: who to whom, the
-message and the reply (their words, with no markdown marks: item 778), the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
+message and the reply (their words, with no markdown marks: item 778), the time and the two runs; `GET /api/agents/{id}`
+gives the messages an agent sent or received (item 1266: its page's fold of them is gone). `GET /api/team`
 gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
 which older tool output is shortened, once, to 700 characters; a step's request to Anthropic also marks the end of the
 part of the run the next step sends unchanged, before the newest tool results, as Anthropic looks for a cached prefix

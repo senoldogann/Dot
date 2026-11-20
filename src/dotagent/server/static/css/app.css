@@ -2064,6 +2064,38 @@ textarea {
   .plugin-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /* A phone's services are one list in one frame (item 1266), as a messaging app's settings: a row each, a line
+     between them, no card of its own. A card per service left 150 px between two rows that say a name and a line. */
+  .plugin-section > .plugin-grid {
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--box-border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .plugin-section > .plugin-grid > .plugin-tile {
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .plugin-section > .plugin-grid > .plugin-tile + .plugin-tile {
+    border-top: 1px solid var(--border);
+  }
+
+  .plugin-grid .plugin-does {
+    -webkit-line-clamp: 1;
+  }
+
+  /* What kind of service it is, its chip, is in its section's words (item 1266); where it stands, connected or waiting
+     for a sign-in, stays on its row: a row that lost its button must still say why. */
+  .plugin-grid .plugin-meta > .chip {
+    display: none;
+  }
 }
 
 /* The skills are one list (item 946): a row each in one frame, a line between them, what each does on one line. */

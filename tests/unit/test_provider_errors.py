@@ -3,7 +3,8 @@ spent quota, on every provider; Ollama's 429 that says the plan's included usage
 another 429 stays a rate limit to retry; and the pause of a model names which it was. Ollama's answer that its model
 runner broke off is retried as a broken connection is (item 256). OpenRouter's 404 for a model the account's privacy
 settings leave no provider of is a refused access that says why and where to change it (item 361), and its 402 for
-credits that do not pay for the longest answer a request allows says so and how long an answer they do pay for."""
+credits that do not pay for the longest answer a request allows says so and how long an answer they do pay for, while
+its 402 for credits held by requests still running is a rate limit that is retried (item 1267)."""
 
 from dotagent.core.errors import (
     ProviderAccessError,
@@ -127,6 +128,23 @@ def test_openrouters_402_for_credits_is_out_of_credits_and_names_the_answer_they
     # A 402 that speaks of no credits stays a model the plan does not include.
     unplanned = classify_openrouter(402, EXCLUDED.model_copy(update={"message": "model not included"}), None, {})
     assert not isinstance(unplanned, ProviderCreditError) and unavailable_reason(unplanned) == "not in the plan"
+
+
+# OpenRouter's answer, seen ten times in the owner's record (item 1267), to a call made while others were running.
+_IN_FLIGHT_BODY: str = (
+    '{"error": {"message": "This request would exceed your available credits given your current in-flight requests. '
+    'Retry after in-flight requests settle, or add credits.", "code": 402}}'
+)
+
+
+def test_openrouters_402_for_credits_held_by_requests_still_running_is_retried_not_out_of_credits() -> None:
+    error = classify_openrouter(402, parse_wire_error(_IN_FLIGHT_BODY), None, {"model": "m"})
+    assert isinstance(error, ProviderRateLimitError) and error.status == 402
+    assert is_retryable_provider_error(error)
+    assert unavailable_reason(error) == "rate limited"
+    # The 402 of credits that do not pay for the request alone stays out of credits, and is not retried.
+    alone = classify_openrouter(402, parse_wire_error(_CREDITS_BODY), None, {})
+    assert isinstance(alone, ProviderCreditError) and not is_retryable_provider_error(alone)
 
 
 def test_spent_credits_are_told_apart_from_a_spent_usage_window() -> None:

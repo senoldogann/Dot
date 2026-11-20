@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { explain, serviceWords, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
+import { explain, serviceFailure, serviceWords, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
 
 class ApiError extends Error {
   constructor(status, message, context = {}) {
@@ -86,4 +86,13 @@ test("a model service's failure reads as its own sentence, the code and the log'
   });
   assert.deepEqual(serviceWords("provider answered HTTP 503"), { text: "The AI service answered with an error (HTTP 503).", details: "provider answered HTTP 503" });
   assert.deepEqual(serviceWords("No OpenAI key is set."), { text: "No OpenAI key is set.", details: "" });
+});
+
+test("a 402 for credits held by requests still running reads as a limit reached, another 402 as a balance to top up", () => {
+  const held = serviceFailure(
+    "provider answered HTTP 402: This request would exceed your available credits given your current in-flight requests. Retry after in-flight requests settle, or add credits.",
+  );
+  assert.equal(held?.short, "Stopped: the AI service's limit was reached");
+  const spent = serviceFailure("provider answered HTTP 402: This request requires more credits, or fewer max_tokens.");
+  assert.equal(spent?.short, "Stopped: the AI service's balance or plan");
 });

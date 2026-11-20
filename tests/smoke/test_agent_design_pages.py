@@ -191,64 +191,40 @@ async def _ended_run(runtime: Runtime, agent_id: str, tools: list[str]) -> None:
     await store.finish_run(run.id, "done", "ok")
 
 
-async def test_the_page_names_what_the_agents_runs_used_and_takes_away_what_none_called_on_the_owners_yes(
+async def test_the_page_keeps_no_fold_of_the_counts_and_the_api_carries_them(
     runtime: Runtime, client: httpx.AsyncClient
 ) -> None:
-    """Item 874: an agent with actions its role never needs is a way to go astray; its page now says which."""
+    """Item 1266: the folds under an agent's box, Chats, What it used, How its work went and Messages, are gone; the
+    counts they showed are the API's, and trim-tools still takes away the actions no run called."""
     MODEL.script = ScriptedProvider(_PROVIDER, [])
     scout: JsonObject = await _agent(client, "Scout", ["web_search", "read_file", "shell", "message_agent"])
     playwright, browser = await _launch(runtime)
     try:
         await _ended_run(runtime, scout["id"], ["web_search", "web_search"])
+        for _ in range(2):
+            await _ended_run(runtime, scout["id"], ["web_search"])
+        detail: JsonObject = (await client.get(f"/api/agents/{scout['id']}")).json()
+        assert detail["usage"]["runs"] == 3
+        assert detail["usage"]["unused"] == ["read_file", "shell"]
         page: Page = await _open(browser, client, f"/agents/{scout['id']}", 1280)
-        used: Locator = page.locator("[data-section='usage']")
-        await expect(used).to_contain_text("Its last 1 run: 123k tokens, 1 action called")
-        await expect(used).to_contain_text("web_search ×2")
-        # One run says little of what a role needs: no action is named as unused yet.
-        await expect(used.locator("[data-usage='wait']")).to_be_visible()
-        await expect(used.locator("[data-usage='unused']")).to_have_count(0)
-        await _ended_run(runtime, scout["id"], ["web_search"])
-        await _ended_run(runtime, scout["id"], ["web_search"])
-        await page.reload()
-        unused: Locator = page.locator("[data-section='usage'] [data-usage='unused']")
-        await expect(unused).to_contain_text("Not called in its last 3 runs: 2 actions")
-        await expect(unused).to_contain_text("read_file, shell")
-        await unused.get_by_role("button", name="Remove them").click()
-        dialog: Locator = page.get_by_role("dialog")
-        await expect(dialog).to_contain_text("Remove 2 actions from Scout?")
-        await dialog.get_by_role("button", name="Remove").click()
-        await expect(page.locator(".toast")).to_contain_text("Scout keeps 2 actions.")
-        record = (await client.get(f"/api/agents/{scout['id']}")).json()["record"]
-        assert record["tools"] == ["web_search", "message_agent"]
-        await expect(page.locator("[data-section='usage'] [data-usage='unused']")).to_have_count(0)
-        # On a phone the section fits the screen.
+        for section in ("chats", "usage", "work", "messages"):
+            await expect(page.locator(f"[data-section='{section}']")).to_have_count(0)
+        trimmed: JsonObject = (await client.post(f"/api/agents/{scout['id']}/trim-tools", json={})).json()
+        assert trimmed["tools"] == ["web_search", "message_agent"]
         phone: Page = await _open(browser, client, f"/agents/{scout['id']}", 390, phone=True)
-        await expect(phone.locator("[data-section='usage']")).to_be_visible()
         assert await phone.evaluate(_SIDEWAYS) <= 0
     finally:
         await browser.close()
         await playwright.stop()
 
 
-async def test_an_agent_with_every_action_is_offered_to_keep_only_the_ones_its_runs_called(
-    runtime: Runtime, client: httpx.AsyncClient
-) -> None:
+async def test_trim_tools_keeps_only_the_actions_the_runs_called(runtime: Runtime, client: httpx.AsyncClient) -> None:
+    """Item 1266: the page's offer to keep only what the runs called left with its fold; trim-tools keeps it."""
     every: JsonObject = await _agent(client, "Generalist", None)
     for _ in range(3):
         await _ended_run(runtime, every["id"], ["read_file", "finish"])
-    playwright, browser = await _launch(runtime)
-    try:
-        page: Page = await _open(browser, client, f"/agents/{every['id']}", 1280)
-        row: Locator = page.locator("[data-section='usage'] [data-usage='every']")
-        await expect(row).to_contain_text("It has every action")
-        await row.get_by_role("button", name="Keep only these").click()
-        await page.get_by_role("dialog").get_by_role("button", name="Keep only these").click()
-        await expect(page.locator(".toast")).to_contain_text("Generalist keeps 2 actions.")
-        record = (await client.get(f"/api/agents/{every['id']}")).json()["record"]
-        assert record["tools"] == ["read_file", "message_agent"]
-    finally:
-        await browser.close()
-        await playwright.stop()
+    trimmed: JsonObject = (await client.post(f"/api/agents/{every['id']}/trim-tools", json={})).json()
+    assert trimmed["tools"] == ["read_file", "message_agent"]
 
 
 async def _edit(page: Page, name: str) -> None:
@@ -354,9 +330,8 @@ async def test_the_page_says_how_the_agents_work_orders_went(runtime: Runtime, c
     playwright, browser = await _launch(runtime)
     try:
         page: Page = await _open(browser, client, f"/agents/{desk['id']}", 1280)
-        row: Locator = page.locator("[data-section='work'] [data-work='orders']")
-        await expect(row).to_contain_text("3 work orders: 1 accepted the first time")
-        await expect(row).to_contain_text("1 after a return · 1 waiting for you · 1 return in all")
+        # The page's fold is gone (item 1266); the API's numbers are what it showed.
+        await expect(page.locator("[data-section='work']")).to_have_count(0)
     finally:
         await browser.close()
         await playwright.stop()

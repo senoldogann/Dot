@@ -167,7 +167,7 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             heads: list[str] = await page.locator("#sidebar .side-head nav.side-pages a").evaluate_all(
                 "(links) => links.map((link) => link.getAttribute('aria-label'))"
             )
-            assert heads == ["Campaigns", "Schedules"], heads
+            assert heads == ["Watch the Mac", "Campaigns", "Schedules"], heads
             # The ready server with no logo shows none: the logo's mark first, and the services most connect first after
             # it, four in all (item 959), each drawn inline.
             marks: Locator = button.locator(".side-connect-mark .mark-logo")

@@ -96,10 +96,11 @@ MONEY_REASONS: frozenset[str] = frozenset({"out of credits", "quota exhausted", 
 
 def unavailable_reason(error: Exception) -> str | None:
     """Why the model whose call raised ``error`` cannot answer for a while: the quota or the rate of its provider is
-    spent, the credits of its account are (OpenRouter's 402), the plan does not include the model (any other HTTP 402),
-    its key was refused (HTTP 401), the access to it was refused (HTTP 403), or it has no key. ``None`` for an error
-    that says nothing about that, such as a transport or protocol error. The connector has retried what can be retried
-    before such an error reaches its caller."""
+    spent (OpenRouter's 402 for credits held by its other requests still running among the rates), the credits of
+    its account are (OpenRouter's other 402 that speaks of credits), the plan does not include the model (any other
+    HTTP 402), its key was refused (HTTP 401), the access to it was refused (HTTP 403), or it has no key. ``None`` for
+    an error that says nothing about that, such as a transport or protocol error. The connector has retried what can
+    be retried before such an error reaches its caller."""
     if isinstance(error, ProviderCreditError):
         return "out of credits"
     if isinstance(error, ProviderWindowError):

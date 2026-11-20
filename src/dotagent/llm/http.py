@@ -65,7 +65,8 @@ def is_retryable_provider_error(exc: Exception) -> bool:
         return False
     if isinstance(exc, ProviderRateLimitError) and (exc.retry_after_s or 0.0) > _MAX_AUTOMATIC_WAIT_S:
         return False
-    if isinstance(exc, ProviderRunnerError):
+    if isinstance(exc, ProviderRunnerError | ProviderRateLimitError):
+        # A rate limit is retried whatever its status: OpenRouter's credits held by requests still running answer 402.
         return True
     if isinstance(exc, ProviderHttpError):
         return exc.status in _RETRYABLE_STATUS

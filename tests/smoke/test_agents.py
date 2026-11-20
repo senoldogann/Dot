@@ -415,7 +415,8 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await expect(page_ui).to_have_title("Scout · Agents · Dot")
             await expect(page_ui.get_by_role("heading", level=1)).to_have_text("Scout")
             await expect(page_ui.locator(".stage-title h1.stage-name")).to_have_count(1)
-            assert await page_ui.locator(".list-row[data-run]").count() == 2
+            # The page lists no run (item 1266): its chats' runs are the API's.
+            assert await page_ui.locator(".list-row[data-run]").count() == 0
             # What it learned: the lesson with its score, the skill with Share.
             assert await page_ui.locator(".agent-learned [data-lesson]").count() == 1
             learned_text: str = await page_ui.locator(".agent-learned").inner_text()
