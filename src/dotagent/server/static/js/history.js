@@ -3,7 +3,8 @@
 
 import { t } from "./i18n.js";
 import { api, query } from "./api.js";
-import { el, plural, repeatsAnswer } from "./dom.js";
+import { visibleInConversation } from "./chatnoise.js";
+import { compact, el, plural, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, besideLine, chatNoteLine,
@@ -216,6 +217,13 @@ function drawFlow(past, flow, asked, events, reactions) {
   let reaction = null;
   let reactedTo = null;
   for (const event of events) {
+    // A compaction, a system message, a hidden wake or tool-call plumbing is not a turn of the conversation. The
+    // record stays in the page, under the details toggle.
+    if (!visibleInConversation(event)) {
+      batch = null;
+      blocks.push({ internal: event });
+      continue;
+    }
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
       if (said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer)) {
@@ -290,7 +298,9 @@ function drawFlow(past, flow, asked, events, reactions) {
     }
   }
   const nodes = blocks.map((block) =>
-    block.page !== undefined
+    block.internal !== undefined
+      ? internalRecord(block.internal)
+      : block.page !== undefined
       ? pageCard(block.page.id, block.page.title)
       : block.schedule !== undefined
       ? scheduleLine(block.schedule)
@@ -319,6 +329,25 @@ function drawFlow(past, flow, asked, events, reactions) {
     flow.replaceChildren(...nodes);
     flow.hidden = nodes.length === 0;
   });
+}
+
+/** An internal event as it stands in an earlier turn: a compaction says the chat was shortened, and the record itself
+ * (the sizes, a system message, a hidden wake) waits for the details toggle. */
+function internalRecord(event) {
+  const data = event.data ?? {};
+  const words =
+    event.kind === "compacted"
+      ? typeof data.tokens_before === "number" && typeof data.tokens_after === "number"
+        ? t("timeline.compactedSized", { before: compact(data.tokens_before), after: compact(data.tokens_after) })
+        : t("timeline.compacted")
+      : typeof event.text === "string" && event.text !== ""
+        ? event.text
+        : event.kind;
+  const record = el("div", { class: "chat-internal" }, el("p", { class: "small muted" }, words));
+  if (event.kind !== "compacted") {
+    return record;
+  }
+  return el("div", { class: "compaction" }, el("p", { class: "compaction-notice" }, t("timeline.condensed")), record);
 }
 
 /** The box the conversation scrolls in: its own on a phone (`html.chat-shell` within the phone's width, run.css), else

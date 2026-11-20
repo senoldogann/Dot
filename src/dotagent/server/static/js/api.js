@@ -736,6 +736,29 @@ export function frameUrl(base64) {
   return URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
 }
 
+const favicons = new Map();
+
+/**
+ * A `blob:` URL for the icon of `host`, fetched from this daemon (`GET /api/favicons/<host>`), or null when the site
+ * has none or the Mac is offline. The same host is asked once. Images need the token, so they are not `<img src>` links.
+ * @param {string} host
+ * @returns {Promise<string | null>}
+ */
+export function faviconUrl(host) {
+  if (typeof host !== "string" || host === "") {
+    return Promise.resolve(null);
+  }
+  let pending = favicons.get(host);
+  if (pending === undefined) {
+    pending = proven()
+      .then(() => fetch(`/api/favicons/${encodeURIComponent(host)}`, { headers: authHeaders(), cache: "force-cache" }))
+      .then(async (response) => (response.ok ? URL.createObjectURL(await response.blob()) : null))
+      .catch(() => null);
+    favicons.set(host, pending);
+  }
+  return pending;
+}
+
 /** A `blob:` URL for a stored screenshot; images need the token, so they cannot be plain `<img src>` links. */
 export function imageUrl(name) {
   let pending = images.get(name);

@@ -1,0 +1,47 @@
+"""The icon of a site a chat linked to: this Mac fetches ``https://<host>/favicon.ico`` and keeps it."""
+
+import time
+
+from fastapi import APIRouter
+from fastapi.responses import Response
+from starlette.exceptions import HTTPException
+
+from dotagent.core.errors import WebError
+from dotagent.core.logs import get_logger
+from dotagent.server.context import ServerContext
+from dotagent.server.favicons import FaviconCache, favicon_host, favicon_url, read_icon
+
+log = get_logger(__name__)
+_MAX_BYTES: int = 64 * 1024
+
+
+def favicons_router(ctx: ServerContext) -> APIRouter:
+    """``GET /api/favicons/{host}`` answers the site's icon, or 404 when there is none. The host is a name, and the
+    fetch is the web connector's, which refuses an address that is not public."""
+    router: APIRouter = APIRouter(prefix="/api")
+    cache: FaviconCache = FaviconCache()
+
+    @router.get("/favicons/{host}")
+    async def favicon(host: str) -> Response:
+        try:
+            name: str = favicon_host(host)
+        except ValueError:
+            raise HTTPException(status_code=404) from None
+        kept = cache.get(name, time.monotonic())
+        if kept is not None:
+            if kept.body is None:
+                raise HTTPException(status_code=404)
+            return Response(kept.body, media_type=kept.media_type, headers={"Cache-Control": "private, max-age=86400"})
+        document = None
+        try:
+            document = await ctx.runtime.web.get(favicon_url(name), _MAX_BYTES)
+        except WebError:
+            document = None
+        found = read_icon(cache, name, document)
+        if found is None:
+            log.info("favicon_missed", host=name)
+            raise HTTPException(status_code=404)
+        log.info("favicon_kept", host=name, bytes=len(found[0]))
+        return Response(found[0], media_type=found[1], headers={"Cache-Control": "private, max-age=86400"})
+
+    return router

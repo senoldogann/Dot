@@ -6,6 +6,7 @@
 // start of the run or the last message) to the moment it ended, so the groups of a run add up to the time the run took.
 
 import { AUTO_LINES, settingValue } from "./appearance/settings.js";
+import { visibleInConversation } from "./chatnoise.js";
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { memoryChange } from "./contextpanel.js";
@@ -416,6 +417,27 @@ function buildFlock() {
  */
 export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere, onAsk, onAnswered, onDotReaction = (/** @type {string} */ _reaction) => undefined, reactions = null, onReactionHold = (/** @type {boolean} */ _held) => undefined }) {
   const element = el("div", { class: "timeline" });
+  // Compactions, system messages, hidden wakes and tool-call plumbing stay out of the conversation until this is
+  // pressed. The record is still in the page, so nothing is thrown away.
+  const internals = el(
+    "button",
+    { class: "chat-details-toggle", type: "button", hidden: true, "aria-pressed": "false" },
+    t("timeline.showInternals"),
+  );
+  internals.addEventListener("click", () => {
+    const on = document.documentElement.dataset.chatDetails !== "on";
+    if (on) {
+      document.documentElement.dataset.chatDetails = "on";
+    } else {
+      delete document.documentElement.dataset.chatDetails;
+    }
+    internals.setAttribute("aria-pressed", String(on));
+    setText(internals, t(on ? "timeline.hideInternals" : "timeline.showInternals"));
+  });
+  element.append(internals);
+  function revealInternals() {
+    internals.hidden = false;
+  }
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
   const scopes = new Map();
@@ -1227,6 +1249,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
     tool_call(scope, record) {
       const data = record.data;
+      // A call kept only as plumbing is the internal record, not a step in the conversation.
+      if (!visibleInConversation(record)) {
+        keepInternal(scope, record);
+        return;
+      }
       if (readsPages(data.tool)) {
         scope.reads.push(record);
       }
@@ -1679,7 +1706,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         compactions.flagged += 1;
       }
       onCompacted({ ...compactions });
-      place(scope, compactionLine(record.data), record.ts);
+      // The reader sees one short line. The sizes, and the summary when the event carries one, stay in the details.
+      const recordNode = el("div", { class: "chat-internal" }, compactionLine(record.data));
+      const summary = typeof record.data.summary === "string" ? record.data.summary.trim() : "";
+      if (summary !== "") {
+        recordNode.append(el("p", { class: "small muted" }, summary));
+      }
+      revealInternals();
+      place(scope, el("div", { class: "compaction" }, el("p", { class: "compaction-notice" }, t("timeline.condensed")), recordNode), record.ts);
     },
 
     // A draft a run wrote for the owner (item 314): a card where it was written, and the owner's Send or Discard on it,
@@ -1878,6 +1912,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     },
   };
 
+  /** A system message, a hidden wake or other internal event, kept in the page and shown with the details. */
+  function keepInternal(scope, record) {
+    const text = typeof record.text === "string" && record.text !== "" ? record.text : record.kind;
+    revealInternals();
+    place(scope, el("div", { class: "chat-internal note" }, el("span", null, text)), record.ts);
+  }
+
   function push(record) {
     let scope = scopes.get(record.run_id);
     if (scope === undefined) {
@@ -1886,6 +1927,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     const handler = handlers[record.kind];
     if (handler !== undefined) {
       handler(scope, record);
+    } else if (!visibleInConversation(record)) {
+      keepInternal(scope, record);
     }
     onGrow();
   }

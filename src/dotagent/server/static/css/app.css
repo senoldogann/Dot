@@ -312,6 +312,58 @@ a {
   text-underline-offset: 2px;
 }
 
+/* A link in a message is a pill: the site's icon and a short label, on one line with the words around it. */
+.prose a.link-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  margin: 0 0.12em;
+  padding: 1px 8px 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text) 7%, var(--surface));
+  color: var(--text);
+  font-size: 0.92em;
+  line-height: 1.45;
+  text-decoration: none;
+  vertical-align: -0.2em;
+  white-space: nowrap;
+}
+
+.prose a.link-pill:hover {
+  text-decoration: none;
+  border-color: var(--border-strong);
+}
+
+.link-pill-icon,
+.link-pill-fallback {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 3px;
+}
+
+.link-pill-fallback {
+  color: var(--muted);
+}
+
+.link-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.bubble.user .prose a.link-pill {
+  background: color-mix(in oklab, var(--on-msg-me) 12%, transparent);
+  border-color: color-mix(in oklab, var(--on-msg-me) 28%, transparent);
+  color: inherit;
+}
+
+.bubble.user .prose a.link-pill .link-pill-fallback {
+  color: inherit;
+}
+
 @media (hover: hover) {
   a:hover {
     text-decoration: underline;
@@ -6089,8 +6141,39 @@ details:not([open]) > :not(summary) {
   color: var(--warn);
 }
 
+/* Where the chat was shortened: one quiet line. The sizes and the summary are the internal record. */
+.compaction-notice {
+  margin: var(--space-2) 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.chat-details-toggle {
+  align-self: center;
+  margin: var(--space-1) 0;
+  padding: 2px 8px;
+  border: 0;
+  background: none;
+  color: var(--faint);
+  font-size: var(--text-xs);
+}
+
+.chat-details-toggle:hover {
+  color: var(--muted);
+}
+
+/* Internal events stay in the page and out of the conversation until the reader asks for them. */
+.chat-internal {
+  display: none !important;
+}
+
+html[data-chat-details="on"] .chat-internal {
+  display: contents !important;
+}
+
 /* A compaction in the conversation (item 312, after Codex's): a quiet rule across the column, its words and the sizes
-   in the middle. */
+   in the middle. It is the internal record of a shortening; the conversation shows the short line above it. */
 .compaction-line {
   display: flex;
   align-items: center;
