@@ -82,6 +82,7 @@ from dotagent.browser.driver import (
 )
 from dotagent.browser.extract import extract_records, render_records
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
+from dotagent.browser.labels import mark_screenshot
 from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.network import Fetched, answer_text, call_lines, hidden_address
 from dotagent.browser.pages import (
@@ -3084,7 +3085,12 @@ class BrowserSession:
             data: bytes = await asyncio.to_thread(
                 jpeg_of_size, shot, viewport.width, viewport.height, config.screenshot_quality
             )
-            return Screenshot(url=tab.page.url, width=viewport.width, height=viewport.height, data=data)
+            # The model is shown the refs of the latest snapshot on the elements; the picture kept for the owner is
+            # the page with none (item 1261).
+            marked: bytes = await asyncio.to_thread(
+                mark_screenshot, data, tab.lines, viewport.width, viewport.height, config.screenshot_quality
+            )
+            return Screenshot(url=tab.page.url, width=viewport.width, height=viewport.height, data=data, marked=marked)
 
     def _tab_of(self, thread_id: str) -> Tab | None:
         """The current tab of the thread without waiting for its lock, ``None`` when the thread has no open tab. Starts

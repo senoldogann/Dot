@@ -6,7 +6,9 @@ is a standing instruction.
 
 ## How it is solved
 
-- `browser_screenshot` gives a JPEG of the viewport; one pixel of it is one CSS pixel of the page.
+- `browser_screenshot` gives a JPEG of the viewport; one pixel of it is one CSS pixel of the page. The picture the
+  model sees also marks each interactive element in view with its snapshot ref, at the element's corner (item 1261).
+  A pixel is still one CSS pixel.
 - `browser_act` with `click_at` presses a checkbox or an image tile by its pixel.
 - `browser_act` with `drag_at` presses at one pixel and lets go at another: an hCaptcha "drag the shape to the loop
   that is closed" puzzle, or a slider.
