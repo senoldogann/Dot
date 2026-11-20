@@ -13,6 +13,7 @@ from dotagent.server.favicons import FaviconCache, favicon_host, favicon_url, re
 
 log = get_logger(__name__)
 _MAX_BYTES: int = 64 * 1024
+_SERVER_ERROR: int = 500
 
 
 def favicons_router(ctx: ServerContext) -> APIRouter:
@@ -38,6 +39,10 @@ def favicons_router(ctx: ServerContext) -> APIRouter:
         except WebError as error:
             log.warning("favicon_fetch_failed", host=name, error=error.message, context=error.context)
             raise HTTPException(status_code=502) from error
+        if document.status >= _SERVER_ERROR:
+            # The site failed rather than said it has no icon: not kept, asked again by the next drawing.
+            log.warning("favicon_fetch_failed", host=name, status=document.status)
+            raise HTTPException(status_code=502)
         found = read_icon(cache, name, document)
         if found is None:
             log.info("favicon_missed", host=name)
