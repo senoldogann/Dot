@@ -17,7 +17,7 @@ from dotagent.mcp.types import McpPurpose
 from dotagent.policy.types import ApprovalMode, Preset
 from dotagent.proactive import UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.scheduler import SCHEDULE_SOURCE
-from dotagent.server import CLI_SOURCE, UI_SOURCE
+from dotagent.server import CLI_SOURCE, REVIEW_SOURCE, UI_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
@@ -603,9 +603,9 @@ _ON_A_PHONE: str = (
 
 _WATCHED: str = "This run was started by the user's own message."
 _BY_DOT: str = "This run was started by Dot ({source}), not by a new message of the user's."
-# The sources of a run that a message of the owner's starts in the app or with dotx run, and of an eval's task, whose
-# goal stands for one; a phone's channel has its own line.
-_OWNER_SOURCES: frozenset[str] = frozenset({UI_SOURCE, CLI_SOURCE, EVAL_SOURCE})
+# The sources of a run that a message of the owner's starts in the app or with dotx run (a review too), and of an
+# eval's task, whose goal stands for one; a phone's channel has its own line.
+_OWNER_SOURCES: frozenset[str] = frozenset({UI_SOURCE, CLI_SOURCE, REVIEW_SOURCE, EVAL_SOURCE})
 
 _STARTED_LEAD: str = (
     "[system note] How this run was started; it holds for this run, in place of what earlier runs of this chat were "

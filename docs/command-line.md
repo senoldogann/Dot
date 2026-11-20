@@ -34,15 +34,15 @@ dotx chat
 leaves).
 
 While the daemon of this Dot home runs, `run` hands its run to it (item 1203): the daemon starts the run, with the
-source `cli` that a run of the command has, in its own Chrome, a tab beside its chats' (Dot's Chrome profile is one
-process's at a time, so a run of the command's own process waited on the daemon's browser work, and theirs on it), and
-its screen is on the pages as any run's is, the phone's too. The command follows it over the daemon's API (the address
-of `[server]` and the token in the Dot home, once the daemon has proven that it holds it) and prints what it prints for
-a run of its own: the steps, the answer, what the run needs from you, the questions it left and, with `--standing`, the
-campaign's line. The lessons of the run are drawn by the daemon after its end: the run's page shows them. With no
-daemon of the home (it never started there, or nothing listens at its address), the run works in the command's own
-process, as on a Mac without one; a program or a daemon of another Dot home at the address is said, and sent nothing.
-`dotx resume` and `dotx chat` work in their own process whether or not a daemon runs.
+source that a run of the command has (`cli`, `review` with `--review`), in its own Chrome, a tab beside its chats'
+(Dot's Chrome profile is one process's at a time, so a run of the command's own process waited on the daemon's browser
+work, and theirs on it), and its screen is on the pages as any run's is, the phone's too. The command follows it over
+the daemon's API (the address of `[server]` and the token in the Dot home, once the daemon has proven that it holds it)
+and prints what it prints for a run of its own: the steps, the answer, what the run needs from you, the questions it
+left and, with `--standing`, the campaign's line. The lessons of the run are drawn by the daemon after its end: the
+run's page shows them. With no daemon of the home (it never started there, or nothing listens at its address), the run
+works in the command's own process, as on a Mac without one; a program or a daemon of another Dot home at the address is
+said, and sent nothing. `dotx resume` and `dotx chat` work in their own process whether or not a daemon runs.
 
 Ctrl-C stops the run that is going on; a second Ctrl-C quits (for a run of the command's own process, as soon as that
 stop is recorded, five seconds at most). For a run of the command's own process, closing the terminal, or SIGTERM, cuts
@@ -68,6 +68,8 @@ off by the command's death, and it can be resumed too; a run handed to the daemo
   holds when standard input is not a terminal, and for a run handed to the daemon: the command answers its cards as
   the terminal (`cli`), so the caller is never kept waiting. A run of the daemon may also leave a question for you
   and go on without it, as a chat's run does: it stays on the run's page
+- `--review` marks a code review (the pre-push hook's, item 1256): its chat is kept under **Code reviews** in the
+  sidebar, apart from your chats, and is never Dot's home chat
 - `--thinking` shows the model's reasoning stream, `--verbose` the tool output and the token use
 - a goal of `-` is read from standard input
 

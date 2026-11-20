@@ -24,6 +24,7 @@ class RunCommand(FrozenModel):
     standing: bool
     browser: BrowserMode | None
     thread: str | None
+    review: bool
     no_input: bool
     thinking: bool
     verbose: bool

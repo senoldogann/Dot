@@ -696,6 +696,7 @@ export const EN = {
   "side.pinned": "Pinned",
   "side.dotsWork": "Dot's work",
   "side.agentsWork": "Agents' work",
+  "side.reviews": "Code reviews",
   "side.statusQueued": "queued",
   "side.statusRunning": "running",
   "side.statusBlocked": "waiting for you",

@@ -62,7 +62,8 @@ above iMessage: one section for the chats of Dot's own initiative (a chat for ea
 each look for work, [Proactive](proactive.md#on-its-own)) and of the schedules, folded until you open it, so that the
 days hold your own chats; opened, it stays open as you left it (until item 855 they were two, **On its own** and
 **Scheduled**). **Agents' work** stands so too, under it (item 1082): the chat of each agent, where the work Dot sends
-it goes on, folded until you open it. The days themselves have no heading and no fold (item 855: a **Chats** label named the list and
+it goes on, folded until you open it. **Code reviews** stands so too, under it: the chats of the pre-push review
+(`dotx run --review`, a thread whose `source` is `review`), folded until you open it. The days themselves have no heading and no fold (item 855: a **Chats** label named the list and
 folded it); their labels (Pinned, Today, Yesterday…) are small and quiet, and **Select** stands at the right of the
 first of them.
 Folded over a chat you have not read, the label shows the accent's dot after its count. Its chat is a row like any
@@ -1448,7 +1449,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
-| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170) |
+| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (`"review"` for `dotx run --review`, kept under Code reviews; a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170) |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs (`stored=true`: only those stored so far, item 734); lifecycle of all runs |
 | `GET /runs/streams?ids=a,b&after=N`                                              | the events of several runs (12 at most) on one stream, without their sub-runs, the stored ones after `N` first, ending once none works (item 889: the office's, as a browser keeps six connections to a server); 404 for a run that is not, 422 for none or too many |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |

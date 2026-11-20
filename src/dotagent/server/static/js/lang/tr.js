@@ -681,6 +681,7 @@ export const TR = {
   "side.pinned": "Sabitlenenler",
   "side.dotsWork": "Dot'un işleri",
   "side.agentsWork": "Ajanların işleri",
+  "side.reviews": "Kod incelemeleri",
   "side.statusQueued": "sırada",
   "side.statusRunning": "çalışıyor",
   "side.statusBlocked": "sizi bekliyor",

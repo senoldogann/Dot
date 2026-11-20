@@ -444,13 +444,25 @@ async def test_dots_own_chats_stand_folded_at_the_foot_and_open_as_the_owner_lea
         await page.context.close()
 
 
-async def test_the_agents_chats_stand_folded_at_the_foot_in_a_section_of_their_own(
-    runtime: Runtime, browser: Browser, address: str, manager: RunManager, replies: Replies, garden: RunRecord
+@pytest.mark.parametrize(
+    ("source", "channel", "label"), [("team", "agents", "Agents' work 1"), ("review", "reviews", "Code reviews 1")]
+)
+async def test_the_agents_chats_and_the_reviews_stand_folded_at_the_foot_in_a_section_of_their_own(
+    runtime: Runtime,
+    browser: Browser,
+    address: str,
+    manager: RunManager,
+    replies: Replies,
+    garden: RunRecord,
+    source: str,
+    channel: str,
+    label: str,
 ) -> None:
     """Item 1082: the chat of each agent, where the work Dot sends it goes on, left the days for a section of its own
-    at the foot, folded until the owner opens it, as Dot's own work is: the owner found the list full of them."""
-    desk: ThreadRecord = await runtime.store.create_thread("Research Desk", "team")
-    await _done(manager, replies, "Find the opening hours", "team", desk.id)
+    at the foot, folded until the owner opens it, as Dot's own work is: the owner found the list full of them. The
+    pre-push hook's reviews too (item 1256)."""
+    desk: ThreadRecord = await runtime.store.create_thread("Research Desk", source)
+    await _done(manager, replies, "Find the opening hours", source, desk.id)
     for width in _WIDTHS:
         page: Page = await _open(browser, address, width)
         await page.evaluate(f"() => localStorage.removeItem('{_FOLDS}')")
@@ -458,12 +470,12 @@ async def test_the_agents_chats_stand_folded_at_the_foot_in_a_section_of_their_o
         sidebar: Locator = page.locator("#sidebar")
         goals: Locator = sidebar.locator(".side-runs .side-chat > a.side-run .side-run-goal")
         await expect(goals).not_to_contain_text(["Find the opening hours"])
-        section: Locator = sidebar.locator(".side-channels section[data-channel=agents]")
-        await expect(section.locator("> .side-label")).to_have_text("Agents' work 1")
+        section: Locator = sidebar.locator(f".side-channels section[data-channel={channel}]")
+        await expect(section.locator("> .side-label")).to_have_text(label)
         await expect(section.locator(".side-chat")).to_have_count(0)
         await section.locator("> .side-label .side-fold").click()
         await expect(section.locator(".side-chat")).to_have_count(1)
-        await _fits(page, f"{width} with the agents' section")
+        await _fits(page, f"{width} with the {channel} section")
         await page.context.close()
 
 

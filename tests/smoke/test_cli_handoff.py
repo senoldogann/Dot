@@ -64,7 +64,7 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return home
 
 
-def _command(approvals: ApprovalMode) -> RunCommand:
+def _command(approvals: ApprovalMode, review: bool) -> RunCommand:
     return RunCommand(
         name="run",
         goal=["Wait for the build."],
@@ -76,6 +76,7 @@ def _command(approvals: ApprovalMode) -> RunCommand:
         standing=False,
         browser=None,
         thread=None,
+        review=review,
         no_input=True,
         thinking=False,
         verbose=False,
@@ -136,7 +137,7 @@ async def test_dotx_run_hands_its_run_to_the_daemon_and_prints_its_answer(
 ) -> None:
     async with _daemon(own_home, [_FINISH]) as (runtime, manager):
         async with runtime.bus.subscribe(None) as subscription:
-            code: int = await cmd_run(_command("ask"))
+            code: int = await cmd_run(_command("ask", False))
             started: list[str] = await _started(subscription)
         printed = capsys.readouterr()
         (run,) = await runtime.store.list_runs(10, None)
@@ -149,11 +150,20 @@ async def test_dotx_run_hands_its_run_to_the_daemon_and_prints_its_answer(
         assert run.source == "cli" and run.status == "done"
 
 
+async def test_a_review_is_handed_with_its_own_source(own_home: Path) -> None:
+    """``dotx run --review`` (the pre-push hook's) starts a run whose chat the sidebar keeps under Code reviews."""
+    async with _daemon(own_home, [_FINISH]) as (runtime, _manager):
+        assert await cmd_run(_command("ask", True)) == 0
+        (run,) = await runtime.store.list_runs(10, None)
+        assert run.source == "review"
+        assert (await runtime.store.get_thread(run.thread_id)).source == "review"
+
+
 async def test_a_question_of_a_handed_run_is_answered_no_by_a_terminal_without_input(
     own_home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     async with _daemon(own_home, [_ASKING, _FINISH]) as (runtime, _):
-        code: int = await asyncio.wait_for(cmd_run(_command("ask")), 30.0)
+        code: int = await asyncio.wait_for(cmd_run(_command("ask", False)), 30.0)
         printed = capsys.readouterr()
         (run,) = await runtime.store.list_runs(10, None)
         (question,) = [
@@ -166,7 +176,7 @@ async def test_a_question_of_a_handed_run_is_answered_no_by_a_terminal_without_i
 
 async def test_ctrl_c_stops_the_handed_run_in_the_daemon(own_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
     async with _daemon(own_home, [_WAITING]) as (runtime, manager):
-        running: asyncio.Task[int] = asyncio.create_task(cmd_run(_command("yolo")))
+        running: asyncio.Task[int] = asyncio.create_task(cmd_run(_command("yolo", False)))
         deadline: float = time.monotonic() + 20.0
         # The command shows the run's first event once its Ctrl-C is its own: a SIGINT before would end pytest.
         shown: str = ""
