@@ -1,9 +1,8 @@
-"""A compaction is a quiet line in the conversation (item 312, after Codex's): a run that compacted its context twice
-shows two lines where it compacted, the first with the size of the context before and after it, the second, of an event
-from before item 312, without them; no note tells the summary or its check (item 260), and the Details panel says how
-many times it compacted and how many checks flagged something. A real server over a stand-in of Anthropic's provider in
-Chrome, wide and on a phone, light and dark. Before item 260 each compaction was a note in the timeline ("Context
-compacted: …"); from item 260 to item 312 the conversation showed nothing of it."""
+"""A compaction is a short line in the conversation: a run that compacted its context twice says "Earlier messages
+were condensed" twice, and the sizes (the first with them, the second, of an event from before item 312, without)
+stay hidden until Show internal events. No note tells the summary or its check (item 260), and the Details panel says
+how many times it compacted and how many checks flagged something. A real server over a stand-in of Anthropic's
+provider in Chrome, wide and on a phone, light and dark."""
 
 import asyncio
 import time
@@ -188,10 +187,16 @@ async def test_a_compaction_is_a_quiet_line_in_the_conversation_and_is_counted_i
                 details = page.locator("#panel-run-details")
                 await expect(details).to_contain_text("Summed up 2 times")
                 await expect(details).to_contain_text("1 summary had a problem")
+                notices = page.locator(".timeline .compaction-notice")
+                await expect(notices).to_have_text(
+                    ["Earlier messages were condensed", "Earlier messages were condensed"]
+                )
                 lines = page.locator(".timeline .compaction-line")
                 await expect(lines).to_have_text(
                     ["Older part of the chat summed up: 401k → 17k", "Older part of the chat summed up"]
                 )
+                await expect(lines.first).to_be_hidden()
+                await page.get_by_role("button", name="Show internal events").click()
                 await expect(lines.first).to_be_visible()
                 await expect(page.locator(".timeline .note", has_text="compacted")).to_have_count(0)
                 await expect(page.locator(".timeline .note", has_text="summarised")).to_have_count(0)

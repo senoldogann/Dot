@@ -416,6 +416,26 @@ function buildFlock() {
  */
 export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere, onAsk, onAnswered, onDotReaction = (/** @type {string} */ _reaction) => undefined, reactions = null, onReactionHold = (/** @type {boolean} */ _held) => undefined }) {
   const element = el("div", { class: "timeline" });
+  // The sizes of a compaction stay out of the conversation until this is pressed; the record is still in the page, so
+  // nothing is thrown away. It shows once the page holds such a record, of this run or of an earlier turn
+  // (`.chat-internal`, app.css), and says the state the page is in, which outlives a timeline.
+  const shown = document.documentElement.dataset.chatDetails === "on";
+  const internals = el(
+    "button",
+    { class: "chat-details-toggle", type: "button", "aria-pressed": String(shown) },
+    t(shown ? "timeline.hideInternals" : "timeline.showInternals"),
+  );
+  internals.addEventListener("click", () => {
+    const on = document.documentElement.dataset.chatDetails !== "on";
+    if (on) {
+      document.documentElement.dataset.chatDetails = "on";
+    } else {
+      delete document.documentElement.dataset.chatDetails;
+    }
+    internals.setAttribute("aria-pressed", String(on));
+    setText(internals, t(on ? "timeline.hideInternals" : "timeline.showInternals"));
+  });
+  element.append(internals);
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
   const scopes = new Map();
@@ -1679,7 +1699,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         compactions.flagged += 1;
       }
       onCompacted({ ...compactions });
-      place(scope, compactionLine(record.data), record.ts);
+      // The reader sees one short line. The sizes stay in the details.
+      const recordNode = el("div", { class: "chat-internal" }, compactionLine(record.data));
+      place(scope, el("div", { class: "compaction" }, el("p", { class: "compaction-notice" }, t("timeline.condensed")), recordNode), record.ts);
     },
 
     // A draft a run wrote for the owner (item 314): a card where it was written, and the owner's Send or Discard on it,

@@ -65,6 +65,12 @@ run needs, sent where the configuration points:
   scan runs only on a host in `[recon] owned_hosts` (see [Recon](recon.md)). `security_scan` sends a form's fields
   with a small, read-only set of payloads (item 781); it too runs only on a host in `[recon] owned_hosts`, and every
   form action must stay on that host (see [Security scan](security.md)).
+- **To the sites a chat links to: a request for their icon.** A link in a message is drawn as a pill with the site's
+  icon (item 1271): the daemon asks `https://<host>/favicon.ico` of that host, as the page draws the message, whether or
+  not a run works, and follows the site's redirects (at most six, often to its CDN), each checked as the first request;
+  every host on the way learns the Mac's address and when the chat was opened, not the page linked. A host that is not
+  a public name is refused, and the fetch is the web tools' (public addresses only). An icon is kept a day, a site that
+  answers without one ten minutes; a failed fetch, a site's server error included, is not kept.
 - **From the shell: whatever a command sends.** The sandbox closes Dot's own files, not the network; a run that has read
   untrusted content asks before a line that sends data out (see [Safety](#safety)).
 - **To TypeSafe, once its key is saved: the texts it judges.** `judge_items` and the tools of posts and campaigns send

@@ -2,11 +2,14 @@
 // become anchors, and the path of a file in code a button that shows the file beside the conversation (item 195). A
 // heading is drawn one level down and keeps the level it was written at in `data-level`, for a copy (item 206).
 
+import { faviconUrl } from "./api.js";
 import { table as tableMarkdown } from "./clipboard.js";
 import { codeBlock } from "./codeblock.js";
 import { copyButton } from "./copybutton.js";
 import { el, requestFile } from "./dom.js";
 import { t } from "./i18n.js";
+import { icon } from "./icons.js";
+import { pillFromPart } from "./linkpill.js";
 import { parseBlocks } from "./markdown.js";
 
 // A file in the home folder as an agent names one it made or read: under ~ or /Users/<name>, to a name with a suffix,
@@ -82,6 +85,43 @@ function fileWords(text) {
   return nodes;
 }
 
+/** A link as a pill: the site's icon when this Mac has it, the link icon until then, and the short label. A click
+ * opens a new window (`target`), which the desktop shell hands to the browser. */
+function linkNode(part) {
+  const pill = pillFromPart(part);
+  const mark = icon("link");
+  mark.classList.add("link-pill-fallback");
+  const image = el("img", { class: "link-pill-icon", alt: "", width: "16", height: "16", hidden: true });
+  const anchor = el(
+    "a",
+    {
+      class: "link-pill",
+      href: pill.href,
+      target: pill.target,
+      rel: pill.rel,
+      title: pill.href,
+      dataset: { host: pill.host },
+    },
+    image,
+    mark,
+    el("span", { class: "link-pill-label" }, pill.label),
+  );
+  if (pill.host !== "") {
+    faviconUrl(pill.host).then((url) => {
+      if (url === null || !anchor.isConnected) {
+        return;
+      }
+      image.addEventListener("error", () => {
+        image.remove();
+      });
+      image.src = url;
+      image.hidden = false;
+      mark.remove();
+    });
+  }
+  return anchor;
+}
+
 function inlineNode(part) {
   switch (part.type) {
     case "code":
@@ -95,7 +135,7 @@ function inlineNode(part) {
     case "break":
       return el("br");
     case "link":
-      return el("a", { href: part.href, target: "_blank", rel: "noopener noreferrer nofollow" }, part.value);
+      return linkNode(part);
     case "text":
       return fileWords(part.value);
     default:
