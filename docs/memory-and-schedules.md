@@ -211,8 +211,11 @@ dotx memory reindex      # embed every note again, for example after changing [m
   notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Task tab, under Set
   up, say so in a warning line (`embedding_failed`, items 256 and 365). A save, a rewrite and a search go on the same
   way when the service fails after those retries (item 1254): the note is kept with no vector, the search returns what
-  the words found, and the failure is logged (`memory_embedding_failed`). Backfill embeds a note that has none once
-  the service answers, on the next save or search that reaches it. The word search does not mind case, accents or
+  the words found, and the failure is logged (`memory_embedding_failed`). A search or a save embeds at most one batch
+  (32 notes) of those that have no vector, then answers from the vectors already stored and from the words (item 1263).
+  The daemon's scheduler embeds the rest in the background, each note stored before the next batch, so a process that
+  dies mid-way leaves what it wrote and the next pass takes the rest; a pass that finds nothing to embed makes no call.
+  `dotx memory reindex` embeds every note at once. The word search does not mind case, accents or
   the Turkish dotted and dotless i (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the
   words that start with its first five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`). The
   embeddings of the skills' texts are made as the daemon starts, in the background and 32 texts a call, and kept in the

@@ -21,13 +21,14 @@ from dotagent.agent.reflection import last_reflection, record_reflection_failure
 from dotagent.agent.reflection_record import REFLECTION_OFF, Reflection, summary_line
 from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT
 from dotagent.config import SchedulerConfig
-from dotagent.core.errors import DotError, NotFoundError, RunConflict, StoreError
+from dotagent.core.errors import DotError, NotFoundError, ProviderError, RunConflict, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.schedule import schedule_of
 from dotagent.harness.weekly import night as harness_night
 from dotagent.llm.types import Speed
+from dotagent.memory.service import backfill
 from dotagent.notify.owner import tell_owner
 from dotagent.plugins import scout_service
 from dotagent.plugins.scout import ScoutStopped
@@ -233,6 +234,8 @@ class Scheduler:
         self._repairing: asyncio.Task[None] | None = None
         # The reading of where the repairs' pull requests stand on GitHub (item 958), which a night waits for.
         self._settling: asyncio.Task[None] | None = None
+        # Notes that have no vector, embedded off the request path. One pass at a time.
+        self._backfilling: asyncio.Task[None] | None = None
         # Dot's own initiative (item 715): its runs while the Mac is idle, started from the tick.
         self._initiative: Initiative = Initiative(runtime, manager)
         # The watch of trading (items 770, 772): sells at a stop or a target, with no model, between runs, and starts
@@ -297,6 +300,9 @@ class Scheduler:
         repairing: asyncio.Task[None] | None = self._repairing
         if repairing is not None:
             repairing.cancel()
+        backfilling: asyncio.Task[None] | None = self._backfilling
+        if backfilling is not None:
+            backfilling.cancel()
         settling: asyncio.Task[None] | None = self._settling
         if settling is not None:
             settling.cancel()
@@ -322,6 +328,8 @@ class Scheduler:
             await asyncio.wait({self._scouting})
         if self._repairing is not None:
             await asyncio.wait({self._repairing})
+        if self._backfilling is not None:
+            await asyncio.wait({self._backfilling})
         if self._settling is not None:
             await asyncio.wait({self._settling})
 
@@ -340,8 +348,8 @@ class Scheduler:
         ``ExceptionGroup``, and a tick that raises counts towards the end of the loop (:meth:`_tick_forever`); a
         failure of the others (the reflection, the harness's step, the record of how learning fares, Dot's own
         initiative of item 715, the follow-up of the work orders of item 907, the trading watch's exits and its look at
-        the market of items 770 and 772, the trend engine of item 818) is logged at each tick with the part's name
-        and never raises (item 688)."""
+        the market of items 770 and 772, the trend engine of item 818, the embedding of notes that have no vector) is
+        logged at each tick with the part's name and never raises (item 688)."""
         failures: list[Exception] = []
         for part in (self._fire_due, self._retry_due, self._start_due_sessions):
             try:
@@ -371,8 +379,47 @@ class Scheduler:
                     note="the loop goes on; this part is tried again at the next tick",
                     exc_info=True,
                 )
+        try:
+            await self._backfill_memory(now)
+        except Exception as exc:
+            log.warning(
+                "scheduler_auxiliary_part_failed",
+                part=self._backfill_memory.__name__,
+                error=repr(exc),
+                note="the loop goes on; this part is tried again at the next tick",
+                exc_info=True,
+            )
         if failures:
             raise ExceptionGroup("a part of the scheduler's tick failed", failures)
+
+    async def _backfill_memory(self, _now: float) -> None:
+        """Embed notes that have no vector, in a task, until none are left (item 1263). A pass already running is left
+        to finish. Each note is stored before the next batch (:func:`dotagent.memory.service.backfill`), so a process
+        that dies mid-way leaves what it wrote and the next tick takes the rest."""
+        running: asyncio.Task[None] | None = self._backfilling
+        if (running is not None and not running.done()) or self._runtime.memory.embedder is None:
+            return
+        if not await self._runtime.store.memories_without_vectors(1):
+            return
+        self._backfilling = asyncio.create_task(self._embed_missing(), name="memory-backfill")
+
+    async def _embed_missing(self) -> None:
+        """One background pass of :func:`dotagent.memory.service.backfill`. A service that fails is logged; the next
+        tick tries again. A fault that is not the service's is logged here, so the task's error is not lost."""
+        try:
+            embedded: int = await backfill(self._runtime.memory)
+        except ProviderError as error:
+            log.warning(
+                "memory_backfill_failed",
+                error_type=type(error).__name__,
+                error=error.message,
+                note="the next tick tries again",
+            )
+        except Exception:
+            log.exception("memory_backfill_crashed")
+        else:
+            if embedded:
+                log.info("memory_backfilled", notes=embedded)
 
     async def _fire_due(self, now: float) -> None:
         """Fire every switched-on schedule that is due at ``now``, each on its own (:meth:`_fire_alone`)."""
