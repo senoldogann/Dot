@@ -129,6 +129,23 @@ def test_openrouters_402_for_credits_is_out_of_credits_and_names_the_answer_they
     assert not isinstance(unplanned, ProviderCreditError) and unavailable_reason(unplanned) == "not in the plan"
 
 
+# OpenRouter's answer, seen ten times in the owner's record (item 1254), to a call made while others were running.
+_IN_FLIGHT_BODY: str = (
+    '{"error": {"message": "This request would exceed your available credits given your current in-flight requests. '
+    'Retry after in-flight requests settle, or add credits.", "code": 402}}'
+)
+
+
+def test_openrouters_402_for_credits_held_by_requests_still_running_is_retried_not_out_of_credits() -> None:
+    error = classify_openrouter(402, parse_wire_error(_IN_FLIGHT_BODY), None, {"model": "m"})
+    assert isinstance(error, ProviderRateLimitError) and error.status == 402
+    assert is_retryable_provider_error(error)
+    assert unavailable_reason(error) == "rate limited"
+    # The 402 of credits that do not pay for the request alone stays out of credits, and is not retried.
+    alone = classify_openrouter(402, parse_wire_error(_CREDITS_BODY), None, {})
+    assert isinstance(alone, ProviderCreditError) and not is_retryable_provider_error(alone)
+
+
 def test_spent_credits_are_told_apart_from_a_spent_usage_window() -> None:
     """Item 713: a run waits for a quota or a rate that comes back by itself, a subscription's window, and never for
     credits, which the owner buys: Anthropic's spent balance and OpenCode's CreditsError are out of credits, OpenCode
