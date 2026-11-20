@@ -47,7 +47,7 @@ _REF_ACTIONS: frozenset[str] = frozenset(
 _TEXT_ACTIONS: frozenset[str] = frozenset({"fill", "type", "select", "insert"})
 # The steps that write text into a field (item 1133): written with no ref, as after a click_at on the field's pixel,
 # their refusal says where the field's ref comes from.
-_WRITING_ACTIONS: frozenset[str] = frozenset({"fill", "type", "insert"})
+WRITING_ACTIONS: frozenset[str] = frozenset({"fill", "type", "insert"})
 _SIDE_EFFECT_ACTIONS: frozenset[str] = frozenset(
     {"click", "double_click", "right_click", "select", "press", "check", "uncheck", "click_at", "drag_at", "drag"}
 )
@@ -116,6 +116,12 @@ class Step(BaseModel):
             return {**data, "action": "click_at"}
         if action == "upload":
             raise ValueError("upload is not a step: call browser_upload with the ref of the upload control and paths")
+        if action == "wait":
+            # A bare wait is left out of the batch before this (item 1133); one that names what it waits for is not.
+            raise ValueError(
+                "wait is not a step: the batch waits for the page to settle after its steps; to wait for words on the "
+                "page, call browser_wait_text"
+            )
         if "expect" in data:
             raise ValueError(
                 "expect belongs to the call, beside steps, and is a guess in your own words; a step takes expect_text "
@@ -126,7 +132,7 @@ class Step(BaseModel):
     @model_validator(mode="after")
     def _check_fields(self) -> Self:
         action: str = self.action
-        if action in _WRITING_ACTIONS and self.ref is None:
+        if action in WRITING_ACTIONS and self.ref is None:
             raise ValueError(
                 f"{action} needs a ref: the ref of the field to write in, from browser_find (for example 'textbox') "
                 "or the snapshot, a field inside a frame too; a click_at gives the steps after it no field"
