@@ -103,15 +103,24 @@ export function serviceWords(line) {
   return { text: words === "" ? t("errors.serviceCode", { code: found[1] }) : sentence(words), details: line.trim() };
 }
 
+// OpenRouter's 402 for credits held by the account's requests still running (item 1254, `llm/provider_errors.py`
+// reads it as a rate limit): it passes once they end, so it is a limit reached, not a balance to top up.
+const HELD_BY_RUNNING = /in-flight requests/i;
+
 /**
- * What the owner can do about a model service's answer of HTTP `status`, by what the code means: a key it refused, a
- * balance or a plan that does not pay, a limit reached, a fault of the service's own, anything else.
+ * What the owner can do about a model service's answer of HTTP `status` with `words`, by what the code means: a key it
+ * refused, a balance or a plan that does not pay, a limit reached (a 402 whose words say requests still running hold
+ * the credits among them), a fault of the service's own, anything else.
  * @param {number} status
+ * @param {string} words
  * @returns {{ short: import("./i18n.js").WordKey, next: import("./i18n.js").WordKey }}
  */
-function serviceCause(status) {
+function serviceCause(status, words) {
   if (status === 401 || status === 403) {
     return { short: "errors.serviceKeyShort", next: "errors.serviceKeyNext" };
+  }
+  if (status === 402 && HELD_BY_RUNNING.test(words)) {
+    return { short: "errors.serviceLimitShort", next: "errors.serviceLimitNext" };
   }
   if (status === 402) {
     return { short: "errors.serviceBalanceShort", next: "errors.serviceBalanceNext" };
@@ -139,6 +148,6 @@ export function serviceFailure(line) {
     return null;
   }
   const status = Number(found[1]);
-  const cause = serviceCause(status);
+  const cause = serviceCause(status, found[2] ?? "");
   return { status, short: t(cause.short), next: t(cause.next), details: line.trim() };
 }

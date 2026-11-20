@@ -3,7 +3,8 @@ spent quota, on every provider; Ollama's 429 that says the plan's included usage
 another 429 stays a rate limit to retry; and the pause of a model names which it was. Ollama's answer that its model
 runner broke off is retried as a broken connection is (item 256). OpenRouter's 404 for a model the account's privacy
 settings leave no provider of is a refused access that says why and where to change it (item 361), and its 402 for
-credits that do not pay for the longest answer a request allows says so and how long an answer they do pay for."""
+credits that do not pay for the longest answer a request allows says so and how long an answer they do pay for, while
+its 402 for credits held by requests still running is a rate limit that is retried (item 1254)."""
 
 from dotagent.core.errors import (
     ProviderAccessError,

@@ -61,7 +61,8 @@ class ProviderAccessError(ProviderHttpError):
 
 
 class ProviderRateLimitError(ProviderHttpError):
-    """429: rate or usage limit reached."""
+    """429: rate or usage limit reached. OpenRouter's 402 for credits held by the account's requests still running is
+    one too (item 1254): it passes once they end."""
 
     def __init__(
         self, message: str, status: int, retry_after_s: float | None, context: Mapping[str, JsonValue]
