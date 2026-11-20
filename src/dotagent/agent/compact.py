@@ -93,10 +93,6 @@ def with_shown(messages: Sequence[Message], shown: Mapping[tuple[str, str], str]
     ]
 
 
-def trim_history(messages: Sequence[Message], keep_recent_results: int, keep_recent_images: int) -> list[Message]:
-    return shrink_old_tool_results(drop_old_images(messages, keep_recent_images), keep_recent_results)
-
-
 def last_settled(messages: Sequence[Message], keep_recent_results: int, keep_recent_images: int) -> int | None:
     """The index of the last of ``messages`` that trimming leaves as it is in the steps to come (item 237): the one
     before the oldest of the newest ``keep_recent_results`` tool messages and the newest ``keep_recent_images``

@@ -7,7 +7,6 @@ that failed. Tool arguments are left out on purpose, so a draft can be read and 
 
 from __future__ import annotations
 
-import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -87,9 +86,3 @@ def save_draft(text: str, run_id: str, out: Path | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return path
-
-
-def draft_name(run_id: str) -> str:
-    """A stable, readable task id to start from (a catalog task still gets its own name)."""
-    stamp: str = time.strftime("%Y%m%d", time.gmtime())
-    return f"run-{run_id[:8]}-{stamp}"

@@ -72,7 +72,6 @@ _TAB_KEY: str = "tab"
 _MAX_UNITS_PER_EVENT: int = 20
 _MARK_CATEGORIES: frozenset[str] = frozenset({"Mn", "Me", "Mc"})
 _JOINER: str = "\u200d"
-_CLICK_STATES: dict[bool, int] = {False: 1, True: 2}
 _TRANSIENT_TYPE: str = "org.nspasteboard.TransientType"
 _PLAIN_TEXT_TYPE: str = "public.utf8-plain-text"
 
