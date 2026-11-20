@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 
 from dotagent import watchdog
-from dotagent.config import load_default_config
-from dotagent.core.errors import ServiceError
+from dotagent.config import AppConfig, load_default_config
+from dotagent.core.errors import ConfigError, ServiceError
 from dotagent.launchd import JobState
 from dotagent.server.views import HealthView
 from dotagent.store.db import Store
@@ -207,3 +207,31 @@ async def test_a_restart_that_fails_is_told_and_tried_again_three_looks_on(
     assert seen.restarts == 1 and seen.notified == ["Dot does not answer"]
     assert read_state(tmp_path / "watchdog.json").misses == 0
     assert await watchdog.run(501) == 0 and seen.restarts == 1
+
+
+async def test_settings_the_daemon_cannot_read_are_told_once_and_again_after_they_read(
+    seen: _Seen, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The look ended unseen as ``watchdog_failed`` while the settings did not read, four times in two days: now the
+    owner gets a banner once (not every minute), and the mark that keeps it once goes when the settings read again."""
+
+    def unread() -> AppConfig:
+        raise ConfigError("[agent] max_concurrent_runs: the settings do not validate", {})
+
+    async def answers(url: str) -> HealthView:
+        return HealthView(ok=True, version="0.0.0-test")
+
+    state_file: Path = tmp_path / "watchdog.json"
+    monkeypatch.setattr(watchdog, "probe_daemon", answers)
+    monkeypatch.setattr(watchdog, "stuck_runs", lambda database, now, quiet_s: [])
+    monkeypatch.setattr(watchdog, "load_user_config", unread)
+    assert await watchdog.run(501) == 0
+    assert await watchdog.run(501) == 0
+    assert seen.notified == ["Dot's settings cannot be read"]
+    assert "config-unread" in read_state(state_file).told
+    monkeypatch.setattr(watchdog, "load_user_config", load_default_config)
+    assert await watchdog.run(501) == 0
+    assert "config-unread" not in read_state(state_file).told
+    monkeypatch.setattr(watchdog, "load_user_config", unread)
+    assert await watchdog.run(501) == 0
+    assert seen.notified == ["Dot's settings cannot be read", "Dot's settings cannot be read"]

@@ -422,6 +422,11 @@ async def _health(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
     writer.close()
 
 
+_BANNERS: list[tuple[str, str]] = []
+# What the program did at its end, in order: the unload of its job ends the process, so the banner must come before it.
+_ENDING: list[str] = []
+
+
 async def _scratch_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, port: int) -> Store:
     """Dot's home and logs in ``tmp_path``, with a store whose runs the program looks at, a configuration that sends
     its health check to ``port``, the daemon's property list in a user home of ``tmp_path`` (the restart loads it
@@ -436,6 +441,22 @@ async def _scratch_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, port: i
     token_path().write_text("the token\n", encoding="utf-8")
     token_path().chmod(0o600)
     monkeypatch.setattr(restart_when_idle, "RESTART_POLL_S", 0.01)
+    _BANNERS.clear()
+    _ENDING.clear()
+
+    async def banner(title: str, message: str) -> None:
+        _BANNERS.append((title, message))
+        _ENDING.append("banner")
+
+    release = restart_when_idle.release_restart_job
+
+    async def released(plist: Path, uid: int) -> None:
+        _ENDING.append("release")
+        await release(plist, uid)
+
+    # No test shows a notification of the Mac: the banner is recorded.
+    monkeypatch.setattr(restart_when_idle, "show_notification", banner)
+    monkeypatch.setattr(restart_when_idle, "release_restart_job", released)
     return await Store.open(db_path(), screenshots_dir())
 
 
@@ -549,6 +570,10 @@ async def test_the_program_gives_up_without_restarting_when_a_run_still_works_at
         assert not any(call.startswith(f"bootout gui/{UID}/{LABEL}") for call in _calls(launchctl))
         assert _calls(launchctl)[-1] == f"bootout gui/{UID}/{RESTART_LABEL}"
         assert _read(plist) is None
+        # The owner is told that the new code is not live: the wait that ran out was found out by chance before.
+        assert len(_BANNERS) == 1
+        assert _BANNERS[0][0] == "Dot was not restarted" and "not live yet" in _BANNERS[0][1]
+        assert _ENDING == ["banner", "release"], "the unload of the job ends the process: the banner comes first"
     finally:
         await store.close()
 
@@ -569,6 +594,8 @@ async def test_the_program_that_cannot_restart_the_daemon_says_so_and_still_unlo
         assert "not installed" in str(failed[0]["error"])
         assert not any(call.startswith(f"bootout gui/{UID}/{LABEL}") for call in _calls(launchctl))
         assert _read(plist) is None
+        assert [title for title, _ in _BANNERS] == ["Dot was not restarted"]
+        assert _ENDING == ["banner", "release"]
     finally:
         await store.close()
 

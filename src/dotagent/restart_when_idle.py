@@ -14,7 +14,9 @@ property list whatever happened. After :data:`~dotagent.launchd.RESTART_WAIT_LIM
 :data:`~dotagent.launchd.RESTART_NIGHT_LIMIT_S` of the night's learning, it gives up without restarting. It writes what
 it did to ``dotx.log``: ``restart_when_idle_waiting``, ``restart_when_idle_waits_for_the_night``,
 ``restart_when_idle_night_unknown``, ``restart_when_idle_idle``, ``restart_when_idle_restarted``,
-``restart_when_idle_gave_up``, ``restart_when_idle_failed`` and ``restart_when_idle_crashed``.
+``restart_when_idle_gave_up``, ``restart_when_idle_failed`` and ``restart_when_idle_crashed``. When it ends with no
+restart it shows a notification of the Mac first (a failed one is ``restart_when_idle_not_told``), as nobody reads its
+log.
 
 ``count_working_runs`` reads the database, ``night_work_of`` asks the daemon, and ``wait_until_idle`` polls both;
 ``main`` is the job's entry point.
@@ -37,6 +39,7 @@ from dotagent.cli_daemon import restart_service
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import DotError, ServiceError
 from dotagent.core.logs import configure_logging, get_logger
+from dotagent.core.notify import show_notification
 from dotagent.core.paths import db_path, dot_home, ensure_layout, log_dir, token_path
 from dotagent.launchd import (
     RESTART_NIGHT_LIMIT_S,
@@ -204,6 +207,21 @@ async def wait_and_restart(database: Path, uid: int) -> int:
     return 0
 
 
+async def _tell_not_restarted(code: int) -> None:
+    """A banner of the Mac when the restart did not happen: the job ends here and nobody reads its log, so a daemon that
+    went on with the old code (a merge that is not live, a wait that ran out at two hours) was found out by chance."""
+    message: str = (
+        "Runs or the night's learning were still at work when the wait ran out, so the new code is not live yet. "
+        "Ask again once they end."
+        if code == 1
+        else "The restart failed. dotx.log says why."
+    )
+    try:
+        await show_notification("Dot was not restarted", message)
+    except DotError as error:
+        log.warning("restart_when_idle_not_told", error=error.message)
+
+
 async def run(uid: int) -> int:
     """Carry out the restart, then unload this job: it ends here whatever happened, so that no job is left that
     ``dotx service status`` would call a restart that waits. Returns the exit code, which is 0 when the daemon was
@@ -219,7 +237,12 @@ async def run(uid: int) -> int:
     except Exception as exc:
         log.exception("restart_when_idle_crashed", error=str(exc))
         code = 3
-    await release_restart_job(plist, uid)
+    try:
+        if code != 0:
+            # Before the release: unloading the job ends this process, and nothing after it runs (the pre-push review).
+            await _tell_not_restarted(code)
+    finally:
+        await release_restart_job(plist, uid)
     return code
 
 

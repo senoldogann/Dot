@@ -1354,8 +1354,10 @@ dotx service uninstall   # stop the daemon and remove the job
   (`POST /api/runs/{id}/stuck`: "A task makes no progress", with its page; `watchdog_run_stuck`). A run inside a call
   that may take longer (a helper's run or a fan-out, 4 hours; a wait; a question to you, 24 hours) counts as busy until
   that call's own limit, which its `tool_call` event carries, has passed too. A run that waits for your approval is
-  `blocked`, not stuck. What it saw is kept in `watchdog.json` in Dot's home; the database is read
-  through a read-only connection.
+  `blocked`, not stuck. When the settings (`config.toml`) do not read, which the daemon cannot start with, the look
+  shows a notification of the Mac once ("Dot's settings cannot be read", `watchdog_config_unread` in `dotx.log`),
+  not every minute, and again if they read again and then fail. What it saw is kept in `watchdog.json` in Dot's
+  home; the database is read through a read-only connection.
 - **A run restarts the daemon with `dotx service restart --when-idle`, never with a launchd job of its own** (item 441;
   the shell tool's description tells the model so). A run that merged a change of Dot's own code wants the daemon
   restarted once it has ended, and restarting at once would cut the run itself off. A run reaches launchctl only in
@@ -1378,7 +1380,9 @@ dotx service uninstall   # stop the daemon and remove the job
   which the next night does again. Then it restarts the daemon as `service restart` does, waits for the
   health check, writes what it did to `dotx.log` (`restart_when_idle_waiting`, `_waits_for_the_night` with what it
   waits for, `_idle`, `_restarted`, `_gave_up` after 2 hours of runs at work or 3 hours of the night's learning without
-  a restart, `_failed`, `_crashed` with a traceback), unloads itself and deletes its property list. The list is written to a new file made in Dot's home
+  a restart, `_failed`, `_crashed` with a traceback), unloads itself and deletes its property list; when it ended with
+  no restart (it gave up, failed or crashed) it shows a notification of the Mac, "Dot was not restarted", as nobody reads
+  its log. The list is written to a new file made in Dot's home
   and put in place in one step, and the one that was there is read without following a link or waiting for a FIFO (a
   command of a run may leave either in Dot's home, and the upgrade of the desktop app, item 575, asks for this restart
   at every update). Asking while one is on its way changes nothing
