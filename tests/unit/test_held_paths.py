@@ -42,6 +42,7 @@ def _journal(tmp_path: Path) -> JournalTarget:
     )
 
 
+@pytest.mark.macos
 def test_a_file_tool_follows_no_link_put_on_the_path_it_checked(tmp_path: Path) -> None:
     workspace, secret = _rooms(tmp_path)
     checked: Path = workspace / "notes" / "a.txt"
@@ -62,6 +63,7 @@ def test_a_file_tool_follows_no_link_put_on_the_path_it_checked(tmp_path: Path) 
         read_regular(checked)
 
 
+@pytest.mark.macos
 def test_a_listing_follows_no_link_put_on_the_path_it_checked(tmp_path: Path) -> None:
     """The review of item 681's eighth round: list_dir lists the folder it was allowed, and a link inside is said to be
     one with where it leads, never entered, so a folder swapped for a link to another does not show that one's names."""
@@ -80,6 +82,7 @@ def test_a_listing_follows_no_link_put_on_the_path_it_checked(tmp_path: Path) ->
         _walk(workspace / "gone", 1)
 
 
+@pytest.mark.macos
 def test_a_named_pipe_is_refused_at_once(tmp_path: Path) -> None:
     workspace, _ = _rooms(tmp_path)
     pipe: Path = workspace / "notes" / "pipe"
@@ -90,6 +93,7 @@ def test_a_named_pipe_is_refused_at_once(tmp_path: Path) -> None:
     assert time.monotonic() - started < 2.0
 
 
+@pytest.mark.macos
 def test_the_daemons_own_files_in_the_workspace_are_made_with_no_link_followed(tmp_path: Path) -> None:
     workspace, secret = _rooms(tmp_path)
     (workspace / "attachments").symlink_to(secret)
@@ -101,6 +105,7 @@ def test_the_daemons_own_files_in_the_workspace_are_made_with_no_link_followed(t
     assert Path(stored.path).read_bytes() == b"two lines\n"
 
 
+@pytest.mark.macos
 def test_the_browser_is_given_copies_of_what_was_checked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
     workspace, secret = _rooms(tmp_path)

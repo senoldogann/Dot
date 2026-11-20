@@ -36,6 +36,16 @@ service are marked:
 | `internet` | the public internet; read-only requests: a few, two or three to each connector, a download of each gallery plugin    |
 | `desktop`  | a logged-in screen and `DOT_DESKTOP_TESTS=1`; it moves the real pointer and keyboard against a local AppKit window |
 | `hosted`   | your own `OPENAI_API_KEY`, `OPENCODE_API_KEY`, `ANTHROPIC_API_KEY` and `OLLAMA_API_KEY`; a few tiny requests, skipped per missing key |
+| `macos`    | macOS itself (its kernel's paths, AppKit or Quartz); skipped where PyObjC is not, as on Linux                        |
+
+**On Linux** (a cloud agent's machine, item 1270) `uv sync` installs everything but PyObjC, and `uv run pytest
+tests/unit` runs every unit test but those that need macOS: the modules listed in `tests/unit/conftest.py` (the
+desktop's own, and those whose tests read paths the way macOS's kernel names them, the shell guard's among them) and
+the tests marked `macos`. The gate runs the unit tests on Linux too, so a module that loads AppKit, Quartz or a
+macOS-only flag where it only names a type, a constant or a value fails there: such a module imports the framework in
+the function that asks macOS, and a type or a constant lives in a module of its own (`desktop/types.py`,
+`desktop/chords.py`, `desktop/snapshot_models.py`, `connections/states.py`). macOS runs every test, and the smoke tests
+and `dotx eval check` run on macOS alone.
 
 Three kinds of check answer three questions about browser and computer use, and none stands for another (items 1145
 to 1147):

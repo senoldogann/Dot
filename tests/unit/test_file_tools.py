@@ -70,6 +70,7 @@ def test_a_heic_photo_stored_on_its_side_is_read_as_it_is_held(tmp_path: Path) -
     assert (read.is_error, read.text, len(read.images)) == (False, "Image IMG_0002.HEIC: 12x16px", 1)
 
 
+@pytest.mark.macos
 def test_a_new_file_gets_the_usual_permission_bits_and_a_file_that_was_there_keeps_its_own(tmp_path: Path) -> None:
     made: Path = tmp_path / "site" / "index.html"
     atomic_write(made, "<p>Hello</p>\n", _journal(tmp_path))

@@ -38,6 +38,7 @@ def places(tmp_path: Path) -> tuple[Path, Path, Path]:
     return root, home, workspace
 
 
+@pytest.mark.macos
 def test_a_file_two_runs_changed_is_diffed_from_before_the_first_and_one_they_made_is_all_added(
     places: tuple[Path, Path, Path],
 ) -> None:
@@ -93,6 +94,7 @@ def test_a_secret_dot_holds_is_masked_in_the_diff(places: tuple[Path, Path, Path
     assert view.files[0].added == 1
 
 
+@pytest.mark.macos
 def test_a_private_key_of_many_lines_is_masked_whatever_part_of_it_changed(places: tuple[Path, Path, Path]) -> None:
     root, home, workspace = places
     created = workspace / "deploy.pem"
@@ -109,6 +111,7 @@ def test_a_private_key_of_many_lines_is_masked_whatever_part_of_it_changed(place
     assert (by_name["old.pem"].diff, by_name["old.pem"].note) == ("", "the change is inside a secret, which is masked")
 
 
+@pytest.mark.macos
 def test_a_file_a_delegated_run_made_and_its_parent_edited_is_diffed_from_before_both(
     places: tuple[Path, Path, Path],
 ) -> None:

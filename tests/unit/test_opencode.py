@@ -489,6 +489,7 @@ def test_a_call_asked_about_twice_keeps_only_what_its_last_ask_was_let_through_f
     assert (result["decision"], result["kind"], result["summary"]) == (None, "write", "Edit /tmp/x/a.md")
 
 
+@pytest.mark.macos
 def test_the_catalog_is_copied_into_the_confined_home_with_no_link_followed(tmp_path: Path) -> None:
     """The confined agent may write its cache: a link it left where the daemon copies the catalog must not have the
     daemon write over the file the link names (the review of item 677)."""
@@ -514,6 +515,7 @@ def test_the_catalog_is_copied_into_the_confined_home_with_no_link_followed(tmp_
     assert (home / "cache" / "opencode" / "models.json").read_text(encoding="utf-8") == '{"models": 1}'
 
 
+@pytest.mark.macos
 def test_a_link_the_confined_agent_put_in_place_of_its_folder_is_replaced_not_followed(tmp_path: Path) -> None:
     """The security review of item 677: the confined agent may replace its data folder by a link to a file; the server
     must still start, and the file the link names stays as it was."""

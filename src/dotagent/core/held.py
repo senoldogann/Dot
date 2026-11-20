@@ -11,8 +11,13 @@ import stat
 from collections.abc import Sequence
 from pathlib import Path
 
-# A folder searched along the way, never followed when it is a link.
-_STEP: int = os.O_SEARCH | os.O_DIRECTORY | os.O_NOFOLLOW
+
+# A folder searched along the way, never followed when it is a link. Read at the call: ``O_SEARCH`` is macOS's, and this
+# module loads where the unit tests run on Linux (item 1270).
+def _step_flags() -> int:
+    return os.O_SEARCH | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
 # A file read: not followed when it is a link, and opened without waiting for a writer when it is a named pipe.
 _READ: int = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
 # A file made new: not over one that is there, not through a link.
@@ -46,13 +51,13 @@ def workspace_folder(workspace: Path, parts: Sequence[str], make: bool) -> int:
 
 def _step(folder: int, part: str, make: bool) -> int:
     try:
-        return os.open(part, _STEP, dir_fd=folder)
+        return os.open(part, _step_flags(), dir_fd=folder)
     except FileNotFoundError:
         if not make:
             raise
     with contextlib.suppress(FileExistsError):
         os.mkdir(part, _NEW_FOLDER_MODE, dir_fd=folder)
-    return os.open(part, _STEP, dir_fd=folder)
+    return os.open(part, _step_flags(), dir_fd=folder)
 
 
 def open_regular(folder: int, name: str) -> int:
