@@ -2,9 +2,11 @@
 (VideoToolbox) compresses it, and each viewer reads the encoded frames as they come.
 
 One capture serves every viewer: it starts with the first and stops when the last one leaves, so nothing is captured
-while nobody watches (macOS shows its screen-recording mark meanwhile). A viewer that falls behind loses frames until
+while nobody watches (macOS shows its screen-recording mark meanwhile). A capture that macOS stops, or whose encoder
+fails (a Mac that slept), ends its viewers, whose page says so and offers to try again; a viewer that goes while its
+capture is still starting leaves it to be stopped once it has started. A viewer that falls behind loses frames until
 the next key frame, which is then asked of the encoder, so a slow phone sees the screen as it is now rather than a
-growing delay. Measured on the owner's MacBook (1920 x 1248 at 60 fps): 56 frames a second, about 15 ms to encode a
+growing delay. Measured on the owner's MacBook (1920 x 1248 at 60 fps): 57 frames a second, about 15 ms to encode a
 frame, 8% of one core and 1 to 1.5 Mbit/s for an ordinary desktop.
 
 A frame on the wire is a header of 13 bytes, its kind (``KEY`` or ``DELTA``), the length of what follows and its time in
@@ -16,7 +18,7 @@ payload starts with the decoder's configuration (the ``avcC`` record, after its 
 import asyncio
 import struct
 import threading
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from dataclasses import dataclass
 
 import CoreMedia as CM
@@ -74,10 +76,11 @@ def avc_message(kind: int, micros: int, config: bytes, frame: bytes) -> bytes:
     return _HEADER.pack(kind, len(payload), micros) + payload
 
 
-# Where an encoded frame goes (is it a key frame, its message), and what hears that macOS stopped the capture and why;
-# both are called on the threads of ScreenCaptureKit and VideoToolbox.
-type FrameSink = Callable[[bool, bytes], None]
-type StopSink = Callable[[str], None]
+# Where an encoded frame goes (the capture it is of, is it a key frame, its message), and what hears that a capture
+# failed and why (macOS stopped it, its encoder failed); both are called on the threads of ScreenCaptureKit and
+# VideoToolbox.
+type FrameSink = Callable[["_Capture", bool, bytes], None]
+type FailureSink = Callable[["_Capture", str], None]
 
 
 class Viewer:
@@ -89,12 +92,19 @@ class Viewer:
 
 
 class _Capture:
-    """The running capture and encoder; ``deliver`` gets each encoded frame on the encoder's thread."""
+    """A capture of the main display and its encoder: made, then started once, then closed once (:func:`_open`)."""
 
-    def __init__(self, settings: LiveSettings, on_frame: FrameSink, on_stop: StopSink) -> None:
+    def __init__(self, settings: LiveSettings, on_frame: FrameSink, on_failure: FailureSink) -> None:
         self._on_frame: FrameSink = on_frame
-        self._on_stop: StopSink = on_stop
+        self._on_failure: FailureSink = on_failure
         self._key_wanted: threading.Event = threading.Event()
+        # Set once the capture failed (told once) and once macOS stopped its stream (which is then not stopped again).
+        self.failed: threading.Event = threading.Event()
+        self._stream_stopped: threading.Event = threading.Event()
+        # Start and close one at a time: a close waits for a start still going on, and a stream that started is stopped.
+        self._lifecycle: threading.Lock = threading.Lock()
+        self._started: bool = False
+        self._closed: bool = False
         display: object = _main_display()
         width, height = frame_size(
             (float(display.width()), float(display.height())),  # type: ignore[attr-defined]  # an SCDisplay
@@ -116,15 +126,27 @@ class _Capture:
             self._output, SCK.SCStreamOutputTypeScreen, None, None
         )
         if not added:
+            VT.VTCompressionSessionInvalidate(self._session)
             raise DesktopError("ScreenCaptureKit refused the stream's output", {"error": str(error)})
         self.size: tuple[int, int] = (width, height)
 
     def start(self) -> None:
-        _await_answer(self._stream.startCaptureWithCompletionHandler_, "startCapture")
+        with self._lifecycle:
+            # Marked before it is asked: a start that times out may still start the stream, which the close then stops.
+            self._started = True
+            _await_answer(self._stream.startCaptureWithCompletionHandler_, "startCapture")
 
-    def stop(self) -> None:
-        _await_answer(self._stream.stopCaptureWithCompletionHandler_, "stopCapture")
-        VT.VTCompressionSessionInvalidate(self._session)
+    def close(self) -> None:
+        """Stop the stream unless macOS stopped it already, and let the encoder go whatever the stop answered."""
+        with self._lifecycle:
+            if self._closed:
+                return
+            self._closed = True
+            try:
+                if self._started and not self._stream_stopped.is_set():
+                    _await_answer(self._stream.stopCaptureWithCompletionHandler_, "stopCapture")
+            finally:
+                VT.VTCompressionSessionInvalidate(self._session)
 
     def want_key(self) -> None:
         self._key_wanted.set()
@@ -144,23 +166,31 @@ class _Capture:
         if self._key_wanted.is_set():
             self._key_wanted.clear()
             options = {VT.kVTEncodeFrameOptionKey_ForceKeyFrame: True}
-        VT.VTCompressionSessionEncodeFrameWithOutputHandler(
-            self._session,
-            pixels,
-            CM.CMSampleBufferGetPresentationTimeStamp(sample),
-            CM.kCMTimeInvalid,
-            options,
-            None,
-            self._encoded,
+        encoded: int = int(
+            VT.VTCompressionSessionEncodeFrameWithOutputHandler(
+                self._session,
+                pixels,
+                CM.CMSampleBufferGetPresentationTimeStamp(sample),
+                CM.kCMTimeInvalid,
+                options,
+                None,
+                self._encoded,
+            )[0]
         )
+        if encoded != 0:
+            self._fail("VideoToolbox did not take a frame", encoded)
 
     def _encoded(self, status: int, _flags: int, sample: object | None) -> None:
-        if status != 0 or sample is None:
+        if status != 0:
+            self._fail("VideoToolbox could not encode a frame", status)
             return
+        if sample is None:
+            return  # a frame the encoder dropped, as a real-time encoder may
         block = CM.CMSampleBufferGetDataBuffer(sample)
         length: int = int(CM.CMBlockBufferGetDataLength(block))
         copied, data = CM.CMBlockBufferCopyDataBytes(block, 0, length, None)
         if copied != 0:
+            self._fail("the encoded frame could not be read", int(copied))
             return
         attachments = CM.CMSampleBufferGetSampleAttachmentsArray(sample, False)
         key: bool = not (attachments and attachments[0].get(CM.kCMSampleAttachmentKey_NotSync))
@@ -173,10 +203,31 @@ class _Capture:
                 CM.kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms,
             )
             config = bytes(atoms["avcC"])
-        self._on_frame(key, avc_message(KEY if key else DELTA, micros, config, bytes(data)))
+        self._on_frame(self, key, avc_message(KEY if key else DELTA, micros, config, bytes(data)))
 
-    def stopped(self, reason: str) -> None:
-        self._on_stop(reason)
+    def stream_stopped(self, reason: str) -> None:
+        self._stream_stopped.set()
+        self._fail(f"macOS stopped the capture: {reason}", 0)
+
+    def _fail(self, reason: str, status: int) -> None:
+        if self.failed.is_set():
+            return
+        self.failed.set()
+        self._on_failure(self, f"{reason} (status {status})" if status != 0 else reason)
+
+
+def _open(settings: LiveSettings, on_frame: FrameSink, on_failure: FailureSink) -> _Capture:
+    """A capture made and started; one that does not start is closed before the error goes on."""
+    capture: _Capture = _Capture(settings, on_frame, on_failure)
+    try:
+        capture.start()
+    except BaseException:
+        try:
+            capture.close()
+        except DesktopError as error:
+            log.warning("screen_watch_close_failed", error=error.message, context=error.context)
+        raise
+    return capture
 
 
 class _StreamOutput(NSObject):  # type: ignore[misc]  # an Objective-C class: SCStreamOutput and SCStreamDelegate
@@ -192,7 +243,7 @@ class _StreamOutput(NSObject):  # type: ignore[misc]  # an Objective-C class: SC
             self._capture.encode(sample)
 
     def stream_didStopWithError_(self, _stream: object, error: object) -> None:
-        self._capture.stopped(str(error))
+        self._capture.stream_stopped(str(error))
 
 
 def _await_answer(start: object, what: str) -> None:
@@ -265,8 +316,12 @@ def _encoder(width: int, height: int, settings: LiveSettings) -> object:
     for key, value in properties.items():
         set_status: int = int(VT.VTSessionSetProperty(session, key, value))
         if set_status != 0:
+            VT.VTCompressionSessionInvalidate(session)
             raise DesktopError("VideoToolbox refused a setting of the encoder", {"key": str(key), "status": set_status})
-    VT.VTCompressionSessionPrepareToEncodeFrames(session)
+    prepared: int = int(VT.VTCompressionSessionPrepareToEncodeFrames(session))
+    if prepared != 0:
+        VT.VTCompressionSessionInvalidate(session)
+        raise DesktopError("VideoToolbox could not prepare the encoder", {"status": prepared})
     return session
 
 
@@ -279,8 +334,8 @@ class LiveScreen:
         self._capture: _Capture | None = None
         self._changing: asyncio.Lock = asyncio.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
-        # The task that stops the capture once the last viewer went, held so that it is not collected while it runs.
-        self._stopping: asyncio.Task[None] | None = None
+        # The tasks that close captures, held so that none is collected while it runs.
+        self._closing: set[asyncio.Task[None]] = set()
 
     def check_allowed(self) -> None:
         """Raise when macOS has not granted Screen Recording to the app that runs Dot, before a stream is answered."""
@@ -288,12 +343,13 @@ class LiveScreen:
             raise DesktopPermissionError("macOS has not granted Screen Recording to the app that runs Dot", {})
 
     async def frames(self) -> AsyncGenerator[bytes]:
-        """The frames of the screen from the next key frame on, until macOS stops the capture, :meth:`end_all` or the
-        reader goes. The capture starts with its first viewer. Leaving takes no ``await``: a stream whose client went is
+        """The frames of the screen from the next key frame on, until the capture fails, :meth:`end_all` or the reader
+        goes. The capture starts with its first viewer. Leaving takes no ``await``: a stream whose client went is
         cancelled again at every one, and its viewer would stay."""
         viewer: Viewer = Viewer()
-        await self._join(viewer)
+        self._viewers.add(viewer)
         try:
+            await self._ensure_capture()
             while True:
                 message: bytes | None = await viewer.frames.get()
                 if message is None:
@@ -302,27 +358,35 @@ class LiveScreen:
         finally:
             self._viewers.discard(viewer)
             if not self._viewers:
-                self._stopping = asyncio.get_running_loop().create_task(self._stop_when_unwatched())
-
-    async def _join(self, viewer: Viewer) -> None:
-        async with self._changing:
-            if self._capture is None:
-                self._loop = asyncio.get_running_loop()
-                capture: _Capture = await asyncio.to_thread(
-                    _Capture, self._settings, self._from_encoder, self._from_macos
-                )
-                await asyncio.to_thread(capture.start)
-                self._capture = capture
-                log.info("screen_watch_started", width=capture.size[0], height=capture.size[1], fps=self._settings.fps)
-            self._viewers.add(viewer)
-            self._capture.want_key()
+                self._spawn(self._stop_when_unwatched())
 
     def end_all(self) -> None:
-        """End every viewer's frames (the daemon stops); the capture stops once they have gone."""
+        """End every viewer's frames (the daemon stops, or the capture failed); the capture stops once they have
+        gone."""
         for viewer in self._viewers:
             while not viewer.frames.empty():
                 viewer.frames.get_nowait()
             viewer.frames.put_nowait(None)
+
+    async def _ensure_capture(self) -> None:
+        async with self._changing:
+            if self._capture is None:
+                self._loop = asyncio.get_running_loop()
+                opening: asyncio.Future[_Capture] = asyncio.ensure_future(
+                    asyncio.to_thread(_open, self._settings, self._from_encoder, self._from_failure)
+                )
+                try:
+                    capture: _Capture = await asyncio.shield(opening)
+                except asyncio.CancelledError:
+                    # The viewer went while the capture started: it is closed once it has.
+                    opening.add_done_callback(self._close_opened)
+                    raise
+                if capture.failed.is_set():
+                    self._close_later(capture)
+                    raise DesktopError("the capture failed as it started", {"size": list(capture.size)})
+                self._capture = capture
+                log.info("screen_watch_started", width=capture.size[0], height=capture.size[1], fps=self._settings.fps)
+            self._capture.want_key()
 
     async def _stop_when_unwatched(self) -> None:
         async with self._changing:
@@ -330,21 +394,50 @@ class LiveScreen:
                 return
             capture: _Capture = self._capture
             self._capture = None
-            await asyncio.to_thread(capture.stop)
+            await asyncio.to_thread(capture.close)
             log.info("screen_watch_stopped")
 
-    def _from_encoder(self, key: bool, message: bytes) -> None:
+    def _from_encoder(self, capture: _Capture, key: bool, message: bytes) -> None:
         loop: asyncio.AbstractEventLoop | None = self._loop
         if loop is not None:
-            loop.call_soon_threadsafe(self._deliver, key, message)
+            loop.call_soon_threadsafe(self._deliver, capture, key, message)
 
-    def _from_macos(self, reason: str) -> None:
+    def _from_failure(self, capture: _Capture, reason: str) -> None:
         log.warning("screen_watch_cut", reason=reason)
         loop: asyncio.AbstractEventLoop | None = self._loop
         if loop is not None:
-            loop.call_soon_threadsafe(self.end_all)
+            loop.call_soon_threadsafe(self._drop, capture)
 
-    def _deliver(self, key: bool, message: bytes) -> None:
+    def _drop(self, capture: _Capture) -> None:
+        """A capture that failed: no longer the one viewers read, closed, and its viewers ended."""
+        if capture is not self._capture:
+            return
+        self._capture = None
+        self._close_later(capture)
+        self.end_all()
+
+    def _close_opened(self, opening: asyncio.Future[_Capture]) -> None:
+        if not opening.cancelled() and opening.exception() is None:
+            self._close_later(opening.result())
+
+    def _close_later(self, capture: _Capture) -> None:
+        self._spawn(asyncio.to_thread(capture.close))
+
+    def _spawn(self, work: Coroutine[None, None, None]) -> None:
+        task: asyncio.Task[None] = asyncio.get_running_loop().create_task(work)
+        self._closing.add(task)
+        task.add_done_callback(self._closed)
+
+    def _closed(self, task: asyncio.Task[None]) -> None:
+        self._closing.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            error: BaseException | None = task.exception()
+            log.error("screen_watch_close_failed", error=str(error), kind=type(error).__name__)
+
+    def _deliver(self, capture: _Capture, key: bool, message: bytes) -> None:
+        # Frames of a capture that is no longer the one viewers read (failed, or left to close) go nowhere.
+        if capture is not self._capture:
+            return
         for viewer in self._viewers:
             if viewer.needs_key and not key:
                 continue
@@ -353,8 +446,7 @@ class LiveScreen:
                 while not viewer.frames.empty():
                     viewer.frames.get_nowait()
                 viewer.needs_key = True
-                if self._capture is not None:
-                    self._capture.want_key()
+                capture.want_key()
                 continue
             viewer.needs_key = False
             viewer.frames.put_nowait(message)
