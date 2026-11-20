@@ -31,7 +31,8 @@
       "resources/tools/uv": "tools/uv",
       "resources/tools/rg": "tools/rg",
       "resources/tools/dot-launcher": "tools/dot-launcher",
-      "resources/constraints.txt": "constraints.txt"
+      "resources/requirements.txt": "requirements.txt",
+      "resources/dotagent_macos-0.1.0-py3-none-any.whl": "dotagent_macos-0.1.0-py3-none-any.whl"
     },
     "macOS": {
       "minimumSystemVersion": "13.0",

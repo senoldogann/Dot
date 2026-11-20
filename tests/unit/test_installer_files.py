@@ -106,19 +106,22 @@ def test_the_property_list_the_installer_reads_as_the_apps_own_job_is_what_the_r
 
 def test_the_app_carries_its_tools_where_the_release_script_puts_them() -> None:
     conf = json.loads((_TAURI / "tauri.conf.json").read_text(encoding="utf-8"))
-    # The three programs and the constraints file are named one by one, never as a glob: a file in the source folder is
-    # not in the app. The constraints file lies beside the tools folder, not in it (that folder holds the three programs
-    # and nothing else), under the name the installer looks for.
+    # The three programs, the requirements file and the wheel are named one by one, never as a glob: a file in the
+    # source folder is not in the app. The requirements and the wheel lie beside the tools folder, not in it (that
+    # folder holds the three programs and nothing else), under the names the installer looks for.
     assert conf["bundle"]["resources"] == {
         "resources/tools/uv": "tools/uv",
         "resources/tools/rg": "tools/rg",
         "resources/tools/dot-launcher": "tools/dot-launcher",
-        "resources/constraints.txt": _constant("CONSTRAINTS"),
+        "resources/requirements.txt": _constant("REQUIREMENTS"),
+        f"resources/{_wheel()}": _wheel(),
     }
     assert not any("*" in source for source in conf["bundle"]["resources"])
     build: str = (_TAURI / "build.rs").read_text(encoding="utf-8")
     assert 'const TOOLS: [&str; 3] = ["uv", "rg", "dot-launcher"];' in build
-    assert f'const CONSTRAINTS: &str = "{_constant("CONSTRAINTS")}";' in build
+    assert f'const REQUIREMENTS: &str = "{_constant("REQUIREMENTS")}";' in build
+    assert 'format!("dotagent_macos-{version}-py3-none-any.whl")' in build
+    assert 'format!("dotagent_macos-{version}-py3-none-any.whl")' in _INSTALLER
     fetch: str = (_DESKTOP / "fetch-tools.sh").read_text(encoding="utf-8")
     assert "out=$desktop/src-tauri/resources/tools" in fetch
     release: str = (_DESKTOP / "release.sh").read_text(encoding="utf-8")
@@ -144,26 +147,37 @@ def test_the_app_carries_its_tools_where_the_release_script_puts_them() -> None:
         assert line[5].endswith(f"/{line[0]}"), line
 
 
-def test_a_release_bundles_the_versions_uv_lock_pins_and_checks_them_in_the_built_app() -> None:
-    """The app installs the package with every dependency at the version of ``uv.lock`` (item 694): the release writes
-    them into the app's Resources before the app is built and signed, and compares the built app's copy with a fresh
-    export of the lock before it is notarized."""
+def _wheel() -> str:
+    """The wheel name a release of this version ships, the one ``tauri.conf.json`` names one by one."""
+    version = json.loads((_TAURI / "tauri.conf.json").read_text(encoding="utf-8"))["version"]
+    return f"dotagent_macos-{version}-py3-none-any.whl"
+
+
+def test_a_release_bundles_the_hashed_requirements_and_checks_them_in_the_built_app() -> None:
+    """The app installs the package and every dependency at the hashes of ``uv.lock``: the release writes the
+    requirements and the wheel into the app's Resources before the app is built and signed, and compares the built
+    app's copies with those files before it is notarized."""
     release: str = (_DESKTOP / "release.sh").read_text(encoding="utf-8")
-    made: int = release.index('constraints_to "$desktop/src-tauri/resources/constraints.txt"')
+    made: int = release.index('requirements_to "$desktop/src-tauri/resources/requirements.txt"')
     built: int = release.index('"$tauri" build --target universal-apple-darwin')
-    checked: int = release.index('constraints_to "$work/constraints.txt"')
-    compared: int = release.index('cmp -s "$work/constraints.txt" "$app/Contents/Resources/constraints.txt"')
+    compared: int = release.index('cmp -s "$work/requirements.txt" "$app/Contents/Resources/requirements.txt"')
+    wheel: int = release.index('cmp -s "$work/$wheel_file" "$app/Contents/Resources/$wheel_file"')
     notarized: int = release.index('notarize "$work/Dot.zip"')
-    assert made < built < checked < compared < notarized
+    assert made < built < compared < wheel < notarized
     # Only the runtime dependencies, from the lock as it is (a lock that pyproject.toml has moved from stops the
-    # release), and no hashes, which `uv tool install` ignores in a constraints file.
-    assert "export --locked --no-dev --no-emit-project" in release and "--no-hashes" in release
+    # release), with the hashes. `uv tool install` ignores the hashes of a constraints file, so the release does not
+    # write one.
+    assert "export --locked --no-dev --no-emit-project" in release
+    assert "--no-hashes" not in release
+    assert "build --wheel" in release and "--hash=sha256:" in release
+    assert "--require-hashes" in _INSTALLER
     assert (_ROOT / "uv.lock").is_file()
 
 
 def test_a_release_publishes_the_package_before_the_app() -> None:
-    """The app installs its own version from PyPI, so the script ends with the tag first, a wait for PyPI, and the
-    release last, made against the tag that exists (``--verify-tag``)."""
+    """The app carries its own wheel; the tag still publishes the package first (a terminal install, and a later
+    put-back of this version, take it from PyPI), then the release, made against the tag that exists
+    (``--verify-tag``)."""
     release: str = (_DESKTOP / "release.sh").read_text(encoding="utf-8")
     tag: int = release.index("git tag $tag")
     wait: int = release.index("https://pypi.org/pypi/dotagent-macos/$version/json")

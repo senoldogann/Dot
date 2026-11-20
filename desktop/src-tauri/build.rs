@@ -8,16 +8,24 @@
 // not fetched them (a development build, the tests) gets an empty stand-in here: it is no program (it cannot be run),
 // so the shell sees no tools and shows no installer. desktop/fetch-tools.sh puts the real ones in their place.
 //
-// The file that pins the package's dependencies (resources/constraints.txt, which desktop/release.sh makes from uv.lock)
-// is named the same way and has an empty stand-in too: the installer takes an empty file for no constraints.
+// The requirements file and the wheel (resources/requirements.txt and
+// resources/dotagent_macos-<version>-py3-none-any.whl, which desktop/release.sh makes from uv.lock) are named the
+// same way and have empty stand-ins too: the installer takes an empty requirements file for no hashes.
 const TOOLS: [&str; 3] = ["uv", "rg", "dot-launcher"];
-const CONSTRAINTS: &str = "constraints.txt";
+const REQUIREMENTS: &str = "requirements.txt";
 
 fn main() {
-    let constraints = std::path::Path::new("resources").join(CONSTRAINTS);
-    if constraints.symlink_metadata().is_err() {
-        std::fs::write(&constraints, b"")
-            .expect("an empty stand-in for the constraints this build does not carry");
+    let resources = std::path::Path::new("resources");
+    let requirements = resources.join(REQUIREMENTS);
+    if requirements.symlink_metadata().is_err() {
+        std::fs::write(&requirements, b"")
+            .expect("an empty stand-in for the requirements this build does not carry");
+    }
+    let version = std::env::var("CARGO_PKG_VERSION").expect("the package version");
+    let wheel = resources.join(format!("dotagent_macos-{version}-py3-none-any.whl"));
+    if wheel.symlink_metadata().is_err() {
+        std::fs::write(&wheel, b"")
+            .expect("an empty stand-in for the wheel this build does not carry");
     }
     for name in TOOLS {
         let path = std::path::Path::new("resources").join("tools").join(name);
