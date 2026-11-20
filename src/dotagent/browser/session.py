@@ -290,6 +290,8 @@ _LAUNCH_ARGS: list[str] = [
 # --disable-extensions, which would keep the extensions installed in its profile from loading (item 264).
 _PLAYWRIGHT_SWITCHES_LEFT_OUT: list[str] = ["--enable-automation", "--disable-extensions"]
 _LAUNCH_ERROR_CHARS: int = 900
+# The address Chrome asks of every page to find out which extensions are installed: refused, and not worth a log line.
+_CHROME_PROBE: str = "chrome-extension://invalid/"
 # A page that answered with a bot wall gets this long to pass its own check (a challenge page reloads itself) before
 # it is read as it stands: 202 is DuckDuckGo's check, the others are the usual walls.
 _CHALLENGE_STATUS: frozenset[int] = frozenset({202, 403, 429, 503, 999})
@@ -2311,7 +2313,9 @@ class BrowserSession:
             if page is not None:
                 # What the run reads of it: made from the values of its own chat (:meth:`_shown_to`).
                 self._refusals[page] = _Refusal(url=self._shown_to(page, url), reason=verdict.reason)
-            _log.info(
+            # Chrome probes ``chrome-extension://invalid/`` on its own, for every page: 24,600 of the 43,000 lines of
+            # two days (57%), and the log's seven days gone in two. Every other refusal stays a line.
+            (_log.debug if url == _CHROME_PROBE else _log.info)(
                 "browser_request_refused",
                 url=truncate_middle(self._shown(url), _LAUNCH_ERROR_CHARS),
                 resource_type=resource_type,
