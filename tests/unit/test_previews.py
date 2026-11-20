@@ -217,6 +217,7 @@ def test_a_workbook_shows_its_cells_with_their_formulas(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.macos
 def test_a_pdf_page_is_drawn_at_the_width_asked_in_its_proportions(tmp_path: Path) -> None:
     pages: list[Image.Image] = [Image.new("RGB", (612, 792), (255, 255, 255)), Image.new("RGB", (792, 612))]
     out: io.BytesIO = io.BytesIO()
@@ -279,6 +280,7 @@ def _pdf_with_text(path: Path, text: str, media_box: bytes = b"0 0 200 100") -> 
     return path
 
 
+@pytest.mark.macos
 @pytest.mark.parametrize("box", [b"0 0 0 792", b"0 0 612 0"])
 def test_a_page_with_no_width_or_no_height_is_refused_and_not_divided_by(tmp_path: Path, box: bytes) -> None:
     """A crop box with a side of nothing (a malformed PDF) raised a ZeroDivisionError, which the daemon answered as a
@@ -291,6 +293,7 @@ def test_a_page_with_no_width_or_no_height_is_refused_and_not_divided_by(tmp_pat
     assert refused.value.context == {"path": str(flat), "page": 1}
 
 
+@pytest.mark.macos
 def test_a_pdf_gives_its_text_for_the_copy_up_to_the_room_it_has(tmp_path: Path) -> None:
     """The panel's copy of a PDF takes its text (item 403), cut where the room given ends, and "" for a PDF of
     pictures alone."""

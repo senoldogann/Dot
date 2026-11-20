@@ -7,6 +7,7 @@ import pytest
 from dotagent.agent.attachments import StoredAttachment, load_attachment, store_attachment
 
 
+@pytest.mark.macos
 @pytest.mark.parametrize("name", ["meta.json", "TEXT.TXT"])
 def test_an_upload_named_like_a_file_dot_keeps_is_kept_whole(tmp_path: Path, name: str) -> None:
     data: bytes = b'{"note": "mine"}'

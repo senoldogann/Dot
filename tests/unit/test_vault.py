@@ -159,6 +159,7 @@ def test_an_owners_rule_fits_a_step_as_it_was_written_and_the_decision_is_record
     assert handed.verdict == "handoff" and MASK in handed.reason and "Summer2024" not in handed.reason
 
 
+@pytest.mark.macos
 def test_the_shell_never_runs_1passwords_command_line() -> None:
     home: Path = Path.home()
     for command in ("op read op://Shared/GitHub/password", "/opt/homebrew/bin/op item list", "sh -c 'op vault list'"):

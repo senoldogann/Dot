@@ -3,7 +3,8 @@ app when it runs; else the tab of a browser that shows Dot's pages, found and ch
 and the browsers built on it, Arc), the browser the page that took the last capture runs in first; else Dot opened in
 the default browser. macOS asks once whether Dot may drive a browser (Privacy & Security › Automation); a browser it
 may not drive, or Firefox, which has no words for its tabs, is only brought to the front. Blocking: the service calls
-it off the event loop."""
+it off the event loop. The applications and the screen are asked by the functions that need them, so that the name of
+the desktop app loads where macOS's frameworks are not (item 1270)."""
 
 import subprocess
 import time
@@ -12,7 +13,6 @@ from typing import Literal
 
 from dotagent.core.errors import DesktopError
 from dotagent.core.logs import get_logger
-from dotagent.desktop import apps, screen
 from dotagent.desktop.flight import Frame
 from dotagent.desktop.types import AppInfo, WindowInfo
 
@@ -172,6 +172,8 @@ def _choose_tab(bundle: str, addresses: Sequence[str]) -> TabFound:
 def _front_frame(pid: int | None, before: int | None) -> Frame | None:
     """The frame of the window in front once the application ``pid`` has it, or, for None, any application but
     ``before`` (the one in front before Dot was asked for, the one just captured); None when none came."""
+    from dotagent.desktop import apps, screen
+
     deadline: float = time.monotonic() + _FRONT_WITHIN_S
     while True:
         front: int | None = apps.frontmost_pid()
@@ -192,6 +194,8 @@ def show_dot(addresses: Sequence[str], fallback_url: str, agent: str | None) -> 
     """Bring Dot's window to the front: the desktop app, a browser's tab that shows one of ``addresses`` (the browser
     of the page's User-Agent ``agent`` first), else ``fallback_url`` opened in the default browser. Returns the frame
     of the window that came to the front, None when none did."""
+    from dotagent.desktop import apps
+
     running: dict[str, AppInfo] = {app.bundle_id: app for app in apps.list_apps() if app.bundle_id is not None}
     before: int | None = apps.frontmost_pid()
     if DESKTOP_APP in running:

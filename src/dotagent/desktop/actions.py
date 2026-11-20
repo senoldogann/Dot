@@ -27,7 +27,8 @@ from dotagent.core.outcomes import OutcomeCheck, judge_added, still_on_its_way
 from dotagent.desktop import apps, ax, screen
 from dotagent.desktop import input as hid
 from dotagent.desktop.ax import ElementState
-from dotagent.desktop.input import EventSource, parse_chord
+from dotagent.desktop.chords import parse_chord
+from dotagent.desktop.input import EventSource
 from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, AppRole, StepContext, enters_text, step_role
 from dotagent.desktop.types import (
     DEFAULT_SCROLL_PX,

@@ -159,6 +159,7 @@ def test_a_chart_of_a_kind_that_is_not_read_is_named_and_the_rest_of_the_slide_i
     )
 
 
+@pytest.mark.macos
 def test_read_file_pages_a_workbook_by_its_lines_and_refuses_one_of_before_2007(tmp_path: Path) -> None:
     workbook = openpyxl.Workbook()
     sheet = workbook.active

@@ -48,6 +48,7 @@ def _plan(changes: list[RunChange]) -> list[UndoStep]:
     return plan_undo(changes, current_states(sorted({change.entry.path for change in changes})))
 
 
+@pytest.mark.macos
 def test_a_changed_file_is_put_back_as_it_was_with_its_permission_bits(tmp_path: Path) -> None:
     root: Path = tmp_path / "undo"
     notes: Path = tmp_path / "notes.txt"
@@ -70,6 +71,7 @@ def test_a_changed_file_is_put_back_as_it_was_with_its_permission_bits(tmp_path:
     assert [step.state for step in _plan(_changes(root, (RUN_ID,)))] == ["as_before"]
 
 
+@pytest.mark.macos
 def test_a_created_file_is_deleted_and_the_folders_made_for_it_are_removed(tmp_path: Path) -> None:
     root: Path = tmp_path / "undo"
     work: Path = tmp_path / "work"
@@ -85,6 +87,7 @@ def test_a_created_file_is_deleted_and_the_folders_made_for_it_are_removed(tmp_p
     assert list(work.iterdir()) == []
 
 
+@pytest.mark.macos
 def test_a_file_changed_after_the_run_is_a_conflict_taken_back_only_with_force(tmp_path: Path) -> None:
     root: Path = tmp_path / "undo"
     notes: Path = tmp_path / "notes.txt"
@@ -100,6 +103,7 @@ def test_a_file_changed_after_the_run_is_a_conflict_taken_back_only_with_force(t
     assert notes.read_text(encoding="utf-8") == "one\n"
 
 
+@pytest.mark.macos
 def test_a_file_deleted_after_the_run_is_a_conflict_that_force_writes_back(tmp_path: Path) -> None:
     root: Path = tmp_path / "undo"
     notes: Path = tmp_path / "sub" / "notes.txt"
@@ -115,6 +119,7 @@ def test_a_file_deleted_after_the_run_is_a_conflict_that_force_writes_back(tmp_p
     assert notes.read_text(encoding="utf-8") == "one\n"
 
 
+@pytest.mark.macos
 def test_a_file_past_the_caps_is_changed_without_a_copy_and_cannot_be_put_back(tmp_path: Path) -> None:
     root: Path = tmp_path / "undo"
     big, first, second, new = (tmp_path / name for name in ("big.txt", "first.txt", "second.txt", "new.txt"))
@@ -150,6 +155,7 @@ def test_the_file_is_left_as_it_is_when_its_change_cannot_be_noted(tmp_path: Pat
     assert notes.read_text(encoding="utf-8") == "one\n"
 
 
+@pytest.mark.macos
 def test_a_journal_line_cut_short_is_left_out_and_the_next_change_is_noted_after_it(tmp_path: Path) -> None:
     root: Path = tmp_path / "undo"
     notes: Path = tmp_path / "notes.txt"
@@ -167,6 +173,7 @@ def test_a_journal_line_cut_short_is_left_out_and_the_next_change_is_noted_after
     assert notes.read_text(encoding="utf-8") == "one\n"
 
 
+@pytest.mark.macos
 def test_the_changes_of_a_delegated_run_are_taken_back_to_the_copy_its_parent_kept(tmp_path: Path) -> None:
     root: Path = tmp_path / "undo"
     notes: Path = tmp_path / "notes.txt"
@@ -179,6 +186,7 @@ def test_the_changes_of_a_delegated_run_are_taken_back_to_the_copy_its_parent_ke
     assert notes.read_text(encoding="utf-8") == "one\n"
 
 
+@pytest.mark.macos
 def test_a_copy_that_is_not_the_one_noted_is_not_written_back(tmp_path: Path) -> None:
     root: Path = tmp_path / "undo"
     notes: Path = tmp_path / "notes.txt"
@@ -190,6 +198,7 @@ def test_a_copy_that_is_not_the_one_noted_is_not_written_back(tmp_path: Path) ->
     assert notes.read_text(encoding="utf-8") == "two\n"
 
 
+@pytest.mark.macos
 def test_a_link_that_came_above_a_changed_file_is_not_followed(tmp_path: Path) -> None:
     """Item 350: the tools note a path with its links resolved, so a folder above it that is a link now came since.
     Taking the change back through it would put the file back, or delete it, in the folder the link names; the step
@@ -216,6 +225,7 @@ def test_a_link_that_came_above_a_changed_file_is_not_followed(tmp_path: Path) -
     assert (elsewhere / "config").read_text(encoding="utf-8") == "made by the run\n"
 
 
+@pytest.mark.macos
 def test_a_link_that_comes_between_the_check_and_the_write_is_not_followed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -239,6 +249,7 @@ def test_a_link_that_comes_between_the_check_and_the_write_is_not_followed(
     assert (elsewhere / "config").read_text(encoding="utf-8") == "the owner's\n"
 
 
+@pytest.mark.macos
 def test_a_folder_the_run_made_below_a_link_that_came_since_is_not_removed(tmp_path: Path) -> None:
     """Item 350: the empty folders a run made are removed when its changes are taken back, but not one that a link
     above it now puts in another folder."""
@@ -266,6 +277,7 @@ def _volume_ignores_case(folder: Path) -> bool:
         probe.unlink()
 
 
+@pytest.mark.macos
 def test_a_file_named_in_another_letter_case_has_one_history_and_goes_back_to_what_it_was(tmp_path: Path) -> None:
     """Item 561: ``doc.txt`` and ``DOC.TXT`` are one file where the volume does not tell case apart, and the journal
     knew it by the spelling it was given: the second spelling had a history of its own, whose "before" was the first
@@ -290,6 +302,7 @@ def test_a_file_named_in_another_letter_case_has_one_history_and_goes_back_to_wh
     assert doc.read_text(encoding="utf-8") == "original\n"
 
 
+@pytest.mark.macos
 def test_a_file_made_in_one_letter_case_and_changed_in_another_is_known_by_the_case_it_was_made_in(
     tmp_path: Path,
 ) -> None:

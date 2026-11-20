@@ -171,6 +171,7 @@ def test_the_job_runs_the_dot_that_is_installed_not_a_package_left_in_its_workin
     assert "daemon" in started.stdout
 
 
+@pytest.mark.macos
 def test_macos_accepts_the_property_list(tmp_path: Path) -> None:
     plist: Path = tmp_path / f"{LABEL}.plist"
     plist.write_bytes(

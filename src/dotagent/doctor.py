@@ -47,7 +47,6 @@ from dotagent.core.paths import (
 )
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
-from dotagent.desktop.capture import rect_capture_supported
 from dotagent.desktop.codes import chat_db_path
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.types import Permissions
@@ -633,6 +632,9 @@ def _local_checks() -> list[CheckResult]:
 
 def _check_screen_capture_support() -> CheckResult:
     """The desktop tools see the screen through ScreenCaptureKit's rectangle capture, which macOS has from 15.2 on."""
+    # ScreenCaptureKit is loaded by the check that asks it, so the doctor loads where it is not (item 1270).
+    from dotagent.desktop.capture import rect_capture_supported
+
     version: str = platform.mac_ver()[0]
     if rect_capture_supported():
         return _result("desktop macos", True, False, f"macOS {version} can capture the screen")

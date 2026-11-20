@@ -19,7 +19,6 @@ from dotagent.core.paths import config_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify.apns import FLEET_ID
 from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT
-from dotagent.qr import qr_png
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import PHONE_STATE
 from dotagent.server.pairing import PairingCode, Redeemed, new_code, redeem, shown_code
@@ -112,6 +111,11 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         if code == "dot" and not running:
             raise PhoneSetupError("Dot answers to no name on a tailnet yet: set it up in Settings › Phone first", {})
         text: str = DOWNLOAD_PAGE if code == "tailscale" else f"https://{running[0]}/"
+        # Core Image makes it: imported here, on the event loop's thread, before a worker draws it (the module binds its
+        # transform as it loads, which two workers at once must not do), and so that the server loads where Core Image
+        # is not (item 1270).
+        from dotagent.qr import qr_png
+
         png: bytes = await asyncio.to_thread(qr_png, text)
         return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})
 

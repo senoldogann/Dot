@@ -36,6 +36,7 @@ def _ctx() -> ToolContext:
     )
 
 
+@pytest.mark.macos
 async def test_a_script_given_a_longer_timeout_finishes_where_the_configured_one_kills_it() -> None:
     tool = build_apple_tool()
     ctx: ToolContext = _ctx()

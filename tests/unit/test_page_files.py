@@ -70,6 +70,7 @@ def _site(tmp_path: Path) -> tuple[Path, Path]:
     return workspace, site / "index.html"
 
 
+@pytest.mark.macos
 def test_the_files_a_page_names_beside_it_are_written_into_it(tmp_path: Path) -> None:
     workspace, page = _site(tmp_path)
     picture: str = f"data:image/png;base64,{base64.b64encode(PNG).decode('ascii')}"
@@ -112,6 +113,7 @@ def test_the_files_a_page_names_beside_it_are_written_into_it(tmp_path: Path) ->
     )
 
 
+@pytest.mark.macos
 def test_a_file_that_would_not_fit_is_left_out_and_the_page_shown_without_it(tmp_path: Path) -> None:
     """The pre-push review: a photo of a few hundred kilobytes made the whole page refused, where item 598 showed it
     without the photo. It is measured before it is read, left out and named, and the rest is written in."""
@@ -125,6 +127,7 @@ def test_a_file_that_would_not_fit_is_left_out_and_the_page_shown_without_it(tmp
     assert "css/site.css" in files.written and "js/app.js" in files.written
 
 
+@pytest.mark.macos
 def test_an_imported_sheet_is_named_as_left_out(tmp_path: Path) -> None:
     """The pre-push review's nit: a sheet a style imports loads from no data: address in a shown page, so it is not
     written in, and the answer names it rather than leaving it unsaid."""
@@ -137,6 +140,7 @@ def test_an_imported_sheet_is_named_as_left_out(tmp_path: Path) -> None:
     assert "../img/bg.png" in files.written
 
 
+@pytest.mark.macos
 def test_a_page_that_comes_out_longer_than_a_page_is_shown_as_written(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -164,6 +168,7 @@ def test_a_style_of_unclosed_urls_is_read_in_linear_time(tmp_path: Path) -> None
     assert files.html == f"<style>{css}</style>" and files.left_out == []
 
 
+@pytest.mark.macos
 def test_a_large_file_named_many_times_is_measured_and_never_read(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -184,6 +189,7 @@ def test_a_large_file_named_many_times_is_measured_and_never_read(
     assert reads == []
 
 
+@pytest.mark.macos
 def test_a_file_swapped_for_a_link_after_it_was_judged_is_not_read(tmp_path: Path) -> None:
     """The independent review: a file is judged by its path and read by its path, so a file of the workspace replaced
     by a link to a protected one, or its folder by a link to a protected folder, in between, was read. It is opened
@@ -210,6 +216,7 @@ def test_a_file_swapped_for_a_link_after_it_was_judged_is_not_read(tmp_path: Pat
         assert writer._read(path, size) is None, swap
 
 
+@pytest.mark.macos
 def test_a_path_that_cannot_be_read_is_left_out_and_named(tmp_path: Path) -> None:
     """The independent review: a NUL in a link, or a picture this process may not read, made show_page fail with an
     unexpected error; each is left out and named."""
@@ -224,6 +231,7 @@ def test_a_path_that_cannot_be_read_is_left_out_and_named(tmp_path: Path) -> Non
     assert files.left_out == ["a\x00b.png", "img/shut.png"]
 
 
+@pytest.mark.macos
 def test_a_script_full_of_end_tags_is_counted_with_its_escapes(tmp_path: Path) -> None:
     """The pre-push review: each "</script" written in takes one character more, which only a margin of 2,000 covered,
     so a script with thousands of them made the whole page fall back and lose every file. They are counted in."""
@@ -236,6 +244,7 @@ def test_a_script_full_of_end_tags_is_counted_with_its_escapes(tmp_path: Path) -
     assert "</SCRIPT>" not in files.html
 
 
+@pytest.mark.macos
 def test_an_import_without_its_semicolon_leaves_the_rest_of_the_style_read(tmp_path: Path) -> None:
     """The pre-push review: an @import with no ";" took the rest of its line and the next ones up to 2,048 characters,
     and the pictures there were neither written in nor named. It ends at a line or a brace."""
@@ -314,6 +323,7 @@ def _address(data: bytes, kind: str = "image/png") -> str:
     return f"data:{kind};base64,{base64.b64encode(data).decode('ascii')}"
 
 
+@pytest.mark.macos
 def test_the_pictures_of_a_srcset_and_the_icon_of_a_page_are_written_in(tmp_path: Path) -> None:
     """Item 612 (the final review): a page with ``srcset`` took the picture its browser chose (the second on every
     Retina Mac) from the file beside it, which a shown page cannot load, though the answer said nothing was left out."""
@@ -328,6 +338,7 @@ def test_the_pictures_of_a_srcset_and_the_icon_of_a_page_are_written_in(tmp_path
     assert sorted(set(files.written)) == ["a.png", "app.js", "b.png", "icon.png", "style.css"]
 
 
+@pytest.mark.macos
 @pytest.mark.parametrize("rel", ["icon", "shortcut icon", "apple-touch-icon", "apple-touch-icon-precomposed", "ICON"])
 def test_every_icon_link_of_a_page_is_written_in_and_other_links_are_not(tmp_path: Path, rel: str) -> None:
     workspace, page = _probe_site(tmp_path)
@@ -357,6 +368,7 @@ def test_the_addresses_of_a_srcset_are_found_as_the_standard_reads_them(srcset: 
     assert [srcset[start:end] for start, end in page_files._srcset_urls(srcset)] == addresses
 
 
+@pytest.mark.macos
 def test_a_candidate_of_a_srcset_that_cannot_be_written_in_stays_and_is_named(tmp_path: Path) -> None:
     workspace, page = _probe_site(tmp_path)
     html: str = '<img srcset="a.png 1x, gone.png 2x, https://example.com/c.png 3x">'
@@ -365,6 +377,7 @@ def test_a_candidate_of_a_srcset_that_cannot_be_written_in_stays_and_is_named(tm
     assert files.left_out == ["gone.png"]
 
 
+@pytest.mark.macos
 def test_a_frame_an_object_and_an_embed_are_named_as_not_loaded_and_the_answer_names_what_is_left(
     tmp_path: Path,
 ) -> None:
@@ -403,6 +416,7 @@ def test_a_page_that_names_nothing_beside_it_is_answered_as_before(tmp_path: Pat
     )
 
 
+@pytest.mark.macos
 def test_a_picture_that_many_img_tags_name_is_written_once_and_each_takes_it_from_there(tmp_path: Path) -> None:
     """Item 612 (the final review): an icon in every row of a thousand was written in a row at a time, used up the
     500,000 characters of the page after 360 rows, and left the other 640 rows with a broken picture."""
@@ -428,6 +442,7 @@ def test_a_picture_that_many_img_tags_name_is_written_once_and_each_takes_it_fro
     assert _still_named(files) == set()
 
 
+@pytest.mark.macos
 def test_the_table_of_pictures_stands_before_the_end_of_the_body_and_cannot_end_its_script_early(
     tmp_path: Path,
 ) -> None:
@@ -444,6 +459,7 @@ def test_the_table_of_pictures_stands_before_the_end_of_the_body_and_cannot_end_
     assert files.html.endswith("</script></BODY></html>") or files.html.endswith("</BODY></html>")
 
 
+@pytest.mark.macos
 def test_a_picture_named_less_than_three_times_stays_in_its_tags_and_one_with_a_srcset_does_too(
     tmp_path: Path,
 ) -> None:
@@ -458,6 +474,7 @@ def test_a_picture_named_less_than_three_times_stays_in_its_tags_and_one_with_a_
     assert several.html == f'<img src="{address}" srcset="{address} 2x">' * 3
 
 
+@pytest.mark.macos
 def test_a_large_picture_that_many_tags_name_fits_the_page_once(tmp_path: Path) -> None:
     """A picture of 150,000 bytes is 200,000 characters: two of them were all a page held, the third was left out."""
     workspace, page = _bare_site(tmp_path)
@@ -467,6 +484,7 @@ def test_a_large_picture_that_many_tags_name_fits_the_page_once(tmp_path: Path) 
     assert files.html.count('data-dot-pic="1"') == 6 and len(files.html) < PAGE_MAX_CHARS
 
 
+@pytest.mark.macos
 def test_a_shared_picture_past_half_the_room_is_in_the_page_once_for_every_tag(tmp_path: Path) -> None:
     """The review of item 612: a picture whose address was more than half the room left fitted its first tag, and each
     tag after it asked for its whole size again: 999 rows of a thousand kept a name the page never loads, and the
@@ -480,6 +498,7 @@ def test_a_shared_picture_past_half_the_room_is_in_the_page_once_for_every_tag(t
     assert len(files.html) < PAGE_MAX_CHARS
 
 
+@pytest.mark.macos
 def test_a_shared_picture_that_does_not_fit_is_named_as_too_large_in_every_tag_and_the_page_is_shown(
     tmp_path: Path,
 ) -> None:
@@ -490,6 +509,7 @@ def test_a_shared_picture_that_does_not_fit_is_named_as_too_large_in_every_tag_a
     assert files.html == html and files.too_large == ["huge.png"] * 4 and files.written == []
 
 
+@pytest.mark.macos
 def test_a_file_named_many_times_is_found_read_and_encoded_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -525,6 +545,7 @@ def test_a_file_named_many_times_is_found_read_and_encoded_once(
     assert files.left_out == [] and len(files.written) == 50 + 50 + 50 + 100 + 50
 
 
+@pytest.mark.macos
 def test_the_writing_in_has_a_time_limit_after_which_the_rest_is_as_written_and_the_answer_says_so(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -555,6 +576,7 @@ def test_the_writing_in_has_a_time_limit_after_which_the_rest_is_as_written_and_
     assert with_its_files(html, page, workspace, (), ()).cut == ""
 
 
+@pytest.mark.macos
 def test_a_page_cut_by_the_time_limit_takes_back_the_names_of_the_tag_it_was_in(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -594,6 +616,7 @@ def test_a_page_cut_by_the_time_limit_takes_back_the_names_of_the_tag_it_was_in(
     ],
     ids=["svg image", "style attribute", "linked sheets", "img tags", "srcset", "icons", "frames"],
 )
+@pytest.mark.macos
 def test_a_pathological_page_of_a_page_of_characters_is_written_in_in_a_moment(tmp_path: Path, page_of: object) -> None:
     """Item 612 (the final review): 22,000 ``image`` tags took 36 seconds, one ``style`` attribute with 22,000 ``url()``
     26, 13,000 linked sheets 21: each naming of a file was found and read again."""

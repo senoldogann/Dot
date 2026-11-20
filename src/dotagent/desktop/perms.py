@@ -1,5 +1,6 @@
 """Privacy permissions the desktop needs, checked without ever showing a prompt, plus the Settings panes that grant
-them."""
+them. The frameworks are imported by the functions that ask macOS, so that the panes and their hints load where they
+are not, as on the Linux that runs a cloud agent's unit tests (item 1270)."""
 
 import ctypes
 import os
@@ -7,9 +8,6 @@ import subprocess
 from functools import cache
 from pathlib import Path
 from typing import Literal
-
-import ApplicationServices as AS
-import Quartz
 
 from dotagent.core.errors import DesktopError, DesktopPermissionError
 from dotagent.core.logs import get_logger
@@ -42,11 +40,15 @@ _PID_PATH_BYTES: int = 4096
 
 
 def _accessibility_granted() -> bool:
+    import ApplicationServices as AS
+
     return bool(AS.AXIsProcessTrustedWithOptions({AS.kAXTrustedCheckOptionPrompt: False}))
 
 
 def check_permissions() -> Permissions:
     """The permissions granted to the responsible process (the app that launched Dot); never prompts."""
+    import Quartz
+
     return Permissions(
         accessibility=_accessibility_granted(),
         screen_recording=bool(Quartz.CGPreflightScreenCaptureAccess()),
@@ -98,6 +100,9 @@ def program_name(program: Path) -> str:
 
 def request_permissions() -> Permissions:
     """Ask macOS to show its permission prompts for what is missing (nothing appears for what is granted)."""
+    import ApplicationServices as AS
+    import Quartz
+
     AS.AXIsProcessTrustedWithOptions({AS.kAXTrustedCheckOptionPrompt: True})
     Quartz.CGRequestScreenCaptureAccess()
     Quartz.CGRequestPostEventAccess()
@@ -149,6 +154,8 @@ def grant_hint(pane: Pane) -> str:
 def require_accessibility() -> None:
     """Raise unless Accessibility and input events are granted. Only these two are read (item 343): the check of
     Screen Recording takes as long again, 6 ms, and reading or controlling an application needs no screenshot."""
+    import Quartz
+
     accessibility: bool = _accessibility_granted()
     post_event: bool = bool(Quartz.CGPreflightPostEventAccess())
     if not (accessibility and post_event):
@@ -161,6 +168,8 @@ def require_accessibility() -> None:
 
 def require_screen_recording() -> None:
     """Raise unless Screen Recording is granted; only that is read."""
+    import Quartz
+
     screen_recording: bool = bool(Quartz.CGPreflightScreenCaptureAccess())
     if not screen_recording:
         raise DesktopPermissionError(
