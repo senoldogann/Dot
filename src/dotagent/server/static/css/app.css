@@ -7173,6 +7173,13 @@ summary:has(> .chev)::-webkit-details-marker {
   color: var(--bad);
 }
 
+/* While a helper works the status line over the composer says how they stand and how long it has been (the capsule); the
+   head says how many they are, and the state and the time once none works (item 1281). */
+.helpers[data-live] .helpers-state,
+.helpers[data-live] .helpers-time {
+  display: none;
+}
+
 .helpers-time {
   flex: none;
   color: var(--muted);
@@ -7204,33 +7211,15 @@ summary:has(> .chev)::-webkit-details-marker {
   border-radius: var(--radius-sm);
 }
 
-/* A phone keeps the head of a delegated run, and of the helpers it belongs to, one line tall (item 401): the state
-   words never wrap, the title or the last line gives way with an ellipsis, and nothing pushes a second row. The rows a
-   finger taps stay 40 px tall through `min-height` (app.css). */
+/* A phone keeps the head of the helpers one line tall (item 401): the state words never wrap and the title gives way
+   with an ellipsis. A helper's row is two lines, as it is on a wide window (item 1281): its name and what it is for,
+   then its last line, each cut with an ellipsis at the row's end; side by side, on 390 px, the name took the line and
+   left the goal "Gör…" and the last line half the row. The rows a finger taps stay 40 px tall through `min-height`
+   (app.css). */
 @media (max-width: 720px) {
   .child > summary {
     gap: var(--space-2);
     padding: var(--space-1) var(--space-2);
-  }
-
-  .child-main {
-    flex-direction: row;
-    align-items: baseline;
-    gap: var(--space-2);
-  }
-
-  .child-title {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  .child-progress {
-    flex: none;
-    max-width: 50%;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--muted);
-    white-space: nowrap;
   }
 
   .helpers > summary {
@@ -10703,7 +10692,14 @@ button.attach-chip {
   }
 }
 
-/* The way to the run's own page shows under the pointer (item 884); a phone, with no pointer, keeps it. */
+/* The way to the run's own page shows under the pointer (item 884); a phone, with no pointer, shows it on a row that is
+   open (item 1281), not as a second icon beside the chevron of every closed row. */
+@media (hover: none) {
+  .child:not([open]) > summary .child-open {
+    display: none;
+  }
+}
+
 @media (hover: hover) {
   .child > summary .child-open {
     opacity: 0;

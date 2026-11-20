@@ -565,11 +565,12 @@ start of its answer (item 245): an agent's run is named by the agent ("Scout"), 
 helpers of the run that started it ("Helper 1", "Helper 2"), and the goal follows quieter, its paths cut to their last
 two parts ("…/housestory/brief.md"); the last thing it did names the tool in the words the steps use ("step 32 ·
 Write file", "Web Research · Web scrape"; item 669), the time it has taken (counting on every second while it works),
-the way to its own page (under the pointer, where there is one) and a chevron that opens its steps. Since item 884 the
+the way to its own page (under the pointer, where there is one; on a touch screen, on an open row, item 1281) and a chevron that opens its steps. Since item 884 the
 row is no card: a line of the conversation on no fill, its face in the column of the faces and its words where theirs
 start, and an agent's folded message under it starts there too. Rows that follow each other gather in one group: its head shows their faces, how many they
-are and how they stand ("3 helpers", "1 working · 2 done"), the time from the first one's start to the last one's end
-and a chevron that folds the rows away; an approval a helper asks for opens the group. The row is closed from the start;
+are ("3 helpers") and, once none works, how they stand ("2 done · 1 stopped") and the time from the first one's start to
+the last one's end (while one works, the status line over the composer says how the run's helpers stand and how long the run has worked,
+and the head does not say it twice, item 1281), and a chevron that folds the rows away; an approval a helper asks for opens the group. The row is closed from the start;
 an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes
 again. Its steps are put in the page the first time it opens, by you or by an approval, and stay (item 767): until then
 the row is its line alone, which its events keep up to date, so a chat whose helpers took hundreds of steps opens light

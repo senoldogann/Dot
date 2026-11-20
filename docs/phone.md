@@ -243,9 +243,11 @@ that say their value and open in place, and How Dot works with its switches; the
 sheet's foot. A pick keeps the sheet open; Done, Close, a tap on the dim above it or a drag of its head down puts it
 away. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
-tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A delegated run's row, under the helpers it belongs to, is one line tall at this width:
-its face, its goal, its state and time, and the way to its page, with the goal or the last line cut by an ellipsis
-rather than wrapped onto a second row (item 401); the helpers' own head is one line too. The details rise from the foot
+tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A delegated run's row, under the helpers it belongs to, is two lines at this width, as on a wide window (item
+1281; item 401 made it one, which left the name the line and the goal three letters): its face, its name and what it is
+for, then its last line, each cut by an ellipsis rather than wrapped, with its state and time at the right and the
+chevron; the way to its own page shows on the row once it is open, not as a second icon on every closed one. The
+helpers' own head is one line. The details rise from the foot
 as a sheet with a grabber, and a drag of its head down closes it; its Agents tab says of each helper its state, its
 model and what it does now (on a wide window too). The Screen tab with nothing yet says in the same empty panel as the
 other tabs that Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the
