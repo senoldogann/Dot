@@ -113,16 +113,18 @@ A model is left out of both lists while its provider has no key (an Ollama model
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or a
 new key of its provider is saved. A model the plan of its provider does not include (HTTP 402, "not in the plan") and
 a plan whose included usage is used up (Ollama's 429 that says so) are such errors too: the connector does not retry
-them, and the model is paused for `helper_cooldown_s` at once (item 254). OpenRouter's 402 that speaks of credits
-pauses it as "out of credits". Dot sends no `max_tokens` unless a call sets one, and OpenRouter then prices a call at
+them, and the model is paused for `helper_cooldown_s` at once (item 254). OpenRouter's 402 that says the account's
+credits do not pay for the request pauses it as "out of credits"; one that says its other requests still hold them is
+a rate limit, below. Dot sends no `max_tokens` unless a call sets one, and OpenRouter then prices a call at
 the model's longest answer (131072 tokens for some), so an account with few credits can be refused a call whose answer
 would be short; when that 402 names the longest answer the credits pay for (`can only afford 29597`) and it is at least
 1,024 tokens, the connector asks once more with that as `max_tokens`, logs `openrouter_max_tokens_lowered`, and the
 model is not paused. OpenRouter's 402 that says the credits are held by the account's requests still running ("would
 exceed your available credits given your current in-flight requests") is no spent balance but a rate limit: the
 connector retries it as it retries a 429, and when it still comes back the model is paused as "rate limited", which
-sends the owner no payment notice, and a run it ends reads on the page as a limit reached, not as a balance to top up
-(item 1254). A pause for money ("out of credits", "quota exhausted", "not in the plan") that begins, or
+sends the owner no payment notice. The run then moves to a standby model when one can take it over, else waits for
+the model as for any rate limit (below: every 10 minutes, as OpenRouter names no time, for `quota_wait_s`), and a run
+it ends reads on the page as a limit reached, not as a balance to top up (item 1254). A pause for money ("out of credits", "quota exhausted", "not in the plan") that begins, or
 replaces a pause for another reason, tells the owner (item 1207): a notice on their phone and desktop, titled
 "A model cannot answer: payment needed" (in the owner's language on iMessage), with the model, why, and the
 provider's own words (which say where to top up), and a tap that opens the models page. A provider is told about at most once a day while its money stays spent, and once more after the daemon restarts; a rate
