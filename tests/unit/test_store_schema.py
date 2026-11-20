@@ -40,6 +40,11 @@ def _tables_digest(path: Path) -> str:
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()
 
 
+def _unpacked(copy: Path, to: Path) -> Path:
+    to.write_bytes(gzip.decompress(copy.read_bytes()))
+    return to
+
+
 def _version(path: Path) -> int:
     connection: sqlite3.Connection = sqlite3.connect(path)
     try:
@@ -84,8 +89,7 @@ async def test_a_database_from_before_versions_is_copied_then_brought_to_the_ver
     copies: list[Path] = sorted((tmp_path / BEFORE_UPGRADE_DIR).glob("dot-*.sqlite3.gz"))
     assert len(copies) == 1
     # The copy is the database as it was: version 0, its row, none of the added columns.
-    restored: Path = tmp_path / "restored.sqlite3"
-    restored.write_bytes(gzip.decompress(copies[0].read_bytes()))
+    restored: Path = _unpacked(copies[0], tmp_path / "restored.sqlite3")
     assert _version(restored) == 0
     connection: sqlite3.Connection = sqlite3.connect(restored)
     try:
