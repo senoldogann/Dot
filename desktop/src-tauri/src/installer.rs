@@ -1,9 +1,10 @@
 //! The installer (item 575): what the desktop app does on a Mac that has no Dot. Its window shows a page bundled with
 //! the app (`ui/installer.html`), and one button runs, from here, the install: Python and Dot's package with the `uv`
-//! the app carries (`uv tool install`, into `runtime/` of Dot's home), `dotx setup` with the model and the key the
+//! the app carries (into `runtime/` of Dot's home), `dotx setup` with the model and the key the
 //! person chose, and `dotx service install` with the launcher the app carries, so that neither Homebrew nor Xcode's
-//! tools are needed. The app also keeps the package in step with itself: when the app updates and its package is the
-//! older, the app upgrades the package it installed.
+//! tools are needed. A release installs with `uv pip sync --require-hashes` from the requirements file the app carries,
+//! so a package whose hash is not the one `uv.lock` pinned is refused. The app also keeps the package in step with
+//! itself: when the app updates and its package is the older, the app upgrades the package it installed.
 //!
 //! What must hold (`roadmap/575.md`):
 //! - Only the installer window's own page may call the commands of this module (`COMMANDS`): Tauri's ACL names them in
@@ -12,8 +13,10 @@
 //!   Python of the environment `uv` made, running `-m dotagent` (that is `dotx`), and `/usr/bin/open`, with the
 //!   arguments the functions below build; the version is the app's own. The sandbox keeps a run's commands from
 //!   writing the runtime folder (`_own_code` in `runtime.py`), so that what the app runs at its start is not theirs.
-//!   The package's dependencies are the versions of the release's own `uv.lock`, not the newest of the day: the app
-//!   carries them as a constraints file (`Tools::constraints`) that `uv` is given at the install and at the upgrade.
+//!   The package and its dependencies are the artifacts of the release's own `uv.lock`, hashes included, not the
+//!   newest of the day: the app carries them as a requirements file (`Tools::requirements`) and the wheel of this
+//!   version, and `uv pip sync --require-hashes` is what installs and upgrades them. A development build has no such
+//!   file and installs with `uv tool install`, as it did before the file existed.
 //! - The key goes to `dotx setup --key-stdin` on its standard input and nowhere else: it is a `Secret`, and every line
 //!   a step prints is masked before it is kept, shown or written to the log.
 //! - It never installs over another Dot (`foreign`, `decide`), and it resumes an install of its own that stopped, from
@@ -67,13 +70,17 @@ const TOOLS_FOLDER: &str = "app-tools";
 const ON_PATH: [&str; 2] = ["rg", "uv"];
 const PACKAGE: &str = "dotagent-macos";
 /// What uv says when the requirements cannot be met together, the one failure the put-back retries without the app's
-/// constraints (`put_back`).
+/// pins (`put_back`).
 const UNRESOLVABLE: &str = "No solution found";
 /// What the daemon imports at its start, which a failed upgrade's environment must still import (`dotx_starts`).
 const ENGINE_IMPORT: &str = "import dotagent.server.daemon";
-/// The file of the app's Resources (beside the tools folder, not in it) that pins every dependency of the package to
-/// the version its release was built and tested with (`desktop/release.sh` makes it from `uv.lock`).
-const CONSTRAINTS: &str = "constraints.txt";
+/// The file of the app's Resources (beside the tools folder, not in it) that pins every dependency, and the wheel of
+/// this version, to the hashes `uv.lock` recorded (`desktop/release.sh` makes it). `uv pip sync --require-hashes`
+/// refuses an artifact that is not one of those hashes.
+const REQUIREMENTS: &str = "requirements.txt";
+/// The index the hashes were taken from. Named on the command, so a `uv.toml` that `--no-config` already ignores is
+/// not the only thing that would have to be wrong for a download to come from somewhere else.
+const PYPI: &str = "https://pypi.org/simple";
 const PYTHON: &str = "3.13";
 const LAUNCH_AGENT: &str = "dev.dotagent.dot.plist";
 /// The label of the service's launchd job, which `LAUNCH_AGENT` is the property list of (`launchd.py` `LABEL`).
@@ -272,17 +279,29 @@ impl Runtime {
         self.dir.join(MARKER)
     }
 
+    /// The virtual environment of the package: `uv tool install` and `uv venv` both make it here, so the launchd job's
+    /// Python stays at the same path either way.
+    fn environment(&self) -> PathBuf {
+        self.tool_dir().join(PACKAGE)
+    }
+
     /// The Python of the package's environment, which runs Dot's own commands (`python -P -m dotagent`, as the launchd
     /// job runs the daemon): it is inside the environment the sandbox keeps a run's commands from changing, which
     /// `bin/dotx`, a link in a folder of its own, is not.
     fn python(&self) -> PathBuf {
-        self.tool_dir().join(PACKAGE).join("bin").join("python")
+        self.environment().join("bin").join("python")
     }
 
     /// The folder of the package's metadata `uv` made, whose name says the version installed.
     fn site_packages(&self) -> PathBuf {
-        self.tool_dir().join(PACKAGE).join("lib")
+        self.environment().join("lib")
     }
+}
+
+/// The wheel a release builds for `version` and ships beside the requirements file. The filename is the one uv checks
+/// against the version inside the wheel (`name-version-py3-none-any`).
+fn wheel_name(version: &str) -> String {
+    format!("dotagent_macos-{version}-py3-none-any.whl")
 }
 
 /// What the app carries in its Resources: `uv`, `rg` and the launcher (`desktop/fetch-tools.sh` puts them there).
@@ -300,12 +319,12 @@ impl Tools {
         self.dir.join("dot-launcher")
     }
 
-    /// The file that pins the package's dependencies, in the app's Resources beside the tools folder, when this build
-    /// carries one: a release does (`desktop/release.sh`), and a development build has an empty stand-in (`build.rs`)
-    /// or none, which is no file to pin by. Without it `uv` takes the newest version each dependency allows, which is
-    /// what an install did before the file existed.
-    fn constraints(&self) -> Option<PathBuf> {
-        let file = self.dir.parent()?.join(CONSTRAINTS);
+    /// The requirements file in the app's Resources beside the tools folder, when this build carries one: a release
+    /// does (`desktop/release.sh`), and a development build has an empty stand-in (`build.rs`) or none, which is no
+    /// file to pin by. Without it the install is `uv tool install` of the package alone, which is what an install did
+    /// before the file existed.
+    fn requirements(&self) -> Option<PathBuf> {
+        let file = self.dir.parent()?.join(REQUIREMENTS);
         fs::metadata(&file)
             .is_ok_and(|meta| meta.is_file() && meta.len() > 0)
             .then_some(file)
@@ -730,6 +749,9 @@ pub struct Plan {
     /// What goes on the program's standard input, the key for `--key-stdin`.
     stdin: Option<Secret>,
     limit: Duration,
+    /// Where the program runs, when that is not the runtime folder. `uv pip sync` resolves a relative wheel path from
+    /// here, so the hashed install runs in the app's Resources, next to the wheel the requirements name.
+    directory: Option<PathBuf>,
 }
 
 impl Plan {
@@ -854,35 +876,55 @@ fn environment_of(
     environment
 }
 
-/// `uv tool install` of the package at the app's own version: `reinstall` for an upgrade. `--no-config` keeps uv from
-/// reading a `uv.toml` (the person's own, under `~/.config/uv`, which a command of a run could write): where the package
-/// comes from is the app's to say, not a file's. The app's constraints file (`Tools::constraints`) goes with it, so
-/// that every dependency is the version the release was built and tested with and not the newest one of that day.
-fn uv_install(tools: &Tools, runtime: &Runtime, version: &str, reinstall: bool) -> Plan {
-    uv_install_pinned(
-        tools,
-        runtime,
-        version,
-        reinstall,
-        tools.constraints().as_deref(),
-    )
+/// The requirements file this app may install `version` from, or why it may not. `None` when the build carries no
+/// file (a development build): the install is then `uv tool install`. A file that does not name this version's wheel,
+/// or a wheel that is not in the app next to it, is refused, and the install does not fall back to an unhashed one.
+fn requirements_for(tools: &Tools, version: &str) -> Result<Option<PathBuf>, String> {
+    let Some(file) = tools.requirements() else {
+        return Ok(None);
+    };
+    let text = fs::read_to_string(&file).map_err(|error| {
+        format!(
+            "The app's requirements could not be read ({}): {error}",
+            file.display()
+        )
+    })?;
+    if text.contains("../") {
+        return Err(
+            "The app's requirements name a path outside the app, so nothing was installed."
+                .to_string(),
+        );
+    }
+    let wheel = wheel_name(version);
+    let needle = format!("./{wheel}");
+    let pins_wheel = text
+        .lines()
+        .any(|line| line.split_whitespace().next() == Some(needle.as_str()));
+    if !pins_wheel {
+        return Err(format!(
+            "The app's requirements do not pin {wheel}, so this version would not be the one installed."
+        ));
+    }
+    let Some(resources) = file.parent() else {
+        return Err("The app's requirements have no folder.".to_string());
+    };
+    let wheel_path = resources.join(&wheel);
+    let present = fs::metadata(&wheel_path).is_ok_and(|meta| meta.is_file() && meta.len() > 0);
+    if !present {
+        return Err(format!(
+            "The app does not carry {wheel}, so the install cannot check that wheel."
+        ));
+    }
+    Ok(Some(file))
 }
 
-/// `uv_install` with the constraints file named, or none: only the way back from a failed upgrade installs the package
-/// of an older version with none, when that version cannot be installed under this app's constraints.
-fn uv_install_pinned(
-    tools: &Tools,
-    runtime: &Runtime,
-    version: &str,
-    reinstall: bool,
-    constraints: Option<&Path>,
-) -> Plan {
+/// `uv tool install` of the package at `version`, the install a build with no requirements file still does.
+/// `--no-config` keeps uv from reading a `uv.toml` (the person's own, under `~/.config/uv`, which a command of a run
+/// could write): where the package comes from is the app's to say, not a file's. `reinstall` is an upgrade.
+fn tool_install(tools: &Tools, runtime: &Runtime, version: &str, reinstall: bool) -> Plan {
     let mut args: Vec<OsString> = vec!["--no-config".into(), "tool".into(), "install".into()];
     if reinstall {
         args.push("--reinstall".into());
-    }
-    if let Some(file) = constraints {
-        args.extend(["--constraints".into(), file.into()]);
     }
     args.extend([
         "--python".into(),
@@ -895,7 +937,182 @@ fn uv_install_pinned(
         env: child_env(runtime, tools),
         stdin: None,
         limit: UV_LIMIT,
+        directory: None,
     }
+}
+
+/// `uv venv` of the package's environment, kept when it is already there (an upgrade, or a tool environment an older
+/// app made at this same path).
+fn venv_plan(tools: &Tools, runtime: &Runtime) -> Plan {
+    Plan {
+        program: tools.uv(),
+        args: vec![
+            "--no-config".into(),
+            "venv".into(),
+            "--no-project".into(),
+            "--allow-existing".into(),
+            "--python".into(),
+            PYTHON.into(),
+            runtime.environment().into(),
+        ],
+        env: child_env(runtime, tools),
+        stdin: None,
+        limit: UV_LIMIT,
+        directory: None,
+    }
+}
+
+/// `uv pip sync --require-hashes` of the app's requirements, run in the folder that holds the wheel so `./<wheel>`
+/// is that file. `reinstall` fetches every package again, which is what an upgrade needs: the environment it replaces
+/// was installed by a version of the app that did not check hashes.
+fn sync_plan(tools: &Tools, runtime: &Runtime, requirements: &Path, reinstall: bool) -> Plan {
+    let mut args: Vec<OsString> = vec![
+        "--no-config".into(),
+        "pip".into(),
+        "sync".into(),
+        "--require-hashes".into(),
+        "--default-index".into(),
+        PYPI.into(),
+        "--python".into(),
+        runtime.environment().into(),
+    ];
+    if reinstall {
+        args.push("--reinstall".into());
+    }
+    args.push(requirements.into());
+    Plan {
+        program: tools.uv(),
+        args,
+        env: child_env(runtime, tools),
+        stdin: None,
+        limit: UV_LIMIT,
+        directory: requirements.parent().map(Path::to_path_buf),
+    }
+}
+
+/// The install or the upgrade of the app's own version. With a requirements file it is a venv and a hash-checked
+/// sync; without one it is `uv tool install`.
+fn uv_install(
+    tools: &Tools,
+    runtime: &Runtime,
+    version: &str,
+    reinstall: bool,
+) -> Result<Vec<Plan>, String> {
+    match requirements_for(tools, version)? {
+        Some(file) => Ok(vec![
+            venv_plan(tools, runtime),
+            sync_plan(tools, runtime, &file, reinstall),
+        ]),
+        None => Ok(vec![tool_install(tools, runtime, version, reinstall)]),
+    }
+}
+
+/// The requirements file without the wheel line, written into the runtime folder: the way back from a failed upgrade
+/// installs an older version under these dependency versions (`uv pip install --constraints`). uv does not check the
+/// hashes of a constraints file, and the app does not carry the older version's wheel, so this path pins versions
+/// only. The wheel line is left out so the constraint is not the new wheel.
+fn rollback_pins(runtime: &Runtime, requirements: &Path) -> Result<PathBuf, String> {
+    let text = fs::read_to_string(requirements).map_err(|error| {
+        format!(
+            "The app's requirements could not be read ({}): {error}",
+            requirements.display()
+        )
+    })?;
+    let mut kept = String::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let first = trimmed
+            .trim_end_matches('\\')
+            .split_whitespace()
+            .next()
+            .unwrap_or("");
+        if first.ends_with(".whl") {
+            continue;
+        }
+        kept.push_str(line);
+        kept.push('\n');
+    }
+    if kept.trim().is_empty() {
+        return Err(
+            "The app's requirements pin no dependency to put the older package back under."
+                .to_string(),
+        );
+    }
+    fs::create_dir_all(&runtime.dir).map_err(|error| {
+        format!(
+            "Dot's folder {} could not be made: {error}",
+            runtime.dir.display()
+        )
+    })?;
+    let path = runtime.dir.join("rollback-constraints.txt");
+    fs::write(&path, kept).map_err(|error| {
+        format!(
+            "The pins for the older package could not be written ({}): {error}",
+            path.display()
+        )
+    })?;
+    Ok(path)
+}
+
+/// Put `version` back into the same environment. A build that carries requirements installs it with
+/// `uv pip install` under those dependency versions (`pins`), or with none when `pins` is absent. A build with no
+/// requirements file uses `uv tool install`, as the install did.
+fn uv_rollback(
+    tools: &Tools,
+    runtime: &Runtime,
+    version: &str,
+    pins: Option<&Path>,
+) -> Result<Vec<Plan>, String> {
+    if tools.requirements().is_none() {
+        return Ok(vec![tool_install(tools, runtime, version, true)]);
+    }
+    let mut args: Vec<OsString> = vec![
+        "--no-config".into(),
+        "pip".into(),
+        "install".into(),
+        "--default-index".into(),
+        PYPI.into(),
+        "--python".into(),
+        runtime.environment().into(),
+        "--reinstall-package".into(),
+        PACKAGE.into(),
+    ];
+    if let Some(file) = pins {
+        let filtered = rollback_pins(runtime, file)?;
+        args.extend(["--constraints".into(), filtered.into()]);
+    }
+    args.push(format!("{PACKAGE}=={version}").into());
+    Ok(vec![
+        venv_plan(tools, runtime),
+        Plan {
+            program: tools.uv(),
+            args,
+            env: child_env(runtime, tools),
+            stdin: None,
+            limit: UV_LIMIT,
+            directory: None,
+        },
+    ])
+}
+
+/// `runtime/bin/dotx`, the link `uv tool install` used to make and the one a person is told to run. The hashed install
+/// puts the script in the environment; this points at it.
+fn link_dotx(runtime: &Runtime) -> io::Result<()> {
+    let script = runtime.environment().join("bin").join("dotx");
+    if !script.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("{} is not there", script.display()),
+        ));
+    }
+    let bin = runtime.bin_dir();
+    fs::create_dir_all(&bin)?;
+    let link = bin.join("dotx");
+    remove_entry(&link)?;
+    symlink(&script, &link)
 }
 
 /// A command of Dot's own, `dotx <words>`, run as the launchd job runs the daemon: by the Python of the package's
@@ -909,6 +1126,7 @@ fn dotx(tools: &Tools, runtime: &Runtime, words: Vec<OsString>, stdin: Option<Se
         env: child_env(runtime, tools),
         stdin,
         limit: DOTX_LIMIT,
+        directory: None,
     }
 }
 
@@ -955,6 +1173,7 @@ fn dotx_starts(tools: &Tools, runtime: &Runtime) -> Plan {
         env: child_env(runtime, tools),
         stdin: None,
         limit: DOTX_LIMIT,
+        directory: None,
     }
 }
 
@@ -1186,7 +1405,7 @@ fn run(plan: &Plan, cwd: &Path, log: &Log, cancel: &AtomicBool, mut seen: impl F
     let mut command = Command::new(&plan.program);
     command
         .args(&plan.args)
-        .current_dir(cwd)
+        .current_dir(plan.directory.as_deref().unwrap_or(cwd))
         .stdin(if plan.stdin.is_some() {
             Stdio::piped()
         } else {
@@ -1449,6 +1668,9 @@ fn stop_of(step: usize, what: &str, ran: Ran, ctx: &Context) -> Stop {
         Ended::NotStarted(why) => format!("{what} could not be started: {why}"),
     };
     let fix = match step {
+        PACKAGE_STEP if says(&ran.lines, &["hash mismatch"]) => {
+            "uv refused a package: its file is not the one this release pinned, so nothing from that file was installed. The log names the package.".to_string()
+        }
         PACKAGE_STEP if says(&ran.lines, &["no solution found", "not found in the package registry", "no matching distribution"]) => {
             format!(
                 "PyPI does not have Dot {} yet. A version reaches PyPI some minutes before its app is published: press Try again in ten minutes.",
@@ -1546,14 +1768,15 @@ fn do_step(
     };
     match step {
         PACKAGE_STEP => {
-            run_step(
-                ctx,
-                shared,
-                log,
-                step,
-                "uv tool install",
-                &uv_install(&ctx.tools, &runtime, &ctx.version, false),
-            )?;
+            let plans = uv_install(&ctx.tools, &runtime, &ctx.version, false).map_err(|error| {
+                Stop::plain(
+                    error,
+                    "This build of Dot is incomplete. Install the latest Dot again.",
+                )
+            })?;
+            for plan in &plans {
+                run_step(ctx, shared, log, step, "uv", plan)?;
+            }
             if !runtime.python().exists() {
                 return Err(Stop::plain(
                     format!(
@@ -1562,6 +1785,14 @@ fn do_step(
                     ),
                     "Press Try again; if it fails again, the log has what uv printed.",
                 ));
+            }
+            if ctx.tools.requirements().is_some() {
+                link_dotx(&runtime).map_err(|error| {
+                    Stop::plain(
+                        format!("The link to dotx could not be made: {error}"),
+                        "Press Try again; if it fails again, the log has what uv printed.",
+                    )
+                })?;
             }
             recorded(PACKAGE_STEP)
         }
@@ -2156,29 +2387,30 @@ pub fn keep_in_step(ctx: &Context) -> Result<Option<String>, String> {
         ctx.version
     ));
     let never = AtomicBool::new(false);
-    let attempt = |what: &str, plan: &Plan| -> Result<(), String> {
-        let ran = run(plan, &runtime.dir, &log, &never, |_| {});
-        match ran.ended {
-            Ended::Exited(0) => Ok(()),
-            ended => {
-                let last = ran.lines.last().cloned().unwrap_or_default();
+    let attempt = |what: &str, plans: &[Plan]| -> Result<(), String> {
+        let mut lines = Vec::new();
+        for plan in plans {
+            let ran = run(plan, &runtime.dir, &log, &never, |_| {});
+            let ended = ran.ended;
+            let failed = !matches!(ended, Ended::Exited(0));
+            lines.extend(ran.lines);
+            if failed {
+                let last = lines.last().cloned().unwrap_or_default();
                 // uv says the requirements cannot be met on the first of several lines, which `put_back` reads
                 // (`UNRESOLVABLE`): the error carries it whatever line came last.
-                if says(&ran.lines, &[&UNRESOLVABLE.to_lowercase()]) {
+                return if says(&lines, &[&UNRESOLVABLE.to_lowercase()]) {
                     Err(format!(
                         "{what} did not end well ({ended:?}): {UNRESOLVABLE}: {last}"
                     ))
                 } else {
                     Err(format!("{what} did not end well ({ended:?}): {last}"))
-                }
+                };
             }
         }
+        Ok(())
     };
-    attempt(
-        "uv tool install",
-        &uv_install(&ctx.tools, &runtime, &ctx.version, true),
-    )
-    .map_err(|error| {
+    let plans = uv_install(&ctx.tools, &runtime, &ctx.version, true)?;
+    attempt("uv", &plans).map_err(|error| {
         let after = put_back(ctx, &runtime, &installed, &log, &attempt);
         format!(
             "Dot's engine could not be updated to {}: {error}. {after} Its log is {}.",
@@ -2186,6 +2418,10 @@ pub fn keep_in_step(ctx: &Context) -> Result<Option<String>, String> {
             log.path.display()
         )
     })?;
+    if ctx.tools.requirements().is_some() {
+        link_dotx(&runtime)
+            .map_err(|error| format!("The link to dotx could not be made: {error}"))?;
+    }
     write_marker(
         &runtime,
         &Marker {
@@ -2194,10 +2430,8 @@ pub fn keep_in_step(ctx: &Context) -> Result<Option<String>, String> {
         },
     )
     .map_err(|error| format!("The install's marker could not be written: {error}"))?;
-    match attempt(
-        "dotx service restart --when-idle",
-        &dotx_restart(&ctx.tools, &runtime),
-    ) {
+    let restart = dotx_restart(&ctx.tools, &runtime);
+    match attempt("dotx service restart --when-idle", &[restart]) {
         Ok(()) => Ok(Some(format!(
             "Dot's engine is {} now. Dot restarts once no run works.",
             ctx.version
@@ -2213,19 +2447,23 @@ pub fn keep_in_step(ctx: &Context) -> Result<Option<String>, String> {
 /// What the app does after `uv` failed to upgrade the package from `installed`: `uv` replaces the environment in place,
 /// so a failure in the middle of it (a download that stopped, a package that would not install) can leave one that
 /// does not start, and the daemon would be down at its next start. So the environment is started once (`dotx_starts`);
-/// when it does not start, `installed` is installed again, under this app's constraints, and without them only when uv
-/// says they cannot be met (an older version may ask for a dependency at a version the new pins do not have; a download
-/// that failed is no reason to take the newest of the day), and started once more. `installed` is read from a folder's
-/// name, so a version that is not one (`release_version`) is not handed to uv at all. The words say what is left, for
-/// the person.
+/// when it does not start, `installed` is installed again, under this app's dependency versions, and without them only
+/// when uv says they cannot be met (an older version may ask for a dependency at a version the new pins do not have; a
+/// download that failed is no reason to take the newest of the day), and started once more. The pins are versions: the
+/// app carries this version's wheel and not the older one's, and `uv pip install --constraints` does not check hashes.
+/// `installed` is read from a folder's name, so a version that is not one (`release_version`) is not handed to uv at
+/// all. The words say what is left, for the person.
 fn put_back(
     ctx: &Context,
     runtime: &Runtime,
     installed: &str,
     log: &Log,
-    attempt: &dyn Fn(&str, &Plan) -> Result<(), String>,
+    attempt: &impl Fn(&str, &[Plan]) -> Result<(), String>,
 ) -> String {
-    let starts = || attempt("import the daemon", &dotx_starts(&ctx.tools, runtime));
+    let starts = || {
+        let plan = dotx_starts(&ctx.tools, runtime);
+        attempt("import the daemon", &[plan])
+    };
     if starts().is_ok() {
         log.line(&format!(
             "the upgrade failed, and the engine {installed} still starts: it is left as it is"
@@ -2241,21 +2479,17 @@ fn put_back(
     log.line(&format!(
         "the upgrade failed and the engine does not start: installing {installed} again"
     ));
-    let mut installed_again = attempt(
-        "uv tool install",
-        &uv_install(&ctx.tools, runtime, installed, true),
-    );
+    let rollback = |pins: Option<&Path>| uv_rollback(&ctx.tools, runtime, installed, pins);
+    let mut installed_again =
+        rollback(ctx.tools.requirements().as_deref()).and_then(|plans| attempt("uv", &plans));
     let unresolvable = installed_again
         .as_ref()
         .is_err_and(|error| error.contains(UNRESOLVABLE));
-    if unresolvable && ctx.tools.constraints().is_some() {
+    if unresolvable && ctx.tools.requirements().is_some() {
         log.line(&format!(
-            "{installed} did not install under this app's constraints: installing it without them"
+            "{installed} did not install under this app's pins: installing it without them"
         ));
-        installed_again = attempt(
-            "uv tool install",
-            &uv_install_pinned(&ctx.tools, runtime, installed, true, None),
-        );
+        installed_again = rollback(None).and_then(|plans| attempt("uv", &plans));
     }
     match installed_again.and_then(|()| starts()) {
         Ok(()) => {
