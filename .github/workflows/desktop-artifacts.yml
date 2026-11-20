@@ -1,0 +1,46 @@
+# An unsigned disk image and latest.json, built when someone starts this workflow by hand. The files are
+# artifacts of the run. The workflow does not tag or publish. Signing and notarization are skipped when
+# their secrets are absent (scripts/desktop_artifact.sh); a signed release stays desktop/release.sh.
+name: desktop-artifacts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    # The upload posts to this run's artifacts, which contents: read cannot do. contents stays read, so
+    # the job cannot push.
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.13"
+          enable-cache: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Rust
+        run: rustup toolchain install
+        working-directory: desktop/src-tauri
+      - name: Disk image and latest.json
+        run: scripts/desktop_artifact.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dot-desktop
+          path: desktop/dist/artifact
+          if-no-files-found: error
+          retention-days: 14
