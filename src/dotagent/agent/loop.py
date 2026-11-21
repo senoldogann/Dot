@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Awaitable, Mapping, Sequence, Set
+from collections.abc import Awaitable, Callable, Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -1933,11 +1933,11 @@ class _Standby:
 
 
 async def _fitted(
-    agent: AgentRun, target: ModelRef, offers_tools: bool, fixed_tokens: int
+    agent: AgentRun, target: ModelRef, offers_tools: bool, fixed_tokens: Callable[[Scaffold], int]
 ) -> tuple[ModelInfo, Scaffold] | str:
     """The information and the scaffold of ``target`` for this run, or why it cannot take the run over: its information
     cannot be read, it cannot call tools while the run offers them, or its window cannot hold the system prompt and
-    the tools (``fixed_tokens``)."""
+    the tools (``fixed_tokens``, of the scaffold: what a model must hold may depend on its window)."""
     runtime: Runtime = agent.runtime
     try:
         info: ModelInfo = await runtime.router.model_info(target)
@@ -1952,10 +1952,16 @@ async def _fitted(
         runtime.context_sizes.of(target.label),
     )
     try:
-        require_room(scaffold, fixed_tokens)
+        require_room(scaffold, fixed_tokens(scaffold))
     except ConfigError as error:
         return error.message
     return info, scaffold
+
+
+def held_tokens(system: Message, specs: tuple[ToolSpec, ...], scaffold: Scaffold) -> int:
+    """The estimated tokens of ``system`` with the tools of ``specs`` that the window of ``scaffold`` holds
+    (:func:`_fit_tools`): what a run moved to that model must hold at least (item 1282)."""
+    return estimate_tokens([system], _fit_tools(system, specs, scaffold)[0])
 
 
 async def _complete_in_time(
@@ -2220,8 +2226,8 @@ async def _to_standby(
     ref: ModelRef,
     error: Exception,
     left: frozenset[str],
-    offers_tools: bool,
-    fixed_tokens: int,
+    system: Message,
+    specs: tuple[ToolSpec, ...],
     step: int,
 ) -> _Standby | None:
     """Move the run to the first standby model that can take it over, now that ``ref`` could not answer because its
@@ -2233,7 +2239,9 @@ async def _to_standby(
     is available (each one the run has not worked on lacks its key, is paused, or is OpenCode's agent or the Claude
     plan, which take no step of Dot's: item 1124): the run then ends with ``error``. A
     standby model that cannot take the run over (:func:`_fitted`) is passed over; when every available one is, the
-    run fails with a :class:`ConfigError` whose message, the run's result, says why for each."""
+    run fails with a :class:`ConfigError` whose message, the run's result, says why for each. A standby model whose
+    window holds the system prompt ``system`` with only some of the tools ``specs`` takes the run over with those
+    (item 1282), as a run started on it would (item 1211): the run leaves the others out once it has moved."""
     runtime: Runtime = agent.runtime
     reason: str | None = _cannot_answer(error)
     if reason is None:
@@ -2246,7 +2254,9 @@ async def _to_standby(
     passed_over: JsonObject = {}
     for target in candidates:
         moved: ModelRef = parse_model_ref(target)
-        fitted: tuple[ModelInfo, Scaffold] | str = await _fitted(agent, moved, offers_tools, fixed_tokens)
+        fitted: tuple[ModelInfo, Scaffold] | str = await _fitted(
+            agent, moved, bool(specs), lambda held: held_tokens(system, specs, held)
+        )
         if isinstance(fitted, str):
             log.warning("standby_passed_over", run_id=agent.run.id, model=target, problem=fitted)
             passed_over[target] = fitted
@@ -2265,6 +2275,21 @@ async def _to_standby(
         f"the run's model cannot answer ({reason}) and no standby model can take the run over: {reasons}",
         {"model": ref.label, "reason": reason, "passed_over": passed_over},
     ) from error
+
+
+@dataclass(frozen=True)
+class _HeldTools:
+    """The tools of a run that a model's window holds, when it holds only some of them (items 1211 and 1282), and what
+    is built from them: the groups, whether they are offered by group, the registry the run calls, whether it may
+    message an agent, what the prompt is built from and the prompt."""
+
+    specs: tuple[ToolSpec, ...]
+    groups: tuple[str, ...]
+    grouped: bool
+    callable_tools: ToolRegistry
+    may_message: bool
+    prompt_inputs: PromptInputs
+    system: Message
 
 
 @dataclass(frozen=True)
@@ -2304,7 +2329,10 @@ async def _routing(agent: AgentRun, ref: ModelRef, offers_tools: bool, fixed_tok
         if paused is not None:
             log.warning("step_route_candidate_skipped", run_id=agent.run.id, model=target.label, problem=paused.reason)
             continue
-        fitted: tuple[ModelInfo, Scaffold] | str = await _fitted(agent, target, offers_tools, fixed_tokens)
+        # A routed step is sent the run's own prompt and tools: the candidate's window holds all of them.
+        fitted: tuple[ModelInfo, Scaffold] | str = await _fitted(
+            agent, target, offers_tools, lambda _held: fixed_tokens
+        )
         if isinstance(fitted, str):
             log.warning("step_route_candidate_skipped", run_id=agent.run.id, model=target.label, problem=fitted)
             continue
@@ -2585,30 +2613,49 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             ),
         )
 
+    # The owner's free mode (item 922), as it stands when the run starts: the gate reads it at every step.
+    free_line: str = _FREE_MODE_LINE if runtime.approvals.free else ""
     prompt_inputs: PromptInputs = await _inputs_for(specs)
-    system: Message = system_message(
-        build_system_prompt(prompt_inputs)
-        # The owner's free mode (item 922), as it stands when the run starts: the gate reads it at every step.
-        + (_FREE_MODE_LINE if runtime.approvals.free else "")
-    )
-    await runtime.bus.emit(run.id, "scaffold", scaffold_event(scaffold, config), True)
-    # Every tool of the run counts, also the ones of groups that are off: a group the run turns on later must fit too.
-    # A window too small for every tool carries the tools it can hold (item 1211): the owner's own servers' go first,
-    # the largest first, and the groups, the registry and the prompt are built again for what stays, so that the run
-    # names only the tools it has and nothing it dropped can be called.
-    specs, left_out = _fit_tools(system, specs, scaffold)
-    if left_out:
-        log.warning("tools_left_out", run_id=run.id, model=ref.label, count=len(left_out), tools=left_out[:20])
-        groups = (CORE_GROUP, *groups_of([spec.name for spec in specs]))
-        grouped = surface == "grouped" and len(groups) > 1
-        if not grouped:
-            specs = tuple(spec for spec in specs if spec.name != USE_TOOLS_TOOL)
-        callable_tools = _run_tools(runtime.registry, run.mode, specs)
-        may_message = any(spec.name == MESSAGE_AGENT_TOOL for spec in specs)
+    system: Message = system_message(build_system_prompt(prompt_inputs) + free_line)
+
+    async def _held_by(fit: Scaffold) -> _HeldTools | None:
+        """The run's tools as the window of ``fit`` holds them, ``None`` when it holds every one. Every tool of the run
+        counts, also the ones of groups that are off: a group the run turns on later must fit too. A window too small
+        for every tool carries the tools it can hold (item 1211), the run's first model's or a standby model's it moves
+        to (item 1282): the owner's own servers' go first, the largest first, and the groups, the registry and the
+        prompt are built again for what stays, so that the run names only the tools it has and nothing it dropped can
+        be called."""
+        kept, left_out = _fit_tools(system, specs, fit)
+        if not left_out:
+            return None
+        log.warning("tools_left_out", run_id=run.id, model=fit.model, count=len(left_out), tools=left_out[:20])
+        kept_groups: tuple[str, ...] = (CORE_GROUP, *groups_of([spec.name for spec in kept]))
+        kept_grouped: bool = surface == "grouped" and len(kept_groups) > 1
+        if not kept_grouped:
+            kept = tuple(spec for spec in kept if spec.name != USE_TOOLS_TOOL)
         # The prompt, and what the run's opening note is built from, name only the tools that stayed.
-        prompt_inputs = await _inputs_for(specs)
-        system = system_message(
-            build_system_prompt(prompt_inputs) + (_FREE_MODE_LINE if runtime.approvals.free else "")
+        inputs: PromptInputs = await _inputs_for(kept)
+        return _HeldTools(
+            specs=kept,
+            groups=kept_groups,
+            grouped=kept_grouped,
+            callable_tools=_run_tools(runtime.registry, run.mode, kept),
+            may_message=any(spec.name == MESSAGE_AGENT_TOOL for spec in kept),
+            prompt_inputs=inputs,
+            system=system_message(build_system_prompt(inputs) + free_line),
+        )
+
+    await runtime.bus.emit(run.id, "scaffold", scaffold_event(scaffold, config), True)
+    held: _HeldTools | None = await _held_by(scaffold)
+    if held is not None:
+        specs, groups, grouped, callable_tools, may_message, prompt_inputs, system = (
+            held.specs,
+            held.groups,
+            held.grouped,
+            held.callable_tools,
+            held.may_message,
+            held.prompt_inputs,
+            held.system,
         )
     require_room(scaffold, estimate_tokens([system], specs))
     candidates: tuple[_Candidate, ...] = await _routing(agent, ref, bool(specs), estimate_tokens([system], specs))
@@ -3007,9 +3054,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 await sink(_RESET)
                 steps -= 1
                 continue
-            standby: _Standby | None = await _to_standby(
-                agent, ref, error, left, bool(specs), estimate_tokens([system], specs), steps
-            )
+            standby: _Standby | None = await _to_standby(agent, ref, error, left, system, specs, steps)
             if standby is None:
                 # A spent quota or rate waits for [agent] quota_wait_s (item 713), a model out of reach for
                 # model_wait_s; spent credits and any other error end the run.
@@ -3107,6 +3152,19 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             # is on now (the outside audit of 2026-10-17, R3).
             candidates = still_routable(candidates, left)
             context = replace(context, output_chars=scaffold.tool_output_chars)
+            # A standby model whose window holds only some of the tools goes on with those (item 1282).
+            held = await _held_by(scaffold)
+            if held is not None:
+                specs, groups, grouped, callable_tools, may_message, system = (
+                    held.specs,
+                    held.groups,
+                    held.grouped,
+                    held.callable_tools,
+                    held.may_message,
+                    held.system,
+                )
+                on = on & frozenset(groups) if grouped else frozenset(groups)
+                context = replace(context, run_tools=frozenset(spec.name for spec in specs))
             if not info.vision:
                 history = drop_old_images(history, 0)
             # The step is asked again on the new model, whose tokens the estimate has not been fitted to.

@@ -177,7 +177,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   owner's own servers' tools (`mcp__`) go first, the largest first, and the three a run cannot work without — `finish`, `use_tools`, `ask_user`, when it has
   them — always stay. The groups, the registry and the prompt are built again for what is left, so a
   run names only the tools it has, and the tools left out are logged. Only when even those do not fit is the run
-  refused at the start, with a hint (item 1211). A model of the `weak` tier is reminded in task and research runs, every `reminder_every` steps, of the goal,
+  refused at the start, with a hint (item 1211). The same holds when a run moves to a standby model with a smaller
+  window: it goes on there with the tools that window holds, and the prompt names only those (item 1282). A model of the `weak` tier is reminded in task and research runs, every `reminder_every` steps, of the goal,
   your messages, the plan and its newest actions. `tiers` in `[agent]` sets a model's tier by hand; with
   `scaffold = "measured"` a model is weak when at least `profile_min_calls` tool calls of its newest 30 finished runs
   were measured and at least `weak_refusal_share` of them were refused before they ran (an unknown tool, or arguments
