@@ -295,6 +295,17 @@ async def test_a_search_of_a_run_reads_neither_dots_own_files_nor_the_protected_
     assert TOKEN in await _search(await _context(runtime, "yolo"), _matching(TOKEN), dot_home())
 
 
+async def test_a_search_of_a_path_that_is_not_there_says_so_as_list_dir_does(runtime: Runtime) -> None:
+    # A path the model guessed, or a folder gone since (item 1283), is not a failure of ripgrep's own.
+    ctx: ToolContext = await _context(runtime, "ask")
+    gone: Path = workspace_dir() / "gone" / "notify.py"
+    searched: str = await _search(ctx, "summary=", gone)
+    with pytest.raises(ToolExecutionError, match="path does not exist") as found:
+        await _run(ctx, "find_files", {"glob": "*.py", "path": str(gone.parent)})
+    assert searched.startswith("path does not exist"), searched
+    assert str(gone.parent) in str(found.value), found.value
+
+
 async def test_a_command_of_a_run_cannot_read_the_sealed_stores_however_its_line_names_them(runtime: Runtime) -> None:
     """Item 531: the data of the browsers, Mail and Messages (``[policy] sealed_paths``) are closed to a command by the
     sandbox, as Dot's own files are: named whole, built from pieces by a substitution, walked by a recursive search of

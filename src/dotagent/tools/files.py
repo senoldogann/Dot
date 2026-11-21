@@ -60,6 +60,10 @@ _RG_ERROR: int = 2
 # reading of a folder of a large tree, such as those under ~/Library/Containers, which reads a moment later).
 _UNREAD_PATH: re.Pattern[str] = re.compile(r"rg: (.+ \(os error (?:1|4|13)\))")
 _UNREAD_SHOWN: int = 10
+# Its line for a path given it that is not there (ENOENT), the model's own guess of a path (item 1283).
+_MISSING_PATH: re.Pattern[str] = re.compile(
+    r"rg: (.+?): (?:IO error for operation on .+: )?No such file or directory \(os error 2\)"
+)
 # What a file tool says when the path it was allowed to act on leads through a link now (item 681); another failure to
 # open a folder of it (a file in a folder's place, no permission) is said as it is (:func:`_not_opened`).
 _MOVED: str = (
@@ -634,6 +638,15 @@ def _unread(stderr: str) -> list[str] | None:
     return said if lines and len(said) == len(lines) else None
 
 
+def _missing(stderr: str, target: Path) -> bool:
+    """Whether all ripgrep said is that ``target``, the path it was given, is not there (item 1283): the search fails
+    as ``list_dir`` and ``read_file`` do for a path that does not exist, rather than as a failure of ripgrep's own. A
+    file gone from below it while it read is still said as it is."""
+    lines: list[str] = [line for line in stderr.splitlines() if line.strip() != ""]
+    named: list[str] = [found.group(1) for line in lines if (found := _MISSING_PATH.fullmatch(line)) is not None]
+    return lines != [] and len(named) == len(lines) and set(named) == {str(target)}
+
+
 def _with_unread(found: str, unread: list[str]) -> str:
     """``found``, with a note of the paths that were not read, so that what they hold is known to be left out."""
     shown: list[str] = unread[:_UNREAD_SHOWN]
@@ -680,6 +693,8 @@ def _search_files_tool() -> RegisteredTool:
         found: ToolResult
         if unread is not None:
             found = ok(_with_unread(_capped(lines, "matches") if stdout.strip() != "" else "No matches.", unread))
+        elif code == _RG_ERROR and _missing(stderr, target_of(args, ctx)):
+            raise ToolExecutionError("path does not exist", {"path": str(target_of(args, ctx))})
         elif code != 0:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "pattern": args.pattern})
         else:
@@ -724,6 +739,8 @@ def _find_files_tool() -> RegisteredTool:
         if unread is not None:
             found: str = _capped(sorted(stdout.splitlines()), "files") if stdout.strip() != "" else "No files matched."
             return ok(_with_unread(found, unread))
+        if code == _RG_ERROR and _missing(stderr, target_of(args, ctx)):
+            raise ToolExecutionError("path does not exist", {"path": str(target_of(args, ctx))})
         if code != 0:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "glob": args.glob})
         return ok(_capped(sorted(stdout.splitlines()), "files"))
