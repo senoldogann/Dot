@@ -523,6 +523,10 @@ class BrowserConfig(FrozenModel):
     allowed_hosts: list[str]
     blocked_hosts: list[str]
     decline_cookie_banners: bool
+    # The largest file a download may save, and the most the downloads folder may hold, in megabytes (item 1298); 0
+    # takes the limit off.
+    download_max_mb: int = Field(ge=0)
+    download_quota_mb: int = Field(ge=0)
 
 
 class DesktopConfig(FrozenModel):

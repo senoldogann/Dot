@@ -754,6 +754,11 @@ def render_index(result: CrawlResult, files: tuple[Path, ...], nonce: str) -> st
     if result.skipped:
         listed.append(f"Left out ({len(result.skipped)}):")
         listed.extend(f"- {entry.url}: {entry.reason}" for entry in result.skipped)
+    listed.extend(result.notes)
+    if result.dropped:
+        listed.append(
+            "Links outside the scope, not followed: " + ", ".join(f"{site} ({count})" for site, count in result.dropped)
+        )
     if result.robots.disallowed:
         listed.append("Disallowed by robots.txt" + (" (the first 10):" if len(result.robots.disallowed) > 10 else ":"))
         listed.extend(f"- {address}" for address in result.robots.disallowed[:10])
