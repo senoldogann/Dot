@@ -80,6 +80,11 @@ its looks failed and GitHub answered none of its requests, it tells you so with 
 answered is not told, though a lead of it failed (a repository renamed or gone fails every night). The
 tell's title is in your language; its text, like that of Dot's other tells, is still English.
 
+A plugin whose archive GitHub will never hand over under that commit (larger than 100 MB, or an answer 404 or 410
+for it) is counted "unusable" and written to what the look has seen, so that the next night does not download it
+again (item 1304); a timeout, a 429 or a 5xx is a failure of that night, and the plugin is tried again. Each archive
+is downloaded into a folder of its own, so that one refused archive leaves the plugins after it as they were.
+
 **Where it looks**, by how far Dot trusts the source before reading a line: Anthropic's own marketplaces
 (`anthropics/claude-plugins-official`, `anthropics/skills`, `anthropics/knowledge-work-plugins`; their catalogue,
 `.claude-plugin/marketplace.json`, pins the commit of each plugin kept elsewhere) and the repositories of the makers the

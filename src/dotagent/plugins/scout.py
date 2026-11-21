@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path, PurePosixPath
 
-from dotagent.core.errors import DotError, GalleryError
+from dotagent.core.errors import ArchiveRefused, DotError, GalleryError
 from dotagent.core.logs import get_logger
 from dotagent.llm.router import ModelRouter
 from dotagent.memory.embedder import Embedder
@@ -372,12 +372,20 @@ class _Scout:
         return fresh[: self._deps.max_leads]
 
     async def _archive(self, entry: GalleryEntry) -> Path:
+        """The archive of ``entry``'s commit, fetched once a night into a staging folder of its own. An archive that
+        will never come (:class:`ArchiveRefused`: too large, a commit GitHub does not have) is :class:`Unusable`,
+        looked at and not asked for again; a timeout or a 5xx stays the failure of the night."""
         key: str = f"{entry.repository.lower()}@{entry.commit}"
         found: Path | None = self._deps.archives.get(key)
         if found is None:
-            folder: Path = self._staging / f"archive-{len(self._deps.archives)}"
-            await asyncio.to_thread(folder.mkdir)
-            found = await self._deps.fetch(entry, folder)
+            folder: Path = Path(await asyncio.to_thread(tempfile.mkdtemp, prefix="archive-", dir=self._staging))
+            try:
+                found = await self._deps.fetch(entry, folder)
+            except BaseException as error:
+                await asyncio.to_thread(shutil.rmtree, folder, True)
+                if isinstance(error, ArchiveRefused):
+                    raise Unusable(error.message, error.context) from error
+                raise
             self._deps.archives[key] = found
         return found
 

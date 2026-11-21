@@ -30,7 +30,7 @@ from typing import IO, BinaryIO, Literal
 import httpx
 from pydantic import Field, ValidationError
 
-from dotagent.core.errors import GalleryError
+from dotagent.core.errors import ArchiveRefused, GalleryError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.help.elsewhere import SKILL_COPY_LIMIT, CopyLimit
@@ -45,6 +45,8 @@ ARCHIVE_URL: str = "https://codeload.github.com/{repository}/tar.gz/{commit}"
 # anthropics/claude-plugins-official, is under 20 MB.
 ARCHIVE_LIMIT_BYTES: int = 100 * 2**20
 DOWNLOAD_TIMEOUT_S: float = 120.0
+# Answers that say "not now" and not "never": the archive is asked for again on a later night.
+_TRANSIENT_STATUSES: frozenset[int] = frozenset({403, 408, 425, 429})
 _CHUNK_BYTES: int = 1 << 16
 _FILE_MODE: int = 0o644
 _SCRIPT_MODE: int = 0o755
@@ -113,14 +115,19 @@ async def download_archive(entry: GalleryEntry, folder: Path) -> Path:
             client.stream("GET", archive_url(entry)) as response,
         ):
             if response.status_code != httpx.codes.OK:
-                raise GalleryError(f"GitHub answered {response.status_code} for the plugin's archive", context)
+                message: str = f"GitHub answered {response.status_code} for the plugin's archive"
+                gone: bool = (
+                    httpx.codes.BAD_REQUEST <= response.status_code < httpx.codes.INTERNAL_SERVER_ERROR
+                    and response.status_code not in _TRANSIENT_STATUSES
+                )
+                raise (ArchiveRefused if gone else GalleryError)(message, context)
             handle: BinaryIO = await asyncio.to_thread(target.open, "xb")
             try:
                 size: int = 0
                 async for chunk in response.aiter_bytes(_CHUNK_BYTES):
                     size += len(chunk)
                     if size > ARCHIVE_LIMIT_BYTES:
-                        raise GalleryError(
+                        raise ArchiveRefused(
                             f"the plugin's archive is larger than {ARCHIVE_LIMIT_BYTES // 2**20} MB", context
                         )
                     await asyncio.to_thread(handle.write, chunk)
