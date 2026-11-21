@@ -9,7 +9,6 @@
 // agent under the list's "…". A team's own page is views/teams.js.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
-import { isTrader, TRADING_DESK } from "../agentpanel.js";
 import { sendToWork } from "../sendwork.js";
 import { AGENTS_CHANGED_EVENT, api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
@@ -36,8 +35,6 @@ import { workOrdersPart } from "../workorders.js";
 import { WORKING_STATES } from "../runstates.js";
 
 const DOT_ID = "dot";
-// The template of the trading desk's agent (item 847, agent/templates.py).
-const TRADER_TEMPLATE = "trader";
 const GOAL_CHARS = 90;
 const MAX_GOAL_PX = 320;
 // How many of a team's agents a card shows the face of, the rest counted (item 610).
@@ -275,8 +272,6 @@ function templateCard(template, onUse, known) {
       templateFact("Needs", "plug", template.needs),
       templateFact("Schedule", "clock", template.schedule === "" ? "When you ask" : template.schedule),
     ),
-    // The Trader's card opens the desk it moved from the settings to (item 847), where trading is set up first.
-    template.id === TRADER_TEMPLATE ? el("a", { class: "small template-desk", href: TRADING_DESK }, "Open the trading desk") : null,
     alsoRow,
     templateTools(template, known),
     templateRefuses(template),
@@ -1505,8 +1500,6 @@ function mountPage(root, ctx, agentId) {
       el(
         "div",
         { class: "stage-pill" },
-        // The Trader's page opens the trading desk (item 847).
-        isTrader(record) ? el("a", { class: "btn ghost sm", href: TRADING_DESK, title: "Open the trading desk" }, icon("trendingUp"), el("span", { class: "label" }, "Trading desk")) : null,
         // What the agent's page can do of it stands in one "…" (item 993, the owner's ask for a plain page): four
         // buttons of a row were a toolbar on a phone.
         agentMenuButton(record),

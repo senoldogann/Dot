@@ -488,12 +488,6 @@ class SkillsDecideCommand(FrozenModel):
     proposal_id: str
 
 
-class TradingBacktestCommand(FrozenModel):
-    name: Literal["trading-backtest"]
-    years: int = Field(ge=1, le=12)
-    cost: float = Field(ge=0, lt=0.1)
-
-
 class StatsCommand(FrozenModel):
     name: Literal["stats"]
     days: int = Field(ge=1)
@@ -600,7 +594,6 @@ type Command = Annotated[
     | EvalSpeedCommand
     | EvalReportCommand
     | StatsCommand
-    | TradingBacktestCommand
     | DaemonCommand
     | OpenCommand
     | UrlCommand

@@ -23,7 +23,6 @@ type LiveKind = Literal[
     "memory",
     "helpers",
     "app",
-    "trading",
     "working",
     "waiting",
     "done",
@@ -101,7 +100,6 @@ _BY_PREFIX: tuple[tuple[str, LiveNow], ...] = (
     ("browser_", LiveNow(kind="browsing", line="Browsing the web")),
     ("desktop_", LiveNow(kind="mac", line="Using your Mac")),
     ("memory_", LiveNow(kind="memory", line="Using its memory")),
-    ("trading_", LiveNow(kind="trading", line="Trading")),
 )
 _PREFIX_MCP: str = "mcp__"
 _SERVER_CHARS: int = 24

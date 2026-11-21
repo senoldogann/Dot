@@ -115,8 +115,6 @@ from dotagent.store.models import (
     TodoStatus,
     ToolOutcome,
     ToolStep,
-    TradingExitRecord,
-    TradingOrderRecord,
     TrashedMemory,
     TrialRun,
     UnattendedCount,
@@ -325,18 +323,6 @@ CREATE TABLE IF NOT EXISTS spends (
     host TEXT NOT NULL, amount REAL NOT NULL, currency TEXT NOT NULL, ts REAL NOT NULL, run_id TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS spends_host ON spends(host, ts);
-CREATE TABLE IF NOT EXISTS trading_orders (
-    id TEXT PRIMARY KEY, mode TEXT NOT NULL, product TEXT NOT NULL, side TEXT NOT NULL, notional REAL NOT NULL,
-    size REAL NOT NULL, price REAL NOT NULL, fee REAL NOT NULL, status TEXT NOT NULL, ts REAL NOT NULL,
-    run_id TEXT NOT NULL, exchange_id TEXT NOT NULL, note TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS trading_orders_ts ON trading_orders(mode, ts);
-CREATE TABLE IF NOT EXISTS trading_exits (
-    id TEXT PRIMARY KEY, mode TEXT NOT NULL, product TEXT NOT NULL, size REAL NOT NULL, stop REAL NOT NULL,
-    target REAL, ts REAL NOT NULL, order_id TEXT NOT NULL, run_id TEXT NOT NULL, status TEXT NOT NULL, closed_ts REAL,
-    sell_id TEXT NOT NULL, note TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS trading_exits_open ON trading_exits(status, mode, product);
 CREATE TABLE IF NOT EXISTS harness_versions (
     id TEXT PRIMARY KEY, parent_id TEXT, made_by TEXT NOT NULL, state TEXT NOT NULL, summary TEXT NOT NULL,
     habits TEXT NOT NULL, tool_guidance TEXT NOT NULL, notes TEXT NOT NULL, created_at REAL NOT NULL,
@@ -1480,10 +1466,19 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
 # or renamed, data rewritten) is a step of ``_MIGRATIONS`` under the next version, and raises this. A database below
 # the version is copied first; one of a later version (a newer Dot wrote it) is refused, so that this one never writes
 # what it does not know. test_store_schema.py pins the tables of the version.
-SCHEMA_VERSION: int = 1
+SCHEMA_VERSION: int = 2
+
+
+async def _drop_trading_tables(connection: aiosqlite.Connection) -> None:
+    """Version 2: Dot no longer trades, so the two tables of its orders and exits (their indexes go with them) are
+    dropped from a database that has them."""
+    await connection.execute("DROP TABLE IF EXISTS trading_exits")
+    await connection.execute("DROP TABLE IF EXISTS trading_orders")
+
+
 # The steps after the additive layer, each under the version it brings the database to, in order. Version 1 is the
 # additive layer itself, which every open applies: no step.
-_MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = ()
+_MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = ((2, _drop_trading_tables),)
 # Where the copy made before a migration goes, beside the database, in a folder of the version it was copied from,
 # which keeps its newest two (``_copy_before_upgrade``); runs neither read nor change them (``runtime._guarded_files``),
 # as the other copies.
@@ -6815,7 +6810,7 @@ class Store:
     @_writing
     async def record_schedule_hand_run(self, schedule_id: str, started_at: float, thread_id: str, run_id: str) -> None:
         """A run of the schedule ``schedule_id`` started out of its time at ``started_at`` in the chat ``thread_id``, by
-        the owner's hand (item 455) or by a move of the market (item 772): its last run and its chat, and nothing of
+        the owner's hand (item 455): its last run and its chat, and nothing of
         when it fires next nor of whether it is switched on, which :meth:`record_schedule_fire` would change. It says
         ``running`` only while ``run_id`` works (item 1047): a run that ended first has its outcome written already."""
         await self._db.execute(
@@ -7596,129 +7591,6 @@ class Store:
             (host, amount, currency, ts, run_id),
         )
         await self._db.commit()
-
-    # ----- trading (docs/trading.md) ---------------------------------------------------------------------------
-
-    @_writing
-    async def add_trading_order(self, order: TradingOrderRecord) -> None:
-        """Keep an order as it is placed: before it reaches a market, so that it counts against the day at once."""
-        await self._db.execute(
-            "INSERT INTO trading_orders(id, mode, product, side, notional, size, price, fee, status, ts, run_id, "
-            "exchange_id, note) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                order.id,
-                order.mode,
-                order.product,
-                order.side,
-                order.notional,
-                order.size,
-                order.price,
-                order.fee,
-                order.status,
-                order.ts,
-                order.run_id,
-                order.exchange_id,
-                order.note,
-            ),
-        )
-        await self._db.commit()
-
-    @_writing
-    async def settle_trading_order(self, order: TradingOrderRecord) -> None:
-        """Write what an order did: its status, what it filled at, the market's id of it and a note."""
-        await self._settle_order(order)
-        await self._db.commit()
-
-    async def _settle_order(self, order: TradingOrderRecord) -> None:
-        await self._db.execute(
-            "UPDATE trading_orders SET notional = ?, size = ?, price = ?, fee = ?, status = ?, exchange_id = ?, "
-            "note = ? WHERE id = ?",
-            (order.notional, order.size, order.price, order.fee, order.status, order.exchange_id, order.note, order.id),
-        )
-
-    async def get_trading_order(self, order_id: str) -> TradingOrderRecord | None:
-        """The order ``order_id``, or None when there is none of that id."""
-        row: aiosqlite.Row | None = await self._one("SELECT * FROM trading_orders WHERE id = ?", (order_id,))
-        return None if row is None else TradingOrderRecord.model_validate(dict(row))
-
-    async def trading_orders(self, mode: str, since: float, limit: int) -> list[TradingOrderRecord]:
-        """The orders of ``mode`` after ``since``, newest first, ``limit`` at most."""
-        rows = await self._all(
-            "SELECT * FROM trading_orders WHERE mode = ? AND ts > ? ORDER BY ts DESC LIMIT ?", (mode, since, limit)
-        )
-        return [TradingOrderRecord.model_validate(dict(row)) for row in rows]
-
-    @_writing
-    async def put_trading_exit(self, exit_: TradingExitRecord) -> None:
-        """Keep an exit as it stands now: a new one, or one whose stop, target, size or status changed."""
-        await self._put_exit(exit_)
-        await self._db.commit()
-
-    @_writing
-    async def settle_trading_buy(self, filled: TradingOrderRecord, exit_: TradingExitRecord) -> None:
-        """Write a filled buy and the exit it asked for in one transaction (item 1107): a stop that crashed between
-        the two left a position held with no stop under it."""
-        await self._settle_order(filled)
-        await self._put_exit(exit_)
-        await self._db.commit()
-
-    @_writing
-    async def unknown_pending_orders(self, note: str) -> int:
-        """Mark ``unknown`` the orders left ``pending`` by a process that stopped while it placed them, but those of
-        a run still at work (a ``dotx`` command that lives): whether they reached a market is not known, and they stay
-        counted against the day (item 1107: they stayed pending for ever). Returns how many."""
-        cursor = await self._db.execute(
-            "UPDATE trading_orders SET status = 'unknown', note = CASE WHEN note = '' THEN ? ELSE note || '; ' || ? END"
-            f" WHERE status = 'pending' AND run_id NOT IN (SELECT id FROM runs WHERE status IN ({_WORKING_SQL}))",
-            (note, note),
-        )
-        await self._db.commit()
-        return cursor.rowcount
-
-    async def _put_exit(self, exit_: TradingExitRecord) -> None:
-        await self._db.execute(
-            "INSERT INTO trading_exits(id, mode, product, size, stop, target, ts, order_id, run_id, status, closed_ts, "
-            "sell_id, note) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
-            "size = excluded.size, stop = excluded.stop, target = excluded.target, status = excluded.status, "
-            "closed_ts = excluded.closed_ts, sell_id = excluded.sell_id, note = excluded.note",
-            (
-                exit_.id,
-                exit_.mode,
-                exit_.product,
-                exit_.size,
-                exit_.stop,
-                exit_.target,
-                exit_.ts,
-                exit_.order_id,
-                exit_.run_id,
-                exit_.status,
-                exit_.closed_ts,
-                exit_.sell_id,
-                exit_.note,
-            ),
-        )
-
-    async def trading_exits(self, status: str, limit: int) -> list[TradingExitRecord]:
-        """The exits of ``status``, oldest first, ``limit`` at most."""
-        rows = await self._all("SELECT * FROM trading_exits WHERE status = ? ORDER BY ts LIMIT ?", (status, limit))
-        return [TradingExitRecord.model_validate(dict(row)) for row in rows]
-
-    async def get_trading_exit(self, exit_id: str) -> TradingExitRecord:
-        row: aiosqlite.Row | None = await self._one("SELECT * FROM trading_exits WHERE id = ?", (exit_id,))
-        if row is None:
-            raise NotFoundError("no such exit", {"exit_id": exit_id})
-        return TradingExitRecord.model_validate(dict(row))
-
-    async def trading_traded_since(self, mode: str, since: float) -> float:
-        """What the orders of ``mode`` after ``since`` were worth, but those that surely did nothing (``failed``): a
-        buy with its fee, which it spent too (item 785: a buy of 25 filled at 24.85 and a fee of 0.15 counts 25)."""
-        row: aiosqlite.Row | None = await self._one(
-            "SELECT COALESCE(SUM(notional + CASE WHEN side = 'buy' THEN fee ELSE 0 END), 0) AS total "
-            "FROM trading_orders WHERE mode = ? AND ts > ? "
-            "AND status != 'failed'",
-            (mode, since),
-        )
-        return float(row["total"]) if row is not None else 0.0
 
     async def spent_since(self, host: str, since: float) -> float:
         """What the pre-approved spends on ``host`` after ``since`` add up to."""

@@ -12,8 +12,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-from pydantic import SecretStr
-
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import SiteLocks
 from dotagent.agent.held_secrets import held_dir, mask_all_held
@@ -133,14 +131,10 @@ from dotagent.tools.skill_save import build_skill_save_tool
 from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.todos import build_todo_tools
-from dotagent.tools.trading import build_trading_tools
 from dotagent.tools.video import build_video_tools
 from dotagent.tools.waits import build_wait_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.tools.work_orders import build_work_order_tools
-from dotagent.trading.coinbase import CoinbaseBroker, kept_key
-from dotagent.trading.market import CoinbaseMarket
-from dotagent.trading.service import Trading, TradingSettings
 from dotagent.vault.items import VaultItems
 from dotagent.vault.onepassword import OnePassword
 from dotagent.vault.secretstore import LoginKeychain
@@ -256,8 +250,6 @@ class Runtime:
     notify: Notifier
     # The runs at work in this process and what each holds (item 301), so that they leave each other's alone.
     peers: Peers
-    # Trading on Coinbase (docs/trading.md): the paper account or the owner's, under the limits of [trading].
-    trading: Trading
     # Dot in the owner's calls (item 1138, docs/meetings.md): the meeting it is in, watched with no model.
     meetings: MeetingDesk
     # The owner's iPhone over WebDriverAgent (docs/phone-control.md); ``None`` while [phone] is off.
@@ -312,8 +304,6 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),
         *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
-        # The trading tools exist only while the owner has trading on (docs/trading.md).
-        *((build_trading_tools(),) if config.trading.mode != "off" else ()),
         # The phone tool exists only while the owner has [phone] on (docs/phone-control.md).
         *((build_phone_tools(),) if config.phone.enabled else ()),
     )
@@ -337,27 +327,6 @@ def _phone(config: AppConfig) -> PhoneDesk | None:
         XcrunDevicectl(run_command),
         time.monotonic,
     )
-
-
-def _trading(config: AppConfig, store: Store, zone: ZoneInfo) -> Trading:
-    """Trading of this installation (docs/trading.md): the paper account, and the owner's Coinbase account with the key
-    Settings › Trading keeps in the login Keychain."""
-    trading: Trading = Trading(
-        store=store,
-        settings=TradingSettings(config.trading),
-        market=CoinbaseMarket(config.trading.timeout_s),
-        zone=zone,
-        failsafe_file=failsafe_path(),
-        key_store=LoginKeychain(keychain_file()),
-    )
-
-    async def key() -> tuple[str, SecretStr] | None:
-        # Read from the trading's store as it stands, so that a test's stand-in for the Keychain is the one read.
-        return None if trading.key_store is None else await kept_key(trading.key_store)
-
-    live: CoinbaseBroker = CoinbaseBroker(key=key, timeout_s=config.trading.timeout_s)
-    trading.live = lambda: live
-    return trading
 
 
 def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
@@ -685,7 +654,6 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             undo_dir=undo_dir(),
             notify=show_notification,
             peers=peers,
-            trading=_trading(config, store, schedule_zone),
             phone=_phone(config),
             transcriber=Transcriber(voice_dir()),
             meetings=MeetingDesk(

@@ -151,8 +151,6 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     last_box = await nav.locator(".settings-nav-link").last.bounding_box()
     assert back_box is not None and last_box is not None and back_box["y"] > last_box["y"], (back_box, last_box)
     await expect(nav.get_by_role("link", name="Memory")).to_contain_text("1")
-    # Trading is the Trader agent's, in no group (item 847).
-    await expect(nav.get_by_role("link", name="Trading")).to_have_count(0)
     # Nothing stands at the foot (item 577): the daemon's state is the page's, the connection and the emergency stop's
     # banner.
     await expect(nav.get_by_role("status")).to_have_count(0)
@@ -170,10 +168,6 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     await expect(page.get_by_role("heading", level=1)).to_have_text("AI services")
     await expect(open_tab.locator(".settings-nav-label")).to_have_text("AI services")
     await expect(nav.locator("[aria-current='page']")).to_have_count(1)
-    # A tab of no group, Trading, is named for itself and marks none.
-    await page.goto(f"{base}/#/settings/trading")
-    await expect(page.get_by_role("heading", level=1)).to_have_text("Trading")
-    await expect(nav.locator("[aria-current='page']")).to_have_count(0)
 
     # The pages under System keep System marked.
     await page.goto(f"{base}/#/diagnostics")

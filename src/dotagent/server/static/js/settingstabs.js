@@ -11,7 +11,6 @@ export const TABS = [
   { id: "websearch", label: "Web search", icon: "search" },
   { id: "browser", label: "Browser", icon: "globe" },
   { id: "vault", label: "Vault", icon: "lock" },
-  { id: "trading", label: "Trading", icon: "trendingUp" },
   { id: "rules", label: "Rules", icon: "shield" },
   { id: "memory", label: "Memory", icon: "database" },
   { id: "harness", label: "Self-improvement", icon: "sparkle" },
@@ -25,8 +24,7 @@ export const TABS = [
 // The settings as groups of rows (item 995, the owner's ask of 2026-11-05 for one plain sheet; item 999, a Mac's nav
 // too, after seven sections of tabs, item 845): a row one tab (or Connect apps), so that a setting is found without
 // knowing its section. On a phone a row has a line under its name that says what it holds; a Mac's nav shows the name
-// alone. `value` names the row whose count or state shows at its right. Trading is in no group: it is the Trader
-// agent's (item 847), and its tab opens from that agent.
+// alone. `value` names the row whose count or state shows at its right.
 export const SETTINGS_GROUPS = [
   {
     title: null,

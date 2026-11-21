@@ -11988,7 +11988,7 @@ button.attach-chip {
     display: none;
   }
 
-  /* An agent's page with two tools in its pill (the Trader's desk and the "…") leaves the name less room. */
+  /* An agent's page with two tools in its pill (two buttons and the "…") leaves the name less room. */
   .stagebar[data-glass] .stagebar-row:has(.stage-pill > :nth-child(2)) > .stage-title:has(> .stage-name):not(:has(> .stage-heading)) {
     max-width: calc(100% - 272px);
   }

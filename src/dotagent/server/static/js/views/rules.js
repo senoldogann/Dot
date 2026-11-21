@@ -220,7 +220,7 @@ function buildFreeMode(isDisposed) {
       el(
         "span",
         { class: "rule-fine" },
-        "It holds from the next step of every task, with no restart. A refusal still stands (research stays read-only, trading keeps its limits). It is switched on from the Mac, not a phone. Kept in the config file as ",
+        "It holds from the next step of every task, with no restart. A refusal still stands (research stays read-only). It is switched on from the Mac, not a phone. Kept in the config file as ",
         el("code", { class: "mono" }, "[policy] free"),
         ".",
       ),

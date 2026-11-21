@@ -208,9 +208,9 @@ async def test_the_kind_is_the_tool_its_flags_and_where_it_reaches() -> None:
     assert permit_key("browser_act", "browser_click", [], "https://[bad]/", "").endswith("target:https://[bad]/")
     # Nor a question a run's untrusted reading raised.
     assert may_remember(["external_send"], "high", "taint")
-    # Money, a trade, a credential, a fill and Dot's own files are never remembered; nor a hand-off, a question, a
+    # Money, a credential, a fill and Dot's own files are never remembered; nor a hand-off, a question, a
     # secret's card, or a question of Dot's own initiative.
-    for flag in ("financial", "trade", "credential", "vault_fill", "self_change"):
+    for flag in ("financial", "credential", "vault_fill", "self_change"):
         assert not may_remember(["message_send", flag], "high", "preset")
     for severity in ("handoff", "question", "secret"):
         assert not may_remember(["message_send"], severity, "preset")

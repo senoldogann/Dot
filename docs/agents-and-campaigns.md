@@ -155,10 +155,9 @@ which their own cards name. How long ago keeps up with the clock while the page 
 when a run starts or ends. The card is the way to the agent's page, and says "Paused" and "Made by Dot" as the page
 does; Dot's opens the chats.
 
-An agent can start from a template (item 315). **Single agents** shows fifteen: Sales Outbound, Talent Scout, Paid
+An agent can start from a template (item 315). **Single agents** shows fourteen: Sales Outbound, Talent Scout, Paid
 Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of Staff, Reviewer, Research Desk,
-Competitor Watch, Release QA, Copy Editor, Design Critic and Trader (item 847: the trading desk's agent, whose card
-opens the desk and whose tools come with trading on; see [Settings › Trading](daemon.md#settings--trading)), each with
+Competitor Watch, Release QA, Copy Editor and Design Critic, each with
 its face, its role, what it needs of the Mac and
 the schedule it suggests. **Use template** makes the agent and opens its page; it is then an agent like any other, to
 change in the editor. Eleven templates first ask what their agent's first run would otherwise have to ask you (item
@@ -166,7 +165,7 @@ change in the editor. Eleven templates first ask what their agent's first run wo
 address, which test account by its name, which steps must always work): your answers go at the end of the agent's
 instructions, each after its question, under "What the owner told you when making you"; a blank one is left out, and
 **Skip** makes the agent as the template has it. An answer that holds a secret is refused, as in an agent's file (a
-password is asked for when it is needed). Paid Media, Expense Manager, Design Critic and Trader ask nothing and make
+password is asked for when it is needed). Paid Media, Expense Manager and Design Critic ask nothing and make
 the agent in one click. Every template names the tools its agent may use (item 425), and its card counts them
 under **Actions** (a 40 px row to tap on a phone) and lists the names a click below it: no template starts an agent with
 every tool, and a tool this home does not have (its group off in the configuration, or its app not here) is struck
