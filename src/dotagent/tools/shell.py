@@ -13,7 +13,7 @@ from pydantic import Field
 from dotagent.agent.held_secrets import held_values
 from dotagent.config import ShellConfig
 from dotagent.core.errors import ToolExecutionError
-from dotagent.core.runenv import RUN_SHELL_MARKER
+from dotagent.core.runenv import RUN_ID_MARKER, RUN_SHELL_MARKER
 from dotagent.core.text import truncate_middle
 from dotagent.policy.paths import classify_path, expand_path
 from dotagent.policy.shell import ShellAssessment, assess_shell
@@ -210,7 +210,11 @@ def build_shell_tool() -> RegisteredTool:
         # The secrets the owner gave this chat on a card (item 857) join its commands' environment, by their names.
         held: dict[str, str] = await asyncio.to_thread(held_values, ctx.thread_id)
         code, output, seconds, timed_out = await run_command(
-            args.command, run_sandbox(ctx).commands, cwd, {**ctx.runtime.shell_env, **held}, timeout_s
+            args.command,
+            run_sandbox(ctx).commands,
+            cwd,
+            {**ctx.runtime.shell_env, **held, RUN_ID_MARKER: ctx.run_id},
+            timeout_s,
         )
         header: str = (
             f"[timed out after {timeout_s}s and was killed]" if timed_out else f"[exit {code} in {seconds:.1f}s]"

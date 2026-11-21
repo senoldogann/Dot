@@ -1275,7 +1275,8 @@ dotx service uninstall   # stop the daemon and remove the job
   start that went well came after it. Without such a failure, read `daemon.err.log`.
 - `dotx service restart` restarts the daemon without changing the job (item 441): the job is unloaded (`bootout` sends
   the daemon SIGTERM, so it stops as it does at the end of a session, and launchctl waits until it has exited) and
-  loaded again from its property list, and the command waits up to 60 seconds for a new process to answer `GET
+  loaded again from its property list (a load launchd refuses is tried a second time, and then the job is started with
+  `launchctl kickstart -k`, item 1310), and the command waits up to 60 seconds for a new process to answer `GET
   /api/health`, then prints its version. Another program that answers there meanwhile (one that listens on every
   address of the port, such as `python3 -m http.server 8765`, takes the connections in the moment before the new
   daemon binds its own) is waited past, and named in the error only when it still answers at the end (item 970);
@@ -1302,7 +1303,13 @@ dotx service uninstall   # stop the daemon and remove the job
   that call's own limit, which its `tool_call` event carries, has passed too. A run that waits for your approval is
   `blocked`, not stuck. When the settings (`config.toml`) do not read, which the daemon cannot start with, the look
   shows a notification of the Mac once ("Dot's settings cannot be read", `watchdog_config_unread` in `dotx.log`),
-  not every minute, and again if they read again and then fail. What it saw is kept in `watchdog.json` in Dot's
+  not every minute, and again if they read again and then fail. When launchd has no job of the daemon though its
+  property list is in place (a restart whose load was refused after the unload, item 1310) the look counts a miss as for
+  a daemon that does not answer, and after three loads the job again (`watchdog_not_loaded`, `watchdog_loaded`; a
+  restart that waits for the runs, an uninstalled service and a daemon that answers are left alone). A load that fails
+  is tried again three looks on, and the notification of the Mac ("Dot is not running") is shown for the first failure
+  only, until the job is loaded. What it saw is
+  kept in `watchdog.json` in Dot's
   home; the database is read through a read-only connection.
 - **A run restarts the daemon with `dotx service restart --when-idle`, never with a launchd job of its own** (item 441;
   the shell tool's description tells the model so). A run that merged a change of Dot's own code wants the daemon
@@ -1326,9 +1333,21 @@ dotx service uninstall   # stop the daemon and remove the job
   which the next night does again. Then it restarts the daemon as `service restart` does, waits for the
   health check, writes what it did to `dotx.log` (`restart_when_idle_waiting`, `_waits_for_the_night` with what it
   waits for, `_idle`, `_restarted`, `_gave_up` after 2 hours of runs at work or 3 hours of the night's learning without
-  a restart, `_failed`, `_crashed` with a traceback), unloads itself and deletes its property list; when it ended with
-  no restart (it gave up, failed or crashed) it shows a notification of the Mac, "Dot was not restarted", as nobody reads
-  its log. The list is written to a new file made in Dot's home
+  a restart, `_failed`, `_crashed` with a traceback), unloads itself and deletes its property list; when it failed or
+  crashed it shows a notification of the Mac, "Dot was not restarted", as nobody reads its log.
+  **A restart that waits is a flag in the store** (item 1310, kv `service.restart_pending`: since when, the run that
+  asked, which run it waits for now, whether the two hours are spent). The job writes it as it waits and removes it
+  once the daemon restarted (or the job ended); `GET /api/status` gives it as `restart_pending`, Settings › System shows
+  it as one line, "Restart", and `dotx service status` names the run it waits for. The run that asked is counted as any
+  other run: restarting under it would cut it off at its last step. After half an hour the daemon tells the owner once,
+  as it tells them anything (the phone, the desktop, the messaging apps), which run holds the restart, by its goal
+  and id, or that it waits for the night's learning. When the 2 hours of runs at work (or 3 of the night's learning)
+  are over the job gives up as before, with its banner ("Dot was not restarted yet": Dot restarts by itself the next
+  time it is idle), and keeps the flag (`gave_up`); it then goes on waiting, with no time limit but a week
+  (`restart_when_idle_second_chance_ended`), for a moment in which no run works (a run blocked on the owner works), none
+  of the night's learning is under way, and restarts the daemon once then. Nothing is stopped meanwhile: schedules and
+  channels start their runs as ever, and no run is ended for the restart. A flag older than the daemon that reads it
+  (a restart by hand, the watchdog's) is none. The list is written to a new file made in Dot's home
   and put in place in one step, and the one that was there is read without following a link or waiting for a FIFO (a
   command of a run may leave either in Dot's home, and the upgrade of the desktop app, item 575, asks for this restart
   at every update). Asking while one is on its way changes nothing

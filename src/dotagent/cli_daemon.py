@@ -26,8 +26,9 @@ from dotagent.cli_commands import (
 )
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import ConfigError, InvalidValueError, ServiceError
-from dotagent.core.paths import dot_home, log_dir, token_path
-from dotagent.core.runenv import started_by_a_run
+from dotagent.core.logs import get_logger
+from dotagent.core.paths import db_path, dot_home, log_dir, token_path
+from dotagent.core.runenv import asking_run, started_by_a_run
 from dotagent.daemon_failure import DaemonFailure, daemon_failure_in, failure_text
 from dotagent.desktop.perms import Pane, open_settings, settings_url
 from dotagent.dot_app import LAUNCHER_ENV, app_path, ensure_app
@@ -65,6 +66,7 @@ from dotagent.launchd import (
     watchdog_agent_path,
 )
 from dotagent.mcp.types import LEFT_OUT_PATH, LeftOutTool
+from dotagent.restart_flag import NOTICE_AFTER_S, RestartFlag, read_flag
 from dotagent.server.daemon import run_daemon
 from dotagent.server.guard import PROOF_PATH, daemon_proof, read_token
 from dotagent.server.links import base_url, health_url, ui_url
@@ -86,6 +88,8 @@ _LEFT_OUT: TypeAdapter[list[LeftOutTool]] = TypeAdapter(list[LeftOutTool])
 _NONCE_BYTES: int = 32
 
 _NO_DAEMON_FIX: str = "start it with 'dotx daemon' (in the foreground) or 'dotx service install' (at every login)"
+
+log = get_logger(__name__)
 
 
 def _clip(text: str, limit: int) -> str:
@@ -306,10 +310,11 @@ def _duration(seconds: float) -> str:
     return f"{seconds / 60:g} minutes"
 
 
-def _restart_line(waiting: JobState | None) -> str:
+def _restart_line(waiting: JobState | None, flag: RestartFlag | None = None, now: float | None = None) -> str:
     """What ``dotx service status`` says about the restart that waits for the runs to end: ``waiting`` is its job in
-    launchd, ``None`` when none is loaded. A job with no process left (its program failed before it unloaded it) waits
-    for nothing, and the next ``--when-idle`` replaces it."""
+    launchd, ``None`` when none is loaded, and ``flag`` the note it keeps in the store (item 1310: since when, which run
+    it waits for, whether the two hours are spent). A job with no process left (its program failed before it unloaded
+    it) waits for nothing, and the next ``--when-idle`` replaces it."""
     if waiting is None:
         return "no restart waits for the runs to end ('dotx service restart --when-idle' asks for one)"
     if waiting.pid is None:
@@ -317,11 +322,31 @@ def _restart_line(waiting: JobState | None) -> str:
             f"a restart was asked for but its program has ended without restarting ({_job_line(waiting)}; see "
             "dotx.log); 'dotx service restart --when-idle' asks for a new one"
         )
+    since: str = ""
+    if flag is not None:
+        held: str = f"; it waits for the run {flag.waiting_for}" if flag.waiting_for else ""
+        ago: str = "" if now is None else f" for {_duration(max(0.0, now - flag.since))}"
+        since = f" (pending{ago}{held})"
+    if flag is not None and flag.gave_up:
+        return (
+            f"the daemon is restarted the next time no run works and none of the night's learning is under way "
+            f"({_job_line(waiting)}); the {_duration(RESTART_WAIT_LIMIT_S)} it waited for runs at work are over{since}"
+        )
     return (
         f"the daemon is restarted once no run works and none of the night's learning is under way "
-        f"({_job_line(waiting)}); it gives up after {_duration(RESTART_WAIT_LIMIT_S)} of runs at work or "
-        f"{_duration(RESTART_NIGHT_LIMIT_S)} of the night's learning"
+        f"({_job_line(waiting)}); it shows a banner after {_duration(RESTART_WAIT_LIMIT_S)} of runs at work or "
+        f"{_duration(RESTART_NIGHT_LIMIT_S)} of the night's learning, and goes on waiting{since}"
     )
+
+
+def _flag_or_none() -> RestartFlag | None:
+    """The note of the restart that waits, as the store has it; none when it cannot be read (the line then says what the
+    job says)."""
+    try:
+        return read_flag(db_path())
+    except ServiceError as exc:
+        log.warning("restart_flag_not_read", error=exc.message)
+        return None
 
 
 async def cmd_service_status(command: ServiceStatusCommand) -> int:
@@ -334,7 +359,8 @@ async def cmd_service_status(command: ServiceStatusCommand) -> int:
     sys.stdout.write(f"job      {LABEL}\n")
     sys.stdout.write(f"file     {status.plist}{'' if status.installed else '  (not installed)'}\n")
     sys.stdout.write(f"launchd  {_job_line(status.job)}\n")
-    sys.stdout.write(f"restart  {_restart_line(waiting)}\n")
+    flag: RestartFlag | None = await asyncio.to_thread(_flag_or_none)
+    sys.stdout.write(f"restart  {_restart_line(waiting, flag, time.time())}\n")
     sys.stdout.write(
         "watchdog "
         + (
@@ -508,15 +534,16 @@ async def cmd_service_restart_when_idle(command: ServiceRestartCommand) -> int:
         )
         return 0
     # A job left loaded with no process (its program failed before it could unload it) is replaced.
-    job: RestartJob = build_restart_job(sys.executable, dot_home(), log_dir(), os.environ)
+    job: RestartJob = build_restart_job(sys.executable, dot_home(), log_dir(), os.environ, asking_run(os.environ))
     await install_restart_job(plist, render_restart_job(job), uid)
     sys.stdout.write(
         f"Loaded a restart that waits (the launchd job {RESTART_LABEL}: {plist}).\n"
         f"The daemon is restarted once no run works, the run that asked included, and none of the night's learning "
         f"(the reflection, the harness's step, the plugin scout, the repair night) is under way; the job looks every "
         f"{RESTART_POLL_S:g} seconds, gives up after {_duration(RESTART_WAIT_LIMIT_S)} of runs at work or "
-        f"{_duration(RESTART_NIGHT_LIMIT_S)} of the night's learning without restarting, and unloads itself either "
-        "way. 'dotx service status' says whether one waits.\n"
+        f"{_duration(RESTART_NIGHT_LIMIT_S)} of the night's learning and shows a banner, then goes on waiting for the "
+        "next time Dot is idle and restarts it once; the owner is told which run holds it after "
+        f"{_duration(NOTICE_AFTER_S)}. 'dotx service status' says whether one waits.\n"
     )
     return 0
 

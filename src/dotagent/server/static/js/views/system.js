@@ -91,6 +91,20 @@ function desktopText(status) {
   return status.desktop_enabled ? "enabled" : "disabled";
 }
 
+/** Item 1310: a restart of Dot that waits for it to be idle, in one short line of the status; empty when none waits. */
+function restartRows(status) {
+  const pending = status.restart_pending;
+  if (pending === null || pending === undefined) {
+    return [];
+  }
+  const asked = `asked ${dateTimeFull(pending.since)}`;
+  if (pending.gave_up) {
+    return [entry("Restart", `waits for Dot to be idle (${asked})`)];
+  }
+  const holder = pending.waiting_for === "" ? "the night's work to end" : "a task to end";
+  return [entry("Restart", `waits for ${holder} (${asked})`)];
+}
+
 /** Item 153: the MCP servers that could not start with the daemon, one line each with the reason; Dot runs without their tools. */
 function leftOutServers(failures) {
   return [
@@ -113,6 +127,7 @@ function statusGroups(status) {
         entry("Started", dateTimeFull(status.started_at)),
         entry("Address", `${status.host}:${status.port}`),
         entry("Home", el("span", { class: "mono" }, status.home)),
+        ...restartRows(status),
       ],
     },
     {

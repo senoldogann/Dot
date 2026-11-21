@@ -14,8 +14,9 @@ article puts an independent watchdog against. Each look, a process that ends, do
   once, through the daemon (``POST /api/runs/{id}/stuck``), as the daemon tells them anything: the push, the desktop,
   iMessage.
 - What it saw is kept in ``watchdog.json`` in Dot's home, the misses and the runs told, and logged to ``dotx.log``:
-  ``watchdog_unanswered``, ``watchdog_restarted``, ``watchdog_run_stuck``, ``watchdog_config_unread`` (the settings do
-  not read: told to the owner once) and ``watchdog_failed``.
+  ``watchdog_unanswered``, ``watchdog_restarted``, ``watchdog_not_loaded`` and ``watchdog_loaded`` (the daemon's
+  job is not loaded though its property list is there, item 1310), ``watchdog_run_stuck``, ``watchdog_config_unread``
+  (the settings do not read: told to the owner once) and ``watchdog_failed``. A load that keeps failing is told once.
 
 The database is read through a read-only connection; the look changes nothing of Dot's but its own file.
 """
@@ -40,7 +41,7 @@ from dotagent.core.logs import configure_logging, get_logger
 from dotagent.core.notify import show_notification
 from dotagent.core.paths import db_path, dot_home, ensure_layout, log_dir, token_path
 from dotagent.core.types import FrozenModel
-from dotagent.launchd import JobState, inspect_job, inspect_restart_job, launch_agent_path
+from dotagent.launchd import JobState, inspect_job, inspect_restart_job, launch_agent_path, load_job
 from dotagent.server.guard import read_token
 from dotagent.server.links import base_url, health_url
 from dotagent.server.views import HealthView
@@ -57,6 +58,9 @@ _STUCK_MARGIN_S: float = 5 * 60.0
 _TOLD_KEPT: int = 200
 # Kept in ``told`` while the settings cannot be read, so that the owner is told once and not every minute.
 _CONFIG_MARK: str = "config-unread"
+# Kept in ``told`` while the job cannot be loaded, so that the owner is told once and not at every try (item 1310).
+_LOAD_MARK: str = "load-failed"
+_MARKS: frozenset[str] = frozenset({_CONFIG_MARK, _LOAD_MARK})
 _STATE_FILE: str = "watchdog.json"
 _DB_TIMEOUT_S: float = 5.0
 _TELL_TIMEOUT_S: float = 10.0
@@ -160,11 +164,50 @@ async def _answers(url: str) -> bool:
     return health is not None
 
 
+async def _unloaded(uid: int, state: WatchdogState, config: AppConfig, path: Path) -> WatchdogState:
+    """The look when launchd has no job of the daemon (item 1310). With no property list either, the service is not
+    installed (or was uninstalled) and there is nothing to do. With the file there and no job, a restart that failed
+    between unloading the job and loading it again left Dot down for good: a miss is counted as for a daemon that does
+    not answer, and after :data:`MISSES_BEFORE_RESTART` the job is loaded from the file again (:func:`load_job`),
+    unless a restart that waits for the runs is on its way (it loads the job itself) or something answers at the
+    daemon's address (a daemon started by hand is not touched). A load that fails is tried again three looks on, and
+    the owner is told of it once, until a look finds the job loaded or a load goes through."""
+    plist: Path = launch_agent_path(Path.home())
+    runs: tuple[str, ...] = tuple(run for run in state.told if run not in _MARKS)
+    if not await asyncio.to_thread(plist.exists) or await inspect_restart_job(uid) is not None:
+        return WatchdogState(misses=0, told=runs)
+    url: str = health_url(config.server.host, config.server.port)
+    if await _answers(url):
+        return WatchdogState(misses=0, told=runs)
+    misses: int = state.misses + 1
+    log.warning("watchdog_not_loaded", plist=str(plist), misses=misses)
+    if misses < MISSES_BEFORE_RESTART:
+        return WatchdogState(misses=misses, told=state.told)
+    try:
+        await load_job(plist, uid)
+    except DotError:
+        # The looks count again from none, so the next try is three looks on; the banner is shown the first time only.
+        told_before: bool = _LOAD_MARK in state.told
+        await asyncio.to_thread(write_state, path, WatchdogState(misses=0, told=(*runs[-_TOLD_KEPT + 1 :], _LOAD_MARK)))
+        if not told_before:
+            await show_notification(
+                "Dot is not running",
+                f"Dot's job was not loaded for {misses} minutes, and the watchdog could not load it.",
+            )
+        raise
+    log.warning("watchdog_loaded", misses=misses)
+    await show_notification(
+        "Dot was started", f"Dot's job was not loaded for {misses} minutes, so the watchdog loaded it."
+    )
+    return WatchdogState(misses=0, told=runs)
+
+
 async def look(uid: int, now: float) -> WatchdogState:
     """One look (the module's docstring); the state it leaves."""
     path: Path = dot_home() / _STATE_FILE
     state: WatchdogState = await asyncio.to_thread(read_state, path)
-    runs_told: tuple[str, ...] = tuple(run for run in state.told if run != _CONFIG_MARK)
+    load_told: bool = _LOAD_MARK in state.told
+    runs_told: tuple[str, ...] = tuple(run for run in state.told if run not in _MARKS)
     try:
         config: AppConfig = load_user_config()
     except DotError as error:
@@ -178,8 +221,11 @@ async def look(uid: int, now: float) -> WatchdogState:
         return WatchdogState(misses=0, told=(*runs_told[-_TOLD_KEPT + 1 :], _CONFIG_MARK))
     state = WatchdogState(misses=state.misses, told=runs_told)
     job: JobState | None = await inspect_job(uid)
-    if job is None or job.pid is None or await inspect_restart_job(uid) is not None:
-        # No service, a service launchd is starting, or a restart that waits for the runs: nothing to do here.
+    if job is None:
+        marked: tuple[str, ...] = (*runs_told, _LOAD_MARK) if load_told else runs_told
+        return await _unloaded(uid, WatchdogState(misses=state.misses, told=marked), config, path)
+    if job.pid is None or await inspect_restart_job(uid) is not None:
+        # A service launchd is starting, or a restart that waits for the runs: nothing to do here.
         return WatchdogState(misses=0, told=state.told)
     url: str = health_url(config.server.host, config.server.port)
     if not await _answers(url):

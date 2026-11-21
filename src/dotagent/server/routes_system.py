@@ -115,6 +115,9 @@ from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS, ChatProvider, Effort, ModelInfo, answers_role
 from dotagent.notify.health import NotifyHealth
 from dotagent.opencode.server import learns_from_data
+from dotagent.restart_flag import RestartFlag
+from dotagent.restart_notice import pending_restart
+from dotagent.runtime import Runtime
 from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import daemon_proof, refuse_from_a_phone
@@ -152,6 +155,7 @@ from dotagent.server.views import (
     ProviderProblem,
     PushKeyView,
     PushSubscribeRequest,
+    RestartPending,
     RestartView,
     ResumeRequest,
     ResumeView,
@@ -260,6 +264,14 @@ async def _provider_models(
     )
 
 
+async def restart_pending_of(runtime: Runtime, started_at: float) -> RestartPending | None:
+    """The restart that waits for Dot to be idle, for the status (item 1310)."""
+    flag: RestartFlag | None = await pending_restart(runtime, started_at)
+    if flag is None:
+        return None
+    return RestartPending(since=flag.since, asked_by=flag.asked_by, waiting_for=flag.waiting_for, gave_up=flag.gave_up)
+
+
 def health_router(notifications: NotifyHealth | None = None) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     watch: NotifyHealth = notifications if notifications is not None else NotifyHealth()
@@ -362,6 +374,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             night_work=[] if ctx.scheduler is None else list(ctx.scheduler.night_work()),
             model_labels={f"{CLAUDE_CODE_PROVIDER}:{model}": model_label(model) for model in CLAUDE_CODE_MODELS},
             notifications=ctx.notifications.summary(),
+            restart_pending=await restart_pending_of(ctx.runtime, ctx.started_at),
         )
 
     @router.get("/models")

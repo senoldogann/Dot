@@ -2071,6 +2071,18 @@ class KeysView(FrozenModel):
     keys: list[KeyView]
 
 
+class RestartPending(FrozenModel):
+    """A restart of the daemon that waits for Dot to be idle (item 1310): since when (``since``, seconds since the
+    epoch), the id of the run that asked for it (``asked_by``, empty when a person did), of the run it waits for now
+    (``waiting_for``, empty when it waits for the night's learning), and whether the two hours it waits for runs at
+    work are over (``gave_up``; it then waits for the next time Dot is idle)."""
+
+    since: float
+    asked_by: str
+    waiting_for: str
+    gave_up: bool
+
+
 class StatusView(FrozenModel):
     version: str
     # What the pages the daemon serves are (a digest of their files at its start): a page loaded from other pages is out
@@ -2110,6 +2122,8 @@ class StatusView(FrozenModel):
     model_labels: dict[str, str]
     # The phone watches (:class:`dotagent.notify.health.NotifyHealth`). ``down`` means HTTP is up and the phone is not.
     notifications: Literal["ok", "down", "off"] = "off"
+    # The restart of the daemon that waits for Dot to be idle, ``None`` when none does (item 1310).
+    restart_pending: RestartPending | None = None
 
 
 # The sections: what waits for the user, what works now, what ended today, what was learned today (item 72: the
