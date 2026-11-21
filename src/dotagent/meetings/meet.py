@@ -8,10 +8,12 @@ this one file. A failure says what was looked for; there is no retry loop and no
 
 import json
 import re
+import unicodedata
 from typing import Final
 
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Locator, Page
+from pydantic import JsonValue
 
 from dotagent.core.errors import DotError
 from dotagent.meetings.types import CaptionSeen, ChatSeen, MeetState, PageBatch, PageTick
@@ -22,20 +24,22 @@ _SHORT_MS: Final[int] = 3000
 _STEP_MS: Final[int] = 10000
 
 # Every selector is an aria label or role Meet draws, gathered 2026-11-12 from two open-source Meet bots, Attendee and
-# TranscripTonic (neither is a contract: Meet may change them without a word).
+# TranscripTonic (neither is a contract: Meet may change them without a word). The toggles' labels carry the keyboard
+# shortcut of the machine ("Turn off microphone (ctrl + d)", "(⌘ + d)" on a Mac), so they are matched by their start
+# (item 1287: the exact labels refused both real tries of 2026-11-12).
 SELECTORS: Final[dict[str, str]] = {
     # Pre-join and in-call microphone and camera toggles: the label names what a click does.
-    "mic_off": '[aria-label="Turn off microphone"]',
-    "mic_on": '[aria-label="Turn on microphone"]',
-    "camera_off": '[aria-label="Turn off camera"]',
-    "camera_on": '[aria-label="Turn on camera"]',
+    "mic_off": 'button[aria-label^="Turn off microphone"], [role="button"][aria-label^="Turn off microphone"]',
+    "mic_on": 'button[aria-label^="Turn on microphone"], [role="button"][aria-label^="Turn on microphone"]',
+    "camera_off": 'button[aria-label^="Turn off camera"], [role="button"][aria-label^="Turn off camera"]',
+    "camera_on": 'button[aria-label^="Turn on camera"], [role="button"][aria-label^="Turn on camera"]',
     # The guest's name field on the pre-join screen of a call joined with no account.
     "name_field": 'input[type="text"][aria-label="Your name"]',
     # In the call: the button that leaves it is there only while Dot is in.
     "leave": 'button[aria-label="Leave call"]',
     # Captions: the toggle, its other face when they are on, and the region their blocks are drawn in.
-    "captions_turn_on": 'button[aria-label="Turn on captions"]',
-    "captions_turn_off": 'button[aria-label="Turn off captions"]',
+    "captions_turn_on": 'button[aria-label^="Turn on captions"]',
+    "captions_turn_off": 'button[aria-label^="Turn off captions"]',
     "captions_region": 'div[role="region"][tabindex="0"]',
     # Chat: the button that opens the panel, the message box (Enter sends) and the live region of the messages.
     "chat_open": 'button[aria-label="Chat with everyone"]',
@@ -167,6 +171,8 @@ _READ_SCRIPT: Final[str] = """
 """
 
 _BUFFER_CAP: Final[int] = 500
+_LABELS_SEEN: Final[int] = 40
+_LABEL_CHARS: Final[int] = 120
 # What a read of a page Dot is not in the call on gives: nothing new.
 _NOTHING: Final[PageBatch] = PageBatch(captions=(), vanished=(), chat=(), dropped=0)
 
@@ -213,6 +219,13 @@ def _text(value: object) -> str:
     return value if isinstance(value, str) else ""
 
 
+def _visible(text: str) -> str:
+    """``text`` with each character of Unicode category C (controls, line breaks as controls, format marks such as the
+    ones that turn the direction of text, zero-width ones) made a space: a call's own names must not reach the log
+    as they were written."""
+    return "".join(" " if unicodedata.category(character)[0] == "C" else character for character in text)
+
+
 def _number(value: object) -> float:
     return float(value) if isinstance(value, (int, float)) else 0.0
 
@@ -243,6 +256,24 @@ class MeetPage:
         the address through ``meeting_address`` before it calls this."""
         await self._page.goto(url, wait_until="domcontentloaded")
 
+    async def _labels_seen(self) -> list[JsonValue]:
+        """The aria labels of the buttons the page shows now (at most :data:`_LABELS_SEEN`, each cut to
+        :data:`_LABEL_CHARS` and without any character of Unicode category C, since a call's own names are among
+        them): what a failed look for a toggle can say the page did offer, so that the next change of Meet's labels is
+        mended from the record, not from a guess. Best effort: a page that is gone gives none, and the error being
+        built stays the one that was raised."""
+        try:
+            raw: object = await self._page.evaluate(
+                "(max) => Array.from(document.querySelectorAll('button[aria-label], [role=button][aria-label]'))"
+                ".map((e) => e.getAttribute('aria-label') || '').filter((l) => l).slice(0, max)",
+                _LABELS_SEEN,
+            )
+        except PlaywrightError:
+            return []
+        if not isinstance(raw, list):
+            return []
+        return [_visible(_text(label))[:_LABEL_CHARS] for label in raw]
+
     async def _off(self, label: str, off_now: str, on_now: str) -> None:
         """Make ``label`` (microphone or camera) off, and check that its toggle now offers to turn it on."""
         if await self._page.locator(on_now).first.is_visible():
@@ -254,8 +285,21 @@ class MeetPage:
         except PlaywrightError as error:
             raise MeetPageError(
                 f"Dot could not turn the {label} off before joining, so it did not ask to join.",
-                {"url": self._page.url, "looked_for": [off_now, on_now], "error": str(error)},
+                {
+                    "url": self._page.url,
+                    "looked_for": [off_now, on_now],
+                    "page_labels": await self._labels_seen(),
+                    "error": str(error),
+                },
             ) from error
+
+    async def _state_or_unknown(self) -> MeetState:
+        """The page's state for an error being built: ``unknown`` when the page cannot be read, so that the error
+        that was raised is not replaced by the failure to describe it."""
+        try:
+            return await self.state()
+        except PlaywrightError:
+            return "unknown"
 
     async def prepare(self, name: str) -> MeetState:
         """Turn the microphone and the camera off (verified), fill the guest name when the field is there, and press
@@ -271,7 +315,12 @@ class MeetPage:
         except PlaywrightError as error:
             raise MeetPageError(
                 "Dot found no Join now or Ask to join button on the page.",
-                {"url": self._page.url, "state": await self.state(), "error": str(error)},
+                {
+                    "url": self._page.url,
+                    "state": await self._state_or_unknown(),
+                    "page_labels": await self._labels_seen(),
+                    "error": str(error),
+                },
             ) from error
         return await self.state()
 
@@ -299,7 +348,12 @@ class MeetPage:
         except PlaywrightError as error:
             raise MeetPageError(
                 "Dot could not turn the captions on.",
-                {"url": self._page.url, "looked_for": [SELECTORS["captions_turn_on"]], "error": str(error)},
+                {
+                    "url": self._page.url,
+                    "looked_for": [SELECTORS["captions_turn_on"]],
+                    "page_labels": await self._labels_seen(),
+                    "error": str(error),
+                },
             ) from error
 
     async def watch(self) -> None:
@@ -337,7 +391,12 @@ class MeetPage:
         except PlaywrightError as error:
             raise MeetPageError(
                 "Dot could not open the meeting's chat.",
-                {"url": self._page.url, "looked_for": [SELECTORS["chat_open"]], "error": str(error)},
+                {
+                    "url": self._page.url,
+                    "looked_for": [SELECTORS["chat_open"]],
+                    "page_labels": await self._labels_seen(),
+                    "error": str(error),
+                },
             ) from error
 
     async def drain(self) -> PageBatch:

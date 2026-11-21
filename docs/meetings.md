@@ -95,7 +95,10 @@ Say "join my call https://meet.google.com/abc-defg-hij" in a chat. Then:
 ## What does not work yet
 
 - Meet's page is read by the labels it draws (`meetings/meet.py`, one table). When Google changes them, Dot says it found
-  a page it does not know, and that table is mended.
+  a page it does not know, and that table is mended. The mic, camera and caption toggles are matched by the start of
+  their label, since Meet ends them with the machine's keyboard shortcut ("Turn off microphone (ctrl + d)"), and a
+  look that fails puts the labels the page did show in the log's `page_labels`. No call has been joined for real yet:
+  the two tries of 2026-11-12 stopped at the microphone toggle, and the fix is checked on a stand-in page only.
 - A meeting of an organisation that lets only its own accounts in cannot be joined by Dot's account.
 - Teams and Zoom are not joined yet.
 - A spoken question cut by a long pause ("Dot, what was the … budget for Q3?") is answered by its first half; the rest

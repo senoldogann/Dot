@@ -8,6 +8,7 @@ import pytest
 import pytest_asyncio
 from meet_stand_in import serve_stand_in
 from playwright.async_api import Browser, Page, async_playwright
+from pydantic import JsonValue
 
 from dotagent.meetings.meet import MeetPage, MeetPageError, meeting_address
 from dotagent.meetings.transcript import CaptionBook, fold_page, new_chat
@@ -110,6 +111,37 @@ async def test_a_page_without_the_toggles_is_not_joined(browser: Browser) -> Non
     with pytest.raises(MeetPageError):
         await MeetPage(page).prepare("Dot")
     await page.close()
+
+
+async def test_a_toggle_Meet_labels_otherwise_is_refused_and_the_page_labels_are_told(browser: Browser) -> None:
+    with serve_stand_in() as address:
+        page: Page = await browser.new_page()
+        meet: MeetPage = MeetPage(page)
+        await meet.open(address)
+        await page.evaluate(
+            "() => document.querySelector('[aria-label^=\"Turn off microphone\"]')"
+            ".setAttribute('aria-label', 'Mikrofonu kapat (ctrl + d)')"
+        )
+        with pytest.raises(MeetPageError) as refused:
+            await meet.prepare("Dot")
+        labels: JsonValue = refused.value.context["page_labels"]
+        assert isinstance(labels, list)
+        assert "Mikrofonu kapat (ctrl + d)" in labels
+        await page.close()
+
+
+async def test_the_labels_a_failed_look_tells_are_cut_and_a_gone_page_tells_none(browser: Browser) -> None:
+    page: Page = await browser.new_page()
+    await page.set_content('<button aria-label="a\n\u202eb' + "x" * 300 + '">Ask to join</button>')
+    meet: MeetPage = MeetPage(page)
+    with pytest.raises(MeetPageError) as refused:
+        await meet.prepare("Dot")
+    labels: JsonValue = refused.value.context["page_labels"]
+    assert isinstance(labels, list) and len(labels) == 1
+    label: JsonValue = labels[0]
+    assert isinstance(label, str) and len(label) == 120 and label.startswith("a  bxx")
+    await page.close()
+    assert await meet._labels_seen() == []
 
 
 async def test_an_address_of_another_host_is_refused() -> None:

@@ -13,6 +13,7 @@ import pytest
 import pytest_asyncio
 from meet_stand_in import PAGE
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, Route, async_playwright
+from structlog.testing import capture_logs
 
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.config import MeetingsConfig
@@ -20,6 +21,7 @@ from dotagent.core.errors import RunConflict
 from dotagent.events import EventBus
 from dotagent.meetings import desk as desk_module
 from dotagent.meetings.desk import ANNOUNCEMENT, Launcher, MeetingChrome, MeetingDesk, MeetingError, Notice
+from dotagent.meetings.meet import MeetPageError
 from dotagent.meetings.notes import MeetingNotes, NoteAction
 from dotagent.meetings.types import MeetingLine
 from dotagent.store.db import Store
@@ -352,11 +354,35 @@ async def test_captions_turned_off_in_the_call_have_dot_leave_and_say_why(
     meeting: MeetingRecord = await joining
     told: int = len(room.told)
     # The host turns the captions off: the stand-in's toggle, as Meet's.
-    await room.pages[-1].click("button[aria-label='Turn off captions']")
+    await room.pages[-1].click("button[aria-label^='Turn off captions']")
     await _told(room, told + 1)
     ended: MeetingRecord = await room.store.get_meeting(meeting.id)
     assert ended.status == "ended" and "captions were turned off" in ended.note
     assert "captions were turned off" in room.told[-1][1]
+
+
+async def test_a_join_that_cannot_find_a_toggle_logs_the_labels_the_page_showed(room: Room) -> None:
+    async def launch() -> MeetingChrome:
+        chrome: MeetingChrome = await room.launch()
+
+        async def other_labels(route: Route) -> None:
+            body: str = PAGE.replace("Turn off microphone (ctrl + d)", "Mikrofonu kapat (ctrl + d)")
+            await route.fulfill(status=200, content_type="text/html; charset=utf-8", body=body)
+
+        await chrome.context.route("https://meet.google.com/**", other_labels)
+        return chrome
+
+    desk: MeetingDesk = MeetingDesk(room.store, room.broker, _noter, _answerer, _CONFIG, launch, lambda: OWNER)
+    desk.tell_with(room.notice)
+    try:
+        with capture_logs() as logs, pytest.raises(MeetPageError):
+            await desk.join(URL, room.run.thread_id, room.run.id, None)
+    finally:
+        await desk.aclose()
+    failed: list[dict[str, object]] = [entry for entry in logs if entry["event"] == "meeting_join_failed"]
+    assert len(failed) == 1
+    context: object = failed[0]["context"]
+    assert isinstance(context, dict) and "Mikrofonu kapat (ctrl + d)" in context["page_labels"]
 
 
 async def test_a_desk_the_daemon_did_not_hand_its_chats_joins_nothing(room: Room) -> None:

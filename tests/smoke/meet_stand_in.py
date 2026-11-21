@@ -1,4 +1,5 @@
 """A local page that stands for Google Meet's, with the aria labels and texts ``dotagent.meetings.meet`` reads.
+The toggles' labels end with a keyboard shortcut, as Meet's do.
 
 The pre-join screen has the mic and camera toggles, the name field and "Ask to join"; a click shows "Asking to be let
 in" for about half a second, then the call (Leave call, captions toggle, a captions region, the chat). The test adds
@@ -24,8 +25,8 @@ const toggle = (on, onLabel, offLabel) => {
 };
 const prejoin = () => {
   root.innerHTML = '';
-  root.append(toggle(true, 'Turn off microphone', 'Turn on microphone'));
-  root.append(toggle(true, 'Turn off camera', 'Turn on camera'));
+  root.append(toggle(true, 'Turn off microphone (ctrl + d)', 'Turn on microphone (ctrl + d)'));
+  root.append(toggle(true, 'Turn off camera (ctrl + e)', 'Turn on camera (ctrl + e)'));
   const name = document.createElement('input');
   name.type = 'text'; name.setAttribute('aria-label', 'Your name');
   root.append(name);
@@ -50,7 +51,7 @@ const call = () => {
   const region = document.createElement('div');
   region.setAttribute('role', 'region'); region.tabIndex = 0;
   const setCap = () => {
-    cap.setAttribute('aria-label', caps ? 'Turn off captions' : 'Turn on captions');
+    cap.setAttribute('aria-label', caps ? 'Turn off captions (c)' : 'Turn on captions (c)');
     region.style.display = caps ? 'block' : 'none';
   };
   cap.onclick = () => { caps = !caps; setCap(); };
