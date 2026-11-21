@@ -504,7 +504,12 @@ Both modes share what follows.
   page busy for a while (a heavy app starting) has that whole time to answer. A page `browser_open` or `browser_new_tab`
   has loaded that answers but has not settled within that time (still being parsed, or busy past the quiet window) is
   shown as it is, with the note that it is still loading (item 954): the open failed, and the run read the very page
-  with its next call.
+  with its next call. A navigation Chrome cuts off (`net::ERR_ABORTED`: a redirect or the site's own script sent the tab
+  elsewhere before the page committed) is no failure when the tab stands on a real page afterwards (item 1296): it
+  waits a moment for that page to commit and be parsed, runs the same landing and settle checks as for any page, and
+  shows it with the note "the page redirected to <address>"; a tab that stands on no page (blank, Chrome's error page,
+  or where it was) is sent again once, whatever `navigation_attempts` says, and a second cut fails as before. `web_*`
+  reads of a scratch tab take the same road: the address they report is the page the tab ended on.
 - `browser_upload` hands the files straight to the file field of the element it is given (item 704): the field itself,
   which sites move off the screen or put under an icon (a click on such a field waited eight seconds and failed), the
   one file field inside it, as in a label that wraps a hidden field, or (item 745) the field its label (`for`) or its

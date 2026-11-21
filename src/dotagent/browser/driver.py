@@ -940,31 +940,106 @@ async def let_page_turn(page: Page, timeout_ms: int) -> None:
             raise _failure("waiting for the page to take its turn failed", page, {}, error) from error
 
 
-async def navigate(page: Page, url: str, timeout_ms: int, attempts: int, backoff_ms: int) -> int | None:
-    """Go to ``url`` and return the HTTP status. Transient network errors are retried; other failures raise at once."""
-    last: PlaywrightError | None = None
-    for attempt in range(1, attempts + 1):
+# A navigation Chrome cut off before it committed ("net::ERR_ABORTED"): a redirect, a script or the site's own meta
+# refresh started another one. The tab may already stand on the page it was sent to (item 1296).
+_ABORTED: str = "net::ERR_ABORTED"
+# How long, after such a cut, the tab is given to commit the page that cut it, and to parse it.
+_ABORT_COMMIT_MS: int = 2000
+_ABORT_PARSE_MS: int = 5000
+# What a tab shows that is no page the run was sent to: its blank start, or Chrome's own error page.
+_NO_PAGE: tuple[str, ...] = ("", "about:blank", "chrome-error://")
+
+
+@dataclass(frozen=True, slots=True)
+class Navigation:
+    """How a navigation ended: the HTTP status of the page (``None`` when it started a download or the status is not
+    known), and, when Chrome cut the navigation off and the tab stood on another real page, that page's address."""
+
+    status: int | None
+    redirected_to: str | None = None
+
+
+def _is_page(url: str) -> bool:
+    return not any(url == mark if mark in ("", "about:blank") else url.startswith(mark) for mark in _NO_PAGE)
+
+
+async def _landed_after_abort(
+    page: Page, before: str, committed: list[str], commit_seen: asyncio.Event, timeout_ms: int
+) -> str | None:
+    """The address of the real page the tab stands on after Chrome cut a navigation off, ``None`` when it stands on
+    none (it is where it was, blank, or on Chrome's error page). The page that cut the navigation off is given a moment
+    to commit and to be parsed (bounded: this is the failure path), then the tab's own address is read."""
+    if not commit_seen.is_set():
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(commit_seen.wait(), min(timeout_ms, _ABORT_COMMIT_MS) / 1000)
+    with contextlib.suppress(PlaywrightTimeoutError):
+        await page.wait_for_load_state("domcontentloaded", timeout=min(timeout_ms, _ABORT_PARSE_MS))
+    landed: str = page.url
+    if not _is_page(landed):
+        return None
+    if landed == before and not any(_is_page(url) for url in committed):
+        return None
+    return landed
+
+
+async def navigate(page: Page, url: str, timeout_ms: int, attempts: int, backoff_ms: int) -> Navigation:
+    """Go to ``url`` and return how it ended. Transient network errors are retried; other failures raise at once.
+
+    A navigation Chrome cut off (``net::ERR_ABORTED``) is not a failure when the tab stands on a real page after it:
+    the page it was sent to redirected, and the answer says to which address (item 1296). When it stands on none, the
+    navigation is tried once more, whatever ``attempts`` says; a second cut with no page raises."""
+    cut: bool = False
+    failures: int = 0
+    while True:
+        before: str = page.url
+        committed: list[str] = []
+        commit_seen: asyncio.Event = asyncio.Event()
+
+        def note_commit(frame: Frame, urls: list[str] = committed, seen: asyncio.Event = commit_seen) -> None:
+            if frame.parent_frame is None:
+                urls.append(frame.url)
+                seen.set()
+
+        page.on("framenavigated", note_commit)
         try:
             response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
         except PlaywrightError as error:
             if "Download is starting" in str(error):
-                return None
-            last = error
+                return Navigation(None)
+            if _ABORTED in str(error):
+                landed: str | None = await _landed_after_abort(page, before, committed, commit_seen, timeout_ms)
+                _log.warning(
+                    "browser_navigation_aborted",
+                    url=url,
+                    landed=truncate_middle(landed or page.url, 400),
+                    retried=cut,
+                )
+                if landed is not None:
+                    return Navigation(None, landed)
+                if cut:
+                    raise _failure(
+                        "navigation failed", page, {"target": url, "attempts": str(failures + 2)}, error
+                    ) from error
+                cut = True
+                await asyncio.sleep(backoff_ms / 1000)
+                continue
+            failures += 1
             transient: bool = any(marker in str(error) for marker in _TRANSIENT_NAVIGATION)
             _log.warning(
                 "browser_navigation_failed",
                 url=url,
-                attempt=attempt,
+                attempt=failures,
                 attempts=attempts,
                 transient=transient,
                 error=truncate_middle(str(error), 400),
             )
-            if not transient or attempt == attempts:
-                raise _failure("navigation failed", page, {"target": url, "attempts": str(attempt)}, error) from error
+            if not transient or failures >= attempts:
+                raise _failure("navigation failed", page, {"target": url, "attempts": str(failures)}, error) from error
             await asyncio.sleep(backoff_ms / 1000)
         else:
-            return response.status if response is not None else None
-    raise BrowserError("navigation failed", {"target": url, "attempts": attempts, "error": str(last)}) from last
+            return Navigation(response.status if response is not None else None)
+        finally:
+            page.remove_listener("framenavigated", note_commit)
 
 
 async def _page_before(page: Page) -> str | None:
