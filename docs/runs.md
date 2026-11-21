@@ -698,14 +698,16 @@ is lowered to 10 and the result says so.
 
 **Crawling and extraction.** `web_crawl(url, scope, max_pages, max_depth)` reads many pages of one site in one call:
 breadth first from the start address, following the links within the scope (`prefix`, the pages under the start
-address's folder, or `host`, every page of its host), several fetches at once and the requests to one host spaced apart,
+address's folder, or `host`, every page of its host; a start address that redirects to the same site's other form,
+`example.com` to `https://www.example.com/`, `http` to `https`, moves the scope to where the site answers from, so its
+links are followed, and a page a redirect carries out of the scope is left out, item 1298), several fetches at once and the requests to one host spaced apart,
 within the limits of `[web.crawl]` (`max_pages` 50, `max_depth` 3, `concurrency` 4, `per_host_spacing_s` 0.5; a call may
 ask for less, never for more). Every page comes back as one clean text document (title, address, description, then the
 text as `web_fetch` renders it, at most `page_max_chars`), each in its own `<web_content>` fence, under an index that
 lists the pages with their depth, size and how they were read, the addresses left out and why, and how many more
 addresses were found within the scope but not read. What the pages and their links wrote of the index (their
 addresses, their titles clipped to 200 characters, the addresses left out, the ones `robots.txt` disallows) stands in a
-fence of its own, and the lines outside it are Dot's; the links listed for a page that is not there, and the JSON of
+fence of its own (with the scope's move and the sites its pages linked to outside the scope, by how many links each), and the lines outside it are Dot's; the links listed for a page that is not there, and the JSON of
 `web_extract`, are fenced the same way (item 554). A page that shows little text without JavaScript (fewer than 400
 characters and three or more script tags) is rendered once in Dot's own browser tab and read from the screen
 (`render = "auto"`; `"never"` fetches only, `"always"` renders every page); PDFs are read as `web_fetch` reads them. A

@@ -52,6 +52,12 @@ class Tab:
     # its server (item 774).
     fetches: int = 0
     sockets: int = 0
+    # What the tab's DevTools session heard of its downloads (item 1298): the address each was begun for, by the id
+    # Chrome gave it, the ids already given to a download Dot watches, and the watches under way.
+    downloads_cdp: CDPSession | None = None
+    download_begun: dict[str, str] = field(default_factory=dict)
+    download_ids: set[str] = field(default_factory=set)
+    download_watches: list["_Watch"] = field(default_factory=list)
     nav_idle: asyncio.Event = field(default_factory=_set_event)
     status: int | None = None
     accept_confirms: bool = False
@@ -209,27 +215,194 @@ async def _on_dialog(tab: Tab, dialog: Dialog) -> None:
     add_note(tab, f"{kind} dialog {verdict}: {message}{hint}")
 
 
-async def _on_download(tab: Tab, directory: Path, download: Download) -> None:
+_MEGABYTE: int = 1024 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadLimits:
+    """What a download may take (item 1298): the largest file, and the most the downloads folder may hold, in bytes; 0
+    is no limit."""
+
+    max_bytes: int = 0
+    quota_bytes: int = 0
+
+
+def _megabytes(size: int) -> str:
+    return f"{size / _MEGABYTE:.0f} MB" if size >= _MEGABYTE else f"{size} bytes"
+
+
+def folder_bytes(directory: Path, leave: Path | None = None) -> int:
+    """What the files under ``directory`` hold, ``leave`` apart (the file a download has just taken). A file that goes
+    while the folder is walked has nothing to count."""
+    total: int = 0
+    for path in directory.rglob("*"):
+        if path == leave:
+            continue
+        try:
+            if path.is_file():
+                total += path.stat().st_size
+        except FileNotFoundError:
+            continue
+    return total
+
+
+def _room(limits: DownloadLimits, held: int) -> tuple[int | None, str]:
+    """How many bytes one more download may take, and which limit sets that: ``None`` when nothing limits it."""
+    rooms: list[tuple[int, str]] = []
+    if limits.max_bytes > 0:
+        rooms.append((limits.max_bytes, f"download_max_mb ({_megabytes(limits.max_bytes)})"))
+    if limits.quota_bytes > 0:
+        rooms.append(
+            (
+                max(0, limits.quota_bytes - held),
+                f"download_quota_mb (the folder holds {_megabytes(held)} of {_megabytes(limits.quota_bytes)})",
+            )
+        )
+    if not rooms:
+        return (None, "")
+    return min(rooms, key=lambda room: room[0])
+
+
+class _Watch:
+    """The bytes a download has taken so far, from Chrome's own progress events for the tab, and the cancel of a
+    download that passes its room. Chrome names a download by an id that Playwright's ``Download`` does not carry, so
+    the id is the one begun for the same address that no other watch has taken."""
+
+    def __init__(self, tab: Tab, download: Download, room: int | None, why: str) -> None:
+        self.tab = tab
+        self.download = download
+        self.room = room
+        self.why = why
+        self.guid: str | None = None
+        self.exceeded: bool = False
+        self.cancelling: asyncio.Task[None] | None = None
+
+    def begun(self, guid: str, url: str) -> None:
+        if self.guid is None and url == self.download.url and guid not in self.tab.download_ids:
+            self.guid = guid
+            self.tab.download_ids.add(guid)
+
+    def progress(self, event: Mapping[str, object]) -> None:
+        if self.room is None or self.exceeded or event.get("guid") != self.guid or self.guid is None:
+            return
+        sizes: list[int] = [
+            size
+            for size in (event.get("receivedBytes"), event.get("totalBytes"))
+            if isinstance(size, int) and not isinstance(size, bool)
+        ]
+        if sizes and max(sizes) > self.room:
+            self.exceeded = True
+            self.cancelling = asyncio.create_task(self.download.cancel())
+
+
+def _on_download_begun(tab: Tab, event: Mapping[str, object]) -> None:
+    guid: object = event.get("guid")
+    url: object = event.get("url")
+    if isinstance(guid, str) and isinstance(url, str):
+        tab.download_begun[guid] = url
+        for watch in list(tab.download_watches):
+            watch.begun(guid, url)
+
+
+def _on_download_progress(tab: Tab, event: Mapping[str, object]) -> None:
+    for watch in list(tab.download_watches):
+        watch.progress(event)
+
+
+def _forget_unclaimed(tab: Tab, url: str) -> None:
+    """Drop what the tab heard of a download of ``url`` that no watch took (one turned away at the quota, or whose
+    events a watch never matched): left in ``download_begun``, its id would be handed to the next download of the same
+    address, whose own progress events would then be ignored and its size judged only when it had finished."""
+    for guid, begun_url in list(tab.download_begun.items()):
+        if begun_url == url and guid not in tab.download_ids:
+            del tab.download_begun[guid]
+
+
+async def watch_downloads(tab: Tab) -> None:
+    """Have the tab's downloads watched for their size while they come in (item 1298): Chrome reports the bytes taken
+    only to a DevTools session that was enabled before the download began, so the tab gets one when it is registered.
+    A session that cannot be made is logged: the size is then judged when the download has finished."""
+    try:
+        cdp: CDPSession = await tab.page.context.new_cdp_session(tab.page)
+        cdp.on("Page.downloadWillBegin", partial(_on_download_begun, tab))
+        cdp.on("Page.downloadProgress", partial(_on_download_progress, tab))
+        await cdp.send("Page.enable")
+    except PlaywrightError as error:
+        _log.warning("browser_downloads_unwatched", error=truncate_middle(str(error), _NOTE_LOG_CHARS))
+        return
+    tab.downloads_cdp = cdp
+
+
+async def _on_download(tab: Tab, directory: Path, limits: DownloadLimits, download: Download) -> None:
     tab.events += 1
     tab.nav_inflight = 0  # a download is not a navigation, so nothing is left to wait for
     tab.nav_idle.set()
     name: str = safe_download_name(download.suggested_filename)
     target: Path = await asyncio.to_thread(unique_download_path, directory, name)
+    held: int = await asyncio.to_thread(folder_bytes, directory, target) if limits.quota_bytes > 0 else 0
+    room, why = _room(limits, held)
+    if room is not None and room <= 0:
+        await _refuse(tab, download, target, f"the downloads folder is at its limit, {why}")
+        _forget_unclaimed(tab, download.url)
+        return
     add_note(tab, f"download started: {target.name}")
+    watch: _Watch = _Watch(tab, download, room, why)
+    for guid, url in list(tab.download_begun.items()):
+        watch.begun(guid, url)
+    tab.download_watches.append(watch)
     try:
         await download.save_as(target)
         failure: str | None = await download.failure()
     except PlaywrightError as error:
-        _log.warning("browser_download_failed", file=target.name, error=truncate_middle(str(error), _NOTE_LOG_CHARS))
-        add_note(tab, f"download of {target.name} failed: {truncate_middle(str(error), _NOTE_LOG_CHARS)}")
-        await asyncio.to_thread(_drop_empty, target)
+        await _ended_badly(tab, target, watch, error)
+        return
+    finally:
+        tab.download_watches.remove(watch)
+        if watch.guid is not None:
+            tab.download_begun.pop(watch.guid, None)
+            tab.download_ids.discard(watch.guid)
+        else:
+            _forget_unclaimed(tab, download.url)
+        if watch.cancelling is not None:
+            with contextlib.suppress(PlaywrightError):
+                await watch.cancelling
+    if watch.exceeded:
+        await _discard(tab, target, f"it passed {why}")
         return
     if failure is not None:
         add_note(tab, f"download of {target.name} failed: {failure}")
         await asyncio.to_thread(_drop_empty, target)
         return
     size: int = await asyncio.to_thread(lambda: target.stat().st_size)
+    if room is not None and size > room:
+        # Finished before a progress event said how large it was, or the watch could not be made.
+        await _discard(tab, target, f"it was {_megabytes(size)}, which passes {why}")
+        return
     add_note(tab, f"download saved to {target} ({size} bytes); it was not opened")
+
+
+async def _discard(tab: Tab, target: Path, reason: str) -> None:
+    """Delete what a download that passed its limit left, and tell the run."""
+    with contextlib.suppress(FileNotFoundError):
+        await asyncio.to_thread(target.unlink)
+    _log.warning("browser_download_over_limit", file=target.name, reason=reason)
+    add_note(tab, f"download of {target.name} was cancelled and deleted: {reason}")
+
+
+async def _refuse(tab: Tab, download: Download, target: Path, reason: str) -> None:
+    """Turn a download away before any of it is saved."""
+    with contextlib.suppress(PlaywrightError):
+        await download.cancel()
+    await _discard(tab, target, reason)
+
+
+async def _ended_badly(tab: Tab, target: Path, watch: _Watch, error: PlaywrightError) -> None:
+    if watch.exceeded:
+        await _discard(tab, target, f"it passed {watch.why}")
+        return
+    _log.warning("browser_download_failed", file=target.name, error=truncate_middle(str(error), _NOTE_LOG_CHARS))
+    add_note(tab, f"download of {target.name} failed: {truncate_middle(str(error), _NOTE_LOG_CHARS)}")
+    await asyncio.to_thread(_drop_empty, target)
 
 
 async def _on_file_chooser(tab: Tab, chooser: FileChooser) -> None:
@@ -402,11 +575,11 @@ def _watch_failure(tab: Tab, error: PlaywrightError) -> BrowserError:
     )
 
 
-def attach_handlers(tab: Tab, downloads: Path) -> None:
+def attach_handlers(tab: Tab, downloads: Path, limits: DownloadLimits) -> None:
     """Wire the page events of ``tab``. Async handlers are scheduled by Playwright; the sync ones only count."""
     page: Page = tab.page
     page.on("dialog", partial(_on_dialog, tab))
-    page.on("download", partial(_on_download, tab, downloads))
+    page.on("download", partial(_on_download, tab, downloads, limits))
     page.on("filechooser", partial(_on_file_chooser, tab))
     page.on("request", partial(_on_request, tab))
     page.on("requestfinished", partial(_on_request_end, tab))

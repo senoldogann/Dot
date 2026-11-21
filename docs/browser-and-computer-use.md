@@ -88,7 +88,8 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
   the background. The window closes with the tab. Making a window takes about 30 ms more than a tab, once per chat
   and for each quiet read. Dot never minimizes it (a minimized window is throttled); a window covered by others runs
   at full speed.
-- Downloads go to the download folder of Chrome, not to Dot's `downloads/`.
+- Downloads go to the download folder of Chrome, not to Dot's `downloads/`, and `[browser] download_max_mb` and
+  `download_quota_mb` do not apply to them (item 1298).
 - Dot closes the tabs it opened as a chat's do (below). If Dot itself does not end cleanly (a crash, a kill), the next
   Dot that attaches to that Chrome closes them (item 703): each Dot process writes the ids Chrome gave its tabs to
   `<home>/browser-tabs.json`, and the tabs of a process that no longer runs are closed when they still have that id in
@@ -224,7 +225,13 @@ Both modes share what follows.
   the step set off, and waits for such a tab until it is the run's, at most a second (item 342): a tab whose page
   answers later stops the batch with a line that it is opening. Then Dot waits until the page has settled (no DOM change
   for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared (two
-  downloads of one name at once are saved as `name` and `name-1`, item 800). A read
+  downloads of one name at once are saved as `name` and `name-1`, item 800). A download of Dot's own Chrome is held
+  to `[browser] download_max_mb` (500 MB; the largest file) and `download_quota_mb` (5120 MB; the most the downloads
+  folder holds); 0 takes a limit off (item 1298). Each tab has a DevTools session of its own for it, since Chrome tells
+  the bytes taken only to one enabled before the download began; a download that passes its room is cancelled as it
+  comes in, what was saved is deleted and the tab's notes say which limit it passed, and a download of a folder
+  already at its quota is turned away before it is saved. Where the session cannot be made the size is judged when the
+  download has finished and the file is deleted then. A read
   of the page (its settling, its size, its snapshot, its whole text, item 1135) whose document is replaced under it, as a sign-in that hops through
   several pages replaces it, is made again on the new document once it is parsed, five times at most (item 752). The
   result is the part of the page that changed, with the refs of the last snapshot still valid; a page that did not

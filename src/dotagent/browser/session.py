@@ -88,6 +88,7 @@ from dotagent.browser.labels import mark_screenshot
 from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.network import Fetched, answer_text, call_lines, hidden_address
 from dotagent.browser.pages import (
+    DownloadLimits,
     Tab,
     ThreadTabs,
     add_note,
@@ -100,6 +101,7 @@ from dotagent.browser.pages import (
     target_id_of,
     unhanded_tab,
     watch_births,
+    watch_downloads,
 )
 from dotagent.browser.profile_lock import (
     ask_handover,
@@ -1989,8 +1991,17 @@ class BrowserSession:
 
     async def _register(self, tab: Tab) -> None:
         page: Page = tab.page
-        attach_handlers(tab, self._downloads)
+        attach_handlers(
+            tab,
+            self._downloads,
+            DownloadLimits(
+                max_bytes=self._config.download_max_mb * 1024 * 1024,
+                quota_bytes=self._config.download_quota_mb * 1024 * 1024,
+            ),
+        )
         page.on("close", partial(self._on_page_closed, tab))
+        if self._config.mode == "own" and (self._config.download_max_mb > 0 or self._config.download_quota_mb > 0):
+            await watch_downloads(tab)
         await watch_births(tab)
         if self._config.mode == "attach":
             self._dot_targets.add(tab.target_id)

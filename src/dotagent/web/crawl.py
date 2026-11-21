@@ -11,6 +11,7 @@ callable the tool hands in so that this module does not depend on the browser.
 
 import asyncio
 import time
+from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
 from html.parser import HTMLParser
 from typing import Literal
@@ -41,13 +42,18 @@ SCRIPT_TAGS_OF_AN_APP: int = 3
 _ROBOTS_MAX_BYTES: int = 200_000
 _LINK_SCHEMES: frozenset[str] = frozenset({"http", "https"})
 _MAX_LINKS_PER_PAGE: int = 500
+# How many of the sites a crawl's pages linked to outside its scope the result names.
+_DROPPED_SITES: int = 10
 
 
 class Scope(FrozenModel):
-    """What the crawl may visit: the pages of the start address's host, or those under its path."""
+    """What the crawl may visit: the pages of the start address's host, or those under its path. ``origins`` are the
+    other forms of the site's address (``http`` or ``https``, with or without ``www.``) that are the same site: empty
+    for the scope of a start address, filled when the crawl found that the start redirects to its twin (item 1298)."""
 
     kind: ScopeKind
     url: str
+    origins: tuple[str, ...] = ()
 
 
 class CrawledPage(FrozenModel):
@@ -82,7 +88,9 @@ class RobotsReport(FrozenModel):
 
 class CrawlResult(FrozenModel):
     """The pages in the order they were read, the addresses left out and why, what ``robots.txt`` said, and whether a
-    limit cut the crawl."""
+    limit cut the crawl. ``scope`` is the scope the crawl ended with (the start's, or the one its redirect moved to);
+    ``notes`` say so, and ``dropped`` are the sites its pages linked to that lie outside it, with how many links each,
+    the most linked first (item 1298)."""
 
     start: str
     scope: Scope
@@ -91,6 +99,8 @@ class CrawlResult(FrozenModel):
     robots: RobotsReport
     frontier_left: int
     seconds: float
+    notes: tuple[str, ...] = ()
+    dropped: tuple[tuple[str, int], ...] = ()
 
 
 class _LinkCollector(HTMLParser):
@@ -141,11 +151,54 @@ def scope_of(kind: ScopeKind, url: str) -> Scope:
     return Scope(kind=kind, url=urlunsplit((parts.scheme, parts.netloc, folder, "", "")))
 
 
+def _origin(url: str) -> str:
+    parts = urlsplit(url)
+    return f"{parts.scheme.lower()}://{parts.netloc.lower()}"
+
+
+def _bare_host(netloc: str) -> str:
+    host: str = netloc.lower()
+    return host.removeprefix("www.")
+
+
+def same_site(one: str, other: str) -> bool:
+    """Whether two addresses are one site: the same host but for a leading ``www.``, over ``http`` or ``https``."""
+    a, b = urlsplit(one), urlsplit(other)
+    return a.scheme in _LINK_SCHEMES and b.scheme in _LINK_SCHEMES and _bare_host(a.netloc) == _bare_host(b.netloc)
+
+
+def _twins(url: str) -> tuple[str, ...]:
+    """Every form of the site's origin: ``http`` and ``https``, with and without ``www.``."""
+    bare: str = _bare_host(urlsplit(url).netloc)
+    return tuple(f"{scheme}://{host}" for scheme in ("https", "http") for host in (bare, f"www.{bare}"))
+
+
+def rebased(scope: Scope, final: str) -> Scope | None:
+    """The scope of a crawl whose start address ended on ``final`` after redirects: ``None`` when ``final`` is another
+    site than the scope's (a start that moved away is not followed there). On the same site the crawl goes on at the
+    address the site answers from, where its links are: the host of ``final``, and for a prefix scope the folder it
+    had (or ``final``'s own folder when the page moved out of it). Every form of the site's address belongs to it."""
+    if not same_site(scope.url, final):
+        return None
+    parts = urlsplit(normalized(final))
+    bound = urlsplit(scope.url)
+    path: str = "/"
+    if scope.kind == "prefix":
+        path = bound.path if (parts.path or "/").startswith(bound.path) else scope_of("prefix", final).url
+        path = urlsplit(path).path
+    return Scope(
+        kind=scope.kind,
+        url=urlunsplit((parts.scheme, parts.netloc, path, "", "")),
+        origins=_twins(final),
+    )
+
+
 def in_scope(url: str, scope: Scope) -> bool:
     """Whether ``url`` belongs to the crawl: the same host, and under the folder for a prefix scope."""
     target = urlsplit(url)
     bound = urlsplit(scope.url)
-    if (target.scheme, target.netloc.lower()) != (bound.scheme, bound.netloc.lower()):
+    origin: str = _origin(url)
+    if origin != _origin(scope.url) and origin not in scope.origins:
         return False
     return scope.kind == "host" or (target.path or "/").startswith(bound.path)
 
@@ -357,6 +410,9 @@ async def crawl(
     started: float = time.monotonic()
     state: _Crawl = _Crawl(web, config, config.user_agent, renderer, quiet)
     first: str = normalized(start)
+    notes: list[str] = []
+    # The sites the pages linked to outside the scope, and how many links each (item 1298).
+    outside: Counter[str] = Counter()
     seen: dict[str, None] = {first: None}
     frontier: list[str] = [first]
     pages: list[CrawledPage] = []
@@ -379,11 +435,31 @@ async def crawl(
         for result in await _read_side_by_side(state, fetchable, depth):
             if isinstance(result, SkippedPage):
                 skipped.append(result)
-            else:
-                pages.append(result)
-                next_links.extend(result.links)
+                continue
+            if depth == 0 and _origin(result.url) != _origin(scope.url):
+                # The start address ended on another origin after its redirects: on the same site, the crawl goes on
+                # from there, where its links are (example.com -> https://www.example.com/). A start that stayed
+                # where it was keeps the scope it has.
+                moved: Scope | None = rebased(scope, result.url)
+                if moved is None:
+                    notes.append(
+                        f"The start address redirected to {result.url}, another site: its links are outside the "
+                        f"scope ({scope.url}) and were not followed."
+                    )
+                elif moved != scope:
+                    notes.append(f"The start address redirected to {result.url}; the scope moved to {moved.url}.")
+                    scope = moved
+            elif depth > 0 and not in_scope(result.url, scope):
+                skipped.append(
+                    SkippedPage(url=result.url, reason=f"a redirect led to it from inside the scope ({scope.url})")
+                )
+                continue
+            pages.append(result)
+            seen.setdefault(normalized(result.url), None)
+            next_links.extend(result.links)
         if not frontier:
             depth += 1
+            outside.update(_host_of(link) for link in set(next_links) if not in_scope(link, scope))
             frontier = list(plan_frontier(next_links, scope, tuple(seen)))
             seen.update(dict.fromkeys(frontier))
             next_links = []
@@ -400,4 +476,6 @@ async def crawl(
         ),
         frontier_left=left,
         seconds=time.monotonic() - started,
+        notes=tuple(notes),
+        dropped=tuple(outside.most_common(_DROPPED_SITES)),
     )
