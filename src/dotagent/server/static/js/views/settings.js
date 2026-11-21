@@ -21,7 +21,6 @@ import * as phone from "./phone.js";
 import * as repair from "./repair.js";
 import * as rules from "./rules.js";
 import * as snapshots from "./snapshots.js";
-import * as trading from "./trading.js";
 import * as websearch from "./websearch.js";
 import * as vault from "./vault.js";
 import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.js";
@@ -34,7 +33,6 @@ const MOUNTS = {
   websearch: websearch.mount,
   browser: mountBrowser,
   vault: vault.mount,
-  trading: trading.mount,
   rules: rules.mount,
   memory: memory.mount,
   harness: harness.mount,

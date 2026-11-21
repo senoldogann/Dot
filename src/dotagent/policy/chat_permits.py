@@ -8,9 +8,9 @@ from urllib.parse import urlsplit
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo, Flag
 
-# What a yes never covers past the step it was given for: money, a trade, a credential or a password manager's fill,
+# What a yes never covers past the step it was given for: money, a credential or a password manager's fill,
 # Dot's own files. Each such step waits for the owner every time.
-NEVER_REMEMBERED: frozenset[Flag] = frozenset({"financial", "trade", "credential", "vault_fill", "self_change"})
+NEVER_REMEMBERED: frozenset[Flag] = frozenset({"financial", "credential", "vault_fill", "self_change"})
 # The severities of a card that holds no permit: a hand-off is the owner's to do, a question the run asked is answered
 # by its words, a secret's card by its value (item 857).
 NOT_REMEMBERED_SEVERITIES: frozenset[str] = frozenset({"handoff", "question", "secret"})

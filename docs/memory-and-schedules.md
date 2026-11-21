@@ -383,10 +383,6 @@ its time and by hand, newest first, one at work among them, each with how it wen
 its answer (`GET /api/schedules/<id>/firings?limit=`, up to 50); a later firing's digest counts a run by hand among its
 earlier runs.
 
-The schedule `[trading] wake_schedule` names is also started when the market moves (item 772, [Trading](trading.md)),
-as **Run now** starts one, in a chat titled `<name> · <time> · market` (or the schedule's own), its first message saying
-what moved; a schedule switched off is not started so, and the end of such a run is told as its firings' ends are.
-
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A run of a schedule that the daemon's end cut off and you resumed (Resume on its page) counts as the schedule's run
   at work when the schedule comes due beside it (item 553): a repeating schedule is skipped, as for any run still
@@ -420,7 +416,7 @@ what moved; a schedule switched off is not started so, and the end of such a run
   says what it tries again and why, and its page shows a line that leads to that task. It starts from the beginning
   rather than going on from the cut task's last step, which a half-done call would invite it to repeat.
   A task is never tried again when it, or a helper it delegated, already sent something out or handed work on: a step
-  whose action the policy flagged as a message or mail, a post, an upload, a payment, a trade or a release (whether or
+  whose action the policy flagged as a message or mail, a post, an upload, a payment or a release (whether or
   not it went through), a work order or a task handed to another agent, a call the cut left unfinished that may have
   been one (or that cannot be told), or a helper's call without a result. A try is never tried again either, nor a
   task the plan's limit stopped without saying when it resets or for longer than 12 hours. Each of those is told to
@@ -485,6 +481,5 @@ what moved; a schedule switched off is not started so, and the end of such a run
   schedules off, as Dot's ("switched off: its agent was deleted"). While you have paused the agent (item 465), its
   schedules fire nothing by themselves: a repeating one is skipped to its next time ("skipped: <name> is paused") and a
   one-time one waits, still due ("waiting: <name> is paused"), and fires once you resume it; a pause counts no failed
-  run and tells nothing, and **Run now** still starts a run; a move of the market (`[trading] wake_schedule`) is no
-  hand and starts nothing as a paused agent (item 785). An agent that cannot be read fires nothing.
+  run and tells nothing, and **Run now** still starts a run. An agent that cannot be read fires nothing.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.

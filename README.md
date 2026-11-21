@@ -182,7 +182,6 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Memory and schedules](docs/memory-and-schedules.md)
 - [Dot comes to you](docs/proactive.md): the morning brief and the watchers
 - [Agents and campaigns](docs/agents-and-campaigns.md)
-- [Trading](docs/trading.md): crypto on Coinbase, paper or live, under limits no run can change
 - [Watching videos](docs/video.md): a video file or a link, seen in frames and heard in a transcript, for any model
 - [Meetings](docs/meetings.md): your Google Meet calls: Dot answers in them and takes notes; a task's post asks you
 - [Recon](docs/recon.md): what a site says about itself, and the open ports of a host you own

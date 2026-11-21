@@ -146,9 +146,6 @@ run needs, sent where the configuration points:
   for each new mail or notification, with your words: a mail's sender, recipients, subject and first lines, or a
   notification's repository, kind, reason and title, in the fence of the mail tools. A calendar watcher, and a GitHub
   watcher without words, ask no model. A mail that cannot be judged is told to you, so it is not dropped.
-- **To Coinbase, while trading is on: the requests of its market data and, for `live`, of your account.** Prices and
-  candles of the products allowed come from Coinbase's public market data, with no key; a `live` account's balances and
-  orders are requests signed with your key ([Trading](trading.md)). Nothing else of yours goes to Coinbase.
 - **To GitHub, for a GitHub watcher: the request for your notifications.** `api.github.com/notifications` with your
   personal access token, every few minutes, as a conditional request; it carries nothing else of yours.
 - **To the search engines and the sites of web-research, the MCP server that comes with Dot: the queries and the pages
@@ -278,21 +275,6 @@ the money hand-off holds where the modes ask; a `yolo` run pays it and what it s
 (item 443). The caps are plain numbers compared with the number on the page, whatever its
 currency, so list sites that bill in one currency. Empty by default.
 
-**Trading** (items 763 and 764, [Trading](trading.md)), off by default. Its limits (`[trading]`: one order, a day's
-orders, a day's loss, one product held, the products allowed) are held in code before any market sees an order of Dot's
-trading tools, in every mode, `yolo`'s too, and no run can change them (a run's own program can reach the key as it can
-Dot's other keys, below: [Trading](trading.md) says what bounds that); the `STOP` file stops every order. A `live`
-order, on your Coinbase account, carries `trade`: it waits for your yes in every mode but `yolo`, never the review
-model's or a rule's to answer, and Dot places it on your yes; a `yolo` run that read outside content has the review
-model check it (item 525). A `paper` order moves no money. An exit's sell (item 770), on the paper account only, is the
-one order no limit holds: Dot's daemon places it with no run once the bid reaches the stop or the target the buy named,
-and it sells what that buy bought; trading off or switched to live, the `STOP` file and Coinbase not taking orders of
-the product hold it, the exit open. On your Coinbase account Dot keeps no exit and sells nothing by itself. A move of
-the market starts the schedule `[trading] wake_schedule` names (item 772), as **Run now** does, with that schedule's own
-approvals. The Coinbase key, which may view and trade and never transfer, is kept in your login Keychain; switching to
-live, raising a limit, allowing a product and saving a key are done on the Mac only, and a phone can always switch
-trading off.
-
 **Decision order**, strictest first:
 
 1. *Auto-review* denies actions that read secrets or send data out (`secret_access`, `exfiltration`), whatever else is
@@ -328,8 +310,7 @@ trading off.
    your rules say: yours in `supervised` and `ask`, the review model's in `auto`, where it answers the policy's
    questions; only a rule that hands the step to you is stricter. A rule that allows it does not answer for you. A login
    filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, except that in `auto` you answer
-   it, not the review model, and so is one of Dot's own vault (item 621, below), and an order with real money on your
-   trading account (`trade`, item 763, [Trading](trading.md)), which Dot places on your yes. A `yolo` run asks nothing
+   it, not the review model, and so is one of Dot's own vault (item 621, below). A `yolo` run asks nothing
    else and makes the step, its record keeping the reason it would have asked for (item 443), but in a chat you opened a
    payment, a message or mail sent for you and a public post are yours there too (item 860, your word: "sadece e-posta
    gönderme ya da ödeme yapma gibi şeyler bana sorsun"), whatever started the run in it, a schedule that a run of the
@@ -347,10 +328,10 @@ trading off.
    answer: its message waits for your yes. The try a schedule starts on its own of a task a restart, a passing model
    error or a stall ended (item 1206) is no resume: it is a new run of the schedule's own source, so the review model
    judges its message as a firing's; it is never started for a task that already sent a message or mail, posted,
-   uploaded, paid, traded, released or handed work on, nor twice (see [Schedules](memory-and-schedules.md)). No rule
+   uploaded, paid, released or handed work on, nor twice (see [Schedules](memory-and-schedules.md)). No rule
    of yours answers for you. A chat a schedule, a watcher, a notice, the reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
    Schedules page runs in a chat of its own). A delegated run, an agent's too, is its parent's. Everything else
-   (commands, MCP tools, files, the web, a release, a trade within its limits) runs in `yolo` without a question. In a
+   (commands, MCP tools, files, the web, a release) runs in `yolo` without a question. In a
    chat Dot opened on its own initiative (item 850): a message, a post and a `release` there wait for your own yes in
    every mode, `yolo`'s and `auto`'s too, never the review model's, and no rule of yours that allows them answers for
    you; [Proactive](proactive.md) says how.
@@ -516,7 +497,7 @@ trading off.
    line in the same folder, as what a line does is not told by its program, and lines typed into a terminal or an
    AppleScript are never remembered, as their record does not say the folder they run in: the same command run again goes, the same command to another recipient or from another
    folder is asked. Five mails sent from one webmail go, whoever they are to; a step on another site is asked. Another
-   chat asks again. No rule, review model or run gives one, and none is given or used for money, a trade, a
+   chat asks again. No rule, review model or run gives one, and none is given or used for money, a
    credential, a password manager's fill, Dot's own files, a hand-off, a question of the run's, a secret's card,
    or a step of a chat Dot opened on its own initiative:
    the card shows no box, and the route refuses it (`POST /api/approvals/{id}/decision` with `remember`). A refusal
@@ -629,9 +610,7 @@ on from, since what a stranger wrote set it off: its goal is your own words and 
 a fence. So does every firing of a schedule a run made after it had read outside content (`schedule_create`, item
 899): its goal may hold those words; a change of yours in its form keeps the mark, and a schedule you make is yours.
 `recall` of such a schedule gives its name and goal in a fence and marks the run that reads them, and `schedule_list`
-marks the run when it lists one and names it (item 978). The run a move of the market starts (item 772) starts unmarked, as its schedule's firing does: what its first
-message adds is product ids Dot checked against the form of an id and numbers it read from Coinbase's list, no one's
-words. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`),
+marks the run when it lists one and names it (item 978). A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`),
 as does one it saved after your message cleared its mark, since your words clear the run's mark, not the page's
 words a note may quote (item 899; a thing for later, `todo_add`, the same):
 it is never among the notes a run starts with, is handed while it works or in a site's note to a run (item 384), nor
@@ -673,8 +652,7 @@ message or a post in a chat you opened, and those of a chat of Dot's own initiat
 steered by what a stranger wrote. Two checks hold for such a run, and neither asks you:
 
 - *The taint check.* Before a yolo run marked untrusted does a step an instruction planted in what it read would be
-  after (a message, a post, an upload or data sent out, a deploy (item 962), a payment, an order with real money on your trading account
-  (item 763), a credential, a login filled from your password manager, privilege or system settings, a schedule or a note it saves, an install, a change of Dot's own files, a read
+  after (a message, a post, an upload or data sent out, a deploy (item 962), a payment, a credential, a login filled from your password manager, privilege or system settings, a schedule or a note it saves, an install, a change of Dot's own files, a read
   of your secrets, a deletion outside the workspace), the review model (`[models] review`) judges it against your own
   instructions, as it does in `auto`, with the run marked untrusted. A step it refuses is refused: the run is told why
   and goes on with the rest, and the record names the review model. Any other answer, `escalate` too, lets the step run
@@ -1289,7 +1267,7 @@ public post and a release too (but a task's post in the chat of a meeting Dot is
 words whole in every mode, item 1138, and a join of a meeting that is not your own word, item 1150; Dot's own answers in
 a call, written from the call's words alone, are asked about in no mode, [Meetings](meetings.md)), in your chats and in Dot's own, as a `yolo` run of a chat nobody watches does; each step
 is recorded with why it would have asked. A refusal still stands (a research run stays read-only, the pace of a site
-and the limits of trading hold), and so does the review model's check of a `yolo` run that read outside content when
+holds), and so does the review model's check of a `yolo` run that read outside content when
 `yolo_taint_check` is on. A step of such a run that carries a secret out of the Mac is not refused in it (item 1097:
 your choice, as a command that measured a token's length was refused; in `yolo` it still is). A run that starts while it is on is told so; a field of a secret (a page's, a window's, a terminal's password
 prompt) is typed as in `yolo`, and the sandbox stays as the run's own mode has it. An eval never runs in it (`eval_config`). Off, every run asks as its mode says. A phone may switch it off, not on (item 678, [Phone](phone.md): it would

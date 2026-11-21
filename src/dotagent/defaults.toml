@@ -517,7 +517,7 @@ yolo_taint_check = true
 # Free mode (item 922, the owner's word of 2026-11-02: "istediğimizde her türlü serbest mod"): true, no run asks you
 # anything, in every chat and every approval mode: a payment, a message or mail sent for you, a public post and a
 # project's change put live too, in your chats and in Dot's own. A refusal still stands (a research run stays
-# read-only, the limits of trading and of a site's pace hold), and so does the review model's check of a yolo run that
+# read-only, the limits of a site's pace hold), and so does the review model's check of a yolo run that
 # read outside content (yolo_taint_check above). Settings › Rules switches it while the daemon runs.
 free = false
 # How long a question waits for your answer, in seconds. A message, a post or a release nobody answers in that time is
@@ -1255,41 +1255,6 @@ review_timeout_s = 120.0
 # ("example.com" covers "www.example.com"); an address is listed as it is. Empty: no active scan anywhere.
 owned_hosts = []
 
-
-[trading]
-# Trading on Coinbase (docs/trading.md). mode is "off" (no trading tools at all), "paper" (an account of Dot's own that
-# trades at Coinbase's real prices with money that is not there: what to try a way of trading with) or "live" (your
-# Coinbase account, with the key of Settings › Trading, which may view and trade and never transfer). The limits are in
-# quote, the currency of every product in products, and hold in every mode, yolo's too: max_order the most one order may
-# be worth, max_day the most a day's orders may add up to, max_day_loss how much the account may lose in a day before no
-# buy is placed until the next, max_position the most one product held may be worth. No run can change them. products
-# may hold "*": then every product priced in quote that trades at least min_volume of it a day is allowed (on Coinbase
-# EUR has a handful of such products, USDC about fifty). wake_schedule names a schedule (its id, as sch_...) that a move
-# of the market starts at once, not at its time (Settings › Trading › Wake on a move chooses it, item 813): the daemon
-# looks at the allowed products every minute, with no model, and a product that moved wake_move_pct percent in fifteen
-# minutes, and three times what it usually moves in fifteen, starts it, at most wake_per_day times a day and
-# wake_gap_min minutes apart. engine = "trend" switches the trend engine on (item 818): engine_coins, each in quote and
-# allowed by products, traded on paper once an hour by a rule of daily closes with no model, each coin's share sized to
-# engine_target_vol yearly volatility and left alone within engine_band of its target, under the same limits.
-mode = "off"
-quote = "EUR"
-products = ["BTC-EUR", "ETH-EUR", "SOL-EUR"]
-min_volume = 1000000.0
-max_order = 25.0
-max_day = 100.0
-max_day_loss = 25.0
-max_position = 200.0
-paper_start = 1000.0
-paper_fee_rate = 0.006
-timeout_s = 15.0
-wake_schedule = ""
-wake_move_pct = 3.0
-wake_per_day = 6
-wake_gap_min = 30.0
-engine = "off"
-engine_coins = ["BTC", "ETH", "SOL"]
-engine_target_vol = 0.5
-engine_band = 0.1
 
 [meetings]
 # Dot in the owner's calls (item 1138, docs/meetings.md): Google Meet, joined in a Chrome of its own whose profile holds

@@ -205,7 +205,6 @@ private func doingSymbol(_ kind: String) -> String {
     case "memory": "books.vertical"
     case "helpers": "person.2"
     case "app": "square.grid.2x2"
-    case "trading": "chart.line.uptrend.xyaxis"
     case "working": "gearshape"
     default: "ellipsis"
     }

@@ -27,6 +27,14 @@ def test_a_key_the_schema_does_not_have_is_named_as_one_a_newer_dot_may_add(tmp_
     assert "extra_forbidden" in str(error.context["errors"])
 
 
+def test_the_table_of_trading_an_older_dot_wrote_says_to_delete_it(tmp_path: Path) -> None:
+    error: ConfigError = _refused(tmp_path, '[trading]\nmode = "off"\n')
+    assert error.message == (
+        "configuration failed validation: trading is a table of an older Dot: Dot no longer trades (item 1286): "
+        "delete the [trading] table from config.toml"
+    )
+
+
 def test_another_error_is_named_by_its_path_and_a_long_list_is_cut(tmp_path: Path) -> None:
     assert _refused(tmp_path, "[server]\nport = 0\n").message.startswith(
         "configuration failed validation: server.port: "

@@ -34,7 +34,6 @@ KEY_HOSTS: tuple[str, ...] = (
     "openrouter.ai",
     "opencode.ai",
     "ollama.com",
-    "coinbase.com",
     "search.brave.com",
     "tavily.com",
     "exa.ai",
