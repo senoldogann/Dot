@@ -4211,9 +4211,16 @@ def _assess_command_body(command: str, args: list[str], scope: ShellScope, given
             *_changing(_written_paths(command, args, scope)),
         ]
     if command in _TARS or command == "unzip":
-        return [_finding("low", (), f"runs {command}"), *_writes_to(command, _unpacked_into(command, args), scope)]
+        return [
+            _finding("low", (), f"runs {command}"),
+            *_writes_to(command, _unpacked_into(command, args), scope),
+            *(_carried_lines(command, args, scope, given) or []),
+        ]
     if command in _SAFE_COMMANDS:
         return [_finding("safe", (), command)]
+    carried: list[Finding] | None = _carried_lines(command, args, scope, given)
+    if carried is not None:
+        return [_finding("low", (), f"runs {command}"), *carried]
     return [_finding("low", (), f"runs {command}"), *_given_lines(args, scope)]
 
 
@@ -4223,6 +4230,103 @@ _LINE_OPTIONS: frozenset[str] = frozenset({"-c", "-e", "--command", "--call", "-
 # What makes a value a command line rather than one word (``gcc -c main.c``, ``ffmpeg -c copy``): a blank, an operator
 # or a substitution.
 _LINE_CHARS: str = " \t\n;&|`<>"
+
+
+# The programs that are given a command line to run by an option or a command of their own, not by the shell's ``-c``:
+# the options of ``tar`` (GNU's and bsdtar's) whose value is a program or a line, ``(short, long)``; vim's Ex commands
+# (``-c``, ``--cmd``, ``+``); sqlite3's dot commands; emacs's Lisp (``--eval``).
+_TAR_LINE_OPTIONS: tuple[tuple[str, str], ...] = (
+    ("-I", "--use-compress-program"),
+    ("", "--to-command"),
+    ("", "--info-script"),
+    ("", "--new-volume-script"),
+    ("", "--rsh-command"),
+)
+_TAR_ACTION_LINE: str = "exec="
+_VIMS: frozenset[str] = frozenset({"vim", "nvim", "vi", "view", "ex", "gvim", "mvim", "vimdiff", "rvim", "rview"})
+_VIM_EX_OPTIONS: tuple[tuple[str, str], ...] = (("-c", ""), ("", "--cmd"))
+# A shell escape in an Ex command: ``!cmd`` at its start, after a range (``%!cmd``, ``1,5!cmd``) or after a word and
+# a blank (``r !cmd``, ``w !cmd``, ``silent !cmd``), but not a ``!`` that ends a command (``q!``, ``w!``).
+_VIM_SHELL_ESCAPE: re.Pattern[str] = re.compile(r"(?:^|[\s%\d,;.$])!\s*(\S.*)\Z", re.DOTALL)
+_SQLITE_SHELL: re.Pattern[str] = re.compile(r"\s*\.(?:shell|system)\s+(\S.*)", re.IGNORECASE)
+_SQLITE_PIPING: re.Pattern[str] = re.compile(r"\s*\.(?:import|output|once|read)\b(.*)", re.IGNORECASE)
+_EMACSES: frozenset[str] = frozenset({"emacs", "emacsclient"})
+_EMACS_LISP_OPTIONS: frozenset[str] = frozenset(
+    {"--eval", "-eval", "--execute", "-execute", "--funcall", "-funcall", "-f", "-e"}
+)
+# What starts a program from Lisp: the ``shell-command`` family takes a command line, the others (``call-process``,
+# ``start-process``, ``make-process``, ``process-lines``) a program and its words.
+_LISP_SPAWNS: re.Pattern[str] = re.compile(
+    r"\(\s*(?:[\w:-]*(?:shell-command|call-process|start-process|make-process|process-file|process-lines|"
+    r"start-file-process)[\w-]*)"
+)
+_LISP_SHELL_LINE: re.Pattern[str] = re.compile(r'\(\s*[\w:-]*shell-command[\w-]*\s+"((?:[^"\\]|\\.)*)"')
+_LISP_ESCAPE: re.Pattern[str] = re.compile(r"\\(.)")
+
+
+def _vim_lines(args: list[str]) -> list[str]:
+    """The command lines vim is told to run: the shell escape of each Ex command it is given with ``-c``, ``--cmd``
+    or ``+``, with the colon and the blanks before it dropped (``-c '!cmd'``, ``-c ':!cmd'``, ``+'!cmd'``)."""
+    commands: list[str] = [value for short, long in _VIM_EX_OPTIONS for value in _option_values(args, short, long)]
+    commands.extend(word[1:] for word in args if word.startswith("+") and len(word) > 1)
+    escapes: list[re.Match[str] | None] = [_VIM_SHELL_ESCAPE.search(line.lstrip(": \t")) for line in commands]
+    return [found.group(1) for found in escapes if found is not None]
+
+
+def _sqlite_lines(texts: list[str]) -> list[str]:
+    """The command lines sqlite3's shell is told to run, in the arguments (a ``-cmd`` value, a statement) or on its
+    input: a ``.shell`` or ``.system`` line, and the ``|command`` that ``.import``, ``.output``, ``.once`` and
+    ``.read`` take in place of a file."""
+    lines: list[str] = []
+    for text in texts:
+        for line in text.splitlines():
+            shell: re.Match[str] | None = _SQLITE_SHELL.fullmatch(line)
+            if shell is not None:
+                lines.append(shell.group(1))
+                continue
+            piping: re.Match[str] | None = _SQLITE_PIPING.fullmatch(line)
+            words: list[str] = (_split_words(piping.group(1)) or []) if piping is not None else []
+            lines.extend(word[1:] for word in words if word.startswith("|") and len(word) > 1)
+    return lines
+
+
+def _lisp_findings(program: str, scope: ShellScope) -> list[Finding]:
+    """Lisp that emacs is told to evaluate: the command line of each ``shell-command`` form with a string in it is
+    judged as that line; any other form that starts a program is code the guard cannot read."""
+    spawns: int = len(_LISP_SPAWNS.findall(program))
+    lines: list[str] = [_LISP_ESCAPE.sub(r"\1", found) for found in _LISP_SHELL_LINE.findall(program)]
+    findings: list[Finding] = [found for line in lines for found in _assess_all(line, scope)]
+    if spawns > len(lines):
+        findings.append(_unknown("emacs evaluates Lisp that starts a program, which the guard does not read"))
+    return findings
+
+
+def _carried_lines(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding] | None:
+    """What a program the guard knows runs when it is handed a command line by an option or a command of its own
+    (item 1302), judged as the same line under ``bash -c`` is: ``tar``'s compress program, ``--to-command`` and
+    checkpoint ``exec=`` action, vim's shell escapes in ``-c``, ``--cmd`` and ``+``, sqlite3's ``.shell`` and
+    ``.system``, emacs's ``shell-command``. None for a program that is not one of these (its ``-c`` is read by
+    :func:`_given_lines`); an option or a command without a command line carries none."""
+    lines: list[str]
+    if command in _TARS:
+        lines = [value for short, long in _TAR_LINE_OPTIONS for value in _option_values(args, short, long) if value]
+        actions: list[str] = _option_values(args, "", "--checkpoint-action")
+        lines.extend(action.removeprefix(_TAR_ACTION_LINE) for action in actions if action.startswith(_TAR_ACTION_LINE))
+    elif command in _VIMS:
+        lines = _vim_lines(args)
+    elif command == "sqlite3":
+        lines = _sqlite_lines([*args, *([given.text] if given.text is not None else [])])
+    elif command in _EMACSES:
+        programs: list[str] = [
+            value
+            for index, word in enumerate(args)
+            for value in ([args[index + 1]] if word in _EMACS_LISP_OPTIONS and index + 1 < len(args) else [])
+            + ([word.partition("=")[2]] if word.startswith(("--eval=", "--execute=")) else [])
+        ]
+        return [found for program in programs for found in _lisp_findings(program, scope)]
+    else:
+        return None
+    return [found for line in lines if line.strip() for found in _assess_all(line, scope)]
 
 
 def _given_lines(args: list[str], scope: ShellScope) -> list[Finding]:

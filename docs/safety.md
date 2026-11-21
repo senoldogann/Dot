@@ -1434,6 +1434,17 @@ event and approval.
 > `difftool -x` or `--upload-pack`/`--receive-pack` as the same line under `bash -c`; `git rebase -i`, `git bisect
 > start` and a diff into a workspace file stay as they were. An option spelt in git's shortened form (`--out=...`) is
 > not read. A path inside a workspace repository's `.git` that such an option names is judged as any workspace path.
+> A program that is handed a command line by an option or a command of its own is read for it (item 1302), and the
+> line is judged as the same line under `bash -c` is: `sqlite3`'s `.shell` and `.system` (in an argument, a `-cmd`
+> value or on its input) and the `|command` of `.import`, `.output`, `.once` and `.read`; the shell escape of an Ex
+> command given to
+> `vim`, `nvim`, `vi`, `view`, `ex` with `-c`, `--cmd` or `+` (`!cmd`, `:!cmd`, `r !cmd`, `%!cmd`); the `shell-command`
+> forms of Lisp given to `emacs` or `emacsclient` with `--eval`, and any other Lisp form that starts a program (asked
+> about, since its program and words are not read); `tar`'s (also `gtar` and `bsdtar`) `--use-compress-program`/`-I`,
+> `--to-command`, `--info-script`, `--new-volume-script`, `--rsh-command` and `--checkpoint-action=exec=`. `sqlite3`
+> queries, `vim` and `emacs` without those options and ordinary `tar` use keep their verdicts. Not read: what these
+> programs load or run from a file (`vim -S`, `emacs -l`, `sqlite3 .read file`, `.load`), vim's `:call system()`,
+> `:terminal` and its script languages, and a `sqlite3` file written by `.output` or `.backup`.
 > A script the line downloads and then runs (`curl -o`, `wget -O` or `git clone`, then a shell, `source`, its path or an
 > interpreter such as `python3`, also after a `cp`, an `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh |
 > bash`) is judged as piping the download into a shell; a file named after an at sign (`curl --data-binary @file`) as

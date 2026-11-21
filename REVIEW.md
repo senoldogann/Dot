@@ -132,6 +132,9 @@ here points at a test that no longer exists.
 - `tests/unit/test_shell_guard_git.py::test_git_given_a_place_to_write_or_a_line_to_run_is_judged_by_it` — `_assess_git`
   ended at the subcommand, so `git rebase --exec`, `bisect run`, `submodule foreach`, `filter-branch --*-filter`,
   `grep -O` and `diff --output` ran or wrote anything as `low` (item 1301).
+- `tests/unit/test_shell_guard_programs.py::test_a_command_line_a_program_is_handed_is_judged_as_it_is_under_bash` — a
+  line handed to `sqlite3 .shell`, `vim -c '!CMD'`, `emacs --eval` or `tar --use-compress-program` was `low` while the
+  same line under `bash -c` was `high` (item 1302).
 
 ## Evidence and format
 
