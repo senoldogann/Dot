@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.compact import estimate_tokens
 from dotagent.agent.helpers import HELPER_UNAVAILABLE_EVENT, MODEL_SWITCHED_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
@@ -45,6 +46,8 @@ QUESTION: str = "CSV or JSON for 40 contacts that a spreadsheet opens?"
 _STAND_IN_KEY: str = "stand-in-key-of-the-test"
 _TIME_LIMIT_S: float = 60.0
 _MAX_EVENTS: int = 10_000
+# A window whose budget holds the system prompt with some of an eval run's tools, not with all of them.
+_NARROW_WINDOW: int = 24_000
 
 
 class RecordingProvider:
@@ -110,6 +113,19 @@ class SpendingProvider:
 
     async def aclose(self) -> None:
         return None
+
+
+class NarrowProvider(RecordingProvider):
+    """A scripted model whose window holds the system prompt with some of the run's tools, not with all of them."""
+
+    def __init__(self, script: ScriptedProvider, window: int) -> None:
+        super().__init__(script)
+        self._window: int = window
+
+    async def model_info(self, model: str) -> ModelInfo:
+        return (await super().model_info(model)).model_copy(
+            update={"context_length": self._window, "own_context_length": self._window, "window_source": "server"}
+        )
 
 
 class FilteringProvider(SpendingProvider):
@@ -413,6 +429,29 @@ async def test_a_run_goes_through_its_standby_models_once_in_order_passing_over_
         (SPENT_OTHER, "ProviderQuotaError"),
         (SCRIPTED_MODEL, None),
     ]
+
+
+async def test_a_standby_model_whose_window_holds_only_some_of_the_tools_takes_the_run_over_with_those(
+    login_env: dict[str, str],
+) -> None:
+    """Item 1282: a standby model with a small window was passed over for the size of every tool, though a run started
+    on it carries the tools its window holds (item 1211), and the run failed with nothing done. It moves there now,
+    with the tools and a prompt that fit."""
+    spent: SpendingProvider = _spent()
+    standby: NarrowProvider = NarrowProvider(
+        ScriptedProvider("ollama", [_finish("Done on the standby model.")]), _NARROW_WINDOW
+    )
+    config: AppConfig = _config([], [SCRIPTED_MODEL], 5)
+    async with _session(config, login_env, {"anthropic": spent, "ollama": standby}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
+    assert played.data(MODEL_SWITCHED_EVENT) == (
+        {"from": SPENT_MAIN, "to": SCRIPTED_MODEL, "reason": "quota exhausted", "step": 1},
+    )
+    [first] = spent.requests
+    [asked] = standby.requests
+    assert FINISH_TOOL in _offered(asked) and _offered(asked) < _offered(first)
+    assert estimate_tokens([asked.messages[0]], asked.tools) < estimate_tokens([first.messages[0]], first.tools)
 
 
 async def test_a_run_that_no_standby_model_can_take_over_fails_saying_why(login_env: dict[str, str]) -> None:
