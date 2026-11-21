@@ -153,8 +153,13 @@ def capture_front_window(desktop: DesktopConfig, with_text: bool) -> Capture:
     if role == "secrets":
         raise DesktopError("the window in front belongs to a password manager, which is never captured", {})
     picture = capture.capture_native(window.bounds, desktop.capture_timeout_s)
-    bundles: dict[int, str | None] = {candidate.pid: candidate.bundle_id for candidate in running}
-    picture, _ = capture.black_out(picture, window.bounds, safety.hidden_regions(windows, bundles))
+    # The windows and the applications are read again right after the capture, and what is blacked out is the union of
+    # both readings: a password manager opened while the picture was taken is in it (item 1299).
+    after: tuple[WindowInfo, ...] = screen.windows_on_screen()
+    bundles: dict[int, str | None] = {candidate.pid: candidate.bundle_id for candidate in (*running, *apps.list_apps())}
+    picture, _ = capture.black_out(
+        picture, window.bounds, safety.hidden_regions(safety.merged_windows(windows, after), bundles)
+    )
     width, height = capture.zoom_size(window.bounds, picture.size, _MAX_EDGE)
     text: str = ""
     if with_text:

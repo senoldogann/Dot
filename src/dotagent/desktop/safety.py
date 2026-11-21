@@ -287,6 +287,16 @@ def step_role(name: str, bundle_id: str | None, title: str | None, label: str | 
     return window_role(name, bundle_id, title)
 
 
+def merged_windows(before: Sequence[WindowInfo], after: Sequence[WindowInfo]) -> tuple[WindowInfo, ...]:
+    """The windows of two readings of the screen as one list, each window once as it stood in each reading: one that
+    moved between them is in both places, so that what is blacked out covers the picture whichever it shows (item
+    1299)."""
+    merged: dict[tuple[int, Rect, bool], WindowInfo] = {}
+    for window in (*before, *after):
+        merged.setdefault((window.window_id, window.bounds, window.on_screen), window)
+    return tuple(merged.values())
+
+
 def hidden_regions(
     windows: Sequence[WindowInfo], bundles: Mapping[int, str | None], own: bool = False
 ) -> tuple[Rect, ...]:

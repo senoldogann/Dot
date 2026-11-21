@@ -45,10 +45,17 @@ def _pointer_units(scale: float) -> Point:
 
 def _picture_of(config: DesktopConfig, area: Rect, windows: Sequence[WindowInfo]) -> tuple[Image.Image, int]:
     """The pixels of ``area`` (points) with password manager windows blacked out, and Dot's own while a secret of its
-    vault may be on the screen (item 621), and how many were."""
+    vault may be on the screen (item 621), and how many were.
+
+    ``windows`` is the list read before the capture. The capture takes time, and a password manager opened (or moved)
+    meanwhile is in the picture but not in that list, so the windows are read again right after it and what is blacked
+    out is the union of both lists, with the bundle ids read after the capture too (item 1299)."""
     perms.require_screen_recording()
     picture: Image.Image = capture.capture_native(area, config.capture_timeout_s)
-    hidden: tuple[Rect, ...] = safety.hidden_regions(windows, apps.bundle_ids(), own=shown.on_screen())
+    after: tuple[WindowInfo, ...] = screen.windows_on_screen()
+    hidden: tuple[Rect, ...] = safety.hidden_regions(
+        safety.merged_windows(windows, after), apps.bundle_ids(), own=shown.on_screen()
+    )
     return capture.black_out(picture, area, hidden)
 
 
