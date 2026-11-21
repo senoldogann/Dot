@@ -58,6 +58,7 @@ from dotagent.browser.types import (
     WRITING_ACTIONS,
     ActOutcome,
     FindResult,
+    HumanCheckOutcome,
     PageView,
     Screenshot,
     ScriptRun,
@@ -842,6 +843,134 @@ def _act_tool() -> RegisteredTool:
         ),
         args_model=ActArgs,
         modes=ACTING_MODES,
+        parallel_safe=False,
+        timeout_s=_SLOW_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
+_CHECK_NAMES: dict[str, str] = {
+    "hcaptcha": "hCaptcha",
+    "recaptcha": "reCAPTCHA",
+    "turnstile": "Cloudflare Turnstile",
+    "human_check": "a 'verify you are human' check",
+}
+
+
+def render_human_check(outcome: HumanCheckOutcome) -> str:
+    """What the model is told about a human check: what it was, what passing it took, and the one thing to do next."""
+    name: str = _CHECK_NAMES.get(outcome.kind, "a human check")
+    if outcome.role == "hold":
+        name = "a Press & Hold button"
+    where: str = f" at {outcome.box.words()}" if outcome.box is not None else ""
+    did: str = ", ".join(outcome.did)
+    if outcome.result == "none":
+        return (
+            "No human check is in front of the page: there is nothing to pass here. Go on with the task, and do not "
+            "take a screenshot to look for one."
+        )
+    if outcome.result == "passed":
+        how: str = f"{did} and it passed" if did else "the page already says it passed"
+        said: str = f" ({outcome.note})" if outcome.note else ""
+        return f"Human check: {name}{where} - {how}{said}, in {outcome.seconds:.1f} s. Go on with the task."
+    asks: str = f" The page asks: {outcome.text!r}." if outcome.text else ""
+    if outcome.result == "challenge":
+        grid: str = f", {outcome.cols} by {outcome.rows} tiles" if outcome.cols and outcome.rows else ""
+        send: str = (
+            f"and press {outcome.verify.words()} in the same batch"
+            if outcome.verify is not None
+            else "then press the button it shows (Verify, Next or Skip)"
+        )
+        corner: str = (
+            f" Its top-left corner is x={outcome.box.x:.0f}, y={outcome.box.y:.0f} and every 2 pixels of the picture "
+            f"are 1 of the page."
+            if outcome.box is not None
+            else ""
+        )
+        return (
+            f"Human check: {name}{where} needs eyes{grid}.{asks} The picture below is that box at twice its size."
+            f"{corner} Pick the tiles with browser_act click_at {send}, then call browser_captcha again to see whether "
+            f"it passed."
+        )
+    return (
+        f"Human check: {name}{where} did not clear ({did or 'it was pressed'}; {outcome.note or 'it is still there'}; "
+        f"{outcome.seconds:.1f} s).{asks} The picture below is the check as it stands: look at it, solve it with "
+        f"browser_act click_at or drag_at, and call browser_captcha again."
+    )
+
+
+def _refuse_a_flagged_press(x: float, y: float, ctx: ToolContext) -> None:
+    """Refuse to press a pixel the last snapshot shows something sensitive under (item 1252), without asking anyone:
+    a check drawn over a button that pays is left to ``browser_act``, which weighs it and asks the user, while this
+    tool runs under the browser's own lock and may not wait for an approval inside it (item 1288).
+
+    Only the snapshot's cached lines are read, so nothing here takes the lock the tool already holds."""
+    step: Step = Step(action="click_at", x=x, y=y)
+    for ref in _refs_at(x, y, ctx):
+        element: Element | None = _element_at(ref, ctx)
+        if element is None:
+            continue
+        assessment: StepAssessment = assess_step(step, element, None)
+        if assessment.flags:
+            raise ToolExecutionError(
+                f"Nothing was pressed at {x:.0f},{y:.0f}: the page shows {element.name or element.role!r} there, and "
+                "this tool presses only a check. Press it yourself with browser_act - click_at at that point - which "
+                "weighs what it lands on and asks the user where the policy says so.",
+                {"x": x, "y": y},
+            )
+
+
+class CaptchaArgs(ToolArgs):
+    timeout_s: Annotated[float, at_most(30.0)] = Field(
+        default=8.0,
+        ge=2.0,
+        le=30.0,
+        description="How long to hold a Press & Hold button, or wait for the check to clear (default 8 s).",
+    )
+
+
+def _captcha_tool() -> RegisteredTool:
+    def classify(args: CaptchaArgs, ctx: ToolContext) -> ActionInfo:
+        target: str = ctx.browser.current_url(ctx.thread_id) or ""
+        summary: str = "Find the human check in front of the page and pass it" if args.timeout_s == 8.0 else ""
+        return _action(
+            "browser_captcha",
+            "browser_click",
+            "low",
+            summary or "Find the human check in front of the page",
+            target,
+            (),
+        )
+
+    async def run(args: CaptchaArgs, ctx: ToolContext) -> ToolResult:
+        async def press(x: float, y: float) -> None:
+            # Whatever this call presses is weighed one pixel at a time, as a click_at of browser_act is.
+            _refuse_a_flagged_press(x, y, ctx)
+
+        outcome: HumanCheckOutcome = await ctx.browser.human_check(
+            ctx.thread_id, args.timeout_s, hides_secrets(ctx.approvals), press
+        )
+        text: str = render_human_check(outcome)
+        if outcome.view is not None:
+            text = f"{text}\n\n{render_page_view(outcome.view, _nonce(), _body_budget(ctx))}"
+        picture: tuple[ImageData, ...] = (_jpeg(outcome.crop),) if outcome.crop else ()
+        result: ToolResult = ok_with_images(text, picture) if picture else ok(text)
+        # What the page says and draws is a stranger's words: none of it is marked when there was no check to read.
+        return result if outcome.result == "none" else mark_untrusted(result)
+
+    return make_tool(
+        name="browser_captcha",
+        description=(
+            "Pass the human check in front of the page: hCaptcha, reCAPTCHA, Cloudflare Turnstile, or the site's own "
+            "'Press & Hold' or 'Verify you are human'. It finds the widget in any frame of the page, presses its "
+            "checkbox or holds its button down until the widget says it is done, and reads the page again a few times "
+            "a second instead of sleeping - one call where a screenshot, a guess at a pixel and a wait used to go. "
+            "Call it the moment a page shows a check, and again after acting on an image challenge. A check that needs "
+            "eyes comes back with its own picture at twice its size and the box to click in."
+        ),
+        args_model=CaptchaArgs,
+        modes=ALL_MODES,
         parallel_safe=False,
         timeout_s=_SLOW_TIMEOUT_S,
         classify=classify,
@@ -1828,6 +1957,7 @@ def _browser_tools() -> tuple[RegisteredTool, ...]:
         _find_tool(),
         _links_tool(),
         _act_tool(),
+        _captcha_tool(),
         _eval_tool(),
         _scroll_tool(),
         _read_text_tool(),

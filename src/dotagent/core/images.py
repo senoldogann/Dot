@@ -101,6 +101,32 @@ def render_jpeg(picture: Image.Image, width: int, height: int, quality: int) -> 
         return encoded
 
 
+def crop_scaled(
+    data: bytes, width: int, height: int, box: tuple[float, float, float, float], scale: float, quality: int
+) -> bytes:
+    """The part of a picture of ``width`` by ``height`` CSS pixels inside ``box`` (left, top, width, height), drawn
+    ``scale`` times as large: a captcha's tiles read at twice their size (item 1288). The box is clipped to the
+    picture first, so a widget at the edge of the viewport gives what of it there is."""
+    try:
+        with Image.open(io.BytesIO(data)) as opened:
+            flat: Image.Image = _flatten(opened)
+    except UNREADABLE_IMAGE as exc:
+        raise ToolExecutionError("the data is not a readable image", {"bytes": len(data), "error": str(exc)}) from exc
+    if flat.size != (width, height):
+        flat = flat.resize((width, height), Image.Resampling.LANCZOS)
+    left, top, box_width, box_height = box
+    area = (
+        max(0, min(width, round(left))),
+        max(0, min(height, round(top))),
+        max(0, min(width, round(left + box_width))),
+        max(0, min(height, round(top + box_height))),
+    )
+    if area[2] - area[0] < 1 or area[3] - area[1] < 1:
+        raise ToolExecutionError("the box is outside the picture", {"box": list(box), "size": [width, height]})
+    crop: Image.Image = flat.crop(area)
+    return render_jpeg(crop, max(1, round(crop.width * scale)), max(1, round(crop.height * scale)), quality)
+
+
 def jpeg_of_size(data: bytes, width: int, height: int, quality: int) -> bytes:
     """The JPEG ``data`` at ``width`` by ``height``: as it is when it has that size, else redrawn at it (a page Chrome
     draws larger or smaller than its CSS pixels, item 358, so that a pixel of the picture is one for ``click_at``)."""

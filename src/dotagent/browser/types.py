@@ -271,6 +271,55 @@ class TextWait(FrozenModel):
     still_s: float | None = None
 
 
+class CheckBox(FrozenModel):
+    """A rectangle in CSS pixels of the main frame's viewport, the coordinates ``click_at`` takes (item 1288)."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+
+    @property
+    def center(self) -> tuple[float, float]:
+        return (self.x + self.width / 2, self.y + self.height / 2)
+
+    def clipped(self, width: float, height: float) -> "CheckBox | None":
+        """The part of this box inside a viewport of ``width`` by ``height``; ``None`` when none of it is."""
+        left: float = max(0.0, min(self.x, width))
+        top: float = max(0.0, min(self.y, height))
+        right: float = max(0.0, min(self.x + self.width, width))
+        bottom: float = max(0.0, min(self.y + self.height, height))
+        if right - left < 1 or bottom - top < 1:
+            return None
+        return CheckBox(x=left, y=top, width=right - left, height=bottom - top)
+
+    def words(self) -> str:
+        return f"{self.x:.0f},{self.y:.0f} {self.width:.0f}x{self.height:.0f}"
+
+
+class HumanCheckOutcome(FrozenModel):
+    """What a human check was, what passing it took, and what is left for the run (item 1288).
+
+    ``result`` is ``none`` (no check in front of the page), ``passed`` (it is gone or says so), ``challenge`` (it needs
+    eyes: an image grid or a drag puzzle, handed back as ``crop``) or ``unfinished`` (it was pressed and did not
+    clear)."""
+
+    result: Literal["none", "passed", "challenge", "unfinished"]
+    kind: str
+    role: str
+    box: CheckBox | None
+    text: str
+    seconds: float
+    did: tuple[str, ...] = ()
+    note: str = ""
+    cols: int = 0
+    rows: int = 0
+    verify: CheckBox | None = None
+    crop: bytes = b""
+    crop_box: CheckBox | None = None
+    view: PageView | None = None
+
+
 class TextView(FrozenModel):
     """A slice of the visible text of a page or element."""
 

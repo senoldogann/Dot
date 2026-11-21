@@ -81,6 +81,7 @@ from dotagent.browser.driver import (
     wait_for_text_or_dialog,
 )
 from dotagent.browser.extract import extract_records, render_records
+from dotagent.browser.human_check import PressGuard, pass_human_check
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
 from dotagent.browser.labels import mark_screenshot
 from dotagent.browser.look import PageLook, color_scheme
@@ -145,6 +146,7 @@ from dotagent.browser.types import (
     FindResult,
     Frame,
     HeldValue,
+    HumanCheckOutcome,
     PageView,
     Screenshot,
     ScriptRun,
@@ -3818,6 +3820,30 @@ class BrowserSession:
             tab.born.clear()
             return True
         return False
+
+    async def human_check(
+        self, thread_id: str, timeout_s: float, hide_secrets: bool, guard: PressGuard | None = None
+    ) -> HumanCheckOutcome:
+        """Find the human check in front of the tab and pass the part of it a press can pass (item 1288).
+
+        ``guard`` is put to before every press, with the pixel it would land on, so that its caller weighs the click as
+        the policy weighs a ``click_at`` (item 1252)."""
+        async with self._locked(thread_id) as thread:
+            tab: Tab = await self._current_tab(thread)
+            await self._enforce_landing(tab)
+            outcome: HumanCheckOutcome = await pass_human_check(tab.page, timeout_s, guard)
+            if outcome.result != "passed":
+                return outcome
+            # A page whose check passed often loads again on its own: the view is read once it has.
+            await self._settle(tab)
+            current: Tab = await self._current_tab(thread)
+            await self._enforce_landing(current)
+            view: PageView = (
+                await self._changes_view(thread, current, hide_secrets)
+                if current is tab
+                else await self._settled_view(thread, current, hide_secrets)
+            )
+            return outcome.model_copy(update={"view": view})
 
     async def act(
         self,

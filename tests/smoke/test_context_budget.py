@@ -103,7 +103,11 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 1,450 for continuing work (item 1227, the owner's ask of 2026-11-19): the five `pipeline_*` tools that keep
 # a client ledger in its record file (a mail begun before it goes out, never sent twice, outcomes apart) and the six
 # parts of how an objective's work is done, each cut to a line after a first wording took 1,800 (29,443 measured here).
-BUDGET_TOKENS: int = 29_750
+# Raised by 300 for `browser_captcha` (item 1288, the owner's ask of 2026-11-21: a run waited too long at captchas and
+# verification pages - a screenshot, a guessed pixel and a sleep apiece, and a "Press & Hold" never passed): one tool
+# that finds the check in any frame, presses or holds it and waits for it to clear, and hands back its picture at twice
+# its size when it needs eyes (29,891 measured here; tools 21,118, which is 400 more than the 20,850 before it).
+BUDGET_TOKENS: int = 30_050
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -133,7 +137,8 @@ SYSTEM_BUDGET_TOKENS: int = 8_900
 # Raised by 200 for the two fields of a browser step and the words of its result of item 1145 above (19,195 measured).
 # Raised by 300 for `watch_video` of item 1212 above (19,472 measured).
 # Raised by 1,350 for the pipeline tools and the parts of an objective's work of item 1227 above (20,808 measured).
-TOOLS_BUDGET_TOKENS: int = 20_850
+# Raised by 400 with `browser_captcha` of item 1288 above (21,118 measured).
+TOOLS_BUDGET_TOKENS: int = 21_250
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

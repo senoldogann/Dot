@@ -188,6 +188,15 @@ Both modes share what follows.
   the page out or is read rather than pressed (a heading). The picture kept with the step, which is what you see, has
   no marks. A mark is where the latest snapshot drew the element: a page that has moved since is marked there, and a
   new snapshot lines the marks up again. A model that cannot see is shown the same marked picture.
+- `browser_captcha` finds the human check in front of the page and passes the part of it a press can pass, in one call
+  (item 1288): it reads the DOM of every frame for hCaptcha, reCAPTCHA, Cloudflare Turnstile and a site's own
+  pressable "Press & Hold" or "Verify you are human" button, takes each box in CSS pixels of the main frame's viewport,
+  presses a checkbox or holds a button down (until the widget stops asking for it, at most `timeout_s`, 8 s by default)
+  and reads the page again every 120 ms until the check clears - the widget gone, its box checked, the site's token
+  set, or the widget's own words saying success - so a page that is still checking itself is left the moment it goes
+  on, not after a fixed wait. What needs eyes comes back as the check's own picture at twice its size, the box it came
+  from, its tile count when the widget names it (reCAPTCHA's `rc-imageselect-table-33` and `-44`) and the box of its
+  Verify / Next button; the answer also carries the page after a pass. See [Captcha](captcha.md).
 - A collapsed dropdown lists its options on its own line, for example
   `combobox "Shipping" [ref=e3]: options "Standard (3-5 days)" [selected], "Express (next day)"`. `select` takes the
   label or the value of one of them, written as listed; a choice that is not there is refused at once with the options
@@ -326,8 +335,14 @@ Both modes share what follows.
   frame too, each that holds no other, put in the place of the control above it (a button's icon presses the button),
   and all of them where boxes overlap, since the snapshot does not say which is on top; so a payment button is a payment
   by its pixel as by its ref. Where the snapshot drew nothing (a canvas), the step is judged by its pixel alone, as
-  before. A step at a pixel goes first in its batch (several in a row are fine): after a step that may move the page it
-  is sent back, to be taken from a new screenshot.
+  before. `browser_captcha`'s own presses are weighed too, one at a time, before the mouse moves, by the elements the
+  snapshot shows under them and by the policy's own reading of those elements' names - not by the typed judge
+  `browser_act` adds for a label no pattern knows, since a check's own words explain the press. It presses nothing it
+  cannot pass: a payment button that a page labels like a check is refused, and the run is told to press it with
+  `browser_act`, which asks the user; a "Verify you are human" line does not press the button drawn beside it. The tool
+  runs under the browser's lock, so it never waits for an approval to hold that lock. A step at a pixel goes first in
+  its batch (several in a row are fine): after a step that may move the page it is sent back, to be taken from a new
+  screenshot.
 - In a rich editor (a contenteditable area such as X's composer) `fill`, `type` and `insert` give the editor the focus
   when it does not have it and wait until it has settled, check the field that has the focus for a secret, write, and
   fail when the editor's text did not change, instead of reporting done; a `fill` that leaves the editor holding its

@@ -1,70 +1,70 @@
 ---
 name: captcha
-description: "Pass an hCaptcha, reCAPTCHA or Cloudflare Turnstile human check in Dot's Chrome by looking at the page and clicking or dragging, without stopping to ask the owner: a checkbox, an image grid, a drag puzzle or a managed challenge. Use whenever a page says 'Verify you are human', 'I am human', 'Checking your browser' or shows a captcha frame."
+description: "Pass an hCaptcha, reCAPTCHA, Cloudflare Turnstile, a 'Press & Hold' button or another human check in Dot's Chrome by calling browser_captcha, which presses or holds the widget itself, and only what it hands back as a picture is solved by looking and clicking or dragging, without stopping to ask the owner. Use whenever a page says 'Verify you are human', 'I am human', 'Press & Hold', 'Checking your browser' or shows a captcha frame."
 ---
 
 # The human check
 
 A human check is part of the task, not the end of it. The owner has said, as a standing instruction, that Dot solves
-these itself and does not stop to ask: solve it with the browser's screenshot and pixel actions, then carry on with
-the work.
+these itself and does not stop to ask. `browser_captcha` does the mechanical part in one call; this skill is about what
+is left after it.
 
 This is for the owner's own Chrome session and the flow he is already in (his job application, his account, his form).
 It is not for mass account creation, spam, scraping a site that forbids it, or a captcha farm.
 
-## What is in front of you
+## First call, every time
 
-| The page shows | It is | What to do |
+`browser_captcha` (with no arguments to start; `timeout_s` up to 30 if a check is slow). One call does what a
+screenshot, a guess at a pixel and a sleep used to do:
+
+- It finds the widget in the page or in any frame of it - hCaptcha, reCAPTCHA, Cloudflare Turnstile, or the site's own
+  "Press & Hold" / "Verify you are human" button - and says where it is in page pixels.
+- It presses a checkbox, or **holds** a "Press & Hold" button down, and lets go when the widget says it took it.
+- It reads the page again a few times a second until the check clears, and stops the moment it does. The answer is
+  `passed` (carry on), `challenge` (it needs eyes), `unfinished` (pressed, still there) or `none` (there is no check:
+  do not go looking for one with a screenshot).
+- A check that passed comes with the page as it stands after it, so the next step is often the one after this call.
+
+Do not take a screenshot to find a captcha, and do not guess at a pixel, before you have called it.
+
+## What the picture is, when it answers `challenge`
+
+The result carries the check's own picture at **twice** its size, with the box it came from: its top-left corner is the
+`x, y` the answer names, and every 2 pixels of the picture are 1 pixel of the page. The answer also names the tiles'
+count when the widget says it (3 by 3, 4 by 4) and the box of the challenge's **Verify** / **Next** button.
+
+| The picture shows | It is | What to do |
 | --- | --- | --- |
-| A box with "I am human" / "I'm not a robot" | hCaptcha / reCAPTCHA v2 checkbox | `click_at` its centre, wait 2 s, take a screenshot again |
-| "Please click each image containing …", a 3×3 or 4×4 grid | reCAPTCHA / hCaptcha image challenge | click each matching tile, then Verify/Next; repeat if it refreshes |
+| "Please click each image containing …", a grid | reCAPTCHA / hCaptcha image challenge | click each matching tile at its centre with `click_at`, press the Verify box the answer named in the same batch, then call `browser_captcha` again |
 | "Please drag the shape to the loop that is closed" | hCaptcha drag puzzle | `drag_at` the shape into the closed loop |
-| "Verify you are human" in a small Cloudflare box | Turnstile | `click_at` the checkbox, wait 10–15 s; often no puzzle follows |
-| "Checking your browser before accessing…" | Cloudflare managed challenge | wait 10–15 s; if it does not pass, open the same URL in a new tab and wait again |
 | An audio button, headphones or "Get an audio challenge" | audio fallback | use it only after the visual way failed twice |
 
-The widget is usually a cross-origin iframe. A ref cannot reach inside it, so `browser_snapshot` may show only the
-frame. That is why the screenshot and pixel coordinates are the way in: a pixel of `browser_screenshot` is a CSS pixel
-of the page, and `click_at` / `drag_at` use the same pixels.
+Tiles and checkboxes have a margin; the **centre** is safe. From the answer's `x, y` and the tile count, the centre of
+tile (i, j) is `x + (i + 0.5) * width / cols`, `y + (j + 0.5) * height / rows`. Batch every matching tile of one grid
+into one `browser_act` call and end it with the Verify box: a captcha redraws after a stray click, and every extra
+round trip is a chance to lose it.
 
-## The loop
+For the drag puzzle, the shape is usually at the bottom and the targets are outlines above it. Take the outline that is
+**closed** (no gap) and matches the shape's curve; drag from the shape's centre, in one smooth line, and let go in the
+loop's centre. If it snaps back, start 2–3 px inside the shape or take the next closed loop.
 
-1. **Wait for the widget** (2–5 s after the page loads), then `browser_screenshot`. If it is below the fold, scroll it
-   into view first, then screenshot again.
-2. **The checkbox.** `browser_act` with `click_at` at the centre of the box. Wait 2 s and screenshot: either the check
-   turns green (done), or a challenge opens.
-3. **An image grid.** Read the prompt ("traffic lights", "crosswalks", "bicycles"…). The grid is a rectangle in the
-   screenshot: divide it into its rows and columns and click the centre of every matching tile. Take a new screenshot
-   after a few clicks if the grid redraws. Press **Verify** / **Next** when the prompt says so; a new grid may appear —
-   solve it the same way, up to three rounds.
-4. **A drag puzzle.** The shape is usually at the bottom; the targets are outlines above it. Find the outline that is
-   **closed** (no gap) and matches the shape. `browser_act` with:
-   `{"action": "drag_at", "x": shape_x, "y": shape_y, "to_x": loop_x, "to_y": loop_y}`.
-   Press at the shape's centre, move in one smooth line, let go in the loop's centre. Wait 1–2 s and screenshot; if
-   the shape snaps back, try the next closed loop, or start the drag 2–3 px inside the shape.
-5. **Cloudflare.** Click the Turnstile checkbox and wait 10–15 s. Do not reload in a loop: a reload is a new challenge
-   and looks like a bot. If it spins, open the same URL in a new tab in the same profile and wait there. A real Chrome
-   profile (Dot's own) usually passes a managed challenge with no puzzle.
-6. **Check it passed.** The widget disappears, the page shows its next content, or a success word appears. Use
-   `browser_wait_text` or a fresh `browser_snapshot`; do not assume the check passed because you clicked. Then go on
-   with the task — the form's Send, the next page, the upload.
-7. **If it fails.** Try another way: a new screenshot and different tiles, the other closed loop, a new tab for
-   Cloudflare, the audio challenge after two visual failures. Three honest attempts per widget is the limit. Then leave
-   the tab open and say in the result what is left; do not ask the owner to solve it and do not sit on the page until
-   it times out.
+## After a pass, and when it does not pass
+
+`browser_captcha` answers `passed` only when the page says so (the widget is gone, its box is checked, the site's token
+is set, or the check's own words say success). Go on with the task from the page the answer carries: the form's Send,
+the next page, the upload.
+
+An `unfinished` answer comes with the check's picture as it stands: look at it. A widget whose inside could not be read
+(rare), a grid that opened without a prompt, a spinner that never ended - solve it from the picture with `click_at` or
+`drag_at`, then call `browser_captcha` again. Three honest attempts per widget is the limit; then leave the tab open
+and say in the result what is left. Do not ask the owner to solve it and do not sit on the page until it times out.
 
 ## The details that decide it
 
-- **Look before every click.** A captcha redraws its images and moves its tiles after each click; coordinates from an
-  old screenshot are wrong. One screenshot, one small batch of clicks, one screenshot.
-- **Click centres.** Tiles and checkboxes have a margin; the centre is safe. For a 400×400 grid at (x0, y0), the
-  centres are at `x0 + (i + 0.5) * 400 / 3`, `y0 + (j + 0.5) * 400 / 3`.
-- **hCaptcha drag:** "the loop that is closed" means the outline without a gap. If two look closed, the one whose
-  curve matches the shape's edge is the target. Drag from the shape, not from the empty canvas.
-- **reCAPTCHA** often needs several rounds: grid, then a second grid, then Verify. Do not press Verify before every
-  matching tile is clicked.
-- **Cloudflare** judges the whole browser, not the click: a visible, persistent Chrome profile passes more often than
-  a fresh headless one. Dot's own Chrome is the visible profile; use it and wait rather than retrying.
+- **Cloudflare judges the whole browser, not the click.** Dot's own Chrome is a persistent, visible profile and passes
+  most managed checks with no puzzle. `browser_captcha` waits for it and stops as soon as the page goes on; if it
+  answers `unfinished`, open the same URL once in a new tab and call `browser_captcha` there. Never reload in a loop: a
+  reload is a new challenge and looks like a bot.
 - **Never** ship the challenge to a solving service, paste its images into a chat, or use a CAPTCHA farm. The check is
   solved here, in the owner's own session, by looking at it.
 - **Never** solve a check to create accounts, send spam, or get past a site's access control for a flow the owner is
@@ -73,5 +73,6 @@ of the page, and `click_at` / `drag_at` use the same pixels.
 ## If the page is a Cloudflare block, not a check
 
 "Sorry, you have been blocked" or a Ray ID with no checkbox is not a puzzle: the site refused this browser or this IP.
-Do not hammer it. Try the same URL once in a new tab; if it is still blocked, say so with the Ray ID and the page, and
-finish the part that does not need that site.
+`browser_captcha` answers `none` there, or `unfinished` with the block's own words. Do not hammer it. Try the same URL
+once in a new tab; if it is still blocked, say so with the Ray ID and the page, and finish the part that does not need
+that site.
