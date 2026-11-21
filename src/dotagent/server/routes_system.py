@@ -107,11 +107,12 @@ from dotagent.help.elsewhere import (
 from dotagent.launchd import JobState, inspect_job, service_runs
 from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, model_label
 from dotagent.llm.claude_code import MODELS as CLAUDE_CODE_MODELS
+from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.roles import ModelRoles
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
-from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS, Effort, ModelInfo, answers_role
+from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS, ChatProvider, Effort, ModelInfo, answers_role
 from dotagent.notify.health import NotifyHealth
 from dotagent.opencode.server import learns_from_data
 from dotagent.secrets import secret_state
@@ -154,6 +155,7 @@ from dotagent.server.views import (
     RestartView,
     ResumeRequest,
     ResumeView,
+    RetiredModel,
     RoleModelRequest,
     SandboxRequest,
     SandboxView,
@@ -237,14 +239,24 @@ async def _provider_models(
 ) -> ProviderModels:
     """The models of one provider; a provider that cannot be reached is reported, it does not fail the others."""
     try:
-        infos: tuple[ModelInfo, ...] = await (await router.provider(provider)).list_models()
+        connector: ChatProvider = await router.provider(provider)
+        infos: tuple[ModelInfo, ...] = await connector.list_models()
     except DotError as exc:
         return ProviderModels(provider=provider, models=[], error=exc.message, problem=_problem(exc))
+    retired: list[RetiredModel] = (
+        [
+            RetiredModel(model=one.model, use=one.use, message=one.message, since=one.since)
+            for one in connector.retired()
+        ]
+        if isinstance(connector, OllamaProvider)
+        else []
+    )
     return ProviderModels(
         provider=provider,
         models=[_option(provider, info, default_effort, agent, sizes) for info in infos],
         error=None,
         problem=None,
+        retired=retired,
     )
 
 

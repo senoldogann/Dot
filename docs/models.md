@@ -41,6 +41,11 @@ and the night's roles offer the Claude plan's too. A cloud model that Ollama's s
 list until `ollama rm` removes it, and refuses every question with HTTP 410: the menu leaves it out and the log names
 it (`ollama_model_retired`, with the command that removes it), so that it does not take Ollama's other models with it
 (item 1195: `mistral-large-3:675b-cloud`, retired on 2026-11-09, emptied the menu of Ollama).
+A retirement is remembered for 6 hours (item 1309), so the list's refresh does not ask the dead model again, and the
+words of the service are read for the model it says to try (`Try glm-5.3-flash:cloud`): `GET /models` gives Ollama's
+`retired` entries (`model`, `use`, `message`, `since`), and `dotx doctor` has a row for each, which fails when a role of
+your `config.toml` (`main`, `vision`, `fast`, `review`, `helpers`, `standby`) names the model and says which. Dot does
+not change your configuration: the model to use instead is yours to choose, and the row says what the service suggests.
 A model of your Claude plan (`claude_code:opus`, `claude_code:sonnet`, or any other it offers) may be the review model, as every question of it is a single one the
 plan answers (item 1032), and the own work model, as its look is a run that has every tool of Dot's own loop there
 (its list, your mail and calendar; item 1063); not the fast model, which takes a run's steps, nor the vision model,
