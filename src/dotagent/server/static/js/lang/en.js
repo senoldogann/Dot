@@ -577,6 +577,7 @@ export const EN = {
   "timeline.waitAgain": "{why}; tried {count} times; Dot asks again at {at} and keeps asking until {until}.",
   "timeline.reconnected": "The connection to {host} is back after {took}; Dot asks {model} again.",
   "timeline.modelBack": "{model} answered again after {took}; Dot goes on",
+  "timeline.scheduleEffort": "This schedule asked for {asked} reasoning, which its model does not offer; it now runs at {kept}.",
   "timeline.helperDown": "The helper {model} cannot answer ({reason})",
   "timeline.helperDownUntil": "The helper {model} cannot answer ({reason} until {until})",
   "timeline.judgeDown": "The extra checker (TypeSafe) cannot answer ({reason}) until {until}. Until then Dot's safety rules and the goal check decide alone.",

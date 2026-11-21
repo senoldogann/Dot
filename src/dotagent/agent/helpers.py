@@ -23,6 +23,9 @@ from dotagent.secrets import secret_state
 HELPER_UNAVAILABLE_EVENT: str = "helper_unavailable"
 # A run moved to a standby model because its own model could not answer.
 MODEL_SWITCHED_EVENT: str = "model_switched"
+# A schedule's firing ran at another reasoning level than the schedule had, which its model does not offer, and the
+# schedule keeps the new one (item 1307).
+SCHEDULE_EFFORT_EVENT: str = "schedule_effort_changed"
 _NO_KEY: str = "no key"
 # Why OpenCode's agent and the Claude plan stand by for nothing: each works a whole run in its own program, and no step
 # of Dot's own loop can be asked of it (llm/types.py WHOLE_RUN_AGENTS).

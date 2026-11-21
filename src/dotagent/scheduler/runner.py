@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from dotagent.agent.helpers import SCHEDULE_EFFORT_EVENT
 from dotagent.agent.learning_health import (
     LEARNED,
     SKIPPED,
@@ -16,7 +17,7 @@ from dotagent.agent.learning_health import (
     quiet_limit,
     record_learning,
 )
-from dotagent.agent.manager import RunManager, thread_title
+from dotagent.agent.manager import RunManager, agent_bounds, thread_title
 from dotagent.agent.reflection import last_reflection, record_reflection_failure, reflection_due
 from dotagent.agent.reflection_record import REFLECTION_OFF, Reflection, summary_line
 from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT
@@ -27,7 +28,7 @@ from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.schedule import schedule_of
 from dotagent.harness.weekly import night as harness_night
-from dotagent.llm.types import Speed
+from dotagent.llm.types import Effort, Speed
 from dotagent.memory.service import backfill
 from dotagent.notify.owner import tell_owner
 from dotagent.plugins import scout_service
@@ -1262,6 +1263,67 @@ class Scheduler:
         (item 666), as the owner's agent the schedule names, within that agent's bounds (item 462), or as Dot."""
         options: ScheduleOptions = record.options
         speed: Speed = "standard" if options.speed is None else options.speed
+        asked: Effort | None = options.effort
+        model: str | None = await self._firing_model(options)
+        kept: Effort | None = await self._corrected_effort(record, model)
+        if kept != asked:
+            options = options.model_copy(update={"effort": kept})
+        run: RunRecord = await self._started(record, options, opening, thread_id, carried, speed)
+        if kept != asked and kept is not None and asked is not None:
+            await self._runtime.bus.emit(
+                run.id,
+                SCHEDULE_EFFORT_EVENT,
+                {"schedule_id": record.id, "name": record.name, "asked": asked, "kept": kept, "model": model},
+                True,
+            )
+        return run
+
+    async def _firing_model(self, options: ScheduleOptions) -> str | None:
+        """The model a firing with ``options`` runs on, as the run takes it: the schedule's own, for an agent's
+        schedule else the agent's, else ``None`` for the configured main model (:func:`agent_bounds`, so that the level
+        is judged against the model that will run it). An agent that cannot be read leaves the schedule's own: the
+        start that follows fails on it as it did."""
+        if options.agent_id is None:
+            return options.model
+        try:
+            agent: AgentRecord = await self._runtime.store.get_agent(options.agent_id)
+        except NotFoundError:
+            return options.model
+        return agent_bounds(agent, options.model, None, None).model
+
+    async def _corrected_effort(self, record: ScheduleRecord, model: str | None) -> Effort | None:
+        """The level ``record``'s firing on ``model`` runs at: its own when that model offers it. When the model does
+        not, the level the model takes for it is written into the schedule, once, so that the next firings find it
+        offered and say nothing (item 1307); a model with no choice leaves the schedule as it is and runs at none."""
+        options: ScheduleOptions = record.options
+        if options.effort is None:
+            return None
+        kept: Effort | None = await self._manager.firing_effort(model, options.effort)
+        if kept is not None and kept != options.effort:
+            log.warning(
+                "schedule_effort_corrected",
+                schedule_id=record.id,
+                model=model,
+                asked=options.effort,
+                kept=kept,
+            )
+            try:
+                await self._runtime.store.set_schedule_effort(record.id, kept)
+            except StoreError as exc:
+                # The firing goes on at the corrected level; the next one corrects it again.
+                log.error("schedule_effort_not_written", schedule_id=record.id, error=exc.message)
+        return kept
+
+    async def _started(
+        self,
+        record: ScheduleRecord,
+        options: ScheduleOptions,
+        opening: str,
+        thread_id: str,
+        carried: tuple[str, ...],
+        speed: Speed,
+    ) -> RunRecord:
+        """The run of a firing of ``record`` with ``options``, as Dot or as the agent they name."""
         if options.agent_id is None:
             return await self._manager.start_firing(
                 record.goal,
