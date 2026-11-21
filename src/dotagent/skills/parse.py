@@ -13,8 +13,12 @@ _DELIMITER: str = "---"
 
 
 def split_frontmatter(path: Path, text: str) -> tuple[str, str]:
-    """The YAML between the opening ``---`` line and the closing one, and everything after the closing line."""
+    """The YAML between the opening ``---`` line and the closing one, and everything after the closing line. Blank
+    lines before the opening line (a file an editor or a generator began with a newline) are read past; anything else
+    there is the error."""
     lines: list[str] = text.lstrip("﻿").splitlines(keepends=True)
+    while lines and lines[0].strip() == "":
+        lines.pop(0)
     if not lines or lines[0].strip() != _DELIMITER:
         raise SkillError("SKILL.md does not start with the --- line that opens the frontmatter", {"path": str(path)})
     for index in range(1, len(lines)):
