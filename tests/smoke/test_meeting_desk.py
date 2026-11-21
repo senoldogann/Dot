@@ -352,7 +352,7 @@ async def test_captions_turned_off_in_the_call_have_dot_leave_and_say_why(
     meeting: MeetingRecord = await joining
     told: int = len(room.told)
     # The host turns the captions off: the stand-in's toggle, as Meet's.
-    await room.pages[-1].click("button[aria-label='Turn off captions']")
+    await room.pages[-1].click("button[aria-label^='Turn off captions']")
     await _told(room, told + 1)
     ended: MeetingRecord = await room.store.get_meeting(meeting.id)
     assert ended.status == "ended" and "captions were turned off" in ended.note
