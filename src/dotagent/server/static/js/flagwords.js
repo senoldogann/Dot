@@ -20,7 +20,7 @@ const FLAG_WORDS = {
   outside_workspace: "reaches outside Dot's own folder",
   persistence: "leaves something that stays after the task",
   upload: "uploads a file",
-  self_change: "changes Dot's own files",
+  self_change: "changes Dot's own files or a file git runs by itself",
   vault_fill: "fills in a login of your vault or password manager, or makes one",
   release: "puts a project's change live",
 };

@@ -2719,6 +2719,83 @@ def _assess_git(args: list[str], scope: ShellScope) -> Finding:
     return _finding("low", (), f"git {sub or 'command'}")
 
 
+# What a git subcommand writes beyond its repository, as an option names the file or folder: ``(short, long)`` of the
+# options of each subcommand (``--output`` is the diff options' own, which ``diff``, ``log`` and ``show`` take).
+_GIT_OUTPUT_OPTIONS: dict[str, tuple[tuple[str, str], ...]] = {
+    "archive": (("-o", "--output"),),
+    "format-patch": (("-o", "--output-directory"),),
+    "checkout-index": (("", "--prefix"),),
+}
+_GIT_DIFF_OUTPUT: tuple[str, str] = ("", "--output")
+# The options with which git is given a command line it runs through a shell: ``(short, long)`` of each subcommand's.
+_GIT_LINE_OPTIONS: dict[str, tuple[tuple[str, str], ...]] = {
+    "rebase": (("-x", "--exec"),),
+    "difftool": (("-x", "--extcmd"),),
+}
+# The options of every subcommand that name a program git starts in place of its own (``fetch --upload-pack=CMD``).
+_GIT_PROGRAM_OPTIONS: tuple[str, ...] = ("--upload-pack", "--receive-pack", "--exec")
+_GIT_FOREACH_SWITCHES: frozenset[str] = frozenset({"--recursive", "-q", "--quiet"})
+_GIT_FILTER_SUFFIX: str = "-filter"
+_GIT_FILTER_PATHS: frozenset[str] = frozenset({"--subdirectory-filter"})
+# ``git grep``'s option that names the program the files it finds are opened in: ``-O<command>`` and
+# ``--open-files-in-pager=<command>``, the value glued to the option.
+_GIT_PAGER_OPTIONS: tuple[str, str] = ("-O", "--open-files-in-pager=")
+
+
+def _git_option_values(rest: list[str], options: tuple[tuple[str, str], ...]) -> list[str]:
+    return [value for short, long in options for value in _option_values(rest, short, long) if value]
+
+
+def _git_filters(rest: list[str]) -> list[str]:
+    """The commands ``git filter-branch`` is given: the value of each ``--<name>-filter`` option but the one that
+    names a folder (``--subdirectory-filter``)."""
+    values: list[str] = []
+    for index, word in enumerate(rest):
+        name, equals, value = word.partition("=")
+        if name.startswith("--") and name.endswith(_GIT_FILTER_SUFFIX) and name not in _GIT_FILTER_PATHS:
+            values.extend([value] if equals else rest[index + 1 : index + 2])
+    return values
+
+
+def _git_pagers(rest: list[str]) -> list[str]:
+    """The commands ``git grep`` is given to open the files it finds in: ``-O<command>`` and
+    ``--open-files-in-pager=<command>`` (the value is glued to the option, so ``-O`` alone names none)."""
+    short, long = _GIT_PAGER_OPTIONS
+    values: list[str] = [
+        word.removeprefix(option) for word in rest for option in (short, long) if word.startswith(option)
+    ]
+    return [value for value in values if value]
+
+
+def _git_runs_and_writes(args: list[str], scope: ShellScope) -> list[Finding]:
+    """What git does beyond the repository (``_assess_git`` reads the line's own words): the file or folder an option
+    writes (``diff --output=PATH``, ``archive -o``, ``format-patch -o``, ``bundle create PATH``, ``checkout-index
+    --prefix``), judged as a redirect to it is, and the command line an option hands it (``rebase --exec``,
+    ``bisect run``, ``submodule foreach``, ``filter-branch --tree-filter``, ``grep -O``, ``difftool -x``,
+    ``--upload-pack``), judged as the line it is."""
+    sub, rest = _git_subcommand(args)
+    where: ShellScope = _git_scope(args, rest, scope)
+    written: list[str] = _git_option_values(rest, (_GIT_DIFF_OUTPUT, *_GIT_OUTPUT_OPTIONS.get(sub, ())))
+    operands: list[str] = _positional(rest)
+    if sub == "bundle" and operands[:1] == ["create"]:
+        written.extend(operands[1:2])
+    lines: list[str] = _git_option_values(rest, _GIT_LINE_OPTIONS.get(sub, ()))
+    lines.extend(value for option in _GIT_PROGRAM_OPTIONS for value in _option_values(rest, "", option) if value)
+    if sub == "filter-branch":
+        lines.extend(_git_filters(rest))
+    if sub == "grep":
+        lines.extend(_git_pagers(rest))
+    if sub == "submodule" and rest[:1] == ["foreach"]:
+        lines.append(" ".join(word for word in rest[1:] if word not in _GIT_FOREACH_SWITCHES))
+    findings: list[Finding] = _writes_to(
+        f"git {sub}", [value for value in written if value not in _QUIET_TARGETS], where
+    )
+    if sub == "bisect" and rest[:1] == ["run"]:
+        findings.extend(_assess_simple(rest[1:], where, _NO_INPUT))
+    findings.extend(found for line in lines if line.strip() for found in _assess_all(line, where))
+    return findings
+
+
 def _clone_operands(rest: list[str]) -> list[str]:
     """The operands of ``git clone`` (its address, then the folder it may be given), its options left out."""
     operands: list[str] = []
@@ -4074,7 +4151,7 @@ def _assess_command_body(command: str, args: list[str], scope: ShellScope, given
     if reader is not None:
         return reader
     if command == "git":
-        return [_assess_git(args, scope), *_cloned_into(args, scope)]
+        return [_assess_git(args, scope), *_cloned_into(args, scope), *_git_runs_and_writes(args, scope)]
     if command in _NETWORK_FETCHERS:
         return [_assess_network_fetcher(command, args), *_writes_to(command, _fetched_files(command, args), scope)]
     if command in _REMOTE_COPY:

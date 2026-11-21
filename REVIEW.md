@@ -126,6 +126,12 @@ here points at a test that no longer exists.
 - `tests/unit/test_check_item_records.py::test_a_commit_that_writes_another_items_records_is_an_offence` — a branch
   renumbered to the number main had just taken wrote over that item's changelog and roadmap, twice in one pull request
   (item 1265, the gate's `scripts/check_item_records.py`).
+- `tests/unit/test_shell_guard_git.py::test_the_file_tools_ask_for_what_git_runs_and_for_nothing_else_in_a_repository` — a
+  file tool wrote a repository's `config` or `hooks` as `low`, and a glob in the `.git` part of the path
+  (`proj/.gi?/config`) was read as a different folder (item 1301).
+- `tests/unit/test_shell_guard_git.py::test_git_given_a_place_to_write_or_a_line_to_run_is_judged_by_it` — `_assess_git`
+  ended at the subcommand, so `git rebase --exec`, `bisect run`, `submodule foreach`, `filter-branch --*-filter`,
+  `grep -O` and `diff --output` ran or wrote anything as `low` (item 1301).
 
 ## Evidence and format
 

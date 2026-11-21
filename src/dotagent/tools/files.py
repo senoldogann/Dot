@@ -23,7 +23,7 @@ from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.photos import MACOS_IMAGE_SUFFIXES, drawn_by_macos
 from dotagent.core.text import truncate_middle
 from dotagent.office import OfficeKind, names_office_file, office_kind, office_text, unreadable_office_file
-from dotagent.policy.paths import CHANGES_DOT, PathClass, classify_path, expand_path
+from dotagent.policy.paths import CHANGES_DOT, CHANGES_GIT_CODE, PathClass, classify_path, expand_path, runs_as_git_code
 from dotagent.policy.types import ActionInfo, Flag, Risk
 from dotagent.tools.base import (
     ACTING_MODES,
@@ -118,7 +118,10 @@ def write_action(
     risk: Risk
     flags: tuple[Flag, ...]
     summary: str = f"{verb} {path}"
-    if path_class in ("workspace", "temp"):
+    if path_class not in ("dot", "protected") and runs_as_git_code(path):
+        # A repository's config and hooks run the next time git does: a change of them is one of what runs on the Mac.
+        risk, flags, summary = "high", ("self_change",), f"{summary} ({CHANGES_GIT_CODE})"
+    elif path_class in ("workspace", "temp"):
         risk, flags = "low", ()
     elif path_class == "home":
         risk, flags = "medium", ("outside_workspace",)

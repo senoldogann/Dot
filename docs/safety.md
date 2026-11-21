@@ -1095,6 +1095,19 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   is refused, never followed (item 556). A plugin's MCP servers, and those you added, start with the
   daemon and are given keys from the key store: put a plugin or a skill in place yourself, or install one from
   Customize › Plugins, which takes a gallery plugin's skills alone, as its commit pins them (item 542).
+- A file git runs as code is asked about like Dot's own files when a file tool writes it (item 1301): the `config` of a
+  git directory (`.git/config`, `.git/modules/<name>/config`, a bare repository's `config`, `config.worktree`: it can
+  name a program for `core.fsmonitor`, `core.sshCommand`, an alias or a filter) and what lies under its `hooks` run the
+  next time git does in that repository, whatever the folder. A write of one by `write_file`, `edit_file`, OpenCode or
+  the pipeline is `self_change`: a question to you in every approval mode but `yolo`, which no rule of yours and no
+  review model answers. The path is the one the tool is given; a glob in it that can match `.git`, `hooks` or `config`
+  counts. What git writes itself (`git config`, `git init`, `git clone`, `git commit`) is a command and not read this
+  way, nor is `.gitattributes`, which only names a driver the config defines. Not covered, decision needed: a shell
+  line that writes `.git/config` or `.git/hooks/*` by a redirect or a copy is still judged as any workspace write. The
+  shell-side reading of such lines was tried and dropped after three reviews each found a new spelling (`cp -t`, `mv`,
+  `tar -C`, `rsync` source folders, a global `--bare`, `--git-dir`, globs). Closing the class needs the sandbox to deny
+  writes to `**/.git/config` and `**/.git/hooks/**` for commands that are not git, or a write allowlist; that is a
+  separate decision for the owner, as it can break `git clone`-style flows run through other tools.
 - What a run did to Dot is not taught to the next (item 585). A run that changed what is listed above, or whose helper
   did, is never distilled into a learned skill, whatever the review model says of it, and the model is not asked; the
   skip is logged with its reason. A helper is a run the run delegated: its steps are read with the run's own, by the
@@ -1415,6 +1428,12 @@ event and approval.
 > which every preset asks about. How it reads is checked against zsh itself: a test runs the lines that fooled it
 > before in a real zsh whose only programs are recorders, and every recorded delete outside the workspace or read of a
 > protected file must be a line a preset asks about (item 1250).
+> What git is given to write or to run is read too (item 1301): the file or folder a `git diff|log|show --output`,
+> `archive -o`, `format-patch -o`, `bundle create` or `checkout-index --prefix` names is judged as a redirect to it, and
+> the command line of `rebase --exec`/`-x`, `bisect run`, `submodule foreach`, `filter-branch --*-filter`, `grep -O`,
+> `difftool -x` or `--upload-pack`/`--receive-pack` as the same line under `bash -c`; `git rebase -i`, `git bisect
+> start` and a diff into a workspace file stay as they were. An option spelt in git's shortened form (`--out=...`) is
+> not read. A path inside a workspace repository's `.git` that such an option names is judged as any workspace path.
 > A script the line downloads and then runs (`curl -o`, `wget -O` or `git clone`, then a shell, `source`, its path or an
 > interpreter such as `python3`, also after a `cp`, an `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh |
 > bash`) is judged as piping the download into a shell; a file named after an at sign (`curl --data-binary @file`) as

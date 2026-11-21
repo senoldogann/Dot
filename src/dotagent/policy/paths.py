@@ -17,6 +17,13 @@ from dotagent.core.errors import NulCharacterError, PolicyDenied
 PathClass = Literal["workspace", "temp", "home", "system", "dot", "protected"]
 # The reason the policy gives when a run would change a ``dot`` path.
 CHANGES_DOT: str = "changes what Dot loads and runs (its code, plugins, skills and playbooks) or its emergency stop"
+# The reason the policy gives when a run would write a file that git runs as code (:func:`runs_as_git_code`).
+CHANGES_GIT_CODE: str = "changes a file git runs as code (a repository's config or hooks): the next git command runs it"
+_GIT_CONFIGS: tuple[str, ...] = ("config", "config.worktree")
+_GIT_HOOKS: str = "hooks"
+_GIT_FOLDER: str = ".git"
+# The folders of a git directory that only hold data (a branch may be named ``config`` or ``hooks``).
+_GIT_DATA: frozenset[str] = frozenset({"refs", "objects", "logs"})
 
 _SYSTEM_PREFIXES: tuple[str, ...] = (
     "/System",
@@ -134,6 +141,44 @@ def within(path: Path, prefix: Path) -> bool:
     folded: str = str(path).casefold()
     root: str = str(prefix).casefold().rstrip("/")
     return folded == root or folded.startswith(f"{root}/") or root == ""
+
+
+def _named(part: str, name: str) -> bool:
+    """Whether the path component ``part`` is ``name`` (letter case aside) or a glob that can match it."""
+    return fnmatch.fnmatchcase(name, part.casefold())
+
+
+def _is_git_directory(folder: Path) -> bool:
+    """Whether ``folder`` holds ``HEAD`` and ``objects``: a bare repository, whose config and hooks git runs like a
+    ``.git``'s."""
+    return (folder / "HEAD").is_file() and (folder / "objects").is_dir()
+
+
+def _holds_git_code(inside: tuple[str, ...]) -> bool:
+    """Whether the path ``inside`` a ``.git`` folder is its config or its hooks (or under them)."""
+    if not inside or any(name.casefold() in _GIT_DATA for name in inside[:-1]):
+        return False
+    return any(_named(name, _GIT_HOOKS) for name in inside) or any(_named(inside[-1], name) for name in _GIT_CONFIGS)
+
+
+def runs_as_git_code(path: Path) -> bool:
+    """Whether ``path`` is a file git runs as code, or the folder of them: the ``config`` of a git directory (it can
+    name a program for ``core.fsmonitor``, ``core.sshCommand``, a filter or an alias), its ``config.worktree``, and what
+    lies under its ``hooks``. A git directory is a ``.git`` folder (also the ``.git/modules/<name>`` of a submodule) or
+    a folder that holds ``HEAD`` and ``objects`` (a bare repository). The data folders (``refs``, ``objects``,
+    ``logs``) hold none. A component of the path may be a glob that can match the name. It judges the exact path a file
+    tool is given; what git writes itself (``git config``, ``git init``) is a command and never reaches this. A shell
+    line that writes there by a redirect or a copy is not judged by it (item 1301, not covered)."""
+    parts: tuple[str, ...] = path.parts
+    for index, part in enumerate(parts):
+        if _named(part, _GIT_FOLDER) and _holds_git_code(parts[index + 1 :]):
+            return True
+        names_code: bool = _named(part, _GIT_HOOKS) or (
+            index == len(parts) - 1 and any(_named(part, name) for name in _GIT_CONFIGS)
+        )
+        if index and names_code and _is_git_directory(Path(*parts[:index])):
+            return True
+    return False
 
 
 def _is_temp(path: Path) -> bool:
