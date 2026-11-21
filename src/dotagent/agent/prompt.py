@@ -878,9 +878,11 @@ _CONTACTS_LINE: str = (
 )
 # A new account (item 740): the run never makes up its password, so that none is chosen by a model or recorded.
 _CREATE_LOGIN_LINE: str = (
-    "- When you make an account on a site, let browser_create_login make its password: it fills the password field "
-    "(and the one that repeats it) and keeps the login in the user's vault, where browser_fill_login finds it later. "
-    "Never make up, type or write a password yourself."
+    "- When you make an account on a site, look in browser_logins first: a login of the site is signed in with, not "
+    "made again. Else let browser_create_login make the password: it fills the password field (and the one that "
+    "repeats it) and keeps the login, with the email or username you pass, in the user's vault, where "
+    "browser_fill_login finds it later. If the sign-up fails, call it again with replace true. Never make up, type "
+    "or write a password yourself."
 )
 _VAULT_LINES: tuple[tuple[str, str], ...] = (
     (FILL_LOGIN_TOOL, _LOGINS_LINE),

@@ -73,7 +73,7 @@ from dotagent.browser.types import (
     Viewport,
 )
 from dotagent.config import AppConfig, BrowserConfig
-from dotagent.core.errors import DotError, ToolExecutionError, ToolInputError
+from dotagent.core.errors import DotError, NotFoundError, ToolExecutionError, ToolInputError
 from dotagent.core.held import held_folder, open_regular
 from dotagent.core.logs import get_logger
 from dotagent.core.outcomes import BROWSER_EXPECTATIONS, expectation_on_last_step
@@ -1726,6 +1726,29 @@ class CreateLoginArgs(ToolArgs):
         min_length=1, max_length=320, description="The account's username or email, as you typed or will type it."
     )
     username_field: str | None = Field(default=None, description="The ref of the username field, to fill it too.")
+    replace: bool = Field(
+        default=False,
+        description="Only when the vault holds a login of this account that a failed sign-up left: new password.",
+    )
+
+
+_MADE_BY_DOT: str = "Made by Dot"
+
+
+async def _notes_of(ctx: ToolContext, item_id: str) -> SecretStr | None:
+    """The notes of a login of the vault, or ``None`` when it keeps none."""
+    try:
+        return await ctx.runtime.vault_items.reveal(item_id, "notes")
+    except NotFoundError:
+        return None
+
+
+async def _undo_login(ctx: ToolContext, item_id: str, before: LoginDraft | None) -> None:
+    """A login whose fill failed: a new one is removed, one that stood is given back what it held."""
+    if before is None:
+        await ctx.runtime.vault_items.remove(item_id)
+    else:
+        await ctx.runtime.vault_items.update(item_id, before)
 
 
 def _create_login_tool() -> RegisteredTool:
@@ -1742,6 +1765,8 @@ def _create_login_tool() -> RegisteredTool:
             f"Make a password for a new account of {args.username} on {site_label(website)}, fill it into this page "
             "and keep the login in your vault"
         )
+        if args.replace:
+            summary += ", replacing the password of the login Dot made for it before (the old one is kept in its notes)"
         # Its login is kept in the owner's vault and typed into a page as a vault login is: it asks as a fill does.
         return _action("browser_create_login", "browser_input", "high", summary, url, ("vault_fill",))
 
@@ -1775,18 +1800,60 @@ def _create_login_tool() -> RegisteredTool:
                 "refs of the fields below."
             )
             return mark_untrusted(ok(f"{reset}\n{render_page_view(fresh, _nonce(), _body_budget(ctx))}"))
+        # One login per account (item 1290): a second call for the same site and username would keep two, and a
+        # sign-in would fill the wrong one. The one that stands may be the account's only working password, so it is
+        # replaced only when the run says its sign-up failed, only when Dot made it, and its old password stays in the
+        # notes of the new one.
+        existing: list[VaultRecord] = [
+            item
+            for item in await ctx.runtime.vault_items.of_kind("login")
+            if item.website == website and (item.username or "").lower() == args.username.lower()
+        ]
+        old_notes: str = ""
+        old_password: SecretStr | None = None
+        old_notes_secret: SecretStr | None = None
+        if existing:
+            stood: VaultRecord = existing[0]
+            old_notes_secret = await _notes_of(ctx, stood.id)
+            old_notes = old_notes_secret.get_secret_value() if old_notes_secret is not None else ""
+            made_by_dot: bool = old_notes.startswith(_MADE_BY_DOT)
+            if not args.replace or not made_by_dot:
+                why: str = (
+                    "if its sign-up never went through, call it again with replace true"
+                    if made_by_dot
+                    else "it is one you saved, so Dot does not replace it"
+                )
+                raise ToolInputError(
+                    f"the vault already holds a login of {args.username} on {site_label(website)} (id {stood.id}): "
+                    f"if the account exists, sign in with {FILL_LOGIN_TOOL} and this login, and make no new one; "
+                    f"{why}.",
+                    {"website": website},
+                )
+            old_password = await ctx.runtime.vault_items.reveal(stood.id, "password")
         password: SecretStr = SecretStr(new_password())
         # From now on the password is a secret Dot holds: masked wherever it would stand (item 551).
         hold_filled(password.get_secret_value())
         made: str = time.strftime("%Y-%m-%d")
-        record: VaultRecord = await ctx.runtime.vault_items.create(
+        notes: str = f"{_MADE_BY_DOT} for a new account on {made}."
+        if old_password is not None:
+            notes += f" Replaced on {made}, its earlier password: {old_password.get_secret_value()}"
+            hold_filled(old_password.get_secret_value())
+        draft: LoginDraft = LoginDraft(
+            kind="login", website=website, username=args.username, password=password, notes=SecretStr(notes)
+        )
+        if existing:
+            record: VaultRecord = await ctx.runtime.vault_items.update(existing[0].id, draft)
+        else:
+            record = await ctx.runtime.vault_items.create(draft)
+        before: LoginDraft | None = (
             LoginDraft(
                 kind="login",
-                website=website,
-                username=args.username,
-                password=password,
-                notes=SecretStr(f"Made by Dot for a new account on {made}."),
+                username=existing[0].username,
+                password=old_password,
+                notes=old_notes_secret if old_notes_secret is not None else SecretStr(""),
             )
+            if existing
+            else None
         )
         values: dict[VaultFieldKind, SecretStr] = {"username": SecretStr(args.username), "password": password}
         fills: list[VaultFill] = [VaultFill(ref=ref, kind=kind, value=values[kind]) for kind, ref in parts]
@@ -1795,14 +1862,14 @@ def _create_login_tool() -> RegisteredTool:
         except Exception as error:
             # Not filled, so no account holds it: the vault does not keep a login that was never used. A field may hold
             # part of it already, and a form sent so would make an account with a password kept nowhere.
-            await ctx.runtime.vault_items.remove(record.id)
+            await _undo_login(ctx, record.id, before)
             raise ToolExecutionError(
                 "filling the new login failed and Dot did not keep it: do not send this form, whose fields may hold "
                 f"part of it; open the page again and call {CREATE_LOGIN_TOOL} again. The failure: {error}",
                 {},
             ) from error
         except BaseException:
-            await ctx.runtime.vault_items.remove(record.id)
+            await _undo_login(ctx, record.id, before)
             raise
         filled: str = "and the confirmation field " if args.confirm is not None else ""
         said: str = (
