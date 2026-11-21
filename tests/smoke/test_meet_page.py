@@ -130,6 +130,20 @@ async def test_a_toggle_Meet_labels_otherwise_is_refused_and_the_page_labels_are
         await page.close()
 
 
+async def test_the_labels_a_failed_look_tells_are_cut_and_a_gone_page_tells_none(browser: Browser) -> None:
+    page: Page = await browser.new_page()
+    await page.set_content('<button aria-label="' + "x" * 300 + '\nsecond line">Ask to join</button>')
+    meet: MeetPage = MeetPage(page)
+    with pytest.raises(MeetPageError) as refused:
+        await meet.prepare("Dot")
+    labels: JsonValue = refused.value.context["page_labels"]
+    assert isinstance(labels, list) and len(labels) == 1
+    label: JsonValue = labels[0]
+    assert isinstance(label, str) and len(label) == 120 and "\n" not in label
+    await page.close()
+    assert await meet._labels_seen() == []
+
+
 async def test_an_address_of_another_host_is_refused() -> None:
     assert meeting_address("https://meet.google.com/abc-defg-hij?authuser=1") == "https://meet.google.com/abc-defg-hij"
     with pytest.raises(MeetPageError):

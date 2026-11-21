@@ -28,10 +28,10 @@ _STEP_MS: Final[int] = 10000
 # (item 1286: the exact labels refused both real tries of 2026-11-12).
 SELECTORS: Final[dict[str, str]] = {
     # Pre-join and in-call microphone and camera toggles: the label names what a click does.
-    "mic_off": '[aria-label^="Turn off microphone"]',
-    "mic_on": '[aria-label^="Turn on microphone"]',
-    "camera_off": '[aria-label^="Turn off camera"]',
-    "camera_on": '[aria-label^="Turn on camera"]',
+    "mic_off": 'button[aria-label^="Turn off microphone"], [role="button"][aria-label^="Turn off microphone"]',
+    "mic_on": 'button[aria-label^="Turn on microphone"], [role="button"][aria-label^="Turn on microphone"]',
+    "camera_off": 'button[aria-label^="Turn off camera"], [role="button"][aria-label^="Turn off camera"]',
+    "camera_on": 'button[aria-label^="Turn on camera"], [role="button"][aria-label^="Turn on camera"]',
     # The guest's name field on the pre-join screen of a call joined with no account.
     "name_field": 'input[type="text"][aria-label="Your name"]',
     # In the call: the button that leaves it is there only while Dot is in.
@@ -170,6 +170,9 @@ _READ_SCRIPT: Final[str] = """
 """
 
 _BUFFER_CAP: Final[int] = 500
+_LABELS_SEEN: Final[int] = 40
+_LABEL_CHARS: Final[int] = 120
+_CONTROL: Final[re.Pattern[str]] = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 # What a read of a page Dot is not in the call on gives: nothing new.
 _NOTHING: Final[PageBatch] = PageBatch(captions=(), vanished=(), chat=(), dropped=0)
 
@@ -247,13 +250,22 @@ class MeetPage:
         await self._page.goto(url, wait_until="domcontentloaded")
 
     async def _labels_seen(self) -> list[JsonValue]:
-        """The aria labels of the buttons the page shows now (at most 40): what a failed look for a toggle can say the
-        page did offer, so that the next change of Meet's labels is mended from the record, not from a guess."""
-        raw: object = await self._page.evaluate(
-            "() => Array.from(document.querySelectorAll('button[aria-label], [role=button][aria-label]'))"
-            ".map((e) => e.getAttribute('aria-label') || '').filter((l) => l).slice(0, 40)"
-        )
-        return [_text(label) for label in raw] if isinstance(raw, list) else []
+        """The aria labels of the buttons the page shows now (at most :data:`_LABELS_SEEN`, each cut to
+        :data:`_LABEL_CHARS` and without control characters, since a call's own names are among them): what a failed
+        look for a toggle can say the page did offer, so that the next change of Meet's labels is mended from the
+        record, not from a guess. Best effort: a page that is gone gives none, and the error being built stays the one
+        that was raised."""
+        try:
+            raw: object = await self._page.evaluate(
+                "(max) => Array.from(document.querySelectorAll('button[aria-label], [role=button][aria-label]'))"
+                ".map((e) => e.getAttribute('aria-label') || '').filter((l) => l).slice(0, max)",
+                _LABELS_SEEN,
+            )
+        except PlaywrightError:
+            return []
+        if not isinstance(raw, list):
+            return []
+        return [_CONTROL.sub(" ", _text(label))[:_LABEL_CHARS] for label in raw]
 
     async def _off(self, label: str, off_now: str, on_now: str) -> None:
         """Make ``label`` (microphone or camera) off, and check that its toggle now offers to turn it on."""
@@ -274,6 +286,14 @@ class MeetPage:
                 },
             ) from error
 
+    async def _state_or_unknown(self) -> MeetState:
+        """The page's state for an error being built: ``unknown`` when the page cannot be read, so that the error
+        that was raised is not replaced by the failure to describe it."""
+        try:
+            return await self.state()
+        except PlaywrightError:
+            return "unknown"
+
     async def prepare(self, name: str) -> MeetState:
         """Turn the microphone and the camera off (verified), fill the guest name when the field is there, and press
         Join now or Ask to join. Returns the state the page is in after that."""
@@ -290,7 +310,7 @@ class MeetPage:
                 "Dot found no Join now or Ask to join button on the page.",
                 {
                     "url": self._page.url,
-                    "state": await self.state(),
+                    "state": await self._state_or_unknown(),
                     "page_labels": await self._labels_seen(),
                     "error": str(error),
                 },

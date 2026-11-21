@@ -383,6 +383,9 @@ class MeetingDesk:
             )
         except BaseException as error:
             note: str = error.message if isinstance(error, DotError) else "the join was stopped"
+            if isinstance(error, DotError):
+                # The note says what failed; the context says what the page showed (item 1286), kept nowhere else.
+                log.error("meeting_join_failed", meeting_id=meeting.id, error=error.message, context=error.context)
             await self._close(live, "failed", note)
             self._lives.discard(live)
             raise
@@ -662,7 +665,7 @@ class MeetingDesk:
         try:
             await live.page.open_chat()
         except MeetPageError as error:
-            log.warning("meeting_chat_closed", meeting_id=live.meeting_id, error=error.message)
+            log.warning("meeting_chat_closed", meeting_id=live.meeting_id, error=error.message, context=error.context)
 
     def _take(self, live: _Live, lines: tuple[MeetingLine, ...]) -> None:
         """Take the questions to Dot among ``lines`` (:func:`take_questions`), logging those dropped."""
