@@ -40,6 +40,7 @@ from dotagent.proactive.initiative import Initiative
 from dotagent.repair.github import command
 from dotagent.repair.night import NIGHT_KEY, PROCESS_STARTED_AT, checkout_of, repair_night
 from dotagent.repair.settle import settle_stored
+from dotagent.restart_notice import tell_if_due
 from dotagent.runtime import Runtime
 from dotagent.scheduler import (
     SCHEDULE_MISSED_EVENT,
@@ -351,6 +352,7 @@ class Scheduler:
             self._scout_if_due,
             self._repair_if_due,
             self._check_learning,
+            self._tell_restart_waits,
             self._initiative.tick,
             self._manager.desk.follow_up,
         ):
@@ -376,6 +378,10 @@ class Scheduler:
             )
         if failures:
             raise ExceptionGroup("a part of the scheduler's tick failed", failures)
+
+    async def _tell_restart_waits(self, now: float) -> None:
+        """Tell the owner which run a restart they asked for waits for, once it has waited half an hour (item 1310)."""
+        await tell_if_due(self._runtime, now)
 
     async def _backfill_memory(self, _now: float) -> None:
         """Embed notes that have no vector, in a task, until none are left (item 1263). A pass already running is left
