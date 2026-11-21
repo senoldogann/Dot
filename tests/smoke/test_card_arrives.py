@@ -298,9 +298,9 @@ async def test_a_settled_step_is_one_line_with_its_command_once_and_the_rest_und
             drawn = await page.evaluate(_SETTLED, [passed, path, ""])
             assert drawn["commands"] == 0 and drawn["wraps"] and drawn["what"] == passed, drawn
             assert path not in drawn["details"], drawn
-            # Nor the fixed sentence of why Dot asks, nor the action again under Details (a live order in yolo).
-            buy: str = "Buy 10 USD of BTC-USD on your Coinbase account (real money)"
-            drawn = await page.evaluate(_SETTLED, [f"{buy} — {OWNERS_REASON}", "trading:live:BTC-USD", ""])
+            # Nor the fixed sentence of why Dot asks, nor the action again under Details (a payment in yolo).
+            buy: str = "Pay 10 USD to a shop with your card (real money)"
+            drawn = await page.evaluate(_SETTLED, [f"{buy} — {OWNERS_REASON}", "payment:shop:10", ""])
             assert drawn["what"] == buy and "In yolo too" not in drawn["line"], drawn
             assert buy not in drawn["details"] and "In yolo too" not in drawn["details"], drawn
             # A step's label beside its command stays one short word on the line.

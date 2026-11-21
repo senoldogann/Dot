@@ -56,10 +56,6 @@ Flag = Literal[
     # The action fills a login of the owner's password manager into a page (item 493): the values never reach the
     # model, and the owner says yes to each fill in every mode but yolo (``policy.engine.vault_guard``).
     "vault_fill",
-    # The action places an order with real money on the owner's trading account (item 763): Dot places it once the
-    # owner says yes, in every mode but yolo, never a review model's to answer (``policy.engine.trade_guard``). Not
-    # ``financial``, whose hand-off leaves the step to the owner's own hands: Dot is the one that places the order.
-    "trade",
     # The action puts a project's change live (item 850): a deploy to production, a merge of a pull request, a push
     # that names the main branch, as the shell guard reads their names. It asks the owner in a chat Dot opened on its
     # own initiative, in every mode (``policy.engine.initiative_guard``), and nowhere else.
@@ -77,7 +73,6 @@ DecisionSource = Literal[
     "hard_stop",
     "guard",
     "vault",
-    "trade",
     "rule",
     "taint",
     "preset",
@@ -148,7 +143,6 @@ TAINT_ESCALATION_FLAGS: frozenset[Flag] = frozenset(
         "social",
         "exfiltration",
         "financial",
-        "trade",
         "credential",
         "privilege",
         "system_settings",

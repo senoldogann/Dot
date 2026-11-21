@@ -26,7 +26,7 @@ _STEP_MS: Final[int] = 10000
 # Every selector is an aria label or role Meet draws, gathered 2026-11-12 from two open-source Meet bots, Attendee and
 # TranscripTonic (neither is a contract: Meet may change them without a word). The toggles' labels carry the keyboard
 # shortcut of the machine ("Turn off microphone (ctrl + d)", "(⌘ + d)" on a Mac), so they are matched by their start
-# (item 1286: the exact labels refused both real tries of 2026-11-12).
+# (item 1287: the exact labels refused both real tries of 2026-11-12).
 SELECTORS: Final[dict[str, str]] = {
     # Pre-join and in-call microphone and camera toggles: the label names what a click does.
     "mic_off": 'button[aria-label^="Turn off microphone"], [role="button"][aria-label^="Turn off microphone"]',

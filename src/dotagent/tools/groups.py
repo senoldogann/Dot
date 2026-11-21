@@ -36,8 +36,6 @@ _PREFIX_GROUPS: tuple[tuple[str, str], ...] = (
     # The mail and the calendars of the accounts the owner signed in (item 424).
     ("mail_", ACCOUNTS_GROUP),
     ("calendar_", ACCOUNTS_GROUP),
-    # Trading on Coinbase (docs/trading.md), while the owner has it on.
-    ("trading_", "trading"),
     # Dot in the owner's calls (item 1138).
     ("meeting_", "meetings"),
     # The owner's iPhone over WebDriverAgent, while [phone] is on.
@@ -101,7 +99,6 @@ _PURPOSES: dict[str, str] = {
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
     "todos": "your own list of work to do for the owner later, on your own while the Mac is idle, and their objectives",
-    "trading": "trading crypto on Coinbase under the owner's limits: prices, the account, orders",
     "waits": "waiting in code until a file is there, an address answers or a check passes",
     "skills": "saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way",
     "video": "watching a video file or a video link: frames of what it shows and a transcript of what is said",

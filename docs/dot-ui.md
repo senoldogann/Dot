@@ -31,7 +31,6 @@ home page is `runs.js`, and one run is `run.js`.
 | Channels | `channels.js` | The owner's messaging apps as ways to reach Dot. |
 | Phone | `phone.js` | Dot on a phone through Tailscale, a step at a time. |
 | Vault | `vault.js` | Logins, cards and contact details Dot may type into pages. |
-| Trading | `trading.js` | The trading desk: worth, day, limits and open positions. |
 | Web search | `websearch.js` | The engines `web_search` asks, in turn. |
 | Snapshots | `snapshots.js` | Both Command keys together capture the window in front (a double tap, once on). |
 | System | `system.js` | Daemon health, the emergency stop, health checks and provider models. |

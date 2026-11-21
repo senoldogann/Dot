@@ -1058,23 +1058,6 @@ class PluginsConfig(FrozenModel):
     dirs: list[str] = Field(default_factory=list)
 
 
-# Whether runs trade, and with what money (docs/trading.md): no trading tools at all, an account of Dot's own that
-# trades at the market's real prices with money that is not there, or the owner's Coinbase account.
-TradingMode = Literal["off", "paper", "live"]
-# The trend engine of item 818: off, or the rule of dotagent.trading.trend.
-TrendEngineMode = Literal["off", "trend"]
-# Among [trading] products (item 771): every product of the quote with [trading] min_volume a day.
-ANY_PRODUCT: str = "*"
-_PRODUCT: re.Pattern[str] = re.compile(r"[A-Z0-9]{2,10}-[A-Z]{3,5}")
-_CURRENCY: re.Pattern[str] = re.compile(r"[A-Z]{3,5}")
-
-
-def is_product_id(text: str) -> bool:
-    """Whether ``text`` reads as a Coinbase product id, as BTC-EUR: what a product of Coinbase's list must be before it
-    is shown to a run (item 772), as a name in [trading] products must."""
-    return _PRODUCT.fullmatch(text) is not None
-
-
 class ReconConfig(FrozenModel):
     """Network reconnaissance (``[recon]``, item 776, docs/recon.md). A passive audit reads what a browser's visit
     reads, on any public site; an active one asks which common ports answer, and runs only on a host whose name is in
@@ -1109,82 +1092,6 @@ class ReconConfig(FrozenModel):
                     ) from None
             names.append(name)
         return tuple(dict.fromkeys(names))
-
-
-class TradingConfig(FrozenModel):
-    """Trading on Coinbase (``[trading]``, docs/trading.md). The limits are in ``quote``, the currency every product of
-    ``products`` is priced in, and no run can raise them: a run cannot change this file, and an order past one of them
-    is refused before it reaches any market, in every mode, yolo's too. ``max_order`` is the most one order may be
-    worth, ``max_day`` the most the orders of a day (the owner's day, ``[scheduler] timezone``) may add up to, buys and
-    sells, ``max_day_loss`` how much the account may lose in a day before no buy is placed until the next (a sell still
-    is), ``max_position`` the most one product held may be worth after a buy. ``paper_start`` is what the paper account
-    starts with, ``paper_fee_rate`` the share of an order its fills pay, as Coinbase's taker fee does."""
-
-    mode: TradingMode
-    quote: str
-    products: list[str] = Field(min_length=1, max_length=50)
-    # With "*" among the products (item 771): every product priced in quote that trades at least this much of the
-    # quote a day, as Coinbase sums it; a market thinner than that is one a small order moves, and one a pump empties.
-    min_volume: float = Field(default=1_000_000.0, ge=0, allow_inf_nan=False)
-    max_order: float = Field(gt=0, allow_inf_nan=False)
-    max_day: float = Field(gt=0, allow_inf_nan=False)
-    max_day_loss: float = Field(gt=0, allow_inf_nan=False)
-    max_position: float = Field(gt=0, allow_inf_nan=False)
-    paper_start: float = Field(gt=0, allow_inf_nan=False)
-    paper_fee_rate: float = Field(ge=0, lt=0.1, allow_inf_nan=False)
-    timeout_s: float = Field(gt=0, le=120, allow_inf_nan=False)
-    # A move of the market that starts a run (item 772): the id of the schedule it starts ("": none), the least move
-    # over fifteen minutes, in percent, that does, how many such runs a day may have and how many minutes apart.
-    wake_schedule: str = Field(default="", max_length=64)
-    wake_move_pct: float = Field(default=3.0, gt=0, le=100, allow_inf_nan=False)
-    wake_per_day: int = Field(default=6, ge=0, le=96)
-    wake_gap_min: float = Field(default=30.0, ge=5, le=1440, allow_inf_nan=False)
-    # The trend engine (item 818, :mod:`dotagent.trading.engine`): ``"trend"`` trades ``engine_coins`` (each priced in
-    # ``quote``) by the rule of :mod:`dotagent.trading.trend`, on paper only, within the limits above, with no model;
-    # ``engine_target_vol`` is the yearly volatility each product's share is sized to, ``engine_band`` how far a share
-    # may be off its target before the engine trades it.
-    engine: TrendEngineMode = "off"
-    engine_coins: list[str] = Field(default_factory=lambda: ["BTC", "ETH", "SOL"], min_length=1, max_length=10)
-    engine_target_vol: float = Field(default=0.5, gt=0, le=2, allow_inf_nan=False)
-    engine_band: float = Field(default=0.10, ge=0, lt=1, allow_inf_nan=False)
-
-    @field_validator("engine_coins")
-    @classmethod
-    def _coins(cls, value: list[str]) -> list[str]:
-        wrong: list[str] = [coin for coin in value if _CURRENCY.fullmatch(coin) is None]
-        if wrong:
-            raise ValueError('[trading] engine_coins are currency codes in capitals, as "BTC": ' + ", ".join(wrong))
-        if len(set(value)) != len(value):
-            raise ValueError("[trading] engine_coins names a coin twice")
-        return value
-
-    def engine_products(self) -> list[str]:
-        """The products the trend engine trades: each of ``engine_coins`` in ``quote``."""
-        return [f"{coin}-{self.quote}" for coin in self.engine_coins]
-
-    @field_validator("quote")
-    @classmethod
-    def _currency(cls, value: str) -> str:
-        if _CURRENCY.fullmatch(value) is None:
-            raise ValueError('[trading] quote is a currency code in capitals, as "EUR"')
-        return value
-
-    @model_validator(mode="after")
-    def _products_in_quote(self) -> Self:
-        wrong: list[str] = [
-            product
-            for product in self.products
-            if product != ANY_PRODUCT
-            and (_PRODUCT.fullmatch(product) is None or not product.endswith(f"-{self.quote}"))
-        ]
-        if wrong:
-            raise ValueError(
-                f'[trading] products are Coinbase product ids priced in {self.quote}, as BTC-{self.quote}, or "*": '
-                + ", ".join(wrong)
-            )
-        if self.max_order > self.max_day:
-            raise ValueError("[trading] max_order is more than max_day, which every order counts against")
-        return self
 
 
 # Who the typed judge asks: nobody, or TypeSafe's System One API.
@@ -1281,7 +1188,6 @@ class AppConfig(FrozenModel):
     apns: ApnsConfig
     repair: RepairConfig
     recon: ReconConfig
-    trading: TradingConfig
     meetings: MeetingsConfig
     phone: PhoneConfig
 
@@ -1334,14 +1240,23 @@ def load_defaults() -> JsonObject:
 _PROBLEMS_NAMED: int = 5
 
 
+# Tables an older Dot had that this one removed, each with what to do about it: a file that still has one is refused as
+# any unknown key is, but not as one a newer Dot may add.
+_REMOVED_TABLES: dict[str, str] = {
+    "trading": "Dot no longer trades (item 1286): delete the [trading] table from config.toml",
+}
+
+
 def describe_problems(exc: ValidationError) -> str:
-    """What failed validation, in a line: a key the schema does not have is named as one a newer Dot may add (a daemon
-    that runs an older checkout than the one that wrote the file refuses it), any other error by its path and its
-    message. At most :data:`_PROBLEMS_NAMED` errors are named."""
+    """What failed validation, in a line: a table this Dot removed is named with what to do, a key the schema does not
+    have is named as one a newer Dot may add (a daemon that runs an older checkout than the one that wrote the file
+    refuses it), any other error by its path and its message. At most :data:`_PROBLEMS_NAMED` errors are named."""
     problems: list[str] = []
     for error in exc.errors(include_url=False, include_context=False, include_input=False):
         path: str = ".".join(str(part) for part in error["loc"])
-        if error["type"] == "extra_forbidden":
+        if error["type"] == "extra_forbidden" and path in _REMOVED_TABLES:
+            problems.append(f"{path} is a table of an older Dot: {_REMOVED_TABLES[path]}")
+        elif error["type"] == "extra_forbidden":
             problems.append(f"{path} is not a setting this version of Dot knows (a newer Dot may add it)")
         else:
             problems.append(f"{path}: {error['msg']}")

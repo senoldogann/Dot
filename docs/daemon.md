@@ -798,7 +798,7 @@ reviews and the goal check), the compactions once there is one, the duration, an
 plan, the agents of the chat and the screen (Dot's computer and the latest screenshots). The Agents tab opens with who
 the chat is with (item 846), as a messaging app's panel shows the contact: for one of your agents its face, name and
 role, its model, approvals and actions, what it learned, its instructions, **Edit**, which opens the agent's editor in
-the panel and shows the agent as saved, and **Open its page** (the Trader's also opens the trading desk); for Dot its
+the panel and shows the agent as saved, and **Open its page**; for Dot its
 model, its name and look, its rules and its memory, each a link to the settings that hold it. Each tab wears its icon, and where the strip has no room for
 every name, the tabs not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs
 the chat's runs handed work to: five at first and the rest on **Show N more**, each with its face and goal, its
@@ -928,7 +928,7 @@ behind a filter; see [Models and providers](models.md#models-and-providers)), **
 search; see [Runs](runs.md)), **Browser** (which Chrome Dot browses with
 and what Chrome has to allow first; see [Browser
 use](browser-and-computer-use.md#browser-use)), **Vault** (the logins, cards and contact details you give Dot; below),
-**Trading** (whether Dot may trade crypto on Coinbase, opened from the Trader agent; see [Settings › Trading](#settings--trading)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
+**Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
 what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, the
 versions, fifty at a time, with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
 harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a sign-in code for its home-screen app; see
@@ -956,66 +956,10 @@ daemon answers and the emergency stop are the page's, as on every page. The page
 920 px under its own name and the line that says what it is for, with no row of tabs, each section a name over a card of
 rows; in a window too narrow for the docked sidebar the nav is in the drawer. On a phone they are the same rows as one
 sheet (item 995), each with a line under its name, each opening its tab as a page of its own (item 330,
-under [Dot on the phone](phone.md#dot-on-the-phone)). Trading is in no group: it is the Trader agent's (item 847, see
-[Settings › Trading](#settings--trading)). The addresses of the tabs are as they were (`#/settings/keys` opens AI
+under [Dot on the phone](phone.md#dot-on-the-phone)). The addresses of the tabs are as they were (`#/settings/keys` opens AI
 services). The earlier addresses of the memory, rules and system pages lead to their tabs, and
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **Snapshots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
-
-### Settings › Trading
-
-**Trading** (`#/settings/trading`, items 764 and 777) is a trading desk: what Dot's trading holds and does, with the
-settings under it. It is the Trader's (item 847): the settings' nav does not list it, and the page of the agent named
-Trader, the Agents tab of its chats' side panel and the Trader's card among the ready-made agents open it. The Trader
-(`trader` in `agent/templates.py`) watches the desk and the trend engine and reports the day (every day at 09:05, the
-schedule it suggests, switched off until you read it): it reads the account, the engine, the orders, the prices and what
-moved, and may pause the engine and resume it; no tool of its places an order, closes a position or changes a limit. Its
-tools are the trading tools, which a run has only with trading on: with trading off, Use on its card is refused and
-says which tools this Dot lacks, and the card's **Open the trading desk** is where trading is switched on. With trading on (Paper or Live) the page shows, top to bottom:
-
-- **Account**: what the account is worth, large; today's change and, in Paper, the change since the account's start,
-  each in green or red with its sign and its share; what is in positions and its share of the account; and two meters
-  of the day's limits, the loss so far against the most lost in a day and what was traded against the most traded,
-  green, then amber past 60 %, red at the limit. A reason the account or what watches the market could not be read
-  stands above them, both when neither could. In Paper, **Start again** (after a question) resets the account to its
-  starting money.
-- **Open positions** (Paper): each buy's exit as a row of a table: the asset, the size, the buy's price, the bid now,
-  what it is worth, its gain or loss in money and in share, and a scale from its stop to its target with the entry
-  (a line) and the price (a dot, green or red) on it, and how far each end is from the price. Live keeps no exit yet
-  ([Trading](trading.md#exits-the-stop-and-the-target-watched-day-and-night)).
-- **Watching**: what Dot looks at between runs, with no model, a line each with a dot of its tone: the open positions'
-  stops and targets (every 15 seconds), the products a run may trade now (with `*`, how many trade past
-  `[trading] min_volume` at this moment), the schedule a move of the market starts with how many runs it started today
-  of `wake_per_day` and when the last one did, and when that schedule fires next; a `wake_schedule` that names no
-  schedule (it was deleted, or Dot started with an empty store) is said in red, one switched off in amber. **Wake on a
-  move**, under the lines, chooses that schedule among the schedules, or none (item 813).
-- **Holdings**: each currency held, its amount, the bid now, what it is worth and its share of the account; a currency
-  that could not be priced is named under them.
-- **Orders**: the latest fifty, newest first, as a table: when, the side (a green Buy or a red Sell) and the product,
-  the size, the price, the worth, the fee and the status, with the reason the run gave under each, on as many lines
-  as it takes.
-- **Settings**, under a line:
-  - **Mode**: Off (Dot has no trading tools), Paper (an account of Dot's own, at Coinbase's real prices, with money
-    that is not there) or Live (your Coinbase account, real money), each with a line saying what it means. Switching
-    to Live asks first and says that a run in yolo mode places orders without asking, within the limits. When trading
-    is on but runs do not have the trading tools yet, the page says they get them after Dot restarts and offers
-    **Restart Dot**.
-  - **Limits**: the most for one order, the most traded and the most lost in a day, the most held of one product, all
-    in the quote currency, and what the paper account starts with (in Paper). The products a run may trade are a list
-    of ids such as `BTC-EUR`, each with a remove button, and a field that allows another; `*` allows the whole market,
-    every product in the quote that trades `[trading] min_volume` a day, and its chip says so in words (item 771).
-    **Save limits** sends only what changed; a reason the daemon gives (a limit past another, an id not priced in the
-    quote, a phone asked to widen) shows under the button. Like the config file's `[trading]` table, these hold from
-    the next order.
-  - **Coinbase key** (when trading is on, or a key is kept): whether a key is kept and the end of its name, **Remove
-    key**, and a form for its name and its private key, which is sent to the Keychain and never shown again. Make the
-    key in the Coinbase Developer Platform with the ECDSA signature algorithm and the permissions View and Trade, never
-    Transfer; a key that may transfer money is refused.
-
-With trading off the page shows the settings alone. On a phone each table's row is a card of labelled lines. A phone's
-key narrows trading (off, paper, a lower limit, a product dropped, the key removed, the paper account started again) and
-is refused anything that widens it, with the reason shown. The endpoints are `GET|PATCH /api/trading` (whose answer
-carries `positions` and `watch`), `PUT|DELETE /api/trading/key` and `POST /api/trading/paper/reset`.
 
 ### Settings › Vault
 

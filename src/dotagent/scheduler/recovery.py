@@ -1,7 +1,7 @@
 """A schedule's task tried once more on its own (item 1206): one that Dot's restart or crash cut off, that a passing
 error of the model service ended, or that stalled, is tried again 15 s after; one the Claude plan's usage limit stopped
 starts again a minute after the plan's reset, when that is at most 12 hours away. A task that did something outward
-(a message or mail, a post, an upload, a payment, a trade, a release) or handed work to another run is never tried
+(a message or mail, a post, an upload, a payment, a release) or handed work to another run is never tried
 again, nor is a try itself: the owner is told instead.
 
 The try is a new run of the schedule's own source, started as a firing is (``Scheduler._start``), so its messages are
@@ -40,7 +40,7 @@ AFTER_RESET_S: float = 60.0
 # The latest reset a task waits for: one further away is not waited for, and the owner is told.
 RESET_WAIT_MOST_S: float = 43_200.0
 # What an action that reaches beyond the Mac raises: a message or mail, a post, an upload or data sent out, a payment, a
-# trade, a project's change put live. A task with a step that raised one is never tried again, whether or not the
+# project's change put live. A task with a step that raised one is never tried again, whether or not the
 # policy let it through.
 OUTWARD_FLAGS: frozenset[Flag] = frozenset(
     {
@@ -51,7 +51,6 @@ OUTWARD_FLAGS: frozenset[Flag] = frozenset(
         "upload",
         "exfiltration",
         "financial",
-        "trade",
         "release",
     }
 )

@@ -212,7 +212,7 @@ which hold your other chats; a search finds them there too; Connect apps (item 4
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The bar has
 no ground of its own (item 1119): its three parts are panes of glass and the conversation scrolls under them, as under
 the composer. A new chat and an agent's page wear the same bar (item 1123): the way back round, an agent's face and
-name in the middle, its tools (the Trader's desk and the "…") in one pill, all on glass over the page. An agent's page
+name in the middle, its tools in one pill, all on glass over the page. An agent's page
 is its conversation (item 1272): it loads as a chat does, Dot's three dots in the middle, its face, name and box stand
 in the middle of the room under the bar, and its way back is the list of chats, or the agents' page it was opened from. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
