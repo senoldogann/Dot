@@ -1234,6 +1234,23 @@ key_id = ""
 team_id = ""
 topic = "dev.dotagent.phone"
 
+[notify]
+# The push services a phone's web push subscription may name (item 1311): Dot posts a signed message that carries up to
+# 140 characters of a question, a draft's subject or a result to the address of a subscription, so an address is taken
+# only on the services of a browser's maker. A host, or *. and a domain for every host under it (never one whose domain
+# also serves what anyone may host, as googleapis.com does: its buckets are named by the caller), or a host with a path
+# the address must begin with. Your list replaces this one: add a new service as
+# one more line beside these.
+push_hosts = [
+  "web.push.apple.com",
+  "*.push.apple.com",
+  "fcm.googleapis.com",
+  "android.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "*.push.services.mozilla.com",
+  "*.notify.windows.com",
+]
+
 [scout]
 # The plugin scout (docs/extending.md): each night, at time (HH:MM in [scheduler] timezone, or "off"), it looks for plugins
 # worth proposing on Customize › Plugins (Anthropic's marketplaces, the makers' own repositories, GitHub's topics for

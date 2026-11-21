@@ -20,7 +20,7 @@ from dotagent.store.db import BEFORE_UPGRADE_DIR, SCHEMA_VERSION, Store
 # tables needs a step in `db._MIGRATIONS` under the next version, `SCHEMA_VERSION` raised, and its digest pinned there.
 _PINNED: dict[int, str] = {
     1: "e58f68b5c41098388860efc1c0f8813a1d73f665f61d9377d4f54d15a217115c",
-    2: "ea0bee45a6ff94a21f2c80c2564ba97aa667fd0e5e82ad158cfbe0f3d25a74bf",
+    2: "f4541a5d75d0ecad92930e7e8e7927faad4393c2932e327ef693ccd26e02b5e2",
 }
 
 
@@ -270,3 +270,30 @@ async def test_a_copy_that_meets_a_full_disk_says_the_disk_is_full(
         await Store.open(database, tmp_path / "images")
     assert isinstance(refused.value.context["free_bytes"], int)
     assert _version(database) == 0
+
+
+async def test_a_subscription_kept_before_the_phone_column_belongs_to_no_phone_and_still_goes_on(
+    tmp_path: Path,
+) -> None:
+    """Item 1311: ``push_subscriptions.phone_id`` is added at open like any column, inside the migration's transaction;
+    a subscription stored before it is the installation's (NULL) and is kept."""
+    database: Path = tmp_path / "dot.sqlite3"
+    first: Store = await Store.open(database, tmp_path / "images")
+    await first.close()
+    old: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        old.execute("ALTER TABLE push_subscriptions DROP COLUMN phone_id")
+        old.execute("INSERT INTO push_subscriptions VALUES ('https://web.push.apple.com/kept', 'p', 'a', 1.0)")
+        old.commit()
+    finally:
+        old.close()
+    store: Store = await Store.open(database, tmp_path / "images")
+    try:
+        [kept] = await store.list_push_subscriptions()
+        assert (kept.endpoint, kept.phone_id) == ("https://web.push.apple.com/kept", None)
+        await store.add_push_subscription("https://web.push.apple.com/new", "p", "a", "aaaaaaaaaaaa")
+        assert await store.delete_phone_push_subscriptions("aaaaaaaaaaaa") == 1
+        assert [s.endpoint for s in await store.list_push_subscriptions()] == ["https://web.push.apple.com/kept"]
+    finally:
+        await store.close()
+    assert _tables_digest(database) == _PINNED[SCHEMA_VERSION]

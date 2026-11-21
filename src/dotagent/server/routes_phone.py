@@ -176,10 +176,12 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
 
     @router.delete("/phone/phones/{phone_id}", status_code=204)
     async def remove_phone(phone_id: str) -> Response:
-        """Remove a phone: its key is refused from now on, and its streams that are open end (item 670)."""
+        """Remove a phone: its key is refused from now on, and its streams that are open end (item 670), and its APNs
+        device and the web push subscriptions its key registered go (item 1311)."""
         if not is_phone_id(phone_id) or not await phones.remove(phone_id):
             raise NotFoundError("that phone is not paired", {})
         await ctx.runtime.store.delete_apns_device(phone_id)
+        await ctx.runtime.store.delete_phone_push_subscriptions(phone_id)
         return Response(status_code=204)
 
     @router.post("/phone/apns", status_code=204)

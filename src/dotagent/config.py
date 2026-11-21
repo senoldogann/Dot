@@ -1007,6 +1007,29 @@ class ApnsConfig(FrozenModel):
     topic: str = Field(min_length=1)
 
 
+class NotifyConfig(FrozenModel):
+    """Where Dot sends a web push (``[notify]``, item 1311): ``push_hosts`` are the push services a browser's
+    subscription may name, each a host (``web.push.apple.com``), ``*.`` and a domain for every host under it, with a
+    path the address must begin with. Never ``*.`` on a domain that also serves what anyone may host
+    (``googleapis.com``).
+    A subscription at any other host is refused, and a stored one is not sent to. The list replaces the packaged one: a
+    new push service is one more line beside these."""
+
+    push_hosts: list[str]
+
+    @field_validator("push_hosts")
+    @classmethod
+    def _hosts(cls, hosts: list[str]) -> list[str]:
+        for entry in hosts:
+            host: str = entry.split("/", 1)[0].removeprefix("*.")
+            if host == "" or "*" in host or ":" in host or "@" in host or any(char.isspace() for char in entry):
+                raise ValueError(
+                    "[notify] push_hosts are host names, as web.push.apple.com or *.push.apple.com, with a path "
+                    f"after a domain that also serves what anyone hosts: {entry!r}"
+                )
+        return hosts
+
+
 class ScoutConfig(FrozenModel):
     """The plugin scout (item 711, docs/extending.md): when it looks each night for plugins worth proposing and for
     updates of those installed, and how much one night may read. It installs nothing: each proposal waits for the
@@ -1186,6 +1209,7 @@ class AppConfig(FrozenModel):
     plugins: PluginsConfig
     scout: ScoutConfig
     apns: ApnsConfig
+    notify: NotifyConfig
     repair: RepairConfig
     recon: ReconConfig
     meetings: MeetingsConfig

@@ -80,7 +80,9 @@ run needs, sent where the configuration points:
   brought back, with the secrets Dot holds and keys of a known form masked (item 551).
 - **To a phone, once you turn its notifications on: a line.** A title, up to 140 characters of the question, of a
   draft's recipients and subject (a message's words, item 314) or of the result, and the page to open, encrypted for
-  that phone's browser and carried by its maker's push service (see [Dot on the phone](phone.md#dot-on-the-phone)). The
+  that phone's browser and carried by its maker's push service (see [Dot on the phone](phone.md#dot-on-the-phone)): a
+  subscription is taken only at the push services of `[notify] push_hosts` (Apple, Google, Firefox, Windows; item 1311),
+  so that no address a caller names receives a push, and it goes with the phone whose key registered it. The
   first line of the morning brief goes the same way (item 570): the model wrote it from what the run read, mail of
   others among it, so it may repeat what a sender wrote.
 - **To Dot's iPhone app through Apple's push service (APNs), once you set `[apns]`: titles.** Apple reads what APNs

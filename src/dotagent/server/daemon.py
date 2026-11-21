@@ -312,7 +312,8 @@ async def run_daemon(config: AppConfig) -> int:
             phone: NotifyHealth = NotifyHealth()
             feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(PUSH_KINDS))
             pusher: asyncio.Task[None] = asyncio.create_task(
-                watch_pushes(runtime.store, feed, runtime.push_keys, stopping), name="push"
+                watch_pushes(runtime.store, feed, runtime.push_keys, stopping, runtime.config.notify.push_hosts),
+                name="push",
             )
             phone.mark_live("push")
             pusher.add_done_callback(functools.partial(_log_push_end, phone, "push"))
