@@ -147,6 +147,9 @@ here points at a test that no longer exists.
 - `tests/unit/test_shell_guard_programs.py::test_a_command_line_a_program_is_handed_is_judged_as_it_is_under_bash` — a
   line handed to `sqlite3 .shell`, `vim -c '!CMD'`, `emacs --eval` or `tar --use-compress-program` was `low` while the
   same line under `bash -c` was `high` (item 1302).
+- `tests/unit/test_shell_guard_awk.py::test_a_pipe_into_a_shell_is_read_through_the_wrappers_in_front_of_it` — the
+  check for an awk pipe into a shell read the first word of the command only, so `print | "env sh"` ran what awk
+  printed while `print | "sh"` asked (item 1303).
 
 ## Evidence and format
 
