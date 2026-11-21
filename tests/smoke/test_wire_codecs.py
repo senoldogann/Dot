@@ -442,9 +442,12 @@ def test_opencode_usage_limit_is_terminal_but_burst_is_retried() -> None:
     quota = classify_opencode(
         429, WireError(kind="GoUsageLimitError", code="", message="m", limit_name="weekly"), 3600.0, {}
     )
-    burst = classify_opencode(429, WireError(kind="RateLimitError", code="", message="m", limit_name=""), 60.0, {})
+    burst = classify_opencode(429, WireError(kind="RateLimitError", code="", message="m", limit_name=""), 20.0, {})
+    long_burst = classify_opencode(429, WireError(kind="RateLimitError", code="", message="m", limit_name=""), 60.0, {})
     assert isinstance(quota, ProviderQuotaError) and quota.context["limit_name"] == "weekly"
     assert isinstance(burst, ProviderRateLimitError) and is_retryable_provider_error(burst)
+    # A pause past 30 s is not slept through in the connector: the run loop's rate-limit wait takes it (item 1306).
+    assert isinstance(long_burst, ProviderRateLimitError) and not is_retryable_provider_error(long_burst)
 
 
 def test_anthropic_billing_and_a_spent_balance_are_terminal_but_an_overloaded_api_is_retried() -> None:
