@@ -810,7 +810,7 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
 - **Dot's own vault** (item 621, Settings › Vault) keeps the logins, cards and contact details you give it. A run can
   have a login typed into a page and can read contact details; a run that makes an account on a site keeps its login
   there with `browser_create_login` (item 740), whose password Dot makes, fills and keeps without a model ever reading
-  it, asking you first as a fill does in every mode but `yolo`; it keeps one login per account (item 1290): a second call is refused, and only a login Dot made can be replaced after a failed sign-up, its old password kept in the notes, never one you saved; a card is kept, shown to you by the eye, and filled into
+  it, asking you first as a fill does in every mode but `yolo`; it keeps one login per account (item 1290): a second call is refused, found by the site's host and port however you wrote the website (item 1294), and only a login Dot made can be replaced after a failed sign-up, its old passwords kept in the notes, never one you saved; a card is kept, shown to you by the eye, and filled into
   no page (that is another item's, and what it needs is in roadmap 621). Dot's tools never show a run a password, a card
   number, an expiry or a security code; what a program that the run writes and starts can reach is under **What keeps a
   value from a run, and what does not**.
