@@ -1586,6 +1586,17 @@ class ModelOption(FrozenModel):
 type ProviderProblem = Literal["no_key", "not_installed", "key_refused", "access_refused", "failed"]
 
 
+class RetiredModel(FrozenModel):
+    """A cloud model its service retired (item 1309): ``model`` as the server lists it, ``use`` the model the service's
+    own words suggest instead (``None`` when they name none), ``message`` those words and ``since`` when Dot learned of
+    it. Dot leaves the owner's choices as they are: a role or schedule that names the model is the owner's to change."""
+
+    model: str
+    use: str | None
+    message: str
+    since: float
+
+
 class ProviderModels(FrozenModel):
     """The models of one provider, or why it listed none: ``error`` is the message and ``problem`` what kind of failure
     it is (``no_key``: no key is set for it, ``not_installed``: the program it runs on is not installed, OpenCode for
@@ -1597,6 +1608,8 @@ class ProviderModels(FrozenModel):
     models: list[ModelOption]
     error: str | None
     problem: ProviderProblem | None
+    # The models the provider's service retired and left out of ``models`` (item 1309); empty for every other provider.
+    retired: list[RetiredModel] = Field(default_factory=list)
 
 
 class PaletteSkill(FrozenModel):

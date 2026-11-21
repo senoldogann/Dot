@@ -8,7 +8,9 @@ with an API key.
 import asyncio
 import ipaddress
 import json
-from collections.abc import Sequence
+import re
+import time
+from collections.abc import Callable, Sequence
 
 import httpx
 from pydantic import JsonValue
@@ -50,6 +52,71 @@ log = get_logger(__name__)
 # The status Ollama answers for a cloud model its service retired (item 1195): `/api/tags` still lists the model while
 # the account keeps it, and every question of it is refused with this.
 _RETIRED_STATUS: int = 410
+# How long a retirement is remembered before the model is asked about again (item 1309).
+RETIRED_TTL_S: float = 6 * 3600.0
+# The replacement the service names: "minimax-m2.7 was retired on November 9, 2026. Try glm-5.3-flash:cloud."
+_REPLACEMENT: re.Pattern[str] = re.compile(r"\bTry\s+([A-Za-z0-9][A-Za-z0-9_.:/\-]*[A-Za-z0-9_])")
+
+
+def suggested_replacement(message: str) -> str | None:
+    """The model the service's words of a retirement tell to try instead, or ``None`` when they name none."""
+    found: re.Match[str] | None = _REPLACEMENT.search(message)
+    return None if found is None else found.group(1)
+
+
+class Retirement(FrozenModel):
+    """A cloud model Ollama's service retired: its name as the server lists it, the service's own words, the model they
+    suggest instead (``use``) and when Dot learned of it (seconds since the epoch)."""
+
+    model: str
+    message: str
+    use: str | None
+    since: float
+
+
+class RetiredModels:
+    """The retirements this process has learned of, each for ``ttl_s`` after it was told, by server and model: a model
+    answered once with 410 is not asked about again in every refresh of the model list (item 1309), and the doctor and
+    the models page can say which models are gone and what to use. The owner's configuration is never rewritten."""
+
+    def __init__(self, ttl_s: float = RETIRED_TTL_S, clock: Callable[[], float] = time.monotonic) -> None:
+        self._ttl_s: float = ttl_s
+        self._clock: Callable[[], float] = clock
+        self._held: dict[tuple[str, str], tuple[float, Retirement]] = {}
+
+    def note(self, server: str, model: str, message: str) -> Retirement:
+        """Remember that ``model`` of ``server`` was retired, in the service's ``message``."""
+        retirement: Retirement = Retirement(
+            model=model, message=message, use=suggested_replacement(message), since=time.time()
+        )
+        self._held[(server, model)] = (self._clock() + self._ttl_s, retirement)
+        return retirement
+
+    def active(self, server: str, model: str) -> Retirement | None:
+        """The retirement of ``model`` still remembered, or ``None`` (not retired as far as this process knows, or its
+        time is over and the model is asked about again)."""
+        held: tuple[float, Retirement] | None = self._held.get((server, model))
+        if held is None:
+            return None
+        if held[0] <= self._clock():
+            del self._held[(server, model)]
+            return None
+        return held[1]
+
+    def all(self, server: str) -> tuple[Retirement, ...]:
+        """The retirements of ``server`` still remembered, by model name."""
+        names: list[str] = sorted(model for held_server, model in self._held if held_server == server)
+        return tuple(found for found in (self.active(server, name) for name in names) if found is not None)
+
+    def forget_unlisted(self, server: str, listed: Sequence[str]) -> None:
+        """Drop the retirements of ``server`` whose model it no longer lists (the owner removed it)."""
+        for held_server, model in list(self._held):
+            if held_server == server and model not in listed:
+                del self._held[(held_server, model)]
+
+
+# The retirements of the process, shared by every connector to a server of it.
+RETIRED: RetiredModels = RetiredModels()
 
 
 class StreamState(FrozenModel):
@@ -392,8 +459,9 @@ def described_models(names: Sequence[str], outcomes: Sequence[ModelInfo | BaseEx
 class OllamaProvider:
     """Connector to an Ollama server (local, or ollama.com with an API key)."""
 
-    def __init__(self, config: OllamaConfig, api_key: str | None) -> None:
+    def __init__(self, config: OllamaConfig, api_key: str | None, retired: RetiredModels = RETIRED) -> None:
         self._config: OllamaConfig = config
+        self._retired: RetiredModels = retired
         self._client: httpx.AsyncClient = build_client(config.connect_timeout_s, config.read_timeout_s)
         self._headers: dict[str, str] = {"Content-Type": "application/json"}
         if api_key:
@@ -423,7 +491,12 @@ class OllamaProvider:
         cached: OllamaModelDetails | None = self._details_cache.get(model)
         if cached is not None:
             return cached
-        shown: JsonObject = await self._post_json("/api/show", {"model": model}, "ollama.show")
+        try:
+            shown: JsonObject = await self._post_json("/api/show", {"model": model}, "ollama.show")
+        except ProviderHttpError as error:
+            if error.status == _RETIRED_STATUS:
+                self._retired.note(self._config.base_url, model, error.message)
+            raise
         details: OllamaModelDetails = parse_model_details(model, shown, num_ctx_for(model, self._config))
         self._details_cache[model] = details
         return details
@@ -446,17 +519,28 @@ class OllamaProvider:
                     names.append(str(entry["name"]))
         return tuple(names)
 
+    def retired(self) -> tuple[Retirement, ...]:
+        """The cloud models this server's service retired that this process knows of, with what to use instead."""
+        return self._retired.all(self._config.base_url)
+
     async def list_models(self) -> tuple[ModelInfo, ...]:
         """The models the server has and can describe. A cloud model Ollama's service retired is left out and logged
-        (:func:`described_models`, item 1195), so that it does not take the rest of the list with it; any other failure
-        fails the list as before."""
+        (:func:`described_models`, item 1195), so that it does not take the rest of the list with it; it is
+        remembered for :data:`RETIRED_TTL_S`, not asked about at every refresh of the list, and :meth:`retired` says
+        which (item 1309). Any other failure fails the list as before."""
+        server: str = self._config.base_url
         names: tuple[str, ...] = await self.installed_names()
+        self._retired.forget_unlisted(server, names)
+        asked: tuple[str, ...] = tuple(name for name in names if self._retired.active(server, name) is None)
         outcomes: list[ModelInfo | BaseException] = await asyncio.gather(
-            *(self.model_info(name) for name in names), return_exceptions=True
+            *(self.model_info(name) for name in asked), return_exceptions=True
         )
-        described: DescribedModels = described_models(names, outcomes)
+        described: DescribedModels = described_models(asked, outcomes)
         for name, message in described.retired:
-            log.warning("ollama_model_retired", model=name, error=message, remove=f"ollama rm {name}")
+            retirement: Retirement = self._retired.note(server, name, message)
+            log.warning(
+                "ollama_model_retired", model=name, error=message, use=retirement.use, remove=f"ollama rm {name}"
+            )
         return described.models
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:

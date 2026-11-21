@@ -340,3 +340,68 @@ async def test_an_ollama_server_that_is_not_running_is_reported_at_once(
         row: CheckResult = rows[f"model {role}"]
         assert (row.ok, row.required, row.detail) == (False, False, f"{reference}: not checked, as {server.detail}")
     assert (rows["helpers"].ok, rows["helpers"].detail) == (False, f"ollama:gemma3: not checked, as {server.detail}")
+
+
+_RETIRED_MODEL: str = "minimax-m2.7:cloud"
+_RETIRED_WORDS: str = f"{_RETIRED_MODEL.split(':')[0]} was retired on November 9, 2026. Try glm-5.3-flash:cloud."
+
+
+class _OllamaHandler(BaseHTTPRequestHandler):
+    """An Ollama server of this Mac: its version, and ``/api/show`` answering 410 for the model its service retired
+    and a model with tools for any other."""
+
+    def _send(self, status: int, body: dict[str, object]) -> None:
+        payload: bytes = json.dumps(body).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_GET(self) -> None:
+        self._send(200, {"version": "0.0.0"})
+
+    def do_POST(self) -> None:
+        asked: str = json.loads(self.rfile.read(int(self.headers["Content-Length"])))["model"]
+        if asked == _RETIRED_MODEL:
+            self._send(410, {"error": _RETIRED_WORDS})
+        else:
+            self._send(200, {"capabilities": ["tools"], "model_info": {"x.context_length": 131072}})
+
+    def log_message(self, format: str, *args: object) -> None:
+        return None
+
+
+async def test_a_retired_model_only_helpers_and_standby_name_has_its_row_naming_them(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Item 1309: ``dotx doctor`` starts knowing no retirement, and learns one from the answer a model gets. The row
+    of a model named by ``helpers`` and ``standby`` alone was built before those roles were asked, so it never came."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    monkeypatch.delenv(UNSET_SECRET, raising=False)
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _OllamaHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        root: str = f"http://127.0.0.1:{server.server_address[1]}"
+        fine: str = "ollama:gemma4:cloud"
+        (tmp_path / "config.toml").write_text(
+            f'[models]\nmain = "{fine}"\nvision = "{fine}"\nfast = "{fine}"\nreview = "ollama:qwen3:cloud"\n'
+            f'helpers = ["ollama:{_RETIRED_MODEL}"]\nstandby = ["{fine}", "ollama:{_RETIRED_MODEL}"]\n\n'
+            f'[providers.ollama]\nbase_url = "{root}"\napi_key_env = "{UNSET_SECRET}"\n\n'
+            f'[providers.openai]\napi_key_env = "{UNSET_SECRET}"\n\n'
+            f'[providers.opencode_go]\napi_key_env = "{UNSET_SECRET}"\n\n'
+            f'[providers.anthropic]\napi_key_env = "{UNSET_SECRET}"\n\n'
+            f'[providers.openrouter]\napi_key_env = "{UNSET_SECRET}"\n\n'
+            f'[judge]\napi_key_env = "{UNSET_SECRET}"\n\n'
+            "[memory]\nembed_enabled = false\n",
+            encoding="utf-8",
+        )
+        rows: dict[str, CheckResult] = {
+            row.name: row for row in await _service_checks(load_config(tmp_path / "config.toml"))
+        }
+    finally:
+        server.shutdown()
+        server.server_close()
+    row: CheckResult = rows[f"ollama model {_RETIRED_MODEL}"]
+    assert (row.ok, row.required) == (False, True)
+    assert "helpers 1, standby 2" in row.detail and "use glm-5.3-flash:cloud" in row.detail
