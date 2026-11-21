@@ -299,10 +299,12 @@ so it starts tainted (asking before outward-facing actions) when one of the runs
 the firings since item 257: a firing from before names no schedule. The agent can create schedules too
 (`schedule_create`): such a schedule goes on in the chat it was made in, with that chat's choices as its composer shows
 them (the ones its first run started with until you picked others: its mode, model, reasoning level, speed, approval
-mode and goal mode; item 291). A firing whose saved reasoning level its model does not offer runs at the nearest one
-it does, the higher of two as near (`medium` on a model of low, high and max runs at high), and the log says so
-(`firing_effort_not_offered`; item 882: a chat's `medium` kept in its schedules, which DeepSeek does not offer, failed
-every firing of them to start); a level chosen for a chat's run is still refused at once. The conversation says so where it happened, in a quiet line of its own (items 665, 1178 and
+mode and goal mode; item 291). A firing whose saved reasoning level its model (an agent's schedule: the model its run takes, the schedule's own, else the agent's) does not offer runs at the nearest one
+it does, the lower of two as near, the cheaper (`medium` on a model of low, high and max runs at low, as a chat's run on that model
+does; on a model with only a thinking switch, `medium` is on and `minimal` is off): the schedule keeps that level from then on, the run's timeline
+says so once ("This schedule asked for medium reasoning, which its model does not offer; it now runs at low."), and the log has
+`schedule_effort_corrected` that once and nothing at the firings after (items 882 and 1307: a chat's `medium` kept in its schedules, which
+DeepSeek does not offer, failed every firing of them to start; a model with no choice leaves the schedule as it is and runs at none); a level chosen for a chat's run is still refused at once. The conversation says so where it happened, in a quiet line of its own (items 665, 1178 and
 1179): the calendar, the schedule's name (cut with an ellipsis on a short line) and when it runs in the words the
 Schedules page uses ("on Mondays at 09:00"; a form the page cannot say in words is "on a repeating schedule", and a
 schedule that runs once says its time in few words in the page's language, "today at 18:53", "tomorrow at 10:00",

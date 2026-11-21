@@ -129,6 +129,7 @@ from dotagent.drafts.service import fail_unsettled_drafts
 from dotagent.evals import EVAL_SOURCE
 from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
+from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
     ONE_MESSAGE_LEVELS,
     WHOLE_RUN_AGENTS,
@@ -400,20 +401,6 @@ def agent_bounds(
 def _offers(info: ModelInfo, effort: Effort) -> bool:
     """Whether the model ``info`` tells of offers the level ``effort``: a model with fewer than two has no choice."""
     return len(info.efforts) >= 2 and effort in info.efforts
-
-
-# The levels of reasoning from the least to the most, for the nearest one a model offers (item 882).
-_LEVEL_ORDER: tuple[Effort, ...] = ("minimal", "low", "medium", "high", "xhigh", "max")
-
-
-def nearest_offered(effort: Effort, offered: Sequence[str]) -> Effort | None:
-    """The level of ``offered`` nearest to ``effort``, the higher of two as near, or ``None`` when the model offers no
-    choice or ``effort`` is no level on the scale (item 882)."""
-    choices: list[Effort] = [level for level in _LEVEL_ORDER if level in offered]
-    if len(offered) < 2 or effort not in _LEVEL_ORDER or not choices:
-        return None
-    at: int = _LEVEL_ORDER.index(effort)
-    return min(choices, key=lambda level: (abs(_LEVEL_ORDER.index(level) - at), -_LEVEL_ORDER.index(level)))
 
 
 def _check_speed(ref: ModelRef, speed: Speed) -> None:
@@ -3499,17 +3486,20 @@ class RunManager:
         answers: list[str] = [_answer_said(question.note) for question in asked if question.status == "approved"]
         return (*await self._instructions_for((goal,), campaign.thread_id, None, None), *answers)
 
+    async def firing_effort(self, model: str | None, effort: Effort) -> Effort | None:
+        """The level a schedule's firing on ``model`` (None: the main model) runs at: its own, or, when the model does
+        not offer it, the one :func:`~dotagent.llm.traits.effective_effort` takes for it, the same as a run's own calls
+        and a standby model take (items 882 and 1307); ``None`` for a model with no choice. A schedule lives for weeks
+        and its model's levels change; on the owner's Mac a schedule made in a chat kept that chat's ``medium``, which
+        DeepSeek does not offer, and every firing failed to start until the schedules were deleted. A level chosen for
+        a chat's run is still refused at once (:meth:`_check_effort`)."""
+        return await self._firing_effort(parse_model_ref(model if model is not None else self._main_model), effort)
+
     async def _firing_effort(self, ref: ModelRef, effort: Effort) -> Effort | None:
-        """The level a schedule's firing runs at: its own, or, when its model does not offer it, the nearest one it
-        does (item 882). A schedule lives for weeks and its model's levels change; on the owner's Mac a schedule made in
-        a chat kept that chat's ``medium``, which DeepSeek does not offer, and every firing failed to start until the
-        schedules were deleted. A level chosen for a chat's run is still refused at once (:meth:`_check_effort`)."""
         info: ModelInfo = await self._runtime.router.model_info(ref)
         if _offers(info, effort):
             return effort
-        kept: Effort | None = nearest_offered(effort, info.efforts)
-        log.warning("firing_effort_not_offered", model=ref.label, effort=effort, offered=list(info.efforts), kept=kept)
-        return kept
+        return effective_effort(info.efforts, effort)
 
     async def _check_effort(self, ref: ModelRef, effort: Effort) -> None:
         """A level chosen for a run has to be one the model offers (a model with fewer than two has no choice)."""
