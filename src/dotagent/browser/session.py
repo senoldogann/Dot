@@ -48,6 +48,7 @@ from dotagent.browser.console import console_lines
 from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
     NEVER_PRESSED,
+    Navigation,
     PageLines,
     Pulse,
     StepResult,
@@ -2517,7 +2518,7 @@ class BrowserSession:
             return None
         return ForbiddenUrlError(_FORBIDDEN_MESSAGE, refusal.url, refusal.reason, "document")
 
-    async def _navigate_checked(self, page: Page, url: str, attempts: int) -> int | None:
+    async def _navigate_checked(self, page: Page, url: str, attempts: int) -> Navigation:
         """:func:`navigate`, with a navigation the rules refused on the way reported as such."""
         config: BrowserConfig = self._config
         try:
@@ -2632,7 +2633,7 @@ class BrowserSession:
         config: BrowserConfig = self._config
         tab.status = None
         try:
-            status: int | None = await self._navigate_checked(tab.page, url, config.navigation_attempts)
+            navigation: Navigation = await self._navigate_checked(tab.page, url, config.navigation_attempts)
         except ForbiddenUrlError as refused:
             # The tab shows Chrome's error page for the refused request; it is left as a page the rules forbid is.
             await self._blank(tab.page)
@@ -2642,8 +2643,12 @@ class BrowserSession:
                 refused.reason,
                 refused.resource_type,
             ) from refused
-        if status is not None:
-            tab.status = status
+        if navigation.status is not None:
+            tab.status = navigation.status
+        if navigation.redirected_to is not None:
+            # Chrome cut the navigation off and the tab stands on the page that did it (item 1296): read, with a note.
+            moved_to: str = truncate_middle(self._shown_to(tab.page, navigation.redirected_to), _SHOWN_URL_CHARS)
+            add_note(tab, f"the page redirected to {moved_to}")
         settled: bool = await self._settle_loaded(tab)
         await self._enforce_landing(tab)
         capture: _Capture = (
@@ -2897,8 +2902,9 @@ class BrowserSession:
         try:
             if config.mode == "own":
                 await self._guard_hops(page)
-            first: int | None = await self._navigate_checked(page, url, config.navigation_attempts)
-            if first is None:
+            navigation: Navigation = await self._navigate_checked(page, url, config.navigation_attempts)
+            first: int | None = navigation.status
+            if first is None and navigation.redirected_to is None:
                 raise BrowserError("the address started a download, not a page", {"url": url})
             if first in _CHALLENGE_STATUS:
                 with contextlib.suppress(PlaywrightError):
@@ -2928,7 +2934,13 @@ class BrowserSession:
                 ) from error
         finally:
             await self._close_scratch(page)
-        return RenderedDocument(url=landed, status=statuses[-1] if statuses else first, html=html)
+        status: int | None = statuses[-1] if statuses else first
+        if status is None:
+            raise BrowserError(
+                "the page redirected and its answer was not seen, so it is not read as a page",
+                {"url": url, "landed": truncate_middle(landed, _LAUNCH_ERROR_CHARS)},
+            )
+        return RenderedDocument(url=landed, status=status, html=html)
 
     async def _background_tab(self, context: BrowserContext) -> Page:
         """A new tab created in the background through CDP. Playwright's ``new_page`` opens in the foreground, which
@@ -4025,7 +4037,9 @@ class BrowserSession:
             add_note(fresh, _FRESH_FOR_LOGIN_NOTE)
             if address not in _BLANK_URLS and not address.startswith("about:blank"):
                 try:
-                    fresh.status = await self._navigate_checked(fresh.page, address, self._config.navigation_attempts)
+                    fresh.status = (
+                        await self._navigate_checked(fresh.page, address, self._config.navigation_attempts)
+                    ).status
                 except BrowserError as error:
                     add_note(fresh, f"the page could not be opened again: {error.message}")
             await self._settle(fresh)
