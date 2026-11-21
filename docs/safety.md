@@ -682,8 +682,11 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
 **Secrets.**
 
 - A run that needs a key, a token or a password of yours asks for it on a card of its own (`ask_secret`, item 857),
-  never in a message. The card holds four things: the run's title for what it is, why it needs it and how to make
-  it, a box that shows no letter of it, and **Save securely** or **Decline**.
+  never in a message. A question (`ask_user`) that asks you to hand one over - a sign-in or verification code on your
+  phone, a password, a key - is refused before it is left, and the run is told to ask on the card instead (item
+  1289). A code the user typed as the card's message counts as their own words, so the page's one-time-code field
+  takes it outside `yolo` too. The card holds four things: the run's title for what it is, why it needs it and how to
+  make it, a box that shows no letter of it, and **Save securely** or **Decline**.
   - A value under 8 characters is not held: no mask could reach it where a command prints it (it would mask those
     characters in every text). The card says so as it is typed, Save securely waits, and **Send as a message** sends
     a short code (an SMS code, a PIN) as the card's answer in words instead, which the run then sees and uses (item
