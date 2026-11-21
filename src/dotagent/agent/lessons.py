@@ -55,7 +55,7 @@ from dotagent.agent.review import (
 from dotagent.agent.sites import site_tags
 from dotagent.agent.verify import CallFact
 from dotagent.config import LessonsMode
-from dotagent.core.errors import DotError, InvalidValueError, NotFoundError, RunConflict
+from dotagent.core.errors import DotError, InvalidValueError, NotFoundError, ProviderError, RunConflict
 from dotagent.core.learned_text import finds_handle, finds_link, finds_secret, gate
 from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search, redact_secrets
@@ -358,7 +358,7 @@ async def repeating_rules(runtime: Runtime, texts: Sequence[str], rules: Sequenc
     each with the rule: by the words (:func:`repeats`) or, with embeddings on, by the meaning, the same way round
     (:func:`same_way_round`) and at least ``[memory] similar_threshold`` close. The adopted habits and tool guidance
     are in every run's prompt, so a lesson that repeats one adds a line to the memory and nothing to a run. An
-    embedding service that fails raises its error."""
+    embedding service that fails leaves the words' answer, as a search does (item 1308)."""
     found: dict[str, str] = {}
     if not texts or not rules:
         return found
@@ -370,7 +370,12 @@ async def repeating_rules(runtime: Runtime, texts: Sequence[str], rules: Sequenc
     left: list[str] = [text for text in texts if text not in found]
     if embedder is None or not left:
         return found
-    vectors: list[Vector] = await embedder.embed([*left, *rules])
+    try:
+        vectors: list[Vector] = await embedder.embed([*left, *rules])
+    except ProviderError as error:
+        # The words were compared above; without the embedding service the meaning is not (item 1308).
+        log.warning("lessons_habits_by_words", error=error.message)
+        return found
     for text, vector in zip(left, vectors, strict=False):
         for line, other in zip(rules, vectors[len(left) :], strict=True):
             close: bool = (
@@ -385,8 +390,9 @@ async def repeating_rules(runtime: Runtime, texts: Sequence[str], rules: Sequenc
 async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, ...]) -> tuple[str, ...]:
     """The lessons the review model draws from a run, without the ones that are not lessons or that a note the run's
     agent is handed already says (another agent's lesson is not the run's to know), nor the ones that repeat a habit or
-    a line of tool guidance the adopted harness gives every run (item 584). A review model or an embedding service that
-    fails raises its error."""
+    a line of tool guidance the adopted harness gives every run (item 584). A review model that fails raises its error;
+    an embedding service that fails does not: the notes are compared by their words alone, as a save and a search do
+    (item 1308)."""
     agent_id: str | None = await _agent_of(runtime.store, case.run_id)
     # The gates of the lessons and of the harness text refuse by a value: the values filled into a page are not
     # among them (item 621).
@@ -396,7 +402,7 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
     # words cannot pass into a lesson of a clean run, which would be saved unmarked.
     known: tuple[str, ...] = tuple(
         redact_secrets(hit.record.content)
-        for hit in await recall_for(runtime.memory, case.goal, _KNOWN_NOTES, agent_id)
+        for hit in await recall_for(runtime.memory, case.goal, _KNOWN_NOTES, agent_id, words_when_down=True)
         if not hit.record.tainted
     )
     writer: LessonWriter = lesson_writer_for(
@@ -431,7 +437,7 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
         if lesson in said:
             log.info("lesson_repeats_a_habit", run_id=case.run_id, habit=said[lesson])
             continue
-        hits: list[MemoryHit] = await recall_for(runtime.memory, lesson, _LIKE_NOTES, agent_id)
+        hits: list[MemoryHit] = await recall_for(runtime.memory, lesson, _LIKE_NOTES, agent_id, words_when_down=True)
         if not any(_says_it(lesson, hit, threshold) for hit in hits):
             fresh.append(lesson)
     log.info("lessons_drawn", run_id=case.run_id, proposed=len(proposal.lessons), kept=len(fresh))
