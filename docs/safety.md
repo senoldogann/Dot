@@ -760,7 +760,8 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   another application (a browser, an installed web app) that shows the web UI, known at each step by the title the UI
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
   title is refused as well). Desktop screenshots black out the password managers' windows, each known by its
-  application's bundle id as well as its name, so on a Mac in any language (item 555), and Dot's own windows for thirty
+  application's bundle id as well as its name, so on a Mac in any language (item 555), the windows read again right after
+  the capture as well as before it, so that one opened while the picture was taken is covered (item 1299), and Dot's own windows for thirty
   seconds after the eye of Settings › Vault showed a secret (item 621), which `desktop_snapshot` and `desktop_read`
   read no more than a password manager's then; their secure fields are not masked.
 - A login of your 1Password is filled by Dot, never by the run's model (item 493). Once you connect 1Password

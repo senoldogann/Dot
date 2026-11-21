@@ -3,7 +3,9 @@ killed."""
 
 import asyncio
 import contextlib
+import os
 import re
+import signal
 from collections.abc import Mapping
 from typing import Literal
 
@@ -85,6 +87,26 @@ async def _windows_of_targets(targets: tuple[str, ...]) -> str:
         return ""
 
 
+def _kill_group(process: asyncio.subprocess.Process) -> None:
+    """Kill ``osascript`` and everything it started (item 1299). The script runs as the leader of a process group of its
+    own (``start_new_session``), so the group is what is killed: a script that does ``do shell script`` or talks to an
+    ``osascript`` child would otherwise outlive its parent and go on acting on the Mac without its run. A group that is
+    gone already has nothing to kill."""
+    if process.returncode is not None:
+        return
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(process.pid, signal.SIGKILL)
+
+
+async def _reaped(process: asyncio.subprocess.Process) -> None:
+    """Wait for a killed ``osascript`` to be gone. One that is not within ``_REAP_TIMEOUT_S`` is logged and left, never
+    raised: a bare ``TimeoutError`` here would hide the error that explains why the script was killed."""
+    try:
+        await asyncio.wait_for(process.wait(), _REAP_TIMEOUT_S)
+    except TimeoutError:
+        _log.warning("osascript_not_reaped", pid=process.pid, waited_s=_REAP_TIMEOUT_S)
+
+
 async def run_osascript(
     language: ScriptLanguage,
     script: str,
@@ -115,12 +137,13 @@ async def run_osascript(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=env,
+        start_new_session=True,
     )
     try:
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout_s)
     except TimeoutError as error:
-        process.kill()
-        await asyncio.wait_for(process.wait(), _REAP_TIMEOUT_S)
+        _kill_group(process)
+        await _reaped(process)
         shown: str = await _windows_of_targets(targets)
         raise DesktopError(
             f"osascript did not finish within {timeout_s:g} s"
@@ -136,9 +159,7 @@ async def run_osascript(
             },
         ) from error
     finally:
-        if process.returncode is None:
-            with contextlib.suppress(ProcessLookupError):
-                process.kill()
+        _kill_group(process)
     if process.returncode != 0:
         said: str = stderr.decode("utf-8", "replace").strip()
         known: tuple[int, str] | None = osascript_error(said)

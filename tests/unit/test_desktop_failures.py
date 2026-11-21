@@ -39,6 +39,7 @@ class _Osascript:
     """A process that never finishes until it is killed."""
 
     returncode: int | None = None
+    pid: int = 424242
 
     async def communicate(self) -> tuple[bytes, bytes]:
         await asyncio.sleep(30)
@@ -69,6 +70,8 @@ async def _timeout(monkeypatch: pytest.MonkeyPatch, windows: object, targets: tu
         return _Osascript()
 
     monkeypatch.setattr(script.asyncio, "create_subprocess_exec", start)
+    # The script's process group is what is killed (item 1299); the stand-in has none, so none is signalled.
+    monkeypatch.setattr(script.os, "killpg", lambda group, sent: None)
     monkeypatch.setattr(screen, "windows_everywhere", windows)
     with pytest.raises(DesktopError) as caught:
         await script.run_osascript(

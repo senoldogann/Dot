@@ -810,7 +810,10 @@ every mode but `yolo` (item 433).
   not encoded again: the JPEG just made is returned (a 3024×1964 frame took about 71 ms to shrink and encode, and
   about 8 ms to recognise as the same frame). The windows of password
   managers and Keychain Access are painted black, known by their application's bundle id and not only by its name,
-  which is in the language of the Mac (item 555). It comes with the lines of text on it, read on this Mac by macOS's
+  which is in the language of the Mac (item 555); the windows are read again right after the capture and what is painted
+  black is the union of both readings, so a password manager opened or moved while the picture was taken is covered too
+  (item 1299; the window capture of `desktop_snapshot` reads its windows and applications again the same way). It
+  comes with the lines of text on it, read on this Mac by macOS's
   Vision from the picture the model is shown (what is painted black is not read), each with the x, y of its centre
   that `desktop_act` takes (item 701, `read_screen_text`; 50 ms a screen once warm): a window that shows nothing to
   accessibility can be read and clicked by a model that sees no image. A zoom into a region (`x`, `y`, `width`,

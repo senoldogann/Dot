@@ -645,7 +645,9 @@ out of reach; an image goes to the model as an image, an iPhone's HEIC photo too
 556). A shell command runs with the `PATH` of your login shell, in its own process
 group (cancelling a run ends the whole group) and under a timeout (`[shell] default_timeout_s`, at most
 `max_timeout_s`). An AppleScript (`apple_script`) ends with its call as well: one whose run is stopped or whose call
-times out is killed, after `[desktop] osascript_timeout_s` or the `timeout_s` the run gives a script that starts an
+times out is killed with the commands it started (it runs as the leader of a process group of its own, which is what
+is killed, and a process that does not exit when killed is logged, never raised in place of the timeout's own error,
+item 1299), after `[desktop] osascript_timeout_s` or the `timeout_s` the run gives a script that starts an
 application or works on a large document (at most 110 s, item 1180); the application may go on with what it was asked,
 which the timeout says. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
 655 and 657, `[web] search_order`): each engine in the owner's order, one whose key is not set passed over and said
