@@ -203,7 +203,7 @@ from dotagent.desktop.types import AppInfo
 from dotagent.store.models import BrowserMode
 from dotagent.vault.hosts import SameOrigin
 from dotagent.vault.masking import in_address, mask_error, masked
-from dotagent.web.addresses import is_private_text, non_public_address
+from dotagent.web.addresses import is_private_text, non_public_address, unread_or_non_public
 
 _log = get_logger("dotagent.browser.session")
 # What a page that had not settled after an action that went through is said to be (the review of every module).
@@ -315,6 +315,16 @@ RECONNECT_NOTICE: str = "Chrome was closed or restarted: click Allow in Chrome s
 # (Chrome follows them before it asks), so each tab is asked about those through a Fetch session of its own
 # (:meth:`BrowserSession._guard_hops`). The owner's Chrome (attach mode) gets neither: its tabs are the owner's.
 _EVERY_URL: re.Pattern[str] = re.compile(".*")
+# What a web tool's page may request before its address is looked at for the public internet (item 1319): only the
+# schemes that reach a server; data:, blob: and the rest carry no address to judge. The look at a host's addresses
+# is kept this long, and given this long to be made.
+_NOT_PUBLIC_MESSAGE: str = (
+    "the page is on a private or local network address; the web tools only reach the public internet "
+    "(web.allow_private_hosts)"
+)
+_NETWORK_SCHEMES: frozenset[str] = frozenset({"http", "https", "ws", "wss", "ftp"})
+_PUBLIC_HOST_TTL_S: float = 30.0
+_PUBLIC_LOOK_TIMEOUT_S: float = 5.0
 _FETCH_PATTERNS: list[dict[str, str]] = [{"urlPattern": "*", "requestStage": "Request"}]
 _DOCUMENT_RESOURCE: str = "Document"
 _BLOCKED_BY_CLIENT: str = "ERR_BLOCKED_BY_CLIENT"
@@ -656,6 +666,9 @@ class _Refusal:
 
     url: str
     reason: str
+    # What the error says, when the refusal is not the URL rules' own: a request to a non-public address for a web tool
+    # says what the later check says (item 1319).
+    message: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -1031,6 +1044,12 @@ class BrowserSession:
         # The pages of Dot's own Chrome whose requests a Fetch session of their own judges (:meth:`_guard_hops`), each
         # with the setting up of its session, which a navigation of the page waits for.
         self._guarded: dict[Page, asyncio.Task[None]] = {}
+        # The pages whose requests the web tools hold to the public internet, each before it is sent (item 1319): the
+        # scratch tab of a read for them, and the run's tab while a crawl renders a page in it. Only in Dot's own
+        # Chrome, whose requests Dot answers; no other tab is in it, so the browser tools reach what they did.
+        self._public_only_pages: set[Page] = set()
+        # What the last look at a host's addresses found, for _PUBLIC_HOST_TTL_S: the host's refusal, or None.
+        self._public_hosts: dict[str, tuple[float, str | None]] = {}
         self._reaper: asyncio.Task[None] | None = None
         # The watch for another Dot process that asks for the profile of Dot's own Chrome (item 1198).
         self._handing: asyncio.Task[None] | None = None
@@ -2437,8 +2456,15 @@ class BrowserSession:
             sending_document(request),
             sending_tab(request),
         )
+        allowed: bool = verdict.allowed
+        sender: Page | None = sending_tab(request)
+        if allowed and sender is not None:
+            why: str | None = await self._not_public(sender, request.url)
+            if why is not None:
+                allowed = False
+                self._refuse_non_public(sender, main_page_of(request), request.url, request.resource_type, why)
         try:
-            if verdict.allowed:
+            if allowed:
                 await route.continue_()
             else:
                 await route.abort(_ABORT_REASON)
@@ -2496,6 +2522,31 @@ class BrowserSession:
     def _forget_page(self, page: Page) -> None:
         self._guarded.pop(page, None)
         self._refusals.pop(page, None)
+        self._public_only_pages.discard(page)
+
+    async def _not_public(self, page: Page | None, url: str) -> str | None:
+        """Why a request of ``page`` to ``url`` is refused before it is sent, when the page is one a web tool holds to
+        the public internet (item 1319): the address it names or resolves to is not a public one, or cannot be read (a
+        refusal where the answer is unknown). ``None`` for any other page, so that a page of the browser tools reaches
+        what it reached, and for an address that is public. A host's addresses are looked at once in
+        ``_PUBLIC_HOST_TTL_S``; the connection Chrome made is read again after the page (:meth:`_require_public`)."""
+        if page is None or page not in self._public_only_pages:
+            return None
+        try:
+            parts = urlsplit(url)
+            host: str | None = parts.hostname
+        except ValueError:
+            return "its address could not be read"
+        if parts.scheme.lower() not in _NETWORK_SCHEMES:
+            return None
+        key: str = (host or "").lower()
+        now: float = time.monotonic()
+        known: tuple[float, str | None] | None = self._public_hosts.get(key)
+        if known is not None and known[0] > now:
+            return known[1]
+        why: str | None = await unread_or_non_public(host or "", _PUBLIC_LOOK_TIMEOUT_S)
+        self._public_hosts[key] = (now + _PUBLIC_HOST_TTL_S, why)
+        return why
 
     def _on_paused(self, cdp: CDPSession, page: Page, main: str | None, event: Mapping[str, object]) -> None:
         task: asyncio.Task[None] = asyncio.create_task(self._answer_paused(cdp, page, main, event))
@@ -2518,7 +2569,25 @@ class BrowserSession:
         navigated: Page | None = page if paused.navigation and in_main else None
         sender: str | None = document_of(page.main_frame) if in_main else None
         verdict: UrlVerdict = self._judge(paused.url, paused.navigation, paused.resource_type, navigated, sender, page)
-        await self._answer_hop(cdp, page, paused.request_id, paused.url, verdict.allowed)
+        allowed: bool = verdict.allowed
+        if allowed:
+            why: str | None = await self._not_public(page, paused.url)
+            if why is not None:
+                allowed = False
+                self._refuse_non_public(page, navigated, paused.url, paused.resource_type, why)
+        await self._answer_hop(cdp, page, paused.request_id, paused.url, allowed)
+
+    def _refuse_non_public(self, page: Page, navigated: Page | None, url: str, resource_type: str, why: str) -> None:
+        """Keep and log the refusal of a request to a non-public address (item 1319): a navigation is kept for the error
+        of the call (:meth:`_refused_navigation`), as the refusals of the URL rules are."""
+        if navigated is not None:
+            self._refusals[page] = _Refusal(url=self._shown_to(page, url), reason=why, message=_NOT_PUBLIC_MESSAGE)
+        _log.info(
+            "browser_request_refused",
+            url=truncate_middle(self._shown(url), _LAUNCH_ERROR_CHARS),
+            resource_type=resource_type,
+            reason=f"{why}; {_NOT_PUBLIC_MESSAGE}",
+        )
 
     async def _answer_hop(self, cdp: CDPSession, page: Page, request_id: str, url: str, allowed: bool) -> None:
         """Let the request ``request_id`` go on, or fail it as blocked by the client. A page that closed under its
@@ -2554,7 +2623,7 @@ class BrowserSession:
         refusal: _Refusal | None = self._refusals.pop(page, None)
         if refusal is None:
             return None
-        return ForbiddenUrlError(_FORBIDDEN_MESSAGE, refusal.url, refusal.reason, "document")
+        return ForbiddenUrlError(refusal.message or _FORBIDDEN_MESSAGE, refusal.url, refusal.reason, "document")
 
     async def _navigate_checked(self, page: Page, url: str, attempts: int) -> Navigation:
         """:func:`navigate`, with a navigation the rules refused on the way reported as such."""
@@ -2716,11 +2785,21 @@ class BrowserSession:
     # A view the model reads takes ``hide_secrets``: the value of a field the page marks secret then shows as
     # ``[hidden]``, in the page's lines and in a screenshot (item 467); the tools give it in every mode but yolo.
 
-    async def open_url(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
-        """Navigate the current tab of the thread."""
+    async def open_url(self, thread_id: str, url: str, hide_secrets: bool, *, public_only: bool = False) -> PageView:
+        """Navigate the current tab of the thread. With ``public_only`` (a web tool rendering a page in the run's tab,
+        :func:`dotagent.tools.web._renderer_for`) every request the tab sends meanwhile, redirect hops and the page's
+        own resources included, is refused before it is sent when its address is not a public one or cannot be read
+        (item 1319); in Dot's own Chrome only, where the requests are Dot's to answer. The browser tools never ask."""
         async with self._locked(thread_id, opens=True) as thread:
             tab: Tab = await self._current_tab(thread)
-            return await self._load(thread, tab, url, hide_secrets)
+            held: bool = public_only and self._config.mode == "own"
+            if held:
+                self._public_only_pages.add(tab.page)
+            try:
+                return await self._load(thread, tab, url, hide_secrets)
+            finally:
+                if held:
+                    self._public_only_pages.discard(tab.page)
 
     async def new_tab(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
         """Open ``url`` in a new tab that becomes the current one."""
@@ -2912,8 +2991,7 @@ class BrowserSession:
             private = await non_public_address(host) if host else None
         if private is not None:
             raise ForbiddenUrlError(
-                "the page is on a private or local network address; the web tools only reach the public internet "
-                "(web.allow_private_hosts)",
+                _NOT_PUBLIC_MESSAGE,
                 landed,
                 f"it was served from {private}",
                 "document",
@@ -2939,6 +3017,8 @@ class BrowserSession:
         page.on("response", lambda response: _note_main_status(page, response, statuses, documents))
         try:
             if config.mode == "own":
+                if public_only:
+                    self._public_only_pages.add(page)
                 await self._guard_hops(page)
             navigation: Navigation = await self._navigate_checked(page, url, config.navigation_attempts)
             first: int | None = navigation.status
@@ -2971,6 +3051,7 @@ class BrowserSession:
                     "reading the page failed", {"url": url, "error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
                 ) from error
         finally:
+            self._public_only_pages.discard(page)
             await self._discard_scratch(page)
         status: int | None = statuses[-1] if statuses else first
         if status is None:

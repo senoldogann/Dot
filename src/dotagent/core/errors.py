@@ -248,7 +248,13 @@ class FailSafeTriggered(DesktopError):
 
 
 class WebError(DotError):
-    """A web request was refused by the address rules, failed on the network, or returned something unusable."""
+    """A web request was refused by the address rules, failed on the network, or returned something unusable.
+
+    ``hops_followed`` is how many redirects :meth:`WebClient.get` had followed when the error came (item 1319): 0 for
+    the link's own first request, so a caller that walks a chain can tell a failure of the first hop from one further
+    on, whose address nobody has looked at."""
+
+    hops_followed: int = 0
 
 
 class PrivateHostRefused(WebError):
