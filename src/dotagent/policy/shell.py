@@ -760,7 +760,8 @@ _AWK_PIPE_OUT: re.Pattern[str] = re.compile(
     r"(?<!\|)\|&?(?!\|)(?!\s*getline)(?:\s*" + _AWK_MARK + r"(?=\s*(?:[;})\n]|$)))?"
 )
 _AWK_PIPE_IN: re.Pattern[str] = re.compile(r"(?:(?:^|(?<=[;{}(\n]))\s*" + _AWK_MARK + r")?\s*\|&?\s*getline")
-_AWK_WRITE: re.Pattern[str] = re.compile(r">>?\s*" + _AWK_MARK)
+_AWK_PRINT: re.Pattern[str] = re.compile(r"(?<![\w$])printf?\b")
+_AWK_TARGET: re.Pattern[str] = re.compile(r"(?:" + _AWK_MARK + r"|\(\s*" + _AWK_MARK + r"\s*\))")
 _AWK_REGEX_AFTER: str = "(,{};!~&|\n?:"
 _SED_FILES: re.Pattern[str] = re.compile(r"(?:^|[;{}!$/0-9])[gpiIemM0-9]*\s*([wWrR])\s+([^\n]+)", re.MULTILINE)
 _UNIQ_VALUES: frozenset[str] = frozenset({"-f", "-s", "-w", "--skip-fields", "--skip-chars", "--check-chars"})
@@ -3748,6 +3749,57 @@ def _awk_blanked(program: str) -> tuple[str, list[str]]:
     return "".join(out), strings
 
 
+def _awk_redirect_targets(blanked: str) -> list[str]:
+    """The target of the ``>`` or ``>>`` of each ``print`` and ``printf`` statement of ``blanked`` (an awk program,
+    :func:`_awk_blanked`), as the text that follows the operator up to the end of the statement. A ``>`` that is not
+    awk's redirect (a comparison in a pattern, in a condition or inside parentheses) is not one."""
+    targets: list[str] = []
+    for statement in _AWK_PRINT.finditer(blanked):
+        depth: int = 0
+        at: int = statement.end()
+        target_start: int | None = None
+        while at < len(blanked):
+            char: str = blanked[at]
+            if char in "([":
+                depth += 1
+            elif char in ")]":
+                depth -= 1
+            elif depth <= 0 and char in ";\n{}":
+                break
+            elif depth == 0 and char == ">" and target_start is None and blanked[at + 1 : at + 2] != "=":
+                at += 1 if blanked[at + 1 : at + 2] == ">" else 0
+                target_start = at + 1
+            at += 1
+        if target_start is not None:
+            targets.append(blanked[target_start:at].strip())
+    return targets
+
+
+def _reads_code_from_input(line: str, scope: ShellScope) -> bool:
+    """Whether the command line ``line`` is a shell or an interpreter that is given no script and no code of its own:
+    it runs what its standard input brings. The wrappers in front of it (``env sh``, ``exec bash``, ``nohup sh``,
+    ``env -S 'sh -s'``) are read through, as every other judgment of a command does."""
+    words: list[str] | None = _split_words(line)
+    return _words_read_code_from_input(words or [], scope)
+
+
+def _words_read_code_from_input(words: list[str], scope: ShellScope) -> bool:
+    run, _ = _run_by_wrappers(words, scope)
+    program: str = _program(run[0]) if run else ""
+    if program == "env":
+        # ``_run_by_wrappers`` stops at an ``env`` given a string to split: the program is in that string.
+        options, rest = _options(run[1:], _WRAPPER_VALUES["env"])
+        split: list[str] = [value for name, value in options if name in ("-S", "--split-string")]
+        parts: list[str] | None = _split_words(split[-1]) if split else []
+        return parts is None or _words_read_code_from_input([*parts, *rest], scope)
+    if program in _SHELLS:
+        inline, operands, reads_input = _shell_arguments(run[1:])
+        return not inline and (reads_input or not operands or operands[0] in _STDIN_FILES)
+    if program in _INTERPRETERS:
+        return not any(word in _INLINE_CODE for word in run[1:]) and all(word == "-" for word in _positional(run[1:]))
+    return False
+
+
 def _assess_awk(command: str, args: list[str], scope: ShellScope) -> list[Finding]:
     """awk judged on its program: the command lines it runs (``system("...")``, ``print | "..."``,
     ``"..." | getline``), the files it prints into (``print > "..."``) and the protected locations its strings name; a
@@ -3763,9 +3815,19 @@ def _assess_awk(command: str, args: list[str], scope: ShellScope) -> list[Findin
         for match in pattern.finditer(blanked):
             if match.group(1) is None:
                 findings.append(_unknown(f"{command} runs a command it puts together while it runs"))
-            else:
-                findings.extend(_assess_all(strings[int(match.group(1))], scope))
-    findings.extend(_assess_redirects([strings[int(match.group(1))] for match in _AWK_WRITE.finditer(blanked)], scope))
+                continue
+            line: str = strings[int(match.group(1))]
+            findings.extend(_assess_all(line, scope))
+            if pattern is _AWK_PIPE_OUT and _reads_code_from_input(line, scope):
+                findings.append(_unknown(f"{command} pipes text it puts together into {line}, which runs it"))
+    literals: list[str] = []
+    for target in _awk_redirect_targets(blanked):
+        named: re.Match[str] | None = _AWK_TARGET.fullmatch(target)
+        if named is None:
+            findings.append(_unknown(f"{command} writes to a file named by an expression it works out while it runs"))
+        else:
+            literals.append(strings[int(named.group(1) or named.group(2))])
+    findings.extend(_assess_redirects(literals, scope))
     return findings or [_finding("safe", (), command)]
 
 

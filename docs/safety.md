@@ -1445,6 +1445,14 @@ event and approval.
 > queries, `vim` and `emacs` without those options and ordinary `tar` use keep their verdicts. Not read: what these
 > programs load or run from a file (`vim -S`, `emacs -l`, `sqlite3 .read file`, `.load`), vim's `:call system()`,
 > `:terminal` and its script languages, and a `sqlite3` file written by `.output` or `.backup`.
+> An `awk` program (`awk`, `gawk`, `mawk`, `nawk`) is read for where it prints (item 1303): the target of the `>` or
+> `>>` of a `print` or `printf` that is not one string literal (`> ENVIRON["HOME"] "/.zshrc"`, `> $1 ".txt"`, `> out`,
+> also `> "dir/" $2`) is a file the guard cannot place, a destructive step outside the workspace that every preset asks
+> about; so is a pipe (`|`) into a command that is not one string literal, and into a shell or an interpreter that is
+> given no script (`print | "sh"`, also through a wrapper: `"env sh"`, `"exec bash"`, `"nohup sh"`, `"env -S 'sh -s'"`),
+> which runs what awk prints. A literal target is judged as a redirect to it is, and a
+> literal command as the line it is. A program that prints to standard output, reads files (`getline < file`) or writes
+> to a literal path keeps its verdict; so does a `>` that compares. A program in a file (`awk -f`) is not read.
 > A script the line downloads and then runs (`curl -o`, `wget -O` or `git clone`, then a shell, `source`, its path or an
 > interpreter such as `python3`, also after a `cp`, an `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh |
 > bash`) is judged as piping the download into a shell; a file named after an at sign (`curl --data-binary @file`) as
