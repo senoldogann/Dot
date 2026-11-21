@@ -7,13 +7,17 @@ named as a video, and the call that names no language. The real dictation model 
 
 import asyncio
 import base64
+import dataclasses
 import os
 import re
 import shutil
 import subprocess
 import tempfile
-from collections.abc import AsyncIterator, Sequence
+import threading
+from collections.abc import AsyncIterator, Iterator, Sequence
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 import pytest_asyncio
@@ -33,6 +37,7 @@ from dotagent.tools.context import ToolContext, run_sandbox
 from dotagent.tools.video import WATCH_VIDEO_TOOL
 from dotagent.video import media
 from dotagent.video.watch import VideoInfo
+from dotagent.web import client
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 # The checks that start ffmpeg need it; the refusals, which start nothing, run everywhere (the gate has no ffmpeg).
@@ -233,7 +238,11 @@ async def test_what_a_site_says_when_a_look_fails_is_fenced_and_marks_the_run(
     async def refused(sandbox: Sequence[str], env: dict[str, str], url: str) -> VideoInfo:
         raise ToolExecutionError(f"yt-dlp failed: ERROR: HTTP Error 403: {_HOSTILE}", {"url": url})
 
+    async def chain_is_public(ctx: ToolContext, url: str) -> None:
+        return None
+
     monkeypatch.setattr(video, "checked_addresses", public)
+    monkeypatch.setattr(video, "_hops_are_public", chain_is_public)
     monkeypatch.setattr(media, "link_info", refused)
     result: ToolResult = await _watched(ctx, {"source": "https://videos.example.org/talk", "frames": 0})
     assert result.is_error and result.untrusted
@@ -318,3 +327,191 @@ async def test_a_slide_shown_for_three_seconds_is_seen(runtime: Runtime) -> None
     assert found is not None
     moments: list[str] = [part.split(") ")[1] for part in found.group(1).split(", ")]
     assert moments == ["00:10", "00:21", "00:31", "01:00"], result.text[:600]
+
+
+_CHAIN_LENGTH: int = 7  # more hops than the web client follows (six)
+
+
+class _Hops(BaseHTTPRequestHandler):
+    """A site that redirects a video link to a second address, as one that is not what it says may."""
+
+    seen: ClassVar[list[str]] = []
+
+    def do_GET(self) -> None:
+        _Hops.seen.append(self.path)
+        port: int = self.server.server_address[1]
+        target: str | None = None
+        if self.path == "/talk":
+            target = f"http://127.0.0.1:{port}/inner"
+        elif self.path.startswith("/chain/"):
+            # Hops of a chain that stays public (the stand-in name) until its end, which is the loopback address.
+            step: int = int(self.path.removeprefix("/chain/"))
+            target = (
+                f"http://videos.test:{port}/chain/{step + 1}"
+                if step < _CHAIN_LENGTH
+                else f"http://127.0.0.1:{port}/inner"
+            )
+        elif self.path == "/to-a-dead-hop":
+            target = f"http://videos.test:{port + 1 if port < 65_000 else port - 1}/nobody"
+        if target is not None:
+            self.send_response(302)
+            self.send_header("Location", target)
+            self.end_headers()
+            return
+        body: bytes = b"a video page"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+
+@pytest.fixture
+def hops() -> Iterator[int]:
+    """A server on this Mac that stands in for a public host named ``videos.test``, which redirects to its own
+    loopback address."""
+    _Hops.seen.clear()
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _Hops)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield server.server_address[1]
+    server.shutdown()
+    server.server_close()
+
+
+def _pretend_videos_test_is_public(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``videos.test`` is a public name that happens to be served from this Mac; every address that is a literal one
+    keeps the rule of the real client."""
+    real = client.checked_addresses
+
+    async def checked(host: str, port: int, *, allow_private_hosts: bool) -> tuple[str, ...]:
+        if host == "videos.test":
+            return ("127.0.0.1",)
+        return await real(host, port, allow_private_hosts=allow_private_hosts)
+
+    monkeypatch.setattr(client, "checked_addresses", checked)
+    monkeypatch.setattr(video, "checked_addresses", checked)
+
+
+async def test_a_link_that_redirects_to_the_local_network_is_refused_before_yt_dlp_runs(
+    runtime: Runtime, hops: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The first host is public, its redirect is not: yt-dlp would have followed it by itself."""
+    ctx: ToolContext = await _context(runtime)
+    _pretend_videos_test_is_public(monkeypatch)
+    asked: list[str] = []
+
+    async def link_info(sandbox: Sequence[str], env: dict[str, str], url: str) -> VideoInfo:
+        asked.append(url)
+        raise AssertionError("yt-dlp must not be started for a link that leads to the local network")
+
+    monkeypatch.setattr(media, "link_info", link_info)
+
+    result: ToolResult = await _watched(ctx, {"source": f"http://videos.test:{hops}/talk", "frames": 0})
+
+    assert result.is_error and "private or local network" in result.text, result.text
+    assert asked == []
+    # The first hop was asked and answered; the second was never connected to.
+    assert _Hops.seen == ["/talk"]
+
+
+async def test_a_link_whose_hops_are_all_public_goes_to_yt_dlp_as_it_was_written(
+    runtime: Runtime, hops: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The legitimate twin: the same link, no redirect to the local network, is handed on unchanged."""
+    ctx: ToolContext = await _context(runtime)
+    _pretend_videos_test_is_public(monkeypatch)
+    asked: list[str] = []
+
+    async def link_info(sandbox: Sequence[str], env: dict[str, str], url: str) -> VideoInfo:
+        asked.append(url)
+        raise ToolExecutionError("yt-dlp failed: the stand-in stops here", {"url": url})
+
+    monkeypatch.setattr(media, "link_info", link_info)
+    link: str = f"http://videos.test:{hops}/inner"
+
+    result: ToolResult = await _watched(ctx, {"source": link, "frames": 0})
+
+    assert asked == [link]
+    assert "the stand-in stops here" in result.text
+
+
+async def test_a_first_request_that_cannot_connect_leaves_the_link_to_yt_dlp(
+    runtime: Runtime, hops: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx: ToolContext = await _context(runtime)
+    _pretend_videos_test_is_public(monkeypatch)
+    asked: list[str] = []
+
+    async def link_info(sandbox: Sequence[str], env: dict[str, str], url: str) -> VideoInfo:
+        asked.append(url)
+        raise ToolExecutionError("yt-dlp failed: the stand-in stops here", {"url": url})
+
+    monkeypatch.setattr(media, "link_info", link_info)
+    # Nothing listens on this port: the probe cannot connect, which says nothing of any address.
+    free: int = hops + 1 if hops < 65_000 else hops - 1
+    link: str = f"http://videos.test:{free}/talk"
+
+    await _watched(ctx, {"source": link, "frames": 0})
+
+    assert asked == [link]
+
+
+async def test_a_chain_longer_than_the_client_follows_is_refused_not_left_to_yt_dlp(
+    runtime: Runtime, hops: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Seven public hops and then the loopback address: the probe gives up at six, and yt-dlp, which follows more,
+    would have reached the end. A chain that cannot be walked is a chain that cannot be judged."""
+    ctx: ToolContext = await _context(runtime)
+    _pretend_videos_test_is_public(monkeypatch)
+
+    async def link_info(sandbox: Sequence[str], env: dict[str, str], url: str) -> VideoInfo:
+        raise AssertionError("yt-dlp must not be started for a chain that was not walked to its end")
+
+    monkeypatch.setattr(media, "link_info", link_info)
+
+    result: ToolResult = await _watched(ctx, {"source": f"http://videos.test:{hops}/chain/0", "frames": 0})
+
+    assert result.is_error and "could not be followed to their end" in result.text, result.text
+    assert "/inner" not in _Hops.seen
+
+
+async def test_a_hop_that_cannot_be_reached_is_refused_not_left_to_yt_dlp(
+    runtime: Runtime, hops: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The first hop answers, the second cannot be connected to: only a failure of the link's own first request says
+    nothing, a later hop is one nobody looked at."""
+    ctx: ToolContext = await _context(runtime)
+    _pretend_videos_test_is_public(monkeypatch)
+
+    async def link_info(sandbox: Sequence[str], env: dict[str, str], url: str) -> VideoInfo:
+        raise AssertionError("yt-dlp must not be started for a chain that was not walked to its end")
+
+    monkeypatch.setattr(media, "link_info", link_info)
+
+    result: ToolResult = await _watched(ctx, {"source": f"http://videos.test:{hops}/to-a-dead-hop", "frames": 0})
+
+    assert result.is_error and "could not be followed to their end" in result.text, result.text
+
+
+async def test_with_private_hosts_allowed_the_link_is_not_probed(
+    runtime: Runtime, hops: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx: ToolContext = await _context(runtime)
+    web = runtime.config.web.model_copy(update={"allow_private_hosts": True})
+    permissive: Runtime = dataclasses.replace(runtime, config=runtime.config.model_copy(update={"web": web}))
+    ctx = dataclasses.replace(ctx, runtime=permissive)
+    asked: list[str] = []
+
+    async def link_info(sandbox: Sequence[str], env: dict[str, str], url: str) -> VideoInfo:
+        asked.append(url)
+        raise ToolExecutionError("yt-dlp failed: the stand-in stops here", {"url": url})
+
+    monkeypatch.setattr(media, "link_info", link_info)
+
+    await _watched(ctx, {"source": f"http://127.0.0.1:{hops}/talk", "frames": 0})
+
+    assert asked == [f"http://127.0.0.1:{hops}/talk"]
+    assert _Hops.seen == [], "no request of Dot's own went to the link before yt-dlp"

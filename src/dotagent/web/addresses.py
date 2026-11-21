@@ -61,6 +61,33 @@ async def non_public_address(host: str) -> str | None:
     return next((str(info[4][0]) for info in infos if is_private_text(str(info[4][0]))), None)
 
 
+async def unread_or_non_public(host: str, timeout_s: float) -> str | None:
+    """Why ``host`` may not be requested by a web tool, before anything is sent to it (item 1319): the first non-public
+    address it is or resolves to, or that none could be read (a name that does not resolve in ``timeout_s``). What is
+    not known to be public is refused, where :func:`non_public_address`, which judges a page already read, lets it
+    by. ``None`` when every address the host has is public."""
+    literal: str = host.strip("[]")
+    if not literal:
+        return "its address names no host"
+    try:
+        ipaddress.ip_address(literal)
+    except ValueError:
+        pass
+    else:
+        return f"{literal} is a private or local network address" if is_private_text(literal) else None
+    try:
+        infos = await asyncio.wait_for(
+            asyncio.get_running_loop().getaddrinfo(host, None, type=socket.SOCK_STREAM), timeout_s
+        )
+    except (socket.gaierror, UnicodeError, TimeoutError) as error:
+        return f"its address could not be read ({type(error).__name__}), so it is not known to be public"
+    found: tuple[str, ...] = tuple(str(info[4][0]) for info in infos)
+    if not found:
+        return "it resolves to no address, so it is not known to be public"
+    private: str | None = next((address for address in found if is_private_text(address)), None)
+    return None if private is None else f"{host} resolves to {private}, a private or local network address"
+
+
 def order_addresses(addresses: Sequence[str]) -> tuple[str, ...]:
     """Each address once, IPv4 first: a Mac without a working IPv6 route would stall on an AAAA record."""
     unique: tuple[str, ...] = tuple(dict.fromkeys(addresses))

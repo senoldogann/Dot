@@ -118,8 +118,10 @@ class _Browser:
     def __init__(self, landed: str) -> None:
         self.landed: str = landed
         self.read: int = 0
+        self.held_to_public: list[bool] = []
 
-    async def open_url(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
+    async def open_url(self, thread_id: str, url: str, hide_secrets: bool, *, public_only: bool = False) -> PageView:
+        self.held_to_public.append(public_only)
         return PageView(
             tab_index=1,
             url=self.landed,
@@ -156,9 +158,12 @@ async def test_the_crawls_reader_of_the_run_tab_gives_back_no_page_that_landed_o
     with pytest.raises(BrowserError, match="only reach the public internet") as refused:
         await render("https://pages.example/a", 1000)
     assert refused.value.context["address"] == "192.168.1.1" and browser.read == 0
-    # With the setting on, as the owner chose, the page is read as it was.
+    # The tab is held to the public internet before its requests go out, not only judged after (item 1319).
+    assert browser.held_to_public == [True]
+    # With the setting on, as the owner chose, the page is read as it was, and the tab is held to nothing.
     allowed = _renderer_for(_context(browser, allow_private_hosts=True))
     assert await allowed("https://pages.example/a", 1000) == "What the page says."
+    assert browser.held_to_public == [True, False]
     # A page of a public address is read.
     public: _Browser = _Browser(f"https://{_PUBLIC}/a")
     assert await _renderer_for(_context(public, allow_private_hosts=False))("https://pages.example/a", 1000) == (
