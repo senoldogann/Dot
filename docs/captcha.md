@@ -14,6 +14,17 @@ is a standing instruction.
   clears: the widget gone, its box checked, the site's token set, or the widget's own success words. A page that is
   still checking itself (Cloudflare's interstitial, Turnstile's spinner) is watched the same way, and the call returns
   the moment it goes on.
+- A page that could not be read is never a page that passed (item 1295). A frame that does not answer in time or goes
+  away while it is read, when it is the page itself, a frame that showed a check a moment ago or a captcha widget's
+  own frame, makes the reading `unreadable`: it is read again until the time is up, and a call that ends so answers
+  `unfinished` — "could not read the page, look at it" — instead of `passed` or "no check here". Just before a press the
+  page is read once more: a check that slid is waited for and pressed where it stops (up to about 0.7 s), one that kept
+  moving is not pressed, and the pixel must be the check's own: `document.elementsFromPoint` in the frame the check
+  lives in, and for a widget in a frame the `<iframe>` itself in every document above it, must show the check's element
+  on top, with nothing of the page's own over it (a cookie wall, a promo). A press that is not made says what covers it.
+  The press is still weighed against the last snapshot as before. The probe reads a node's `textContent` before its
+  `innerText` and looks at the first thousand and the last two thousand candidate nodes of a page of more than three
+  thousand, so a very long page costs what a short one does.
 - What needs eyes comes back from that call as the check's own picture at twice its size, the box it came from, the
   tile count when the widget names it, and the box of its Verify / Next button. `browser_act` with `click_at` presses a
   tile by its pixel, `drag_at` presses at one pixel and lets go at another: an hCaptcha "drag the shape to the loop
