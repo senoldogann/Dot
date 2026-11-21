@@ -1022,12 +1022,24 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   deleteContainer` and `randomDisk`, `defaults -currentHost write` and `networksetup -setwebproxy … status.example.com`
   had passed as queries. The sandbox of the modes that ask does not keep these tools from the system's services, so the
   guard is what asks; in `yolo` nothing does.
-- Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
-  `AUTH` in the name) are removed from the processes the shell tool starts and from the `osascript` of the AppleScript
-  tool, whose `do shell script` starts a shell with the same environment (item 555), `SSH_AUTH_SOCK` among them, so a
-  command is not told where your SSH agent listens (`[shell] pass_env` lists exceptions). The agent's socket is a file
-  in a fixed place under `/private/var/run`, which the sandbox does not close: a command that looks for it there still
-  reaches the keys the agent holds unlocked.
+- Environment variables that hold a secret are removed from the processes the shell tool starts and from the `osascript`
+  of the AppleScript tool, whose `do shell script` starts a shell with the same environment (item 555; `[shell]
+  pass_env` lists exceptions). By name, without regard to case (item 1293): `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`,
+  `CREDENTIAL`, `COOKIE`, `NETRC`, `BEARER` and `WEBHOOK` anywhere in the name; `KEY`, `AUTH` and `SESSION` anywhere in
+  it; `PASS`, `PAT`, `PWD` and `DSN` as a word of it (`GH_PAT`, `MYSQL_PWD`, `SENTRY_DSN`; `PATH` has none of them);
+  and a name that ends in `_SK` or `_PK`. By name and value: `DATABASE_URL`, `REDIS_URL`, `MONGODB_URI`, `AMQP_URL` and
+  `CELERY_BROKER_URL`, which usually carry a password, and any other name that ends in `_URL`, `_URI` or `_PROXY` whose
+  value has a user and a password in it (`https://user:pw@host`; `[shell] pass_env` keeps a proxy that needs one). A
+  short list of ordinary variables is kept though a weak part
+  (`KEY`, `AUTH`, `SESSION`, `PASS`, `PAT`, `PWD`) stands in the name: `SSH_AUTH_SOCK`, `XDG_SESSION_*`,
+  `TERM_SESSION_ID`, `ITERM_SESSION_ID`, `SECURITYSESSIONID`, `GPG_TTY`, `KEYCHAIN*`, `GIT_AUTHOR_*`,
+  `HOMEBREW_NO_*`, `PATH`, `PWD` and `OLDPWD`, unless the name holds a strong part too (`KEYCHAIN_PASSWORD` goes); a
+  prefix of the list excuses only the weak part it holds, so what follows it is read as any name is (`KEYCHAIN_PASS`,
+  `XDG_SESSION_KEY` and `GIT_AUTHOR_KEY` go). So a
+  command is told where your SSH agent listens (`SSH_AUTH_SOCK`, item 1293: before, it was not). A command could always
+  reach the socket, which sits at a path of launchd's making (`/private/var/run/com.apple.launchd.<random>/Listeners`),
+  found by listing that folder, and with it the keys the agent holds
+  unlocked; a command that cannot read `~/.ssh` is still held to that.
 - Outside a `yolo` run (which may, without asking, item 433) the agent can neither read nor change `~/.ssh`, `~/.gnupg`,
   `~/Library/Keychains`, `~/.aws`, `~/.config/gcloud`, the tokens and passwords that command lines keep (`~/.netrc`,
   `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`, `~/.pypirc`, the credentials of Cargo and RubyGems,

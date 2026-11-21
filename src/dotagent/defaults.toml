@@ -650,7 +650,8 @@ social_per_day = 0
 public_spacing_s = 0.0
 
 [shell]
-# Environment variables whose names look like secrets are removed from tool processes unless listed here.
+# Environment variables that hold a secret (a name like a token, key, password, cookie, session or webhook; an address
+# with a password in it) are removed from tool processes unless listed here.
 pass_env = []
 login_env_timeout_s = 20.0
 default_timeout_s = 120
