@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path, PurePosixPath
 
-from dotagent.core.errors import ArchiveRefused, DotError, GalleryError
+from dotagent.core.errors import ArchiveRefused, DotError, GalleryError, SkillError
 from dotagent.core.logs import get_logger
 from dotagent.llm.router import ModelRouter
 from dotagent.memory.embedder import Embedder
@@ -86,6 +86,7 @@ from dotagent.plugins.scout_types import (
     looked_key,
 )
 from dotagent.plugins.types import SKILLS_DIR
+from dotagent.skills.parse import parse_skill
 
 log = get_logger(__name__)
 
@@ -175,6 +176,39 @@ def skill_folders(archive: Path, path: str) -> tuple[str, ...]:
         # Two skills of one name would land in one folder of the plugin: the first is kept.
         kept.setdefault(skill_folder_name(folder), folder)
     return tuple(sorted(kept.values()))[:MAX_SKILLS]
+
+
+def loadable_skills(archive: Path, folders: Sequence[str]) -> tuple[tuple[str, ...], dict[str, str]]:
+    """Of the skill ``folders`` of the repository in ``archive``, those whose ``SKILL.md`` the skills parser takes
+    (frontmatter, name, description and instructions: what a run loads), and why each of the others cannot be loaded
+    (item 1305). Raises GalleryError when the archive cannot be read."""
+    wanted: dict[str, str] = {f"{folder}/SKILL.md": folder for folder in folders}
+    problems: dict[str, str] = {}
+    loaded: set[str] = set()
+    try:
+        with tarfile.open(archive, mode="r:gz") as tar:
+            for member in tar:
+                folder: str | None = wanted.get("/".join(PurePosixPath(member.name).parts[1:]))
+                if folder is None or not member.isreg():
+                    continue
+                handle = tar.extractfile(member)
+                if handle is None:
+                    continue
+                try:
+                    parse_skill(Path(folder, "SKILL.md"), handle.read().decode("utf-8"), "plugin")
+                except UnicodeDecodeError:
+                    problems[folder] = "SKILL.md cannot be read as UTF-8 text"
+                except SkillError as error:
+                    problems[folder] = error.message
+                else:
+                    loaded.add(folder)
+    except (tarfile.TarError, EOFError, OSError) as error:
+        raise GalleryError(f"the archive cannot be read ({type(error).__name__})", {"archive": archive.name}) from error
+    kept: tuple[str, ...] = tuple(folder for folder in folders if folder in loaded)
+    left: dict[str, str] = {
+        folder: problems.get(folder, "SKILL.md is not in the archive") for folder in folders if folder not in loaded
+    }
+    return kept, left
 
 
 def skill_texts(skills: Path) -> tuple[SkillText, ...]:
@@ -427,6 +461,21 @@ class _Scout:
         folders = tuple(folder for folder in folders if folder not in held)
         if not folders:
             return None
+        # A skill the parser a run loads it with refuses is left out; a plugin none of whose skills loads is unusable
+        # (item 1305: a plugin whose SKILL.md does not start with the --- line was proposed, and every run then logged
+        # it as skipped).
+        try:
+            loadable, unloadable = await asyncio.to_thread(loadable_skills, archive, folders)
+        except GalleryError as error:
+            raise Unusable(error.message, error.context) from error
+        for folder, reason in unloadable.items():
+            log.info("scout_skill_unloadable", repository=lead.repository, skill=folder, reason=reason)
+        if not loadable:
+            first: str = next(iter(unloadable.values()))
+            raise Unusable(
+                f"none of its {len(folders)} skill(s) can be loaded: {first}", {"repository": lead.repository}
+            )
+        folders = loadable
         entry: GalleryEntry = provisional.model_copy(update={"skills": folders})
         made: Path = self._staging / f"made-{entry.id}"
         try:

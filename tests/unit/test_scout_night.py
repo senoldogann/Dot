@@ -20,7 +20,7 @@ from dotagent.llm.router import ModelRef
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply, ToolCall, Usage
 from dotagent.plugins import scout_sources
 from dotagent.plugins.gallery import GalleryEntry, files_hash, install, unpack
-from dotagent.plugins.scout import ScoutDeps, ScoutStopped, run_night, skill_folders, skill_texts
+from dotagent.plugins.scout import ScoutDeps, ScoutStopped, loadable_skills, run_night, skill_folders, skill_texts
 from dotagent.plugins.scout_review import REVIEW_TOOL
 from dotagent.plugins.scout_sources import API, RAW, GitHub, OutOfRequests, TokenRefused
 from dotagent.plugins.scout_types import (
@@ -959,3 +959,71 @@ async def test_the_download_tells_an_archive_that_never_comes_from_one_that_may(
     with pytest.raises(GalleryError) as caught:
         await gallery_module.download_archive(_gallery()[0], tmp_path)
     assert isinstance(caught.value, ArchiveRefused) is never
+
+
+async def test_a_plugin_none_of_whose_skills_loads_is_unusable_and_recorded_once(tmp_path: Path) -> None:
+    sha: str = "6" * 40
+    key: str = f"partner/skills@{sha}"
+    bad: bytes = _archive(
+        "partner/skills",
+        sha,
+        {"plugins/twilio/skills/twilio/SKILL.md": "# Twilio\nNo frontmatter here.\n"},
+    )
+    downloads: list[str] = []
+
+    async def fetch(entry: GalleryEntry, folder: Path) -> Path:
+        downloads.append(entry.repository)
+        if entry.repository == "partner/skills":
+            return _written(folder / "archive.tar.gz", bad)
+        return await _fetch(entry, folder)
+
+    answers: dict[str, object] = _answers()
+    catalogue: JsonObject = json.loads(json.dumps(CATALOGUE))
+    plugins: list[object] = list(catalogue["plugins"])  # type: ignore[call-overload]
+    plugins[2] = {
+        "name": "twilio",
+        "description": "Twilio",
+        "source": {
+            "source": "git-subdir",
+            "url": "https://github.com/partner/skills.git",
+            "path": "plugins/twilio",
+            "sha": sha,
+        },
+    }
+    catalogue["plugins"] = plugins
+    answers[RAW.format(repository=OFFICIAL, commit=SHA_MARKET)] = catalogue
+    deps: ScoutDeps = _deps(tmp_path, _GitHub(answers))
+    deps.fetch = fetch
+    first: ScoutState = await run_night(deps, ScoutState())
+    assert "twilio" not in _by_id(first) and "sales-reports" in _by_id(first), (
+        "the other plugins are proposed as before"
+    )
+    assert any(one.startswith(key) for one in first.looked)
+    assert ", 2 unusable" in first.last_summary
+    deps = _deps(tmp_path, _GitHub(answers))
+    deps.fetch = fetch
+    await run_night(deps, first)
+    assert downloads.count("partner/skills") == 1
+
+
+def test_loadable_skills_keep_the_skills_a_run_loads_and_say_why_the_others_cannot_be(tmp_path: Path) -> None:
+    archive: Path = tmp_path / "a.tar.gz"
+    archive.write_bytes(
+        _archive(
+            "maker/skills",
+            SHA_NEW,
+            {
+                "skills/good/SKILL.md": _skill("good", "A good skill"),
+                "skills/no-front/SKILL.md": "# just markdown\n",
+                "skills/empty/SKILL.md": "---\nname: empty\ndescription: x\n---\n\n",
+                "skills/lead/SKILL.md": "\n\n" + _skill("lead", "Starts with blank lines"),
+            },
+        )
+    )
+    kept, left = loadable_skills(
+        archive, ("skills/good", "skills/no-front", "skills/empty", "skills/lead", "skills/missing")
+    )
+    assert kept == ("skills/good", "skills/lead")
+    assert "does not start with the --- line" in left["skills/no-front"]
+    assert "no instructions" in left["skills/empty"]
+    assert left["skills/missing"] == "SKILL.md is not in the archive"

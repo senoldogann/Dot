@@ -273,7 +273,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import schedule_timing
 from dotagent.scheduler.timing import format_local
 from dotagent.secrets import known_secrets
-from dotagent.skills.catalog import load_skills, playbook_root
+from dotagent.skills.catalog import load_skills, playbook_root, unreported
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
 from dotagent.store.models import (
@@ -2383,11 +2383,12 @@ async def _route_step(
 
 async def run_skills(runtime: Runtime, run: RunRecord) -> SkillCatalog:
     """The skills ``run`` is offered (its agent's, item 1022), the same for a run of Dot's own loop and one on the
-    owner's Claude plan (item 1068); a skill that could not be read is logged and left out."""
+    owner's Claude plan (item 1068); a skill that could not be read is left out and logged once per process while its
+    file stays as it is (item 1305), and stays in the catalog's problems, which Doctor shows."""
     skills: SkillCatalog = await asyncio.to_thread(
         load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
     )
-    for problem in skills.problems:
+    for problem in unreported(skills.problems):
         log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
     return skills.model_copy(update={"skills": await offered_to_run(runtime.config, skills, run.agent_id)})
 

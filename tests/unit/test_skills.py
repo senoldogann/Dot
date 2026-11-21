@@ -2,6 +2,7 @@
 configuration, and what the prompt says about them. The folders are real folders in a temporary directory."""
 
 import json
+import os
 import plistlib
 import re
 import sys
@@ -28,6 +29,7 @@ from dotagent.skills.catalog import (
     load_catalog,
     plugin_skill_name,
     skill_roots,
+    unreported,
 )
 from dotagent.skills.discover import find_skill_files
 from dotagent.skills.icons import ICON_NAMES, skill_icon
@@ -123,6 +125,31 @@ def test_a_skill_named_otherwise_than_its_folder_or_described_at_length_loads(tm
 def test_a_byte_order_mark_before_the_frontmatter_is_tolerated(tmp_path: Path) -> None:
     file: Path = tmp_path / "tidy" / "SKILL.md"
     assert parse_skill(file, "﻿" + _simple("tidy"), "home").name == "tidy"
+
+
+def test_blank_lines_before_the_opening_line_are_read_past_and_nothing_else_is(tmp_path: Path) -> None:
+    file: Path = tmp_path / "tidy" / "SKILL.md"
+    assert parse_skill(file, "\n\n  \n" + _simple("tidy"), "home").name == "tidy"
+    assert parse_skill(file, "﻿\r\n" + _simple("tidy"), "home").name == "tidy"
+    for text in ("# title\n" + _simple("tidy"), "<!-- note -->\n" + _simple("tidy"), "\n\n"):
+        with pytest.raises(SkillError):
+            parse_skill(file, text, "home")
+
+
+def test_a_skill_that_cannot_be_read_is_told_once_while_its_file_stays_and_again_when_it_changes(
+    tmp_path: Path,
+) -> None:
+    root: Path = tmp_path / "skills"
+    _skill_dir(root, "good", _simple("good"))
+    broken: Path = _skill_dir(root, "bad", "# no frontmatter\n") / "SKILL.md"
+    catalog = load_catalog([SkillRoot(path=root, source="home")])
+    assert [skill.name for skill in catalog.skills] == ["good"], "the skills that load are offered as before"
+    assert len(unreported(catalog.problems)) == 1
+    assert unreported(load_catalog([SkillRoot(path=root, source="home")]).problems) == ()
+    assert len(load_catalog([SkillRoot(path=root, source="home")]).problems) == 1, "the problem stays in the catalog"
+    broken.write_text("# still no frontmatter\n", encoding="utf-8")
+    os.utime(broken, ns=(1_000_000_000, 2_000_000_000))
+    assert len(unreported(load_catalog([SkillRoot(path=root, source="home")]).problems)) == 1
 
 
 @pytest.mark.parametrize(
