@@ -1,21 +1,27 @@
 # Captcha and human checks
 
-Dot solves the human check in front of it — hCaptcha, reCAPTCHA, Cloudflare Turnstile, "Verify you are human" — in
-its own Chrome, from the page's screenshot, and then carries on with the task. It does not stop to ask the owner; that
+Dot solves the human check in front of it — hCaptcha, reCAPTCHA, Cloudflare Turnstile, a site's own "Press & Hold" or
+"Verify you are human" — in its own Chrome, and then carries on with the task. It does not stop to ask the owner; that
 is a standing instruction.
 
 ## How it is solved
 
-- `browser_screenshot` gives a JPEG of the viewport; one pixel of it is one CSS pixel of the page. The picture the
-  model sees also marks each interactive element in view with its snapshot ref, at the element's corner (item 1261).
-  A pixel is still one CSS pixel.
-- `browser_act` with `click_at` presses a checkbox or an image tile by its pixel.
-- `browser_act` with `drag_at` presses at one pixel and lets go at another: an hCaptcha "drag the shape to the loop
+- `browser_captcha` finds the check itself, in the page or in any frame of it, and passes the mechanical part in one
+  call. It reads the DOM of every frame for the widgets it knows (hCaptcha, reCAPTCHA, Cloudflare Turnstile) and for a
+  pressable button that says what it wants ("Press & Hold", "Verify you are human", "I'm not a robot"), takes each
+  box in CSS pixels of the main frame's viewport, presses the checkbox or holds the button down (a hold jiggles the
+  pointer once and lets go when the widget stops asking for it), and reads the page again every 120 ms until the check
+  clears: the widget gone, its box checked, the site's token set, or the widget's own success words. A page that is
+  still checking itself (Cloudflare's interstitial, Turnstile's spinner) is watched the same way, and the call returns
+  the moment it goes on.
+- What needs eyes comes back from that call as the check's own picture at twice its size, the box it came from, the
+  tile count when the widget names it, and the box of its Verify / Next button. `browser_act` with `click_at` presses a
+  tile by its pixel, `drag_at` presses at one pixel and lets go at another: an hCaptcha "drag the shape to the loop
   that is closed" puzzle, or a slider.
-- After a click or a drag the page is read again; a captcha redraws its tiles and moves its pieces, so the next look
-  is a new screenshot.
+- `browser_screenshot` is still there for a check the call does not know: a JPEG of the viewport whose pixels are CSS
+  pixels, with each interactive element marked by its snapshot ref at its corner (item 1261).
 
-The method is the built-in `captcha` skill (`src/dotagent/skills/builtin/captcha/SKILL.md`): the checkbox, the image
+The method is the built-in `captcha` skill (`src/dotagent/skills/builtin/captcha/SKILL.md`): the first call, the image
 grid, the drag puzzle, Cloudflare's wait, the three-attempt limit, and what a failure looks like. The system prompt
 says the same in one line, so a run does not turn a check into a question.
 
@@ -30,6 +36,6 @@ says the same in one line, so a run does not turn a check into a question.
 
 ## When it fails
 
-After three honest attempts (a fresh screenshot, other tiles, the other closed loop, a new tab for Cloudflare, the
-audio challenge once) the tab is left open and the result says what is left. A check is a step in the work, not a
-reason to sit on the page until it times out.
+`browser_captcha` answers `unfinished` with the check's picture as it stands. After three honest attempts (other tiles,
+the other closed loop, a new tab for Cloudflare, the audio challenge once) the tab is left open and the result says what
+is left. A check is a step in the work, not a reason to sit on the page until it times out.

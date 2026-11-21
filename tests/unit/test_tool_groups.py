@@ -247,9 +247,9 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
     assert section[2:] == [
         "- waits: waiting in code until a file is there, an address answers or a check passes (wait_until)",
         "- browser: Chrome, for pages that need JavaScript, a log-in or clicking (browser_open, browser_new_tab, "
-        "browser_snapshot, browser_find, browser_links, browser_act, browser_eval, browser_scroll, browser_read_text, "
-        "browser_requests, browser_extract, browser_console, browser_viewport, browser_screenshot, "
-        "browser_wait_text, browser_back and 6 more)",
+        "browser_snapshot, browser_find, browser_links, browser_act, browser_captcha, browser_eval, browser_scroll, "
+        "browser_read_text, browser_requests, browser_extract, browser_console, browser_viewport, "
+        "browser_screenshot, browser_wait_text and 7 more)",
         "- memory_admin: correcting or forgetting saved notes (memory_update, memory_forget)",
         "- todos: your own list of work to do for the owner later, on your own while the Mac is idle, and their "
         "objectives (todo_add, todo_drop, objective_add, objective_update, objectives)",

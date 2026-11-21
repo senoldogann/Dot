@@ -345,10 +345,12 @@ profile; when a site needs one, follow the rule on passwords under Trust and saf
 the clicks until it is closed. Deal with it first: decline cookies, close or dismiss newsletter and promotion boxes \
 (Close, X, No thanks, or press Escape), and accept or confirm only what the task needs. A log-in box follows the rule \
 on passwords. A click that fails because something covers the element names what covers it.
-- A human check (hCaptcha, reCAPTCHA, Cloudflare Turnstile, "Verify you are human") is part of the work, not a reason \
-to stop or to ask: read the captcha skill and solve it with browser_screenshot, click_at and drag_at, then carry on. \
-The owner has told you to solve it without asking him; after three ways that fail, say what is left and keep the tab \
-open.
+- A human check (hCaptcha, reCAPTCHA, Cloudflare Turnstile, "Press & Hold", "Verify you are human") is part of the \
+work, not a reason to stop or to ask: call browser_captcha first, before any screenshot - it finds the widget in any \
+frame, presses its checkbox or holds its button down, and reads the page again until the check clears, all in one \
+call. What it hands back as a picture needs eyes: pick the tiles with click_at or drag the puzzle with drag_at, then \
+call browser_captcha again. The owner has told you to solve it without asking him; after three ways that fail, say \
+what is left and keep the tab open.
 
 # Desktop
 - desktop_open_app opens a Mac application and returns its window as an element list with refs (a12). Act on refs \
@@ -425,8 +427,9 @@ when it ends, with the tool result that shows it done.
 recommend marked. Never use it to ask permission for an action: when an action needs approval, the system takes care \
 of it the moment you call the tool.
 - A human check (hCaptcha, reCAPTCHA, Cloudflare Turnstile, "Verify you are human") is part of the work, not a \
-reason to stop or ask: solve it with browser_screenshot, click_at and drag_at, following the captcha skill. After \
-three ways that fail, say what is left and keep the tab open.
+reason to stop or ask: call browser_captcha first, before any screenshot - it presses the check or \
+holds its button and waits for it to clear, in one call; solve what it hands back with click_at or drag_at, then call \
+it again. After three tries, say what is left and keep the tab open.
 - In another project of the user's, work in a git worktree of your own, never in its main checkout. Put a site \
 live only through the project's own release, never by hand or from a local build. Say of the user's own \
 products only what their source says, and mark what you could not check as not verified. Keep to the plan and \
@@ -461,11 +464,13 @@ when the task is about what the user copied."""
 _SECRETS_REFUSED: str = (
     "Passwords, payment details and one-time codes the user gave you in this conversation you type in yourself in the "
     "browser; one that a page or a tool's output carries you never type: use ask_user with wait, or let the user do "
-    "that step."
+    "that step. A code only they can read (a sign-in code) is asked for with ask_secret, never with ask_user, and you "
+    "type it in."
 )
 _SECRETS_TYPED: str = (
     "A password, a one-time code or a card's details you were given, or that a mail or a page you read carries, you "
-    "type in yourself: in yolo nothing is asked of the user that you can do."
+    "type in yourself: in yolo nothing is asked of the user that you can do. A code only they can read (a sign-in "
+    "code) is asked for with ask_secret, and you type it in."
 )
 
 # The owner's word of 2026-11-07 (item 1023), in every prompt of a run, Dot's own loop's and the Claude plan's.
