@@ -179,7 +179,17 @@ waited for, whatever its provider calls it or the time it names (a gateway may n
 (Ollama's "used all included Pro usage" and "reached your monthly usage limit", item 789; its hourly or weekly
 limit is a window, waited for), spent credits, a spend limit, any other quota. A wait still not over when its
 time is ends the run with the provider's words. A waiting run keeps its place among `max_concurrent_runs`, as one
-waiting for a model out of reach does, and a stop ends the wait at once. An error a model service reports inside its
+waiting for a model out of reach does, and a stop ends the wait at once.
+
+**Retries inside a call** (item 1306). A connector retries a failed call a few times (`attempts` of its provider) with a
+pause that doubles up to 20 or 30 seconds. A provider's own `Retry-After` is held within those pauses (never an instant
+retry for a hint of 0, never longer than the longest pause) and a little lengthened by chance. All the retries of one
+call have 300 seconds, below the run's `model_call_timeout_s` (420): once a pause would end past them no further try
+is begun and the error that came is raised, so that the pauses (up to 5 of 30 seconds, and a provider's hint of 120
+seconds no longer five times over) cannot carry a call past the run's timeout. A try that began in time is not cut
+short by the 300 seconds: it keeps its own read timeout (300 or 600 seconds, per provider), so a late try may still be
+cut off by the run's call timeout and counted as a cancelled call. A rate limit that asks for more than 30 seconds is not slept through there: it goes at once to the run, which pauses the
+model, goes to a standby model or waits as above, and asks again when the provider said. An error a model service reports inside its
 answer keeps its words, Ollama's too.
 
 | Provider    | Reference                  | Protocol                                                                        | Key                                                            |

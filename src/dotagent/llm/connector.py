@@ -105,6 +105,19 @@ def _worth_retrying(error: Exception) -> bool:
     return is_retryable_provider_error(error) and out_of_reach(error) is None
 
 
+# The time after which a connector's retries begin no new pause and no new try, below the run loop's
+# model_call_timeout_s (420 s): the pauses alone, up to 30 s each and as many as 5, no longer carry a call past it
+# (item 1306). A try that began before it keeps its own read timeout (300 to 600 s in defaults.toml), so one late try
+# may still be cut off by the loop; that is not budgeted.
+RETRY_DEADLINE_S: float = 300.0
+
+
+def budgeted(policy: RetryPolicy) -> RetryPolicy:
+    """``policy`` with a total deadline of at most :data:`RETRY_DEADLINE_S`."""
+    held: float = RETRY_DEADLINE_S if policy.deadline_s is None else min(policy.deadline_s, RETRY_DEADLINE_S)
+    return policy.model_copy(update={"deadline_s": held})
+
+
 async def _unless_out_of_reach[T](operation: Callable[[], Awaitable[T]]) -> T:
     """``operation``, whose broken connection is told as one to a server that cannot be connected to when it cannot
     be (:func:`~dotagent.llm.reach.cannot_connect`)."""
@@ -129,7 +142,7 @@ async def retry_with_reset(
         started.append(True)
         return await _unless_out_of_reach(attempt_once)
 
-    return await retry_async(attempt, _worth_retrying, retry_after_hint, policy, label)
+    return await retry_async(attempt, _worth_retrying, retry_after_hint, budgeted(policy), label)
 
 
 async def _json_attempt(
@@ -169,7 +182,7 @@ async def post_json(
         lambda: _unless_out_of_reach(lambda: _json_attempt(send, context, classify, label)),
         _worth_retrying,
         retry_after_hint,
-        policy,
+        budgeted(policy),
         label,
     )
 
@@ -192,6 +205,6 @@ async def get_json(
         lambda: _unless_out_of_reach(lambda: _json_attempt(send, context, classify, label)),
         _worth_retrying,
         retry_after_hint,
-        policy,
+        budgeted(policy),
         label,
     )
