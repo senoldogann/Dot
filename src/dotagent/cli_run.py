@@ -126,12 +126,13 @@ async def _until_recorded(manager: RunManager, run_id: str) -> None:
 
 
 async def close_here(manager: RunManager, runtime: Runtime) -> None:
-    """Close a run manager of this process, then its runtime (item 1284): the learning still drawn from the runs that
-    ended (a skill's question to the review model, which a run's end starts in the background) is cancelled while the
-    store is open, so its cut-off model call is recorded as the daemon's stop records it. Closed the other way round,
-    the work was cut once the process ended, into a closed store."""
+    """Close the runtime of this process once the learning still drawn from the runs that ended (a skill's question to
+    the review model, which a run's end starts in the background) is dropped (item 1284), so that its cut-off model
+    call is recorded while the store is open. Closed the other way round, the work was cut once the process ended,
+    into a closed store. Only the learning is dropped: a run a second Ctrl-C left working keeps the command no longer
+    than ``_QUIT_WAIT_S`` and keeps the end its stop gives it."""
     try:
-        await manager.shutdown()
+        await manager.drop_learning()
     finally:
         await close_runtime(runtime)
 

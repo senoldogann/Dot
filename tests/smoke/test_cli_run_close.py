@@ -15,13 +15,16 @@ from structlog.testing import capture_logs
 from dotagent.agent.manager import RunManager
 from dotagent.cli_run import close_here
 from dotagent.config import AppConfig, load_default_config
+from dotagent.core.paths import db_path, screenshots_dir
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.llm.calls import CALL_EVENT, CANCELLED
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
-from dotagent.runtime import Runtime, open_runtime
-from dotagent.store.models import RunRecord
+from dotagent.runtime import Runtime, close_runtime, open_runtime
+from dotagent.store.db import Store
+from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -114,6 +117,43 @@ async def test_closing_a_dotx_run_cuts_the_skill_work_while_its_store_is_open(lo
                 await model.asked.wait()
         finally:
             await close_here(manager, runtime)
+        store: Store = await Store.open(db_path(), screenshots_dir())
+        try:
+            events: list[EventRecord] = await store.list_events(run.id, 0, 1000)
+        finally:
+            await store.close()
     assert ended.status == "done"
     assert model.cut
     assert [entry for entry in logs if entry["event"] == "model_call_not_recorded"] == []
+    # The cut-off question of the skill writer is on the run's record.
+    cut: list[EventRecord] = [
+        event
+        for event in events
+        if event.kind == CALL_EVENT and event.data["purpose"] == "playbook" and event.data["error"] == CANCELLED
+    ]
+    assert len(cut) == 1, [event.data for event in events if event.kind == CALL_EVENT]
+
+
+async def test_dropping_the_learning_leaves_a_live_run_to_its_stop(login_env: dict[str, str]) -> None:
+    """A run that a second Ctrl-C left working is not waited for, nor ended as a daemon's stop, by the close: the
+    command still quits after ``_QUIT_WAIT_S``, and the daemon closes the run as its command's death."""
+    with scratch_home() as home, eval_environment(home, {}):
+        runtime: Runtime = await open_runtime(_config(), login_env)
+        model: WaitingWriter = WaitingWriter(ScriptedProvider(_PROVIDER, []), 0)
+        await runtime.router.register(_PROVIDER, model)
+        manager: RunManager = RunManager(runtime)
+        try:
+            run: RunRecord = await manager.start(
+                "Keep hi in notes.txt.", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask",
+                False, (),
+            )  # fmt: skip
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                await model.asked.wait()
+                await manager.drop_learning()
+            still: list[str] = manager.active_run_ids()
+            cut_by_the_drop: bool = model.cut
+        finally:
+            await manager.shutdown()
+            await close_runtime(runtime)
+    assert run.id in still
+    assert not cut_by_the_drop

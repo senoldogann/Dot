@@ -536,6 +536,8 @@ class RunManager:
         self._learning: dict[str, asyncio.Task[None]] = {}
         # Runs that ended whose playbook is being written or whose use of playbooks is being recorded, by run id.
         self._distilling: dict[str, asyncio.Task[None]] = {}
+        # Set once the learning was dropped (:meth:`drop_learning`): a run that ends after it starts none.
+        self._learning_dropped: bool = False
         # Held while a lesson is saved or dismissed, by the owner or by ``auto``, so that each is decided once.
         self._deciding: asyncio.Lock = asyncio.Lock()
         # Held while an approval or a question is decided, so that the answer to a question a run left goes on once.
@@ -2520,11 +2522,7 @@ class RunManager:
         await self.desk.close()
         if self._asks is not None:
             self._asks.cancel()
-        learning: list[asyncio.Task[None]] = [*self._learning.values(), *self._distilling.values()]
-        for task in learning:
-            task.cancel()
-        if learning:
-            await asyncio.wait(learning)
+        await self.drop_learning()
         # The releases of what the owner's input left pressed are bounded: they end on their own (item 479).
         if self._releases:
             await asyncio.wait(list(self._releases))
@@ -2532,6 +2530,18 @@ class RunManager:
             # Its runs have ended: this process lets go of them.
             await asyncio.to_thread(self._owner.release)
             self._owner = None
+
+    async def drop_learning(self) -> None:
+        """Cancel the learning still drawn from runs that ended (their lessons and their skill work) and wait until it
+        has ended, so that what it records, such as a cut-off model call, reaches a store that is still open; a run that
+        ends from now on starts none. Live runs are left as they are: ``dotx run`` closes this way (item 1284), and a
+        run a second Ctrl-C left working is closed by the daemon as its command's death."""
+        self._learning_dropped = True
+        learning: list[asyncio.Task[None]] = [*self._learning.values(), *self._distilling.values()]
+        for task in learning:
+            task.cancel()
+        if learning:
+            await asyncio.wait(learning)
 
     def _handle(self, run_id: str) -> RunHandle:
         handle: RunHandle | None = self._handles.get(run_id)
@@ -3603,9 +3613,10 @@ class RunManager:
             inbox.shutdown()
             recorded: bool = await self._close(run, status, result, needs, error, inbox, finished, restated)
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
-        if recorded and lessons is not None and not self._stopping:
+        learns: bool = recorded and not self._stopping and not self._learning_dropped
+        if learns and lessons is not None:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
-        if recorded and not self._stopping and playbook_case(runtime.config, run, status) is not None:
+        if learns and playbook_case(runtime.config, run, status) is not None:
             self._distilling[run.id] = asyncio.create_task(self._distil(run, status))
         if not self._stopping:
             # The tabs the run left (item 696): a chat no message goes on from closes them all (a helper's, and one an
