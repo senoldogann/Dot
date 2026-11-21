@@ -673,7 +673,7 @@ with its reason (for an engine that answered with an error: the HTTP status and 
 masked, so an engine that is down reads differently from one out of credit; the log's `search_engine_failed` and
 `search_engine_benched` carry the whole context), and the age of a remembered answer. Bing is not a rung: without a
 session its page answers some queries with the results of another query. `web_fetch` reads HTML and PDF and refuses
-localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set. A body is read as it comes and
+localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set. A site whose TLS certificate does not verify (a name it does not cover, expired, self-signed) is not tried again and is not told as a failure in transit: the result says the certificate does not verify and another try will not help (item 1285). A body is read as it comes and
 inflated a piece at a time (gzip or deflate, once): a body in more codings, or in one Dot does not read, is refused, so
 that a few hundred bytes of nested gzip are not gigabytes in memory (item 554). A page that turns the plain request away
 (HTTP 401, 403, 429, 503 or 999, LinkedIn's refusal), closes the plain request's TLS handshake (some sites answer only

@@ -111,19 +111,31 @@ def _cause_chain(exc: BaseException) -> str:
     return " <- ".join(parts)
 
 
+def _tls_error(exc: httpx.HTTPError) -> ssl.SSLError | None:
+    """The TLS error behind a connection that could not be opened, or None when TLS was not the cause."""
+    current: BaseException | None = exc if isinstance(exc, httpx.ConnectError) else None
+    for _ in range(_CAUSE_DEPTH):
+        if current is None:
+            return None
+        if isinstance(current, ssl.SSLError):
+            return current
+        current = current.__cause__ or current.__context__
+    return None
+
+
 def _refused_handshake(exc: httpx.HTTPError) -> bool:
     """Whether ``exc`` is a connection whose TLS handshake the server closed or refused, a certificate that did not
     verify not among them (that is refused in a browser too). A site behind some filters closes a hello that does not
     offer HTTP/2 first (item 960: measured 2026-11-03, closed four times of four with ALPN ``http/1.1``, open four
     times of four with ``h2``)."""
-    current: BaseException | None = exc if isinstance(exc, httpx.ConnectError) else None
-    for _ in range(_CAUSE_DEPTH):
-        if current is None:
-            return False
-        if isinstance(current, ssl.SSLError):
-            return not isinstance(current, ssl.SSLCertVerificationError)
-        current = current.__cause__ or current.__context__
-    return False
+    error: ssl.SSLError | None = _tls_error(exc)
+    return error is not None and not isinstance(error, ssl.SSLCertVerificationError)
+
+
+def _unverified_certificate(exc: httpx.HTTPError) -> bool:
+    """Whether ``exc`` is a connection whose certificate did not verify (a name it does not cover, expired,
+    self-signed): the site's own setup, which another try does not change and a browser refuses too (item 1285)."""
+    return isinstance(_tls_error(exc), ssl.SSLCertVerificationError)
 
 
 def _is_transient(exc: Exception) -> bool:
@@ -357,6 +369,11 @@ class WebClient:
             finally:
                 await response.aclose()
         except _TRANSIENT_ERRORS as exc:
+            if _unverified_certificate(exc):
+                raise WebError(
+                    "the site's TLS certificate does not verify, so the page was not read; another try will not help",
+                    {"url": _shown(url), "error_type": type(exc).__name__, "error": _shown(_cause_chain(exc))},
+                ) from exc
             failure: type[WebTransportError] = WebHandshakeRefused if _refused_handshake(exc) else WebTransportError
             raise failure(
                 "the request failed in transit",
