@@ -980,12 +980,14 @@ class LiveActivity(FrozenModel):
 
 class PushSubscription(FrozenModel):
     """A browser's web push subscription (item 52): the push service's endpoint and the keys the message is encrypted
-    with, as ``PushSubscription.toJSON()`` gives them."""
+    with, as ``PushSubscription.toJSON()`` gives them, and the phone whose key registered it (item 1311; None for the
+    installation's token)."""
 
     endpoint: str
     p256dh: str
     auth: str
     created_at: float
+    phone_id: str | None = None
 
 
 class CampaignEntry(FrozenModel):

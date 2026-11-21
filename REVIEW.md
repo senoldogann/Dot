@@ -29,6 +29,12 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_phone_limits.py::test_a_foreign_push_host_is_refused_and_a_removed_phone_takes_its_subscriptions` — a web
+  push subscription took any https address, so Dot posted every push, signed, to a host the caller named, and it
+  belonged to no phone, so removing the phone left it (item 1311).
+- `tests/unit/test_push_hosts.py::test_no_packaged_entry_takes_a_domain_that_serves_what_anyone_hosts` — the first list
+  took `*.googleapis.com/fcm/`, which `<bucket>.storage.googleapis.com/fcm/...` matches, so a caller still named where
+  Dot posts a push (item 1311).
 - `tests/unit/test_store_schema.py::test_a_copy_that_meets_a_full_disk_says_the_disk_is_full` — the copy made before
   an upgrade told a full disk only from the system's error, while SQLite's online backup, its largest write, reports
   it as its own (item 1268).

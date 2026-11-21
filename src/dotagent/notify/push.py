@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 import stat
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -25,6 +26,7 @@ from dotagent.core.errors import DotError
 from dotagent.core.types import FrozenModel
 from dotagent.drafts.service import DRAFT_CREATED_EVENT
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
+from dotagent.notify.hosts import push_host_problem
 from dotagent.notify.keys import keys_problem
 from dotagent.notify.owner import OWNER_TOLD_EVENT, OwnerTold
 from dotagent.scheduler import (
@@ -318,14 +320,27 @@ async def _next_event(queue: asyncio.Queue[EventRecord], stopping: asyncio.Event
     return None
 
 
-async def _push_to(store: Store, keys: PushKeys, subscription: PushSubscription, message: PushMessage) -> PushOutcome:
+async def _push_to(
+    store: Store, keys: PushKeys, subscription: PushSubscription, message: PushMessage, hosts: Sequence[str]
+) -> PushOutcome:
     """Send ``message`` to one subscription: one whose keys cannot encrypt it or whose push service calls it gone is
-    deleted, and any other refusal is logged and the subscription kept."""
+    deleted, one at a host that is not on ``hosts`` (item 1311: a subscription kept before the door checked, or a host
+    taken off the list) is not posted to and is kept, so that the list is the owner's to change, and any other refusal
+    is logged and the subscription kept."""
     problem: str | None = keys_problem(subscription.p256dh, subscription.auth)
     if problem is not None:
         await store.delete_push_subscription(subscription.endpoint)
         log.warning("push_subscription_unusable", endpoint=subscription.endpoint, problem=problem)
         return "removed"
+    refused: str | None = push_host_problem(subscription.endpoint, hosts, https_only=False)
+    if refused is not None:
+        log.warning(
+            "push_subscription_host_refused",
+            endpoint=subscription.endpoint,
+            problem=refused,
+            setting="[notify] push_hosts",
+        )
+        return "failed"
     try:
         await send_push(keys, subscription, message)
     except PushError as error:
@@ -348,9 +363,10 @@ async def _push_to(store: Store, keys: PushKeys, subscription: PushSubscription,
     return "sent"
 
 
-async def push_event(store: Store, keys: PushKeys, event: EventRecord) -> PushTotals:
-    """Send one event to every subscription, each on its own (:func:`_push_to`; the code review's Y15): one that fails
-    keeps no other from its message. Returns the totals, all naught for an event the phone is not told of."""
+async def push_event(store: Store, keys: PushKeys, event: EventRecord, hosts: Sequence[str]) -> PushTotals:
+    """Send one event to every subscription at a push service of ``hosts``, each on its own (:func:`_push_to`; the code
+    review's Y15): one that fails keeps no other from its message. Returns the totals, all naught for an event the phone
+    is not told of."""
     message: PushMessage | None = (
         notice_message(event)
         if event.run_id == SYSTEM_RUN_ID
@@ -359,12 +375,15 @@ async def push_event(store: Store, keys: PushKeys, event: EventRecord) -> PushTo
     if message is None:
         return PushTotals(sent=0, failed=0, removed=0)
     outcomes: list[PushOutcome] = [
-        await _push_to(store, keys, subscription, message) for subscription in await store.list_push_subscriptions()
+        await _push_to(store, keys, subscription, message, hosts)
+        for subscription in await store.list_push_subscriptions()
     ]
     return PushTotals(sent=outcomes.count("sent"), failed=outcomes.count("failed"), removed=outcomes.count("removed"))
 
 
-async def watch_pushes(store: Store, feed: Subscription, keys: PushKeys, stopping: asyncio.Event) -> None:
+async def watch_pushes(
+    store: Store, feed: Subscription, keys: PushKeys, stopping: asyncio.Event, hosts: Sequence[str]
+) -> None:
     """Send every subscription what the events of ``feed`` say, until the daemon starts to stop. ``feed`` takes the
     kinds of ``PUSH_KINDS``, and its caller opens it, so that what happens before this task first runs is sent too. An
     event that cannot be pushed (its run was deleted, the store failed) is logged and the next one still goes; the
@@ -374,7 +393,7 @@ async def watch_pushes(store: Store, feed: Subscription, keys: PushKeys, stoppin
         if event is None:
             continue
         try:
-            totals: PushTotals = await push_event(store, keys, event)
+            totals: PushTotals = await push_event(store, keys, event, hosts)
         except DotError as error:
             log.warning("push_event_failed", run_id=event.run_id, kind=event.kind, error=str(error))
             continue

@@ -127,7 +127,8 @@ def push_service() -> Iterator[_PushService]:
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false',
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false\n\n'
+        '[notify]\npush_hosts = ["127.0.0.1"]\n',
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
@@ -170,7 +171,9 @@ async def client(runtime: Runtime, manager: RunManager) -> AsyncIterator[httpx.A
     server: DotServer = DotServer(serving_config(create_app(context)), stopping)
     serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
     async with runtime.bus.subscribe_kinds(PUSH_KINDS) as feed:
-        pusher: asyncio.Task[None] = asyncio.create_task(watch_pushes(runtime.store, feed, runtime.push_keys, stopping))
+        pusher: asyncio.Task[None] = asyncio.create_task(
+            watch_pushes(runtime.store, feed, runtime.push_keys, stopping, runtime.config.notify.push_hosts)
+        )
         while not server.started:
             assert not serving.done(), "the server stopped while starting"
             await asyncio.sleep(0.05)
@@ -345,7 +348,10 @@ def _home_left_by_an_unclean_end(home: Path) -> Path:
     """Make ``home`` a Dot home whose daemon listens on a free port, with the mark of a daemon that did not end cleanly
     in it; returns the mark."""
     home.mkdir()
-    (home / "config.toml").write_text(f"[server]\nport = {_free_port()}\n", encoding="utf-8")
+    # The test's push service is on this Mac, over plain HTTP: its host is added to the push services.
+    (home / "config.toml").write_text(
+        f'[server]\nport = {_free_port()}\n\n[notify]\npush_hosts = ["127.0.0.1"]\n', encoding="utf-8"
+    )
     mark: Path = home / "daemon.running"
     mark.touch()
     return mark

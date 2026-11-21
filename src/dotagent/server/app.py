@@ -198,7 +198,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(health_router(ctx.notifications))
     phones: PairedPhones = ctx.phones if ctx.phones is not None else PairedPhones.load(phones_path())
     app.include_router(proof_router(ctx.token, phones))
-    app.include_router(system_router(ctx, pages.build))
+    app.include_router(system_router(ctx, pages.build, phones))
     app.include_router(about_router(ctx))
     app.include_router(runs_router(ctx))
     app.include_router(queue_router(ctx))
