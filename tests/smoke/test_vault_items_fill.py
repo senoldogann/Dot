@@ -30,6 +30,7 @@ import pytest_asyncio
 import structlog
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Frame, Page
+from pydantic import SecretStr
 from vault_stand_ins import MemorySecretStore
 
 from dotagent.agent.gate import RunGate, SiteLocks
@@ -39,7 +40,7 @@ from dotagent.agent.verify import new_facts
 from dotagent.browser import session as browser_session
 from dotagent.browser.driver import _remark_frame
 from dotagent.config import load_config
-from dotagent.core.errors import BrowserError, ForbiddenUrlError, PolicyDenied, ToolInputError
+from dotagent.core.errors import BrowserError, DotError, ForbiddenUrlError, PolicyDenied, ToolInputError
 from dotagent.core.logs import configure_logging
 from dotagent.core.paths import env_file_path, workspace_dir
 from dotagent.core.types import JsonObject
@@ -52,7 +53,7 @@ from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import known_secrets, write_env_value
 from dotagent.server import UI_SOURCE
-from dotagent.store.models import ApprovalRecord, RunRecord, ThreadRecord
+from dotagent.store.models import ApprovalRecord, RunRecord, ThreadRecord, VaultRecord
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.meta import FINISH_TOOL
@@ -1374,3 +1375,78 @@ async def test_a_new_login_is_made_only_for_the_site_it_was_allowed_for(
     with pytest.raises(ToolInputError, match="another site than the one asked for"):
         await prepared.run(ctx)
     assert [item for item in await vault.of_kind("login") if item.username == "lin@example.com"] == []
+
+
+async def test_a_second_new_login_for_the_same_account_is_refused_unless_the_sign_up_failed(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
+) -> None:
+    """Item 1290: one login per account. A second call keeps no second login; with replace the one that a failed
+    sign-up left gets a new password, under the same record."""
+    runtime, keychain, _ = parts
+    vault: VaultItems = await _vault(runtime)
+    ctx, gate = await _context(runtime, "yolo")
+    url: str = f"https://shop.example.localhost:{sites.shop.port}/signup"
+    refs: dict[str, str] = await _refs(ctx, gate, url, {"pass": "Password"})
+    await _call(ctx, gate, "browser_create_login", {"password": refs["pass"], "username": "Twice@example.com"})
+    (first,) = [item for item in await vault.of_kind("login") if (item.username or "").lower() == "twice@example.com"]
+    old: str = keychain.kept[first.id]["password"]
+    refs = await _refs(ctx, gate, url, {"pass": "Password"})
+    with pytest.raises(ToolInputError, match="already holds a login"):
+        await _call(ctx, gate, "browser_create_login", {"password": refs["pass"], "username": "twice@example.com"})
+    assert len([i for i in await vault.of_kind("login") if (i.username or "").lower() == "twice@example.com"]) == 1
+    refs = await _refs(ctx, gate, url, {"pass": "Password"})
+    await _call(
+        ctx, gate, "browser_create_login", {"password": refs["pass"], "username": "twice@example.com", "replace": True}
+    )
+    (again,) = [item for item in await vault.of_kind("login") if (item.username or "").lower() == "twice@example.com"]
+    assert again.id == first.id and keychain.kept[first.id]["password"] != old
+    # The password that stood is kept in the notes, where the owner finds it if the first sign-up had gone through.
+    assert old in keychain.kept[first.id]["notes"] and keychain.kept[first.id]["notes"].startswith("Made by Dot")
+
+
+async def test_a_login_the_owner_saved_is_never_replaced_and_a_failed_replace_gives_the_old_one_back(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
+) -> None:
+    """Item 1290: replace is for a login Dot made. One the owner saved is refused with replace too, and a fill that
+    fails while a login is replaced puts back its password and its notes."""
+    runtime, keychain, _ = parts
+    vault: VaultItems = await _vault(runtime)
+    ctx, gate = await _context(runtime, "yolo")
+    site: str = f"https://shop.example.localhost:{sites.shop.port}"
+    mine: VaultRecord = await vault.create(
+        LoginDraft(
+            kind="login",
+            website=site,
+            username="own@example.com",
+            password=SecretStr("owners-own-password"),
+            notes=SecretStr("my notes"),
+        )
+    )
+    refs: dict[str, str] = await _refs(ctx, gate, f"{site}/signup", {"pass": "Password"})
+    with pytest.raises(ToolInputError, match="one you saved"):
+        await _call(
+            ctx,
+            gate,
+            "browser_create_login",
+            {"password": refs["pass"], "username": "own@example.com", "replace": True},
+        )
+    assert keychain.kept[mine.id]["password"] == "owners-own-password" and keychain.kept[mine.id]["notes"] == "my notes"
+    made: VaultRecord = await vault.create(
+        LoginDraft(
+            kind="login",
+            website=site,
+            username="Dot@example.com",
+            password=SecretStr("dots-old-password"),
+            notes=SecretStr("Made by Dot for a new account on 2026-11-01."),
+        )
+    )
+    with pytest.raises(DotError) as failed:
+        await _call(
+            ctx,
+            gate,
+            "browser_create_login",
+            {"password": "e9999", "username": "dot@example.com", "replace": True},
+        )
+    assert "did not keep it" in str(failed.value)  # the fill failed after the login was replaced
+    assert keychain.kept[made.id]["password"] == "dots-old-password"
+    assert keychain.kept[made.id]["notes"] == "Made by Dot for a new account on 2026-11-01."

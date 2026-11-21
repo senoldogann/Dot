@@ -452,7 +452,11 @@ Both modes share what follows.
   username's, and the account's username, makes a password of 16 characters (`secrets`, each of lower and upper case,
   digits and signs), keeps the login in Dot's vault first (its website the page's origin, a note of when it was made),
   then fills it as a vault login is filled, under the same rules (outside `yolo` you are asked first, as for a fill; in
-  `yolo` it runs at once), and takes the login back out of the vault when the fill fails; the model never chooses, sees
+  `yolo` it runs at once), and takes the login back out of the vault when the fill fails; an account keeps one login
+  (item 1290): when the vault already holds a login of that site and username the call is refused and names the login
+  to sign in with, and when the sign-up never went through the run calls again with `replace`, which changes the
+  password of a login Dot made (never one you saved), keeps the old password in its notes and, when the fill fails,
+  gives the old password and notes back (the approval says it replaces one); the model never chooses, sees
   or records the password, and the run is told to make no password itself. A password or a code goes only into an input,
   a textarea or a dropdown, never into an element that is edited (`contenteditable`); a ref that names an element inside
   the label of a field names that field. A read-only field takes no part of a login, and is refused at once, saying so
