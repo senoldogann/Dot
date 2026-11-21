@@ -157,7 +157,7 @@ def build_apple_tool() -> RegisteredTool:
         language: ScriptLanguage = args.language
         timeout_s: float = script_timeout_s(args.timeout_s, ctx.runtime.config.desktop.osascript_timeout_s)
         # The environment a run's commands have, without the variables that look like secrets: what the script starts
-        # (`do shell script`) would otherwise sign with the owner's SSH agent and print their exported keys (item 555).
+        # (`do shell script`) would otherwise print the owner's exported keys (items 555 and 1293).
         result: str = await run_osascript(
             language,
             args.script,
