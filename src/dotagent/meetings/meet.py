@@ -8,6 +8,7 @@ this one file. A failure says what was looked for; there is no retry loop and no
 
 import json
 import re
+import unicodedata
 from typing import Final
 
 from playwright.async_api import Error as PlaywrightError
@@ -172,7 +173,6 @@ _READ_SCRIPT: Final[str] = """
 _BUFFER_CAP: Final[int] = 500
 _LABELS_SEEN: Final[int] = 40
 _LABEL_CHARS: Final[int] = 120
-_CONTROL: Final[re.Pattern[str]] = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 # What a read of a page Dot is not in the call on gives: nothing new.
 _NOTHING: Final[PageBatch] = PageBatch(captions=(), vanished=(), chat=(), dropped=0)
 
@@ -219,6 +219,13 @@ def _text(value: object) -> str:
     return value if isinstance(value, str) else ""
 
 
+def _visible(text: str) -> str:
+    """``text`` with each character of Unicode category C (controls, line breaks as controls, format marks such as the
+    ones that turn the direction of text, zero-width ones) made a space: a call's own names must not reach the log
+    as they were written."""
+    return "".join(" " if unicodedata.category(character)[0] == "C" else character for character in text)
+
+
 def _number(value: object) -> float:
     return float(value) if isinstance(value, (int, float)) else 0.0
 
@@ -251,10 +258,10 @@ class MeetPage:
 
     async def _labels_seen(self) -> list[JsonValue]:
         """The aria labels of the buttons the page shows now (at most :data:`_LABELS_SEEN`, each cut to
-        :data:`_LABEL_CHARS` and without control characters, since a call's own names are among them): what a failed
-        look for a toggle can say the page did offer, so that the next change of Meet's labels is mended from the
-        record, not from a guess. Best effort: a page that is gone gives none, and the error being built stays the one
-        that was raised."""
+        :data:`_LABEL_CHARS` and without any character of Unicode category C, since a call's own names are among
+        them): what a failed look for a toggle can say the page did offer, so that the next change of Meet's labels is
+        mended from the record, not from a guess. Best effort: a page that is gone gives none, and the error being
+        built stays the one that was raised."""
         try:
             raw: object = await self._page.evaluate(
                 "(max) => Array.from(document.querySelectorAll('button[aria-label], [role=button][aria-label]'))"
@@ -265,7 +272,7 @@ class MeetPage:
             return []
         if not isinstance(raw, list):
             return []
-        return [_CONTROL.sub(" ", _text(label))[:_LABEL_CHARS] for label in raw]
+        return [_visible(_text(label))[:_LABEL_CHARS] for label in raw]
 
     async def _off(self, label: str, off_now: str, on_now: str) -> None:
         """Make ``label`` (microphone or camera) off, and check that its toggle now offers to turn it on."""
