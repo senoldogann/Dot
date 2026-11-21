@@ -404,7 +404,9 @@ lessons wait on that card, in the conversation: Save to memory keeps one, Dismis
 /api/runs/{id}/lessons/{index}/save`, `/dismiss` and `/undo`). A lesson is what its last decision made it, and every
 decision waits for the one before it: a second save or dismissal of a lesson decided already is refused, save the Save
 anyway of one `auto` left out. `dotx run` and `dotx resume` show the lessons after the answer when the run worked in
-their own process; Ctrl-C skips the wait, and the exit status stays the run's. A `dotx run` handed to the daemon (item
+their own process; Ctrl-C skips the wait, and the exit status stays the run's. The skill work the run's end started
+there and that is still going when the command ends is cut, as a stop of the daemon cuts it, while the store is open,
+so the run's record keeps its cut-off model call (item 1284). A `dotx run` handed to the daemon (item
 1203) does not wait for them: the daemon draws them, and the run's page shows them. A saved lesson is a note of the agent like the others: a later run gets it when it
 fits its goal, and the Memory page edits or forgets it; a lesson of an agent's run is that agent's own (see Agents), and
 the notes it is checked against are the ones that agent's runs are handed. The same text saved again is the same note,

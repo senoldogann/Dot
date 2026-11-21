@@ -125,6 +125,17 @@ async def _until_recorded(manager: RunManager, run_id: str) -> None:
         sys.stderr.write(f"run {run_id} has not recorded its stop yet; the Dot daemon closes it\n")
 
 
+async def close_here(manager: RunManager, runtime: Runtime) -> None:
+    """Close a run manager of this process, then its runtime (item 1284): the learning still drawn from the runs that
+    ended (a skill's question to the review model, which a run's end starts in the background) is cancelled while the
+    store is open, so its cut-off model call is recorded as the daemon's stop records it. Closed the other way round,
+    the work was cut once the process ended, into a closed store."""
+    try:
+        await manager.shutdown()
+    finally:
+        await close_runtime(runtime)
+
+
 async def _read_goal(parts: list[str]) -> str:
     if parts == ["-"]:
         text: str = await asyncio.to_thread(sys.stdin.read)
@@ -184,9 +195,9 @@ async def run_here(config: AppConfig, command: RunCommand, goal: str, options: U
     """Carry out the goal of ``command`` in this process, its runtime and its run its own (no daemon of this home runs);
     0 when the run ended done."""
     runtime: Runtime = await build_runtime(config)
+    manager: RunManager = RunManager(runtime)
     try:
         _say_left_out_servers(runtime)
-        manager: RunManager = RunManager(runtime)
         manager.leave_queues()
         ui: TerminalUi = TerminalUi(RuntimeDesk(runtime), runtime.config.server, options)
         run: RunRecord = (
@@ -231,13 +242,14 @@ async def run_here(config: AppConfig, command: RunCommand, goal: str, options: U
             sys.stderr.write(f"{render_first_session_end(await runtime.store.get_campaign(run.campaign_id))}\n")
         await _show_lessons(runtime, manager, ui, run.id)
     finally:
-        await close_runtime(runtime)
+        await close_here(manager, runtime)
     return 0 if run.status == "done" else 1
 
 
 async def cmd_resume(command: ResumeCommand) -> int:
     """Resume a run that was cut off in this process, like ``dotx run``: see ``RunManager.resume``."""
     runtime: Runtime = await build_runtime(load_user_config())
+    manager: RunManager = RunManager(runtime)
     try:
         _say_left_out_servers(runtime)
         options: UiOptions = UiOptions(
@@ -246,7 +258,6 @@ async def cmd_resume(command: ResumeCommand) -> int:
             show_thinking=command.thinking,
             verbose=command.verbose,
         )
-        manager: RunManager = RunManager(runtime)
         manager.leave_queues()
         ui: TerminalUi = TerminalUi(RuntimeDesk(runtime), runtime.config.server, options)
         run: RunRecord = await follow_run(runtime, manager, ui, lambda: manager.resume(command.run_id))
@@ -254,7 +265,7 @@ async def cmd_resume(command: ResumeCommand) -> int:
         ui.show_open_ends(ui.needs_from_user, await runtime.store.list_left_questions(run.id))
         await _show_lessons(runtime, manager, ui, run.id)
     finally:
-        await close_runtime(runtime)
+        await close_here(manager, runtime)
     return 0 if run.status == "done" else 1
 
 
@@ -262,9 +273,9 @@ async def cmd_chat(command: ChatCommand) -> int:
     if not sys.stdin.isatty():
         raise ConfigError("chat needs an interactive terminal; use 'dotx run' for scripts", {})
     runtime: Runtime = await build_runtime(load_user_config())
+    manager: RunManager = RunManager(runtime)
     try:
         _say_left_out_servers(runtime)
-        manager: RunManager = RunManager(runtime)
         manager.leave_queues()
         ui: TerminalUi = TerminalUi(
             RuntimeDesk(runtime),
@@ -302,7 +313,7 @@ async def cmd_chat(command: ChatCommand) -> int:
             if run.status != "done":
                 sys.stderr.write(f"[{run.status}]\n")
     finally:
-        await close_runtime(runtime)
+        await close_here(manager, runtime)
 
 
 async def dispatch(command: Command) -> int:
