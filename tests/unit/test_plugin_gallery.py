@@ -205,8 +205,12 @@ def folders(tmp_path: Path) -> tuple[Path, Path]:
 
 
 class TestInstall:
-    async def test_installs_the_pinned_plugin_into_dots_plugins_folder(self, folders: tuple[Path, Path]) -> None:
+    async def test_installs_the_pinned_plugin_into_dots_plugins_folder(
+        self, folders: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         work, plugins = folders
+        # Dot's own plugins folder is the owner's real one on a machine that has installed plugins: not this test's.
+        monkeypatch.setattr("dotagent.plugins.catalog.plugins_dir", lambda: plugins)
         entry, archive = _pinned(work)
 
         where: Path = await install(entry, plugins, _fetch(archive))

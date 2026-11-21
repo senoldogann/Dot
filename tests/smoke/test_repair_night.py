@@ -471,7 +471,10 @@ async def _night(
     """A runtime set for a night, with one problem in its book seen three times, and the restarts it asks for."""
     (stand_ins / "mode").write_text(mode, encoding="utf-8")
     repo: Path = stand_ins.parent / "Dot"
-    with scratch_home() as home, eval_environment(home, {}):
+    with scratch_home() as home, eval_environment(home, {"DOT_LOG_DIR": str(home / "logs")}):
+        # The log the night reads for sightings is the test's own: on a Mac whose Dot has run, the real one holds
+        # problems of its own, and the night would work on those too.
+        (home / "logs").mkdir()
         runtime: Runtime = await open_runtime(_config(repo, stand_ins / "claude", merge), login_env)
         runtime.shell_env.update(
             {
