@@ -8,6 +8,8 @@ from datetime import datetime
 
 from pydantic import JsonValue
 
+from dotagent.core.secret_forms import mask_values
+
 # What a pattern matches is masked; one with two groups keeps them (a URL up to the colon before its password, the
 # name of a secret and what stands between it and its value, or a header up to its credentials) and masks the rest.
 _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
@@ -301,13 +303,10 @@ def redact_secrets(text: str) -> str:
 
 def mask_known(text: str, known: Sequence[str]) -> str:
     """``text`` with every value of ``known`` (secrets Dot holds, :func:`dotagent.secrets.known_secrets`) masked where
-    it stands, word for word and the longest first, and nothing else. A value shorter than
-    :data:`KNOWN_SECRET_MIN_CHARS` is left alone."""
-    masked: str = text
-    for value in sorted(set(known), key=len, reverse=True):
-        if len(value) >= KNOWN_SECRET_MIN_CHARS:
-            masked = masked.replace(value, "***")
-    return masked
+    it stands, the longest first, and nothing else: as it is and in each form a tool, a page or a log writes it back
+    (:func:`dotagent.core.secret_forms.forms_of`: JSON-escaped, URL-encoded, form-encoded, HTML-escaped, base64). A
+    value shorter than :data:`KNOWN_SECRET_MIN_CHARS` is left alone."""
+    return mask_values(text, known, "***", KNOWN_SECRET_MIN_CHARS)
 
 
 def redact_known(text: str, known: Sequence[str]) -> str:

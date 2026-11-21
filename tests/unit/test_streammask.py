@@ -1,8 +1,10 @@
 """The text a step streams has its secrets masked as the message it stores has (item 551): one split between two deltas
 is found whole, and no delta shows the start of one that the next completes."""
 
+import base64
 from collections.abc import Sequence
 from typing import Literal
+from urllib.parse import quote_plus
 
 import pytest
 
@@ -66,6 +68,24 @@ async def test_a_secret_is_masked_whole_wherever_the_stream_splits_it(secret: st
     # Nothing of it was shown before the end either: what came before the end is a start of what was shown after.
     assert shown.startswith(before)
     assert "***" in before or secret[:10] not in before, before
+
+
+@pytest.mark.parametrize("sizes", [(1,), (2, 3), (7,)])
+@pytest.mark.parametrize("form", ["url", "base64", "base64-padded"])
+async def test_a_secret_written_in_an_encoded_form_is_masked_whole_wherever_the_stream_splits_it(
+    form: str, sizes: tuple[int, ...]
+) -> None:
+    """Item 1292: the stream withholds the start of an encoded form as it does of the plain value."""
+    held: str = 'p"a+s/w=rd\\x!é9-long'
+    written: str = {
+        "url": quote_plus(held),
+        "base64": base64.b64encode(held.encode()).decode().rstrip("="),
+        "base64-padded": base64.b64encode(held.encode()).decode(),
+    }[form]
+    text: str = f"Here is what the file says: {written} and that is all.{PROSE * 2}"
+    before, shown = await _streamed(text, sizes, (held,))
+    assert shown == redact_known(text, (held,)) and written not in shown and "***" in shown
+    assert written[:8] not in before.replace("***", ""), before
 
 
 @pytest.mark.parametrize("sizes", [(1,), (4,), (3, 11)])
