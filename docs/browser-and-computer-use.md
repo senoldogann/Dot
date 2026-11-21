@@ -456,7 +456,11 @@ Both modes share what follows.
   (item 1290): when the vault already holds a login of that site and username the call is refused and names the login
   to sign in with, and when the sign-up never went through the run calls again with `replace`, which changes the
   password of a login Dot made (never one you saved), keeps the old password in its notes and, when the fill fails,
-  gives the old password and notes back (the approval says it replaces one); the model never chooses, sees
+  gives the old password and notes back (the approval says it replaces one). A login is the same account by its host and
+  port, however you wrote the website (`github.com`, `https://github.com` and `HTTPS://www.GitHub.com/login` are one),
+  and its username without case and blanks; every password a replace left behind stays in the notes, a line each, the
+  oldest first, and past the notes' 1,000 characters the oldest lines go first; two calls for one account that start
+  together go one after the other, so that one of them finds the login the other made (item 1294); the model never chooses, sees
   or records the password, and the run is told to make no password itself. A password or a code goes only into an input,
   a textarea or a dropdown, never into an element that is edited (`contenteditable`); a ref that names an element inside
   the label of a field names that field. A read-only field takes no part of a login, and is refused at once, saying so

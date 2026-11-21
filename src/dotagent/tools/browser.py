@@ -12,9 +12,11 @@ import contextlib
 import json
 import os
 import posixpath
+import re
 import secrets
 import shutil
 import time
+import weakref
 from collections.abc import Sequence
 from dataclasses import replace
 from itertools import pairwise
@@ -111,8 +113,8 @@ from dotagent.tools.groups import group_of
 from dotagent.tools.meta import USE_TOOLS_TOOL
 from dotagent.tools.pages import PAGE_SUFFIXES, SHOW_PAGE_TOOL
 from dotagent.vault.choices import LoginChoice, find_login, login_choices
-from dotagent.vault.hosts import elsewhere_advice, fills_on, site_label
-from dotagent.vault.items import LoginDraft, LoginFill
+from dotagent.vault.hosts import elsewhere_advice, fills_on, same_site, site_key, site_label
+from dotagent.vault.items import MOST_NOTES_CHARS, LoginDraft, LoginFill
 from dotagent.vault.onepassword import Login, LoginSecret, VaultError, kept_token
 
 _log = get_logger(__name__)
@@ -1733,6 +1735,43 @@ class CreateLoginArgs(ToolArgs):
 
 
 _MADE_BY_DOT: str = "Made by Dot"
+# A line of a login's notes that keeps a password it had before a replace (item 1290), and what its words are.
+_EARLIER: re.Pattern[str] = re.compile(r"Replaced on \d{4}-\d{2}-\d{2}, its earlier password: (?P<password>\S+)")
+# The logins being made or replaced, one lock for each account (host, port, username), so that two calls for one account
+# go one after the other (item 1294). A lock nobody holds or waits for is let go.
+_ACCOUNT_LOCKS: "weakref.WeakValueDictionary[tuple[str, int | None, str], asyncio.Lock]" = weakref.WeakValueDictionary()
+
+
+def _account_lock(website: str, username: str) -> asyncio.Lock:
+    """The lock of the account ``username`` on ``website``: one for the host and port of the site however the website is
+    written, and for the username without case and blanks."""
+    host, port = site_key(website) or (website.lower(), None)
+    key: tuple[str, int | None, str] = (host, port, username.strip().lower())
+    lock: asyncio.Lock | None = _ACCOUNT_LOCKS.get(key)
+    if lock is None:
+        lock = _ACCOUNT_LOCKS[key] = asyncio.Lock()
+    return lock
+
+
+def _same_account(item: VaultRecord, website: str, username: str) -> bool:
+    """Whether ``item`` is the login of ``username`` on ``website``: the same host and port, however the owner wrote the
+    website (``github.com`` and ``https://github.com`` are one), and the same username without case and blanks."""
+    return (
+        item.website is not None
+        and same_site(item.website, website)
+        and (item.username or "").strip().lower() == username.strip().lower()
+    )
+
+
+def _replaced_notes(header: str, old_notes: str, old_password: str, made: str, limit: int = MOST_NOTES_CHARS) -> str:
+    """The notes of a login whose password was replaced: ``header`` (the new "Made by Dot" line), then a line for
+    each password it had, the oldest first: those the old notes keep and ``old_password``, the one that stood. Past
+    ``limit`` characters the oldest lines go first; the header and the newest line stay."""
+    lines: list[str] = [found.group(0) for found in _EARLIER.finditer(old_notes)]
+    lines.append(f"Replaced on {made}, its earlier password: {old_password}")
+    while len(lines) > 1 and len("\n".join([header, *lines])) > limit:
+        lines.pop(0)
+    return "\n".join([header, *lines])
 
 
 async def _notes_of(ctx: ToolContext, item_id: str) -> SecretStr | None:
@@ -1803,74 +1842,77 @@ def _create_login_tool() -> RegisteredTool:
         # One login per account (item 1290): a second call for the same site and username would keep two, and a
         # sign-in would fill the wrong one. The one that stands may be the account's only working password, so it is
         # replaced only when the run says its sign-up failed, only when Dot made it, and its old password stays in the
-        # notes of the new one.
-        existing: list[VaultRecord] = [
-            item
-            for item in await ctx.runtime.vault_items.of_kind("login")
-            if item.website == website and (item.username or "").lower() == args.username.lower()
-        ]
-        old_notes: str = ""
-        old_password: SecretStr | None = None
-        old_notes_secret: SecretStr | None = None
-        if existing:
-            stood: VaultRecord = existing[0]
-            old_notes_secret = await _notes_of(ctx, stood.id)
-            old_notes = old_notes_secret.get_secret_value() if old_notes_secret is not None else ""
-            made_by_dot: bool = old_notes.startswith(_MADE_BY_DOT)
-            if not args.replace or not made_by_dot:
-                why: str = (
-                    "if its sign-up never went through, call it again with replace true"
-                    if made_by_dot
-                    else "it is one you saved, so Dot does not replace it"
-                )
-                raise ToolInputError(
-                    f"the vault already holds a login of {args.username} on {site_label(website)} (id {stood.id}): "
-                    f"if the account exists, sign in with {FILL_LOGIN_TOOL} and this login, and make no new one; "
-                    f"{why}.",
-                    {"website": website},
-                )
-            old_password = await ctx.runtime.vault_items.reveal(stood.id, "password")
-        password: SecretStr = SecretStr(new_password())
-        # From now on the password is a secret Dot holds: masked wherever it would stand (item 551).
-        hold_filled(password.get_secret_value())
-        made: str = time.strftime("%Y-%m-%d")
-        notes: str = f"{_MADE_BY_DOT} for a new account on {made}."
-        if old_password is not None:
-            notes += f" Replaced on {made}, its earlier password: {old_password.get_secret_value()}"
-            hold_filled(old_password.get_secret_value())
-        draft: LoginDraft = LoginDraft(
-            kind="login", website=website, username=args.username, password=password, notes=SecretStr(notes)
-        )
-        if existing:
-            record: VaultRecord = await ctx.runtime.vault_items.update(existing[0].id, draft)
-        else:
-            record = await ctx.runtime.vault_items.create(draft)
-        before: LoginDraft | None = (
-            LoginDraft(
-                kind="login",
-                username=existing[0].username,
-                password=old_password,
-                notes=old_notes_secret if old_notes_secret is not None else SecretStr(""),
+        # notes of the new one. The site is the host and port, however the owner wrote the website, the username is
+        # read without case and blanks, and calls for one account go one after the other (item 1294), so that two
+        # that start together cannot both find no login.
+        async with _account_lock(website, args.username):
+            existing: list[VaultRecord] = [
+                item
+                for item in await ctx.runtime.vault_items.of_kind("login")
+                if _same_account(item, website, args.username)
+            ]
+            old_notes: str = ""
+            old_password: SecretStr | None = None
+            old_notes_secret: SecretStr | None = None
+            if existing:
+                stood: VaultRecord = existing[0]
+                old_notes_secret = await _notes_of(ctx, stood.id)
+                old_notes = old_notes_secret.get_secret_value() if old_notes_secret is not None else ""
+                made_by_dot: bool = old_notes.startswith(_MADE_BY_DOT)
+                if not args.replace or not made_by_dot:
+                    why: str = (
+                        "if its sign-up never went through, call it again with replace true"
+                        if made_by_dot
+                        else "it is one you saved, so Dot does not replace it"
+                    )
+                    raise ToolInputError(
+                        f"the vault already holds a login of {args.username} on {site_label(website)} (id {stood.id}): "
+                        f"if the account exists, sign in with {FILL_LOGIN_TOOL} and this login, and make no new one; "
+                        f"{why}.",
+                        {"website": website},
+                    )
+                old_password = await ctx.runtime.vault_items.reveal(stood.id, "password")
+            password: SecretStr = SecretStr(new_password())
+            # From now on the password is a secret Dot holds: masked wherever it would stand (item 551).
+            hold_filled(password.get_secret_value())
+            made: str = time.strftime("%Y-%m-%d")
+            notes: str = f"{_MADE_BY_DOT} for a new account on {made}."
+            if old_password is not None:
+                notes = _replaced_notes(notes, old_notes, old_password.get_secret_value(), made)
+                hold_filled(*(found.group("password") for found in _EARLIER.finditer(notes)))
+            draft: LoginDraft = LoginDraft(
+                kind="login", website=website, username=args.username, password=password, notes=SecretStr(notes)
             )
-            if existing
-            else None
-        )
-        values: dict[VaultFieldKind, SecretStr] = {"username": SecretStr(args.username), "password": password}
-        fills: list[VaultFill] = [VaultFill(ref=ref, kind=kind, value=values[kind]) for kind, ref in parts]
-        try:
-            view: PageView = await ctx.browser.fill_from_vault(ctx.thread_id, fills, on_site)
-        except Exception as error:
-            # Not filled, so no account holds it: the vault does not keep a login that was never used. A field may hold
-            # part of it already, and a form sent so would make an account with a password kept nowhere.
-            await _undo_login(ctx, record.id, before)
-            raise ToolExecutionError(
-                "filling the new login failed and Dot did not keep it: do not send this form, whose fields may hold "
-                f"part of it; open the page again and call {CREATE_LOGIN_TOOL} again. The failure: {error}",
-                {},
-            ) from error
-        except BaseException:
-            await _undo_login(ctx, record.id, before)
-            raise
+            if existing:
+                record: VaultRecord = await ctx.runtime.vault_items.update(existing[0].id, draft)
+            else:
+                record = await ctx.runtime.vault_items.create(draft)
+            before: LoginDraft | None = (
+                LoginDraft(
+                    kind="login",
+                    username=existing[0].username,
+                    password=old_password,
+                    notes=old_notes_secret if old_notes_secret is not None else SecretStr(""),
+                )
+                if existing
+                else None
+            )
+            values: dict[VaultFieldKind, SecretStr] = {"username": SecretStr(args.username), "password": password}
+            fills: list[VaultFill] = [VaultFill(ref=ref, kind=kind, value=values[kind]) for kind, ref in parts]
+            try:
+                view: PageView = await ctx.browser.fill_from_vault(ctx.thread_id, fills, on_site)
+            except Exception as error:
+                # Not filled, so no account holds it: the vault does not keep a login that was never used. A field may
+                # hold part of it already, and a form sent so would make an account with a password kept nowhere.
+                await _undo_login(ctx, record.id, before)
+                raise ToolExecutionError(
+                    "filling the new login failed and Dot did not keep it: do not send this form, whose fields may "
+                    f"hold part of it; open the page again and call {CREATE_LOGIN_TOOL} again. The failure: {error}",
+                    {},
+                ) from error
+            except BaseException:
+                await _undo_login(ctx, record.id, before)
+                raise
         filled: str = "and the confirmation field " if args.confirm is not None else ""
         said: str = (
             f"Made a password of {_NEW_PASSWORD_CHARS} characters for {args.username} on {site_label(website)}, filled "
