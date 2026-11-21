@@ -699,6 +699,13 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   - It is written nowhere else: no event, no approval, no message of the chat's history, no prompt and no log line.
   - It is masked in what any tool returns, before the run reads it, so a command that prints it, or writes it to a
     file another tool reads, shows it masked. A daemon started again masks it again.
+  - **A held secret is masked in each form a text writes it in (item 1292).** As it is, JSON-escaped, URL-encoded
+    (`%20` and `+`), form-encoded, HTML-escaped and as base64 (standard and URL-safe, padded or not, at each of the
+    three byte alignments inside a longer base64 text), by the one function every mask of a held value uses
+    (`core/secret_forms.py`): a tool's text, an event, the tail of a log, a note, the stream of what the model says,
+    and the pages a login filled. A value under 8 characters stays unmasked (4 for the vault's pages, where a
+    one-time code of six digits is masked as ever; base64 forms under 8 characters are left, as a short run of a
+    picture's base64 would stand by chance). A form not listed (a secret split by a script, hex, rot13) is not found.
   - The run reads only its name. The folder of the chats' files is guarded as `.env` is: outside `yolo` no command
     or file tool reads or changes it, so a chat's command reads its own secrets from its environment alone. A `yolo`
     run may read any file, this one too, and what it reads of a value is masked; a name it writes there that the

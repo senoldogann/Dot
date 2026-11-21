@@ -4,16 +4,21 @@ to never gets the request. No network and no model service is used. Whole events
 streams, hold no such secret either (item 551)."""
 
 import asyncio
+import base64
+import html
+import json
 import threading
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import ClassVar
+from urllib.parse import quote, quote_plus
 
 import pytest
 import pytest_asyncio
 
+from dotagent import secrets
 from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
@@ -317,3 +322,82 @@ async def test_a_yolo_run_that_read_nothing_outside_finishes_a_shell_and_a_file_
             assert HELD not in str(sent.data) and HELD not in str(shell.data) and HELD not in str(written.data)
             note: str = await asyncio.to_thread((home / "workspace" / "note.txt").read_text, "utf-8")
             assert note == "hello"
+
+
+class _Recording(ScriptedProvider):
+    """The scripted model that keeps what each request showed it."""
+
+    def __init__(self, name: str, turns: list[ScriptedTurn]) -> None:
+        super().__init__(name, turns)
+        self.seen: list[str] = []
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        self.seen.append(str(request.messages))
+        return await super().complete(request, sink)
+
+
+async def test_a_tool_result_that_prints_a_held_secret_in_an_encoded_form_reaches_neither_the_run_nor_the_events(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1292: a command that prints a held value as a JSON string, an address, a form, HTML or base64 shows it
+    masked to the run and in the events, as it does the value itself; the text around it is as it was."""
+    held: str = 'p"a+s/w=rd\\x!é9-held'
+    forms: dict[str, str] = {
+        "plain": held,
+        "json": json.dumps(held)[1:-1],
+        "quote": quote(held),
+        "quote_plus": quote_plus(held),
+        "html": html.escape(held),
+        "base64": base64.b64encode(held.encode()).decode(),
+        "base64 urlsafe unpadded": base64.urlsafe_b64encode(held.encode()).decode().rstrip("="),
+    }
+    monkeypatch.setattr(secrets, "_filled", frozenset({held}))
+    with scratch_home() as home, eval_environment(home, {}):
+        printed: Path = home / "printed.txt"
+        await asyncio.to_thread(
+            printed.write_text,
+            "\n".join(f"{name}: [{form}]" for name, form in forms.items()) + "\nplain words stay\n",
+            "utf-8",
+        )
+        turns: list[ScriptedTurn] = [
+            _turn("shell", {"command": f"cat {printed}"}),
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)
+            ),
+        ]
+        provider: _Recording = _Recording(_PROVIDER, turns)
+        config: AppConfig = eval_config(load_default_config())
+        runtime: Runtime = await open_runtime(config, login_env)
+        try:
+            await runtime.router.register(_PROVIDER, provider)
+            manager: RunManager = RunManager(runtime)
+            try:
+                run: RunRecord = await manager.start(
+                    "Print the file.",
+                    "task",
+                    SCRIPTED_MODEL,
+                    None,
+                    UI_SOURCE,
+                    None,
+                    None,
+                    "standard",
+                    None,
+                    "yolo",
+                    False,
+                    (),
+                )
+                async with asyncio.timeout(WAIT_S):
+                    ended: RunRecord = await manager.wait(run.id)
+                assert ended.status == "done", ended
+            finally:
+                await manager.shutdown()
+            shell: EventRecord = (await runtime.store.events_of_kind(run.id, "tool_result", 10))[0]
+        finally:
+            await close_runtime(runtime)
+    assert (shell.data["tool"], shell.data["ok"]) == ("shell", True), shell.data
+    shown_to_run: str = provider.seen[-1]
+    for name, form in forms.items():
+        assert form not in str(shell.data), (name, shell.data)
+        assert form not in shown_to_run, (name, shown_to_run)
+    assert str(shell.data["text"]).count("***") >= len(forms), shell.data
+    assert "plain words stay" in str(shell.data["text"])
