@@ -13,7 +13,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from dotagent.core.errors import GalleryError, ProviderTransportError
+from dotagent.core.errors import ArchiveRefused, GalleryError, ProviderTransportError
 from dotagent.core.types import JsonObject
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef
@@ -878,3 +878,84 @@ async def test_a_night_whose_sources_all_failed_is_blind(tmp_path: Path) -> None
     del answers[f"{API}/repos/{OFFICIAL}/commits/HEAD"]
     state: ScoutState = await run_night(_deps(tmp_path, _GitHub(answers)), ScoutState())
     assert state.blind == "failed" and ", 1 failed" in state.last_summary
+
+
+async def test_a_refused_archive_does_not_stop_the_next_one_and_every_staging_folder_is_its_own(tmp_path: Path) -> None:
+    folders: list[Path] = []
+    calls: list[str] = []
+
+    async def fetch(entry: GalleryEntry, folder: Path) -> Path:
+        folders.append(folder)
+        calls.append(entry.repository)
+        if len(calls) == 1:
+            (folder / "archive.tar.gz").write_bytes(b"partial")
+            raise ArchiveRefused("the plugin's archive is larger than 100 MB", {"plugin": entry.id})
+        return await _fetch(entry, folder)
+
+    deps: ScoutDeps = _deps(tmp_path, _GitHub(_answers()))
+    deps.fetch = fetch
+    state: ScoutState = await run_night(deps, ScoutState())
+    assert len(folders) == len(set(folders)) >= 2
+    assert ", 0 failed" in state.last_summary
+    assert "sync" in _by_id(state) and "listed" in _by_id(state), "the leads after the refused archive were examined"
+    assert any(key.startswith(f"{OFFICIAL.lower()}@{SHA_MARKET}:plugins/sales-reports") for key in state.looked)
+
+
+async def test_an_oversize_archive_is_recorded_and_not_downloaded_again_the_next_night(tmp_path: Path) -> None:
+    downloads: list[str] = []
+
+    async def fetch(entry: GalleryEntry, folder: Path) -> Path:
+        downloads.append(entry.repository)
+        if entry.repository == "partner/skills":
+            raise ArchiveRefused("the plugin's archive is larger than 100 MB", {"plugin": entry.id})
+        return await _fetch(entry, folder)
+
+    deps: ScoutDeps = _deps(tmp_path, _GitHub(_answers()))
+    deps.fetch = fetch
+    first: ScoutState = await run_night(deps, ScoutState())
+    assert downloads.count("partner/skills") == 1
+    assert any(key.startswith(f"partner/skills@{SHA_PARTNER}") for key in first.looked)
+    deps = _deps(tmp_path, _GitHub(_answers()))
+    deps.fetch = fetch
+    await run_night(deps, first)
+    assert downloads.count("partner/skills") == 1
+
+
+async def test_a_transient_archive_failure_is_a_failure_of_the_night_and_tried_again(tmp_path: Path) -> None:
+    downloads: list[str] = []
+
+    async def fetch(entry: GalleryEntry, folder: Path) -> Path:
+        downloads.append(entry.repository)
+        if entry.repository == "partner/skills":
+            raise GalleryError("GitHub answered 503 for the plugin's archive", {"plugin": entry.id})
+        return await _fetch(entry, folder)
+
+    deps: ScoutDeps = _deps(tmp_path, _GitHub(_answers()))
+    deps.fetch = fetch
+    first: ScoutState = await run_night(deps, ScoutState())
+    assert ", 1 failed" in first.last_summary
+    assert not any(key.startswith("partner/skills") for key in first.looked)
+    deps = _deps(tmp_path, _GitHub(_answers()))
+    deps.fetch = fetch
+    await run_night(deps, first)
+    assert downloads.count("partner/skills") == 2
+
+
+@pytest.mark.parametrize(
+    ("status", "never"), [(404, True), (410, True), (503, False), (500, False), (429, False), (403, False)]
+)
+async def test_the_download_tells_an_archive_that_never_comes_from_one_that_may(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: int, never: bool
+) -> None:
+    from dotagent.plugins import gallery as gallery_module
+
+    real = httpx.AsyncClient
+
+    def client(**kwargs: object) -> httpx.AsyncClient:
+        kwargs.pop("timeout", None)
+        return real(transport=httpx.MockTransport(lambda request: httpx.Response(status)), **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(gallery_module.httpx, "AsyncClient", client)
+    with pytest.raises(GalleryError) as caught:
+        await gallery_module.download_archive(_gallery()[0], tmp_path)
+    assert isinstance(caught.value, ArchiveRefused) is never

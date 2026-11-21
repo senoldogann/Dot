@@ -334,6 +334,12 @@ class GalleryError(DotError):
     unpacked, or its files are not the ones pinned (item 542)."""
 
 
+class ArchiveRefused(GalleryError):
+    """The archive of a plugin's commit will not be handed over however often it is asked for: it is larger than the
+    limit, or GitHub answers that the commit or repository is not there. A timeout or a 5xx is a plain GalleryError
+    that a later night tries again (item 1304)."""
+
+
 class ElsewhereError(DotError):
     """A skill or an MCP server that another agent of the Mac set up cannot be added to Dot, or removed from it, as
     asked: it is not there, Dot has it already, its name is taken, or Dot cannot use it as it is written."""
