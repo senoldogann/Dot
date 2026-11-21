@@ -895,8 +895,21 @@ def render_human_check(outcome: HumanCheckOutcome) -> str:
             f"{corner} Pick the tiles with browser_act click_at {send}, then call browser_captcha again to see whether "
             f"it passed."
         )
+    if outcome.unreadable:
+        pressed: str = f"{did}; " if did else "nothing was pressed; "
+        return (
+            f"Human check: {name}{where} is not known to have passed ({pressed}{outcome.note}; "
+            f"{outcome.seconds:.1f} s). Take a screenshot of the page, look at what is there, and call browser_captcha "
+            f"again once it shows."
+        )
+    if not outcome.did:
+        return (
+            f"Human check: {name}{where} was not pressed ({outcome.note or 'the page changed'}; "
+            f"{outcome.seconds:.1f} s).{asks} Nothing was clicked. The picture below is the check as it stands: look "
+            f"at it, and call browser_captcha again or press it yourself with browser_act click_at."
+        )
     return (
-        f"Human check: {name}{where} did not clear ({did or 'it was pressed'}; {outcome.note or 'it is still there'}; "
+        f"Human check: {name}{where} did not clear ({did}; {outcome.note or 'it is still there'}; "
         f"{outcome.seconds:.1f} s).{asks} The picture below is the check as it stands: look at it, solve it with "
         f"browser_act click_at or drag_at, and call browser_captcha again."
     )

@@ -339,7 +339,8 @@ Both modes share what follows.
   snapshot shows under them and by the policy's own reading of those elements' names - not by the typed judge
   `browser_act` adds for a label no pattern knows, since a check's own words explain the press. It presses nothing it
   cannot pass: a payment button that a page labels like a check is refused, and the run is told to press it with
-  `browser_act`, which asks the user; a "Verify you are human" line does not press the button drawn beside it. The tool
+  `browser_act`, which asks the user; a "Verify you are human" line does not press the button drawn beside it. The press goes to a pixel read again just before
+  it and checked to be the check's own element, never to one a page covers with its own (item 1295, [captcha](captcha.md)). The tool
   runs under the browser's lock, so it never waits for an approval to hold that lock. A step at a pixel goes first in
   its batch (several in a row are fine): after a step that may move the page it is sent back, to be taken from a new
   screenshot.
