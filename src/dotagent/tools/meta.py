@@ -2,6 +2,7 @@
 turning on a tool group."""
 
 import asyncio
+import re
 from typing import Annotated, Literal, Self, get_args
 
 from pydantic import AfterValidator, Field, StringConstraints, model_validator
@@ -121,6 +122,79 @@ def _finish_tool() -> RegisteredTool:
     )
 
 
+# What a question is asking for, when the answer is a secret (item 1289). A question's text is written in the chat and
+# kept with the run, so a code or a password asked there would be there for good; the card of ``ask_secret`` is the one
+# place a secret is typed. The words are the nouns a person names a secret by, in the languages of Dot's owners, and the
+# verbs that ask for one. The test leans towards the card: a noun is its stem, so that the suffixes of Turkish and
+# Finnish - "şifreni", "salasanan" - are the same secret, and a code or a key is only one with the word that makes it
+# one (a bare "code" or "kod" is none: "should I write the code in Python?", "what is the error code?"). It only ever
+# adds a refusal, never takes one away: a question it reads as asking for nothing stays a question, and a decision the
+# run asks about its own next step that names a secret ("should I write the password reset page first?") is read as one
+# asked for - the card costs the user a step, a secret in the chat costs more.
+_SECRET_NOUNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "a one-time code",
+        re.compile(
+            r"\b(?:verification|one[- ]time|security|sign[- ]?in|confirmation|login|2fa|two[- ]factor|sms|auth)\s+"
+            r"code\w*\b|\botp\w*\b"
+            r"|\b(?:doğrulama|güvenlik|tek kullanımlık|giriş|sms|onay)\s+kod\w*\b"
+            r"|\b(?:vahvistus|turva|kirjautumis|kertakäyttö)koodi\w*\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "a key or a token",
+        re.compile(
+            r"\b(?:api|secret|access|private|bearer|auth|session)\s+(?:key|token)\w*\b|\bprivate key\w*\b"
+            r"|\b(?:api|gizli|erişim)\s+anahtar\w*\b|\b(?:salaisuus|api)avain\w*\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "a card's details",
+        re.compile(
+            r"\bcard (?:number|cvv|cvc|pin)\b|\bcvv\w*\b|\bcvc\w*\b|\bkart\s+numaras\w*\b",
+            re.IGNORECASE,
+        ),
+    ),
+)
+_PASSWORD: re.Pattern[str] = re.compile(
+    r"\bpassword\w*\b|\bpassphrase\w*\b|\bpasscode\w*\b|\bşifre\w*\b|\bparola\w*\b|\bsalasana\w*\b",
+    re.IGNORECASE,
+)
+# The verbs that ask for a value, each a whole word: "ver" asks for something, "verification" is a thing.
+_SECRET_ASKED: re.Pattern[str] = re.compile(
+    r"\b(?:what|which|have|get|know|remember|use|write|type|enter|send|give|share|tell|paste|provide|forward"
+    r"|reply|answer)\b"
+    r"|\b(?:ver|verir|verebilir|verin|verdin|yaz|yazar|yazın|yazdın|yazabilir|yazıyor|gir|girer|girin|girdin"
+    r"|girebilir|gönder|gönderir|gönderin|gönderdin|gönderebilir|paylaş|paylaşır|paylaşın|paylaşabilir|söyle|söyler"
+    r"|söyleyin|söyleyebilir|ilet|iletir|iletin|iletebilir|cevapla|cevaplar|bildir|bildirir)\b"
+    r"|\b(?:kirjoita\w*|anna\w*|lähetä\w*|laheta\w*|ilmoita\w*|kerro\w*)\b",
+    re.IGNORECASE,
+)
+_SECRET_QUESTION_REFUSED: str = (
+    "This question asks the user for {what}, and a question is written in the chat and kept with the run: no secret "
+    "goes in a message. Call ask_secret instead with name='{name}', label='<what it is and where it came from - the "
+    "code Stripe sent to the owner's phone>', and why='<why you need it and what you will do with it>': the user types "
+    "it on a card that keeps it out of the chat, and a code too short for the card comes back to you as its own note, "
+    "which you type in as it is. Use ask_user only when the answer is no secret."
+)
+
+
+def secret_asked(question: str) -> tuple[str, str] | None:
+    """What a question asks the user to hand over when it is a secret, as the words for it and a name for the card,
+    or ``None`` when the question asks for no secret (item 1289)."""
+    if not _SECRET_ASKED.search(question):
+        return None
+    for what, noun in _SECRET_NOUNS:
+        if noun.search(question):
+            name: str = "CODE" if what == "a one-time code" else what.split()[-1].upper()
+            return (what, name)
+    if _PASSWORD.search(question):
+        return ("a password", "PASSWORD")
+    return None
+
+
 class AskUserArgs(ToolArgs):
     question: str = Field(description="One precise question. Only ask what you cannot find out or decide yourself.")
     options: list[Option] | None = Field(
@@ -152,6 +226,10 @@ def _ask_user_tool() -> RegisteredTool:
         return _meta_action(ASK_USER_TOOL, f"Ask the user: {args.question}")
 
     async def run(args: AskUserArgs, ctx: ToolContext) -> ToolResult:
+        asked: tuple[str, str] | None = secret_asked(args.question)
+        if asked is not None:
+            what, name = asked
+            return fail(_SECRET_QUESTION_REFUSED.format(what=what, name=name))
         options: list[QuestionOption] = args.options or []
         details: JsonObject = {
             "question": args.question,
@@ -185,7 +263,8 @@ def _ask_user_tool() -> RegisteredTool:
             "Ask the user a question. With wait, the result is their answer. Without it the question stays on the "
             "chat for them and you go on: the result says so, and their answer comes to you later as their message. "
             "In a run nobody watches the question is always left for the user. Use sparingly: prefer deciding "
-            "yourself."
+            "yourself. A question that asks for a secret (a password, a key, a code from their phone) is refused: "
+            "ask_secret is the card for those."
         ),
         args_model=AskUserArgs,
         modes=ALL_MODES,
@@ -532,10 +611,13 @@ def _ask_secret_tool() -> RegisteredTool:
         # the user may send as a message instead (item 1073): it comes as the card's note, in their words, from the page
         # alone (a command that cannot ask declines with a note of its own, which is no word of the user's).
         if outcome.status == "denied" and outcome.decided_by == UI_SOURCE and outcome.note.strip():
+            # The user's own words, as an answer to a question of the run is (item 1289): a code they typed here may go
+            # into the page's one-time-code field, which outside yolo takes only text the user gave in this run.
+            ctx.gate.add_instruction(outcome.note.strip())
             return ok(
                 f"The user did not save {args.label} on the card and wrote instead: {outcome.note.strip()}\n"
-                "If that is what you asked for (a short code), use it as it is. It is in this chat now: do not save, "
-                "print or send it anywhere it does not need to go."
+                "If that is what you asked for (a short code), use it as it is: type it into the field that asks for "
+                "it. It is in this chat now: do not save, print or send it anywhere it does not need to go."
             )
         return ok(
             f"The user did not give {args.label} ({outcome.status}). Do not ask for it in a message; go on without "
