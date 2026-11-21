@@ -106,6 +106,13 @@ class ThreadTabs:
     # The tabs that closed without the run closing them, newest last, each as its address and what closed it (item
     # 1209): a run that asks for a tab by a number it saw before is told what became of it.
     closed: deque[str] = field(default_factory=lambda: deque(maxlen=_KEPT_CLOSED))
+    # Chrome quit or crashed under tabs the thread held (item 1297): every one of them, and the refs the run took from
+    # them, are gone. The first browser call afterwards says so instead of working in a new blank tab.
+    tabs_lost: bool = False
+    # When the last tab of the thread went away without Dot closing it (its page, or Chrome): Chrome's crash closes the
+    # pages one by one before it tells the context is gone, so a thread left with no tab a moment before that was
+    # emptied by it (``monotonic`` time, 0 when never).
+    emptied_at: float = 0.0
 
     def remove(self, tab: Tab) -> None:
         """Forget ``tab``; the active index keeps pointing at the same tab, or at its neighbour when it was active."""

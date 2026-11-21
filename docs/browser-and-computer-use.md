@@ -72,7 +72,10 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
   a new connection: after a restart of the service, or after Chrome itself was closed or restarted. Then the next
   browser call connects again by itself, a notification says "Chrome asks to allow Dot", and a step that waits for
   the click, or that was under way when Chrome went, says in one line that Chrome was closed or restarted and that
-  Allow is to be clicked (item 341). Settings › Browser reads how Chrome stands every 3 seconds while it is open:
+  Allow is to be clicked (item 341). In either mode, when Chrome quit or crashed under tabs a chat held (item 1297),
+  the first browser call of that chat afterwards fails once saying "Chrome was closed or crashed; your tabs and refs
+  are gone; open the page again" instead of working in a new blank tab; `browser_open` and `browser_new_tab` go on in
+  a new tab that carries the same note, and a chat that held no tab is told nothing. Settings › Browser reads how Chrome stands every 3 seconds while it is open:
   connected, waiting for Allow, Chrome closed, remote debugging off, or Chrome restarted, each with what to do. A
   schedule that fires with nobody there waits `attach_timeout_s` for the click and then fails; for the five minutes
   after an Allow nobody clicked, a call of a run nobody watches (a schedule's or a watcher's, a campaign's sessions
@@ -602,7 +605,9 @@ Both modes share what follows.
   address, which is never named: in the owner's Chrome it may be a tab of the owner's; item 1160). The cause of such
   a tab is not known yet, and these tell the browser's side of the handover from the page's the next time. A
   quiet read's tab is closed the way it was made, through Chrome's own `Target.closeTarget`: Playwright's close never
-  came back for a tab whose failed navigation Chrome was still committing its error page in (item 960).
+  came back for a tab whose failed navigation Chrome was still committing its error page in (item 960). A close that
+  fails after the page was read is logged and no longer replaces the page with an error (item 1297): the tab is closed
+  again at the next round of the idle reaper.
   macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own
   (a link to a new tab, `window.open`): the app that had the focus is brought back right after, as long as the program
   that runs Dot has Accessibility. Switching tabs does not raise the window. With `true` the window comes to the front

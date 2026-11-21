@@ -303,6 +303,9 @@ _DRIVER_LOST: str = "Connection closed while reading from the driver"
 # What a step says when the Chrome of the user went away since Dot connected to it, and what the owner is told on the
 # Mac when Dot connects to it again (item 341).
 CHROME_RESTARTED: str = "Chrome was closed or restarted"
+# How long after the last tab of a thread closed that Chrome's loss still counts as what closed it (item 1297).
+_LOSS_WINDOW_S: float = 5.0
+TABS_LOST: str = "Chrome was closed or crashed; your tabs and refs are gone; open the page again"
 RECONNECT_NOTICE: str = "Chrome was closed or restarted: click Allow in Chrome so that Dot can go on."
 # The URL rules on every request of Dot's own Chrome (item 135, measured 2026-10-15 with Playwright 1.63 and Chrome
 # 155): a route on the context sees the first request of every page, popups included, each resource a page loads and
@@ -1034,6 +1037,8 @@ class BrowserSession:
         self._uses: int = 0
         self._used_at: float = time.monotonic()
         self._closed: bool = False
+        # Tabs of quiet reads that could not be closed (item 1297): the reaper's round tries them again.
+        self._stray_scratch: set[Page] = set()
         # The front of the Mac around Dot's own Chrome (item 118): Chrome's process, the application that had the front
         # when a thread last began to act, and the checks under way that give the front back after a page's own tab.
         self._chrome_pid: int | None = None
@@ -1360,7 +1365,13 @@ class BrowserSession:
         self._refusals.clear()
         self._guarded.clear()
         self._kept_out.clear()
+        now: float = time.monotonic()
         for thread in self._threads.values():
+            # Its tabs are still listed, or the pages of the last of them closed a moment ago: Chrome's crash closes the
+            # pages one by one before it tells that the context is gone.
+            if thread.tabs or (thread.emptied_at and now - thread.emptied_at < _LOSS_WINDOW_S):
+                thread.tabs_lost = True
+            thread.emptied_at = 0.0
             thread.tabs.clear()
             thread.active = 0
 
@@ -1669,6 +1680,10 @@ class BrowserSession:
                 await self.close_idle_background_tabs()
             except Exception:  # noqa: BLE001 - logged with its traceback
                 _log.exception("browser_idle_tabs_close_failed")
+            try:
+                await self._close_strays()
+            except Exception:  # noqa: BLE001 - logged with its traceback
+                _log.exception("browser_stray_close_failed")
             try:
                 await self._close_unused()
             except Exception:  # noqa: BLE001 - logged with its traceback
@@ -2004,6 +2019,8 @@ class BrowserSession:
                 # A tab Dot closes has left its thread by now: one still in it was closed by its page or in Chrome.
                 thread.remove(tab)
                 note_closed(thread, tab.page.url, "its page closed it, or it was closed in Chrome")
+                if not thread.tabs:
+                    thread.emptied_at = time.monotonic()
                 return
 
     def _take_initial_page(self) -> Page | None:
@@ -2033,6 +2050,9 @@ class BrowserSession:
                 with contextlib.suppress(Exception):
                     await page.close()
                 raise
+            if thread.tabs_lost:
+                thread.tabs_lost = False
+                add_note(tab, TABS_LOST)
             thread.tabs.append(tab)
             thread.active = len(thread.tabs) - 1
         await self._enforce_cap(thread)
@@ -2065,13 +2085,20 @@ class BrowserSession:
             _log.warning("browser_tab_close_failed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
 
     @asynccontextmanager
-    async def _locked(self, thread_id: str) -> AsyncIterator[ThreadTabs]:
+    async def _locked(self, thread_id: str, *, opens: bool = False) -> AsyncIterator[ThreadTabs]:
+        """The thread's lock, with the browser connected. A call that works in the thread's tabs finds them gone when
+        Chrome quit or crashed under them (item 1297) and is told so once, rather than meeting a new blank tab where its
+        page was; one that ``opens`` a page of its own (``browser_open``, ``browser_new_tab``) goes on in a new tab,
+        which carries the note."""
         thread: ThreadTabs | None = self._threads.get(thread_id)
         if thread is None:
             thread = ThreadTabs()
             self._threads[thread_id] = thread
         async with thread.lock:
             await self._ensure_context(self._unattended(thread_id))
+            if thread.tabs_lost and not opens:
+                thread.tabs_lost = False
+                raise BrowserError(TABS_LOST, {})
             await self._note_front()
             playwright: Playwright | None = self._playwright
             thread.last_used = time.monotonic()
@@ -2680,14 +2707,14 @@ class BrowserSession:
 
     async def open_url(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
         """Navigate the current tab of the thread."""
-        async with self._locked(thread_id) as thread:
+        async with self._locked(thread_id, opens=True) as thread:
             tab: Tab = await self._current_tab(thread)
             return await self._load(thread, tab, url, hide_secrets)
 
     async def new_tab(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
         """Open ``url`` in a new tab that becomes the current one."""
         self._require_allowed(url)
-        async with self._locked(thread_id) as thread:
+        async with self._locked(thread_id, opens=True) as thread:
             tab: Tab = await self._create_tab(thread)
             return await self._load(thread, tab, url, hide_secrets)
 
@@ -2933,7 +2960,7 @@ class BrowserSession:
                     "reading the page failed", {"url": url, "error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
                 ) from error
         finally:
-            await self._close_scratch(page)
+            await self._discard_scratch(page)
         status: int | None = statuses[-1] if statuses else first
         if status is None:
             raise BrowserError(
@@ -3040,6 +3067,36 @@ class BrowserSession:
                     await page.close()
                 raise
         return page
+
+    async def _discard_scratch(self, page: Page) -> None:
+        """Close the tab of a quiet read at the end of the read, in a ``finally``: a close that fails must not raise
+        there, where it would replace the page already read (or the error that ended the read) with "closing a tab
+        failed" (item 1297). It is logged, and the tab is left to the reaper, whose next round closes it again
+        (:meth:`_close_strays`). Only the failures a closing tab has are kept out of the way (Chrome's refusal to
+        close in time, a target already gone); anything else is a bug and is raised."""
+        try:
+            await self._close_scratch(page)
+        except (BrowserError, PlaywrightError) as error:
+            self._stray_scratch.add(page)
+            _log.warning(
+                "browser_scratch_not_closed",
+                url=truncate_middle(self._shown_to(page, page.url), _SHOWN_URL_CHARS),
+                error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
+            )
+
+    async def _close_strays(self) -> None:
+        """Try again to close the tabs of quiet reads that could not be closed; a tab that closed meanwhile (Chrome
+        quit, the page itself) is forgotten, one that still cannot be closed waits for the next round."""
+        for page in list(self._stray_scratch):
+            if page.is_closed():
+                self._stray_scratch.discard(page)
+                continue
+            try:
+                await self._close_scratch(page)
+            except (BrowserError, PlaywrightError) as error:
+                _log.warning("browser_stray_scratch_not_closed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
+                continue
+            self._stray_scratch.discard(page)
 
     async def _close_scratch(self, page: Page) -> None:
         """Close the tab of a quiet read the way it was made, through Chrome's own ``Target.closeTarget``, and wait for
@@ -3264,7 +3321,7 @@ class BrowserSession:
         thread: ThreadTabs | None = self._threads.get(thread_id)
         if thread is None or not thread.scripted or not thread.tabs:
             return False
-        async with self._locked(thread_id) as thread:
+        async with self._locked(thread_id, opens=True) as thread:
             tab: Tab | None = self._tab_of(thread_id)
             for other in [one for one in thread.tabs if one is not tab]:
                 await self._close_tab_object(thread, other)
@@ -3306,7 +3363,7 @@ class BrowserSession:
         async with self._teach_lock:
             if self._teaching is not None:
                 raise RunConflict("a task is being recorded already", {"thread_id": self._teaching.thread_id})
-            async with self._locked(thread_id) as thread:
+            async with self._locked(thread_id, opens=True) as thread:
                 tab: Tab = await self._current_tab(thread)
                 if tab.page.url in _BLANK_URLS or tab.page.url.startswith("about:blank"):
                     try:
@@ -4024,7 +4081,7 @@ class BrowserSession:
         thread: ThreadTabs | None = self._threads.get(thread_id)
         if thread is None or not thread.scripted:
             return None
-        async with self._locked(thread_id) as thread:
+        async with self._locked(thread_id, opens=True) as thread:
             if not thread.scripted or not thread.tabs:
                 return None
             address: str = thread.tabs[thread.active].page.url
