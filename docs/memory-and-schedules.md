@@ -213,6 +213,12 @@ dotx memory reindex      # embed every note again, for example after changing [m
   way when the service fails after those retries (item 1254): the note is kept with no vector, the search returns what
   the words found, and the failure is logged (`memory_embedding_failed`). A search or a save embeds at most one batch
   (32 notes) of those that have no vector, then answers from the vectors already stored and from the words (item 1263).
+  The lessons of a run go on the same way (item 1308): when the service fails, the lesson writer's check for a note that
+  says it already, and the comparison with the habits of the adopted harness, are made by the words alone, and the run's
+  lessons are kept as before (they were all dropped with `lessons_failed`, a 404 for `bge-m3` among them). The first
+  time a call of the service fails after it answered, or since Dot started, Dot tells you once ("Memory is on word
+  search", on your phone and desktop, opening Memory) and logs `memory_degraded`; it tells again only after the service
+  answered and failed anew (`memory_embeddings_back` in the log).
   The daemon's scheduler embeds the rest in the background, each note stored before the next batch, so a process that
   dies mid-way leaves what it wrote and the next pass takes the rest; a pass that finds nothing to embed makes no call.
   `dotx memory reindex` embeds every note at once. The word search does not mind case, accents or

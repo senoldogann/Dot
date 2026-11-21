@@ -6,7 +6,7 @@ import sys
 import time
 from collections.abc import Sequence
 from contextlib import AsyncExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -79,6 +79,7 @@ from dotagent.meetings.desk import MeetingDesk, launch_meeting_chrome
 from dotagent.meetings.notes import MeetingNotes, make_notes
 from dotagent.meetings.types import MeetingLine
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
+from dotagent.memory.watch import WatchedEmbedder
 from dotagent.notify.money import MoneyTeller
 from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.oauth.accounts import Accounts
@@ -591,6 +592,9 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
         cleanup.push_async_callback(close_memory_index, memory)
         registry: ToolRegistry = build_registry((*_tool_groups(config, typesafe_key is not None), build_mcp_tools(mcp)))
         bus: EventBus = EventBus(store)
+        # The embedding service's failures are told to the owner once (item 1308).
+        if memory.embedder is not None:
+            memory = replace(memory, embedder=WatchedEmbedder(memory.embedder, bus))
         typesafe: TypeSafeService | None = (
             TypeSafeService(config.judge, config.models.helper_cooldown_s, bus)
             if typesafe_key is not None or config.judge.provider == "typesafe"
