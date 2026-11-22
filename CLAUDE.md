@@ -5,6 +5,9 @@ serves a REST API and a web UI (plain JavaScript modules and CSS under `src/dota
 a Tauri desktop shell in Rust (`desktop/`). It runs with the owner's rights on their Mac, so a change is judged by what
 it lets a run do as much as by how it reads.
 
+Roadmap: `ROADMAP.md` stops at item 458; for items after 458 use [roadmap/INDEX.md](roadmap/INDEX.md) (a table of every
+item, newest first, one file each under `roadmap/`).
+
 ## Goals and non-goals
 
 - Goal: work on a goal until it is done, acting without asking, but stop for what it must not decide alone (money,
@@ -77,7 +80,7 @@ A change that takes days is many pushes, each waiting on the review and the gate
 - **A pull request carries a batch (item 541).** What a session builds goes in one branch and one pull request, so that
   the review, the gate and the merge run once: several roadmap items, each its own commit `Item N: ...` with its own
   `roadmap/<n>.md` (and `changes/<n>.md` when what Dot does changes), the numbers taken together (`scripts/next_item.py
-  3`). Merge a batch with `uv run python scripts/merge_pr.py <n> rebase`, so that each item stays one commit that can be
+  3`); run `uv run python scripts/roadmap_index.py` before each commit and commit `roadmap/INDEX.md` with it (item 1317). Merge a batch with `uv run python scripts/merge_pr.py <n> rebase`, so that each item stays one commit that can be
   reverted alone (a pull request of one item may be squashed: `squash`). Order the commits by item and say in the body which is which. Keep a part out of
   the batch when it needs the owner's look (a change under "Always needs a human" waiting on them must not hold the
   rest) or is a risk that should be reverted alone.
